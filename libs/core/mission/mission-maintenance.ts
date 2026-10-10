@@ -423,6 +423,7 @@ export function assertScopeChangeApproval(input: {
     authMethod: humanApproval.authMethod,
     payloadHash: humanApproval.payloadHash,
     effectBinding: humanApproval.effectBinding,
+    phase: 'recheck',
   });
   return {
     approval,

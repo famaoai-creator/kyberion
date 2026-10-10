@@ -34,6 +34,8 @@ export interface LockIo {
   linkExclusive?(fromPath: string, toPath: string): void;
   /** Directory listing (names), used for best-effort housekeeping of lock litter. */
   readdir?(dirPath: string): string[];
+  /** True when both paths are links of one inode (entries compared, not followed). */
+  sameFile?(a: string, b: string): boolean;
 }
 
 let lockIo: LockIo | undefined;
@@ -183,7 +185,7 @@ export function releaseLock(resourceId: string): void {
   const io = requireLockIo();
   if (io.exists(lockFile)) {
     try {
-      const content = io.loadJson<{ pid?: number }>(lockFile);
+      const content = loadLockRecord<{ pid?: number }>(io, lockFile);
       if (content.pid === process.pid) {
         io.unlink(lockFile);
       }
@@ -213,6 +215,40 @@ function errorCode(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
 }
 
+/**
+ * Read a lock record. While a displaced record is put back, `<file>` and its
+ * `<file>.stale-*` tomb are two links of one inode, and secure-io refuses to
+ * read the `<file>` side (it cannot tell where a hard link's other names
+ * live without listing the directory). The tomb side is readable and has the
+ * same bytes, so read the record through it rather than mistake a live owner's
+ * record for an unreadable one (release would then leave it behind).
+ */
+function loadLockRecord<T>(io: LockIo, file: string): T {
+  try {
+    return io.loadJson<T>(file);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '';
+    const sameFile = io.sameFile;
+    if (!message.includes('hard link') || !io.readdir || !sameFile) throw error;
+    const dir = path.dirname(file);
+    const prefix = `${path.basename(file)}.stale-`;
+    for (const name of io.readdir(dir)) {
+      if (!name.startsWith(prefix) || !TOMB_PATTERN.test(name)) continue;
+      const tomb = path.join(dir, name);
+      try {
+        // Only a tomb that is this record's own inode (a leftover tomb from an
+        // older recovery holds another owner's record), before and after.
+        if (!sameFile(file, tomb)) continue;
+        const record = io.loadJson<T>(tomb);
+        if (sameFile(file, tomb)) return record;
+      } catch {
+        // gone or swapped: try the next one
+      }
+    }
+    throw error;
+  }
+}
+
 /** Only content problems make a record 'unknown'; I/O failures do not. */
 function isMalformedRecordError(error: unknown): boolean {
   if (error instanceof SyntaxError) return true;
@@ -234,7 +270,7 @@ function inspectRecord(file: string): LockRecordView {
     statAge = undefined;
   }
   try {
-    content = io.loadJson<Record<string, unknown> | null>(file);
+    content = loadLockRecord<Record<string, unknown> | null>(io, file);
   } catch (error: unknown) {
     if (errorCode(error) === 'ENOENT') return { state: 'missing' };
     if (isMalformedRecordError(error)) return { state: 'unknown', ageMs: statAge };

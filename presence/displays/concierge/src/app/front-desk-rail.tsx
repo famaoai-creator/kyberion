@@ -3,12 +3,18 @@
 import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
 import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
 import {
-  announceTenantChange,
-  readSelectedTenant,
+  railSelectionValue,
+  railSwitcherOptions,
+  type RailSelection,
+  type RailSwitcherPayload,
+} from '../lib/rail-switcher';
+import {
+  reflectResolvedSelection,
+  switchTenantSelection,
   withSelectedTenant,
 } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
@@ -28,8 +34,7 @@ import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-a
  * items (home / ask / progress on presence-studio) are plain navigations.
  */
 
-const TENANT_STORAGE_KEY = 'front-desk.tenant';
-/** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug }`). */
+/** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug | 'personal' | 'shared' }`). */
 const TENANT_SWITCH_ACTION = 'tenant.switch';
 
 interface FrontDeskNavItemPayload {
@@ -71,22 +76,9 @@ interface FrontDeskMeResponse {
   viewing: FrontDeskTenantView | null;
   tenants: FrontDeskTenantView[];
   can_switch: boolean;
-}
-
-function readStoredTenant(): string | null {
-  try {
-    return readSelectedTenant();
-  } catch {
-    return null;
-  }
-}
-
-function storeTenant(slug: string): void {
-  try {
-    window.localStorage.setItem(TENANT_STORAGE_KEY, slug);
-  } catch {
-    // best-effort only — a switch that cannot persist still redraws once.
-  }
+  /** The server-validated selection for this request (URL/cookie are only hints). */
+  selection?: RailSelection;
+  switcher?: RailSwitcherPayload;
 }
 
 /**
@@ -99,6 +91,7 @@ function storeTenant(slug: string): void {
 export function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
   if (pathname === '/') return 'decide';
   if (pathname === '/ingest') return 'ingest';
+  if (pathname === '/management') return 'organization';
   if (pathname === '/setup/first-run') return null;
   if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
     return 'settings';
@@ -106,18 +99,28 @@ export function currentItemId(pathname: string | null): FrontDeskNavItemPayload[
 }
 
 export function FrontDeskRail() {
+  return (
+    <React.Suspense fallback={null}>
+      <FrontDeskRailContent />
+    </React.Suspense>
+  );
+}
+
+function FrontDeskRailContent() {
   const { locale } = useConciergeI18n();
   const pathname = usePathname();
+  // Management changes hierarchy with native replaceState on the same path.
+  // Subscribe to Next's query context so rail hrefs follow those selections.
+  useSearchParams();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
   const selectionGeneration = React.useRef(0);
 
-  const fetchMe = React.useCallback((tenant?: string | null) => {
+  const fetchMe = React.useCallback(() => {
     const generation = ++selectionGeneration.current;
     setNav(null);
     setMe(null);
-    const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    return fetch(`/api/me${query}`, { cache: 'no-store' })
+    return fetch('/api/me', { cache: 'no-store' })
       .then((res) => {
         // A rejected bearer requires sign-in even on loopback. Never discard it
         // and retry as the anonymous local operator.
@@ -140,12 +143,10 @@ export function FrontDeskRail() {
       })
       .then((data: FrontDeskMeResponse | null) => {
         if (generation !== selectionGeneration.current) return;
-        if (data?.ok && (!tenant || data.viewing?.tenant_slug === tenant)) {
+        if (data?.ok) {
           setMe(data);
-          if (data.viewing && (!tenant || tenant === data.viewing.tenant_slug)) {
-            storeTenant(data.viewing.tenant_slug);
-            announceTenantChange(data.viewing.tenant_slug);
-          }
+          // Show what the server actually resolved; a refused hint is replaced.
+          if (data.selection) reflectResolvedSelection(railSelectionValue(data.selection));
         }
       })
       .catch(() => {
@@ -173,24 +174,15 @@ export function FrontDeskRail() {
   }, [locale, me]);
 
   React.useEffect(() => {
-    let storedTenant: string | null = null;
-    try {
-      storedTenant = readStoredTenant();
-    } catch {
-      storedTenant = null;
-    }
-    fetchMe(storedTenant);
+    fetchMe();
   }, [fetchMe]);
 
   // The shell's provider supplies `next/link`; keep it for the rail items.
   const outerActions = useA2UIActions();
-  const onAction = React.useCallback(
-    (actionId: string, payload?: Record<string, unknown>) => {
-      if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
-      fetchMe(payload.value);
-    },
-    [fetchMe]
-  );
+  const onAction = React.useCallback((actionId: string, payload?: Record<string, unknown>) => {
+    if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
+    switchTenantSelection(payload.value);
+  }, []);
 
   const current = currentItemId(pathname);
   const roleLabel = (role: FrontDeskTenantView['role'] | undefined) =>
@@ -220,30 +212,47 @@ export function FrontDeskRail() {
 
   // UI-05: the brand and tenant blocks are the shared `ui:nav-rail`
   // `brand` / `context` slots (same markup and CSS as the presence-studio
-  // rail). The tenant block appears only once a tenant is actually being
-  // viewed — an empty name/role block reads as broken. With more than one
-  // tenant it is a switcher whose `tenant.switch` action carries the slug.
+  // rail). The block appears whenever there is somewhere to switch to — even
+  // when the selected company has no profile — or a single company is viewed.
+  // Options are 個人, the viewer's allowed companies, and システム for
+  // all-company viewers; `tenant.switch` carries the value.
+  const personalLabel = frontDeskText('tenant_personal_label', locale);
+  const systemLabel = frontDeskText('tenant_system_label', locale);
+  const options =
+    me?.selection && me.switcher
+      ? railSwitcherOptions(me.selection, me.switcher, {
+          personal: personalLabel,
+          system: systemLabel,
+        })
+      : [];
+  const selectedOption = options.find((option) => option.selected);
+  const contextDetail = (): string | undefined => {
+    if (!me || !nav) return undefined;
+    if (me.viewing) {
+      return options.length > 1
+        ? renderMessage(nav.tenant_viewing_summary, {
+            role: roleLabel(me.viewing.role),
+            count: me.switcher?.companies.length ?? me.tenants.length,
+          })
+        : renderMessage(nav.tenant_viewing_single, { role: roleLabel(me.viewing.role) });
+    }
+    if (me.selection?.mode === 'personal') {
+      return frontDeskText('tenant_personal_detail', locale, {
+        count: me.switcher?.companies.length ?? me.tenants.length,
+      });
+    }
+    if (me.selection?.mode === 'system') return frontDeskText('tenant_system_detail', locale);
+    return undefined;
+  };
   const context =
-    nav && me?.viewing
+    nav && me && (me.viewing || options.length > 1)
       ? {
-          label: me.viewing.display_name || me.viewing.tenant_slug,
-          detail: me.can_switch
-            ? renderMessage(nav.tenant_viewing_summary, {
-                role: roleLabel(me.viewing.role),
-                count: me.tenants.length,
-              })
-            : renderMessage(nav.tenant_viewing_single, { role: roleLabel(me.viewing.role) }),
+          label: me.viewing
+            ? me.viewing.display_name || me.viewing.tenant_slug
+            : selectedOption?.label || personalLabel,
+          detail: contextDetail(),
           switch_label: nav.tenant_switch_aria,
-          ...(me.can_switch
-            ? {
-                action: { id: TENANT_SWITCH_ACTION },
-                options: me.tenants.map((tenant) => ({
-                  value: tenant.tenant_slug,
-                  label: tenant.display_name,
-                  selected: tenant.tenant_slug === me.viewing?.tenant_slug,
-                })),
-              }
-            : {}),
+          ...(options.length > 1 ? { action: { id: TENANT_SWITCH_ACTION }, options } : {}),
         }
       : undefined;
 

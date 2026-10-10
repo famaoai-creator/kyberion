@@ -242,4 +242,82 @@ describe('operator home summary', () => {
     });
     expect(summary.nextAction.title).toContain('quality');
   });
+
+  it('selects only company-less records when includeUntenanted is set with no tenants', async () => {
+    const approval = (
+      id: string,
+      scope: Record<string, string> | undefined,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id,
+      title: id,
+      status: 'pending',
+      severity: 'normal',
+      ...(scope ? { scope } : {}),
+      ...extra,
+    });
+    vi.doMock('../governance/approval-store.js', () => ({
+      listApprovalRequests: () => [
+        approval('APR-TENANT', { tier: 'public', tenant_slug: 'tenant-a' }),
+        approval('APR-TIER-ONLY', { tier: 'public' }),
+        approval('APR-UNSCOPED', undefined),
+        approval(
+          'APR-CONTEXT-TENANT',
+          { tier: 'public' },
+          { requestedByContext: { surface: 'api', tenantSlug: 'tenant-a' } }
+        ),
+        approval(
+          'APR-LOOP-TENANT',
+          { tier: 'public' },
+          { work_loop: { context: { tier: 'public', tenant_slug: 'tenant-a' } } }
+        ),
+        approval('APR-LEGACY-UNSCOPED', undefined, { tenant_id: 'tenant-a' }),
+      ],
+    }));
+    const writeMission = (missionId: string, tenantSlug?: string, tenantId?: string) => {
+      const dir = path.join(tmpRoot, 'active/missions/public', missionId);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: missionId,
+          status: 'active',
+          tier: 'public',
+          mission_type: 'delivery',
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+          ...(tenantId ? { tenant_id: tenantId } : {}),
+          assigned_persona: 'operator',
+          execution_mode: 'local',
+          priority: 1,
+          confidence_score: 1,
+          git: { branch: missionId, start_commit: 'abc', latest_commit: 'abc', checkpoints: [] },
+          history: [],
+        })
+      );
+    };
+    writeMission('MSN-TENANT', 'tenant-a');
+    writeMission('MSN-SYSTEM');
+    writeMission('MSN-LEGACY-TENANT', undefined, 'tenant-a');
+    const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
+
+    const system = collectOperatorHomeSummary({
+      scope: { tiers: ['public'], tenantSlugs: [], includeUntenanted: true },
+    });
+    expect(system.activeMissions.map((mission) => mission.missionId)).toEqual(['MSN-SYSTEM']);
+    expect(system.pendingApprovals.map((item) => item.id).sort()).toEqual([
+      'APR-TIER-ONLY',
+      'APR-UNSCOPED',
+    ]);
+
+    const none = collectOperatorHomeSummary({ scope: { tiers: ['public'], tenantSlugs: [] } });
+    expect(none.activeMissions).toEqual([]);
+    expect(none.pendingApprovals).toEqual([]);
+
+    const tenant = collectOperatorHomeSummary({
+      scope: { tiers: ['public'], tenantSlugs: ['tenant-a'] },
+    });
+    expect(tenant.activeMissions.map((mission) => mission.missionId)).toEqual(['MSN-TENANT']);
+    expect(tenant.pendingApprovals.map((item) => item.id)).toEqual(['APR-TENANT']);
+    vi.doUnmock('../governance/approval-store.js');
+  });
 });

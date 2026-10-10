@@ -21,6 +21,11 @@
     },
     "display_name": { "type": "string", "minLength": 1 },
     "status": { "type": "string", "enum": ["active", "suspended"] },
+    "suspended_by": {
+      "type": "string",
+      "pattern": "^scim:scim-[a-f0-9]{16}$",
+      "description": "Provenance of the current suspension when SCIM provisioning made it (`scim:<token_id>`). Absent for a suspension made in Kyberion; only meaningful while status is suspended. SCIM may reactivate only a member it suspended."
+    },
     "memberships": {
       "type": "array",
       "items": {
@@ -58,7 +63,12 @@
         "properties": {
           "issuer": { "type": "string", "minLength": 1 },
           "subject": { "type": "string", "minLength": 1 },
-          "email": { "type": "string", "minLength": 1 }
+          "email": { "type": "string", "minLength": 1 },
+          "provisioned_by": {
+            "type": "string",
+            "pattern": "^scim:scim-[a-f0-9]{16}$",
+            "description": "Set when SCIM provisioning created this binding (`scim:<token_id>`). SCIM never replaces or removes a binding without it."
+          }
         }
       }
     },

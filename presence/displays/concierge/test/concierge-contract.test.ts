@@ -248,30 +248,45 @@ describe('concierge surface contract', () => {
       'src/app/api/voice/status/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
-      expect(source, route).toContain('resolveConciergeViewer');
+      // The selected-company resolver wraps resolveConciergeViewer and only narrows it.
+      expect(source, route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
       expect(source, route).toMatch(/resolved\.response/);
     }
   });
 
   it('implements the CS-01 durable scoped conversation without uncertain failover', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/message/route.ts'), 'utf8');
+    const service = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/surface/front-desk-request-service.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    const projection = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/surface/front-desk-request-projection.ts'), {
+        encoding: 'utf8',
+      })
+    );
     expect(route).toContain('requireConciergeMutationAccess');
     // Durable scoped requests execute once; bridge timeouts cannot safely retry.
     expect(route).not.toContain('/api/ingest-text');
-    expect(route).toContain('reserveConversationTurn');
-    expect(route).toContain('conversationKey');
-    expect(route).toContain("import('@agent/core/surface/channel-surface')");
-    expect(route).toContain('runSurfaceMessageConversation');
+    expect(route).toContain('runFrontDeskRequest(viewer,');
+    expect(route).not.toContain('runSurfaceMessageConversation');
+    expect(service).toContain('reserveConversationTurn');
+    expect(service).toContain('conversationKey: ref.key');
+    expect(service).toContain("import('./channel-surface.js')");
+    expect(service).toContain('runSurfaceMessageConversation');
+    expect(service).not.toMatch(/from ['"].*(?:next\/|concierge\/)/);
     // Conversation execution receives a server-resolved, non-personal scope
-    // through the single supervised direct-conversation path.
-    expect(route).toContain('resolveConciergeViewer');
-    expect(route).toContain('frontDeskRuntimeScope');
-    expect(route).toContain('scope');
+    // through the single supervised direct-conversation path (narrowed to the
+    // selected company by conversationViewerForSelection).
+    expect(route).toContain('conversationViewerForSelection(req)');
+    expect(service).toContain('frontDeskRuntimeScope(viewer)');
+    expect(service).toContain('scope,');
     // An uncertain execution produces an actionable non-success 503.
     expect(route).toContain("mode: 'unavailable'");
     expect(route).toContain('503');
     expect(route).toContain('reply');
-    expect(route).toContain('intentResolution');
+    expect(projection).toContain('intentResolution');
     // Shared orchestrator repairs the UX contract; the route projects its approval result.
     const orchestrator = String(
       safeReadFile(pathResolver.rootResolve('libs/core/surface/surface-runtime-orchestrator.ts'), {
@@ -279,10 +294,11 @@ describe('concierge surface contract', () => {
       })
     );
     expect(orchestrator).toContain('checkAndRepairSurfaceUxContract');
-    expect(route).toContain('viewFromIntentResolution');
-    expect(route).toContain("shape: 'clarification'");
-    expect(route).toContain("shape: 'execution_preview'");
-    expect(route).toContain('locale,\n    senderAgentId:');
+    expect(projection).toContain('viewFromIntentResolution');
+    expect(projection).toContain("shape: 'clarification'");
+    expect(projection).toContain("shape: 'execution_preview'");
+    expect(service).toContain('locale: request.locale,');
+    expect(service).toContain("senderAgentId: 'kyberion:front-desk'");
   });
 
   it('streams summary changes over SSE with heartbeat and abort cleanup', () => {
@@ -298,8 +314,8 @@ describe('concierge surface contract', () => {
     expect(page).not.toContain('window.prompt');
     expect(page).toContain("t('home.change_send')");
     expect(page).toContain('startSummaryWatch');
-    expect(fs.readFileSync(path.join(appDir, 'src/lib/summary-watch.ts'), 'utf8')).toContain(
-      "new EventSource('/api/events')"
+    expect(fs.readFileSync(path.join(appDir, 'src/lib/summary-watch.ts'), 'utf8')).toMatch(
+      /new EventSource\(\s*selection[\s\S]*'\/api\/events'\s*\)/
     );
   });
 

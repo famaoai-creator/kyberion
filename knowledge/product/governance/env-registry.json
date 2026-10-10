@@ -405,6 +405,17 @@
       "documented": true
     },
     {
+      "name": "KYBERION_APPROVAL_ASSURANCE",
+      "category": "runtime",
+      "type": "enum",
+      "enum": ["warn", "enforce"],
+      "required": false,
+      "default": "warn",
+      "subsystem": "governance",
+      "description": "Human-approval assurance override (HA-03/HA-08). The governed default is approval-policy.json assurance_mode (warn); this variable can only tighten it to enforce, never relax a policy that says enforce. warn accepts a human-only decision whose authMethod is below the request's min_assurance but records assurance_shortfall in the audit and notifies the operator; enforce rejects it (A3 requests then need a Concierge passkey). A missing or local-token authMethod is rejected in both modes, and agent-facing decision paths never settle human-only requests.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_AUDIO_BUS",
       "category": "runtime",
       "type": "string",

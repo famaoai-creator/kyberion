@@ -20,6 +20,18 @@ export function readConciergeScopeQuery(params: URLSearchParams): ConciergeScope
   };
 }
 
+/**
+ * Organization/project narrowing for routes that read the selected company.
+ * `?tenant=` is the selection hint itself (`selected-tenant.ts`), already
+ * applied to the viewer, so it is not narrowed a second time.
+ */
+export function readSelectedScopeQuery(
+  params: URLSearchParams
+): Pick<ConciergeScopeQuery, 'organizationId' | 'projectId'> {
+  const { organizationId, projectId } = readConciergeScopeQuery(params);
+  return { organizationId, projectId };
+}
+
 export class RequestInputError extends Error {
   constructor(message: string) {
     super(message);

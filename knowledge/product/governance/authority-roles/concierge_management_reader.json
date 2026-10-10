@@ -1,0 +1,9 @@
+{
+  "role": "concierge_management_reader",
+  "description": "Read-only management projection and fresh owner-membership verification. Requires an exact request resource capability; no write operations or credential access.",
+  "default_persona": "unknown",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential"]
+}

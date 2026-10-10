@@ -1,7 +1,7 @@
 ---
 title: 'Approval Gate Design: Store First, Surface as Renderer'
 tags: [governance, approval, mission, gate, human-in-the-loop]
-last_updated: 2026-10-09
+last_updated: 2026-10-10
 ---
 
 # Approval Gate Design
@@ -31,6 +31,64 @@ mission brief
 ```
 
 この分離により、サーフェスを追加・交換しても、承認の監査記録とゲートの判定契約は共有のまま保てる。
+
+## 認証強度（assurance）とパスキー
+
+human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、決定の `authMethod` から求めた強度と
+比べる（`approval-assurance.ts`）。A3 は WebAuthn パスキー（`passkey`）だけが満たす。
+
+- **A3 が既定の依頼**: dual-key の secret 操作（gate が `dual-key` 判定したもの）、`approval-policy.json`
+  の rule に `min_assurance: "A3"` を持つもの（`secret-grant-access`、`auth-grant-authority`、
+  `vault-direct-write`、`config-policy-update`）、project trust（`project-trust` チャネル）。
+  チャネルの下限（`APPROVAL_CHANNEL_MIN_ASSURANCE`）は決定時に適用するので、HA-07 以前に作られた
+  未決の project trust 依頼も A3 で判定する。
+- **モード**: `approval-policy.json` の `assurance_mode`（出荷時 `warn`）。`KYBERION_APPROVAL_ASSURANCE=enforce`
+  は締める方向にだけ効き、policy の `enforce` を緩めることはできない。policy が読めないときは `enforce`。
+  - `warn`: 強度が足りない決定も通すが、audit に `assurance_shortfall` を記録し operator に通知する。
+  - `enforce`: 拒否する。A3 の拒否メッセージはパスキーでの承認手順を示す。
+  - どちらのモードでも、`authMethod` 無し・`local_admin_token`、agent 経路からの human_only 決定は拒否する（HA-02）。
+- **移行（HA-08）**: 未決の依頼は決定時点の validator で判定する（`min_assurance` が無い旧レコードは A2）。
+  さらに今の policy の下限も掛ける: gate の依頼は `accountability.policy_rule_id`（無い旧レコードは
+  effect binding = intent id）で rule を引き、その `min_assurance` と `dual_key_confirmation`（= A3）の
+  強い方を `min_assurance` と比べて高い方で判定する（`resolvePolicyAssuranceFloor`）。payload 条件は
+  記録されないので、effect を挙げる rule はすべて数える（強い側に倒す）。policy が読めなければ A3。
+  決定済みのレコードは再判定しない（`recheck` は強度を見直さない）。
+- **パスキーで決める流れ**: Concierge の承認カード（`min_assurance` が A3）→
+  `POST /api/approvals/{id}/passkey`（`options`、カードが表示した `presentedDigest` 必須。今の依頼と
+  合わなければ拒否）が、依頼 id・決定・presented digest・期限・nonce を束ねた
+  単回・120 秒のチャレンジを approval store の横（`passkey-challenges/`）に発行 → ブラウザで署名 →
+  `verify` で rpID / origin、チャレンジ、期限、未使用、資格情報の持ち主、署名カウンタの前進を確認 →
+  store が検証済みチャレンジを消費してから `authMethod: 'passkey'` で記録する。`passkey` を名乗るだけの
+  決定は store が拒否する。member はサーバー側で viewer から解決し、body の identity は受け付けない。
+- **パスキーの登録**: Concierge の 設定 › プロフィール › パスキー（`/api/me/passkeys`）。公開鍵だけを
+  `knowledge/personal/members/{id}/passkeys.json` に保存する。rpID / origin は
+  `KYBERION_OIDC_PUBLIC_BASE_URLS`（`concierge=`）/ `KYBERION_OIDC_PUBLIC_BASE_URL` から取り、loopback の
+  peer（ソケットのアドレスで判定。`Host` ヘッダーは見ない）だけリクエストの origin を使う。
+  staged workflow の後段承認（依頼が approved でも workflow の承認が残っている間）もパスキーで決められる。
+- **登録ルール（パスキーそのものが A3 の鍵なので、登録・削除も守る）**:
+  - 登録・削除（`options` / `verify` / `revoke` / `step_up_*`）は本人のブラウザ / OIDC セッション
+    （`surfaceDecisionAuthMethod(principal, true) === 'surface_session'`）だけ。registry の bearer token、
+    資格情報の無い loopback viewer、agent principal / agent 経路（HA-02 と同じ拒否）は 403。
+  - 使えるパスキーが既にあるなら、追加・削除の前にそのパスキーでの step-up が要る。step-up チャレンジは
+    目的（`enroll` / `revoke`）・member・対象・期限・nonce に束ね、単回・120 秒。削除の step-up は
+    その資格情報 1 件にだけ効き、登録には使えない。step-up の検証（`step_up_verify`）は、ceremony を
+    行ったブラウザにだけ単回のランダムな step-up token（256 bit）を返し、ファイルには sha256 だけを残す。
+    登録の `options` / `verify` と `revoke` はその token を要求するので、同じ member の別セッション
+    （盗まれたセッションなど）は他人の step-up を使えない。クライアントは token をメモリにだけ持つ。
+  - step-up 無しで登録したパスキー（最初の 1 本など）は `usable_after` = 登録時刻 +
+    `approval-policy.json` の `passkey_enrollment_cooldown_hours`（既定 24）まで A3 を満たさない。
+    その間の承認は「いつから使えるか」を示して拒否し、設定画面にも表示する。盗まれたセッションが
+    足したパスキーを本人が消せるよう、使えるパスキーが 1 本も無いときは step-up 無しで削除できる。
+  - 登録・削除は audit chain（`passkey` / `register`・`revoke`、`steppedUp`・`usableAfter`・
+    `wasCoolingDown`）に記録し、operator に `ops_alert` で通知する。通知本文は、既存のパスキーで確認
+    したか、cooldown 中ならいつから使えるか、セッションだけの削除で cooldown 中の鍵を消したかを示す。
+  - cooldown の下限は 1 時間（schema の `minimum: 1`、コードでも 1 未満は 1 に丸める）。
+  - **残るリスク（bootstrap race）**: 使えるパスキーが 1 本も無い間は、最初に登録した人（本人か、
+    セッションを盗んだ者か）が勝つ。step-up で防げない状態なので、cooldown（その間 A3 に使えない）と
+    登録・削除の operator 通知、cooldown 中の鍵をセッションだけで消せることで緩和する。
+  - パスキーファイルは personal 層（gitignore 済み、knowledge index は `.md` だけ、tenant ingest は
+    members を読まない）に置き、`sovereign_concierge` が読み書きする。期限切れの approval チャレンジは
+    日次の `approval-store-hygiene` パイプライン（`sweepExpiredPasskeyChallenges`）が掃除する。
 
 ## 職務分離（separation of duties）
 

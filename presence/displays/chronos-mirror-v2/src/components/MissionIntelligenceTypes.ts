@@ -435,6 +435,8 @@ interface PendingApprovalSummary {
   trackId?: string;
   serviceId?: string;
   work_loop?: OrganizationWorkLoopSummary;
+  /** HA-06: digest of what this item shows; a decision sends it back. */
+  presentedDigest?: string;
 }
 
 interface DistillCandidateSummary {

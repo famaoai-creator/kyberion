@@ -13,7 +13,12 @@ import {
   reconcilePlane,
   requestDeclassify as requestDeclassifyGrant,
 } from './cloudflare-os-held-lifecycle.js';
-import { resolveProvisionalReferences, summarizeHeldAction } from './cloudflare-os-held-support.js';
+import {
+  resolveProvisionalReferences,
+  summarizeHeldAction,
+  type HeldActionDecision,
+} from './cloudflare-os-held-support.js';
+export type { HeldActionDecision } from './cloudflare-os-held-support.js';
 import { createHeldApprovalRequest } from './governance/held-effect-request.js';
 import {
   assertPersistableParams,
@@ -175,19 +180,6 @@ export interface HeldActionSummary {
   approvalRequestId?: string;
   /** Set when an apply was claimed; with no outcome it needs an operator (releaseApplyClaim). */
   applyClaim?: { by: string; at: string };
-}
-
-export interface HeldActionDecision {
-  resolvedBy: string;
-  decidedByType: 'human' | 'ai_agent' | 'service';
-  authenticated: boolean;
-  payloadHash: string;
-  effectBinding: string;
-  /**
-   * SC-04: set when the decision arrives from the held-effect bridge — the
-   * linked approval request already settled, so the plane only mirrors it.
-   */
-  viaApprovalRequest?: boolean;
 }
 
 export interface ResourceIntroduction {
@@ -526,6 +518,7 @@ export class CloudflareOsControlPlane {
         decidedBy: by,
         decidedByType: approval.decidedByType,
         authenticated: approval.authenticated,
+        authMethod: approval.authMethod,
         payloadHash: approval.payloadHash,
         effectBinding: approval.effectBinding,
       });

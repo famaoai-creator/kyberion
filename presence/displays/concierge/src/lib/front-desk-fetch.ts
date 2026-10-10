@@ -1,5 +1,7 @@
 import { getFrontDeskAuthRevision, readFrontDeskRequestToken } from './front-desk-auth-token';
+import { syncSelectionCookieFromUrl } from './tenant-context';
 const MEMBER_PATHS = [
+  '/api/management',
   '/api/me',
   '/api/front-desk/nav',
   '/api/front-desk/links',
@@ -18,6 +20,7 @@ const MEMBER_PATHS = [
   '/api/work-inventory',
   '/api/message',
   '/api/summary',
+  '/api/personal-summary',
   '/api/response-status',
   '/api/hygiene',
   '/api/memory-queue',
@@ -59,6 +62,7 @@ export async function frontDeskFetch(path: string, init: RequestInit = {}): Prom
       throw new DOMException('Member request context changed', 'AbortError');
   };
   current();
+  syncSelectionCookieFromUrl();
   const headers = new Headers(init.headers);
   headers.delete('Authorization');
   if (token) headers.set('Authorization', 'Bearer ' + token);

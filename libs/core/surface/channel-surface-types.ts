@@ -101,6 +101,8 @@ export interface SlackMissionIssuanceResult {
 export interface SlackApprovalActionPayload {
   requestId: string;
   decision: 'approved' | 'rejected';
+  /** HA-06: digest of the card the button was rendered on. */
+  presentedDigest?: string;
 }
 
 export interface SlackMissionProposalActionPayload {

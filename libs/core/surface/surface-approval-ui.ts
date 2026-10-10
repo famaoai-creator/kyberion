@@ -6,6 +6,9 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
   annotateApprovalRejectionReason,
+  resolveCompactPresentedDigest,
+  compactApprovalPresentedDigest,
+  surfaceDecisionBinding,
   APPROVAL_CHANGE_INSTRUCTION_MAX,
   type ApprovalRecord,
   type ApprovalRequestDraft,
@@ -45,7 +48,9 @@ const HALT_TOKEN = /^(?:\/halt|\/stop-all|全停止|緊急停止)$/iu;
 // Resuming is the risky direction: it stays a CLI act, and chat only says so.
 const RESUME_TOKEN = /^(?:\/resume|運用再開)$/iu;
 
-const DECISION_TOKEN = /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)$/iu;
+// HA-06: card buttons append the compact presented digest; typed tokens may omit it.
+const DECISION_TOKEN =
+  /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)(?::([0-9a-f]{12}|[0-9a-f]{64}))?$/iu;
 // `revise` is accepted as an alias of `changes`. The free text after the token
 // is sliced off, never matched, so chat input cannot drive regex backtracking.
 const CARD_TOKEN = /^appr:([0-9a-f-]{36}):(changes|revise|explain)(?=\s|$)/iu;
@@ -209,16 +214,17 @@ export function buildSurfaceApprovalText(
 export function buildSurfaceApprovalActions(
   record: ApprovalRequestRecord
 ): SurfaceApprovalAction[] {
+  const digest = compactApprovalPresentedDigest(record);
   return [
     {
       requestId: record.id,
       decision: 'approved',
-      callbackData: `appr:${record.id}:approve`,
+      callbackData: `appr:${record.id}:approve:${digest}`,
     },
     {
       requestId: record.id,
       decision: 'rejected',
-      callbackData: `appr:${record.id}:reject`,
+      callbackData: `appr:${record.id}:reject:${digest}`,
     },
   ];
 }
@@ -239,10 +245,14 @@ export function buildDecisionCardActions(record: ApprovalRequestRecord): Decisio
   const kinds: DecisionCardActionKind[] = record.decisionCard
     ? ['approve', 'changes', 'reject', 'explain']
     : ['approve', 'reject'];
+  const digest = compactApprovalPresentedDigest(record);
   return kinds.map((kind) => ({
     requestId: record.id,
     kind,
-    callbackData: `appr:${record.id}:${kind}`,
+    callbackData:
+      kind === 'approve' || kind === 'reject'
+        ? `appr:${record.id}:${kind}:${digest}`
+        : `appr:${record.id}:${kind}`,
   }));
 }
 
@@ -406,6 +416,8 @@ export function applySurfaceApprovalDecision(params: {
   deciderIdentitySource?: 'caller_supplied';
   /** Agent session the deciding process ran in (recorded with the decision). */
   decidedInAgentSession?: string;
+  /** HA-06: full digest of the card the decider acted on (chat tokens expand theirs first). */
+  presentedDigest?: string;
 }): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.surface;
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -428,8 +440,7 @@ export function applySurfaceApprovalDecision(params: {
     decidedByType: 'human',
     authenticated: true,
     authMethod: params.authMethod ?? defaultSurfaceAuthMethod(params.surface),
-    payloadHash: record.accountability?.payloadHash,
-    effectBinding: record.accountability?.effectBinding,
+    ...surfaceDecisionBinding(record, params.presentedDigest),
     ...(params.note ? { note: params.note } : {}),
     ...(params.reasonCategory ? { reasonCategory: params.reasonCategory } : {}),
     ...(params.changeInstruction !== undefined
@@ -475,13 +486,21 @@ export function applySurfaceApprovalChangeRequest(params: {
  * identity — so it is recorded as `local_token` and must never be logged as
  * `surface_session`.
  *
- * Every other surface keeps its prior behaviour of recording nothing: asserting
- * `surface_session` for all of them would be the same dishonesty in the other
- * direction (`presence` is a local server too). Callers that know their own
- * strength pass `authMethod` explicitly.
+ * HA-03: a human-only decision must declare its proof. Chat bridges vouch only
+ * for the channel's account (`channel_identity`; iMessage senders can be
+ * spoofed). A `presence` text decision carries no verified identity at all, so
+ * it is recorded as `manual`. Callers that know their own strength pass
+ * `authMethod` explicitly.
  */
 function defaultSurfaceAuthMethod(surface: SurfaceApproval): ApprovalRecord['authMethod'] {
-  return surface === 'brief' ? 'local_token' : undefined;
+  switch (surface) {
+    case 'brief':
+      return 'local_token';
+    case 'presence':
+      return 'manual';
+    default:
+      return 'channel_identity';
+  }
 }
 
 export interface SurfaceApprovalReply {
@@ -589,6 +608,7 @@ function resolveSurfaceApprovalRecord(params: {
   decision: SurfaceApprovalDecision;
   decidedBy: string;
   locale?: SupportedLocale;
+  presentedDigest?: string;
 }): SurfaceApprovalReply {
   if (params.record.status !== 'pending') {
     return {
@@ -611,6 +631,17 @@ function resolveSurfaceApprovalRecord(params: {
       reply: t('surface:approval_expired', undefined, params.locale),
     };
   }
+  // Card tokens carry the compact digest; expand it here, on the chat callback
+  // path only — the store accepts nothing but the full digest.
+  const presentedDigest = params.presentedDigest
+    ? resolveCompactPresentedDigest(params.record, params.presentedDigest)
+    : undefined;
+  if (presentedDigest === null) {
+    return {
+      handled: true,
+      reply: t('surface:approval_changed_since_shown', undefined, params.locale),
+    };
+  }
   const updated = applySurfaceApprovalDecision({
     surface: params.surface,
     requestId: params.record.id,
@@ -619,6 +650,7 @@ function resolveSurfaceApprovalRecord(params: {
     threadTs: params.record.threadTs,
     decidedBy: params.decidedBy,
     storageChannel: params.storageChannel,
+    ...(presentedDigest ? { presentedDigest } : {}),
   });
   return {
     handled: true,
@@ -712,6 +744,7 @@ export function resolveSurfaceApprovalReply(params: {
       decision,
       decidedBy: params.decidedBy,
       locale: params.locale,
+      ...(token[3] ? { presentedDigest: token[3].toLowerCase() } : {}),
     });
   } else {
     decision = normalizeDecision(text);
