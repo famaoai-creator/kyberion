@@ -43,6 +43,8 @@ export type {
   ReservedConversationTurn,
 } from './surface/front-desk-conversation-store.js';
 export * from './surface/front-desk-conversation-history.js';
+export * from './surface/front-desk-request-result.js';
+export * from './surface/front-desk-request-service.js';
 
 export {
   SurfaceConversationAdmissionError,

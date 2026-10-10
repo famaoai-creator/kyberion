@@ -174,7 +174,8 @@ function readOnlyExecutionHistoryText(projection?: FrontDeskExecutionProjection)
   }
 }
 
-function projectConversationHistory(
+/** Internal read-only projection shared with exact request readback. */
+export function projectConversationHistory(
   viewer: FrontDeskConversationViewer,
   transcript: Transcript,
   freshReports: boolean
