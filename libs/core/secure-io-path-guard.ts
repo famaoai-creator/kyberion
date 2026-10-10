@@ -487,13 +487,13 @@ export function safeRealpath(filePath: string): string {
  *   while safeLinkExclusiveSync puts a displaced record back).
  * - Reads of package files under the root `node_modules/`, or under a
  *   workspace package's `node_modules/` the caller cannot write: the pnpm
- *   store links every package file into each project. The literal path must
- *   be one of those prefixes; nothing under `active/` or another writable
- *   tree qualifies.
+ *   store links every package file into each project. Decided on the
+ *   canonical path (see isTrustedNodeModulesRead).
  *
- * Writes that replace the entry (safeWriteFile, the copy destination: temp +
- * rename) never touch the old inode and need no check. Files outside the
- * repository (vault mounts) are judged by the vault allowance.
+ * Both exemptions apply only while the canonical path still names the inode
+ * the caller holds. A multi-link file outside the repository (vault mount
+ * target) gets no exemption. Writes that replace the entry (safeWriteFile,
+ * the copy destination: temp + rename) never touch the old inode.
  */
 export type HardLinkOperation = 'read' | 'write';
 
@@ -574,8 +574,9 @@ export function assertNotForeignHardLink(
   // in between would let the exemption be judged on one file while the bytes
   // come from another, so an exemption applies only when `canonical` still
   // names the very inode the caller holds.
+  // A multi-link file outside the repository (a vault mount target) gets no
+  // exemption: its other names cannot be pinned or judged from here.
   if (sameInodeAt(canonical, stat)) {
-    if (isInside(path.resolve(pathResolver.rootDir()), canonical) === undefined) return;
     if (operation === 'read' && isTrustedNodeModulesRead(canonical)) return;
     if (isLockTombPair(canonical, stat)) return;
   }
@@ -584,15 +585,22 @@ export function assertNotForeignHardLink(
   );
 }
 
-/** True when `canonical` currently resolves to the inode `held` (inode 0 is unverifiable). */
+/**
+ * True when `canonical` (inside the checkout) currently resolves to the inode
+ * `held`. Inode 0 is unverifiable; a path outside the checkout is never pinned.
+ */
 function sameInodeAt(canonical: string, held: fs.Stats): boolean {
   if (held.ino === 0) return false;
+  const target = path.resolve(canonical);
+  let now: fs.Stats | undefined;
   try {
-    const now = fs.statSync(canonical);
-    return now.dev === held.dev && now.ino === held.ino;
+    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
+      now = fs.statSync(target);
+    else if (target.startsWith(realRoot().real + path.sep)) now = fs.statSync(target);
   } catch {
     return false;
   }
+  return now !== undefined && now.dev === held.dev && now.ino === held.ino;
 }
 
 /**
