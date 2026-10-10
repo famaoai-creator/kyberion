@@ -25,6 +25,8 @@ vi.mock('../organization/member-registry.js', async (original) => ({
 
 import { listMemberIdsStrict, readMemberProfile } from '../organization/member-registry.js';
 import { SurfaceViewerScopeError } from './surface-mutation-guard.js';
+import { SurfaceViewerScopeError as ContractScopeError } from './surface-viewer-scope-contract.js';
+import { canonicalHumanOwner as contractHumanOwner } from './verified-human-request-contract.js';
 import {
   canonicalHumanOwner,
   HUMAN_REQUEST_READ_SCOPE,
@@ -326,6 +328,42 @@ describe('monotonic request authority', () => {
 });
 
 describe('canonical ownership validation', () => {
+  it('preserves canonical validation and error constructor identity through legacy exports', () => {
+    expect(canonicalHumanOwner).toBe(contractHumanOwner);
+    expect(SurfaceViewerScopeError).toBe(ContractScopeError);
+    const viewer = resolve().viewer;
+    for (const [patch, message] of [
+      [{ canonicalHuman: undefined }, 'Verified human identity denied.'],
+      [{ principalId: 'user:bob' }, 'Verified human identity denied.'],
+      [{ tenantSlugs: ['public'] }, 'Verified human request scope denied.'],
+      [{ tenantSlugs: ['alpha\n'] }, 'Verified human request scope denied.'],
+      [{ organizationIds: ['org a'] }, 'Verified human request scope denied.'],
+      [{ projectIds: ['project/a'] }, 'Verified human request scope denied.'],
+      [{ tierAccess: ['personal'] }, 'Verified human request scope denied.'],
+    ] as const) {
+      let thrown: unknown;
+      try {
+        contractHumanOwner({ ...viewer, ...patch } as SurfaceViewerScope);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(SurfaceViewerScopeError);
+      expect(thrown).toBeInstanceOf(ContractScopeError);
+      expect(thrown).toMatchObject({ name: 'SurfaceViewerScopeError', status: 403, message });
+    }
+  });
+
+  it('rejects an inherited malformed marker and keeps valid ownership detached and frozen', () => {
+    const { canonicalHuman, ...legacy } = resolve().viewer;
+    expect(contractHumanOwner(legacy)).toBeUndefined();
+    const inherited = Object.assign(Object.create({ canonicalHuman: undefined }), legacy);
+    expect(() => contractHumanOwner(inherited)).toThrow('Verified human identity denied.');
+    const owner = contractHumanOwner({ ...legacy, canonicalHuman: { ...canonicalHuman } });
+    expect(owner).toEqual(canonicalHuman);
+    expect(owner).not.toBe(canonicalHuman);
+    expect(Object.isFrozen(owner)).toBe(true);
+  });
+
   it('leaves unmarked legacy viewers alone, but rejects malformed markers without fallback', () => {
     const { canonicalHuman: _marker, ...legacy } = resolve().viewer;
     expect(canonicalHumanOwner(legacy)).toBeUndefined();

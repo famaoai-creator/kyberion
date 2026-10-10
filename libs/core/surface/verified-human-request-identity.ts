@@ -9,9 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { isValidChronosScopeId } from '../chronos-access-registry.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { isValidMemberId } from '../organization/member-id-grammar.js';
 import {
   listMemberIdsStrict,
   readMemberProfile,
@@ -20,12 +18,22 @@ import {
   type MemberRole,
 } from '../organization/member-registry.js';
 import type { SurfacePermission } from './surface-authorization.js';
+import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
+import type {
+  CanonicalHumanRequestIdentity,
+  SurfaceViewerScope,
+} from './surface-viewer-scope-contract.js';
 import {
-  narrowSurfaceViewerScope,
-  SurfaceViewerScopeError,
-  type CanonicalHumanRequestIdentity,
-  type SurfaceViewerScope,
-} from './surface-mutation-guard.js';
+  canonicalHumanOwner,
+  isValidHumanRequestAuthorityNamespace,
+  denyVerifiedHumanIdentity,
+  denyVerifiedHumanScope,
+  isBoundedHumanRequestText,
+  normalizeHumanRequestScopeList,
+  normalizeHumanRequestScopeIds,
+  normalizeHumanRequestTiers,
+} from './verified-human-request-contract.js';
+export { canonicalHumanOwner } from './verified-human-request-contract.js';
 
 export const HUMAN_REQUEST_READ_SCOPE = 'kyberion:requests:read';
 export const HUMAN_REQUEST_RECEIVE_SCOPE = 'kyberion:requests:receive';
@@ -66,79 +74,7 @@ export interface VerifiedHumanRequestResolution {
   >;
 }
 
-const NAMESPACE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MEMBER_ROLES: readonly MemberRole[] = ['owner', 'operator', 'approver', 'viewer'];
-const SAFE_TEXT = /^[^\u0000-\u001f\u007f]+$/u;
-
-function denyIdentity(): never {
-  // Never expose a registry path, member list, subject, or profile parse error.
-  throw new SurfaceViewerScopeError(403, 'Verified human identity denied.');
-}
-function denyScope(): never {
-  throw new SurfaceViewerScopeError(403, 'Verified human request scope denied.');
-}
-function boundedText(value: unknown, max = 4096): value is string {
-  return typeof value === 'string' && value.length <= max && SAFE_TEXT.test(value);
-}
-function scopeList(value: unknown, valid: (value: string) => boolean): string[] {
-  if (
-    !Array.isArray(value) ||
-    !value.length ||
-    value.some((item) => !boundedText(item, 256) || !valid(item))
-  )
-    denyScope();
-  return [...new Set(value as string[])].sort();
-}
-function scopeIds(value: unknown): string[] | 'all' {
-  return value === 'all' ? 'all' : scopeList(value, isValidChronosScopeId);
-}
-function tiers(value: unknown): ('public' | 'confidential')[] {
-  return scopeList(value, (tier) => tier === 'public' || tier === 'confidential') as (
-    'public' | 'confidential'
-  )[];
-}
-
-/**
- * Validate an opt-in ownership marker, without claiming to authenticate it.
- * Absent markers preserve legacy behavior. Present but malformed markers must
- * never fall back to legacy ownership. Callers still authenticate every request.
- */
-export function canonicalHumanOwner(
-  viewer: SurfaceViewerScope
-): CanonicalHumanRequestIdentity | undefined {
-  if (!('canonicalHuman' in viewer)) return undefined;
-  const identity = viewer.canonicalHuman;
-  if (
-    !identity ||
-    typeof identity !== 'object' ||
-    Array.isArray(identity) ||
-    Object.keys(identity).sort().join(',') !==
-      'authorityNamespace,memberId,membershipFingerprint,version' ||
-    identity.version !== 1 ||
-    typeof identity.authorityNamespace !== 'string' ||
-    !NAMESPACE.test(identity.authorityNamespace) ||
-    typeof identity.memberId !== 'string' ||
-    !isValidMemberId(identity.memberId) ||
-    identity.memberId.startsWith('ext-') ||
-    typeof identity.membershipFingerprint !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(identity.membershipFingerprint) ||
-    viewer.memberId !== identity.memberId ||
-    viewer.principalId !== `user:${identity.memberId}` ||
-    viewer.source !== 'token' ||
-    viewer.role !== 'readonly'
-  )
-    denyIdentity();
-  scopeList(viewer.tenantSlugs, isValidTenantSlug);
-  scopeIds(viewer.organizationIds);
-  scopeIds(viewer.projectIds);
-  tiers(viewer.tierAccess);
-  return Object.freeze({
-    version: 1,
-    authorityNamespace: identity.authorityNamespace,
-    memberId: identity.memberId,
-    membershipFingerprint: identity.membershipFingerprint,
-  });
-}
 
 function strictMember(
   identity: VerifiedHumanClaims,
@@ -149,12 +85,12 @@ function strictMember(
     // registry read only; it never becomes the remote viewer's role.
     return withExecutionContext('sovereign_concierge', () => {
       const ids = listMemberIdsStrict(options);
-      if (new Set(ids).size !== ids.length) denyIdentity();
+      if (new Set(ids).size !== ids.length) denyVerifiedHumanIdentity();
       const matches: MemberProfile[] = [];
       for (const id of ids) {
         const member = readMemberProfile(id, options);
         // Missing after enumeration is unverifiable, even after a prior match.
-        if (!member || member.member_id !== id) denyIdentity();
+        if (!member || member.member_id !== id) denyVerifiedHumanIdentity();
         if (
           member.external_identities?.some(
             (binding) => binding.issuer === identity.issuer && binding.subject === identity.subject
@@ -163,11 +99,11 @@ function strictMember(
           matches.push(member);
       }
       // Count suspended bindings as matches: active + suspended is ambiguous.
-      if (matches.length !== 1 || matches[0].status !== 'active') denyIdentity();
+      if (matches.length !== 1 || matches[0].status !== 'active') denyVerifiedHumanIdentity();
       return matches[0];
     });
   } catch {
-    denyIdentity();
+    denyVerifiedHumanIdentity();
   }
 }
 
@@ -179,7 +115,7 @@ function memberships(member: MemberProfile): Map<string, MemberRole> {
       !MEMBER_ROLES.includes(row.role) ||
       (rows.has(row.tenant_slug) && rows.get(row.tenant_slug) !== row.role)
     )
-      denyIdentity();
+      denyVerifiedHumanIdentity();
     rows.set(row.tenant_slug, row.role);
   }
   return rows;
@@ -190,34 +126,33 @@ export function resolveVerifiedHumanRequestIdentity(
 ): VerifiedHumanRequestResolution {
   if (
     !input.identity ||
-    !boundedText(input.identity.issuer) ||
-    !boundedText(input.identity.subject) ||
+    !isBoundedHumanRequestText(input.identity.issuer) ||
+    !isBoundedHumanRequestText(input.identity.subject) ||
     (input.transport !== 'mcp-oauth' && input.transport !== 'browser-session')
   )
-    denyIdentity();
+    denyVerifiedHumanIdentity();
+  if (!input.policy || !isValidHumanRequestAuthorityNamespace(input.policy.authorityNamespace))
+    denyVerifiedHumanScope();
+  const serverTenants = normalizeHumanRequestScopeList(input.policy.tenantSlugs, isValidTenantSlug);
+  const organizationIds = normalizeHumanRequestScopeIds(input.policy.organizationIds);
+  const projectIds = normalizeHumanRequestScopeIds(input.policy.projectIds);
+  let tierAccess = normalizeHumanRequestTiers(input.policy.tierAccess);
   if (
-    !input.policy ||
-    typeof input.policy.authorityNamespace !== 'string' ||
-    !NAMESPACE.test(input.policy.authorityNamespace)
+    !Array.isArray(input.oauthScopes) ||
+    input.oauthScopes.some((scope) => !isBoundedHumanRequestText(scope))
   )
-    denyScope();
-  const serverTenants = scopeList(input.policy.tenantSlugs, isValidTenantSlug);
-  const organizationIds = scopeIds(input.policy.organizationIds);
-  const projectIds = scopeIds(input.policy.projectIds);
-  let tierAccess = tiers(input.policy.tierAccess);
-  if (!Array.isArray(input.oauthScopes) || input.oauthScopes.some((scope) => !boundedText(scope)))
-    denyScope();
+    denyVerifiedHumanScope();
 
   const member = strictMember(input.identity, input.memberRegistry ?? {});
   const memberRoles = memberships(member);
   const tenantSlugs = serverTenants.filter((tenant) => memberRoles.has(tenant));
-  if (!tenantSlugs.length) denyScope();
+  if (!tenantSlugs.length) denyVerifiedHumanScope();
   const narrowed = narrowSurfaceViewerScope(
     { tenantSlugs, organizationIds, projectIds },
     input.narrowing ?? {}
   );
   if (input.narrowing?.tier !== undefined) {
-    if (!tierAccess.includes(input.narrowing.tier)) denyScope();
+    if (!tierAccess.includes(input.narrowing.tier)) denyVerifiedHumanScope();
     tierAccess = [input.narrowing.tier];
   }
   const canonicalHuman: CanonicalHumanRequestIdentity = Object.freeze({
@@ -304,7 +239,7 @@ export function resolveVerifiedBrowserHumanRequestIdentity(
     !Number.isFinite(Date.parse(input.proof.expiresAt)) ||
     Date.parse(input.proof.expiresAt) <= now
   )
-    denyIdentity();
+    denyVerifiedHumanIdentity();
   // oauthScopes here are explicit trusted browser-adapter operation policy,
   // never OAuth grants inferred from browser login scopes or request fields.
   return resolveVerifiedHumanRequestIdentity({
