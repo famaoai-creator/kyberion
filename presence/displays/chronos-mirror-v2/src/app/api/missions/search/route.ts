@@ -4,7 +4,10 @@ import { buildMissionHistoryItems } from '../../../../lib/su-surface-data';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
-  viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
+  withViewerExecutionContext,
 } from '../../../../lib/viewer-context';
 import {
   readChronosOptionalStringParam,
@@ -21,20 +24,32 @@ export function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   try {
-    const tenantSlugs = viewerScopeTenantSlugs(
+    const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
       readChronosOptionalStringParam(url.searchParams.get('tenant'))
     );
-    const missions = buildMissionHistoryItems({
-      query: readChronosOptionalStringParam(url.searchParams.get('query')),
-      status: readChronosOptionalStringParam(url.searchParams.get('status')),
-      tier: 'confidential',
-      tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
-      tenantSlugs,
-      kind: readChronosOptionalStringParam(url.searchParams.get('kind')),
-      missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
-      limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
-    });
+    const organizationIds = strictViewerScopeOrganizationIds(
+      resolvedViewer.context,
+      readChronosOptionalStringParam(url.searchParams.get('organization_id'))
+    );
+    const projectIds = strictViewerScopeProjectIds(
+      resolvedViewer.context,
+      readChronosOptionalStringParam(url.searchParams.get('project_id'))
+    );
+    const missions = withViewerExecutionContext(resolvedViewer.context, () =>
+      buildMissionHistoryItems({
+        organizationIds,
+        projectIds,
+        query: readChronosOptionalStringParam(url.searchParams.get('query')),
+        status: readChronosOptionalStringParam(url.searchParams.get('status')),
+        tier: 'confidential',
+        tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
+        tenantSlugs,
+        kind: readChronosOptionalStringParam(url.searchParams.get('kind')),
+        missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
+        limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
+      })
+    );
     return NextResponse.json({ missions });
   } catch (error) {
     return viewerErrorResponse(error);

@@ -96,6 +96,7 @@
     "libs/core/sdlc-artifact-store.test.ts",
     "libs/core/secret/secret-bridge.test.ts",
     "libs/core/secure-io.branch.test.ts",
+    "libs/core/secure-io.metadata-fd.test.ts",
     "libs/core/secure-io-path-guard.ts",
     "libs/core/secure-io.symlink-canonical.test.ts",
     "libs/core/secure-io.symlink-root-alias.test.ts",

@@ -379,7 +379,7 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(9);
+    expect(payload.items).toHaveLength(10);
     expect(payload.items.map((item) => item.id)).toEqual([
       'home',
       'ask',
@@ -389,6 +389,7 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
       'ingest',
       'first-job',
       'help',
+      'organization',
       'settings',
     ]);
 
@@ -396,11 +397,14 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
     expect(byId.home.label).toBe('ホーム');
     expect(byId.decide.label).toBe('決める');
 
-    // decide/settings are hosted on concierge itself: relative, not external.
+    // Decide, organization management, and settings are local Concierge destinations.
     expect(byId.decide.external).toBe(false);
     expect(byId.decide.href).toBe('/');
     expect(byId.settings.external).toBe(false);
     expect(byId.settings.href).toBe('/settings');
+    expect(byId.organization.external).toBe(false);
+    expect(byId.organization.href).toBe('/management');
+    expect(byId.organization.scope_query_style).toBe('camel');
 
     // home/ask/progress are hosted on presence-studio: absolute, same-tab.
     for (const id of ['home', 'ask', 'progress'] as const) {

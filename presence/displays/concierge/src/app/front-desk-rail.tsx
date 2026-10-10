@@ -3,7 +3,7 @@
 import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
 import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
 import {
@@ -99,6 +99,7 @@ function storeTenant(slug: string): void {
 export function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
   if (pathname === '/') return 'decide';
   if (pathname === '/ingest') return 'ingest';
+  if (pathname === '/management') return 'organization';
   if (pathname === '/setup/first-run') return null;
   if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
     return 'settings';
@@ -106,8 +107,19 @@ export function currentItemId(pathname: string | null): FrontDeskNavItemPayload[
 }
 
 export function FrontDeskRail() {
+  return (
+    <React.Suspense fallback={null}>
+      <FrontDeskRailContent />
+    </React.Suspense>
+  );
+}
+
+function FrontDeskRailContent() {
   const { locale } = useConciergeI18n();
   const pathname = usePathname();
+  // Management changes hierarchy with native replaceState on the same path.
+  // Subscribe to Next's query context so rail hrefs follow those selections.
+  useSearchParams();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
   const selectionGeneration = React.useRef(0);
