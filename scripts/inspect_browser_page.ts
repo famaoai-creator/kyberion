@@ -12,6 +12,7 @@
 import http from 'node:http';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { htmlToMarkdown, extractHtmlTitle } from '@agent/core/html-to-markdown';
+import { stripTags } from '@agent/core/html-sanitize';
 import {
   assertSupportedNodeEngine,
   loadBrowserActuator,
@@ -160,9 +161,7 @@ export async function inspectWithFetch(
   const buttons: PageInspectionResult['buttons'] = [];
   for (const match of buttonMatches) {
     let text = match[1];
-    while (/<[^>]*>/g.test(text)) {
-      text = text.replace(/<[^>]*>/g, '');
-    }
+    text = stripTags(text, '');
     text = text.replace(/\s+/g, ' ').trim();
     if (text) buttons.push({ text: text.slice(0, 50) });
   }
@@ -173,9 +172,7 @@ export async function inspectWithFetch(
   for (const match of headingMatches) {
     const level = match[1].toLowerCase();
     let text = match[2];
-    while (/<[^>]*>/g.test(text)) {
-      text = text.replace(/<[^>]*>/g, '');
-    }
+    text = stripTags(text, '');
     text = text.replace(/\s+/g, ' ').trim();
     if (text) headings.push({ level, text: text.slice(0, 80) });
   }
@@ -186,9 +183,7 @@ export async function inspectWithFetch(
   for (const match of linkMatches) {
     const href = match[1].trim();
     let text = match[2];
-    while (/<[^>]*>/g.test(text)) {
-      text = text.replace(/<[^>]*>/g, '');
-    }
+    text = stripTags(text, '');
     text = text.replace(/\s+/g, ' ').trim();
     const isSafeScheme =
       href.startsWith('/') ||
