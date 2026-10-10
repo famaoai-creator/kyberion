@@ -170,10 +170,32 @@ function realRoot(): { real: string; caseInsensitive: boolean } {
  */
 function onDiskLeaf(realDir: string, leaf: string): string {
   if (!realRoot().caseInsensitive) return leaf;
+  const joined = path.resolve(realDir, leaf);
+  // Probe only inside the checkout (containment on the probed value).
+  let candidate: string | undefined;
+  if (joined.startsWith(path.resolve(pathResolver.rootDir()) + path.sep)) candidate = joined;
+  else if (joined.startsWith(realRoot().real + path.sep)) candidate = joined;
+  if (candidate === undefined) return leaf;
+  let stat: fs.Stats | undefined;
+  try {
+    stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+  } catch {
+    return leaf;
+  }
+  if (!stat) return leaf; // no entry: the typed spelling is what gets created
+  // Not a link: realpath returns the on-disk spelling without a listing.
+  if (!stat.isSymbolicLink()) {
+    try {
+      return path.basename(fs.realpathSync.native(candidate));
+    } catch {
+      return leaf;
+    }
+  }
+  // A link leaf must not be followed; only then list the directory.
   const wanted = leaf.normalize('NFC').toLowerCase();
   let names: string[];
   try {
-    names = fs.readdirSync(realDir);
+    names = fs.readdirSync(path.dirname(candidate));
   } catch {
     return leaf;
   }
@@ -480,14 +502,16 @@ var WORKSPACE_NODE_MODULES =
 
 /** Read exemption for pnpm store links (see the block comment above). */
 function isTrustedNodeModulesRead(resolved: string): boolean {
-  const logicalRoot = path.resolve(pathResolver.rootDir());
-  const relative = isInside(logicalRoot, path.resolve(resolved));
+  // Decided on the CANONICAL path: root node_modules/ also holds pnpm's
+  // workspace links (node_modules/@agent/core -> libs/core), so a literal
+  // node_modules/ prefix can still land in a writable tree.
+  const canonical = canonicalGuardPath(resolved, 'follow');
+  const relative = isInside(path.resolve(pathResolver.rootDir()), canonical);
   if (relative === undefined) return false;
   const posix = relative.split(path.sep).join('/');
-  if (posix.startsWith('node_modules/')) return true;
-  if (!WORKSPACE_NODE_MODULES.test(posix)) return false;
-  // A caller that could plant a link there gets no exemption.
-  return !validateWritePermission(path.resolve(resolved)).allowed;
+  if (!posix.startsWith('node_modules/') && !WORKSPACE_NODE_MODULES.test(posix)) return false;
+  // A caller that could plant a link at the canonical location gets no exemption.
+  return !validateWritePermission(canonical).allowed;
 }
 
 /** Lock recovery's `<base>` / `<base>.stale-*` pair in the locks directory. */
@@ -496,25 +520,39 @@ function isLockTombPair(canonical: string, stat: fs.Stats): boolean {
   const locksDir = path.join(path.resolve(pathResolver.rootDir()), 'active/shared/runtime/locks');
   const dir = path.dirname(canonical);
   if (dir !== locksDir && !dir.startsWith(locksDir + path.sep)) return false;
-  const name = path.basename(canonical);
-  const tombOf = STALE_TOMB.exec(name);
-  let partners: string[];
-  if (tombOf) {
-    partners = [tombOf[1]];
-  } else {
-    const names = fs.readdirSync(dir);
-    // Bounded: a lock directory holds a handful of records.
-    if (names.length > 10000) return false;
-    partners = names.filter((n) => n.startsWith(`${name}.stale-`) && STALE_TOMB.test(n));
+  // Probe-only: the tomb names its base, so only the tomb side qualifies.
+  // The base side would need a directory listing to find its tomb; lock
+  // inspection treats an unreadable record as live, so refusing it during
+  // the put-back window is safe.
+  const tombOf = STALE_TOMB.exec(path.basename(canonical));
+  if (!tombOf) return false;
+  try {
+    const base = fs.lstatSync(path.join(dir, tombOf[1]));
+    return base.dev === stat.dev && base.ino === stat.ino;
+  } catch {
+    return false;
   }
-  return partners.some((partner) => {
-    try {
-      const st = fs.lstatSync(path.join(dir, partner));
-      return st.dev === stat.dev && st.ino === stat.ino;
-    } catch {
-      return false;
-    }
-  });
+}
+
+/**
+ * Move-side hard-link rule: a file with other names may only move as a lock
+ * tomb, and only within its own locks directory (a tomb moved to another
+ * name, e.g. MEMORY.md, would keep aliasing the lock record).
+ */
+export function assertHardLinkMove(
+  resolvedSrc: string,
+  srcPath: string,
+  resolvedDest: string
+): void {
+  const stat = fs.lstatSync(resolvedSrc);
+  assertNotForeignHardLink(stat, resolvedSrc, srcPath, 'write');
+  if (!stat.isFile() || stat.nlink <= 1) return;
+  const srcDir = path.dirname(canonicalGuardPath(resolvedSrc, 'leaf'));
+  if (path.dirname(canonicalGuardPath(resolvedDest, 'leaf')) !== srcDir) {
+    throw new Error(
+      `[SECURITY] Refusing to move ${srcPath}: a hard-linked lock tomb may only move within its locks directory`
+    );
+  }
 }
 
 export function assertNotForeignHardLink(
@@ -608,13 +646,19 @@ export function chmodInPlace(resolved: string, displayPath: string, mode: number
 }
 
 /**
- * mkdir -p for a directory whose canonical path the caller has already
- * checked. Missing components are created one at a time, and before each
- * mkdir the parent must still canonicalize to the location that was checked,
+ * mkdir -p for a directory whose canonical path (`checkedCanonicalDir`) the
+ * caller has already checked. Missing components are created one at a time,
+ * and before each mkdir the parent must still canonicalize to the location
+ * that was checked,
  * so a component swapped for a link mid-way cannot leave directories in
  * another scope. Only creates inside the checkout.
  */
-export function mkdirGuarded(resolvedDir: string, displayPath: string, mode?: number): void {
+export function mkdirGuarded(
+  resolvedDir: string,
+  checkedCanonicalDir: string,
+  displayPath: string,
+  mode?: number
+): void {
   const target = path.resolve(resolvedDir);
   const missing: string[] = [];
   let existing = target;
@@ -627,7 +671,9 @@ export function mkdirGuarded(resolvedDir: string, displayPath: string, mode?: nu
   if (missing.length === 0) return;
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
-  let expected = canonicalGuardPath(existing, 'follow');
+  // Baseline = what the permission check judged, minus the missing tail.
+  let expected = path.resolve(checkedCanonicalDir);
+  for (let i = 0; i < missing.length; i += 1) expected = path.dirname(expected);
   let current = existing;
   for (const name of missing) {
     current = path.join(current, name);

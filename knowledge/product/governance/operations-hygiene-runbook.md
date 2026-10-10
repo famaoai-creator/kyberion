@@ -754,21 +754,27 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   physical location and is never remapped again.
 - **Case-insensitive volumes judge the on-disk spelling.** Whether the root's volume folds case is
   probed once per root (on the nearest root component whose name has letters). In `leaf` mode the
-  leaf takes its on-disk spelling (`knowledge/PERSONAL` is judged as `knowledge/personal`); in
-  `follow` mode the platform realpath already returns the on-disk case. Tier detection itself
-  stays case-sensitive.
-- **Foreign hard links are refused for in-place access.** Read, size (`validateFileSize`), copy
-  source, append, open-for-append, chmod, fsync, move source and hard-link source refuse a regular
-  file with `nlink > 1`, checked on the opened descriptor where the helper opens one (copies read
-  from that descriptor; snapshots return bytes only from the vetted inode). There are two
-  exceptions, both narrow on purpose (a broader "all links in one directory" rule was defeated by
-  moving the link next to its protected sibling):
-  - _Lock recovery_: in `active/shared/runtime/locks/`, exactly two links named `<base>` and
-    `<base>.stale-<pid>-<ms>-<n>` — the tomb pair that exists while `safeLinkExclusiveSync` puts a
-    displaced record back. Only these candidate names are examined (bounded scan).
-  - _pnpm store reads_: the literal path is under the root `node_modules/`, or under a workspace
-    package's `node_modules/` (`pnpm-workspace.yaml` globs) that the caller cannot write. A
-    `node_modules` directory anywhere else (for example under `active/`) gets no exemption.
+  leaf takes its on-disk spelling (`knowledge/PERSONAL` is judged as `knowledge/personal`) from
+  `lstat` + realpath; the directory is listed only when the leaf is itself a symlink. In `follow`
+  mode the platform realpath already returns the on-disk case. Tier detection stays case-sensitive.
+- **Foreign hard links are refused for in-place access.** Read, size (`validateFileSize`),
+  metadata (`safeStat`, `safeFileAgeMs`), copy source, append, open-for-append, chmod, fsync, move
+  source and hard-link source refuse a regular file with `nlink > 1`, checked on the opened
+  descriptor where the helper opens one (copies read from that descriptor; snapshots return bytes
+  only from the vetted inode, and a file missing at check time must be single-link when opened).
+  There are two exceptions, both narrow on purpose (a broader "all links in one directory" rule
+  was defeated by moving the link next to its protected sibling):
+  - _Lock recovery tombs, probe-only_: in `active/shared/runtime/locks/`, a file named
+    `<base>.stale-<pid>-<ms>-<n>` with exactly two links whose other link is `<base>` (one `lstat`;
+    no directory listing, so filling the directory cannot block it). The `<base>` side is refused —
+    finding its tomb would need a listing — and lock inspection treats an unreadable record as
+    live, which is the safe reading during the put-back window. A tomb may move only within its
+    locks directory, never to another name such as `MEMORY.md`.
+  - _pnpm store reads_: decided on the **canonical** path, which must lie under the root
+    `node_modules/` (in practice `node_modules/.pnpm/`) or a workspace package's `node_modules/`,
+    at a location the caller cannot write. The literal prefix is not trusted: root `node_modules/`
+    holds pnpm's workspace links (`node_modules/@actuator/service -> libs/actuators/service-actuator`)
+    into trees a role may write.
 - **In-place opens never truncate.** `safeAppendFileSync` accepts only `a`, `a+`, `ax`, `ax+`;
   `openInPlace` rejects any other flag before opening, so a foreign hard link is never truncated
   before it is vetted. Writes that replace the entry — `safeWriteFile` and the copy destination
@@ -789,9 +795,10 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   An inode number of 0 (FAT/exFAT, some network shares) is unverifiable and fails closed.
 - **Missing parents are created one at a time.** `safeWriteFile`, `safeMkdir` (recursive),
   `safeOpenAppendFile`, `safeCreateExclusiveFileSync`, `safePublishExclusiveFileSync` and
-  `safeSymlinkSync` create missing directories through `mkdirGuarded`: before each component the
-  parent must still canonicalize to the location that was checked, so a component swapped for a
-  link cannot leave directories in another scope.
+  `safeSymlinkSync` create missing directories through `mkdirGuarded`, which takes the canonical
+  directory the permission check judged as its baseline: before each component the parent must
+  still canonicalize to that checked location, so a component swapped for a link cannot leave
+  directories in another scope.
 
 **Residual risk (documented, not closed).**
 
@@ -824,8 +831,9 @@ stat 52–54 → 72–78, mkdir (existing) 376–378 → 429, safeWriteFile (ato
 **Gate.** `libs/core/secure-io.symlink-canonical.test.ts` (symlink-then-write, append, mkdir,
 dangling link, copy/move through a linked parent, rm/unlink, reads into `knowledge/personal/`,
 junction refusal, ancestor rename after an earlier resolution, hard-link append / copy / chmod /
-fsync / read / move, lock-recovery tomb pair only in the locks directory, truncating append flags,
-`node_modules` planted in a writable tree, `validateFileSize` tier and hard-link guard, directory
+fsync / read / move / stat / snapshot, probe-only lock tomb rule and tomb moves, truncating append
+flags, `node_modules` planted in a writable tree, `node_modules/@actuator/service` workspace alias
+read as `software_developer`, `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix) and the import boundary in

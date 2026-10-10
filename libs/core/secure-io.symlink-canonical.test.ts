@@ -13,9 +13,12 @@ import {
   safeMkdir,
   safeMoveSync,
   safeOpenAppendFile,
+  safeFileAgeMs,
   safeReadFile,
+  safeReadFileSnapshot,
   safeReaddir,
   safeRmSync,
+  safeStat,
   safeSymlinkSync,
   safeUnlinkSync,
   safeWriteFile,
@@ -280,26 +283,43 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.statSync(victim).nlink).toBe(1);
   });
 
-  it('allows only lock recovery tomb pairs in the locks directory', () => {
+  it('allows only the tomb side of a lock recovery pair, probe-only, in the locks directory', () => {
     const locks = `active/shared/runtime/locks/vitest-secure-io-${RUN}`;
     try {
       fs.mkdirSync(abs(locks), { recursive: true });
       fs.writeFileSync(abs(`${locks}/res.lock`), '{"pid":1}');
       fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/res.lock.stale-1-2-3`));
-      expect(safeReadFile(`${locks}/res.lock`)).toBe('{"pid":1}');
+      // The tomb names its base: one lstat decides, no directory listing.
       expect(safeReadFile(`${locks}/res.lock.stale-1-2-3`)).toBe('{"pid":1}');
-      safeAppendFileSync(`${locks}/res.lock`, '\n');
-      safeFsyncFile(`${locks}/res.lock`);
-      // Any other name for the inode, even in the same directory, is refused.
-      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/other.json`));
+      safeFsyncFile(`${locks}/res.lock.stale-1-2-3`);
+      // The base side would need a listing to find its tomb: refused
+      // (lock inspection treats an unreadable record as live).
       expect(() => safeReadFile(`${locks}/res.lock`)).toThrow(/hard link/);
+      // A tomb may move within its locks directory, never elsewhere.
+      expect(() =>
+        safeMoveSync(`${locks}/res.lock.stale-1-2-3`, `${scratchRel}/MEMORY.md`)
+      ).toThrow(/only move within its locks directory/);
+      expect(fs.existsSync(abs(`${scratchRel}/MEMORY.md`))).toBe(false);
+      safeMoveSync(`${locks}/res.lock.stale-1-2-3`, `${locks}/res.lock.stale-4-5-6`);
+      // Any other name for the inode is refused, even in the locks directory.
+      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/other.json`));
+      expect(() => safeReadFile(`${locks}/res.lock.stale-4-5-6`)).toThrow(/hard link/);
     } finally {
       fs.rmSync(abs(locks), { recursive: true, force: true });
     }
     // The same pair outside the locks directory gets no exception.
     fs.writeFileSync(abs(`${scratchRel}/res.lock`), 'x');
     fs.linkSync(abs(`${scratchRel}/res.lock`), abs(`${scratchRel}/res.lock.stale-1-2-3`));
-    expect(() => safeAppendFileSync(`${scratchRel}/res.lock`, 'y')).toThrow(/hard link/);
+    expect(() => safeAppendFileSync(`${scratchRel}/res.lock.stale-1-2-3`, 'y')).toThrow(
+      /hard link/
+    );
+  });
+
+  it('refuses metadata and snapshots of a higher-tier file through a hard link', () => {
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/hl-meta.txt`));
+    expect(() => safeStat(`${scratchRel}/hl-meta.txt`)).toThrow(/hard link/);
+    expect(() => safeFileAgeMs(`${scratchRel}/hl-meta.txt`)).toThrow(/hard link/);
+    expect(() => safeReadFileSnapshot(`${scratchRel}/hl-meta.txt`, 64)).toThrow(/hard link/);
   });
 
   it('refuses to move a hard link to a protected file under a writable name', () => {
@@ -315,6 +335,24 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       /only appends/
     );
     expect(fs.readFileSync(path.join(abs(protectedRel), 'existing.txt'), 'utf8')).toBe('protected');
+  });
+
+  it('gives no node_modules exemption through a workspace link into a role-writable tree', () => {
+    // node_modules/@actuator/service -> libs/actuators/service-actuator (pnpm
+    // workspace link); software_developer may write libs/actuators/.
+    const alias = 'node_modules/@actuator/service';
+    const pkgDir = 'libs/actuators/service-actuator';
+    expect(fs.realpathSync(abs(alias))).toBe(fs.realpathSync(abs(pkgDir)));
+    const plantRel = `${pkgDir}/vitest-secure-io-${RUN}`;
+    process.env.MISSION_ROLE = 'software_developer';
+    try {
+      fs.mkdirSync(abs(plantRel), { recursive: true });
+      fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${plantRel}/x.txt`));
+      expect(() => safeReadFile(`${plantRel}/x.txt`)).toThrow(/hard link/);
+      expect(() => safeReadFile(`${alias}/vitest-secure-io-${RUN}/x.txt`)).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(abs(plantRel), { recursive: true, force: true });
+    }
   });
 
   it('gives no node_modules exemption to a node_modules directory in a writable tree', () => {
