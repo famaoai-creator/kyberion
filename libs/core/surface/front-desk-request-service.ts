@@ -80,6 +80,9 @@ export async function runFrontDeskRequest(
       trustedViewer.organizationIds === 'all' ? 'all' : [...trustedViewer.organizationIds],
     projectIds: trustedViewer.projectIds === 'all' ? 'all' : [...trustedViewer.projectIds],
     tierAccess: [...trustedViewer.tierAccess],
+    ...(trustedViewer.canonicalHuman
+      ? { canonicalHuman: { ...trustedViewer.canonicalHuman } }
+      : {}),
   };
   const request: FrontDeskRequestInput = { ...input };
   let scope: ReturnType<typeof frontDeskRuntimeScope>;
