@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => {
   const isHostOutput = vi.fn(() => false);
   const recordHostRequest = vi.fn();
   return {
+    actualSafeExistsSync: undefined as undefined | ((target: string) => boolean),
     isHostOutput,
     recordHostRequest,
     executeServicePreset,
@@ -67,6 +68,7 @@ vi.mock('../service/service-runtime-registry.js', () => ({
 
 vi.mock('../secure-io.js', async () => {
   const actual = (await vi.importActual('../secure-io.js')) as any;
+  mocks.actualSafeExistsSync = actual.safeExistsSync;
   return {
     ...actual,
     safeWriteFile: vi.fn(),
@@ -924,6 +926,10 @@ describe('CodexHostBridgeImageGenerationProvider', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    // Harness detection reads the reasoning-provider registry from disk.
+    mocks.safeExistsSync.mockImplementation((target: string) =>
+      mocks.actualSafeExistsSync!(target)
+    );
   });
 
   afterEach(() => {
@@ -955,6 +961,9 @@ describe('AgyHostBridgeImageGenerationProvider', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    mocks.safeExistsSync.mockImplementation((target: string) =>
+      mocks.actualSafeExistsSync!(target)
+    );
   });
 
   afterEach(() => {
@@ -977,6 +986,9 @@ describe('CursorHostBridgeImageGenerationProvider', () => {
     delete process.env.CURSOR_AGENT;
     delete process.env.CURSOR_API_KEY;
     delete process.env.KYBERION_CURSOR_CLI_BIN;
+    mocks.safeExistsSync.mockImplementation((target: string) =>
+      mocks.actualSafeExistsSync!(target)
+    );
   });
 
   afterEach(() => {

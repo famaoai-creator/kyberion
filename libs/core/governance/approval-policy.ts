@@ -189,6 +189,22 @@ export function resolveApprovalPolicy(input: {
   return base;
 }
 
+function hasDangerousShellPattern(command: string): boolean {
+  if (!command) return false;
+  const pipe = command.indexOf('|');
+  const pipesIntoShell =
+    pipe > 0 && /^(?:sh|bash|zsh|fish)\b/i.test(command.slice(pipe + 1).trimStart());
+  const curl = command.indexOf('curl');
+  const wget = command.indexOf('wget');
+  return (
+    /rm\s+-rf/i.test(command) ||
+    (pipesIntoShell && ((curl >= 0 && curl < pipe) || (wget >= 0 && wget < pipe))) ||
+    /base64\s+-(?:d|decode)/i.test(command) ||
+    /eval\s/i.test(command) ||
+    /\bexec\s*\(/i.test(command)
+  );
+}
+
 function applyInjectionFloor(
   input: { intentId?: string; payload?: Record<string, unknown> },
   base: ApprovalPolicyResolution
@@ -200,7 +216,7 @@ function applyInjectionFloor(
       Boolean(input.payload?.base_url);
     const isShell =
       /shell|command|exec|run_shell|bash/i.test(input.intentId || '') ||
-      /(?:rm\s+-rf|curl\s+.*\|\s*(?:sh|bash|zsh|fish)|wget\s+.*\|\s*(?:sh|bash|zsh|fish)|base64\s+-(?:d|decode)|eval\s|\bexec\s*\()/i.test(
+      hasDangerousShellPattern(
         String(input.payload?.command ?? input.payload?.cmd ?? input.payload?.script ?? '')
       );
     const isModify =

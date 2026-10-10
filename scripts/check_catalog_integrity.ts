@@ -112,6 +112,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/orchestration/hearing-scenarios.json',
   },
   {
+    id: 'charter-decision-vocabulary',
+    schemaPath: 'knowledge/product/schemas/charter-decision-vocabulary.schema.json',
+    dataPath: 'knowledge/product/governance/charter-decision-vocabulary.json',
+  },
+  {
     id: 'work-inventory-taxonomy',
     schemaPath: 'knowledge/product/schemas/work-inventory-taxonomy.schema.json',
     dataPath: 'knowledge/product/governance/work-inventory-taxonomy.json',

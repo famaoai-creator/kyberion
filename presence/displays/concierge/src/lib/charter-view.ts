@@ -13,6 +13,8 @@ export interface CharterFormDraft {
   expires_in_days: string;
   allow_named_spend: boolean;
   allow_customer_outbound: boolean;
+  /** Decision types delegated by name (the server holds the list of delegable ones). */
+  delegated_decisions: string[];
   supersedes_decision_rights: boolean;
 }
 
@@ -25,6 +27,7 @@ export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
   expires_in_days: '90',
   allow_named_spend: false,
   allow_customer_outbound: false,
+  delegated_decisions: [],
   supersedes_decision_rights: false,
 };
 
@@ -76,6 +79,7 @@ export function draftToForm(tenantSlug: string, draft: CharterFormDraft) {
     max_loss_per_incident: parseAmount(draft.max_loss_per_incident),
     allow_named_spend: draft.allow_named_spend,
     allow_customer_outbound: draft.allow_customer_outbound,
+    delegated_decisions: [...draft.delegated_decisions].sort(),
     supersedes_decision_rights: draft.supersedes_decision_rights,
     deputies: parseDeputies(draft.deputies),
     expires_in_days: Number(draft.expires_in_days),
@@ -89,6 +93,7 @@ export function draftFromCharter(charter: {
   deputies: string[];
   allows_named_spend: boolean;
   allows_customer_outbound?: boolean;
+  delegated_decisions?: string[];
   supersedes_decision_rights: boolean;
 }): CharterFormDraft {
   return {
@@ -100,6 +105,7 @@ export function draftFromCharter(charter: {
     expires_in_days: '90',
     allow_named_spend: charter.allows_named_spend,
     allow_customer_outbound: charter.allows_customer_outbound === true,
+    delegated_decisions: [...(charter.delegated_decisions ?? [])],
     supersedes_decision_rights: charter.supersedes_decision_rights,
   };
 }
@@ -122,6 +128,7 @@ export interface CharterTenantView {
     max_loss_per_incident: number;
     allows_named_spend: boolean;
     allows_customer_outbound?: boolean;
+    delegated_decisions?: string[];
     supersedes_decision_rights: boolean;
     report: {
       tripwires_standing: string[];
@@ -146,6 +153,7 @@ export interface CharterDraft {
     expires_in_days: number;
     allow_named_spend: boolean;
     allow_customer_outbound: boolean;
+    delegated_decisions?: string[];
     supersedes_decision_rights: boolean;
   };
 }
@@ -162,6 +170,7 @@ export function draftFromProposal(proposal: CharterDraft): CharterFormDraft {
     expires_in_days: String(f.expires_in_days),
     allow_named_spend: f.allow_named_spend,
     allow_customer_outbound: f.allow_customer_outbound,
+    delegated_decisions: [...(f.delegated_decisions ?? [])],
     supersedes_decision_rights: f.supersedes_decision_rights,
   };
 }
@@ -242,6 +251,34 @@ export function parseCharterOverview(value: unknown): CharterTenantView[] | unde
     out.push(e as unknown as CharterTenantView);
   }
   return out;
+}
+
+export interface CharterDecisionOption {
+  decision_type: string;
+  label: string;
+}
+
+/** The delegable decision types the server offers; malformed entries are dropped. */
+export function parseCharterDecisionOptions(value: unknown): CharterDecisionOption[] {
+  if (!value || typeof value !== 'object') return [];
+  const options = (value as Record<string, unknown>).decision_options;
+  if (!Array.isArray(options)) return [];
+  return options.filter(
+    (o): o is CharterDecisionOption =>
+      Boolean(o) &&
+      typeof (o as CharterDecisionOption).decision_type === 'string' &&
+      typeof (o as CharterDecisionOption).label === 'string'
+  );
+}
+
+/** Toggle one delegated decision; the list stays sorted and duplicate-free. */
+export function setDelegatedDecision(
+  draft: CharterFormDraft,
+  decisionType: string,
+  on: boolean
+): CharterFormDraft {
+  const rest = draft.delegated_decisions.filter((d) => d !== decisionType);
+  return { ...draft, delegated_decisions: (on ? [...rest, decisionType] : rest).sort() };
 }
 
 export function isManuallyStopped(view: CharterTenantView): boolean {

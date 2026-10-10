@@ -12,7 +12,12 @@
  */
 
 import { decodeEntities } from './text-escaping.js';
-import { stripElementBlocks, stripTags } from './html-sanitize.js';
+import {
+  elementBlocks,
+  replaceElementBlocks,
+  stripElementBlocks,
+  stripTags,
+} from './html-sanitize.js';
 
 /** Remove comments with a linear scan — no regex backtracking on `<!--` runs. */
 function stripComments(html: string): string {
@@ -35,34 +40,30 @@ function inlineText(html: string): string {
 
 function convertInline(html: string): string {
   let out = html;
-  out = out.replace(
-    /<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
-    (_, href: string, text: string) => `[${inlineText(text)}](${href})`
-  );
-  out = out.replace(
-    /<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi,
-    (_, _tag: string, text: string) => `**${inlineText(text)}**`
-  );
-  out = out.replace(
-    /<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi,
-    (_, _tag: string, text: string) => `*${inlineText(text)}*`
-  );
-  out = out.replace(
-    /<code\b[^>]*>([\s\S]*?)<\/code>/gi,
-    (_, text: string) => `\`${inlineText(text)}\``
-  );
+  out = replaceElementBlocks(out, 'a', (text, openTag) => {
+    const href = /href="([^"]*)"/iu.exec(openTag)?.[1];
+    return href === undefined ? openTag + text + '</a>' : `[${inlineText(text)}](${href})`;
+  });
+  for (const tag of ['strong', 'b']) {
+    out = replaceElementBlocks(out, tag, (text) => `**${inlineText(text)}**`);
+  }
+  for (const tag of ['em', 'i']) {
+    out = replaceElementBlocks(out, tag, (text) => `*${inlineText(text)}*`);
+  }
+  out = replaceElementBlocks(out, 'code', (text) => `\`${inlineText(text)}\``);
   return out;
 }
 
 function convertTable(tableHtml: string): string {
   const rows: string[][] = [];
-  const rowMatches = tableHtml.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
-  for (const rowHtml of rowMatches) {
+  for (const rowHtml of elementBlocks(tableHtml, 'tr')) {
     const cells: string[] = [];
-    const cellMatches = rowHtml.match(/<(th|td)\b[^>]*>[\s\S]*?<\/\1>/gi) ?? [];
-    for (const cellHtml of cellMatches) {
-      const body = cellHtml.replace(/^<(th|td)\b[^<>]*>/i, '').replace(/<\/(th|td)>$/i, '');
-      cells.push(inlineText(convertInline(body)).replace(/\|/g, '\\|'));
+    const cellBlocks = [...elementBlocks(rowHtml, 'th'), ...elementBlocks(rowHtml, 'td')].sort(
+      (a, b) => rowHtml.indexOf(a) - rowHtml.indexOf(b)
+    );
+    for (const cellHtml of cellBlocks) {
+      const body = cellHtml.slice(cellHtml.indexOf('>') + 1, cellHtml.lastIndexOf('</'));
+      cells.push(inlineText(convertInline(body)).replace(/\\/g, '\\\\').replace(/\|/g, '\\|'));
     }
     if (cells.length > 0) rows.push(cells);
   }
@@ -78,7 +79,7 @@ function convertTable(tableHtml: string): string {
 }
 
 function convertList(listHtml: string, ordered: boolean): string {
-  const items = listHtml.match(/<li\b[^>]*>[\s\S]*?<\/li>/gi) ?? [];
+  const items = elementBlocks(listHtml, 'li');
   const lines = items.map((itemHtml, index) => {
     const body = itemHtml.replace(/^<li\b[^>]*>/i, '').replace(/<\/li>$/i, '');
     const marker = ordered ? `${index + 1}.` : '-';
@@ -96,25 +97,30 @@ export function htmlToMarkdown(html: string): string {
 
   // Protect <pre> blocks from inline/whitespace processing.
   const preBlocks: string[] = [];
-  out = out.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_, body: string) => {
+  out = replaceElementBlocks(out, 'pre', (body) => {
     const code = decodeEntities(stripTags(body, '')).replace(/^\n+|\n+$/g, '');
     preBlocks.push(`\`\`\`\n${code}\n\`\`\``);
     return `\n\n@@KYB_PRE_${preBlocks.length - 1}@@\n\n`;
   });
 
-  out = out.replace(/<table\b[^>]*>[\s\S]*?<\/table>/gi, (table) => convertTable(table));
-  out = out.replace(/<ol\b[^>]*>[\s\S]*?<\/ol>/gi, (list) => convertList(list, true));
-  out = out.replace(/<ul\b[^>]*>[\s\S]*?<\/ul>/gi, (list) => convertList(list, false));
+  out = replaceElementBlocks(out, 'table', (inner, openTag, closeTag) =>
+    convertTable(`${openTag}${inner}${closeTag}`)
+  );
+  out = replaceElementBlocks(out, 'ol', (inner, openTag, closeTag) =>
+    convertList(`${openTag}${inner}${closeTag}`, true)
+  );
+  out = replaceElementBlocks(out, 'ul', (inner, openTag, closeTag) =>
+    convertList(`${openTag}${inner}${closeTag}`, false)
+  );
 
-  out = out.replace(
-    /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi,
-    (_, level: string, text: string) =>
-      `\n\n${'#'.repeat(Number(level))} ${inlineText(convertInline(text))}\n\n`
-  );
-  out = out.replace(
-    /<p\b[^>]*>([\s\S]*?)<\/p>/gi,
-    (_, text: string) => `\n\n${inlineText(convertInline(text))}\n\n`
-  );
+  for (let level = 1; level <= 6; level += 1) {
+    out = replaceElementBlocks(
+      out,
+      `h${level}`,
+      (text) => `\n\n${'#'.repeat(level)} ${inlineText(convertInline(text))}\n\n`
+    );
+  }
+  out = replaceElementBlocks(out, 'p', (text) => `\n\n${inlineText(convertInline(text))}\n\n`);
   out = out.replace(/<br\s*\/?>/gi, '\n');
   out = out.replace(/<\/(div|section|article|blockquote)>/gi, '\n\n');
 

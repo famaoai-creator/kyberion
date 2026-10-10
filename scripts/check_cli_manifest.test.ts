@@ -353,15 +353,12 @@ describe('CLI manifest', () => {
       );
     });
 
-    it('keeps the repository free of undeclared shadowing (intent -> intent trace)', () => {
+    it('keeps the repository free of undeclared shadowing (intent:trace is canonical)', () => {
       const manifest = loadCliManifest();
       expect(manifest.script_commands?.find((c) => c.script === 'intent:trace')).toMatchObject({
         command: 'intent trace',
       });
-      expect(manifest.deprecated_script_aliases).toContainEqual({
-        script: 'intent',
-        replaced_by: 'intent:trace',
-      });
+      expect(manifest.deprecated_script_aliases ?? []).toEqual([]);
     });
 
     it('keeps deprecated aliases out of the ratchet and out of script_commands', () => {
@@ -467,34 +464,10 @@ describe('CU-08 package script naming', () => {
     );
   });
 
-  it('keeps each renamed script as a warning alias that runs the replacement unchanged', () => {
+  it('keeps the manifest free of deprecated aliases (single canonical name per entry)', () => {
     const manifest = loadCliManifest();
-    const renamed = Object.fromEntries(
-      (manifest.deprecated_script_aliases ?? []).map((alias) => [alias.script, alias.replaced_by])
-    );
-    expect(renamed).toMatchObject({
-      dev: 'verify',
-      chronos: 'scheduler',
-      inventory: 'work:inventory',
-      'customer:create': 'stance:create',
-      'customer:switch': 'stance:switch',
-      onboard: 'onboarding',
-      ingest: 'knowledge:ingest',
-      'agy:sdk:setup': 'agy:sdk-setup',
-    });
-    const bodies = { verify: 'pnpm run typecheck', dev: 'pnpm run typecheck' };
-    const failures = checkCliManifest(manifest, {
-      packageScripts: new Set([
-        ...(manifest.script_commands ?? []).flatMap((command) =>
-          command.script ? [command.script] : []
-        ),
-        ...(manifest.deprecated_script_aliases ?? []).map((alias) => alias.script),
-      ]),
-      packageScriptBodies: bodies,
-    });
-    expect(failures).toContain(
-      'deprecated script alias dev must run the notice then the verify command unchanged: "node scripts/deprecated_script_alias.mjs dev verify && pnpm run typecheck"'
-    );
+    expect(manifest.deprecated_script_aliases ?? []).toEqual([]);
+    expect(manifest.deprecated_command_aliases ?? []).toEqual([]);
   });
 });
 

@@ -9,7 +9,7 @@ import {
 } from '../secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from '../voice/audio-device-lease.js';
 import { pathResolver } from '../path-resolver.js';
-import { clamp } from '../foundation/text.js';
+import { clamp, sanitizeIdSegment } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
 import {
@@ -158,7 +158,7 @@ function resolveAudioPlaybackAdapter(
 }
 
 function tonePathFor(deviceName: string): string {
-  const safeName = deviceName.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'output';
+  const safeName = sanitizeIdSegment(deviceName, { separator: '_', fallback: 'output' });
   const stamp = nowIso().replace(/[:.]/g, '-');
   return path.join(DEFAULT_TONE_DIR, `${safeName}-${stamp}.wav`);
 }

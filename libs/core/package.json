@@ -244,6 +244,10 @@
       "types": "./dist/agent/agent-adapter.d.ts",
       "default": "./dist/agent/agent-adapter.js"
     },
+    "./agent-execution-context": {
+      "types": "./dist/agent-execution-context.d.ts",
+      "default": "./dist/agent-execution-context.js"
+    },
     "./agent-registry": {
       "types": "./dist/agent/agent-registry.d.ts",
       "default": "./dist/agent/agent-registry.js"
@@ -7195,6 +7199,10 @@
     "./governance/charter-call-site": {
       "types": "./dist/governance/charter-call-site.d.ts",
       "default": "./dist/governance/charter-call-site.js"
+    },
+    "./governance/charter-decision-vocabulary": {
+      "types": "./dist/governance/charter-decision-vocabulary.d.ts",
+      "default": "./dist/governance/charter-decision-vocabulary.js"
     },
     "./governance/approval-digest": {
       "types": "./dist/governance/approval-digest.d.ts",

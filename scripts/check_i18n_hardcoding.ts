@@ -20,6 +20,7 @@ import {
   writeI18nHardcodingBaselineAtPath,
   type I18nHardcodingBaseline,
 } from '@agent/core/i18n-hardcoding-baseline';
+import { replaceElementBlocks } from '@agent/core/html-sanitize';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import {
@@ -244,19 +245,15 @@ export function scanHtmlForKanaLiterals(text: string, repoRelativePath: string):
   let exemptions = 0;
   const originalLines = text.split('\n');
   let markup = text.replace(/<!--[\s\S]*?-->/gu, blankOut);
-  markup = markup.replace(
-    /(<script\b[^<>]*>)([\s\S]*?)(<\/script[^<>]*>)/giu,
-    (_match, open: string, body: string, close: string) => {
-      const result = scanFileForKanaLiterals(body, `${repoRelativePath}.inline.js`);
-      count += result.count;
-      exemptions += result.exemptions;
-      return `${open}${blankOut(body)}${close}`;
-    }
-  );
-  markup = markup.replace(
-    /(<style\b[^>]*>)([\s\S]*?)(<\/style[^<>]*>)/giu,
-    (_match, open: string, body: string, close: string) => `${open}${blankOut(body)}${close}`
-  );
+  markup = replaceElementBlocks(markup, 'script', (body, open, close) => {
+    const result = scanFileForKanaLiterals(body, `${repoRelativePath}.inline.js`);
+    count += result.count;
+    exemptions += result.exemptions;
+    return `${open}${blankOut(body)}${close}`;
+  });
+  markup = replaceElementBlocks(markup, 'style', (body, open, close) => {
+    return `${open}${blankOut(body)}${close}`;
+  });
 
   const lineOf = (offset: number) => markup.slice(0, offset).split('\n').length - 1;
   const isExempt = (lineIndex: number) =>
