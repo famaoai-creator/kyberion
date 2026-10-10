@@ -9,8 +9,5 @@
  * existing `member-registry.js` importer.
  */
 
-const MEMBER_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
-
-export function isValidMemberId(value: string): boolean {
-  return MEMBER_ID_RE.test(value);
-}
+// The foundation scope leaf also serves contracts without pulling in domain code.
+export { isValidMemberId } from '../foundation/scope.js';
