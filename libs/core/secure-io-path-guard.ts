@@ -187,7 +187,11 @@ function onDiskLeaf(realDir: string, leaf: string): string {
   // Not a link: realpath returns the on-disk spelling without a listing.
   if (!stat.isSymbolicLink()) {
     try {
-      return path.basename(fs.realpathSync.native(candidate));
+      const real = fs.realpathSync.native(candidate);
+      // Only trust the spelling if realpath reached the entry we lstat'd (a
+      // leaf swapped for a link in between falls through to the listing).
+      const reached = fs.lstatSync(real);
+      if (reached.dev === stat.dev && reached.ino === stat.ino) return path.basename(real);
     } catch {
       return leaf;
     }
@@ -500,13 +504,13 @@ export function safeRealpath(filePath: string): string {
  *   while safeLinkExclusiveSync puts a displaced record back).
  * - Reads of package files under the root `node_modules/`, or under a
  *   workspace package's `node_modules/` the caller cannot write: the pnpm
- *   store links every package file into each project. The literal path must
- *   be one of those prefixes; nothing under `active/` or another writable
- *   tree qualifies.
+ *   store links every package file into each project. Decided on the
+ *   canonical path (see isTrustedNodeModulesRead).
  *
- * Writes that replace the entry (safeWriteFile, the copy destination: temp +
- * rename) never touch the old inode and need no check. Files outside the
- * repository (vault mounts) are judged by the vault allowance.
+ * Both exemptions apply only while the canonical path still names the inode
+ * the caller holds. A multi-link file outside the repository (vault mount
+ * target) gets no exemption. Writes that replace the entry (safeWriteFile,
+ * the copy destination: temp + rename) never touch the old inode.
  */
 export type HardLinkOperation = 'read' | 'write';
 
@@ -518,14 +522,16 @@ var WORKSPACE_NODE_MODULES =
   /^(?:libs\/core|libs\/shared-[^/]+|libs\/actuators\/[^/]+|satellites\/[^/]+|presence\/displays\/[^/]+|presence\/bridge\/[^/]+)\/node_modules\//;
 
 /** Read exemption for pnpm store links (see the block comment above). */
-function isTrustedNodeModulesRead(resolved: string): boolean {
+function isTrustedNodeModulesRead(canonical: string): boolean {
   // Decided on the CANONICAL path: root node_modules/ also holds pnpm's
   // workspace links (node_modules/@agent/core -> libs/core), so a literal
   // node_modules/ prefix can still land in a writable tree.
-  const canonical = canonicalGuardPath(resolved, 'follow');
   const relative = isInside(path.resolve(pathResolver.rootDir()), canonical);
   if (relative === undefined) return false;
   const posix = relative.split(path.sep).join('/');
+  // The pnpm content store: written only by the package manager. Exempt for
+  // every caller (SUDO included, whose write scope covers the whole root).
+  if (posix.startsWith('node_modules/.pnpm/')) return true;
   if (!posix.startsWith('node_modules/') && !WORKSPACE_NODE_MODULES.test(posix)) return false;
   // A caller that could plant a link at the canonical location gets no exemption.
   return !validateWritePermission(canonical).allowed;
@@ -580,12 +586,38 @@ export function assertNotForeignHardLink(
 ): void {
   if (!stat.isFile() || stat.nlink <= 1) return;
   const canonical = canonicalGuardPath(resolved, 'follow');
-  if (isInside(path.resolve(pathResolver.rootDir()), canonical) === undefined) return;
-  if (operation === 'read' && isTrustedNodeModulesRead(resolved)) return;
-  if (isLockTombPair(canonical, stat)) return;
+  // Every exemption below is judged on `canonical`, which is re-derived from
+  // the path after the caller opened or stat-ed the file. A component swapped
+  // in between would let the exemption be judged on one file while the bytes
+  // come from another, so an exemption applies only when `canonical` still
+  // names the very inode the caller holds.
+  // A multi-link file outside the repository (a vault mount target) gets no
+  // exemption: its other names cannot be pinned or judged from here.
+  if (sameInodeAt(canonical, stat)) {
+    if (operation === 'read' && isTrustedNodeModulesRead(canonical)) return;
+    if (isLockTombPair(canonical, stat)) return;
+  }
   throw new Error(
     `[SECURITY] Refusing to ${operation} ${displayPath}: it is a hard link (nlink=${stat.nlink}); its other names may live in another scope`
   );
+}
+
+/**
+ * True when `canonical` (inside the checkout) currently resolves to the inode
+ * `held`. Inode 0 is unverifiable; a path outside the checkout is never pinned.
+ */
+function sameInodeAt(canonical: string, held: fs.Stats): boolean {
+  if (held.ino === 0) return false;
+  const target = path.resolve(canonical);
+  let now: fs.Stats | undefined;
+  try {
+    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
+      now = fs.statSync(target);
+    else if (target.startsWith(realRoot().real + path.sep)) now = fs.statSync(target);
+  } catch {
+    return false;
+  }
+  return now !== undefined && now.dev === held.dev && now.ino === held.ino;
 }
 
 /**

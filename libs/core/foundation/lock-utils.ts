@@ -183,7 +183,7 @@ export function releaseLock(resourceId: string): void {
   const io = requireLockIo();
   if (io.exists(lockFile)) {
     try {
-      const content = io.loadJson<{ pid?: number }>(lockFile);
+      const content = loadLockRecord<{ pid?: number }>(io, lockFile);
       if (content.pid === process.pid) {
         io.unlink(lockFile);
       }
@@ -213,6 +213,34 @@ function errorCode(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException)?.code;
 }
 
+/**
+ * Read a lock record. While a displaced record is put back, `<file>` and its
+ * `<file>.stale-*` tomb are two links of one inode, and secure-io refuses to
+ * read the `<file>` side (it cannot tell where a hard link's other names
+ * live without listing the directory). The tomb side is readable and has the
+ * same bytes, so read the record through it rather than mistake a live owner's
+ * record for an unreadable one (release would then leave it behind).
+ */
+function loadLockRecord<T>(io: LockIo, file: string): T {
+  try {
+    return io.loadJson<T>(file);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '';
+    if (!message.includes('hard link') || !io.readdir) throw error;
+    const dir = path.dirname(file);
+    const prefix = `${path.basename(file)}.stale-`;
+    for (const name of io.readdir(dir)) {
+      if (!name.startsWith(prefix) || !TOMB_PATTERN.test(name)) continue;
+      try {
+        return io.loadJson<T>(path.join(dir, name));
+      } catch {
+        // not the tomb of this record, or gone: try the next one
+      }
+    }
+    throw error;
+  }
+}
+
 /** Only content problems make a record 'unknown'; I/O failures do not. */
 function isMalformedRecordError(error: unknown): boolean {
   if (error instanceof SyntaxError) return true;
@@ -234,7 +262,7 @@ function inspectRecord(file: string): LockRecordView {
     statAge = undefined;
   }
   try {
-    content = io.loadJson<Record<string, unknown> | null>(file);
+    content = loadLockRecord<Record<string, unknown> | null>(io, file);
   } catch (error: unknown) {
     if (errorCode(error) === 'ENOENT') return { state: 'missing' };
     if (isMalformedRecordError(error)) return { state: 'unknown', ageMs: statAge };
