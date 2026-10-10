@@ -71,8 +71,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
     const missionId = id.toUpperCase();
     // Only missions the hygiene report currently classifies as stalled are
-    // actionable here — the card list and this guard read the same report, so
-    // the route can never reach beyond what the operator was shown.
+    // actionable here, within the viewer's full authorized scope (not the
+    // rail's selected company — the list is narrowed, this write is not). The
+    // decision authorizes against the mission's own tenant below.
     const inquiry = findHygieneInquiry(missionId, resolved.context);
     if (!inquiry) {
       return NextResponse.json({ ok: false, error: t('api.hygiene.not_found') }, { status: 404 });

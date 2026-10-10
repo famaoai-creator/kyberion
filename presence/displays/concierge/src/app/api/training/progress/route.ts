@@ -12,7 +12,8 @@ import {
   readTrainingProgress,
   summarizeTrainingProgress,
 } from '@agent/core/training-catalog';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { conciergeErrorResponse } from '../../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
 import { conciergeFrontDeskRoleForTenant } from '../../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
@@ -28,7 +29,7 @@ export const dynamic = 'force-dynamic';
  * presence-studio surface.
  */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   // The overview spans every tenant the caller is an owner of — a resolved

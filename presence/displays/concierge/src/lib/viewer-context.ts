@@ -47,6 +47,11 @@ export interface ConciergeViewerContext {
   memberId?: string;
   /** The seam-resolved principal (authz policy-engine input). */
   principal?: ResolvedPrincipal;
+  /**
+   * Set only by the system selection (`tenantSlugs: []`): reads also admit
+   * records that carry no tenant. Routes that ignore it show nothing.
+   */
+  includeUntenanted?: boolean;
 }
 
 export class ConciergeViewerError extends Error {

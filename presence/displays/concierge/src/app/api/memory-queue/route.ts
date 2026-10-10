@@ -4,7 +4,9 @@ import {
   type MemoryCandidate,
 } from '@agent/core/knowledge/memory-promotion-queue';
 import { withExecutionContext } from '@agent/core/authority';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
+import { tenantVisibleToViewer } from '../../../lib/tenant-visibility';
+import { conciergeErrorResponse } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +48,7 @@ function toItem(candidate: MemoryCandidate): MemoryQueueItem {
 }
 
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const candidates = withExecutionContext('sovereign_concierge', () =>
@@ -58,12 +60,7 @@ export function GET(req: NextRequest) {
       .filter(
         (candidate) =>
           resolved.context.tierAccess.includes(candidate.sensitivity_tier) &&
-          (resolved.context.tenantSlugs === 'all'
-            ? true
-            : Boolean(
-                candidate.scope?.tenant_slug &&
-                resolved.context.tenantSlugs.includes(candidate.scope.tenant_slug)
-              ))
+          tenantVisibleToViewer(resolved.context, candidate.scope?.tenant_slug)
       )
       .sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)));
     return NextResponse.json({ ok: true, candidates: candidates.map(toItem) });
