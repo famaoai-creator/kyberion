@@ -76,6 +76,8 @@ function errnoCode(error: unknown): string {
     'ENAMETOOLONG',
     'EISDIR',
     'EOUTSIDE',
+    'ENXIO',
+    'EOPNOTSUPP',
   ];
   for (const code of known) if (raw === code) return code;
   return 'EUNKNOWN';
@@ -84,6 +86,15 @@ function errnoCode(error: unknown): string {
 function rethrowAsErrno(error: unknown, operation: string): never {
   const code = errnoCode(error);
   throw Object.assign(new Error(`${operation} failed (${code})`), { code });
+}
+
+/** open(2) whose failure carries only the errno, never the absolute path. */
+function openOrErrno(target: string, flags: number, operation: string): number {
+  try {
+    return fs.openSync(target, flags);
+  } catch (error) {
+    rethrowAsErrno(error, operation);
+  }
 }
 
 /*
@@ -422,24 +433,23 @@ export function openInPlace(
     throw new Error(`[SECURITY] Unsupported in-place open flag '${flags}' for ${displayPath}`);
   }
   // Non-blocking: a FIFO (or a link flipped to one) must not hang the caller.
-  let open = base[flags] | (c.O_NONBLOCK ?? 0);
+  let open = base[flags] | (c.O_NONBLOCK ?? 0) | (c.O_NOCTTY ?? 0);
   if (noFollow) open |= c.O_NOFOLLOW ?? 0;
-  const creates = flags.startsWith('a');
-  let fd: number | undefined;
-  if (!flags.startsWith('ax')) {
-    try {
-      fd = fs.openSync(resolved, open);
-    } catch (error) {
-      if (!creates || errnoCode(error) !== 'ENOENT') rethrowAsErrno(error, 'open');
-    }
-  }
-  let created = false;
+  const exclusiveOnly = flags.startsWith('ax');
+  let fd = exclusiveOnly ? undefined : openExisting(resolved, open, flags.startsWith('a'));
   if (fd === undefined) {
-    // Create only a new entry, never through a (dangling) link: O_EXCL with
-    // O_NOFOLLOW fails on any existing leaf instead of creating its target.
-    const exclusive = open | c.O_CREAT | c.O_EXCL | (c.O_NOFOLLOW ?? 0);
-    fd = fs.openSync(resolved, exclusive, mode);
-    created = true;
+    fd = createInVettedDir(resolved, displayPath, open, operation, mode);
+    if (fd === undefined) {
+      // EEXIST: a concurrent appender created it first. Open that file (never
+      // a dangling leaf link: open without O_CREAT fails on it).
+      if (exclusiveOnly) {
+        throw Object.assign(new Error('open failed (EEXIST)'), { code: 'EEXIST' });
+      }
+      fd = openExisting(resolved, open, true);
+      if (fd === undefined) {
+        throw new Error(`[SECURITY] Refusing to ${operation} ${displayPath}: dangling link`);
+      }
+    }
   }
   let accepted = false;
   try {
@@ -451,30 +461,70 @@ export function openInPlace(
     accepted = true;
     return fd;
   } finally {
-    if (!accepted) {
-      if (created) removeCreatedEntry(fd, resolved);
-      fs.closeSync(fd);
-    }
+    // A file this call created is left in place when vetting fails: deleting
+    // by path could be redirected (a parent flipped) onto a protected file.
+    if (!accepted) fs.closeSync(fd);
+  }
+}
+
+/** open(2) without O_CREAT; undefined when the entry is missing and that is allowed. */
+function openExisting(resolved: string, open: number, missingOk: boolean): number | undefined {
+  try {
+    return fs.openSync(resolved, open);
+  } catch (error) {
+    if (!missingOk || errnoCode(error) !== 'ENOENT') rethrowAsErrno(error, 'open');
+    return undefined;
   }
 }
 
 /**
- * Undo a create whose vetting failed: unlink the new entry at `resolved`
- * only while it is still the inode just created (no leaf link: it was
- * created O_NOFOLLOW) and inside the checkout.
+ * Create a new file (O_CREAT|O_EXCL|O_NOFOLLOW: never through a leaf link)
+ * in the parent directory as opened and authorized, not as named later. On
+ * Linux the create goes through the held directory descriptor
+ * (/proc/self/fd/<n>/<name>, an openat), so a parent component flipped after
+ * the check cannot redirect it; elsewhere the create is by path and the
+ * parent must still be the inode held afterwards. Returns undefined on
+ * EEXIST (a concurrent creator won).
  */
-function removeCreatedEntry(fd: number, resolved: string): void {
+function createInVettedDir(
+  resolved: string,
+  displayPath: string,
+  open: number,
+  operation: HardLinkOperation,
+  mode?: number
+): number | undefined {
+  const c = fs.constants;
+  const parent = path.dirname(resolved);
+  const name = path.basename(resolved);
+  const changed = `[SECURITY] Refusing to ${operation} ${displayPath}: the directory changed between the permission check and the create`;
+  let dirFd: number;
   try {
-    const mine = fs.fstatSync(fd);
-    const target = path.resolve(resolved);
-    let entry: fs.Stats | undefined;
-    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
-      entry = fs.lstatSync(target);
-    else if (target.startsWith(realRoot().real + path.sep)) entry = fs.lstatSync(target);
-    if (entry && entry.dev === mine.dev && entry.ino === mine.ino && entry.size === 0)
-      fs.unlinkSync(target);
-  } catch {
-    // best effort: a concurrent change already moved the entry
+    const dirFlags = c.O_RDONLY | (c.O_DIRECTORY ?? 0) | (c.O_NONBLOCK ?? 0) | (c.O_NOCTTY ?? 0);
+    dirFd = fs.openSync(parent, dirFlags);
+  } catch (error) {
+    rethrowAsErrno(error, 'open');
+  }
+  try {
+    const heldDir = fs.fstatSync(dirFd);
+    const dirAt = heldDir.isDirectory() ? openedLocation(dirFd, parent, heldDir) : undefined;
+    if (dirAt === undefined) throw new Error(changed);
+    assertAuthorizedAt(path.join(dirAt, name), displayPath, operation);
+    const viaFd = procFdAvailable();
+    const exclusive = open | c.O_CREAT | c.O_EXCL | (c.O_NOFOLLOW ?? 0);
+    let fd: number;
+    try {
+      fd = fs.openSync(viaFd ? `/proc/self/fd/${dirFd}/${name}` : resolved, exclusive, mode);
+    } catch (error) {
+      if (errnoCode(error) === 'EEXIST') return undefined;
+      rethrowAsErrno(error, 'open');
+    }
+    if (!viaFd && !leafIsInode(canonicalGuardPath(parent, 'follow'), heldDir)) {
+      fs.closeSync(fd);
+      throw new Error(`${changed} (an empty file may remain at ${displayPath})`);
+    }
+    return fd;
+  } finally {
+    fs.closeSync(dirFd);
   }
 }
 
@@ -489,7 +539,8 @@ export function openDirVetted(
   authorizedCanonical?: string
 ): number {
   const c = fs.constants;
-  const fd = fs.openSync(resolved, c.O_RDONLY | (c.O_DIRECTORY ?? 0) | (c.O_NONBLOCK ?? 0));
+  const dirFlags = c.O_RDONLY | (c.O_DIRECTORY ?? 0) | (c.O_NONBLOCK ?? 0) | (c.O_NOCTTY ?? 0);
+  const fd = openOrErrno(resolved, dirFlags, 'open');
   let accepted = false;
   try {
     if (!fs.fstatSync(fd).isDirectory()) {
@@ -507,7 +558,7 @@ export function openDirVetted(
 export function readdirVetted(resolved: string, displayPath: string): string[] {
   const fd = openDirVetted(resolved, displayPath, 'read');
   try {
-    if (process.platform === 'linux') {
+    if (procFdAvailable()) {
       try {
         return fs.readdirSync(`/proc/self/fd/${fd}`);
       } catch {
@@ -559,10 +610,15 @@ export function vetOpenedFd(
  * anything else (sockets, FIFOs, devices) is pinned by path identity.
  */
 export function statVetted(resolved: string, displayPath: string): fs.Stats {
-  const peek = fs.statSync(resolved);
+  let peek: fs.Stats;
+  try {
+    peek = fs.statSync(resolved);
+  } catch (error) {
+    rethrowAsErrno(error, 'stat');
+  }
   if (peek.isFile() || peek.isDirectory()) {
-    const { O_RDONLY, O_NONBLOCK } = fs.constants;
-    const fd = fs.openSync(resolved, O_RDONLY | (O_NONBLOCK ?? 0));
+    const { O_RDONLY, O_NONBLOCK, O_NOCTTY } = fs.constants;
+    const fd = openOrErrno(resolved, O_RDONLY | (O_NONBLOCK ?? 0) | (O_NOCTTY ?? 0), 'stat');
     try {
       return vetOpenedFd(fd, resolved, displayPath, 'read');
     } finally {
@@ -579,10 +635,29 @@ export function statVetted(resolved: string, displayPath: string): fs.Stats {
   return peek;
 }
 
+// eslint-disable-next-line no-var
+var procFdDisabled: boolean | undefined;
+
+/** Whether /proc/self/fd may be used (Linux); tests force the portable fallback. */
+function procFdAvailable(): boolean {
+  return process.platform === 'linux' && procFdDisabled !== true;
+}
+
+/**
+ * Test seam: disable the /proc/self/fd fast path so the portable fallback
+ * (re-derived canonical path + inode identity, used on macOS and Windows)
+ * runs on Linux CI too. Returns the previous setting.
+ */
+export function setProcFdLookupDisabledForTesting(disabled: boolean): boolean {
+  const previous = procFdDisabled === true;
+  procFdDisabled = disabled;
+  return previous;
+}
+
 /** Where the opened file actually lives (logical-root form), or undefined if it cannot be pinned. */
 function openedLocation(fd: number, resolved: string, held: fs.Stats): string | undefined {
   if (held.ino === 0) return undefined;
-  if (process.platform === 'linux') {
+  if (procFdAvailable()) {
     try {
       const link = fs.readlinkSync(`/proc/self/fd/${fd}`);
       if (path.isAbsolute(link) && !link.endsWith(' (deleted)')) return toLogicalRoot(link);
@@ -598,11 +673,16 @@ function openedLocation(fd: number, resolved: string, held: fs.Stats): string | 
 function leafIsInode(canonical: string, held: fs.Stats): boolean {
   if (held.ino === 0) return false;
   const target = path.resolve(canonical);
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  const physicalRoot = realRoot().real;
   let now: { dev: number; ino: number } | undefined;
   try {
-    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
-      now = fs.lstatSync(target);
-    else if (target.startsWith(realRoot().real + path.sep)) now = fs.lstatSync(target);
+    // The checkout root itself is a valid target (a walk starts by listing
+    // it); it is neither "under" the root nor a vault target.
+    if (target === logicalRoot) now = fs.lstatSync(logicalRoot);
+    else if (target === physicalRoot) now = fs.lstatSync(physicalRoot);
+    else if (target.startsWith(logicalRoot + path.sep)) now = fs.lstatSync(target);
+    else if (target.startsWith(physicalRoot + path.sep)) now = fs.lstatSync(target);
     else now = vaultTargetIdentity(target);
   } catch {
     return false;
@@ -876,31 +956,31 @@ export function copyReplacing(resolvedSrc: string, srcPath: string, resolvedDest
   }
 }
 
-/** chmod through an fd for regular files, so a foreign hard link is refused. */
+/**
+ * chmod through a vetted descriptor (files and directories only), so neither
+ * a foreign hard link nor a link flipped after the check is changed. Sockets,
+ * FIFOs and devices are refused: Node has no lchmod on Linux, so a chmod by
+ * path could follow a leaf link flipped onto a protected file. A process that
+ * needs a private socket binds it under a restrictive umask.
+ */
 export function chmodInPlace(
   resolved: string,
   displayPath: string,
   mode: number,
   authorizedCanonical?: string
 ): void {
-  // Through a vetted descriptor for files and directories. A Unix socket
-  // cannot be opened: it is chmod'ed at its canonical path after an identity
-  // pin. FIFOs and devices are refused.
   const c = fs.constants;
-  const peek = fs.statSync(resolved);
-  if (peek.isSocket()) {
-    const canonical = canonicalGuardPath(resolved, 'follow');
-    if (!leafIsInode(canonical, peek)) {
-      throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: the entry changed`);
+  let fd: number;
+  try {
+    fd = fs.openSync(resolved, c.O_RDONLY | (c.O_NONBLOCK ?? 0) | (c.O_NOCTTY ?? 0));
+  } catch (error) {
+    const code = errnoCode(error);
+    if (code === 'ENXIO' || code === 'EOPNOTSUPP') {
+      // open(2) of a Unix socket (Linux: ENXIO, macOS: EOPNOTSUPP)
+      throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: not a file or directory`);
     }
-    if (canonical !== authorizedCanonical) assertAuthorizedAt(canonical, displayPath, 'write');
-    const target = path.resolve(canonical);
-    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
-      return fs.chmodSync(target, mode);
-    if (target.startsWith(realRoot().real + path.sep)) return fs.chmodSync(target, mode);
-    throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: outside the repository`);
+    rethrowAsErrno(error, 'chmod');
   }
-  const fd = fs.openSync(resolved, c.O_RDONLY | (c.O_NONBLOCK ?? 0));
   try {
     const held = fs.fstatSync(fd);
     if (!held.isFile() && !held.isDirectory()) {
