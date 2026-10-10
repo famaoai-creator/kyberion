@@ -236,15 +236,22 @@ export function main(
     print(JSON.stringify(result.attestation, null, 2));
     return;
   }
-  const result = withExecutionContext('sovereign_concierge', () =>
-    mutateTenant({
-      verb: args.command as TenantLifecycleVerb,
-      slug: args.slug!,
-      displayName: args.displayName,
-      assignedRole: args.assignedRole,
-      knowledgeRoot: args.knowledgeRoot,
-      apply: args.apply,
-    })
+  // Bind to the target tenant (as attest-provider does above) so the mutation
+  // carries its own scope: creating or mutating tenant data must not depend on
+  // whichever tenant the operator's persisted scope happens to point at.
+  const result = withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      mutateTenant({
+        verb: args.command as TenantLifecycleVerb,
+        slug: args.slug!,
+        displayName: args.displayName,
+        assignedRole: args.assignedRole,
+        knowledgeRoot: args.knowledgeRoot,
+        apply: args.apply,
+      }),
+    undefined,
+    args.slug
   );
   print(JSON.stringify(result, null, 2));
 }

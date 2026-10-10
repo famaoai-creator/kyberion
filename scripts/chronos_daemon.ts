@@ -457,15 +457,27 @@ async function runTenantPipelineInChild(
  */
 export function readScheduledPipelineAdf(fullPath: string): {
   scope: ChronosPipelineScope;
+  /** null when the file is valid JSON but not a pipeline ADF (e.g. a design
+   *  protocol document sharing the directory) — the caller skips it quietly. */
   adf: any;
 } {
   const scope = assertChronosPipelinePath(fullPath);
-  const readAdf = () =>
-    readValidatedPipelineAdf(fullPath, {
+  const readAdf = () => {
+    // Only `action: 'pipeline'` documents are ADF pipelines. Data files under
+    // pipelines/ (e.g. PPTX design protocols listed in pipeline-adf-contract's
+    // KNOWN_DATA_FILES) fail schema validation by design; warning about them
+    // on every tick is noise, so they are skipped before validation.
+    const parsed = parseSafeJsonInput(
+      String(safeReadFile(fullPath, { encoding: 'utf8' })),
+      fullPath
+    ) as Record<string, unknown> | null;
+    if (!parsed || parsed.action !== 'pipeline') return null;
+    return readValidatedPipelineAdf(fullPath, {
       // Chronos only registers pipeline files through its governed
       // scheduler path; make that trust decision explicit for the loader.
       trustResolved: true,
     });
+  };
   if (scope.kind === 'repository') return { scope, adf: readAdf() };
   assertRegisteredTenantPipeline(scope);
   return {
@@ -482,9 +494,11 @@ function syncSchedulesFromAdf(): void {
 
   const desired: Array<Parameters<typeof reconcileScheduledPipelines>[1][number]> = [];
   for (const fullPath of [...files, ...tenantFiles.map((entry) => entry.file)]) {
+    // `_`-prefixed JSON files are test fixtures / partials — never schedulable.
+    if (path.basename(fullPath).startsWith('_')) continue;
     try {
       const { scope, adf } = readScheduledPipelineAdf(fullPath);
-      if (!adf.schedule?.cron) continue;
+      if (!adf || !adf.schedule?.cron) continue;
       // Refuse to schedule a tenant pipeline whose runtime needs exceed its
       // tenant allowlist or the global ceiling (re-checked at run time too).
       if (scope.kind === 'tenant') resolveTenantRuntimeEnv(scope, adf.runtime);

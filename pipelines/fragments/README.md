@@ -2,6 +2,16 @@
 
 このディレクトリには、複数のパイプラインで再利用可能な ADF (Agentic Data Format) のステップ群（Fragments）を配置します。
 
+## Chronos との関係
+
+- Fragments は単独ではスケジュールされない（`schedule` を持たない）。chronos daemon は
+  `pipelines/` 配下の JSON をすべて走査するが、`action: "pipeline"` でない文書（データ
+  プロトコル等）は検証せずスキップし、`_` プレフィックスのファイルはテスト fixture /
+  partial として常にスキップする。
+- 同じ fragment を同一 ADF 内で二度 include すると include 展開で node id が衝突する。
+  同じチェックを二箇所に使いたい場合は、片方を一意な `id` を持つインライン step にする
+  （`avatar-runtime-preflight.json` / `voice-profile-runtime-preflight.json` 参照）。
+
 ## 新規追加された Deterministic Fragments
 
 ### 1. `executive-report-patrol.json`

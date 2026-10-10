@@ -8123,6 +8123,11 @@
         "ja": "Chronos スケジューラーデーモンを実行",
         "qps-ploc": "⟦Řůñ ŧħė Ƈħřőñőş şƈħėḓůŀėř ḓȧėɱőñ ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_nhi": {
+        "en": "Issue and manage non-human identities (NHI ledger)",
+        "ja": "非人間アイデンティティ（NHI レジャー）の発行と管理",
+        "qps-ploc": "⟦Ïşşůė ȧñḓ ɱȧñȧɠė ñőñ-ħůɱȧñ ïḓėñŧïŧïėş (ÑĦÏ ŀėḓɠėř) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
       "cli_cmd_script_chronos_install": {
         "en": "Install the Chronos launchd agent",
         "ja": "Chronos の launchd エージェントをインストール",
@@ -8132,6 +8137,16 @@
         "en": "Show Chronos launchd uninstall steps",
         "ja": "Chronos の launchd アンインストール手順を表示",
         "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_chronos_restart": {
+        "en": "Restart the Chronos daemon via the host service manager",
+        "ja": "ホストのサービスマネージャ経由で Chronos デーモンを再起動",
+        "qps-ploc": "⟦Řėşŧȧřŧ ŧħė Ƈħřőñőş ḓȧėɱőñ ṽïȧ ŧħė ħőşŧ şėřṽïƈė ɱȧñȧɠėř ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_chronos_status": {
+        "en": "Show the Chronos daemon's service-manager status",
+        "ja": "Chronos デーモンのサービスマネージャ状態を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė Ƈħřőñőş ḓȧėɱőñ'ş şėřṽïƈė-ɱȧñȧɠėř şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "cli_cmd_script_learning_harvest": {
         "en": "Propose recurring runtime failures as learning candidates",
