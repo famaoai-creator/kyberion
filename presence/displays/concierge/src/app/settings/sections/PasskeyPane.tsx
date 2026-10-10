@@ -4,6 +4,8 @@ import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 
 import * as React from 'react';
 import { Button, SettingsGroup } from '@agent/shared-ui';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
+import type { ConciergeLocale } from '../../../lib/i18n';
 import {
   parsePasskeyList,
   passkeyCoolingDown,
@@ -22,7 +24,7 @@ type Message = { text: string; error?: boolean } | null;
  * Once a usable passkey exists, adding or removing one is confirmed with it;
  * a passkey added without that confirmation waits out the enrollment cooldown.
  */
-export function PasskeyPane({ t }: { t: SettingsTranslate }) {
+export function PasskeyPane({ locale, t }: { locale: ConciergeLocale; t: SettingsTranslate }) {
   const [passkeys, setPasskeys] = React.useState<PasskeySummary[] | null>(null);
   const [stepUp, setStepUp] = React.useState(false);
   const [label, setLabel] = React.useState('');
@@ -82,7 +84,7 @@ export function PasskeyPane({ t }: { t: SettingsTranslate }) {
                 {passkey.label} · {passkey.created_at.slice(0, 10)}
                 {passkeyCoolingDown(passkey) && passkey.usable_after
                   ? ` · ${t('setup.passkey_cooling', {
-                      when: new Date(passkey.usable_after).toLocaleString(),
+                      when: new Date(passkey.usable_after).toLocaleString(localeToBcp47(locale)),
                     })}`
                   : null}
               </span>

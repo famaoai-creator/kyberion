@@ -1058,7 +1058,7 @@ export default function SettingsPage() {
             sectionRef={setSectionRef('profile')}
           >
             <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
-            <PasskeyPane t={t} />
+            <PasskeyPane locale={locale} t={t} />
           </ProfileSection>
         );
 
