@@ -94,18 +94,36 @@ function assertHttpUrl(raw: string): URL {
   return parsed;
 }
 
+function stripElementBlocks(html: string, tag: 'script' | 'style'): string {
+  const pattern = new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}[^>]*>`, 'gi');
+  let out = html;
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(pattern, ' ');
+  } while (out !== prev);
+  return out;
+}
+
+function stripTags(html: string): string {
+  let out = html;
+  while (out.includes('<')) {
+    const next = out.replace(/<[^>]*>/g, ' ');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 function extractPlainText(html: string): string {
-  const withoutScripts = html
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ');
-  const withoutTags = withoutScripts.replace(/<[^>]*>/g, ' ');
+  const withoutTags = stripTags(stripElementBlocks(stripElementBlocks(html, 'script'), 'style'));
   return withoutTags
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&')
     .replace(/\s+/g, ' ')
     .trim();
 }

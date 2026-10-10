@@ -67,6 +67,20 @@ function getAllTags(xml: string, tag: string): string[] {
   return results;
 }
 
+/**
+ * Remove tags until stable so malformed markup (`<<t>`) cannot leave a
+ * re-formed tag behind.
+ */
+function stripTags(xml: string): string {
+  let out = xml;
+  while (out.includes('<')) {
+    const next = out.replace(/<[^<>]+>/g, '');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 function emuToNum(emu: string | undefined): number {
   if (!emu) return 0;
   return parseInt(emu) || 0;
@@ -968,7 +982,7 @@ async function extractWorkbook(zip: JSZip): Promise<{
   const dnSource = dnTags.length > 0 ? dnTags : getAllTags(xml, 'x:definedName');
   for (const dn of dnSource) {
     const name = getAttr(dn, 'name') || '';
-    const value = dn.replace(/<[^<>]+>/g, '').trim();
+    const value = stripTags(dn).trim();
     const localSheetId = getAttr(dn, 'localSheetId');
     result.definedNames.push({
       name,

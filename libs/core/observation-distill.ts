@@ -8,6 +8,8 @@
  * and HTTP-response (network) observation families.
  */
 
+import { htmlToPreviewText } from './html-sanitize.js';
+
 export interface DistillTextOptions {
   maxHeadLines?: number;
   maxTailLines?: number;
@@ -113,12 +115,7 @@ export function distillHttpResponse(
       if (links.length >= maxLinks) break;
       links.push(match[1]);
     }
-    const stripped = text
-      .replace(/<script\b[^<>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^<>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^<>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const stripped = htmlToPreviewText(text).replace(/\s+/g, ' ').trim();
     return {
       kind: 'html',
       total_chars: text.length,

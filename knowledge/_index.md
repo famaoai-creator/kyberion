@@ -99,6 +99,7 @@
 - [Kyberion Scenario Coverage Matrix](./product/architecture/kyberion-scenario-coverage-matrix.md) (public | Unknown)
 - [Kyberion Surface UX Architecture](./product/architecture/kyberion-surface-ux-architecture.md) (public | Ecosystem Architect)
 - [Kyberion コンセプト評価と実装改善計画](./product/architecture/kyberion-concept-evaluation-2026-04-26.md) (public | Codex)
+- [Kyberion 性能・リソース効率レビューと Luna 向け改善計画](./product/architecture/performance-resource-review-luna-plan-20261007.md) (public | Unknown)
 - [LLM Execution Boundary](./product/architecture/llm-execution-boundary.md) (public | Unknown)
 - [Lightpanda as a Browser Automation Runtime Provider — Evaluation](./product/architecture/lightpanda-browser-runtime-evaluation.md) (public | ecosystem_architect)
 - [Loop Closure Machinery — 4つの自己改善ループの実装地図](./product/architecture/loop-closure-machinery.md) (public | Unknown)

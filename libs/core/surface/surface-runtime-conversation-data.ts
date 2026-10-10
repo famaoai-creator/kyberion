@@ -8,6 +8,7 @@ import {
 } from './surface-conversation-runtime-context.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { htmlToPreviewText } from '../html-sanitize.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
@@ -843,10 +844,7 @@ export async function handleTaskSessionRoute(
       const rawHtml = extractExternalResponseText(fetchResult);
 
       // 2. Strip HTML tags and extract readable text
-      const plainTextRaw = String(rawHtml)
-        .replace(/<script[^<>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^<>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^<>]+>/g, ' ')
+      const plainTextRaw = htmlToPreviewText(String(rawHtml))
         .replace(/&nbsp;/g, ' ')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')

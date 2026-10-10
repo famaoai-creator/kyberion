@@ -457,11 +457,10 @@ export function saveBrowserOnboardingVoiceSample(input: {
     .toLowerCase();
   const extension = extensionByType[contentType];
   if (!extension) throw new Error(`unsupported voice sample content type: ${contentType}`);
-  if (
-    !Buffer.isBuffer(input.data) ||
-    input.data.length === 0 ||
-    input.data.length > 12 * 1024 * 1024
-  ) {
+  if (!Buffer.isBuffer(input.data)) {
+    throw new Error('voice sample must be between 1 byte and 12 MiB');
+  }
+  if (input.data.length === 0 || input.data.length > 12 * 1024 * 1024) {
     throw new Error('voice sample must be between 1 byte and 12 MiB');
   }
   const sampleDir = assertSafeRepositoryPath(

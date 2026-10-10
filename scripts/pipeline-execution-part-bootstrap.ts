@@ -1214,21 +1214,19 @@ export async function runInlineCoreTransform(
   // script's `Number(input)` into NaN. Only an absent input means "whole ctx".
   const input = resolveVars(params.input ?? ctx, ctx);
   const script = String(params.script || 'input');
-  // Wrap in IIFE so pipeline scripts can use `return` statements naturally
-  const wrappedScript = `(function() { ${script} })()`;
-  const sandbox = {
-    Buffer,
-    input,
-    ctx: { ...ctx },
-    console: {
-      log: (...args: any[]) =>
-        logger.info(
-          `[TRANSFORM-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
-        ),
-    },
+  // Compile the declared contract body as a function (parameters instead of
+  // string interpolation) so pipeline scripts can use `return` naturally.
+  const consoleShim = {
+    log: (...args: any[]) =>
+      logger.info(
+        `[TRANSFORM-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
+      ),
   };
-  vm.createContext(sandbox);
-  const result = await new vm.Script(wrappedScript).runInContext(sandbox);
+  const parsingContext = vm.createContext({});
+  const transform = vm.compileFunction(script, ['input', 'ctx', 'Buffer', 'console'], {
+    parsingContext,
+  });
+  const result = await transform(input, { ...ctx }, Buffer, consoleShim);
   const transformKey = resolveExportKey(step, 'last_transform');
   ctx = { ...ctx, [transformKey]: result };
   return ctx;
