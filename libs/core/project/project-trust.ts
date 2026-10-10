@@ -14,6 +14,12 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { pathResolver } from '../path-resolver.js';
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+  type ApprovalRequesterRef,
+} from '../governance/approval-requester.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
 import { isBuiltinPipelineResource } from '../trust-requiring-resources.js';
@@ -149,6 +155,8 @@ function isProjectTrustRequest(record: ApprovalRequestRecord, relativePath: stri
 export function createProjectTrustApprovalRequest(params: {
   inputPath: string;
   requestedBy?: string;
+  /** The requester the entry point resolved (overrides `requestedBy`). */
+  requester?: ApprovalRequesterInput;
   /** Defaults to a project-local pipeline. */
   resource?: ProjectTrustResource;
 }): ApprovalRequestRecord {
@@ -181,13 +189,17 @@ export function createProjectTrustApprovalRequest(params: {
   );
   if (existing && !isApprovalRequestExpired(existing)) return existing;
 
-  const requestedBy = params.requestedBy?.trim() || 'project-trust-cli';
+  const requester: ApprovalRequesterRef = params.requester
+    ? resolveApprovalRequesterInput(params.requester)
+    : { requestedBy: params.requestedBy?.trim() || 'project-trust-cli' };
+  const requestedBy = requester.requestedBy;
   return createApprovalRequest('mission_controller', {
     channel: PROJECT_TRUST_APPROVAL_CHANNEL,
     storageChannel: PROJECT_TRUST_APPROVAL_CHANNEL,
     threadTs: binding,
     correlationId: binding,
     requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'channel-approval',
     draft: {
       title: card.title,
@@ -197,7 +209,7 @@ export function createProjectTrustApprovalRequest(params: {
     },
     requestedByContext: {
       surface: 'terminal',
-      actorId: requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'project-trust',
     },
     justification: {

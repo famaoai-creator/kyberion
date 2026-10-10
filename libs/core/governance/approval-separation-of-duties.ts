@@ -131,15 +131,31 @@ export function isSeparationOfDutiesEnabled(): boolean {
 }
 
 /**
- * Whether an already-approved record may be turned into an effect under the
- * current separation-of-duties setting. `null` when usable (or the setting is
- * off); otherwise the violation and the decider it concerns.
+ * Why an approved record cannot be turned into an effect: a separation-of-duties
+ * violation (only while the setting is on), or `revoked` — revoked through
+ * `revokeApprovalRequest`, refused whatever the setting.
+ */
+export type ApprovalUnusableReason = SeparationOfDutiesViolation | 'revoked';
+
+/** The command that revokes an approved record (further uses refused). */
+export function approvalRevokeCommand(requestId: string): string {
+  return `pnpm kyberion approvals --revoke ${requestId}`;
+}
+
+/**
+ * Whether an already-approved record may be turned into an effect. `null` when
+ * usable; otherwise the reason and the principal it concerns (the decider, or
+ * for `revoked` the revoker). A revoked record is refused whatever the
+ * separation-of-duties setting; the separation check runs only while it is on.
  */
 export function evaluateApprovalUsability(
   record: ApprovalRequestRecord,
   /** The consumer asking (registry: approval-sod-consumers.contract.test.ts); not audited. */
   _context?: { consumer: string }
-): { violation: SeparationOfDutiesViolation; decidedBy: string } | null {
+): { violation: ApprovalUnusableReason; decidedBy: string } | null {
+  if (record.revocation) {
+    return { violation: 'revoked', decidedBy: record.revocation.revokedBy };
+  }
   if (!resolveSeparationOfDutiesPolicy().enabled) return null;
   for (const decision of approvingDecisions(record)) {
     const violation = evaluateSeparationOfDuties(
@@ -159,7 +175,7 @@ export function evaluateApprovalUsability(
 
 export function auditSeparationOfDutiesRefusal(params: {
   record: ApprovalRequestRecord;
-  violation: SeparationOfDutiesViolation;
+  violation: ApprovalUnusableReason;
   decidedBy: string;
   stage: string;
   reason: string;
@@ -168,7 +184,7 @@ export function auditSeparationOfDutiesRefusal(params: {
   auditChain.record({
     agentId: 'approval-store',
     action: 'approval_decision',
-    operation: 'separation_of_duties',
+    operation: params.violation === 'revoked' ? 'revoked_approval_use' : 'separation_of_duties',
     result: 'denied',
     reason: params.reason,
     correlationId: record.correlationId,
@@ -209,16 +225,30 @@ export function assertApprovalUsable(
 ): void {
   const refusal = evaluateApprovalUsability(record);
   if (!refusal) return;
-  const reason = `Separation of duties: approval ${record.id} cannot be used because ${SEPARATION_OF_DUTIES_MESSAGES[refusal.violation]}`;
   const next =
     options.rerequestHint ??
     (options.rerequestCommand
       ? `request a new approval with \`${options.rerequestCommand}\``
       : 'request a new approval by re-running the command that opened this one');
-  const message =
-    `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and can no longer be cancelled or used; ` +
-    `it is never reused — ${next}, then have a different, server-identified principal decide it ` +
-    '(`pnpm kyberion approvals --approve <new-request-id>`).';
+  let message: string;
+  if (refusal.violation === 'revoked') {
+    const revocation = record.revocation!;
+    message =
+      `[POLICY_VIOLATION] Approval ${record.id} cannot be used because it was revoked by ` +
+      `${revocation.revokedBy} at ${revocation.revokedAt}` +
+      `${revocation.reason ? ` (${revocation.reason})` : ''}. A revoked approval is never reused — ` +
+      `${next}, then have it decided again (\`pnpm kyberion approvals --approve <new-request-id>\`).`;
+  } else {
+    const reason = `Separation of duties: approval ${record.id} cannot be used because ${SEPARATION_OF_DUTIES_MESSAGES[refusal.violation]}`;
+    const withdraw =
+      record.status === 'approved' && !record.applyClaim && !record.applyResult
+        ? ` To revoke it (further uses refused), run \`${approvalRevokeCommand(record.id)}\`.`
+        : '';
+    message =
+      `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and is never reused — ` +
+      `${next}, then have a different, server-identified principal decide it ` +
+      `(\`pnpm kyberion approvals --approve <new-request-id>\`).${withdraw}`;
+  }
   // The audit carries the full message, so the operator's next step is in
   // the audit trail too (held actions settle without surfacing an error).
   auditSeparationOfDutiesRefusal({

@@ -3795,6 +3795,18 @@
       "types": "./dist/governance/approval-store.d.ts",
       "default": "./dist/governance/approval-store.js"
     },
+    "./governance/approval-requester": {
+      "types": "./dist/governance/approval-requester.d.ts",
+      "default": "./dist/governance/approval-requester.js"
+    },
+    "./governance/approval-revocation": {
+      "types": "./dist/governance/approval-revocation.d.ts",
+      "default": "./dist/governance/approval-revocation.js"
+    },
+    "./governance/cli-operator-principal": {
+      "types": "./dist/governance/cli-operator-principal.d.ts",
+      "default": "./dist/governance/cli-operator-principal.js"
+    },
     "./workforce/artifact-bundle": {
       "types": "./dist/workforce/artifact-bundle.d.ts",
       "default": "./dist/workforce/artifact-bundle.js"
@@ -5770,6 +5782,10 @@
     "./service/service-recording": {
       "types": "./dist/service/service-recording.d.ts",
       "default": "./dist/service/service-recording.js"
+    },
+    "./service/service-recording-review-approval": {
+      "types": "./dist/service/service-recording-review-approval.d.ts",
+      "default": "./dist/service/service-recording-review-approval.js"
     },
     "./service/service-runtime-policy": {
       "types": "./dist/service/service-runtime-policy.d.ts",

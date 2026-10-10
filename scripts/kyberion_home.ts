@@ -7,7 +7,6 @@
  * (inbox / approvals) is actionable in place; `ask` talks to the same brain
  * every other surface uses.
  */
-import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import {
   getChannelAdapter,
   listOperatorNotificationChannels,
@@ -33,7 +32,12 @@ import {
   validateDesktopRecording,
 } from '@agent/core/virtual/desktop-recording';
 import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance/approval-store';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import {
+  decideApprovalFromCli,
+  findRevocableApproval,
+  revokeApprovalFromCli,
+} from './lib/approval-cli-decision.js';
 import { loadDesktopPipeline } from '@agent/core/virtual/desktop-pipeline';
 import {
   loadProcedures,
@@ -239,12 +243,23 @@ function handleInboxSubcommand(argv: {
   printOutput(ui('recorder:recorder_inbox_summary'));
 }
 
-function handleApprovalsSubcommand(argv: {
-  approve?: string;
-  deny?: string;
-  note?: string;
+type ApprovalsArgv = Partial<Record<'approve' | 'deny' | 'revoke' | 'reason' | 'note', string>> & {
   json?: boolean;
-}): void {
+};
+
+async function handleApprovalsSubcommand(argv: ApprovalsArgv): Promise<void> {
+  if (argv.revoke) {
+    const requestId = String(argv.revoke);
+    const request = findRevocableApproval(requestId);
+    if (!request) {
+      printOutput(ui('recorder:recorder_approvals_revoke_not_found', { id: requestId }));
+      throw new ScriptExitError(1, '', true);
+    }
+    const revoked = revokeApprovalFromCli(request, { reason: argv.reason || argv.note });
+    const { id, title } = revoked;
+    printOutput(ui('recorder:recorder_approval_updated', { id, title, status: 'revoked' }));
+    return;
+  }
   const pending = listApprovalRequests({ status: 'pending' });
   if (argv.approve || argv.deny) {
     const requestId = String(argv.approve || argv.deny);
@@ -253,18 +268,8 @@ function handleApprovalsSubcommand(argv: {
       printOutput(ui('recorder:recorder_approvals_not_found', { id: requestId }));
       throw new ScriptExitError(1, '', true);
     }
-    const decided = decideApprovalRequest('mission_controller', {
-      channel: request.channel,
-      storageChannel: request.storageChannel,
-      requestId: request.id,
+    const decided = await decideApprovalFromCli(request, {
       decision: argv.approve ? 'approved' : 'rejected',
-      decidedBy: resolveOperatorDisplayName(),
-      decidedByRole: 'sovereign',
-      authMethod: 'manual',
-      decidedByType: 'human',
-      authenticated: true,
-      payloadHash: request.accountability?.payloadHash,
-      effectBinding: request.accountability?.effectBinding,
       note: argv.note || 'decided via pnpm kyberion approvals',
     });
     printOutput(
@@ -297,7 +302,7 @@ function handleApprovalsSubcommand(argv: {
       }
     }
     printOutput(
-      `      requested by ${request.requestedBy} via ${request.channel} at ${request.requestedAt}`
+      `      requested by ${request.requestedBy}${request.requestedByDisplayName ? ` (${request.requestedByDisplayName})` : ''} via ${request.channel} at ${request.requestedAt}`
     );
   }
   printOutput('');
@@ -1268,6 +1273,11 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('accept', { type: 'string', description: 'inbox: mark entry as accepted' })
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
+    .option('revoke', {
+      type: 'string',
+      description: 'approvals: revoke an approved request id (further uses refused)',
+    })
+    .option('reason', { type: 'string', description: 'approvals: revocation reason' })
     .option('note', { type: 'string', description: 'approvals: decision note' })
     .option('substrate', { type: 'string', choices: ['browser', 'desktop', 'service'] })
     .option('origin', { type: 'string', description: 'browser procedure origin binding' })
@@ -1376,9 +1386,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       });
       return;
     case 'approvals':
-      handleApprovalsSubcommand(
-        argv as { approve?: string; deny?: string; note?: string; json?: boolean }
-      );
+      await handleApprovalsSubcommand(argv as ApprovalsArgv);
       return;
     case 'deals':
       if (argv['ingest-audio']) {

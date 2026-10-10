@@ -1,5 +1,11 @@
 /** EG-11: one-time cleanup mission. Dry-run is the default; apply is an
  * explicitly approved, soft-delete-only operation with an evidence receipt. */
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+} from '@agent/core/governance/approval-requester';
+import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import * as path from 'node:path';
 import {
   assertApprovalUsable,
@@ -155,6 +161,8 @@ export function computeCleanupApprovalPayloadHash(
 export function openCleanupApproval(input: {
   missionId: string;
   requestedBy?: string;
+  /** The requester the CLI resolved; resolved only when a request is opened. */
+  requester?: ApprovalRequesterInput;
   rootDir?: string;
 }): OpenCleanupApprovalResult {
   const missionId = input.missionId.trim().toUpperCase();
@@ -182,12 +190,16 @@ export function openCleanupApproval(input: {
     };
   }
 
+  const requester = input.requester
+    ? resolveApprovalRequesterInput(input.requester)
+    : { requestedBy: input.requestedBy || 'entity-governance-controller' };
   const record = createApprovalRequest('mission_controller', {
     channel: CLEANUP_APPROVAL_CHANNEL,
     storageChannel: CLEANUP_APPROVAL_CHANNEL,
     threadTs: missionId,
     correlationId: `entity-governance-cleanup-${missionId}`,
-    requestedBy: input.requestedBy || 'entity-governance-controller',
+    requestedBy: requester.requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'mission_gate',
     draft: {
       title: `EG-11 cleanup approval: ${missionId}`,
@@ -198,7 +210,7 @@ export function openCleanupApproval(input: {
     source: { missionId },
     requestedByContext: {
       surface: 'terminal',
-      actorId: input.requestedBy || 'entity-governance-controller',
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'mission_controller',
       missionId,
     },
@@ -371,7 +383,10 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   const requestedByIndex = argv.indexOf('--requested-by');
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
-    const result = openCleanupApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
+    const result = openCleanupApproval({
+      missionId,
+      requester: cliApprovalRequester(requestedBy, 'entity-governance-controller'),
+    });
     print(JSON.stringify(result, null, 2));
     if (result.reason) throw new ScriptExitError(1, '', true);
     return;
