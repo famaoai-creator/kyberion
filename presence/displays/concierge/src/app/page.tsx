@@ -454,6 +454,7 @@ export default function ConciergePage() {
             decision,
             channel: item.channel,
             storageChannel: item.storage_channel,
+            presentedDigest: item.presented_digest,
           }),
         });
         if (!response.ok) throw new Error('Approval failed');

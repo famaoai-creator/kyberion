@@ -71,6 +71,7 @@
             "refused": "codex CLI has no text-only / no-exec headless mode: even --sandbox read-only still lets the model run shell commands, which would violate the planner tier's no-exec invariant. Refusing delegation rather than granting an under-restricted approximation."
           }
         },
+        "install_path_markers": ["/@openai/codex/"],
         "session_markers": [
           {
             "env": "CODEX_CLI"

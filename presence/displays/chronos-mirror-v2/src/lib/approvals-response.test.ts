@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseApprovalsResponse } from './approvals-response';
+import { approvalProjectId, parseApprovalsResponse } from './approvals-response';
 
 const approval = {
   id: 'approval-1',
@@ -76,6 +76,27 @@ describe('approvals response boundary', () => {
       })
     ).toBeUndefined();
     expect(parseApprovalsResponse({ approvals: [approval], accessRole: 'admin' })).toBeUndefined();
+  });
+
+  it('keeps the tenant source and rejects an unknown one', () => {
+    const fromMission = { ...approval, tenantSource: 'mission' };
+    expect(
+      parseApprovalsResponse({ approvals: [fromMission], accessRole: 'readonly' })?.approvals[0]
+        .tenantSource
+    ).toBe('mission');
+    expect(
+      parseApprovalsResponse({
+        approvals: [{ ...approval, tenantSource: 'client' }],
+        accessRole: 'readonly',
+      })
+    ).toBeUndefined();
+  });
+
+  it('reads the project from work_loop.context, not a top-level field', () => {
+    expect(approvalProjectId({ workLoop: { context: { project_id: 'project-ctx' } } })).toBe(
+      'project-ctx'
+    );
+    expect(approvalProjectId({ workLoop: { project_id: 'project-top' } })).toBeUndefined();
   });
 
   it('rejects unsafe nested keys and primitive approval entries', () => {

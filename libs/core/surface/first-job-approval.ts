@@ -12,6 +12,7 @@ import { findDotCharter } from '../dot/dot-charter.js';
 import { currentDotActions } from '../dot/dot-dispatch.js';
 import {
   computeApprovalPayloadHash,
+  computeApprovalPresentedDigest,
   decideApprovalRequest,
   loadApprovalRequest,
   isApprovalRequestExpired,
@@ -344,6 +345,9 @@ export function decideFirstJobApproval(
         authenticated: true,
         payloadHash: checked.effect.payloadHash,
         effectBinding: checked.effect.effectBinding,
+        // display_digest and expectedRecordHash already bind this record to what was shown.
+        presentedDigest: computeApprovalPresentedDigest(checked.record),
+        deciderPrincipal: fresh.principal,
         diagnosticDecision: proof,
         expectedRecordHash: computeApprovalPayloadHash({ record: checked.record }),
       });

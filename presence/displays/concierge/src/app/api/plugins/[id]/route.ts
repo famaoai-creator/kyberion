@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
+import { logger } from '@agent/core/core';
+import {
+  decideApprovalRequest,
+  loadApprovalRequest,
+  surfaceDecisionAuthMethod,
+  surfaceDecisionBinding,
+} from '@agent/core/governance/approval-store';
 import {
   listManagedPlugins,
   refreshManagedPluginActivation,
@@ -54,7 +60,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const parsedBody = await readRequestObject(req, 'request body', ['decision', 'note']);
+    const parsedBody = await readRequestObject(req, 'request body', [
+      'decision',
+      'note',
+      'presentedDigest',
+    ]);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
@@ -138,11 +148,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       decision: decision === 'approve' ? 'approved' : 'rejected',
       decidedBy: decidedBy?.id ?? 'concierge',
       decidedByRole: decidedBy?.role ?? 'sovereign',
-      authMethod: 'surface_session',
+      authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
       decidedByType: 'human',
       authenticated: true,
-      payloadHash: approval.accountability?.payloadHash,
-      effectBinding: approval.accountability?.effectBinding,
+      deciderPrincipal: resolved.context.principal,
+      ...surfaceDecisionBinding(approval, body?.presentedDigest),
       note: note || 'Decision captured from the concierge (秘書室) plugin screen.',
     });
 
@@ -173,8 +183,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       message,
     });
   } catch (error) {
-    console.error(
-      `[concierge/plugins] decision route failed: ${error instanceof Error ? error.stack || error.message : String(error)}`
+    logger.error(
+      `[concierge/plugins] plugin decision failed — ${error instanceof Error ? error.message : String(error)} ` +
+        '| next: check the plugin approval request and retry from the settings page ' +
+        `| evidence: ${error instanceof Error && error.stack ? error.stack.split('\n')[1]?.trim() : 'no stack'}`
     );
     return NextResponse.json({ ok: false, error: t('api.plugin.failed') }, { status: 500 });
   }

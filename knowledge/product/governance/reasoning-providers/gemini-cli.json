@@ -71,6 +71,7 @@
             "notes": "Gemini CLI plan mode is the provider no-write projection."
           }
         },
+        "install_path_markers": ["/@google/gemini-cli/"],
         "session_markers": [
           {
             "env": "GEMINI_CLI"

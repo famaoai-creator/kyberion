@@ -22,20 +22,21 @@ Canonical source for reasoning provider descriptors (RSP-20).
 Every per-provider table is derived from these descriptors — do not add a
 provider list, switch, or map in TypeScript. Fields:
 
-| Field                                                                | Consumers                                                                                                              |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `transport`, `data_egress`, `capabilities`, `profile`                | backend capability profile (`backend-capability-profile.ts`), route capabilities, utility fit                          |
-| `adapter` (+ `openai_compatible_preset`)                             | readiness probes (`reasoning-provider-readiness.ts`), env probe, route doctor, API / OpenAI-compatible bundle builders |
-| `cli.binary`, `cli.version_args`, `cli.help_args`, `cli.bin_env_key` | env probe, conformance matrix, `providerCliBinary`, managed provider CLIs                                              |
-| `cli.sandbox`                                                        | opt-in sandbox-enforcement probe (`{prompt}` / `{permission_args}` tokens)                                             |
-| `cli.install`                                                        | `pnpm` managed provider CLI install metadata                                                                           |
-| `cli.discovery`                                                      | chain construction skips CLIs that provider discovery reports absent                                                   |
-| `cli.model_flag`                                                     | pane-agent model forwarding                                                                                            |
-| `cli.session_markers`, `cli.session_principal`                       | agent-session detection for approval requesters and deciders (`detectCliAgentPrincipal`)                               |
-| `aliases`, `model_vendor`                                            | identifier resolution (runtime backend names, model-registry vendors)                                                  |
-| `endpoint`, `egress_provider_id`                                     | reasoning egress gate; omitted endpoint fails closed                                                                   |
-| `model_env_keys`                                                     | per-mode model env override precedence                                                                                 |
-| `setup_hint`, `runtime_instructions`                                 | route doctor remediation, worker prompt provider notes                                                                 |
+| Field                                                                | Consumers                                                                                                                                       |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transport`, `data_egress`, `capabilities`, `profile`                | backend capability profile (`backend-capability-profile.ts`), route capabilities, utility fit                                                   |
+| `adapter` (+ `openai_compatible_preset`)                             | readiness probes (`reasoning-provider-readiness.ts`), env probe, route doctor, API / OpenAI-compatible bundle builders                          |
+| `cli.binary`, `cli.version_args`, `cli.help_args`, `cli.bin_env_key` | env probe, conformance matrix, `providerCliBinary`, managed provider CLIs                                                                       |
+| `cli.sandbox`                                                        | opt-in sandbox-enforcement probe (`{prompt}` / `{permission_args}` tokens)                                                                      |
+| `cli.install`                                                        | `pnpm` managed provider CLI install metadata                                                                                                    |
+| `cli.discovery`                                                      | chain construction skips CLIs that provider discovery reports absent                                                                            |
+| `cli.model_flag`                                                     | pane-agent model forwarding                                                                                                                     |
+| `cli.session_markers`, `cli.session_principal`                       | agent-session detection for approval requesters and deciders (`detectCliAgentPrincipal`)                                                        |
+| `cli.install_path_markers`                                           | install-path fragments that identify an interpreter-wrapped CLI among a terminal decider's parent processes (`providerHarnessInProcessLineage`) |
+| `aliases`, `model_vendor`                                            | identifier resolution (runtime backend names, model-registry vendors)                                                                           |
+| `endpoint`, `egress_provider_id`                                     | reasoning egress gate; omitted endpoint fails closed                                                                                            |
+| `model_env_keys`                                                     | per-mode model env override precedence                                                                                                          |
+| `setup_hint`, `runtime_instructions`                                 | route doctor remediation, worker prompt provider notes                                                                                          |
 
 Adding a provider that reuses an existing adapter is a registry-only change:
 add `{mode}.json`, append the mode to `index.json`, and (when it should be
