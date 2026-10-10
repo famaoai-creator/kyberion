@@ -35,10 +35,7 @@ import {
   type ConciergeMemoryQueueItem,
   type ConciergeResponseStatus,
 } from '../lib/concierge-advisory-response';
-import {
-  parseConciergeOutcomePreviewResponse,
-  type ConciergeOutcomePreview,
-} from '../lib/outcome-preview-response';
+import { useOutcomePreview } from '../lib/use-outcome-preview';
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
 import {
   deriveCardFields,
@@ -55,8 +52,6 @@ import {
 type HygieneInquiry = ConciergeHygieneInquiry;
 type MemoryQueueItem = ConciergeMemoryQueueItem;
 type ResponseStatus = ConciergeResponseStatus;
-
-type OutcomePreview = ConciergeOutcomePreview;
 
 // FD-04: the viewer identity used only to render "決める人" (decide_by) on
 // every card — the same identity every card shares, since a browser session
@@ -571,40 +566,68 @@ export default function ConciergePage() {
     [refreshMemoryQueue]
   );
 
-  // CS-03 受領プレビュー: one preview open at a time, fetched on demand.
-  const [previewId, setPreviewId] = React.useState<string | null>(null);
-  const [previewData, setPreviewData] = React.useState<OutcomePreview | null>(null);
-  const [previewError, setPreviewError] = React.useState<string | null>(null);
-  const [previewBusyId, setPreviewBusyId] = React.useState<string | null>(null);
+  // Queue order = decision urgency: approvals block others' work, stalled
+  // missions and learnings wait on the human alone, deliverables and
+  // exceptions can breathe a little longer.
+  const allEntries: DecideQueueEntry[] = [
+    ...(summary?.approval_queue ?? []).map((item): DecideQueueEntry => ({
+      id: `approval-${item.id}`,
+      kind: 'approval',
+      item,
+    })),
+    ...hygiene.map((item): DecideQueueEntry => ({
+      id: `hygiene-${item.mission_id}`,
+      kind: 'hygiene',
+      item,
+    })),
+    ...memoryQueue.map((item): DecideQueueEntry => ({
+      id: `memory-${item.id}`,
+      kind: 'memory',
+      item,
+    })),
+    ...(summary?.outcome_feed ?? []).map((item): DecideQueueEntry => ({
+      id: `outcome-${item.entry_id}`,
+      kind: 'outcome',
+      item,
+    })),
+    ...(summary?.exception_feed ?? []).map((item): DecideQueueEntry => ({
+      id: `exception-${item.id}`,
+      kind: 'exception',
+      item,
+    })),
+  ];
 
-  const togglePreview = React.useCallback(
-    async (item: ConciergeSummary['outcome_feed'][number]) => {
-      if (previewId === item.entry_id) {
-        setPreviewId(null);
-        setPreviewData(null);
-        setPreviewError(null);
-        return;
-      }
-      setPreviewBusyId(item.entry_id);
-      try {
-        const response = await fetch(`/api/outcomes/${encodeURIComponent(item.entry_id)}/preview`, {
-          cache: 'no-store',
-        });
-        const parsed = parseConciergeOutcomePreviewResponse(
-          await response.json().catch(() => null)
-        );
-        if (!response.ok || !parsed) throw new Error('Invalid outcome preview response');
-        setPreviewData(parsed);
-        setPreviewError(null);
-      } catch (error) {
-        setPreviewData(null);
-        setPreviewError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setPreviewId(item.entry_id);
-        setPreviewBusyId(null);
-      }
-    },
-    [previewId]
+  const { queue, deferred, countsByKind } = groupDecideQueue(allEntries, deferredIds);
+  const visibleKinds = presentKinds(countsByKind);
+  const tenantOptions = tenantFilterOptions(queue);
+  // The organization row only appears once the queue spans more than one
+  // organization; a stale selection (its items all decided) falls back to everything.
+  const showTenantFilter = tenantOptions.tenants.length > 1;
+  const activeTenantFilter =
+    showTenantFilter &&
+    (tenantFilter === 'all' ||
+      (tenantFilter === NO_TENANT_FILTER
+        ? tenantOptions.unassigned > 0
+        : tenantOptions.tenants.some((entry) => entry.slug === tenantFilter)))
+      ? tenantFilter
+      : 'all';
+  const byTenant = filterByTenant(queue, activeTenantFilter);
+  const filteredQueue =
+    kindFilter === 'all' ? byTenant : byTenant.filter((entry) => entry.kind === kindFilter);
+  const totalQueueCount = queue.length;
+
+  // Preview ownership follows actual queue visibility, including derived filters and deferral.
+  const {
+    id: previewId,
+    data: previewData,
+    error: previewError,
+    busy: previewBusy,
+    toggle: togglePreview,
+  } = useOutcomePreview(
+    loadError
+      ? []
+      : filteredQueue.flatMap((entry) => (entry.kind === 'outcome' ? [entry.item] : [])),
+    JSON.stringify([kindFilter, tenantFilter, activeTenantFilter])
   );
 
   if (loadError) {
@@ -893,7 +916,6 @@ export default function ConciergePage() {
                   : frontDeskText('action_open', locale)
               }
               variant="secondary"
-              disabled={previewBusyId === item.entry_id}
               onClick={() => void togglePreview(item)}
             />
           ) : null}
@@ -903,7 +925,14 @@ export default function ConciergePage() {
           <OutcomeFiles entryId={item.entry_id} revision={item.updated_at} />
         ) : null}
         {previewId === item.entry_id ? (
-          <div className="outcome-preview">
+          <div
+            className="outcome-preview"
+            role="region"
+            aria-label={item.title}
+            aria-live="polite"
+            aria-busy={previewBusy}
+          >
+            {previewBusy ? <p className="decide-muted">{t('home.loading')}</p> : null}
             {previewError ? (
               <Callout tone="danger" title={t('home.preview_error', { error: previewError })} />
             ) : null}
@@ -980,56 +1009,6 @@ export default function ConciergePage() {
       </DecideCardFrame>
     );
   };
-
-  // Queue order = decision urgency: approvals block others' work, stalled
-  // missions and learnings wait on the human alone, deliverables and
-  // exceptions can breathe a little longer.
-  const allEntries: DecideQueueEntry[] = [
-    ...summary.approval_queue.map((item): DecideQueueEntry => ({
-      id: `approval-${item.id}`,
-      kind: 'approval',
-      item,
-    })),
-    ...hygiene.map((item): DecideQueueEntry => ({
-      id: `hygiene-${item.mission_id}`,
-      kind: 'hygiene',
-      item,
-    })),
-    ...memoryQueue.map((item): DecideQueueEntry => ({
-      id: `memory-${item.id}`,
-      kind: 'memory',
-      item,
-    })),
-    ...summary.outcome_feed.map((item): DecideQueueEntry => ({
-      id: `outcome-${item.entry_id}`,
-      kind: 'outcome',
-      item,
-    })),
-    ...summary.exception_feed.map((item): DecideQueueEntry => ({
-      id: `exception-${item.id}`,
-      kind: 'exception',
-      item,
-    })),
-  ];
-
-  const { queue, deferred, countsByKind } = groupDecideQueue(allEntries, deferredIds);
-  const visibleKinds = presentKinds(countsByKind);
-  const tenantOptions = tenantFilterOptions(queue);
-  // The organization row only appears once the queue spans more than one
-  // organization; a stale selection (its items all decided) falls back to everything.
-  const showTenantFilter = tenantOptions.tenants.length > 1;
-  const activeTenantFilter =
-    showTenantFilter &&
-    (tenantFilter === 'all' ||
-      (tenantFilter === NO_TENANT_FILTER
-        ? tenantOptions.unassigned > 0
-        : tenantOptions.tenants.some((entry) => entry.slug === tenantFilter)))
-      ? tenantFilter
-      : 'all';
-  const byTenant = filterByTenant(queue, activeTenantFilter);
-  const filteredQueue =
-    kindFilter === 'all' ? byTenant : byTenant.filter((entry) => entry.kind === kindFilter);
-  const totalQueueCount = queue.length;
 
   const entryTitle = (entry: DecideQueueEntry): string =>
     entry.kind === 'memory'
