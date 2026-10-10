@@ -606,13 +606,14 @@ step) get their own file names.
 
 **Rule.** Dedicated lifecycle commands and generic status updates must execute the
 same guarded facade. Archive checks live missions, task sessions and unfinished
-tracks before changing ownership projections. Leaving archived state requires an
-explicit restore operation.
+tracks before changing ownership projections, and records the prior status so the
+explicit restore operation can return to it. All project and track writes —
+create and bootstrap included — require the mission owner.
 
 **Procedure.** When changing project or track statuses, update the CLI and typed
 facade together, reconcile operational state and default track membership, and
 preserve rollback and audit behavior. Verify descriptive edits do not implicitly
-restore archived records.
+restore archived records or reselect the default track.
 
 **Gate.** Run the focused lifecycle regressions in
 `libs/core/project/project-management.test.ts` and build core plus the repo CLI.
