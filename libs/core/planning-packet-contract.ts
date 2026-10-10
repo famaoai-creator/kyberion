@@ -1,6 +1,7 @@
 import { PlanningPacketSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { PlanningPacket } from './surface/channel-surface-types.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { replaceFencedBlocks } from './foundation/text.js';
 
 export interface PlanningPacketValidationResult {
   valid: boolean;
@@ -32,7 +33,9 @@ export function extractPlanningPacketBlocks(raw: string): ExtractPlanningPacketB
   const planningPacketErrors: string[] = [];
   let text = raw;
 
-  text = text.replace(/```(?:\s*)planning_packet\s*\n([\s\S]*?)```/gi, (_match, json) => {
+  text = replaceFencedBlocks(text, (lang, content, block) => {
+    if (lang.toLowerCase() !== 'planning_packet') return block;
+    const json = content;
     const trimmed = String(json).trim();
     if (!trimmed) {
       planningPacketErrors.push('planning_packet block was empty');

@@ -301,8 +301,11 @@ function extractPreviousSummary(messages: readonly WorkerContextMessage[]): stri
     .reverse()
     .find((message) => message.content.includes('<summary>'));
   if (!summaryMessage) return undefined;
-  const match = summaryMessage.content.match(/<summary>\s*([\s\S]*?)\s*<\/summary>/u);
-  return match?.[1]?.trim() || undefined;
+  const openIndex = summaryMessage.content.indexOf('<summary>');
+  const closeIndex = summaryMessage.content.indexOf('</summary>', openIndex);
+  return openIndex >= 0 && closeIndex > openIndex
+    ? summaryMessage.content.slice(openIndex + '<summary>'.length, closeIndex).trim() || undefined
+    : undefined;
 }
 
 export function isRegularUpdateSummaryPromptPath(filePath: string): boolean {

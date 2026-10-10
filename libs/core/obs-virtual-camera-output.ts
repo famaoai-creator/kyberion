@@ -100,6 +100,8 @@ interface ObsResponse {
 }
 
 function v5Auth(password: string, challenge: string, salt: string): string {
+  // codeql[js/insufficient-password-hash] — the OBS WebSocket v5 handshake
+  // protocol mandates this exact SHA-256 challenge-response; not storage.
   const sha256 = (value: string): string => createHash('sha256').update(value).digest('base64');
   return sha256(sha256(password + salt) + challenge);
 }
