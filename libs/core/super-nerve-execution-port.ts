@@ -10,6 +10,7 @@ const superNerveExecutorSeam = createSeam<SuperNerveExecutor>({
   key: 'super-nerve-executor',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/super-nerve-execution-port.ts',
 });
 
 const DEFAULT_METADATA: SeamProviderMetadata = {

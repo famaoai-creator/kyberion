@@ -143,6 +143,7 @@ const streamingTtsSeam = createSeam<() => StreamingTextToSpeechBridge>({
   key: 'streaming-tts-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/streaming-tts-bridge.ts',
 });
 const streamingTtsDisposers = new Map<string, () => void>();
 

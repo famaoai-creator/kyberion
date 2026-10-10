@@ -41,6 +41,7 @@ const riskyApprovalHandlerSeam = createSeam<RiskyApprovalHandler>({
   key: 'risky-approval-handler',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/risky-op-approval-port.ts',
 });
 
 /**
@@ -54,6 +55,7 @@ const riskyApprovalOverrideSeam = createSeam<RiskyApprovalOverride>({
   key: 'risky-approval-override',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/risky-op-approval-port.ts',
 });
 
 const OVERRIDE_METADATA: SeamProviderMetadata = {

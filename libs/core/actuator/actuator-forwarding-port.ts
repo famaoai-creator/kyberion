@@ -39,6 +39,7 @@ const actuatorForwardingPortSeam = createSeam<ActuatorForwardingPort>({
   key: 'actuator-forwarding-port',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/actuator/actuator-forwarding-port.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 const forwardingPortStorage = new AsyncLocalStorage<ActuatorForwardingPort>();

@@ -56,6 +56,7 @@ const vadBackendSeam = createSeam<VadBackend>({
   key: 'voice.vad-backend',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/vad-registry.ts',
 });
 const registrations = new Map<string, () => void>();
 

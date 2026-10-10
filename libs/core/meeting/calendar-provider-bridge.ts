@@ -119,6 +119,7 @@ const calendarProviderSeam = createSeam<CalendarProviderBridge>({
   key: 'calendar-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/meeting/calendar-provider-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

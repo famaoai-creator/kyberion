@@ -32,6 +32,7 @@ const execAdapterSeam = createSeam<AgentExecAdapterBridge>({
   key: 'agent-exec-adapter-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/agent/agent-exec-adapter-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

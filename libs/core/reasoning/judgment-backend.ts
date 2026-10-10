@@ -178,6 +178,7 @@ const judgmentSeam = createSeam<JudgmentBackend>({
   key: 'judgment-backend',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/reasoning/judgment-backend.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

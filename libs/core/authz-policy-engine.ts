@@ -145,6 +145,7 @@ const authzProviderSeam = createSeam<AuthzProvider>({
   key: AUTHZ_SEAM_ID,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/authz-policy-engine.ts',
 });
 
 export function registerAuthzProvider(
