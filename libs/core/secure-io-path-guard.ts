@@ -17,8 +17,10 @@ import { validateReadPermission, validateWritePermission } from './tier-guard.js
 // eslint-disable-next-line no-var
 var mediationProbeFn: (() => boolean) | undefined;
 
-/** secure-io registers its sensitive-path mediation state here. */
+/** secure-io registers its sensitive-path mediation state here, once. */
 export function registerSensitivePathMediationProbe(probe: () => boolean): void {
+  // First registration wins: a later caller must not swap the probe out.
+  if (mediationProbeFn) return;
   mediationProbeFn = probe;
 }
 
@@ -55,7 +57,8 @@ export function entryExists(p: string): boolean {
  *   chmod, read). Every component is resolved.
  * - `leaf`: the operation acts on the directory entry itself and never
  *   follows the leaf (rename, unlink, rm, rmdir, lstat, readlink, creating a
- *   link). Only the parent is resolved; the leaf name is kept.
+ *   link). Only the parent is resolved; the leaf name is kept (with its
+ *   on-disk case on a case-insensitive volume).
  *
  * The canonical path is mapped back into the logical root space
  * (`pathResolver.rootDir()`), so a checkout reached through a symlinked
@@ -65,30 +68,31 @@ export function entryExists(p: string): boolean {
  * and the canonical path names the physical location the OS will touch,
  * which is exactly what the guard must judge.
  *
- * Cost: realpath(3) walks every component (~30 us at depth 15 on the CI
- * VM), so parent directories are served from a small per-process cache that
- * is re-verified on every hit instead of trusted: stat(literal dir) must
- * still reach the cached (dev, ino) — so the bytes land in the very same
- * directory object that was fully resolved — and lstat(cached real path)
- * must still be that directory, not a link. A dir swapped for a link to
- * anywhere else changes the inode and misses, and so does the directory
- * itself renamed away with a link left at its old path (lstat sees the
- * link). The one case a hit cannot see is an ANCESTOR of the cached real
- * path renamed into another location with a link left behind; that needs
- * write permission at the new location plus a link secure-io itself refuses
- * to create (target outside the caller's write scope), and every secure-io
- * move / rm / rmdir / unlink / symlink clears the cache anyway. See the runbook section "secure-io
- * symlink canonicalization" for the measured cost.
+ * No realpath cache: every check walks the path afresh. A per-process cache
+ * of resolved directories cannot see a rename done through raw fs or by
+ * another process (an ancestor renamed into a protected tree with a link
+ * left behind re-verifies as "same inode"), and re-verifying every ancestor
+ * costs about as much as realpath itself. See runbook §10 for the cost.
  * ---------------------------------------------------------------------------
  */
 export type CanonicalMode = 'follow' | 'leaf';
 
 // eslint-disable-next-line no-var
-var realRootCache: { root: string; real: string } | undefined;
+var realRootCache: { root: string; real: string; caseInsensitive: boolean } | undefined;
 
-function realProjectRoot(): string {
+function swapCase(value: string): string {
+  let out = '';
+  for (const ch of value) {
+    const lower = ch.toLowerCase();
+    out += ch === lower ? ch.toUpperCase() : lower;
+  }
+  return out;
+}
+
+/** realpath of the logical root and whether its volume folds case (probed once per root). */
+function realRoot(): { real: string; caseInsensitive: boolean } {
   const root = path.resolve(pathResolver.rootDir());
-  if (realRootCache?.root === root) return realRootCache.real;
+  if (realRootCache?.root === root) return realRootCache;
   let real = root;
   try {
     real = fs.realpathSync.native(root);
@@ -96,8 +100,37 @@ function realProjectRoot(): string {
     // An unresolvable root leaves the logical root as the comparison base;
     // every path below it then fails canonicalization and is refused.
   }
-  realRootCache = { root, real };
-  return real;
+  let caseInsensitive = false;
+  const swapped = path.join(path.dirname(real), swapCase(path.basename(real)));
+  if (swapped !== real) {
+    try {
+      const a = fs.lstatSync(real);
+      const b = fs.lstatSync(swapped);
+      caseInsensitive = a.dev === b.dev && a.ino === b.ino;
+    } catch {
+      caseInsensitive = false;
+    }
+  }
+  realRootCache = { root, real, caseInsensitive };
+  return realRootCache;
+}
+
+/**
+ * On a case-insensitive volume, the on-disk spelling of an existing entry
+ * `leaf` in the real directory `realDir` (`knowledge/PERSONAL` -> `personal`);
+ * tier detection is case-sensitive, so the typed spelling must not be judged.
+ */
+function onDiskLeaf(realDir: string, leaf: string): string {
+  if (!realRoot().caseInsensitive) return leaf;
+  const wanted = leaf.normalize('NFC').toLowerCase();
+  let names: string[];
+  try {
+    names = fs.readdirSync(realDir);
+  } catch {
+    return leaf;
+  }
+  if (names.includes(leaf)) return leaf;
+  return names.find((name) => name.normalize('NFC').toLowerCase() === wanted) ?? leaf;
 }
 
 /** Physical path of `absPath`: realpath of the deepest existing entry plus the missing tail. */
@@ -109,7 +142,8 @@ function physicalPath(absPath: string, hops = 0): string {
   }
   // Fast path: an existing, fully resolvable path costs one realpath call.
   try {
-    return fs.realpathSync.native(absPath);
+    const real = fs.realpathSync.native(absPath);
+    return path.join(path.dirname(real), onDiskLeaf(path.dirname(real), path.basename(real)));
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
@@ -150,83 +184,23 @@ export function isInside(base: string, candidate: string): string | undefined {
  * Fails closed: a component that cannot be resolved (loop, permission error)
  * throws instead of falling back to the literal path.
  */
-// eslint-disable-next-line no-var
-var realDirCache: Map<string, { dev: number; ino: number; real: string }> | undefined;
-
-/** Drop every cached directory resolution (called after structural mutations). */
-export function invalidateRealDirCache(): void {
-  realDirCache?.clear();
-}
-
-/** True when `p` is itself (not via a final symlink) the directory (dev, ino). */
-function sameInode(p: string, dev: number, ino: number): boolean {
-  try {
-    const st = fs.lstatSync(p);
-    return st.dev === dev && st.ino === ino;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Real path of an existing directory, from the verified cache when possible.
- * Returns undefined when `dir` is not an existing directory (callers then
- * take the full physicalPath walk).
- */
-function cachedRealDir(dir: string): string | undefined {
-  let st: fs.Stats;
-  try {
-    st = fs.statSync(dir);
-  } catch {
-    return undefined;
-  }
-  if (!st.isDirectory()) return undefined;
-  const cache = (realDirCache ??= new Map());
-  const hit = cache.get(dir);
-  if (hit && hit.dev === st.dev && hit.ino === st.ino && sameInode(hit.real, st.dev, st.ino)) {
-    return hit.real;
-  }
-  const real = fs.realpathSync.native(dir);
-  if (!sameInode(real, st.dev, st.ino)) return undefined; // raced: let the slow path decide
-  if (cache.size >= 4096) cache.clear();
-  cache.set(dir, { dev: st.dev, ino: st.ino, real });
-  return real;
-}
-
-/** physicalPath with the parent served from cachedRealDir; leaf handled per mode. */
-function fastPhysicalPath(absolute: string, mode: CanonicalMode): string {
-  const parent = path.dirname(absolute);
-  const leaf = path.basename(absolute);
-  if (parent === absolute) return physicalPath(absolute);
-  const realParent = cachedRealDir(parent);
-  if (realParent === undefined) {
-    return mode === 'follow' ? physicalPath(absolute) : path.join(physicalPath(parent), leaf);
-  }
-  const candidate = path.join(realParent, leaf);
-  if (mode === 'leaf') return candidate;
-  let leafStat: fs.Stats;
-  try {
-    leafStat = fs.lstatSync(candidate);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') return candidate; // missing leaf under a real parent
-    throw error;
-  }
-  return leafStat.isSymbolicLink() ? physicalPath(candidate) : candidate;
-}
-
 export function canonicalGuardPath(resolved: string, mode: CanonicalMode): string {
   const absolute = path.resolve(resolved);
   let physical: string;
   try {
-    physical = fastPhysicalPath(absolute, mode);
+    if (mode === 'follow' || path.dirname(absolute) === absolute) {
+      physical = physicalPath(absolute);
+    } else {
+      const realParent = physicalPath(path.dirname(absolute));
+      physical = path.join(realParent, onDiskLeaf(realParent, path.basename(absolute)));
+    }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
     throw new Error(
       `[SECURITY] Refusing access to ${resolved}: a path component does not resolve (${code})`
     );
   }
-  const relative = isInside(realProjectRoot(), physical);
+  const relative = isInside(realRoot().real, physical);
   if (relative === undefined) return physical;
   const logicalRoot = path.resolve(pathResolver.rootDir());
   return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
@@ -283,12 +257,71 @@ export function guardWritePath(
   mode: CanonicalMode = 'follow',
   operation = 'write'
 ): { resolved: string; canonical: string } {
+  const resolved = guardLiteralWritePath(filePath, operation);
+  const canonical = assertCanonicalWritable(resolved, filePath, mode);
+  return { resolved, canonical };
+}
+
+/** The literal half of guardWritePath, for callers that run the canonical check later. */
+export function guardLiteralWritePath(filePath: string, operation = 'write'): string {
   assertSensitivePathAllowed(filePath, operation, mediationProbe());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
-  const canonical = assertCanonicalWritable(resolved, filePath, mode);
-  return { resolved, canonical };
+  return resolved;
+}
+
+/** Identity of the directory a write was checked against (see assertTempInCheckedDir). */
+export interface CheckedDir {
+  dir: string;
+  dev: number;
+  ino: number;
+}
+
+export function captureCheckedDir(dir: string): CheckedDir {
+  const st = fs.statSync(dir);
+  return { dir, dev: st.dev, ino: st.ino };
+}
+
+/**
+ * Narrows the check-to-use race of an atomic write: after the temp file is
+ * opened, the checked directory must still be the same directory object, it
+ * must still canonicalize to itself (no component swapped for a link), and
+ * the temp entry seen there must be the descriptor just opened.
+ */
+export function assertTempInCheckedDir(checked: CheckedDir, tempPath: string, fd: number): void {
+  const dirNow = fs.statSync(checked.dir);
+  const tempNow = fs.lstatSync(tempPath);
+  const opened = fs.fstatSync(fd);
+  if (
+    dirNow.dev !== checked.dev ||
+    dirNow.ino !== checked.ino ||
+    tempNow.dev !== opened.dev ||
+    tempNow.ino !== opened.ino ||
+    canonicalGuardPath(checked.dir, 'follow') !== checked.dir
+  ) {
+    throw new Error(
+      `[SECURITY] Refusing to write in ${checked.dir}: the directory changed between the permission check and the write`
+    );
+  }
+}
+
+/** Open for in-place access (read, append, fsync, chmod); refuses foreign hard links on the fd. */
+export function openInPlace(
+  resolved: string,
+  displayPath: string,
+  flags: string,
+  operation: HardLinkOperation,
+  mode?: number
+): number {
+  const fd = fs.openSync(resolved, flags, mode);
+  try {
+    assertNotForeignHardLink(fs.fstatSync(fd), resolved, displayPath, operation);
+    return fd;
+  } catch (error) {
+    fs.closeSync(fd);
+    throw error;
+  }
 }
 
 /** Read counterpart of guardWritePath; `deny` formats the literal-denial message. */
@@ -342,4 +375,115 @@ export function safeRealpath(filePath: string): string {
   }
   assertSensitivePathAllowed(canonical, 'read', mediationProbe());
   return canonical;
+}
+
+/*
+ * Hard links. A hard link is a second name for the same inode, and nothing
+ * on the path says where the other names live: `tmp/x/hl.txt` may be the
+ * very inode of `knowledge/personal/a.txt`. Path canonicalization cannot see
+ * that, so operations that read or modify the existing inode in place
+ * (read, append, copy source, chmod, fsync, open-for-append) refuse a
+ * regular file with more than one link unless every link lives in the same
+ * directory as the checked path (e.g. lock recovery's `<file>` +
+ * `<file>.stale-*` tomb pair while a displaced record is put back). Writes
+ * that replace the entry (safeWriteFile, copy destination: temp + rename)
+ * never touch the old inode and need no check.
+ *
+ * Reads under `node_modules/` are exempt: the pnpm store links every package
+ * file into each project. Files outside the repository (vault mounts) are
+ * judged by the vault allowance, not by link count.
+ */
+export type HardLinkOperation = 'read' | 'write';
+
+export function assertNotForeignHardLink(
+  stat: fs.Stats,
+  resolved: string,
+  displayPath: string,
+  operation: HardLinkOperation
+): void {
+  if (!stat.isFile() || stat.nlink <= 1) return;
+  const canonical = canonicalGuardPath(resolved, 'follow');
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  const relative = isInside(logicalRoot, canonical);
+  if (relative === undefined) return;
+  if (operation === 'read' && relative.split(path.sep).includes('node_modules')) return;
+  const dir = path.dirname(canonical);
+  let sameInodeNames = 0;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      try {
+        const st = fs.lstatSync(path.join(dir, name));
+        if (st.dev === stat.dev && st.ino === stat.ino) sameInodeNames += 1;
+      } catch {
+        // raced entry: not a link of this inode
+      }
+    }
+  } catch {
+    sameInodeNames = 0;
+  }
+  if (sameInodeNames >= stat.nlink) return;
+  throw new Error(
+    `[SECURITY] Refusing to ${operation} ${displayPath}: it is a hard link (nlink=${stat.nlink}) to a file that also lives outside this directory`
+  );
+}
+
+/**
+ * A symlink is a standing write grant on its target: every later write
+ * through it lands there. Its target must resolve inside the repository and
+ * be writable (literal and canonical) by the caller. The link is stored
+ * relative. Windows junctions are refused by the caller: they need no
+ * privilege and always store an absolute target.
+ */
+export function assertSymlinkTargetWritable(resolvedTarget: string, displayPath: string): void {
+  const canonicalTarget = canonicalGuardPath(resolvedTarget, 'follow');
+  if (isInside(path.resolve(pathResolver.rootDir()), canonicalTarget) === undefined) {
+    throw new Error(
+      `[SECURITY] Refusing to create a symbolic link to ${displayPath}: it resolves outside the repository (${canonicalTarget})`
+    );
+  }
+  for (const candidate of new Set([path.resolve(resolvedTarget), canonicalTarget])) {
+    assertSensitivePathAllowed(candidate, 'write', mediationProbe());
+    const writeGuard = validateWritePermission(candidate);
+    if (!writeGuard.allowed) {
+      throw new Error(
+        `[SECURITY] Refusing to create a symbolic link to ${displayPath}: the target is outside the caller's write scope. ${writeGuard.reason ?? ''}`.trim()
+      );
+    }
+  }
+}
+
+/**
+ * Copy by replacing the destination entry (temp + rename) instead of writing
+ * into its inode, which may be a hard link to a file elsewhere. The source
+ * inode is read, so it gets the read-side hard-link check. A symlink
+ * destination is refused, as in safeWriteFile.
+ */
+export function copyReplacing(resolvedSrc: string, srcPath: string, resolvedDest: string): void {
+  assertNotForeignHardLink(fs.statSync(resolvedSrc), resolvedSrc, srcPath, 'read');
+  let destIsLink = false;
+  try {
+    destIsLink = fs.lstatSync(resolvedDest).isSymbolicLink();
+  } catch {
+    destIsLink = false;
+  }
+  if (destIsLink) throw new Error(`[SECURITY] Refusing to replace symbolic link: ${resolvedDest}`);
+  const temp = `${resolvedDest}.tmp.${process.pid}.${Math.random().toString(36).slice(2)}`;
+  try {
+    fs.copyFileSync(resolvedSrc, temp, fs.constants.COPYFILE_EXCL);
+    fs.renameSync(temp, resolvedDest);
+  } catch (error) {
+    fs.rmSync(temp, { force: true });
+    throw error;
+  }
+}
+
+/** chmod through an fd for regular files, so a foreign hard link is refused. */
+export function chmodInPlace(resolved: string, displayPath: string, mode: number): void {
+  if (!fs.statSync(resolved).isFile()) return fs.chmodSync(resolved, mode);
+  const fd = openInPlace(resolved, displayPath, 'r', 'write');
+  try {
+    fs.fchmodSync(fd, mode);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
