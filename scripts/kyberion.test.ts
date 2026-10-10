@@ -308,6 +308,13 @@ describe('CU-08 removed command aliases stay removed', () => {
     expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, warn)).toEqual(['onboard', 'apply']);
     expect(rewriteRoutedArgs(['chronos'], manifest, warn)).toEqual(['chronos']);
     expect(rewriteRoutedArgs(['dev'], manifest, warn)).toEqual(['dev']);
+    expect(rewriteRoutedArgs(['ingest', '--file', 'a.pdf'], manifest, warn)).toEqual([
+      'ingest',
+      '--file',
+      'a.pdf',
+    ]);
+    // `chronos dev` (Chronos Mirror UI) stays a live command, not an alias.
+    expect(rewriteRoutedArgs(['chronos', 'dev'], manifest, warn)).toEqual(['chronos', 'dev']);
     expect(warnings).toEqual([]);
   });
 
@@ -319,6 +326,12 @@ describe('CU-08 removed command aliases stay removed', () => {
     await expect(main(['chronos', 'uninstall'], () => undefined)).rejects.toThrow(
       /chronos uninstall/u
     );
+  });
+
+  it('still runs the canonical command end to end', async () => {
+    const output: unknown[] = [];
+    await main(['scheduler', 'uninstall'], (value) => output.push(value));
+    expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
 
   it('leaves current command names untouched and silent', () => {
