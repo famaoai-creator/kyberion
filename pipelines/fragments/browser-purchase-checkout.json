@@ -15,7 +15,7 @@
     {
       "id": "proceed_to_checkout",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "{{checkout_button_selector}}"
       }
@@ -41,7 +41,7 @@
     {
       "id": "finalize_payment",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "{{confirm_payment_button_selector}}"
       }

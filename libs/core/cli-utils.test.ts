@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import {
+  ACTUATOR_SERVE_RESULT_PREFIX,
   createStandardYargs,
   normalizeActuatorServeRequest,
   runActuatorCli,
@@ -26,6 +27,61 @@ afterEach(() => {
 });
 
 describe('cli-utils', () => {
+  it.each([
+    { status: 'failed', results: [{ status: 'failed', error: 'stale reference' }] },
+    { status: 'denied', error: 'viewer scope denied', context: { audited: true } },
+    { ok: false, error: 'element missing' },
+  ])('reports operation failure and preserves evidence in serve mode: %j', async (output) => {
+    vi.spyOn(process.stdin, Symbol.asyncIterator).mockImplementation(async function* () {
+      yield Buffer.from('{"id":"r1","input":{"action":"pipeline"}}\n');
+    });
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--serve'],
+      handleAction: async () => output,
+    });
+
+    const framed = write.mock.calls
+      .map(([line]) => String(line))
+      .find((line) => line.startsWith(ACTUATOR_SERVE_RESULT_PREFIX));
+    expect(framed).toBeDefined();
+    expect(JSON.parse(framed!.slice(ACTUATOR_SERVE_RESULT_PREFIX.length))).toEqual({
+      id: 'r1',
+      ok: false,
+      error: output.error || output.results?.[0]?.error,
+      result: output,
+    });
+  });
+
+  it('continues serving successfully after an operation failure', async () => {
+    vi.spyOn(process.stdin, Symbol.asyncIterator).mockImplementation(async function* () {
+      yield Buffer.from('{"id":"r1"}\n{"id":"r2"}\n');
+    });
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const handleAction = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'failed', error: 'stale reference' })
+      .mockResolvedValueOnce({ status: 'succeeded', results: [] });
+
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--serve'],
+      handleAction,
+    });
+
+    const responses = write.mock.calls
+      .map(([line]) => String(line))
+      .filter((line) => line.startsWith(ACTUATOR_SERVE_RESULT_PREFIX))
+      .map((line) => JSON.parse(line.slice(ACTUATOR_SERVE_RESULT_PREFIX.length)));
+    expect(responses.map(({ id, ok }) => ({ id, ok }))).toEqual([
+      { id: 'r1', ok: false },
+      { id: 'r2', ok: true },
+    ]);
+    expect(responses[1].result).toEqual({ status: 'succeeded', results: [] });
+  });
+
   it('rejects malformed warm actuator requests before dispatch', () => {
     expect(() => normalizeActuatorServeRequest([])).toThrow(
       'actuator serve request must be a JSON object'
@@ -96,6 +152,36 @@ describe('cli-utils', () => {
     });
 
     expect(logSpy).toHaveBeenCalledWith(JSON.stringify({ echoed: { message: 'hello' } }, null, 2));
+  });
+
+  it.each([
+    { status: 'failed', results: [{ status: 'failed', error: 'stale reference' }] },
+    { status: 'denied', error: 'viewer scope denied', context: { audited: true } },
+    { ok: false, error: 'element missing' },
+  ])('prints one-shot failure evidence and exits unsuccessfully: %j', async (output) => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    const inputPath = `${TMP_DIR}/failure.json`;
+    safeWriteFile(inputPath, JSON.stringify({ action: 'pipeline' }));
+    const printResult = vi.fn();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const previousExitCode = process.exitCode;
+    process.exitCode = undefined;
+    try {
+      await runActuatorCliEntryPoint(
+        () =>
+          runActuatorCli({
+            name: 'test-actuator',
+            args: ['node', 'script', '--input', inputPath],
+            handleAction: async () => output,
+            printResult,
+          }),
+        'test-actuator'
+      );
+      expect(printResult).toHaveBeenCalledExactlyOnceWith(output);
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = previousExitCode;
+    }
   });
 
   it('validates apply actions under --dry-run without calling handleAction', async () => {
