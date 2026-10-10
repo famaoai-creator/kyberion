@@ -18,13 +18,16 @@ import {
   safeReadFileSnapshot,
   safeReaddir,
   safeRmSync,
+  safeSpawn,
   safeStat,
   safeSymlinkSync,
   safeUnlinkSync,
   safeWriteFile,
   validateFileSize,
 } from './secure-io.js';
+import { acquireLock, releaseLock } from './foundation/lock-utils.js';
 import {
+  assertNotForeignHardLink,
   assertTempInCheckedDir,
   captureCheckedDir,
   registerSensitivePathMediationProbe,
@@ -353,6 +356,99 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     } finally {
       fs.rmSync(abs(plantRel), { recursive: true, force: true });
     }
+  });
+
+  it('grants a hard-link exemption only to the inode the caller holds', () => {
+    // The state a symlink swap between open and check produces: the caller
+    // holds the planted inode, while the path now resolves into the pnpm store.
+    const planted = abs(`${scratchRel}/planted`);
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), planted);
+    const pnpmFile = fs.realpathSync(abs('node_modules/vitest/package.json'));
+    fs.symlinkSync(pnpmFile, abs(`${scratchRel}/sw`));
+    expect(() =>
+      assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
+    ).toThrow(/hard link/);
+    // ... and an outside-repository path is no exemption either.
+    fs.rmSync(abs(`${scratchRel}/sw`));
+    fs.symlinkSync('/etc/hostname', abs(`${scratchRel}/sw`));
+    expect(() =>
+      assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
+    ).toThrow(/hard link/);
+  });
+
+  it('never leaks a hard-linked secret while a symlink flips into the pnpm store (bounded race)', async () => {
+    const planted = abs(`${scratchRel}/planted`);
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), planted);
+    const pnpmFile = fs.realpathSync(abs('node_modules/vitest/package.json'));
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(planted, sw);
+    const flipper = `
+      const fs = require('node:fs');
+      const [sw, a, b] = process.argv.slice(1);
+      const end = Date.now() + 4000;
+      let i = 0;
+      while (Date.now() < end) {
+        const tmp = sw + '.tmp';
+        try { fs.rmSync(tmp, { force: true }); fs.symlinkSync(i++ % 2 ? a : b, tmp); fs.renameSync(tmp, sw); } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', flipper, sw, planted, pnpmFile], {
+      stdio: 'ignore',
+    });
+    let leaked = 0;
+    let tries = 0;
+    let sawStore = 0; // proves the flipper ran: the store side is readable
+    try {
+      const end = Date.now() + 3000;
+      while (Date.now() < end) {
+        tries += 1;
+        try {
+          const text = String(safeReadFile(`${scratchRel}/sw`));
+          if (text.includes('personal-tier secret')) leaked += 1;
+          if (text.includes('"name": "vitest"')) sawStore += 1;
+        } catch {
+          // refused or raced: never a leak
+        }
+        if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(100);
+    expect(sawStore).toBeGreaterThan(0);
+    expect(leaked).toBe(0);
+  }, 20000);
+
+  it('releases a lock while its record has a recovery tomb link', async () => {
+    const id = `vitest-secure-io-release-${RUN}`;
+    const lockFile = abs(`active/shared/runtime/locks/${encodeURIComponent(id)}.lock`);
+    const tomb = `${lockFile}.stale-99999-${Date.now()}-1`;
+    process.env.MISSION_ROLE = 'mission_controller';
+    try {
+      expect(await acquireLock(id, 300)).toBe(true);
+      fs.linkSync(lockFile, tomb);
+      releaseLock(id);
+      expect(fs.existsSync(lockFile)).toBe(false);
+      expect(await acquireLock(id, 300)).toBe(true);
+      releaseLock(id);
+    } finally {
+      fs.rmSync(lockFile, { force: true });
+      fs.rmSync(tomb, { force: true });
+    }
+  });
+
+  it('reports a missing file with code ENOENT', () => {
+    let code: unknown;
+    try {
+      safeReadFile(`${scratchRel}/does-not-exist.json`);
+    } catch (error) {
+      code = (error as NodeJS.ErrnoException).code;
+    }
+    expect(code).toBe('ENOENT');
+  });
+
+  it('lets SUDO read pnpm store files (the store is exempt for every caller)', () => {
+    process.env.KYBERION_SUDO = 'true';
+    expect(() => safeReadFile('node_modules/vitest/package.json')).not.toThrow();
   });
 
   it('gives no node_modules exemption to a node_modules directory in a writable tree', () => {
