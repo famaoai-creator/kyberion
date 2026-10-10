@@ -294,40 +294,33 @@ describe('kyberion command router', () => {
 describe('CU-08 deprecated command aliases', () => {
   const manifest = loadCliManifest();
 
-  it('routes a renamed command to its replacement with one warning line', () => {
+  it('passes former alias names through untouched after the alias drop', () => {
     const warnings: string[] = [];
     const routed = rewriteRoutedArgs(
       ['customer', 'create', '--slug', 'acme'],
       manifest,
       (message) => warnings.push(message)
     );
-    expect(routed).toEqual(['stance', 'create', '--slug', 'acme']);
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('kyberion customer create');
-    expect(warnings[0]).toContain('kyberion stance create');
+    expect(routed).toEqual(['customer', 'create', '--slug', 'acme']);
+    expect(warnings).toHaveLength(0);
   });
 
-  it('maps every old `<noun> default` name to the renamed command', () => {
+  it('leaves every former alias token unchanged', () => {
     const silent = (): void => undefined;
-    expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, silent)).toEqual([
-      'onboarding',
-      'apply',
-    ]);
-    expect(rewriteRoutedArgs(['chronos'], manifest, silent)).toEqual(['scheduler']);
-    expect(rewriteRoutedArgs(['dev'], manifest, silent)).toEqual(['verify']);
-    expect(rewriteRoutedArgs(['ingest', '--file', 'a.pdf'], manifest, silent)).toEqual([
-      'knowledge',
-      'ingest',
-      '--file',
-      'a.pdf',
-    ]);
-    // `chronos dev` (Chronos Mirror UI) is a live command, not an alias.
-    expect(rewriteRoutedArgs(['chronos', 'dev'], manifest, silent)).toEqual(['chronos', 'dev']);
+    for (const args of [
+      ['onboard', 'apply'],
+      ['chronos'],
+      ['dev'],
+      ['ingest', '--file', 'a.pdf'],
+      ['chronos', 'dev'],
+    ]) {
+      expect(rewriteRoutedArgs(args, manifest, silent)).toEqual(args);
+    }
   });
 
-  it('still runs the old command name end to end', async () => {
+  it('still runs the canonical command end to end', async () => {
     const output: unknown[] = [];
-    await main(['chronos', 'uninstall'], (value) => output.push(value));
+    await main(['scheduler', 'uninstall'], (value) => output.push(value));
     expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
 
