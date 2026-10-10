@@ -1,5 +1,10 @@
 import type { FrontDeskArtifactRevisionInput } from '@agent/core/surface/front-desk-conversation-history';
 import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface';
+import type {
+  FrontDeskConversationShape,
+  FrontDeskConversationNextAction,
+  FrontDeskConversationPromotion,
+} from '@agent/core/surface/front-desk-request-projection';
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
@@ -26,21 +31,12 @@ function hasSafeConversationTree(value: unknown): boolean {
  * reply may claim are the four standard conversation shapes plus a plain
  * `reply` when the orchestrator result does not distinguish one.
  */
-export type ConversationShape =
-  'clarification' | 'execution_preview' | 'status_summary' | 'delivery_summary' | 'reply';
+export type ConversationShape = FrontDeskConversationShape;
 
 export type ConversationMode = 'voice-hub' | 'orchestrator' | 'unavailable' | 'history' | 'intake';
 
-export interface ConversationNextAction {
-  id: string;
-  /** Human-readable label; the dock sends it verbatim as the next message. */
-  label: string;
-}
-
-export interface ConversationPromotion {
-  kind: 'mission' | 'task_session';
-  label: string;
-}
+export type ConversationNextAction = FrontDeskConversationNextAction;
+export type ConversationPromotion = FrontDeskConversationPromotion;
 
 export interface ConversationMessageRequest {
   text: string;
