@@ -42,6 +42,126 @@
       "escalates_to": "ceo",
       "final_decision_holder": "human",
       "requires_human_acceptance": true
+    },
+    {
+      "decision_type": "quote_issuance",
+      "authorized_role": "finance_controller",
+      "threshold": {
+        "metric": "amount_jpy",
+        "value": 1000000,
+        "unit": "JPY"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "expense_reimbursement",
+      "authorized_role": "finance_controller",
+      "threshold": {
+        "metric": "amount_jpy",
+        "value": 100000,
+        "unit": "JPY"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "vendor_invoice_payment",
+      "authorized_role": "finance_controller",
+      "threshold": {
+        "metric": "amount_jpy",
+        "value": 500000,
+        "unit": "JPY"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "meeting_scheduling",
+      "authorized_role": "operator",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "external_reply",
+      "authorized_role": "operator",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "public_announcement",
+      "authorized_role": "ceo",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "access_grant",
+      "authorized_role": "operator",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "internal_task_assignment",
+      "authorized_role": "operator",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
+    },
+    {
+      "decision_type": "internal_document_approval",
+      "authorized_role": "operator",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true,
+      "charter_delegable": true
     }
   ]
 }

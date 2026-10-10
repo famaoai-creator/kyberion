@@ -338,6 +338,9 @@ export function enforceApprovalGate(
         correlationId,
         payload,
         decisionRightsEscalates: decisionRightsEvaluation?.requiresEscalation === true,
+        decisionRightsCharterDelegable:
+          decisionRightsEvaluation?.escalationKind === 'human_acceptance' &&
+          decisionRightsEvaluation.charterDelegable,
       })
     : ({ kind: 'none' } as const);
   if (charterOutcome.kind === 'stop') {

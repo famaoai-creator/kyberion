@@ -3,27 +3,26 @@
  * validated pipeline step) into the trusted `charter` input of the approval
  * gate — or `undefined`, meaning "the legacy gate applies unchanged".
  *
- * Only decision types with an honest charter vocabulary are mapped. An
- * unmapped type (secret mutation, headcount, anything new) never gets a
- * charter branch: the envelope has nothing to say about it, and "the envelope
- * says nothing" must not read as "allowed".
+ * Only decision types listed in the charter decision vocabulary are mapped. An
+ * unlisted type (secret mutation, anything new) never gets a charter branch:
+ * the envelope has nothing to say about it, and "the envelope says nothing"
+ * must not read as "allowed". Listed types that require delegation must also
+ * be named in `envelope.delegated_decisions`.
  *
- * Money and contracts are treated as irreversible and their worst-case loss as
- * the full amount: the charter's `irreversible` and appetite limits apply
- * conservatively, and the charter must name the decision type in
- * `irreversible_named_actions` to let it run unattended.
+ * An irreversible decision's worst-case loss is its full amount, and the
+ * charter must name the decision type in `irreversible_named_actions` to let
+ * it run unattended.
  */
 
 import { agentActor } from '../actor.js';
 import { buildNhiId, NHI_SLUG_PATTERN } from '../nhi-id.js';
+import type { CharterAction } from './accountability-charter.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { findActiveCharter, type CharterPathOptions } from './accountability-charter-registry.js';
-
-/** decision_type (decision-rights matrix) → charter action class. */
-const DECISION_TYPE_TO_CHARTER_CLASS: Readonly<Record<string, string>> = {
-  operational_spend: 'payment',
-  contract_signature: 'sign_contract',
-};
+import {
+  findCharterDecision,
+  type CharterDecisionVocabulary,
+} from './charter-decision-vocabulary.js';
 
 /** decision-rights thresholds are expressed in JPY (`amount_jpy`). */
 const DECISION_RIGHTS_CURRENCY = 'JPY';
@@ -42,32 +41,59 @@ export function charterInputForDecision(
     agentId?: string;
     decisionType: string;
     amount?: number;
+    /** Outside parties the decision reaches (messages, invitations). */
+    recipients?: number;
   },
-  options: CharterPathOptions = {},
+  options: CharterPathOptions & { vocabulary?: CharterDecisionVocabulary } = {},
   now: Date = new Date()
 ): ApprovalGateCharterInput | undefined {
-  const actionClass = DECISION_TYPE_TO_CHARTER_CLASS[input.decisionType];
-  if (!actionClass || !input.tenantSlug) return undefined;
+  const entry = findCharterDecision(input.decisionType, options.vocabulary);
+  if (!entry || !input.tenantSlug) return undefined;
+  const pathOptions: CharterPathOptions = options.rootDir ? { rootDir: options.rootDir } : {};
   const scope = { kind: 'organization', tenant_slug: input.tenantSlug } as const;
-  const charter = findActiveCharter(scope, now, options);
+  const charter = findActiveCharter(scope, now, pathOptions);
   if (!charter) return undefined;
   const actor = agentActor(
     buildNhiId(input.tenantSlug, workerSlug(input.agentId)),
     charter.accountable.actor
   );
   const amount =
-    typeof input.amount === 'number' && Number.isFinite(input.amount) ? input.amount : 0;
+    entry.amount_semantics !== 'none' &&
+    typeof input.amount === 'number' &&
+    Number.isFinite(input.amount) &&
+    input.amount > 0
+      ? input.amount
+      : 0;
+  const recipients =
+    typeof input.recipients === 'number' &&
+    Number.isInteger(input.recipients) &&
+    input.recipients >= 0
+      ? input.recipients
+      : entry.default_recipients;
+  const action: CharterAction = {
+    actor,
+    action_class: entry.action_class,
+    ...(entry.requires_delegation ? { decision_type: entry.decision_type } : {}),
+    ...(entry.amount_semantics === 'spend' && amount > 0
+      ? { amount, currency: DECISION_RIGHTS_CURRENCY }
+      : {}),
+    reversible: entry.reversible,
+    ...(entry.reversible ? {} : { irreversible_action_name: entry.decision_type }),
+    estimated_loss: entry.reversible ? 0 : amount,
+    ...(entry.reputational_class ? { reputational_class: entry.reputational_class } : {}),
+    ...(recipients !== undefined || entry.systems !== undefined
+      ? {
+          blast_radius: {
+            ...(recipients !== undefined ? { recipients } : {}),
+            ...(entry.systems !== undefined ? { systems: entry.systems } : {}),
+          },
+        }
+      : {}),
+  };
   return {
     scope,
-    action: {
-      actor,
-      action_class: actionClass,
-      ...(amount > 0 ? { amount, currency: DECISION_RIGHTS_CURRENCY } : {}),
-      reversible: false,
-      irreversible_action_name: input.decisionType,
-      estimated_loss: amount,
-    },
-    ...(options.rootDir ? { pathOptions: options } : {}),
+    action,
+    ...(options.rootDir ? { pathOptions } : {}),
   };
 }
 
