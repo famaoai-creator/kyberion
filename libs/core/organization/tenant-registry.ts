@@ -11,6 +11,7 @@ import {
   safeMkdir,
   safeLstat,
   safeReaddir,
+  safeUnlinkSync,
   safeWriteFile,
   assertSafeRepositoryPath,
 } from '../secure-io.js';
@@ -438,9 +439,25 @@ export function writeTenantProfile(
     normalized.knowledge_root!
   );
   const file = tenantProfilePath(normalized.tenant_slug, options);
+  const isNewProfile = !safeExistsSync(file);
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
-  if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
+  try {
+    if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
+  } catch (error) {
+    // Roll back a profile written by this call: a registered tenant without
+    // its knowledge root is a half-created state that `create` can neither
+    // use nor retry (it refuses existing slugs). Pre-existing profiles are
+    // left alone — the write above may have been a legitimate update.
+    if (isNewProfile) {
+      try {
+        safeUnlinkSync(file);
+      } catch {
+        // best-effort rollback; surface the original failure
+      }
+    }
+    throw error;
+  }
   return normalized;
 }
 
