@@ -17,6 +17,7 @@ import { listSurfaceNotificationsAcrossChannels } from './surface/surface-ux.js'
 import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
 import { computeApprovalPresentedDigest } from './governance/approval-presentation.js';
+import { requiredDecisionAssurance } from './governance/approval-human-decision.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -41,6 +42,8 @@ export interface CeoApprovalItem {
   organization_id?: string;
   /** HA-06: digest of what this item shows; the decision sends it back. */
   presented_digest?: string;
+  /** HA-07: the weakest decider proof a human-only request accepts (A3 = passkey). */
+  min_assurance?: 'A0' | 'A1' | 'A2' | 'A3';
 }
 
 export interface CeoOutcomeItem {
@@ -221,6 +224,14 @@ function toApprovalItem(
       : undefined,
     ...(record.id && record.title
       ? { presented_digest: computeApprovalPresentedDigest(approval) }
+      : {}),
+    ...(approval.accountability?.finalDecision === 'human_only'
+      ? {
+          min_assurance: requiredDecisionAssurance(
+            approval.accountability,
+            String(record.storageChannel || record.channel || '')
+          ),
+        }
       : {}),
   };
 }

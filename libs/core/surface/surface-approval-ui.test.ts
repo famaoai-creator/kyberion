@@ -140,7 +140,9 @@ describe('surface-approval-ui MO-11 cross-surface coherence', () => {
       requestedBy: 'agent-1',
       draft: { title: 'Deploy', summary: 'Explicit auth method.' },
     });
-    expect(
+    // `passkey` is never taken on the caller's word (HA-07): it needs a
+    // verified challenge, so a bare claim is refused.
+    expect(() =>
       applySurfaceApprovalDecision({
         surface: 'telegram',
         requestId: explicit.id,
@@ -149,8 +151,19 @@ describe('surface-approval-ui MO-11 cross-surface coherence', () => {
         threadTs: 'thread-explicit',
         decidedBy: 'human-1',
         authMethod: 'passkey',
+      })
+    ).toThrow(/needs its verified challenge/);
+    expect(
+      applySurfaceApprovalDecision({
+        surface: 'telegram',
+        requestId: explicit.id,
+        decision: 'approved',
+        channel: FIXTURE_CHANNEL,
+        threadTs: 'thread-explicit',
+        decidedBy: 'human-1',
+        authMethod: 'surface_session',
       }).decidedAuthMethod
-    ).toBe('passkey');
+    ).toBe('surface_session');
   });
 
   it('carries the rejection reason and note into the store, not just the call', () => {

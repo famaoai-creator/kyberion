@@ -37,7 +37,10 @@ import {
   isFixtureApproval,
   purgeFixtureApprovals,
   sweepExpirablePendingApprovals,
+  sweepExpiredPasskeyChallenges,
 } from './approval-store-hygiene.js';
+import { issueApprovalPasskeyChallenge } from './approval-passkey-challenge.js';
+import { computeApprovalPresentedDigest } from './approval-presentation.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
@@ -222,5 +225,53 @@ describe('purgeFixtureApprovals', () => {
         }
       });
     }
+  });
+});
+
+describe('sweepExpiredPasskeyChallenges', () => {
+  const channel = `hygiene-passkey-${process.pid}`;
+
+  afterEach(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const root of Object.values(approvalStoreRoots())) {
+        const dir = pathResolver.rootResolve(`${root}/${channel}`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('removes challenges past expiry plus retention and keeps live ones', () => {
+    const created = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'passkey-sweep',
+      requestedBy: 'operator',
+      draft: { title: 'passkey sweep', summary: 'HA-07 challenge cleanup' },
+      accountability: { finalDecision: 'human_only', min_assurance: 'A3' },
+    });
+    const issue = (now: Date) =>
+      issueApprovalPasskeyChallenge('mission_controller', {
+        record: created,
+        presentedDigest: computeApprovalPresentedDigest(created),
+        storageChannel: channel,
+        decision: 'approved',
+        memberId: 'owner',
+        now,
+      });
+    const stale = issue(new Date(Date.now() - 3 * 60 * 60 * 1000));
+    const live = issue(new Date());
+    const path = (id: string) =>
+      `${approvalStoreRoots().coordination}/${channel}/approvals/passkey-challenges/${id}.json`;
+
+    const dry = sweepExpiredPasskeyChallenges({ dryRun: true });
+    const mine = dry.candidates.filter((c) => c.storageChannel === channel);
+    expect(mine.map((c) => c.logicalPath)).toEqual([path(stale.challenge_id)]);
+    expect(safeExistsSync(pathResolver.rootResolve(path(stale.challenge_id)))).toBe(true);
+
+    const applied = sweepExpiredPasskeyChallenges({ dryRun: false });
+    expect(applied.errors).toEqual([]);
+    expect(applied.applied).toContain(path(stale.challenge_id));
+    expect(safeExistsSync(pathResolver.rootResolve(path(stale.challenge_id)))).toBe(false);
+    expect(safeExistsSync(pathResolver.rootResolve(path(live.challenge_id)))).toBe(true);
   });
 });
