@@ -130,7 +130,7 @@ export function rawReadFileSnapshot(
   filePath: string,
   rootDir: string,
   maxBytes: number,
-  expected?: { dev: number; ino: number }
+  expected?: { dev: number; ino: number } | 'single-link'
 ): Buffer {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_SNAPSHOT_READ_BYTES) {
     throw new Error(
@@ -210,7 +210,11 @@ export function rawReadFileSnapshot(
     }
     // The caller vetted an inode (e.g. its link count) before this function
     // ran; the bytes are returned only if they came from that inode.
-    if (expected && (opened.dev !== BigInt(expected.dev) || opened.ino !== BigInt(expected.ino))) {
+    if (
+      expected === 'single-link'
+        ? opened.nlink > 1n
+        : expected && (opened.dev !== BigInt(expected.dev) || opened.ino !== BigInt(expected.ino))
+    ) {
       throw new Error(`[SECURITY] File changed before snapshot read: ${resolved}`);
     }
     return buffer.subarray(0, offset);

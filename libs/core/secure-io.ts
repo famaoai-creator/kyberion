@@ -37,6 +37,7 @@ import {
   assertCanonicalReadable,
   assertCanonicalWritable,
   canonicalGuardPath,
+  assertHardLinkMove,
   assertNotForeignHardLink,
   mkdirGuarded,
   assertSymlinkTargetWritable,
@@ -381,7 +382,8 @@ export function safeReadFileSnapshot(filePath: string, maxBytes: number): Buffer
   const resolved = assertReadableRepositoryFile(filePath, 'snapshot');
   const vetted = fs.existsSync(resolved) ? fs.statSync(resolved) : undefined;
   if (vetted) assertNotForeignHardLink(vetted, resolved, filePath, 'read');
-  const expected = vetted && { dev: vetted.dev, ino: vetted.ino };
+  // Pin the vetted inode; a file that appears after the check must be single-link.
+  const expected = vetted ? { dev: vetted.dev, ino: vetted.ino } : ('single-link' as const);
   return rawReadFileSnapshot(resolved, pathResolver.rootDir(), maxBytes, expected);
 }
 
@@ -543,7 +545,7 @@ export function safeWriteFile(
 
   const canonical = assertCanonicalWritable(resolved, filePath, 'follow');
   const dir = path.dirname(resolved);
-  if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, filePath);
+  if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
 
   if (fs.existsSync(resolved) && fs.lstatSync(resolved).isSymbolicLink()) {
     throw new Error(`[SECURITY] Refusing to replace symbolic link: ${resolved}`);
@@ -596,7 +598,7 @@ export function safeWriteFile(
       if (firstErr?.code !== 'ENOENT') throw firstErr;
       // Respect the caller's mkdir option: only re-create the directory when
       // directory creation was requested in the first place.
-      if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, filePath);
+      if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
       if (!fs.existsSync(dir)) throw firstErr;
       writeAtomically();
     }
@@ -676,7 +678,7 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
   assertCanonicalWritable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedDest, destPath, 'leaf');
   // A moved hard link keeps aliasing its other names under any new name.
-  assertNotForeignHardLink(fs.lstatSync(resolvedSrc), resolvedSrc, srcPath, 'write');
+  assertHardLinkMove(resolvedSrc, srcPath, resolvedDest);
   fs.renameSync(resolvedSrc, resolvedDest);
 }
 
@@ -710,10 +712,10 @@ export function safeSymlinkSync(
   if (!linkGuard.allowed) {
     throw new Error(linkGuard.reason);
   }
-  assertCanonicalWritable(resolvedLink, linkPath, 'leaf');
+  const canonicalLink = assertCanonicalWritable(resolvedLink, linkPath, 'leaf');
   assertSymlinkTargetWritable(resolvedTarget, targetPath);
   const dir = path.dirname(resolvedLink);
-  if (!fs.existsSync(dir)) mkdirGuarded(dir, linkPath);
+  if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonicalLink), linkPath);
   fs.symlinkSync(path.relative(dir, resolvedTarget), resolvedLink, type);
 }
 
@@ -758,9 +760,9 @@ export function safeMkdir(
   dirPath: string,
   options: fs.MakeDirectoryOptions = { recursive: true }
 ): void {
-  const { resolved } = guardWritePath(dirPath);
+  const { resolved, canonical } = guardWritePath(dirPath);
   if (fs.existsSync(resolved)) return;
-  if (options.recursive) mkdirGuarded(resolved, dirPath, Number(options.mode ?? 0o777));
+  if (options.recursive) mkdirGuarded(resolved, canonical, dirPath, Number(options.mode ?? 0o777));
   else fs.mkdirSync(resolved, options);
 }
 
@@ -778,9 +780,9 @@ export function ensureDir(
  * Open a file for append safely and return the file descriptor.
  */
 export function safeOpenAppendFile(filePath: string): number {
-  const { resolved } = guardWritePath(filePath);
+  const { resolved, canonical } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) mkdirGuarded(dir, filePath);
+  if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
   return openInPlace(resolved, filePath, 'a', 'write');
 }
 
@@ -789,9 +791,9 @@ export function safeOpenAppendFile(filePath: string): number {
  * when another process already owns the path.
  */
 export function safeCreateExclusiveFileSync(filePath: string, data: string | Buffer = ''): void {
-  const { resolved } = guardWritePath(filePath);
+  const { resolved, canonical } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) mkdirGuarded(dir, filePath);
+  if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
   const fd = fs.openSync(resolved, 'wx');
   try {
     if (data.length > 0) fs.writeFileSync(fd, data);
@@ -821,9 +823,9 @@ export function safeCreateExclusiveFileSync(filePath: string, data: string | Buf
  * path of safeCreateExclusiveFileSync.
  */
 export function safePublishExclusiveFileSync(filePath: string, data: string | Buffer): void {
-  const { resolved } = guardWritePath(filePath);
+  const { resolved, canonical } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) mkdirGuarded(dir, filePath);
+  if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
   const temp = `${resolved}.${process.pid}.${createHash('sha256')
     .update(`${Date.now()}:${Math.random()}`)
     .digest('hex')
@@ -1448,7 +1450,10 @@ export function safeStat(filePath: string): fs.Stats {
     );
   }
   assertCanonicalReadable(resolved, filePath, 'follow');
-  return fs.statSync(resolved);
+  const stat = fs.statSync(resolved);
+  // Metadata of a hard link to a higher tier is as sensitive as its size.
+  assertNotForeignHardLink(stat, resolved, filePath, 'read');
+  return stat;
 }
 
 /**
