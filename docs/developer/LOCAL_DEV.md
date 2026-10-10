@@ -171,6 +171,6 @@ LOG_LEVEL=debug pnpm pipeline --input pipelines/baseline-check.json
 ## What's coming (Phase C'-7 follow-up)
 
 - [x] `pnpm test:watch` — current narrow watch loop for `libs/core/` while iterating locally.
-- [ ] `pnpm dev` — single-command workspace watch mode that rebuilds + reruns affected tests on save.
+- [ ] single-command workspace watch mode that rebuilds + reruns affected tests on save (current split: `pnpm verify` for typecheck/lint/unit, `pnpm test:watch` for the live loop).
 - [ ] Hot-reload for actuators in pipelines (currently each change requires a build).
 - [ ] In-browser TypeScript playground for ADF authoring (Phase D' candidate).

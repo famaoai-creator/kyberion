@@ -9,7 +9,7 @@ import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { isRecord } from '../foundation/text.js';
+import { isRecord, extractFencedBlock } from '../foundation/text.js';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { safeExec, safeMkdir } from '../secure-io.js';
@@ -543,9 +543,9 @@ export function parseLlmResponse(raw: string, responseFormat?: string): unknown 
     logger.warn(`[mission-llm] suppressed error in parseLlmResponse: ${err}`);
   }
 
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    return parseSafeJsonInput(jsonMatch[1].trim(), 'mission LLM fenced response');
+  const fenced = extractFencedBlock(content);
+  if (fenced && (!fenced.lang || fenced.lang.toLowerCase() === 'json')) {
+    return parseSafeJsonInput(fenced.content.trim(), 'mission LLM fenced response');
   }
 
   return parseSafeJsonInput(content.trim(), 'mission LLM response');

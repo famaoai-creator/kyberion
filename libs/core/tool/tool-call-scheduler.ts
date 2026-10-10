@@ -1,3 +1,4 @@
+import { trimEndChars } from '../foundation/text.js';
 /**
  * KD-07: resource-claim declaring tool-call scheduler.
  *
@@ -57,7 +58,7 @@ export type ScheduledCallResult<T> =
 
 function normalizeClaimPath(rawPath: string): string {
   const posix = rawPath.replace(/\\/gu, '/');
-  const trimmed = posix.length > 1 ? posix.replace(/\/+$/u, '') : posix;
+  const trimmed = posix.length > 1 ? trimEndChars(posix, '/') : posix;
   return trimmed || '/';
 }
 

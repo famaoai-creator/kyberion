@@ -2,6 +2,7 @@ import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design
 import type { PptxElement, PptxStyle } from '../../contracts/pptx-protocol.js';
 import { clamp } from '../../foundation/text.js';
 import { stripTags } from '../../html-sanitize.js';
+import { findXmlElement, replaceXmlAttr, stripSelfClosingElements } from './xml-lite.js';
 import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
 
 function inToEmu(inches: number): number {
@@ -32,6 +33,14 @@ function lineSpacingPctValue(ls: number): number {
 
 function ptToEmu(pt: number): number {
   return Math.round(pt * 12700);
+}
+
+/** Patch x/y/cx/cy attributes on the first a:off/a:ext pair inside raw spPr XML. */
+function patchXfrmAttrs(spPrXml: string, x: number, y: number, cx: number, cy: number): string {
+  let out = replaceXmlAttr(spPrXml, 'a:off', 'x', String(x));
+  out = replaceXmlAttr(out, 'a:off', 'y', String(y));
+  out = replaceXmlAttr(out, 'a:ext', 'cx', String(cx));
+  return replaceXmlAttr(out, 'a:ext', 'cy', String(cy));
 }
 
 function buildColorFill(color?: string): string {
@@ -135,8 +144,8 @@ function insertInSchemaOrder(
  */
 function ensureOpenRPr(rPr: string, locale = 'ja-JP'): string {
   // Convert self-closing <a:rPr .../> to <a:rPr ...></a:rPr>
-  if (rPr.match(/<a:rPr[^>]*\/>/)) {
-    rPr = rPr.replace(/\/>$/, '></a:rPr>');
+  if (rPr.includes('<a:rPr') && rPr.trimEnd().endsWith('/>')) {
+    rPr = `${rPr.trimEnd().slice(0, -2)}></a:rPr>`;
   }
   // Ensure lang attribute
   if (!rPr.includes(' lang="')) {
@@ -185,10 +194,10 @@ export function buildShape(
   let basePPr = '<a:pPr/>';
   let baseRPr = `<a:rPr lang="${locale}"></a:rPr>`;
   if (el.pXmlLst && el.pXmlLst.length > 0) {
-    const pPrMatch = el.pXmlLst[0].match(/<a:pPr[^>]*>[\s\S]*?<\/a:pPr>/);
-    if (pPrMatch) basePPr = pPrMatch[0];
-    const rPrMatch = el.pXmlLst[0].match(/<a:rPr[^>]*\/>|<a:rPr[^>]*>[\s\S]*?<\/a:rPr>/);
-    if (rPrMatch) baseRPr = ensureOpenRPr(rPrMatch[0], locale);
+    const pPrMatch = findXmlElement(el.pXmlLst[0], 'a:pPr');
+    if (pPrMatch) basePPr = pPrMatch.outer;
+    const rPrMatch = findXmlElement(el.pXmlLst[0], 'a:rPr');
+    if (rPrMatch) baseRPr = ensureOpenRPr(rPrMatch.outer, locale);
   }
 
   // We should use pXmlLst ONLY if the user hasn't supplied a modified textRuns array.
@@ -290,16 +299,18 @@ export function buildShape(
       if (run.options?.color || el.style?.color) {
         const c = run.options?.color || el.style?.color;
         const fillXml = buildColorFill(c);
-        if (rPr.includes('<a:solidFill')) {
-          rPr = rPr.replace(/<a:solidFill[\s\S]*?<\/a:solidFill>/, fillXml);
+        const existingFill = findXmlElement(rPr, 'a:solidFill');
+        if (existingFill) {
+          rPr = rPr.slice(0, existingFill.start) + fillXml + rPr.slice(existingFill.end);
         } else {
           rPr = insertInSchemaOrder(rPr, 'a:rPr', fillXml, 'a:solidFill', RPR_CHILD_ORDER);
         }
       }
       if (run.options?.highlight) {
         const hlXml = `<a:highlight><a:srgbClr val="${run.options.highlight.replace('#', '')}"/></a:highlight>`;
-        if (rPr.includes('<a:highlight')) {
-          rPr = rPr.replace(/<a:highlight[\s\S]*?<\/a:highlight>/, hlXml);
+        const existingHighlight = findXmlElement(rPr, 'a:highlight');
+        if (existingHighlight) {
+          rPr = rPr.slice(0, existingHighlight.start) + hlXml + rPr.slice(existingHighlight.end);
         } else {
           rPr = insertInSchemaOrder(rPr, 'a:rPr', hlXml, 'a:highlight', RPR_CHILD_ORDER);
         }
@@ -310,7 +321,7 @@ export function buildShape(
         const eaXml = `<a:ea typeface="${resolveEastAsianFontFamily(font)}"/>`;
         // Strip any existing latin/ea first (simplest way to "replace" a child
         // whose position must already be schema-correct), then reinsert.
-        rPr = rPr.replace(/<a:latin[^>]*\/>/g, '').replace(/<a:ea[^>]*\/>/g, '');
+        rPr = stripSelfClosingElements(stripSelfClosingElements(rPr, 'a:latin'), 'a:ea');
         rPr = insertInSchemaOrder(rPr, 'a:rPr', latinXml, 'a:latin', RPR_CHILD_ORDER);
         rPr = insertInSchemaOrder(rPr, 'a:rPr', eaXml, 'a:ea', RPR_CHILD_ORDER);
       }
@@ -423,11 +434,7 @@ export function buildShape(
   let spPrContent = '';
   if (el.spPrXml) {
     // If we have the exact original XML, we just need to ensure the x, y, cx, cy are updated just in case the shape was moved via protocol
-    spPrContent = el.spPrXml
-      .replace(/(<a:off[^>]*?\s)x="[^"]*"/, `$1x="${x}"`)
-      .replace(/(<a:off[^>]*?\s)y="[^"]*"/, `$1y="${y}"`)
-      .replace(/(<a:ext[^>]*?\s)cx="[^"]*"/, `$1cx="${cx}"`)
-      .replace(/(<a:ext[^>]*?\s)cy="[^"]*"/, `$1cy="${cy}"`);
+    spPrContent = patchXfrmAttrs(el.spPrXml, x, y, cx, cy);
   } else {
     const rotAttr = el.style?.rotate ? ` rot="${Math.round(el.style.rotate * 60000)}"` : '';
     // A preset-geometry adjust guide value MUST be an integer in guide units
@@ -506,11 +513,7 @@ export function buildConnector(el: PptxElement, id: number, rIdLink?: string): s
 
   let spPrContent = '';
   if (el.spPrXml) {
-    spPrContent = el.spPrXml
-      .replace(/(<a:off[^>]*?\s)x="[^"]*"/, `$1x="${x}"`)
-      .replace(/(<a:off[^>]*?\s)y="[^"]*"/, `$1y="${y}"`)
-      .replace(/(<a:ext[^>]*?\s)cx="[^"]*"/, `$1cx="${cx}"`)
-      .replace(/(<a:ext[^>]*?\s)cy="[^"]*"/, `$1cy="${cy}"`);
+    spPrContent = patchXfrmAttrs(el.spPrXml, x, y, cx, cy);
   } else {
     spPrContent = `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="${shapeType}"><a:avLst/></a:prstGeom>${buildLine(el.style)}</p:spPr>`;
   }
@@ -537,11 +540,7 @@ export function buildImage(el: PptxElement, id: number, rId: string, rIdLink?: s
     el.cNvPrXml || `<p:cNvPr id="${id}" name="Picture ${id}"${descrAttr}>${linkXml}</p:cNvPr>`;
   const nvPr = el.nvPrXml || `<p:nvPr>${el.extensions || ''}</p:nvPr>`;
   const spPr = el.spPrXml
-    ? el.spPrXml
-        .replace(/(<a:off[^>]*?\s)x="[^"]*"/, `$1x="${x}"`)
-        .replace(/(<a:off[^>]*?\s)y="[^"]*"/, `$1y="${y}"`)
-        .replace(/(<a:ext[^>]*?\s)cx="[^"]*"/, `$1cx="${cx}"`)
-        .replace(/(<a:ext[^>]*?\s)cy="[^"]*"/, `$1cy="${cy}"`)
+    ? patchXfrmAttrs(el.spPrXml, x, y, cx, cy)
     : `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>`;
 
   // Use raw blipFill if available (preserves crop, effects, etc.), but update the embed rId

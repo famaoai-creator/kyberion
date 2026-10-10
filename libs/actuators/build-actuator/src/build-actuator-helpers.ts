@@ -66,10 +66,28 @@ function resolveBuildPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
 }
 
+function isWordChar(ch: string): boolean {
+  return (
+    (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch === '_'
+  );
+}
+
+function isErrorSummaryLine(line: string): boolean {
+  if (line.includes('FAILED')) return true;
+  const lower = line.toLowerCase();
+  for (let idx = lower.indexOf('error'); idx >= 0; idx = lower.indexOf('error', idx + 1)) {
+    const beforeOk = idx === 0 || !isWordChar(lower[idx - 1]);
+    const afterIndex = idx + 'error'.length;
+    const afterOk = afterIndex >= lower.length || !isWordChar(lower[afterIndex]);
+    if (beforeOk && afterOk) return true;
+  }
+  return false;
+}
+
 export function extractErrorSummary(logText: string): string[] {
   return logText
     .split('\n')
-    .filter((line) => /(?:\berror\b|\bFAILED\b)/i.test(line))
+    .filter(isErrorSummaryLine)
     .slice(-ERROR_SUMMARY_MAX_LINES)
     .map((line) => line.trim());
 }

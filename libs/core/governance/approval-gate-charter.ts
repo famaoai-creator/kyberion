@@ -19,7 +19,12 @@ import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { resolveApprovalPolicy, type ApprovalPolicyResolution } from './approval-policy.js';
-import type { CharterAction, CharterAvailability, CharterScope } from './accountability-charter.js';
+import {
+  delegatedDecisionPolicy,
+  type CharterAction,
+  type CharterAvailability,
+  type CharterScope,
+} from './accountability-charter.js';
 import {
   evaluateUnderCharter,
   recordCharterConsumption,
@@ -32,6 +37,11 @@ export interface ApprovalGateCharterInput {
   action: CharterAction;
   /** Defaults to "the accountable human is available". */
   availability?: CharterAvailability;
+  /**
+   * The decision commits money but the caller gave no usable amount. The
+   * envelope cannot price it, so the charter never allows it on its own.
+   */
+  amountUnknown?: boolean;
   pathOptions?: CharterPathOptions;
 }
 
@@ -60,6 +70,11 @@ export function runCharterGate(input: {
   payload?: Record<string, unknown>;
   /** The decision-rights matrix routes this decision to a human. */
   decisionRightsEscalates?: boolean;
+  /**
+   * The matrix escalates only because a human accepts this type, and the
+   * organization marked the type `charter_delegable`.
+   */
+  decisionRightsCharterDelegable?: boolean;
   now?: Date;
 }): CharterGateOutcome {
   const { charter, agentId, operationId, correlationId } = input;
@@ -104,9 +119,28 @@ export function runCharterGate(input: {
         reason: `hardened policy '${policy.matchedRuleId ?? 'dual_key_confirmation'}' is outside what a charter can delegate`,
       };
     }
+    if (charter.amountUnknown) {
+      return {
+        kind: 'require_approval',
+        reason: `decision commits money without a usable amount; charter ${active.charter_id} cannot price it`,
+      };
+    }
     // The matrix is organizational governance: a charter stands in for it only
-    // when the accountable human explicitly, and with authority, said so.
-    if (input.decisionRightsEscalates && active.envelope.supersedes_decision_rights !== true) {
+    // when the accountable human explicitly, and with authority, said so — for
+    // every decision (supersedes) or for a type the organization made
+    // delegable and the charter named (the evaluation already checked the name).
+    // The named type must be the one the matrix evaluated.
+    const delegatedType = charter.action.decision_type;
+    const namedDelegableType =
+      input.decisionRightsCharterDelegable === true &&
+      Boolean(delegatedType) &&
+      input.payload?.decision_type === delegatedType &&
+      delegatedDecisionPolicy(active.envelope, delegatedType!) !== 'forbid';
+    if (
+      input.decisionRightsEscalates &&
+      active.envelope.supersedes_decision_rights !== true &&
+      !namedDelegableType
+    ) {
       return {
         kind: 'require_approval',
         reason: `decision-rights matrix escalates this decision and charter ${active.charter_id} does not supersede it`,
