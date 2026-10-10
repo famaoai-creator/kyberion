@@ -1577,6 +1577,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/personal-summary/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1598,6 +1603,11 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/push/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/response-status/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1763,6 +1773,11 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/scim-server.ts#withScimContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/selected-tenant.ts#conciergeAllowedTenants",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3630,6 +3645,7 @@
         "presence/displays/concierge/src/app/api/outcomes/[id]/files/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts",
+        "presence/displays/concierge/src/app/api/personal-summary/route.ts",
         "presence/displays/concierge/src/app/api/plugins/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/route.ts",
         "presence/displays/concierge/src/app/api/push/route.ts",
@@ -3676,6 +3692,7 @@
         "presence/displays/concierge/src/app/manifest.ts",
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
+        "presence/displays/concierge/src/app/personal-overview.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
         "presence/displays/concierge/src/app/scim/v2/ResourceTypes/route.ts",
         "presence/displays/concierge/src/app/scim/v2/Schemas/route.ts",
@@ -3750,15 +3767,19 @@
         "presence/displays/concierge/src/lib/outcome-files-response.ts",
         "presence/displays/concierge/src/lib/outcome-files.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
+        "presence/displays/concierge/src/lib/personal-aggregate.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
         "presence/displays/concierge/src/lib/push-client.ts",
         "presence/displays/concierge/src/lib/push-server.ts",
         "presence/displays/concierge/src/lib/quiet-hours-view.ts",
+        "presence/displays/concierge/src/lib/rail-switcher.ts",
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
+        "presence/displays/concierge/src/lib/response-status-scope.ts",
         "presence/displays/concierge/src/lib/review-watch.ts",
         "presence/displays/concierge/src/lib/scim-server.ts",
+        "presence/displays/concierge/src/lib/selected-tenant.ts",
         "presence/displays/concierge/src/lib/settings-types.ts",
         "presence/displays/concierge/src/lib/settings-view.ts",
         "presence/displays/concierge/src/lib/setup-auxiliary-response.ts",
@@ -3768,6 +3789,7 @@
         "presence/displays/concierge/src/lib/summary-watch.ts",
         "presence/displays/concierge/src/lib/surface-auth-route.ts",
         "presence/displays/concierge/src/lib/tenant-context.ts",
+        "presence/displays/concierge/src/lib/tenant-visibility.ts",
         "presence/displays/concierge/src/lib/use-concierge-i18n.ts",
         "presence/displays/concierge/src/lib/use-ingest-flow.ts",
         "presence/displays/concierge/src/lib/use-outcome-preview.ts",

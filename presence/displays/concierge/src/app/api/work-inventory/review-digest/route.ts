@@ -5,23 +5,24 @@ import { listWorkInventoryConsents } from '@agent/core/workforce/work-inventory-
 import { nowIso } from '@agent/core/foundation/time';
 import { buildObservationReview } from '../../../../lib/observation-review';
 import { requireWorkInventoryMember } from '../../../../lib/work-inventory-member';
-import {
-  conciergeErrorResponse,
-  narrowConciergeScope,
-  resolveConciergeViewer,
-} from '../../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
+import { conciergeErrorResponse, narrowConciergeScope } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'no-store' };
 
-/** Read-only, subject-owned counts; client parameters can only narrow server scope. */
+/**
+ * Read-only, subject-owned counts for the company named by `?tenant=`, which
+ * must also be the server-validated selection; client parameters can only
+ * narrow server scope.
+ */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) {
     resolved.response.headers.set('Cache-Control', 'no-store');
     return resolved.response;
   }
-  const viewer = resolved.context;
+  const viewer = resolved.viewer;
   if (viewer.source === 'anonymous' || !viewer.principalId) {
     return NextResponse.json(
       { ok: false, error_code: 'identity_required' },
@@ -34,11 +35,14 @@ export function GET(req: NextRequest) {
     return member.response;
   }
   try {
-    const tenant = req.nextUrl.searchParams.get('tenant');
+    // The company must be requested explicitly and accepted as the selection.
+    const tenant =
+      resolved.selection.mode === 'tenant' && resolved.selection.source === 'url'
+        ? resolved.selection.tenant_slug
+        : null;
     // Records have no organization/project attribution: restricted viewers cannot read them.
     if (
       !tenant ||
-      tenant === 'all' ||
       viewer.organizationIds !== 'all' ||
       viewer.projectIds !== 'all' ||
       !viewer.tierAccess.includes('confidential') ||
