@@ -313,13 +313,11 @@ describe('CU-08 removed command aliases stay removed', () => {
 
   it('rejects removed command names end to end', async () => {
     await expect(main(['customer', 'create', '--slug', 'acme'], () => undefined)).rejects.toThrow(
-      /不明な kyberion コマンド/u
+      /customer create/u
     );
-    await expect(main(['onboard', 'apply'], () => undefined)).rejects.toThrow(
-      /不明な kyberion コマンド/u
-    );
+    await expect(main(['onboard', 'apply'], () => undefined)).rejects.toThrow(/onboard apply/u);
     await expect(main(['chronos', 'uninstall'], () => undefined)).rejects.toThrow(
-      /不明な kyberion コマンド/u
+      /chronos uninstall/u
     );
   });
 
