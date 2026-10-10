@@ -37,10 +37,16 @@ import {
   assertCanonicalReadable,
   assertCanonicalWritable,
   canonicalGuardPath,
+  assertNotForeignHardLink,
+  assertSymlinkTargetWritable,
+  assertTempInCheckedDir,
+  chmodInPlace,
+  copyReplacing,
+  captureCheckedDir,
+  guardLiteralWritePath,
   guardReadPath,
   guardWritePath,
-  invalidateRealDirCache,
-  isInside,
+  openInPlace,
   registerSensitivePathMediationProbe,
 } from './secure-io-path-guard.js';
 export { safeRealpath } from './secure-io-path-guard.js';
@@ -244,16 +250,19 @@ export function buildSafeExecEnv(
  * Validate that a file does not exceed a size limit.
  */
 export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB): number {
-  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const stat = fs.statSync(resolved);
-  const sizeMB = stat.size / (1024 * 1024);
+  // Size is file metadata of a possibly higher tier: same read guard as content.
+  const resolved = assertReadableRepositoryFile(filePath, 'input');
+  return assertSizeWithin(fs.statSync(resolved).size, resolved, maxSizeMB);
+}
+
+function assertSizeWithin(size: number, resolved: string, maxSizeMB: number): number {
+  const sizeMB = size / (1024 * 1024);
   if (sizeMB > maxSizeMB) {
     throw new Error(
       `File too large: ${resolved} is ${sizeMB.toFixed(1)}MB (limit: ${maxSizeMB}MB)`
     );
   }
-  return stat.size;
+  return size;
 }
 
 /**
@@ -287,11 +296,13 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
   if (!fs.existsSync(resolved)) {
     throw new Error(`File not found: ${resolved}`);
   }
-  validateFileSize(resolved, maxSizeMB);
-  if (encoding === null) {
-    return fs.readFileSync(resolved);
+  const fd = openInPlace(resolved, filePath, 'r', 'read');
+  try {
+    assertSizeWithin(fs.fstatSync(fd).size, resolved, maxSizeMB);
+    return encoding === null ? fs.readFileSync(fd) : fs.readFileSync(fd, { encoding });
+  } finally {
+    fs.closeSync(fd);
   }
-  return fs.readFileSync(resolved, { encoding });
 }
 
 export interface SafeReadTailResult {
@@ -346,6 +357,7 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
     if (!stat.isFile()) {
       throw new Error(`Not a regular file: ${resolved}`);
     }
+    assertNotForeignHardLink(stat, resolved, filePath, 'read');
     const readLength = Math.max(0, Math.min(length, stat.size - position));
     const buffer = Buffer.alloc(readLength);
     let offset = 0;
@@ -363,6 +375,8 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
 export { MAX_SNAPSHOT_READ_BYTES } from './fs-primitives.js';
 export function safeReadFileSnapshot(filePath: string, maxBytes: number): Buffer {
   const resolved = assertReadableRepositoryFile(filePath, 'snapshot');
+  if (fs.existsSync(resolved))
+    assertNotForeignHardLink(fs.statSync(resolved), resolved, filePath, 'read');
   return rawReadFileSnapshot(resolved, pathResolver.rootDir(), maxBytes);
 }
 
@@ -386,6 +400,7 @@ export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTa
     if (!stat.isFile()) {
       throw new Error(`Not a regular file: ${resolved}`);
     }
+    assertNotForeignHardLink(stat, resolved, filePath, 'read');
 
     const size = stat.size;
     const readLength = Math.min(maxBytes, size);
@@ -464,7 +479,10 @@ export function safeWriteFile(
   options: SafeWriteOptions = {}
 ): void {
   const { mkdir = true } = options;
-  const { resolved, canonical } = guardWritePath(filePath);
+  const resolved = guardLiteralWritePath(filePath);
+  // Tier for the policy decision only; the canonical permission check runs
+  // after policy evaluation, as close to the write as possible.
+  const tierPath = canonicalGuardPath(resolved, 'follow');
 
   // Policy engine gate (with re-entrancy guard to avoid infinite loop
   // since policyEngine.evaluate -> loadFromFile -> safeReadFile)
@@ -475,7 +493,7 @@ export function safeWriteFile(
         agentId: executionPersonaText() || 'unknown',
         operation: 'file_write',
         // The tier where the bytes land: the canonical path, not a link in a lower tier.
-        target_tier: detectTier(canonical),
+        target_tier: detectTier(tierPath),
         // Root operator processes are sovereign-tier by default; subagent
         // spawns can downgrade via KYBERION_AGENT_TIER so sovereign-shield
         // (personal-tier isolation) has real firing context.
@@ -496,7 +514,7 @@ export function safeWriteFile(
           result: 'failed',
           reason: policyDecision.message || 'policy violation',
           metadata: {
-            target_tier: detectTier(canonical),
+            target_tier: detectTier(tierPath),
           },
         });
         throw new Error(
@@ -518,6 +536,7 @@ export function safeWriteFile(
     }
   }
 
+  const canonical = assertCanonicalWritable(resolved, filePath, 'follow');
   const dir = path.dirname(resolved);
   if (mkdir && !fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -531,21 +550,25 @@ export function safeWriteFile(
   // temp file (or its dir) between write and rename — ENOENT here is
   // recoverable by re-materializing the temp file once.
   const writeAtomically = (): void => {
+    // Temp and target live in the directory that was checked (canonical).
+    const checked = captureCheckedDir(path.dirname(canonical));
+    const target = path.join(checked.dir, path.basename(canonical));
     const ns = process.hrtime.bigint().toString();
-    const tempPath = `${resolved}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
+    const tempPath = `${target}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
     let fd: number | null = null;
     try {
       // Apply the requested mode at creation time. Applying it only through
       // writeFileSync(fd, ...) has no effect because the descriptor is already open.
       fd = fs.openSync(tempPath, 'wx', options.mode ?? 0o666);
+      assertTempInCheckedDir(checked, tempPath, fd);
       fs.writeFileSync(fd, data, { encoding: options.encoding });
       fs.fsyncSync(fd);
       fs.closeSync(fd);
       fd = null;
       if (options.createOnly) {
-        fs.linkSync(tempPath, resolved);
+        fs.linkSync(tempPath, target);
         fs.unlinkSync(tempPath);
-      } else fs.renameSync(tempPath, resolved);
+      } else fs.renameSync(tempPath, target);
     } catch (atomicErr) {
       if (fd !== null)
         try {
@@ -589,7 +612,14 @@ export function safeAppendFileSync(
   options: any = 'utf8'
 ): void {
   const { resolved } = guardWritePath(filePath);
-  fs.appendFileSync(resolved, data, options);
+  const opts = typeof options === 'string' ? { encoding: options } : options || {};
+  // Appends modify the existing inode: refuse a foreign hard link (on the fd).
+  const fd = openInPlace(resolved, filePath, opts.flag ?? 'a', 'write', opts.mode);
+  try {
+    fs.appendFileSync(fd, data, { encoding: opts.encoding });
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**
@@ -611,7 +641,7 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
   // copyfile follows a symlink at either end.
   assertCanonicalReadable(resolvedSrc, srcPath, 'follow');
   assertCanonicalWritable(resolvedDest, destPath, 'follow');
-  fs.copyFileSync(resolvedSrc, resolvedDest);
+  copyReplacing(resolvedSrc, srcPath, resolvedDest);
 }
 
 /**
@@ -639,7 +669,6 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
   assertCanonicalReadable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedDest, destPath, 'leaf');
-  invalidateRealDirCache();
   fs.renameSync(resolvedSrc, resolvedDest);
 }
 
@@ -647,19 +676,9 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
 export type SafeSymlinkType = 'file' | 'dir';
 
 /**
- * Create a symlink safely with permission validation.
- *
- * A link is a standing write grant on its target: every later write through
- * the link lands in the target. So the caller must be allowed to WRITE the
- * canonical target (not merely read it), the target must resolve inside the
- * repository, and the link's own location must be writable. The link is
- * stored relative so it keeps pointing inside the checkout when it moves.
- *
- * `junction` is refused: Windows junctions need no symlink privilege, always
- * store an absolute target and are followed by every Win32 API, so they are
- * the one link kind an unprivileged pipeline could use to redirect a
- * directory to an arbitrary absolute path. No caller needs one; `dir` and
- * `file` cover the supported cases (the type is ignored outside Windows).
+ * Create a symlink safely with permission validation. A link is a standing
+ * write grant on its target, so the caller needs write scope on the canonical
+ * target too (assertSymlinkTargetWritable). `junction` is refused (runbook §10).
  */
 export function safeSymlinkSync(
   targetPath: string,
@@ -684,26 +703,11 @@ export function safeSymlinkSync(
     throw new Error(linkGuard.reason);
   }
   assertCanonicalWritable(resolvedLink, linkPath, 'leaf');
-  const canonicalTarget = canonicalGuardPath(resolvedTarget, 'follow');
-  if (isInside(path.resolve(pathResolver.rootDir()), canonicalTarget) === undefined) {
-    throw new Error(
-      `[SECURITY] Refusing to create a symbolic link to ${targetPath}: it resolves outside the repository (${canonicalTarget})`
-    );
-  }
-  for (const candidate of new Set([path.resolve(resolvedTarget), canonicalTarget])) {
-    assertSensitivePathAllowed(candidate, 'write', isSensitivePathMediated());
-    const writeGuard = validateWritePermission(candidate);
-    if (!writeGuard.allowed) {
-      throw new Error(
-        `[SECURITY] Refusing to create a symbolic link to ${targetPath}: the target is outside the caller's write scope. ${writeGuard.reason ?? ''}`.trim()
-      );
-    }
-  }
+  assertSymlinkTargetWritable(resolvedTarget, targetPath);
   const dir = path.dirname(resolvedLink);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  invalidateRealDirCache();
   fs.symlinkSync(path.relative(dir, resolvedTarget), resolvedLink, type);
 }
 
@@ -718,7 +722,6 @@ export function safeRmSync(
   // not descend through links, but a symlinked PARENT would redirect the
   // removal into another scope — so the parent is canonicalized.
   const { resolved } = guardWritePath(targetPath, 'leaf');
-  invalidateRealDirCache();
   if (fs.existsSync(resolved)) {
     fs.rmSync(resolved, options);
   }
@@ -730,7 +733,6 @@ export function safeRmSync(
 export function safeUnlinkSync(filePath: string): void {
   // unlink removes the entry itself; only a symlinked parent can redirect it.
   const { resolved } = guardWritePath(filePath, 'leaf');
-  invalidateRealDirCache();
   if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
 }
 
@@ -740,7 +742,6 @@ export function safeUnlinkSync(filePath: string): void {
  */
 export function safeRmdirSync(dirPath: string): void {
   const { resolved } = guardWritePath(dirPath, 'leaf');
-  invalidateRealDirCache();
   if (fs.existsSync(resolved)) fs.rmdirSync(resolved);
 }
 
@@ -776,7 +777,7 @@ export function safeOpenAppendFile(filePath: string): number {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  return fs.openSync(resolved, 'a');
+  return openInPlace(resolved, filePath, 'a', 'write');
 }
 
 /**
@@ -899,7 +900,7 @@ export function safeFileAgeMs(filePath: string): number | undefined {
  */
 export function safeFsyncFile(filePath: string): void {
   const { resolved } = guardWritePath(filePath);
-  const fd = fs.openSync(resolved, 'r+');
+  const fd = openInPlace(resolved, filePath, 'r+', 'write');
   try {
     fs.fsyncSync(fd);
   } finally {
@@ -914,7 +915,7 @@ export function safeFsyncFile(filePath: string): void {
  */
 export function safeChmodSync(filePath: string, mode: number): void {
   const { resolved } = guardWritePath(filePath);
-  fs.chmodSync(resolved, mode);
+  chmodInPlace(resolved, filePath, mode);
 }
 
 /**
