@@ -111,9 +111,10 @@ live in one module, `libs/core/private-host-cache.mjs`:
 The STT cache also re-validates on every hit: candidates are rebuilt from
 the governed registry, and a binary is accepted only where the probe could
 have found it (the tool's own managed python, or a PATH directory outside
-`active/`, `knowledge/`, `customer/`, `vault/`). A secure-io weakness that
-lets a persona write through a symlink into `node_modules/` is being fixed
-in secure-io itself (V4).
+`active/`, `knowledge/`, `customer/`, `vault/`). secure-io also refuses to
+create a symlink into, or write through one to, a tree the persona may not
+write (canonical-path guard), so a link from `active/` cannot reach these
+caches.
 
 ### Owner scope (deterministic placement)
 

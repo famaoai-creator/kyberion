@@ -338,11 +338,11 @@ Rules:
   `knowledge/`, `customer/`, `vault/`). **Trust-model exception:** these are the only runtime
   stores outside `active/`, outside secure-io and outside the retention catalog; the transpile
   cache prunes entries written more than 30 days ago (at most daily), the STT cache is one file.
-  **Known gap, fixed separately (V4, `fix/secure-io-symlink-canonicalize-20261009`):** secure-io
-  checks a path as written while the OS follows symlinks, so a persona can create a link from
-  `active/shared/tmp/` into `node_modules/.cache/` and write through it. Until V4 lands, the
-  owner/mode checks do not stop that (the planted file has the same uid and a 0644 mode), but the
-  STT revalidation does.
+  **Symlink write-through is closed in secure-io (V4, #1019).** Before it, secure-io checked a
+  path as written while the OS followed symlinks, so a persona could link `active/shared/tmp/x`
+  to `node_modules/.cache/<cache>` and write through the link (same uid, 0644, so the owner/mode
+  checks did not catch it). secure-io now refuses to create such a link and refuses writes
+  through one; re-verified for both caches as `finance_controller` and `worker`.
 
 - **The cache key covers the loader itself.** It hashes `scripts/ts-loader-cache.mjs`, where the
   compiler options live, so editing the options invalidates every entry with no version to bump.
