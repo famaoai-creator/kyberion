@@ -4,7 +4,9 @@ import {
   DEFAULT_STALE_PENDING_APPROVAL_MS,
   purgeFixtureApprovals,
   sweepExpirablePendingApprovals,
+  sweepExpiredPasskeyChallenges,
   type ApprovalSweepResult,
+  type ExpiredPasskeyChallenge,
   type ExpirablePendingApproval,
   type FixtureApprovalRecord,
 } from '@agent/core/governance/approval-store-hygiene';
@@ -16,7 +18,8 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * Autonomous-operation P1-2 / P1-4: expire pending approvals nobody will act
  * on and move test-fixture records out of the live approval store.
  *
- * Dry-run by default; `--apply` performs both sweeps. Fixture records go to
+ * Dry-run by default; `--apply` performs the sweeps (expired passkey
+ * challenge files are deleted). Fixture records go to
  * `active/archive/.trash/` (30-day restore window), which only the sovereign
  * persona may write, so `--apply` needs `KYBERION_PERSONA=sovereign`.
  *
@@ -44,6 +47,8 @@ export interface ApprovalStoreHygieneReport {
   staleAfterDays: number;
   pendingExpiry: ApprovalSweepResult<ExpirablePendingApproval>;
   fixturePurge: ApprovalSweepResult<FixtureApprovalRecord>;
+  /** Expired passkey challenge files (HA-07). */
+  passkeyChallenges?: ApprovalSweepResult<ExpiredPasskeyChallenge>;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -88,7 +93,12 @@ export function formatApprovalStoreHygieneReport(report: ApprovalStoreHygieneRep
     lines.push('  (--json lists every record with its title, requester and matched rule)');
   }
   if (!report.dryRun) lines.push(`  trashed: ${fixturePurge.applied.length}`);
-  const errors = [...pendingExpiry.errors, ...fixturePurge.errors];
+  const challenges = report.passkeyChallenges;
+  if (challenges) {
+    lines.push('', `Expired passkey challenges to remove: ${challenges.candidates.length}`);
+    if (!report.dryRun) lines.push(`  removed: ${challenges.applied.length}`);
+  }
+  const errors = [...pendingExpiry.errors, ...fixturePurge.errors, ...(challenges?.errors ?? [])];
   if (errors.length > 0) {
     lines.push('', `Errors (${errors.length}):`, ...errors.slice(0, 20).map((e) => `  - ${e}`));
   }
@@ -112,11 +122,13 @@ export function runApprovalStoreHygieneSweeps(options: {
     staleAfterMs: options.staleAfterDays * DAY_MS,
     records: records.filter((record) => record.status === 'pending' && !trashed.has(record.id)),
   });
+  const passkeyChallenges = sweepExpiredPasskeyChallenges({ dryRun: options.dryRun });
   return {
     dryRun: options.dryRun,
     staleAfterDays: options.staleAfterDays,
     pendingExpiry,
     fixturePurge,
+    passkeyChallenges,
   };
 }
 

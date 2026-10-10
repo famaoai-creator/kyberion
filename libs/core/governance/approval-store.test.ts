@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   APPROVAL_CHANGE_INSTRUCTION_MAX,
   VITEST_APPROVAL_STORE_ROOT,
@@ -489,8 +489,7 @@ describe('approval-store path normalization', () => {
     });
 
     it('rejects the same decision in enforce mode without persisting it', () => {
-      const previous = process.env.KYBERION_APPROVAL_ASSURANCE;
-      process.env.KYBERION_APPROVAL_ASSURANCE = 'enforce';
+      vi.stubEnv('KYBERION_APPROVAL_ASSURANCE', 'enforce');
       try {
         const record = createApprovalRequest('mission_controller', {
           channel: 'assurance-test',
@@ -513,8 +512,7 @@ describe('approval-store path normalization', () => {
         ).toThrow('requires assurance A2; channel_identity provides A1');
         expect(loadApprovalRequest(record.channel, record.id)?.status).toBe('pending');
       } finally {
-        if (previous === undefined) delete process.env.KYBERION_APPROVAL_ASSURANCE;
-        else process.env.KYBERION_APPROVAL_ASSURANCE = previous;
+        vi.unstubAllEnvs();
       }
     });
   });

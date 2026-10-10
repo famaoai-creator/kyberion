@@ -60,6 +60,7 @@ import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
 import { DisplaySection } from './sections/DisplaySection';
+import { PasskeyPane } from './sections/PasskeyPane';
 import { FormScope } from './sections/form-scope';
 import { postSetupUpload, toUploadFile } from './settings-api';
 import {
@@ -1057,6 +1058,7 @@ export default function SettingsPage() {
             sectionRef={setSectionRef('profile')}
           >
             <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
+            <PasskeyPane t={t} />
           </ProfileSection>
         );
 
