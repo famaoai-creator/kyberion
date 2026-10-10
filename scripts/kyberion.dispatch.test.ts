@@ -202,7 +202,7 @@ describe('kyberion script-command dispatch', () => {
 
   it('rejects a removed alias without spawning (onboard apply --identity x)', async () => {
     await expect(main(['onboard', 'apply', '--identity', 'x'], () => undefined)).rejects.toThrow(
-      /不明な kyberion コマンド/u
+      /onboard apply/u
     );
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
   });
