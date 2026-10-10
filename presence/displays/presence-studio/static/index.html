@@ -1493,8 +1493,8 @@
             ${item.expected_outcome ? `<div class="small">${escapeHtml(uiText("expected outcome", "expected outcome"))}: ${escapeHtml(item.expected_outcome)}</div>` : ""}
             ${(item.learned_titles || []).length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${escapeHtml((item.learned_titles || []).join(" · "))}</div>` : ""}
             <div class="controls" style="margin-top: 10px; margin-bottom: 0;">
-              <button class="button" type="button" data-approval-id="${escapeHtml(item.id)}" data-decision="approved">${escapeHtml(uiText("Approve", "承認"))}</button>
-              <button class="button secondary" type="button" data-approval-id="${escapeHtml(item.id)}" data-decision="rejected">${escapeHtml(uiText("Reject", "却下"))}</button>
+              <button class="button" type="button" data-approval-id="${escapeHtml(item.id)}" data-presented-digest="${escapeHtml(item.presented_digest || "")}" data-decision="approved">${escapeHtml(uiText("Approve", "承認"))}</button>
+              <button class="button secondary" type="button" data-approval-id="${escapeHtml(item.id)}" data-presented-digest="${escapeHtml(item.presented_digest || "")}" data-decision="rejected">${escapeHtml(uiText("Reject", "却下"))}</button>
             </div>
           `;
           approvalInboxEl.appendChild(node);
@@ -1503,12 +1503,13 @@
           button.addEventListener("click", async () => {
             const requestId = button.getAttribute("data-approval-id");
             const decision = button.getAttribute("data-decision");
+            const presentedDigest = button.getAttribute("data-presented-digest");
             if (!requestId || !decision) return;
             try {
               await fetch(`/api/approvals/${encodeURIComponent(requestId)}/decision`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ decision }),
+                body: JSON.stringify(presentedDigest ? { decision, presentedDigest } : { decision }),
               });
               await loadAsyncState();
               if (latestState) render(latestState);

@@ -12,6 +12,7 @@ import {
 } from '../../../lib/charter-server';
 import { readRequestObject } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ const asContext = <T>(fn: () => T): T =>
  * accountable human is always the authenticated member, never a client field.
  */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const locale = resolveConciergeLocale(req.nextUrl.searchParams.get('locale') ?? undefined);

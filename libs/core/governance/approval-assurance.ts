@@ -90,6 +90,33 @@ export function assuranceMeets(
   return APPROVAL_ASSURANCE_LEVELS.indexOf(provided) >= APPROVAL_ASSURANCE_LEVELS.indexOf(required);
 }
 
+/**
+ * HA-05: the auth method an HTTP surface may record, from the principal its
+ * route resolved and whether that principal resolved to a member.
+ * `surface_session` (A2) only for a member resolved from a verified session
+ * (browser session, OIDC, a member-bound registry token). A localadmin / API
+ * bearer, an agent principal, or no resolved member (the Chronos sovereign
+ * fallback) is `local_admin_token`, which a human-only decision refuses. A
+ * credential-free loopback viewer proves only local access: `manual` (A1).
+ */
+export function surfaceDecisionAuthMethod(
+  principal: { provider: string; actor?: { kind?: string } } | null | undefined,
+  memberResolved: boolean
+): ApprovalAuthMethod {
+  if (!principal || !memberResolved || principal.actor?.kind === 'agent')
+    return 'local_admin_token';
+  switch (principal.provider) {
+    case 'browser-session':
+    case 'oidc-jwt':
+    case 'registry-token':
+      return 'surface_session';
+    case 'loopback-local':
+      return 'manual';
+    default:
+      return 'local_admin_token';
+  }
+}
+
 export interface ApprovalAssuranceShortfall {
   required: ApprovalAssuranceLevel;
   provided: ApprovalAssuranceLevel;

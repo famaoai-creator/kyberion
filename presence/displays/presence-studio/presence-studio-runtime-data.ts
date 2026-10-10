@@ -78,6 +78,7 @@ import {
 import { probeMicCapture } from '@agent/core/mic-capture';
 import { resolveEmailTriagePath } from '@agent/core/integrations/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
+import { computeApprovalPresentedDigest } from '@agent/core/governance/approval-store';
 import { registerFrontDeskAuxPages, registerFrontDeskHomeWorkPages } from './front-desk-pages.js';
 import { registerUiGalleryRoutes } from './ui-gallery-routes.js';
 
@@ -185,6 +186,7 @@ export function buildApprovalInboxItem(record: any) {
     learned_titles: learned,
     project_id: projectId,
     work_loop: record?.work_loop,
+    presented_digest: computeApprovalPresentedDigest(record),
   };
 }
 

@@ -723,6 +723,10 @@ export const presenceStudioBrowserBootstrapSchema = z
 export const presenceStudioApprovalDecisionSchema = z
   .object({
     decision: z.enum(['approved', 'rejected']),
+    presentedDigest: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
   })
   .strict();
 

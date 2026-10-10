@@ -141,6 +141,8 @@ export interface ReasoningProviderCli {
   session_markers?: readonly ReasoningProviderCliSessionMarker[];
   /** Principal name recorded as `agent:<name>` for such a session (default: the mode). */
   session_principal?: string;
+  /** Install-path fragments (`/@anthropic-ai/claude-code/`) that identify a wrapped CLI process. */
+  install_path_markers?: readonly string[];
 }
 
 export interface ReasoningProviderDescriptor {
@@ -544,6 +546,16 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
   }
   const sessionPrincipal = optionalString(value, 'session_principal', /^[a-z0-9][a-z0-9-]*$/u);
   if (!sessionPrincipal.ok) return 'cli.session_principal must be a lowercase name';
+  const installPathMarkers = value.install_path_markers;
+  if (
+    installPathMarkers !== undefined &&
+    (!Array.isArray(installPathMarkers) ||
+      !installPathMarkers.every(
+        (marker) => typeof marker === 'string' && marker.length >= 3 && /^\/.*\/$/u.test(marker)
+      ))
+  ) {
+    return 'cli.install_path_markers must be path fragments that start and end with /';
+  }
   return {
     binary: value.binary,
     version_args: [...value.version_args],
@@ -557,6 +569,7 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
     ...(permissionProfiles ? { permission_profiles: permissionProfiles } : {}),
     ...(sessionMarkers ? { session_markers: sessionMarkers } : {}),
     ...(sessionPrincipal.value ? { session_principal: sessionPrincipal.value } : {}),
+    ...(installPathMarkers ? { install_path_markers: [...(installPathMarkers as string[])] } : {}),
   };
 }
 

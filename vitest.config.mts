@@ -11,6 +11,36 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 // reach the forks. An outer run's nonce is kept.
 process.env.KYBERION_VITEST_RUN_ID ||= `${process.pid}-${Date.now().toString(36)}`;
 
+// The machine is not a fixture: a run started from a provider CLI (Claude
+// Code, Codex, Cursor, …) inherits its agent-session markers, and the approval
+// store refuses human-only decisions from an agent process. Strip the markers
+// `detectAgentExecutionContext` reads (the reasoning-provider registry plus the
+// Kyberion runtime ones) before the forks start; a test that needs one stubs it.
+function stripAgentSessionMarkers(): void {
+  const markers: Array<{ env: string; equals?: string }> = [
+    { env: 'KYBERION_AGENT_ID' },
+    { env: 'KYBERION_NHI_ID' },
+    { env: 'KYBERION_RUN_ORIGIN' },
+    { env: 'AI_AGENT' },
+  ];
+  const registryDir = path.join(rootDir, 'knowledge/product/governance/reasoning-providers');
+  for (const file of fs.readdirSync(registryDir).filter((name) => name.endsWith('.json'))) {
+    const parsed = JSON.parse(fs.readFileSync(path.join(registryDir, file), 'utf8')) as {
+      providers?: Array<{ cli?: { session_markers?: Array<{ env: string; equals?: string }> } }>;
+    };
+    for (const provider of parsed.providers ?? [])
+      markers.push(...(provider.cli?.session_markers ?? []));
+  }
+  for (const marker of markers) {
+    const value = process.env[marker.env];
+    if (value === undefined) continue;
+    if (marker.equals !== undefined && value.toLowerCase() !== marker.equals.toLowerCase())
+      continue;
+    delete process.env[marker.env];
+  }
+}
+stripAgentSessionMarkers();
+
 function preferTypeScriptSourceForJsImports() {
   return {
     name: 'prefer-typescript-source-for-js-imports',

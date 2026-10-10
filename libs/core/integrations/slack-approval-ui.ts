@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   APPROVAL_CHANGE_INSTRUCTION_MAX,
   approvalEventLogicalPath,
+  computeApprovalPresentedDigest,
   createApprovalRequest,
   loadApprovalRequest,
 } from '../governance/approval-store.js';
@@ -170,6 +171,7 @@ export function buildSlackApprovalBlocks(
           value: JSON.stringify({
             requestId: record.id,
             decision: 'approved' satisfies SlackApprovalActionPayload['decision'],
+            presentedDigest: computeApprovalPresentedDigest(record),
           }),
         },
         {
@@ -183,6 +185,7 @@ export function buildSlackApprovalBlocks(
           value: JSON.stringify({
             requestId: record.id,
             decision: 'rejected' satisfies SlackApprovalActionPayload['decision'],
+            presentedDigest: computeApprovalPresentedDigest(record),
           }),
         },
         ...(record.decisionCard
@@ -306,13 +309,25 @@ export function parseSlackApprovalAction(value: string): SlackApprovalActionPayl
   if (parsed.decision !== 'approved' && parsed.decision !== 'rejected') {
     throw new Error('Slack approval action requires a valid decision');
   }
-  return { requestId: parsed.requestId, decision: parsed.decision };
+  const presentedDigest = parsed.presentedDigest;
+  if (
+    presentedDigest !== undefined &&
+    (typeof presentedDigest !== 'string' || !/^[0-9a-f]{64}$/u.test(presentedDigest))
+  ) {
+    throw new Error('Slack approval action carries a malformed presentedDigest');
+  }
+  return {
+    requestId: parsed.requestId,
+    decision: parsed.decision,
+    ...(typeof presentedDigest === 'string' ? { presentedDigest } : {}),
+  };
 }
 
 export function applySlackApprovalDecision(params: {
   requestId: string;
   decision: 'approved' | 'rejected';
   decidedBy: string;
+  presentedDigest?: string;
 }): SlackApprovalRequestRecord {
   const record = loadApprovalRequest('slack', params.requestId);
   if (!record) throw new Error(`Approval request not found: slack/${params.requestId}`);
@@ -323,6 +338,7 @@ export function applySlackApprovalDecision(params: {
     channel: record.channel,
     threadTs: record.threadTs,
     decidedBy: params.decidedBy,
+    ...(params.presentedDigest ? { presentedDigest: params.presentedDigest } : {}),
   });
   emitSlackApprovalEvent({
     correlation_id: updated.correlationId,

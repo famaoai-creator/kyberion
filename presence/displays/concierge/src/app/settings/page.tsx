@@ -62,7 +62,12 @@ import { AdvancedSection, type ManagementState } from './sections/AdvancedSectio
 import { DisplaySection } from './sections/DisplaySection';
 import { FormScope } from './sections/form-scope';
 import { postSetupUpload, toUploadFile } from './settings-api';
-import { withSelectedTenant, readSelectedTenant } from '../../lib/tenant-context';
+import {
+  SYSTEM_SELECTION,
+  withSelectedTenant,
+  readSelectedTenant,
+  readTenantSelection,
+} from '../../lib/tenant-context';
 import './settings.css';
 
 /**
@@ -494,7 +499,10 @@ export default function SettingsPage() {
         const response = await fetch(`/api/plugins/${encodeURIComponent(id)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify({
+            decision,
+            presentedDigest: plugins.find((plugin) => plugin.id === id)?.approval?.presented_digest,
+          }),
         });
         const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
         if (!response.ok || !parsed?.message) throw new Error('Plugin action failed');
@@ -507,7 +515,7 @@ export default function SettingsPage() {
         setBusy(false);
       }
     },
-    [refreshPlugins]
+    [plugins, refreshPlugins]
   );
 
   // CS-03 ガバナンス設定: filing only fires from the inline confirm step. The
@@ -1276,6 +1284,10 @@ export default function SettingsPage() {
         <div role="status" aria-live="polite">
           <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} />
         </div>
+      ) : null}
+      {/* Personal view: company-scoped panes read nothing until a company is chosen. */}
+      {!meViewing && meTenants.length > 1 && readTenantSelection() !== SYSTEM_SELECTION ? (
+        <Callout tone="info" title={frontDeskText('personal_scope_hint', locale)} />
       ) : null}
 
       <div className="settings-layout">

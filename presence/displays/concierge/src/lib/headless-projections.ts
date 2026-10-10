@@ -134,6 +134,7 @@ export function readConciergeHome(
     tenantSlugs: narrowed.tenantSlugs,
     organizationIds: narrowed.organizationIds,
     projectIds: narrowed.projectIds,
+    ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
   return withConciergeViewerContext(viewer, () =>
     buildCeoSurfaceSummary({ scope, limit: query.limit || 20 })

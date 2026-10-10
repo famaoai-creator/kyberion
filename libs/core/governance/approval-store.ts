@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
@@ -14,13 +14,19 @@ import {
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import type { ApprovalConsumption, ApprovalRevocation } from './approval-revocation.js';
 import {
+  bindPresentedDecision,
+  refuseHumanOnlyDecisionByAgentProcess,
   reportAssuranceShortfall,
+  settleUnpresentedHumanDecision,
   validateHumanFinalDecision,
   withDefaultMinAssurance,
+  type ApprovalDeciderPrincipal,
 } from './approval-human-decision.js';
 export { validateHumanFinalDecision } from './approval-human-decision.js';
 import type * as assurance from './approval-assurance.js';
 export * from './approval-assurance.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
+export * from './approval-presentation.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -431,24 +437,6 @@ export function recordSessionCacheAutoApproval(
     granted_at: params.entry.grantedAt,
     channel: params.entry.channel,
   });
-}
-
-/** Stable SHA-256 fingerprint for binding an approval to its exact effect payload. */
-export function computeApprovalPayloadHash(payload: Record<string, unknown> | undefined): string {
-  const canonicalize = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(canonicalize);
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([key, entry]) => [key, canonicalize(entry)])
-      );
-    }
-    return value;
-  };
-  return createHash('sha256')
-    .update(JSON.stringify(canonicalize(payload || {})))
-    .digest('hex');
 }
 
 /**
@@ -1013,6 +1001,10 @@ function decideApprovalRequestUnlocked(
     authenticated?: boolean;
     payloadHash?: string;
     effectBinding?: string;
+    /** HA-06: digest of what the surface showed the decider (approval-presentation.ts). */
+    presentedDigest?: string;
+    /** The principal an HTTP route resolved for the decider; an agent principal is refused for human-only. */
+    deciderPrincipal?: ApprovalDeciderPrincipal | null;
     note?: string;
     /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
     reasonCategory?: RejectionReasonCategory;
@@ -1092,14 +1084,17 @@ function decideApprovalRequestUnlocked(
     throw new Error(`[POLICY_VIOLATION] Approval request has expired: ${record.id}`);
   }
 
+  refuseHumanOnlyDecisionByAgentProcess(record, { principal: params.deciderPrincipal });
+  const bound = bindPresentedDecision(record, params);
   const assuranceShortfall = validateHumanFinalDecision({
     accountability: record.accountability,
     decidedByType: params.decidedByType,
     authenticated: params.authenticated,
     authMethod: params.authMethod,
-    payloadHash: params.payloadHash,
-    effectBinding: params.effectBinding,
+    payloadHash: bound.payloadHash,
+    effectBinding: bound.effectBinding,
   });
+  settleUnpresentedHumanDecision(record, bound, params.decidedBy);
 
   if (params.decision === 'approved') {
     enforceSeparationOfDutiesOnDecision(role, {
@@ -1110,12 +1105,12 @@ function decideApprovalRequestUnlocked(
     });
   }
 
-  const cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
+  let cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
   if (cacheDescriptor) {
     // The session cache is a standing grant, so its seed is held to the
     // human-only contract even when the record itself carries no
     // accountability binding. Fail before persisting so callers notice.
-    validateHumanFinalDecision({
+    const cacheShortfall = validateHumanFinalDecision({
       accountability: { finalDecision: 'human_only' },
       decidedByType: params.decidedByType,
       authenticated: params.authenticated,
@@ -1131,6 +1126,8 @@ function decideApprovalRequestUnlocked(
         '[POLICY_VIOLATION] Session approval cache requires an exact human effect binding'
       );
     }
+    // A decision let through below its assurance level (warn) never seeds the cache.
+    if (assuranceShortfall || cacheShortfall) cacheDescriptor = undefined;
   }
 
   const decidedAt = nowIso();
@@ -1152,8 +1149,8 @@ function decideApprovalRequestUnlocked(
             authMethod: params.authMethod,
             decidedByType: params.decidedByType,
             authenticated: params.authenticated,
-            payloadHash: params.payloadHash,
-            effectBinding: params.effectBinding,
+            payloadHash: bound.payloadHash,
+            effectBinding: bound.effectBinding,
             note: params.note,
             reasonCategory: params.reasonCategory,
             ...(params.deciderIdentitySource
@@ -1219,8 +1216,9 @@ function decideApprovalRequestUnlocked(
     auth_method: params.authMethod,
     decided_by_type: params.decidedByType,
     authenticated: params.authenticated,
-    payload_hash: params.payloadHash,
-    effect_binding: params.effectBinding,
+    payload_hash: bound.payloadHash,
+    effect_binding: bound.effectBinding,
+    ...(params.presentedDigest ? { presented_digest: params.presentedDigest } : {}),
     channel: updated.channel,
     thread_ts: updated.threadTs,
     // LC-10: the rejection rationale must survive into the event stream —

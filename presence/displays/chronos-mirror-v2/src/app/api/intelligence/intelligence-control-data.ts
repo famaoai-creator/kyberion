@@ -27,6 +27,7 @@ import { safeReadFileRange } from '@agent/core/secure-io';
 import { isRecord, readJsonLines } from '@agent/core/foundation';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import * as intelligenceData from './intelligence-observation-data';
+import { computeApprovalPresentedDigest } from '@agent/core/governance/approval-store';
 import {
   parseDashboardJsonRecord,
   parseDashboardOwnerSummary,
@@ -1052,6 +1053,7 @@ export function collectPendingApprovals(
       trackId: request.track_id,
       serviceId: request.target?.serviceId,
       work_loop: request.work_loop,
+      presentedDigest: computeApprovalPresentedDigest(request),
     }))
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 24);

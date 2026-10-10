@@ -17,6 +17,7 @@ export type PluginEntry = {
   source: string;
   requested_by?: string;
   approval_status?: string;
+  approval?: { id: string; channel: string; presented_digest?: string };
 };
 export type ConfigPresetInput = {
   key: string;

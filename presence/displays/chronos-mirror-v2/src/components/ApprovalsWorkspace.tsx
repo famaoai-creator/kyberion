@@ -20,7 +20,11 @@ import {
   uxTextOr,
   type SupportedLocale,
 } from '../lib/ux-vocabulary';
-import { parseApprovalsResponse, type ClientApproval } from '../lib/approvals-response';
+import {
+  approvalProjectId,
+  parseApprovalsResponse,
+  type ClientApproval,
+} from '../lib/approvals-response';
 
 type Approval = ClientApproval;
 
@@ -42,6 +46,13 @@ function approvalMutationLabel(value: string | undefined, locale: SupportedLocal
     rotate: 'chronos_change_rotate',
   };
   return uxText(labels[value || ''] || 'chronos_change_other', locale);
+}
+
+function approvalTenantLabel(item: Approval, locale: SupportedLocale): string | undefined {
+  if (!item.tenantSlug) return undefined;
+  return item.tenantSource === 'mission'
+    ? `${item.tenantSlug} (${uxText('chronos_tenant_from_mission', locale)})`
+    : item.tenantSlug;
 }
 
 export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
@@ -94,6 +105,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           decision,
           note,
           tenant,
+          ...(selected.presentedDigest ? { presentedDigest: selected.presentedDigest } : {}),
         }),
       });
       if (!response.ok) throw new Error('Failed to record the approval decision');
@@ -145,7 +157,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
               <div className="flex flex-col gap-0.5">
                 <WsTitleCell
                   title={item.title}
-                  id={`${item.tenantSlug || uxText('chronos_org_not_configured', locale)} / ${item.kind || kindFallback}`}
+                  id={`${approvalTenantLabel(item, locale) || uxText('chronos_org_not_configured', locale)} / ${item.kind || kindFallback}`}
                   onSelect={select}
                   selected={selected?.id === item.id}
                 />
@@ -272,12 +284,12 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             items={[
               {
                 label: uxText('chronos_tenant', locale),
-                value: selected.tenantSlug || '-',
+                value: approvalTenantLabel(selected, locale) || '-',
                 mono: true,
               },
               {
                 label: uxText('chronos_project', locale),
-                value: selected.workLoop?.project_id || '-',
+                value: approvalProjectId(selected) || '-',
                 mono: true,
               },
               {

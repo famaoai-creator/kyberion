@@ -5,6 +5,7 @@ import {
 import { loadState } from '@agent/core/mission/mission-state';
 import { withExecutionContext } from '@agent/core/authority';
 import type { ConciergeViewerContext } from './viewer-context';
+import { tenantVisibleToViewer } from './tenant-visibility';
 
 /**
  * CS-03 停滞ミッション伺いカード — server-side view over the mission hygiene
@@ -66,8 +67,7 @@ function visibleToViewer(finding: PlannedMissionFinding, viewer: ConciergeViewer
   if (!viewer.tierAccess.includes(finding.tier as ConciergeViewerContext['tierAccess'][number])) {
     return false;
   }
-  if (viewer.tenantSlugs === 'all') return true;
-  return Boolean(finding.tenant_slug && viewer.tenantSlugs.includes(finding.tenant_slug));
+  return tenantVisibleToViewer(viewer, finding.tenant_slug);
 }
 
 /**

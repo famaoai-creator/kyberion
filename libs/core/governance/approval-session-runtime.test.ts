@@ -104,6 +104,18 @@ vi.mock('./approval-policy.js', async (importOriginal) => ({
   resolveSeparationOfDutiesPolicy: () => ({ enabled: false }),
 }));
 
+// The hermetic root has no reasoning-provider registry either; the store-level
+// agent refusal is covered by approval-human-proof.test.ts.
+vi.mock('../agent-execution-context.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent-execution-context.js')>()),
+  detectAgentExecutionContext: () => ({
+    isAgent: false,
+    principal: null,
+    harnesses: [],
+    signals: [],
+  }),
+}));
+
 type ApprovalStoreModule = typeof import('./approval-store.js');
 
 describe('approval runtime hardening (KC-03)', () => {

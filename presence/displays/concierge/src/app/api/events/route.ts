@@ -4,9 +4,12 @@ import {
   type BridgePollLoopHandle,
 } from '../../../../../../../satellites/shared/bridge-poll-loop';
 import type { NextRequest } from 'next/server';
+import { createLogger } from '@agent/core/logger';
 import { readConciergeHome } from '../../../lib/headless-projections';
-import { readConciergeScopeQuery } from '../../../lib/request-input';
-import { resolveConciergeViewer } from '../../../lib/viewer-context';
+import { readSelectedScopeQuery } from '../../../lib/request-input';
+import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
+
+const logger = createLogger('concierge-events');
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,7 +32,7 @@ function summaryEventChunk(serialized: string): string {
 }
 
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   const encoder = new TextEncoder();
   let previousPayload = '';
@@ -58,12 +61,14 @@ export function GET(req: NextRequest) {
         try {
           serialized = JSON.stringify(
             readConciergeHome(resolved.context, {
-              ...readConciergeScopeQuery(req.nextUrl.searchParams),
+              ...readSelectedScopeQuery(req.nextUrl.searchParams),
             })
           );
         } catch (error) {
-          console.warn(
-            `[concierge] summary stream check failed: ${error instanceof Error ? error.message : String(error)}`
+          logger.warn(
+            `summary stream check failed — the stream keeps its last payload | next: check the summary read path | evidence: ${
+              error instanceof Error ? error.message : String(error)
+            }`
           );
           return;
         }

@@ -17,7 +17,7 @@ export type PluginEntry = {
   source: string;
   requested_by?: string;
   approval_status?: string;
-  approval?: { id: string; channel: string };
+  approval?: { id: string; channel: string; presented_digest?: string };
 };
 export type ConfigPresetInput = {
   key: string;
@@ -138,7 +138,8 @@ export function parsePluginListResponse(value: unknown): PluginEntry[] | undefin
       entry.approval !== undefined &&
       (!isRecord(entry.approval) ||
         typeof entry.approval.id !== 'string' ||
-        typeof entry.approval.channel !== 'string')
+        typeof entry.approval.channel !== 'string' ||
+        !optionalString(entry.approval, 'presented_digest'))
     ) {
       return undefined;
     }
@@ -157,6 +158,9 @@ export function parsePluginListResponse(value: unknown): PluginEntry[] | undefin
             approval: {
               id: (entry.approval as JsonRecord).id as string,
               channel: (entry.approval as JsonRecord).channel as string,
+              ...(typeof (entry.approval as JsonRecord).presented_digest === 'string'
+                ? { presented_digest: (entry.approval as JsonRecord).presented_digest as string }
+                : {}),
             },
           }),
     };
