@@ -56,11 +56,11 @@ import {
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 
 const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
-
 const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
   key: 'image-generation-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/media/image-generation-bridge.ts',
 });
 
 const imageGenerationProviderDisposers = new Map<string, () => void>();

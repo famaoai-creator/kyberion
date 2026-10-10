@@ -119,6 +119,7 @@ const speechToTextSeam = createSeam<SpeechToTextBridge>({
   key: 'speech-to-text-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/speech-to-text-bridge.ts',
   select: (providers) =>
     [...providers].sort(
       (left, right) =>

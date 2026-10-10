@@ -36,6 +36,7 @@ const auditForwarderSeam = createSeam<AuditForwarder>({
   key: 'audit-forwarder',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/governance/audit-forwarder.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 
