@@ -881,14 +881,16 @@ export function playTimeline(timeline: PresenceTimelineAdf): {
   // Cap scheduled timers — an unbounded events array could exhaust the
   // Node timer queue for this dev surface.
   const MAX_TIMELINE_DELAY_MS = 24 * 60 * 60 * 1000;
-  const timers = timeline.events
-    .filter((event) => event.at_ms >= 0 && event.at_ms <= MAX_TIMELINE_DELAY_MS)
-    .slice(0, 500)
-    .map((event) =>
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  for (const event of timeline.events.slice(0, 500)) {
+    const delay = Number(event.at_ms);
+    if (!Number.isFinite(delay) || delay < 0 || delay > MAX_TIMELINE_DELAY_MS) continue;
+    timers.push(
       setTimeout(() => {
         applyTimelineEvent(surfaceId, timeline, event);
-      }, event.at_ms)
+      }, delay)
     );
+  }
   activeTimelineTimers.set(surfaceId, timers);
   return { accepted: true, surfaceId, scheduled: timeline.events.length };
 }

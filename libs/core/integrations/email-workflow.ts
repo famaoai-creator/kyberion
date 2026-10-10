@@ -312,7 +312,7 @@ export function parseEmailAddressHeader(value: string): { display_name: string; 
       }
     }
   }
-  const emailMatch = trimmed.match(/[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+/);
+  const emailMatch = trimmed.match(/[^\s@]{1,64}@[^\s@.]{1,63}(?:\.[^\s@.]{1,63})+/);
 
   if (angled) {
     const display_name = normalizeHeaderValue(angled[0].replace(/^"|"$/g, '')) || angled[1].trim();
