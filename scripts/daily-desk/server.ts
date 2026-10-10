@@ -468,7 +468,7 @@ export async function main(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal server error',
               });
             }
             print(`[daily-desk] ${e instanceof Error ? e.message : String(e)}`);

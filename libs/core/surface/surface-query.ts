@@ -299,6 +299,25 @@ export function isSurfaceWeatherQuery(text: string): boolean {
   );
 }
 
+/** Strip query-suffix phrases right-to-left without `$`-anchored regexes. */
+function stripTrailingQueryPhrases(value: string, ...groups: string[][]): string {
+  let out = value.trimEnd();
+  for (let iter = 0; iter < groups.length + 1; iter += 1) {
+    const before = out;
+    for (const group of groups) {
+      const ordered = [...group].sort((a, b) => b.length - a.length);
+      for (const phrase of ordered) {
+        if (out.toLowerCase().endsWith(phrase.toLowerCase())) {
+          out = out.slice(0, out.length - phrase.length).trimEnd();
+          break;
+        }
+      }
+    }
+    if (out === before) break;
+  }
+  return out;
+}
+
 export function extractSurfaceWebSearchQuery(text: string): string | null {
   const trimmed = normalizeQuery(text);
   if (!/(検索|調べて|ググって|web|search|look up|find on the web)/i.test(trimmed)) return null;
@@ -307,10 +326,14 @@ export function extractSurfaceWebSearchQuery(text: string): string | null {
     /^(検索|search)(して|してください|してくれる|して)?\s*/i,
     /^(調べて|調べると|look up|find)\s*/i,
     /^(web\s*search|internet\s*search)\s*/i,
-  ])
-    .replace(/\s*(を)?(検索|search|調べて|調べる|look up|find)(して|してください)?\s*$/i, '')
-    .trim();
-  return stripped || null;
+  ]).trim();
+  const withoutSuffix = stripTrailingQueryPhrases(
+    stripped,
+    ['して', 'してください'], // i18n-exempt: query-matching phrase
+    ['検索', 'search', '調べて', '調べる', 'look up', 'find'], // i18n-exempt: query-matching phrase
+    ['を'] // i18n-exempt: query-matching phrase
+  );
+  return withoutSuffix || null;
 }
 
 export function extractSurfaceKnowledgeQuery(text: string): string | null {
@@ -325,10 +348,13 @@ export function extractSurfaceKnowledgeQuery(text: string): string | null {
     /^(ナレッジ|knowledge|knowledge base)(で|から|を)?\s*/i,
     /^(docs?|ドキュメント|仕様|手順)(で|から|を)?\s*/i,
     /^(調べて|検索して|search|look up)\s*/i,
-  ])
-    .replace(/\s*(を)?(調べて|検索して|search|look up)\s*$/i, '')
-    .trim();
-  return stripped || trimmed;
+  ]).trim();
+  const withoutSuffix = stripTrailingQueryPhrases(
+    stripped,
+    ['調べて', '検索して', 'search', 'look up'], // i18n-exempt: query-matching phrase
+    ['を'] // i18n-exempt: query-matching phrase
+  );
+  return withoutSuffix || trimmed;
 }
 
 export function classifySurfaceQueryIntent(

@@ -319,7 +319,12 @@ finally {
 const FORBIDDEN_SECRET_MAP_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function assertSafeSecretMapKey(key: string, label: 'service' | 'account'): void {
-  if (FORBIDDEN_SECRET_MAP_KEYS.has(key)) {
+  if (
+    key === '__proto__' ||
+    key === 'constructor' ||
+    key === 'prototype' ||
+    FORBIDDEN_SECRET_MAP_KEYS.has(key)
+  ) {
     throw new Error(`[SECRET_BRIDGE_INVALID_KEY] ${label} may not be '${key}'`);
   }
 }

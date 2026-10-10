@@ -2,7 +2,7 @@ import { t } from './t.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readTextFile } from './foundation/text.js';
+import { readTextFile, trimEndChars } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
@@ -422,7 +422,7 @@ const URL_IN_TEXT =
 function extractLinkHost(raw: string): string | null {
   // Trailing prose punctuation is not part of the URL ("see https://x.example,")
   // — WHATWG URL would otherwise fold it into the hostname (review minor 4).
-  let candidate = raw.replace(/[.,;:!?]+$/, '');
+  let candidate = trimEndChars(raw, '.,;:!?');
   if (candidate.startsWith('//')) candidate = `https:${candidate}`;
   else if (/^www\./i.test(candidate)) candidate = `https://${candidate}`;
   try {

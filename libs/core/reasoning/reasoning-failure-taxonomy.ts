@@ -18,13 +18,23 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
   // call. Retrying the same prompt only recreates the user-visible "waiting"
   // state and multiplies the delay. Fail over, when policy allows it, but do
   // not retry in place.
-  if (/\[codex-cli\].*(?:timed out|timeout)|codex-cli.*wall.?clock/i.test(message)) {
+  const loweredMessage = message.toLowerCase();
+  const codexCliIndex = Math.min(
+    ...['[codex-cli]', 'codex-cli'].map((m) => loweredMessage.indexOf(m)).filter((i) => i >= 0),
+    Number.POSITIVE_INFINITY
+  );
+  const codexTimedOut =
+    codexCliIndex !== Number.POSITIVE_INFINITY &&
+    (loweredMessage.slice(codexCliIndex).includes('timed out') ||
+      loweredMessage.slice(codexCliIndex).includes('timeout') ||
+      /wall.?clock/i.test(loweredMessage.slice(codexCliIndex)));
+  if (codexTimedOut) {
     return { class: 'transient', retryable: false, allowFailover: true, demoteProvider: true };
   }
   if (/abort|cancel|user.?stop|operator.?cancel/i.test(message)) {
     return { class: 'cancelled', retryable: false, allowFailover: false, demoteProvider: false };
   }
-  if (/claude-agent.*no active session|no active session.*claude-agent/i.test(message)) {
+  if (loweredMessage.includes('claude-agent') && loweredMessage.includes('no active session')) {
     return { class: 'transient', retryable: false, allowFailover: true, demoteProvider: true };
   }
   if (
@@ -47,9 +57,11 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
   ) {
     return { class: 'capacity', retryable: false, allowFailover: true, demoteProvider: false };
   }
-  if (
-    /unsupported|not implemented|tool.?use.*not|vision.*not|structured.?output.*not/i.test(message)
-  ) {
+  const capabilityMatch = /(?:tool.?use|vision|structured.?output)/i.exec(message);
+  const capabilityNoted =
+    capabilityMatch !== null &&
+    /not/i.test(message.slice((capabilityMatch.index ?? 0) + capabilityMatch[0].length));
+  if (/unsupported|not implemented/i.test(message) || capabilityNoted) {
     return { class: 'capability', retryable: false, allowFailover: true, demoteProvider: false };
   }
   if (
