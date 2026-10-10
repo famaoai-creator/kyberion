@@ -921,8 +921,10 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   ctime; a filesystem with coarse ctime granularity lets a link and an unlink inside one tick go
   unseen, an attacker that can also write the target can move its size along, and a name held
   on a protected inode for the whole open-and-vet window — a park, not a churn — is
-  indistinguishable from a file that was always there. A file under a continuous stream of
-  chmod, utimes or writes faster than one vet is refused there. Linux is pinned by the
+  indistinguishable from a file that was always there. A ctime that moved between two `fstat`s
+  is re-compared from the later one, up to eight times, so a file chmod-ed or touched as often as
+  every millisecond is still served; a writer that never pauses leaves no quiet window and is
+  refused there. Linux is pinned by the
   `(deleted)` marker and is not affected.
 - _A single slow unlink on Linux._ A hard link older than one second, unlinked exactly while a
   read runs, is not settled (ext4 drops the link count before it stamps the ctime). Churn — every
