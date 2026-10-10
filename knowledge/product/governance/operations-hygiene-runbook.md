@@ -830,18 +830,21 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 - **Hard-link churn cannot pass the link count.** An attacker that loops
   `rm name; ln knowledge/personal/…/secret name` makes the first `fstat` see `nlink=1` while the
   name is unlinked and the location check pass once it is relinked. `vetOpenedFd` therefore
-  refuses a `/proc` entry ending in `(deleted)` (never re-derives it from the path), re-`fstat`s
-  after the location check and refuses any change between the two (inode, link count, or a ctime
-  that moved without the mtime — a data write moves both, `link`/`unlink` only the ctime), and
-  judges hard links on that last `fstat`. It then requires the name opened through to be still
-  linked: on Linux its `/proc` entry is not `(deleted)`. `unlink(2)` drops the link count before
-  it marks the name deleted, both under the parent directory's lock, so for a single-link file
-  whose ctime moved within the last second (an unlink in progress has just set it) the parent is
-  read once first — `getdents` waits for that lock — and the entry must read the same afterwards.
-  Off Linux the canonical leaf must still be the inode with the same link count and ctime, after
-  the same parent read for a recently changed file. Appends are vetted this way before any byte
-  is written. Cost on the CI VM: about +20 µs per in-place read, +15 µs more for a file changed in
-  the last second.
+  re-`fstat`s after the location check and refuses any change between the two: inode, link
+  count, or a ctime that moved without a size change — a data write moves the size as well as
+  ctime and mtime, while `link`/`unlink` move only the ctime and `utimes` can stamp
+  ctime == mtime without writing. A fully unlinked inode (`nlink` 0) is exempt: no name reaches
+  it, so it cannot be a protected file. `vetOpenedFd` then judges hard links on that last
+  `fstat` and requires the name opened through to be still linked: on Linux a `/proc` entry
+  ending in `(deleted)` is served only while the inode itself has `nlink` 0 — the atomic
+  write-then-rename replacement, whose stale content is exactly what the caller opened — never
+  re-derived from the path. `unlink(2)` drops the link count before it marks the name deleted,
+  both under the parent directory's lock, so for a single-link file whose ctime moved within
+  the last second (an unlink in progress has just set it) the parent is read once first —
+  `getdents` waits for that lock — and the entry must read the same afterwards. Off Linux the
+  canonical leaf must still be the inode with the same link state, after the same parent read
+  for a recently changed file. Appends are vetted this way before any byte is written. Cost on
+  the CI VM: about +20 µs per in-place read, +15 µs more for a file changed in the last second.
 - **Appends create only inside the directory that was opened and authorized.** An append opens
   without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
   through a leaf link) after the parent directory is opened and its own location authorized for
@@ -907,8 +910,10 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   a link" holds for every component on Linux and macOS.
 - _Hard-link churn off Linux._ Without `/proc` a name is identified by path, link count and
   ctime; a filesystem with coarse ctime granularity lets a link and an unlink inside one tick go
-  unseen, and an attacker that can also write the target can move its mtime along. Linux is
-  pinned by the `(deleted)` marker and is not affected.
+  unseen, an attacker that can also write the target can move its size along, and a name held
+  on a protected inode for the whole open-and-vet window — a park, not a churn — is
+  indistinguishable from a file that was always there. Linux is pinned by the `(deleted)`
+  marker and is not affected.
 - _Hard links to files outside the repository_ (vault targets) are not detected. Path-only helpers
   (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
   content.
