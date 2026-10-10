@@ -574,16 +574,26 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   remap is applied once, by `pathResolver.resolve`, to the literal path; the canonical path is the
   physical location and is never remapped again.
 - **Case-insensitive volumes judge the on-disk spelling.** Whether the root's volume folds case is
-  probed once per root. On such a volume the leaf of a canonical path takes its on-disk spelling
-  (`knowledge/PERSONAL` is judged as `knowledge/personal`); ancestors already come back from the
-  platform realpath in their on-disk case. Tier detection itself stays case-sensitive.
-- **Foreign hard links are refused for in-place access.** Read, copy source, append,
-  open-for-append, chmod and fsync refuse a regular file with `nlink > 1` (checked on the opened
-  descriptor where the helper opens one) unless every link of the inode lives in the same
-  directory as the checked path — which covers lock recovery's `<file>` + `<file>.stale-*` tomb
-  pair while `safeLinkExclusiveSync` puts a displaced record back. Reads under `node_modules/`
-  are exempt (pnpm links every store file into each project). Writes that replace the entry —
-  `safeWriteFile` and the copy destination (now temp + rename) — never touch the old inode.
+  probed once per root (on the nearest root component whose name has letters). In `leaf` mode the
+  leaf takes its on-disk spelling (`knowledge/PERSONAL` is judged as `knowledge/personal`); in
+  `follow` mode the platform realpath already returns the on-disk case. Tier detection itself
+  stays case-sensitive.
+- **Foreign hard links are refused for in-place access.** Read, size (`validateFileSize`), copy
+  source, append, open-for-append, chmod, fsync, move source and hard-link source refuse a regular
+  file with `nlink > 1`, checked on the opened descriptor where the helper opens one (copies read
+  from that descriptor; snapshots return bytes only from the vetted inode). There are two
+  exceptions, both narrow on purpose (a broader "all links in one directory" rule was defeated by
+  moving the link next to its protected sibling):
+  - _Lock recovery_: in `active/shared/runtime/locks/`, exactly two links named `<base>` and
+    `<base>.stale-<pid>-<ms>-<n>` — the tomb pair that exists while `safeLinkExclusiveSync` puts a
+    displaced record back. Only these candidate names are examined (bounded scan).
+  - _pnpm store reads_: the literal path is under the root `node_modules/`, or under a workspace
+    package's `node_modules/` (`pnpm-workspace.yaml` globs) that the caller cannot write. A
+    `node_modules` directory anywhere else (for example under `active/`) gets no exemption.
+- **In-place opens never truncate.** `safeAppendFileSync` accepts only `a`, `a+`, `ax`, `ax+`;
+  `openInPlace` rejects any other flag before opening, so a foreign hard link is never truncated
+  before it is vetted. Writes that replace the entry — `safeWriteFile` and the copy destination
+  (temp + rename) — never touch the old inode.
 - **A symlink is a standing write grant.** `safeSymlinkSync` requires write permission on the
   canonical target, refuses targets that resolve outside the repository, stores the link relative,
   and accepts only `dir` / `file`. `junction` is refused there and in the orchestrator `symlink`
@@ -597,15 +607,24 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   just before creating directories. It writes its temp file in the checked (canonical) directory
   and, once the temp descriptor is open, requires that directory to still be the same `(dev, ino)`,
   still canonicalize to itself, and to hold the descriptor just opened before renaming into place.
+  An inode number of 0 (FAT/exFAT, some network shares) is unverifiable and fails closed.
+- **Missing parents are created one at a time.** `safeWriteFile`, `safeMkdir` (recursive),
+  `safeOpenAppendFile`, `safeCreateExclusiveFileSync`, `safePublishExclusiveFileSync` and
+  `safeSymlinkSync` create missing directories through `mkdirGuarded`: before each component the
+  parent must still canonicalize to the location that was checked, so a component swapped for a
+  link cannot leave directories in another scope.
 
 **Residual risk (documented, not closed).**
 
 - _Check-to-use race._ Other helpers still run their syscall on the literal path after the check;
   a concurrent process that swaps a component for a link between the two can redirect one
   operation. `safeWriteFile` narrows the window to the rename after its re-verification.
-- _Hard links created after the check_ (between the fd's `fstat` and a later re-open) and hard links
-  to files outside the repository (vault targets) are not detected. Path-only helpers (`safeStat`,
-  `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no content.
+- _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
+  hard links to files outside the repository (vault targets) are not detected. Path-only helpers
+  (`safeStat`, `safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked
+  file but no content.
+- _Per-process state_: nothing is cached, because cache clearing is per-process only and never
+  sees a rename done through raw fs or by another process.
 - A raw-fs or out-of-process actor can always bypass secure-io; these rules govern what a persona
   can do through secure-io.
 
@@ -626,11 +645,12 @@ stat 52–54 → 72–78, mkdir (existing) 376–378 → 429, safeWriteFile (ato
 **Gate.** `libs/core/secure-io.symlink-canonical.test.ts` (symlink-then-write, append, mkdir,
 dangling link, copy/move through a linked parent, rm/unlink, reads into `knowledge/personal/`,
 junction refusal, ancestor rename after an earlier resolution, hard-link append / copy / chmod /
-fsync / read, lock-recovery tomb pair, `validateFileSize` tier guard, directory swap between check
-and temp open, single probe registration, `node_modules` read exemption, legitimate links in scope,
-Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts` (checkout behind a
-linked prefix) and the import boundary in `libs/core/security-boundary.contract.test.ts`. Each
-attack case fails on the pre-fix code.
+fsync / read / move, lock-recovery tomb pair only in the locks directory, truncating append flags,
+`node_modules` planted in a writable tree, `validateFileSize` tier and hard-link guard, directory
+swap between check and temp open, single probe registration, `node_modules` read exemption,
+legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
+(checkout behind a linked prefix) and the import boundary in
+`libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---
 
