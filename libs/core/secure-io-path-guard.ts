@@ -659,7 +659,8 @@ export function vetOpenedFd(
   // Hard-link churn (`rm name; ln secret name` in a loop): the first fstat
   // can run while the name is unlinked (nlink 1) and the location check after
   // it is relinked. Re-fstat now and refuse a link or unlink in between
-  // (sameLinkState), then require that the name opened through still exists,
+  // (sameLinkState), then require that the name opened through still exists
+  // — unless nothing does (an orphaned inode cannot be a protected file) —
   // and judge hard links on this last fstat.
   const now = fs.fstatSync(fd);
   if (
@@ -680,13 +681,14 @@ export function vetOpenedFd(
  * After the final fstat: the name the descriptor was opened through is still
  * linked, so a single-link count is not a name caught mid-unlink.
  *
- * Linux: its /proc entry is not "(deleted)" — an unlinked name never comes
- * back; a new link is a new name. unlink(2) drops the link count before it
- * marks the name deleted, both under the parent directory's lock, so for a
- * single-link file the parent is read once (which waits for that lock) and
- * the entry must still read the same afterwards. Elsewhere: the canonical
- * leaf is still this inode (an unlink caught between two syscalls there is
- * residual).
+ * Linux: its /proc entry is not "(deleted)" unless the inode itself is
+ * fully unlinked (nlink 0 — an unlinked name never comes back; a new link
+ * is a new name, and an inode with no names cannot be a protected file).
+ * unlink(2) drops the link count before it marks the name deleted, both
+ * under the parent directory's lock, so for a single-link file the parent
+ * is read once (which waits for that lock) and the entry must still read
+ * the same afterwards. Elsewhere: the canonical leaf is still this inode
+ * (an unlink caught between two syscalls there is residual).
  */
 function stillNamed(fd: number, resolved: string, held: fs.Stats): boolean {
   if (procFdAvailable()) {
@@ -696,16 +698,34 @@ function stillNamed(fd: number, resolved: string, held: fs.Stats): boolean {
     } catch {
       return stillNamedByPath(resolved, held);
     }
-    if (!path.isAbsolute(link) || link.endsWith(' (deleted)')) return false;
+    if (!path.isAbsolute(link)) return false;
+    if (link.endsWith(DELETED_MARK)) return unnameableInode(fd);
     if (!held.isFile() || held.nlink !== 1 || !recentlyChanged(held)) return true;
     if (!settleDirectory(path.dirname(link))) return false;
     try {
-      return fs.readlinkSync(procFdPath(fd)) === link;
+      // A rename can land while the parent settles: an entry now marked
+      // deleted is still fine while the inode kept no name.
+      const again = fs.readlinkSync(procFdPath(fd));
+      return again === link || (again.endsWith(DELETED_MARK) && unnameableInode(fd));
     } catch {
       return false;
     }
   }
   return stillNamedByPath(resolved, held);
+}
+
+/**
+ * The opened name is gone. Only a fully unlinked inode can never be reached
+ * through a protected name, so the one deleted name still served is the
+ * atomic write-then-rename replacement — the stale content is exactly what
+ * the caller opened.
+ */
+function unnameableInode(fd: number): boolean {
+  try {
+    return fs.fstatSync(fd).nlink === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -794,6 +814,9 @@ var procFdDisabled: boolean | undefined;
 // eslint-disable-next-line no-var
 var procFdRoot: string | undefined;
 
+/** The mark /proc/self/fd appends to a link whose name was unlinked. */
+const DELETED_MARK = ' (deleted)';
+
 /** `/proc/self/fd/<fd>` (tests point the base at a missing directory). */
 function procFdPath(fd: number): string {
   return `${procFdRoot ?? '/proc/self/fd'}/${fd}`;
@@ -837,10 +860,13 @@ function openedLocation(fd: number, resolved: string, held: fs.Stats): string | 
   if (procFdAvailable()) {
     try {
       const link = fs.readlinkSync(procFdPath(fd));
-      // A deleted name is refused, never re-derived from the path: the path
-      // may meanwhile name a new link to the same inode.
-      if (link.endsWith(' (deleted)') || !path.isAbsolute(link)) return undefined;
-      return toLogicalRoot(link);
+      if (!path.isAbsolute(link)) return undefined;
+      // A "(deleted)" mark is the name the descriptor was opened through,
+      // since unlinked — still its true location, judged under that name.
+      // stillNamed then serves it only while the inode has no name at all
+      // (nlink 0); an inode with a name left could be a protected file.
+      const opened = link.endsWith(DELETED_MARK) ? link.slice(0, -DELETED_MARK.length) : link;
+      return toLogicalRoot(opened);
     } catch {
       // /proc unavailable: fall back to the path identity check below
     }
@@ -855,7 +881,7 @@ function leafIsInode(canonical: string, held: fs.Stats, exact = false): boolean 
   const target = path.resolve(canonical);
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
-  let now: fs.Stats | { dev: number; ino: number } | undefined;
+  let now: fs.Stats | undefined;
   try {
     // The checkout root itself is a valid target (a walk starts by listing
     // it); it is neither "under" the root nor a vault target.
@@ -870,17 +896,24 @@ function leafIsInode(canonical: string, held: fs.Stats, exact = false): boolean 
   }
   if (now === undefined || now.dev !== held.dev || now.ino !== held.ino) return false;
   // exact: no link or unlink since `held` was taken.
-  return !exact || ('nlink' in now && sameLinkState(held, now));
+  return !exact || sameLinkState(held, now);
 }
 
 /**
- * No link or unlink between two stats of one inode: the same link count, and
- * a ctime that either did not move or moved with the mtime (a data write
- * sets both to one timestamp; link(2) and unlink(2) move only the ctime).
+ * No link or unlink between two stats of one inode: the same link count —
+ * or none left, an inode no name reaches cannot be a protected file — and a
+ * ctime that either did not move or belongs to a data write. link(2) and
+ * unlink(2) move only the ctime, but so does utimes(2), which can stamp
+ * ctime == mtime without writing; the write exemption therefore also
+ * requires the size to have moved, a change only writing the target itself
+ * can fake.
  */
-function sameLinkState(before: fs.Stats, after: fs.Stats): boolean {
+// Exported for the guard-internals tests.
+export function sameLinkState(before: fs.Stats, after: fs.Stats): boolean {
+  if (after.nlink === 0) return true;
   if (before.nlink !== after.nlink) return false;
-  return after.ctimeMs === before.ctimeMs || after.ctimeMs === after.mtimeMs;
+  if (after.ctimeMs === before.ctimeMs) return true;
+  return after.size !== before.size && after.ctimeMs === after.mtimeMs;
 }
 
 function assertAuthorizedAt(

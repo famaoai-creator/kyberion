@@ -35,6 +35,7 @@ import {
   assertTempInCheckedDir,
   captureCheckedDir,
   registerSensitivePathMediationProbe,
+  sameLinkState,
   setProcFdLookupDisabledForTesting,
   setProcFdRootForTesting,
 } from './secure-io-path-guard.js';
@@ -520,6 +521,45 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         try {
           safeReadFile(`${scratchRel}/busy.log`);
           read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('keeps reading while another process atomically replaces the file', async () => {
+    // A runtime store writes a temp file and renames it over the old one.
+    // The reader may open the inode being unlinked: its /proc entry reads
+    // "(deleted)", but with nlink 0 it can never be relinked to a secret,
+    // so it is still served. Off Linux the portable pin cannot know which
+    // name the descriptor was opened through and refuses (as on main).
+    if (process.platform !== 'linux') return;
+    const log = abs(`${scratchRel}/replaced.log`);
+    fs.writeFileSync(log, 'v0\n');
+    const replacer = `
+      const fs = require('node:fs');
+      const [name] = process.argv.slice(1);
+      const tmp = name + '.tmp';
+      let i = 0;
+      const end = Date.now() + 5000;
+      while (Date.now() < end) {
+        try { fs.writeFileSync(tmp, 'v' + ++i + '\\n'); fs.renameSync(tmp, name); } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', replacer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          const text = String(safeReadFile(`${scratchRel}/replaced.log`));
+          if (/^v\d+\n$/.test(text)) read += 1;
         } catch {
           refused += 1;
         }
@@ -1092,5 +1132,28 @@ describe('secure-io guard internals', () => {
   it('reads pnpm store files under node_modules despite their link count', () => {
     const pkg = 'node_modules/vitest/package.json';
     expect(() => safeReadFile(pkg)).not.toThrow();
+  });
+
+  it('accepts only a real write between the two link-state samples', () => {
+    // The masked-churn finding: utimes(2), a same-size truncate or an
+    // in-place write can stamp ctime == mtime without a link or unlink, so
+    // "ctime moved together with mtime" alone cannot prove a data write —
+    // only a size change can.
+    const stat = (over: Partial<fs.Stats>) =>
+      ({ nlink: 1, ctimeMs: 100, mtimeMs: 100, size: 10, ...over }) as fs.Stats;
+    const before = stat({});
+    // Untouched, and a name fully unlinked in between (an orphan inode can
+    // never be a protected file — the atomic write+rename replacement).
+    expect(sameLinkState(before, stat({}))).toBe(true);
+    expect(sameLinkState(before, stat({ nlink: 0 }))).toBe(true);
+    // A link or unlink moved the link count, or only the ctime.
+    expect(sameLinkState(before, stat({ nlink: 2 }))).toBe(false);
+    expect(sameLinkState(before, stat({ ctimeMs: 200 }))).toBe(false);
+    // The mask: ctime stamped equal to mtime, the size unmoved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200 }))).toBe(false);
+    // A real write: size, ctime and mtime all moved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200, size: 11 }))).toBe(true);
+    // A moving size alone is not enough (ctime must belong to the write).
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 100, size: 11 }))).toBe(false);
   });
 });
