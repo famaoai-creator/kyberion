@@ -124,7 +124,7 @@ Leftover fixture missions show up in `pnpm mission list` and in mission hygiene 
 
 ## Other gates that exist for tests
 
-- **Approvals** go to `active/shared/runtime/vitest-approvals/` (`approvalStoreRoots()`).
+- **Approvals** go to `active/shared/runtime/vitest-approvals/run-<id>/pool-<n>/` (`approvalStoreRoots()`; `<id>` is a per-run nonce, so concurrent runs in one checkout stay apart). Files that run one after another in a pool share that directory, so a record one file leaves behind is read by whichever file the scheduler runs next. Clear every channel your file writes in `afterEach`, and assert only on the records your test created (for an append-only log, the entries after the length you read before acting). `tests/vitest-approval-store-guard.ts` clears the pool store around every file and names a file that left records behind; under `KYBERION_TEST_LEAK_STRICT=1` (CI) that fails the file unless it is on the shrink-only `tests/fixtures/approval-store-leftover-baseline.json`.
 - **Operator notifications** are suppressed under Vitest. A delivery suite opts back in with `KYBERION_ALLOW_TEST_NOTIFICATIONS=1`.
 - **Traces** are not persisted under Vitest unless the caller passes a `dir` or sets `KYBERION_TRACE_TEST_PERSIST=1`.
 - **Child processes** inherit `VITEST` / `VITEST_POOL_ID` (`SAFE_EXEC_ENV_ALLOWLIST`, `CHILD_PROCESS_ENV_KEYS`), so a script spawned by a test uses the same sandbox.

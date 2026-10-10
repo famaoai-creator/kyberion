@@ -1,5 +1,14 @@
 import * as nodePath from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const ownerMember = vi.hoisted(() => ({ present: null as boolean | null }));
+vi.mock('../organization/member-registry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../organization/member-registry.js')>();
+  return {
+    ...actual,
+    resolveMemberByPrincipal: (...args: Parameters<typeof actual.resolveMemberByPrincipal>) =>
+      ownerMember.present === false ? null : actual.resolveMemberByPrincipal(...args),
+  };
+});
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
   const { customerRootWithSodOverlay } =
@@ -24,6 +33,10 @@ import {
 } from '../workforce/work-coordination.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import * as pathResolver from '../path-resolver.js';
+import {
+  cliAgentSessionEnv,
+  resolveCliApprovalRequester,
+} from '../governance/cli-operator-principal.js';
 import {
   safeExec,
   safeExistsSync,
@@ -444,16 +457,40 @@ describe('mission existing work reconciliation', () => {
     }
   });
 
-  it('uses the governed USER accessor when no persona is configured', () => {
+  it('uses the governed USER accessor when no persona, agent session or owner member is present', () => {
     prepareMission();
     writeManifest(buildManifest());
     delete process.env.KYBERION_PERSONA;
     process.env.USER = actorId;
+    for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
+    ownerMember.present = false;
+    try {
+      const request = createMissionWorkReconciliationApprovalRequest({ missionId, manifestPath });
+      reconciliationApprovalIds.push(request.id);
+      expect(request.requestedBy).toBe(actorId);
+    } finally {
+      vi.unstubAllEnvs();
+      ownerMember.present = null;
+    }
+  });
 
-    const request = createMissionWorkReconciliationApprovalRequest({ missionId, manifestPath });
-    reconciliationApprovalIds.push(request.id);
-
-    expect(request.requestedBy).toBe(actorId);
+  it('records the requester the entry point resolved, keeping the detected principal as actorId', () => {
+    prepareMission();
+    writeManifest(buildManifest());
+    for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
+    try {
+      vi.stubEnv('CLAUDECODE', '1');
+      const byAgent = createMissionWorkReconciliationApprovalRequest({
+        missionId,
+        manifestPath,
+        requester: () => resolveCliApprovalRequester({ explicit: 'planner-bot', legacy: 'x' }),
+      });
+      reconciliationApprovalIds.push(byAgent.id);
+      expect(byAgent.requestedBy).toBe('planner-bot');
+      expect(byAgent.requestedByContext?.actorId).toBe('agent:claude-code');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('requires mission-controller authority and a governed output location', () => {

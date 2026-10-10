@@ -177,7 +177,7 @@ gets clean JSON.
   lists the accepted exceptions).
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
-  before calling it fixed. Four defect classes caused the 2026-10 load and order failures:
+  before calling it fixed. Five defect classes caused the 2026-10 load and order failures:
   - **A real child process for code the test could call in process.** A spawned
     `node --import ts-loader.mjs scripts/x.ts` or `dist/...` CLI spends seconds on start-up
     (transpiling, loading the core stack, re-reading the 290KB `libs/core/package.json` for every
@@ -197,6 +197,32 @@ gets clean JSON.
     starts and `await Promise.allSettled(...)` them in `afterEach` (with an explicit hook timeout)
     before cleanup. A module-level seam registration must be safe to re-evaluate
     (part-core registers with an unexported `replaceKey`; a supersede logs a warning).
+    The same race re-created catalog seams (`Seam task-intent-builder is already registered in
+the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declares
+    `owner: '<its own repo-relative path>'`. Under Vitest only, the catalog lets a second
+    definition with the same owner and multiplicity replace the stale entry (with a warning) and
+    still rejects any other duplicate. Outside Vitest every re-registration still throws
+    `SEAM_DUPLICATE_PROVIDER`: there it means a real double load, and the owner is a plain string
+    any module can copy. `libs/core/seam-reevaluation.test.ts` re-evaluates defining modules and
+    fails on a catalog seam (in `libs/`, `presence/`, `satellites/` or `scripts/`) without its own
+    path as owner.
+  - **A per-pool store shared by consecutive files.** The test approval store
+    (`active/shared/runtime/vitest-approvals/run-<id>/pool-<n>/`) outlives a test file.
+    `operations-halt.enforcement.test.ts` left a `Merge PR 7` notice in
+    `autonomy/actions.jsonl`, and `approval-decision-routing.test.ts` failed whenever it ran next
+    in the same pool (2026-10). A writer clears its channels in `afterEach`; a reader asserts only
+    on what it appended. The `tests/vitest-approval-store-guard.ts` setup file clears the pool
+    store at its top level (evaluated per file before the file is imported, so records a file
+    seeds at import time survive) and again after the file's own hooks (`sequence.hooks:
+'stack'`), so the leftovers of one file never reach the next. It fails a file that left
+    records behind under `KYBERION_TEST_LEAK_STRICT=1`, unless the file is on the shrink-only
+    `tests/fixtures/approval-store-leftover-baseline.json` (34 files over the full root suite;
+    a policy test caps the count and requires every entry to exist, and the guard notes a listed
+    file that left nothing). `<id>` is a per-run nonce (`KYBERION_VITEST_RUN_ID`) that
+    `vitest.config.mts` sets before the workers fork, so two Vitest runs in one checkout never
+    wipe each other's pool; without a pool id the guard does nothing. Reproduce such a pair by
+    running the writer and then the reader with `--maxWorkers=1` (both get pool 1). To see a
+    reader's dependence, use a config without the guard in `setupFiles`.
   - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
     meant for one artifact, also answered the media-backend registry's directory check. The test
     passed only when an earlier test had already cached the registry. Route governed catalog paths
@@ -235,7 +261,7 @@ gets clean JSON.
    `execFileSync` with its caller (a `--require` preload in `NODE_OPTIONS` that wraps
    `node:child_process` and calls `syncBuiltinESMExports()`). Large `(idle)` time in the worker
    means it is waiting on a child or on transforms.
-3. Fix the cause (the four classes above). Raise a timeout only for work that is legitimately heavy,
+3. Fix the cause (the classes above). Raise a timeout only for work that is legitimately heavy,
    such as a cold stack import in `beforeAll` or a real CLI end-to-end suite, and record the
    measurement next to it.
 4. Force a timeout (`--testTimeout=<small>`) and check that only the timed-out test fails.
@@ -352,6 +378,15 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
   rewrite other tenants' entries (deny-unless-brokered). Read such a file through a governed
   system-scope reader (the pattern of `check_tenant_registry_consistency`'s read grant), and write it
   only through a governed store-writer.
+- **Document duplicate evidence belongs to the selected tenant.** The explicit ingest ceremony
+  reads committed asset hashes from that tenant's information-asset ledger. Never use the
+  standalone actuator's shared hash registry to decide whether a tenant import may land, and
+  never add a second hash-registration write after the card/ledger commit. A legacy global
+  registry is neither migration authority nor proof that the selected destination has the file;
+  leave it untouched. Preserve historical-hash and source-version/reparse semantics. Verify with
+  `scripts/ingest.dedup-ordering.test.ts`: identical bytes into two tenants, independent updates,
+  read-only previews, foreign legacy rows, a failed ledger append, and a retry after a committed
+  ledger entry with no registry record. This does not claim concurrent commit atomicity.
 - **Facades carry their own binding.** A governed facade binds the tenant and organization it was
   given (`--tenant-slug`, `--organization-id`) via
   `withExecutionContext(role, fn, undefined, tenantSlug, organizationId)`. An operator must never
@@ -457,7 +492,29 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
     request without a requester, an empty or placeholder decider (`APPROVAL_PLACEHOLDER_DECIDERS`),
     and a decider the surface took from its caller (`deciderIdentitySource: 'caller_supplied'`).
     Refusals are audited (`separation_of_duties` / `denied`). A surface whose token proves only
-    possession (the mission brief page) resolves the decider server-side.
+    possession (the mission brief page) resolves the decider server-side, and with the setting on
+    refuses every approval (rejections still pass): any local process can open the page, so the
+    operator approves on Chronos, presence-studio or the terminal TTY challenge instead.
+  - The terminal has one operator principal (`libs/core/governance/cli-operator-principal.ts`):
+    the local owner member, recorded as `user:<member_id>` both as `requestedBy` when a CLI or
+    script opens a request and as `decidedBy` for `pnpm kyberion approvals --approve`; the
+    onboarding name goes to `requestedByDisplayName` / `decidedByDisplayName` and is never
+    compared. A CLI run inside an agent session (`KYBERION_AGENT_ID`, `KYBERION_NHI_ID`,
+    `KYBERION_RUN_ORIGIN=agent`, or a provider harness marker such as `CLAUDECODE`, declared per CLI as `cli.session_markers` in `reasoning-providers/`) opens requests
+    as `agent:<…>`, so a human approving it is not a self-approval. The detected principal is always
+    kept as `requestedByContext.actorId`; `--requested-by` only adds an identity. With the setting
+    on, a terminal with no owner member (`pnpm organization member ensure-owner` provisions it) or an
+    approval typed inside an agent session is refused with a diagnostic, never recorded under a
+    placeholder, and a terminal approval needs an interactive TTY and a typed one-time code
+    (`decidedVia: 'cli_tty_challenge'`; no flag skips it; no TTY points at Chronos or
+    presence-studio). With it off, a decision typed in an agent session is recorded as
+    `caller_supplied` with `decidedInAgentSession`, so it fails a later re-check.
+  - **This is best effort, not a security boundary.** Agent-session markers are environment
+    variables an agent can clear, and anything that gives an agent a pseudo-terminal can read and
+    type the challenge code: terminal-actuator, but equally `script`, `expect`, `unbuffer` or a shell
+    coproc. The challenge times out after 120s (`[POLICY_VIOLATION] challenge timed out`) and
+    records nothing. The strong path for a separated approval is an authenticated
+    surface (Chronos or presence-studio).
   - Every consumer that turns an approved record into an effect checks it first under a consumer
     id (`assertApprovalUsable` / `approvalUsabilityRefusal`); the registry is
     `libs/core/governance/approval-sod-consumers.contract.test.ts`. A decision recorded while
@@ -468,9 +525,19 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
     blocks approving decisions and approval use even with the setting off (fail closed,
     diagnostic message); plugin activation degrades to `pending_approval` with a warning, and a
     pending DOT autonomy promotion stays pending until the next sweep.
-  - Known limits (string identities, the CLI persona-vs-name gap, policy/service deciders, flows
-    outside the approval store such as `service_recording review`) are listed in
-    [approval-gate-design](./approval-gate-design.md).
+  - `pnpm kyberion approvals --revoke <id> [--reason …]` revokes an approved record: further uses
+    are refused (an effect that already happened is not undone). Allowed for its requester, one of
+    its approvers, or the local owner — resolved server-side by `revokeApprovalAsLocalOwner`, never
+    asserted by the caller. Audited as `approval_decision` / `revoke` and a `revoked` event. Whatever
+    the setting, `evaluateApprovalUsability` refuses a revoked record for every consumer, and
+    separation-of-duties refusals name the revoke command. One-shot consumers that take no apply
+    claim record consumption with `markApprovalConsumed` (`service_recording_promotion`,
+    `organization_decision`), so the approval is used once and a later revoke reports it consumed.
+  - `service_recording review` decides through the store (`service-recording-review` channel,
+    requested at `capture` or `request-review`); promotion re-checks the approval
+    (`service_recording_promotion`).
+  - Known limits (string identities, a human typing into an agent session's shell, policy/service
+    deciders) are listed in [approval-gate-design](./approval-gate-design.md).
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
   profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
@@ -522,13 +589,29 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
 5. When you add an approval request creator, record the real requester identity in
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
-   `libs/core/governance/approval-separation-of-duties.test.ts`).
+   `libs/core/governance/approval-separation-of-duties.test.ts`). A creator that runs in a CLI or
+   script resolves its requester at the CLI entry point (`scripts/lib/cli-approval-requester.ts`,
+   `resolveCliApprovalRequester({ explicit, legacy })`) and passes it to the library as a lazily
+   resolved `ApprovalRequesterInput` — never from the persona, a component name or
+   `resolveOperatorDisplayName()`, and never read from the environment inside `libs/`. Record
+   `approvalRequesterActorId(requester)` as `requestedByContext.actorId`, never a copy of
+   `requestedBy`. A terminal decision goes through `decideApprovalFromCli` (gates:
+   `scripts/approvals_cli_identity.test.ts`, `approval-sod-consumers.contract.test.ts`).
 6. When you add code that turns an approved record into an effect, call
    `assertApprovalUsable(record, { consumer })` before the effect. When you add a decision surface
    that takes the decider from its caller instead of a resolved session, pass
    `deciderIdentitySource: 'caller_supplied'`; when it falls back to a placeholder decider id,
    add that id to `APPROVAL_PLACEHOLDER_DECIDERS` (gates: approval-separation-of-duties.test.ts,
-   `approval-actuator-sod.test.ts`).
+   `approval-actuator-sod.test.ts`). A consumer that only runs the check while separation of
+   duties is on must still run it on a record it can load, so a revoked approval is refused
+   (gate: `approval-revocation.test.ts`, contract test).
+7. A consumer must not skip its usability check while separation of duties is off: a revoked
+   approval is refused whatever the setting. The contract test fails on any
+   `!isSeparationOfDutiesEnabled()` guard in a consumer file outside its listed, justified
+   exceptions. A one-shot consumer without an apply claim calls `markApprovalConsumed`.
+8. Never add an approve/reject flow that writes its decision outside the approval store (as
+   `service_recording review` did): open a hash-bound request in its own channel, decide it with
+   `decideApprovalRequest`, and register the consumer that turns it into an effect.
 
 **Profile timeouts are hard limits.** Since #1006 the codex/gemini structured runners honour a
 profile's `timeout_ms`; before that they used their 5-minute adapter default. A timeout is not a

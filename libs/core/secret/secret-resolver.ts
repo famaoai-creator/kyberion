@@ -54,6 +54,7 @@ const secretResolverSeam = createSeam<SecretResolver>({
   key: 'secret-resolver',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/secret/secret-resolver.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

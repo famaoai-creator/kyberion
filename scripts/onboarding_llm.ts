@@ -19,6 +19,7 @@
  *
  * The exported helpers are shared with the interactive onboarding wizard.
  */
+import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
 import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { auditChain } from '@agent/core/governance/audit-chain';
@@ -499,7 +500,7 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     ...(attestedBy ? { attested_by: attestedBy } : {}),
     ...(validForDays !== undefined ? { valid_for_days: validForDays } : {}),
     ...(approvalRequestId ? { approvalRequestId } : {}),
-    invoker: captureAttestationInvoker(),
+    invoker: captureCliAttestationInvoker(),
     ...(options.tenantRegistryRootDir
       ? { tenantRegistryRootDir: options.tenantRegistryRootDir }
       : {}),

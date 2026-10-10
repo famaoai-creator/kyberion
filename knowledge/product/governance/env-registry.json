@@ -4237,6 +4237,15 @@
       "subsystem": "surfaces"
     },
     {
+      "name": "KYBERION_VITEST_RUN_ID",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Test-only: per-run nonce (<pid>-<base36 time>) that vitest.config.mts sets before the workers fork. approvalStoreRoots() puts the Vitest approval store under vitest-approvals/run-<id>/pool-<n>/ so two Vitest runs in one checkout do not share or wipe each other's records; child processes of a test inherit it, and tests/vitest-run-id.ts removes the run's directory at teardown.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_VLLM_KEY",
       "category": "secret",
       "type": "string",

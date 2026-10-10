@@ -11,6 +11,7 @@ const publicIngressProviderSeam = createSeam<PublicIngressProvider>({
   key: 'public-ingress-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/ingress/public-ingress-seam.ts',
 });
 
 const disposers = new Map<string, () => void>();

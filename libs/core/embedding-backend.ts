@@ -14,6 +14,7 @@ const embeddingBackendSeam = createSeam<EmbeddingBackend>({
   key: 'embedding-backend',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/embedding-backend.ts',
 });
 let registeredBackendDisposer: (() => void) | null = null;
 

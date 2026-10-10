@@ -72,6 +72,7 @@ const inventoryProviderSeam = createSeam<VirtualDeviceInventoryProvider>({
   key: 'virtual-device-inventory',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/virtual/virtual-device-inventory-bridge.ts',
 });
 
 /** Supplemental device discovery; disposal removes only this registration. */

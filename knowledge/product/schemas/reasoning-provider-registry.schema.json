@@ -173,6 +173,24 @@
                 "description": "Availability is answered by provider discovery; chain construction must not spawn again when discovery reports it absent.",
                 "type": "boolean"
               },
+              "session_markers": {
+                "description": "Env vars the CLI harness sets in every child process; a set marker means the process runs inside this CLI's agent session (approval requester/decider detection).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["env"],
+                  "properties": {
+                    "env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+                    "equals": { "type": "string", "minLength": 1 }
+                  }
+                }
+              },
+              "session_principal": {
+                "description": "Name recorded as agent:<name> for a detected session; defaults to the mode.",
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
               "model_flag": {
                 "description": "Flag that forwards an explicit model id when the CLI is launched as a pane agent.",
                 "type": "string",

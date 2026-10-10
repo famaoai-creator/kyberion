@@ -71,7 +71,12 @@
             "args": ["--agent", "plan"],
             "notes": "OpenCode CLI planner tier runs on the plan agent without --auto approval."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "OPENCODE_CLI"
+          }
+        ]
       }
     }
   ]

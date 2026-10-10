@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Per-run nonce for the Vitest approval store (tests/vitest-run-id.ts). Set
+// while the config loads, in the main process before the worker pool is forked,
+// so every worker inherits it; process.env changes made in globalSetup do not
+// reach the forks. An outer run's nonce is kept.
+process.env.KYBERION_VITEST_RUN_ID ||= `${process.pid}-${Date.now().toString(36)}`;
+
 function preferTypeScriptSourceForJsImports() {
   return {
     name: 'prefer-typescript-source-for-js-imports',
@@ -99,9 +105,16 @@ export default defineConfig({
     // combined-run flakes (writes landing in another suite's tmp root).
     pool: 'forks',
     maxWorkers: 4,
-    setupFiles: ['./tests/vitest-network-guard.ts'],
-    // Reports test writes that land in live state (active/, knowledge/personal/, customer/, …).
-    globalSetup: ['./tests/vitest-active-leak-guard.ts'],
+    // The approval-store guard keeps per-pool approval state from leaking between files.
+    setupFiles: ['./tests/vitest-network-guard.ts', './tests/vitest-approval-store-guard.ts'],
+    // Setup-file afterAll hooks must run after the file's own (the
+    // approval-store guard checks what the file left once its cleanup ran).
+    sequence: { hooks: 'stack' },
+    // vitest-run-id: removes this run's approval-store directory (nonce above),
+    // so concurrent runs in one checkout do not wipe each other.
+    // vitest-active-leak-guard: reports
+    // test writes that land in live state (active/, knowledge/personal/, …).
+    globalSetup: ['./tests/vitest-run-id.ts', './tests/vitest-active-leak-guard.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
