@@ -213,6 +213,7 @@ describe('routeAutonomousDecision', () => {
       payloadHash: forged.payloadHash,
       effectBinding: forged.effectBinding,
       finalDecision: 'human_only',
+      min_assurance: 'A2',
     });
   });
 

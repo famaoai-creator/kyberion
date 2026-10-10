@@ -475,13 +475,21 @@ export function applySurfaceApprovalChangeRequest(params: {
  * identity — so it is recorded as `local_token` and must never be logged as
  * `surface_session`.
  *
- * Every other surface keeps its prior behaviour of recording nothing: asserting
- * `surface_session` for all of them would be the same dishonesty in the other
- * direction (`presence` is a local server too). Callers that know their own
- * strength pass `authMethod` explicitly.
+ * HA-03: a human-only decision must declare its proof. Chat bridges vouch only
+ * for the channel's account (`channel_identity`; iMessage senders can be
+ * spoofed). A `presence` text decision carries no verified identity at all, so
+ * it is recorded as `manual`. Callers that know their own strength pass
+ * `authMethod` explicitly.
  */
 function defaultSurfaceAuthMethod(surface: SurfaceApproval): ApprovalRecord['authMethod'] {
-  return surface === 'brief' ? 'local_token' : undefined;
+  switch (surface) {
+    case 'brief':
+      return 'local_token';
+    case 'presence':
+      return 'manual';
+    default:
+      return 'channel_identity';
+  }
 }
 
 export interface SurfaceApprovalReply {

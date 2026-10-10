@@ -13,8 +13,14 @@ import {
 } from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import type { ApprovalConsumption, ApprovalRevocation } from './approval-revocation.js';
-import { validateHumanFinalDecision } from './approval-human-decision.js';
+import {
+  reportAssuranceShortfall,
+  validateHumanFinalDecision,
+  withDefaultMinAssurance,
+} from './approval-human-decision.js';
 export { validateHumanFinalDecision } from './approval-human-decision.js';
+import type * as assurance from './approval-assurance.js';
+export * from './approval-assurance.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -133,9 +139,9 @@ export interface ApprovalRecord {
    * MO-11 S-3: `local_token` = a loopback-bound page gated by a per-launch
    * token (the mission-brief surface). It proves possession of a locally
    * printed token, not identity — recorded distinctly so audits can tell it
-   * apart from a real session, and tighten later.
+   * apart from a real session (HA-03: its assurance level, `approval-assurance.ts`).
    */
-  authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual' | 'local_token';
+  authMethod?: assurance.ApprovalAuthMethod;
   note?: string;
   /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
   reasonCategory?: RejectionReasonCategory;
@@ -150,6 +156,11 @@ export interface ApprovalRecord {
 export interface ApprovalAccountability {
   /** Final accountability is held by a human principal, never an agent/service. */
   finalDecision: 'human_only';
+  /**
+   * HA-03: the weakest decider proof that may settle this request. Set on
+   * creation (A2, or A3 for dual-key); a record without it is read as A2.
+   */
+  min_assurance?: assurance.ApprovalAssuranceLevel;
   payloadHash?: string;
   effectBinding?: string;
 }
@@ -227,6 +238,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
    * `brief` surface's `local_token`) stays visible wherever it is reviewed.
    */
   decidedAuthMethod?: ApprovalRecord['authMethod'];
+  /** HA-03: the decision was let through below `min_assurance` (warn rollout mode). */
+  assuranceShortfall?: assurance.ApprovalAssuranceShortfall;
   status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'applied' | 'failed';
   sourceText?: string;
   /** KC-03: origin of the request, for source-scoped cancellation. */
@@ -627,7 +640,7 @@ export function createApprovalRequest(
         outcomeIds: ['approval_request'],
         requiresApproval: true,
       }),
-    accountability: params.accountability,
+    accountability: withDefaultMinAssurance(params.accountability),
     steering: params.steering,
     ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
     ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
@@ -1079,7 +1092,7 @@ function decideApprovalRequestUnlocked(
     throw new Error(`[POLICY_VIOLATION] Approval request has expired: ${record.id}`);
   }
 
-  validateHumanFinalDecision({
+  const assuranceShortfall = validateHumanFinalDecision({
     accountability: record.accountability,
     decidedByType: params.decidedByType,
     authenticated: params.authenticated,
@@ -1178,6 +1191,7 @@ function decideApprovalRequestUnlocked(
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(assuranceShortfall ? { assuranceShortfall } : {}),
     ...(params.diagnosticDecision ? { diagnosticDecision: params.diagnosticDecision } : {}),
     ...(changeInstruction
       ? {
@@ -1215,7 +1229,9 @@ function decideApprovalRequestUnlocked(
     note: params.note,
     reason_category: params.reasonCategory,
     ...(changeInstruction ? { change_instruction: changeInstruction } : {}),
+    ...(assuranceShortfall ? { assurance_shortfall: assuranceShortfall } : {}),
   });
+  if (assuranceShortfall) reportAssuranceShortfall(updated, assuranceShortfall, params.decidedBy);
   projectApprovalWorkerEvent(
     'approval_response',
     {

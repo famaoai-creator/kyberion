@@ -254,32 +254,12 @@ describe('terminal approvals record one stable operator principal', () => {
     );
   });
 
-  it('with SoD off, an approval typed in an agent session is caller_supplied and fails a later SoD re-check', async () => {
+  it('with SoD off, an agent session still cannot decide a human-only request from the terminal', async () => {
     vi.stubEnv('KYBERION_AGENT_ID', 'planner');
     const id = requestFromCli();
-    // Same agent session approves (SoD off: no challenge, nothing refused).
-    await approveFromCli(id);
-    expect(stored(id)).toMatchObject({
-      status: 'approved',
-      decidedBy: 'user:owner',
-      decidedByIdentitySource: 'caller_supplied',
-      decidedInAgentSession: 'agent:planner',
-    });
-    expect(evaluateApprovalUsability(stored(id))).toBeNull();
-
-    setSeparationOfDuties(true);
-    expect(evaluateApprovalUsability(stored(id))?.violation).toBe('unverified_decider');
-    plainTerminal();
-    expect(() =>
-      withExecutionContext('sovereign_concierge', () =>
-        attestTenantProvider({
-          ...claim,
-          rootDir,
-          invoker: { actor: 'operator-cli' },
-          approvalRequestId: id,
-        })
-      )
-    ).toThrow(/decider identity was supplied by the caller/);
+    expect(stored(id).accountability?.finalDecision).toBe('human_only');
+    await expect(approveFromCli(id)).rejects.toThrow(/\[APPROVAL_HUMAN_PROOF_REQUIRED\]/);
+    expect(stored(id).status).toBe('pending');
   });
 
   it('with SoD on, refuses to approve from inside an agent session', async () => {

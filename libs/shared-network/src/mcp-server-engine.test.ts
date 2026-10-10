@@ -968,6 +968,26 @@ describe('createKyberionMcpServer()', () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Approval decision failed');
     });
+
+    it('HA-02: human_only の拒否コードを呼び出し元にそのまま返す', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
+      mockDecideApproval.mockImplementation(() => {
+        throw new Error(
+          '[APPROVAL_HUMAN_PROOF_REQUIRED] kyberion.approval.decide cannot decide human-only approval req-001'
+        );
+      });
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.approval.decide')!.handler;
+      const result = await handler({
+        request_id: 'req-001',
+        decision: 'approved',
+        decided_by: 'op',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('[APPROVAL_HUMAN_PROOF_REQUIRED]');
+    });
   });
 
   describe('kyberion.audit.export', () => {

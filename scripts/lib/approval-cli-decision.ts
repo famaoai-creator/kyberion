@@ -35,6 +35,7 @@ import {
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
+import { refuseHumanOnlyDecisionOnAgentPath } from '@agent/core/governance';
 import {
   revokeApprovalAsLocalOwner,
   revokeApprovalRequest,
@@ -126,6 +127,9 @@ export async function decideApprovalFromCli(
   }
 ): Promise<ApprovalRequestRecord> {
   const decider = resolveCliApprovalDecider({ ...params, decision: params.decision });
+  if (decider.decidedInAgentSession) {
+    refuseHumanOnlyDecisionOnAgentPath(request, 'the terminal inside an agent session');
+  }
   const challenged = params.decision === 'approved' && isSeparationOfDutiesEnabled();
   if (challenged) {
     const terminal = resolveCliTtyChallengeTerminal();

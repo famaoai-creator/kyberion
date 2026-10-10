@@ -440,6 +440,7 @@ describe('enforceApprovalGate', () => {
       expect.objectContaining({
         accountability: expect.objectContaining({
           finalDecision: 'human_only',
+          min_assurance: 'A2',
           effectBinding: 'secret:set',
           payloadHash: expect.any(String),
         }),
@@ -448,6 +449,30 @@ describe('enforceApprovalGate', () => {
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         reason: 'New approval request created; awaiting decision',
+      })
+    );
+  });
+
+  it('HA-03: a dual-key request requires assurance A3', () => {
+    mockResolvePolicy.mockReturnValue({
+      requiresApproval: true,
+      matchedRuleId: 'secret-policy',
+      missingRequirements: ['dual_key_confirmation'],
+    });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([]);
+    mockCreateRequest.mockReturnValue({
+      id: 'req-dual-key',
+      status: 'pending',
+    } as ApprovalRequestRecord);
+
+    enforceApprovalGate(baseParams);
+
+    expect(mockCreateRequest).toHaveBeenCalledWith(
+      'mission_controller',
+      expect.objectContaining({
+        accountability: expect.objectContaining({ min_assurance: 'A3' }),
       })
     );
   });
