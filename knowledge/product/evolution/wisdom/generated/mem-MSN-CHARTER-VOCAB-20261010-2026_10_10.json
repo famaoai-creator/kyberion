@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-CHARTER-VOCAB-20261010-2026_10_10",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Widening what a charter can delegate: fail closed at every seam",
+  "summary": "When a new decision type becomes delegable through the accountability charter, each place the gate can fall through to allowed must fail closed on its own, not rely on a list kept elsewhere.",
+  "candidate_id": "mem-MSN-CHARTER-VOCAB-20261010-2026_10_10",
+  "evidence_refs": [
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/design-spec.json"
+  ],
+  "created_at": "2026-10-10T09:53:43.114Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Lessons from adding 12 charter-delegable business decision types (MSN-CHARTER-VOCAB-20261010):\n\n1. A decision-rights escalation must force approval by itself. The approval-policy rule that listed decision types was a second, hand-kept list; new types missing from it fell to the policy default (no approval) for tenants without a charter. The gate now treats any matrix escalation as requiring a human, and the rule list is only explanatory.\n2. Money decisions need a usable amount. A missing, non-finite or negative amount used to be priced as 0, which skips every budget and loss check. The call site marks such actions amountUnknown and the charter never allows them alone.\n3. Bind the delegated decision type to the evaluated payload. The charter stand-in for the matrix must check that the type the charter delegated is the same type the matrix evaluated.\n4. Treat per-type policy tables as untrusted maps: use Object.hasOwn and validate values, otherwise an unknown value (or a prototype key) reads as a grant and slips past the delegation-chain subset check.\n5. Delegation needs two keys: the organization marks a type charter_delegable in decision-rights, and the accountable human names it in the charter. Only human-acceptance escalations are delegable; role mismatch and over-threshold escalations still need supersedes_decision_rights.\n6. Adding an actuator op input requires regenerating knowledge/product/orchestration/actuator-op-discovery.json (pnpm generate:op-registry) or pipeline-op-schemas rejects pipelines that use it; revert the unrelated formatting churn the generators write into CAPABILITIES_GUIDE.md and global_actuator_index.json."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-CHARTER-VOCAB-20261010/evidence/design-spec.json"
+  ],
+  "source_branch": "feat/charter-business-vocabulary-20261010",
+  "source_commit": "ad3093dbbaba804f84628620c6146b07b2734bdd"
+}
