@@ -39,22 +39,50 @@ export function entryExists(p: string): boolean {
   const candidate = path.resolve(p);
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
-  if (
-    candidate !== logicalRoot &&
-    candidate !== physicalRoot &&
-    !candidate.startsWith(logicalRoot + path.sep) &&
-    !candidate.startsWith(physicalRoot + path.sep)
-  ) {
-    throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
-  }
+  let stat: fs.Stats | undefined;
   try {
-    fs.lstatSync(candidate);
-    return true;
+    // Each probe sits behind its own containment check on the probed value.
+    if (candidate === logicalRoot) stat = fs.lstatSync(logicalRoot);
+    else if (candidate === physicalRoot) stat = fs.lstatSync(physicalRoot);
+    else if (candidate.startsWith(logicalRoot + path.sep))
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    else if (candidate.startsWith(physicalRoot + path.sep))
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT' || code === 'ENOTDIR') return false;
-    throw error;
+    if (errnoCode(error) === 'ENOTDIR') return false;
+    rethrowAsErrno(error, 'lstat');
   }
+  return stat !== undefined;
+}
+
+/**
+ * The errno of a caught error as one of a fixed set of literals. Guard errors
+ * reach HTTP surfaces through callers' messages, so a caught error object is
+ * never rethrown or echoed from this module — only its errno classification.
+ */
+function errnoCode(error: unknown): string {
+  const raw = (error as NodeJS.ErrnoException | undefined)?.code;
+  // Inline list (no module const): reachable during the secure-io bootstrap cycle.
+  const known = [
+    'ENOENT',
+    'ENOTDIR',
+    'ELOOP',
+    'EACCES',
+    'EPERM',
+    'EEXIST',
+    'EINVAL',
+    'ENAMETOOLONG',
+    'EISDIR',
+    'EOUTSIDE',
+  ];
+  for (const code of known) if (raw === code) return code;
+  return 'EUNKNOWN';
+}
+
+function rethrowAsErrno(error: unknown, operation: string): never {
+  const code = errnoCode(error);
+  throw Object.assign(new Error(`${operation} failed (${code})`), { code });
 }
 
 /*
@@ -165,8 +193,8 @@ function physicalPath(absPath: string, hops = 0): string {
     // realpath already returns the on-disk case on case-folding platforms.
     return fs.realpathSync.native(absPath);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
+    const code = errnoCode(error);
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') rethrowAsErrno(error, 'realpath');
   }
   const missing: string[] = [];
   let existing = absPath;
@@ -179,7 +207,7 @@ function physicalPath(absPath: string, hops = 0): string {
   try {
     return path.join(fs.realpathSync.native(existing), ...missing);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    if (errnoCode(error) !== 'ENOENT') rethrowAsErrno(error, 'realpath');
     // `existing` is a dangling symlink (lstat sees it, realpath cannot follow
     // it). A write through it would create its target, so follow it by hand,
     // relative to its real parent so `..` in the link text resolves the way
@@ -187,12 +215,14 @@ function physicalPath(absPath: string, hops = 0): string {
     const link = path.resolve(existing);
     const logicalRoot = path.resolve(pathResolver.rootDir());
     const physicalRoot = realRoot().real;
-    if (!link.startsWith(logicalRoot + path.sep) && !link.startsWith(physicalRoot + path.sep)) {
-      // A dangling link outside the checkout is never followed.
+    // A dangling link outside the checkout is never followed.
+    let linkText: string;
+    if (link.startsWith(logicalRoot + path.sep)) linkText = fs.readlinkSync(link);
+    else if (link.startsWith(physicalRoot + path.sep)) linkText = fs.readlinkSync(link);
+    else
       throw Object.assign(new Error('dangling link outside the repository'), { code: 'EOUTSIDE' });
-    }
     const parentReal = fs.realpathSync.native(path.dirname(link));
-    const target = path.resolve(parentReal, fs.readlinkSync(link));
+    const target = path.resolve(parentReal, linkText);
     return physicalPath(path.join(target, ...missing), hops + 1);
   }
 }
@@ -441,8 +471,11 @@ export function safeRealpath(filePath: string): string {
  */
 export type HardLinkOperation = 'read' | 'write';
 
-const STALE_TOMB = /^(.+)\.stale-\d+-\d+-\d+$/;
-const WORKSPACE_NODE_MODULES =
+// `var`: reachable during the secure-io bootstrap cycle (no TDZ).
+// eslint-disable-next-line no-var
+var STALE_TOMB = /^(.+)\.stale-\d+-\d+-\d+$/;
+// eslint-disable-next-line no-var
+var WORKSPACE_NODE_MODULES =
   /^(?:libs\/core|libs\/shared-[^/]+|libs\/actuators\/[^/]+|satellites\/[^/]+|presence\/displays\/[^/]+|presence\/bridge\/[^/]+)\/node_modules\//;
 
 /** Read exemption for pnpm store links (see the block comment above). */
@@ -612,7 +645,7 @@ export function mkdirGuarded(resolvedDir: string, displayPath: string, mode?: nu
     try {
       fs.mkdirSync(current, { mode });
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if (errnoCode(error) !== 'EEXIST') rethrowAsErrno(error, 'mkdir');
     }
     expected = path.join(expected, name);
   }
