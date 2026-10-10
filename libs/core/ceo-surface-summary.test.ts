@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeCeoSurfaceSummary } from './ceo-surface-summary.js';
+import { composeCeoSurfaceSummary, notificationMatchesScope } from './ceo-surface-summary.js';
 import type { OperatorHomeSummary } from './surface/operator-home-summary.js';
 
 function makeHomeSummary(): OperatorHomeSummary {
@@ -192,5 +192,32 @@ describe('ceo-surface-summary', () => {
     for (const forbidden of ['actuator', 'ADF', 'pipeline', 'dispatch']) {
       expect(text.toLowerCase()).not.toContain(forbidden.toLowerCase());
     }
+  });
+
+  it('admits scope-less (legacy) notifications only to the company-less view', () => {
+    const scopeless = { request_id: 'NTF-LEGACY', status: 'attention' };
+    const tieredScopeless = { ...scopeless, tier: 'personal' };
+    const namedTenant = { ...scopeless, tenant_slug: 'acme' };
+    const system = {
+      tiers: ['confidential', 'public'] as Array<'confidential' | 'public'>,
+      tenantSlugs: [],
+      includeUntenanted: true,
+    };
+    expect(notificationMatchesScope(scopeless, system)).toBe(true);
+    expect(notificationMatchesScope(tieredScopeless, system)).toBe(false);
+    expect(notificationMatchesScope(namedTenant, system)).toBe(false);
+    expect(
+      notificationMatchesScope({ scope: { tier: 'public' }, status: 'attention' }, system)
+    ).toBe(true);
+
+    for (const scope of [
+      { tiers: system.tiers, tenantSlugs: [] },
+      { tiers: system.tiers, tenantSlugs: ['acme'] },
+      { tiers: system.tiers },
+    ]) {
+      expect(notificationMatchesScope(scopeless, scope)).toBe(false);
+    }
+    expect(notificationMatchesScope(scopeless, undefined)).toBe(true);
+    expect(notificationMatchesScope(scopeless, { tenantSlugs: 'all' })).toBe(true);
   });
 });

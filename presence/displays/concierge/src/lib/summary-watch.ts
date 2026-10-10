@@ -1,4 +1,9 @@
 import { getFrontDeskAuthRevision, readFrontDeskRequestToken } from './front-desk-auth-token';
+import {
+  SELECTED_TENANT_PARAM,
+  selectionFromPageUrl,
+  syncSelectionCookieFromUrl,
+} from './tenant-context';
 const INTERVAL_MS = 30_000;
 const TIMEOUT_MS = 15_000;
 /** Native EventSource cannot carry a tab bearer. */
@@ -55,7 +60,13 @@ export function startSummaryWatch(input: {
   run();
   if (!token) {
     try {
-      source = new EventSource('/api/events');
+      syncSelectionCookieFromUrl();
+      const selection = selectionFromPageUrl();
+      source = new EventSource(
+        selection
+          ? `/api/events?${SELECTED_TENANT_PARAM}=${encodeURIComponent(selection)}`
+          : '/api/events'
+      );
       source.addEventListener('summary', (event) => {
         if (current()) {
           controller?.abort();

@@ -25,6 +25,7 @@ import {
   workInventoryErrorResponse,
 } from '../../../../lib/work-inventory-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
+import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,11 +47,11 @@ function toSummaryView(summary: WorkInventoryObservationSummary) {
 
 /**
  * WI-15: member-facing "確認待ちの要約" (pending observation summaries) —
- * the viewer's own summaries plus the candidate work-inventory entries in
- * the viewer's own resolved scope (id + title only) to attach one to.
+ * the viewer's own summaries plus the candidate work-inventory entries of the
+ * selected company (id + title only) to attach one to.
  */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   const member = requireWorkInventoryMember(req, resolved.context);
   if (member.response) return member.response;
