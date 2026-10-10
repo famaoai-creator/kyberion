@@ -507,6 +507,7 @@ export function MissionIntelligence({
           channel: approval.channel,
           storageChannel: approval.storageChannel,
           decision,
+          ...(approval.presentedDigest ? { presentedDigest: approval.presentedDigest } : {}),
         }),
       });
       if (!res.ok) throw new Error('Approval decision failed');

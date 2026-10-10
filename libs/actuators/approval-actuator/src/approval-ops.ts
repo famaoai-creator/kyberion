@@ -21,6 +21,8 @@ export interface EvaluateDecisionRightsInput {
   caller_role?: string;
   channel?: string;
   amount?: number;
+  /** Outside parties the decision reaches (messages, invitations). */
+  recipients?: number;
   tenant_slug?: string;
   mission_id?: string;
   title?: string;
@@ -57,6 +59,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     agentId: input.agent_id,
     decisionType: input.decision_type,
     amount: input.amount,
+    ...(typeof input.recipients === 'number' ? { recipients: input.recipients } : {}),
   });
   if ((!evaluation || !evaluation.requiresEscalation) && !charter) {
     return { allowed: true, status: 'not_required' };

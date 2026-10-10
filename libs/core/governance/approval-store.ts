@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
@@ -13,8 +13,21 @@ import {
 } from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import type { ApprovalConsumption, ApprovalRevocation } from './approval-revocation.js';
-import { validateHumanFinalDecision } from './approval-human-decision.js';
+import {
+  bindPresentedDecision,
+  refuseHumanOnlyDecisionByAgentProcess,
+  reportAssuranceShortfall,
+  settlePasskeyDecisionProof,
+  settleUnpresentedHumanDecision,
+  validateHumanFinalDecision,
+  withDefaultMinAssurance,
+  type ApprovalDeciderPrincipal,
+} from './approval-human-decision.js';
 export { validateHumanFinalDecision } from './approval-human-decision.js';
+import type * as assurance from './approval-assurance.js';
+export * from './approval-assurance.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
+export * from './approval-presentation.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -24,7 +37,7 @@ import {
 } from '../workforce/artifact-store.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
-import { isVitestProcess } from '../foundation/env.js';
+import { approvalStoreRoots } from './approval-store-paths.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
 import { validateDecisionCard, type DecisionCard } from './decision-card.js';
@@ -133,9 +146,9 @@ export interface ApprovalRecord {
    * MO-11 S-3: `local_token` = a loopback-bound page gated by a per-launch
    * token (the mission-brief surface). It proves possession of a locally
    * printed token, not identity — recorded distinctly so audits can tell it
-   * apart from a real session, and tighten later.
+   * apart from a real session (HA-03: its assurance level, `approval-assurance.ts`).
    */
-  authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual' | 'local_token';
+  authMethod?: assurance.ApprovalAuthMethod;
   note?: string;
   /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
   reasonCategory?: RejectionReasonCategory;
@@ -150,6 +163,13 @@ export interface ApprovalRecord {
 export interface ApprovalAccountability {
   /** Final accountability is held by a human principal, never an agent/service. */
   finalDecision: 'human_only';
+  /**
+   * HA-03: the weakest decider proof that may settle this request. Set on
+   * creation (A2, or A3 for dual-key); a record without it is read as A2.
+   */
+  min_assurance?: assurance.ApprovalAssuranceLevel;
+  /** The approval-policy rule that required the request (decision-time floor, HA-08). */
+  policy_rule_id?: string;
   payloadHash?: string;
   effectBinding?: string;
 }
@@ -227,6 +247,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
    * `brief` surface's `local_token`) stays visible wherever it is reviewed.
    */
   decidedAuthMethod?: ApprovalRecord['authMethod'];
+  /** HA-03: the decision was let through below `min_assurance` (warn rollout mode). */
+  assuranceShortfall?: assurance.ApprovalAssuranceShortfall;
   status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'applied' | 'failed';
   sourceText?: string;
   /** KC-03: origin of the request, for source-scoped cancellation. */
@@ -420,24 +442,6 @@ export function recordSessionCacheAutoApproval(
   });
 }
 
-/** Stable SHA-256 fingerprint for binding an approval to its exact effect payload. */
-export function computeApprovalPayloadHash(payload: Record<string, unknown> | undefined): string {
-  const canonicalize = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(canonicalize);
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([key, entry]) => [key, canonicalize(entry)])
-      );
-    }
-    return value;
-  };
-  return createHash('sha256')
-    .update(JSON.stringify(canonicalize(payload || {})))
-    .digest('hex');
-}
-
 /**
  * MO-11 S-4: statuses that represent a settled decision. `applied` / `failed`
  * are post-decision effect outcomes, so they are settled too.
@@ -507,39 +511,7 @@ function enforceSeparationOfDutiesOnDecision(
   );
 }
 
-/**
- * Repo-relative root of the vitest-isolated approval store. Test runs write
- * here instead of the live store so fixture approvals never mix with real
- * operator decisions; the storage retention catalog expires it.
- */
-export const VITEST_APPROVAL_STORE_ROOT = 'active/shared/runtime/vitest-approvals';
-
-/**
- * Repo-relative roots of the approval store: request records live under
- * `coordination`, the append-only event log under `observability`.
- */
-export function approvalStoreRoots(env: Record<string, string | undefined> = process.env): {
-  coordination: string;
-  observability: string;
-} {
-  if (isVitestProcess(env)) {
-    // Per run (KYBERION_VITEST_RUN_ID, set by tests/vitest-run-id.ts) and per
-    // worker: two Vitest runs in one checkout, and parallel files that clear a
-    // channel, must not race each other.
-    const run = env.KYBERION_VITEST_RUN_ID
-      ? `/run-${env.KYBERION_VITEST_RUN_ID.replace(/[^\w-]/g, '')}`
-      : '';
-    const pool = env.VITEST_POOL_ID ? `/pool-${env.VITEST_POOL_ID.replace(/[^\w-]/g, '')}` : '';
-    return {
-      coordination: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/coordination/channels`,
-      observability: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/observability/channels`,
-    };
-  }
-  return {
-    coordination: 'active/shared/coordination/channels',
-    observability: 'active/shared/observability/channels',
-  };
-}
+export { approvalStoreRoots, VITEST_APPROVAL_STORE_ROOT } from './approval-store-paths.js';
 
 function approvalRequestsLogicalDir(storageChannel: string): string {
   return `${approvalStoreRoots().coordination}/${normalizeApprovalChannel(storageChannel)}/approvals/requests`;
@@ -627,7 +599,7 @@ export function createApprovalRequest(
         outcomeIds: ['approval_request'],
         requiresApproval: true,
       }),
-    accountability: params.accountability,
+    accountability: withDefaultMinAssurance(params.accountability),
     steering: params.steering,
     ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
     ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
@@ -1000,6 +972,12 @@ function decideApprovalRequestUnlocked(
     authenticated?: boolean;
     payloadHash?: string;
     effectBinding?: string;
+    /** HA-06: digest of what the surface showed the decider (approval-presentation.ts). */
+    presentedDigest?: string;
+    /** HA-07: the verified challenge a `passkey` decision consumes (approval-passkey-challenge.ts). */
+    passkeyChallengeId?: string;
+    /** The principal an HTTP route resolved for the decider; an agent principal is refused for human-only. */
+    deciderPrincipal?: ApprovalDeciderPrincipal | null;
     note?: string;
     /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
     reasonCategory?: RejectionReasonCategory;
@@ -1079,14 +1057,19 @@ function decideApprovalRequestUnlocked(
     throw new Error(`[POLICY_VIOLATION] Approval request has expired: ${record.id}`);
   }
 
-  validateHumanFinalDecision({
+  refuseHumanOnlyDecisionByAgentProcess(record, { principal: params.deciderPrincipal });
+  const bound = bindPresentedDecision(record, params);
+  settlePasskeyDecisionProof(role, record, { ...params, storageChannel });
+  const assuranceShortfall = validateHumanFinalDecision({
+    channel: normalizeApprovalChannel(storageChannel),
     accountability: record.accountability,
     decidedByType: params.decidedByType,
     authenticated: params.authenticated,
     authMethod: params.authMethod,
-    payloadHash: params.payloadHash,
-    effectBinding: params.effectBinding,
+    payloadHash: bound.payloadHash,
+    effectBinding: bound.effectBinding,
   });
+  settleUnpresentedHumanDecision(record, bound, params.decidedBy);
 
   if (params.decision === 'approved') {
     enforceSeparationOfDutiesOnDecision(role, {
@@ -1097,12 +1080,12 @@ function decideApprovalRequestUnlocked(
     });
   }
 
-  const cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
+  let cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
   if (cacheDescriptor) {
     // The session cache is a standing grant, so its seed is held to the
     // human-only contract even when the record itself carries no
     // accountability binding. Fail before persisting so callers notice.
-    validateHumanFinalDecision({
+    const cacheShortfall = validateHumanFinalDecision({
       accountability: { finalDecision: 'human_only' },
       decidedByType: params.decidedByType,
       authenticated: params.authenticated,
@@ -1118,6 +1101,8 @@ function decideApprovalRequestUnlocked(
         '[POLICY_VIOLATION] Session approval cache requires an exact human effect binding'
       );
     }
+    // A decision let through below its assurance level (warn) never seeds the cache.
+    if (assuranceShortfall || cacheShortfall) cacheDescriptor = undefined;
   }
 
   const decidedAt = nowIso();
@@ -1139,8 +1124,8 @@ function decideApprovalRequestUnlocked(
             authMethod: params.authMethod,
             decidedByType: params.decidedByType,
             authenticated: params.authenticated,
-            payloadHash: params.payloadHash,
-            effectBinding: params.effectBinding,
+            payloadHash: bound.payloadHash,
+            effectBinding: bound.effectBinding,
             note: params.note,
             reasonCategory: params.reasonCategory,
             ...(params.deciderIdentitySource
@@ -1178,6 +1163,7 @@ function decideApprovalRequestUnlocked(
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(assuranceShortfall ? { assuranceShortfall } : {}),
     ...(params.diagnosticDecision ? { diagnosticDecision: params.diagnosticDecision } : {}),
     ...(changeInstruction
       ? {
@@ -1205,8 +1191,10 @@ function decideApprovalRequestUnlocked(
     auth_method: params.authMethod,
     decided_by_type: params.decidedByType,
     authenticated: params.authenticated,
-    payload_hash: params.payloadHash,
-    effect_binding: params.effectBinding,
+    payload_hash: bound.payloadHash,
+    effect_binding: bound.effectBinding,
+    ...(params.presentedDigest ? { presented_digest: params.presentedDigest } : {}),
+    ...(params.passkeyChallengeId ? { passkey_challenge_id: params.passkeyChallengeId } : {}),
     channel: updated.channel,
     thread_ts: updated.threadTs,
     // LC-10: the rejection rationale must survive into the event stream —
@@ -1215,7 +1203,9 @@ function decideApprovalRequestUnlocked(
     note: params.note,
     reason_category: params.reasonCategory,
     ...(changeInstruction ? { change_instruction: changeInstruction } : {}),
+    ...(assuranceShortfall ? { assurance_shortfall: assuranceShortfall } : {}),
   });
+  if (assuranceShortfall) reportAssuranceShortfall(updated, assuranceShortfall, params.decidedBy);
   projectApprovalWorkerEvent(
     'approval_response',
     {

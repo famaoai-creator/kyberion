@@ -24,7 +24,12 @@
             }
           },
           "requires_approval": { "type": "boolean" },
-          "missing_requirements": { "type": "array", "items": { "type": "string" } }
+          "missing_requirements": { "type": "array", "items": { "type": "string" } },
+          "min_assurance": {
+            "type": "string",
+            "enum": ["A0", "A1", "A2", "A3"],
+            "description": "HA-07: the weakest decider proof (approval-assurance.ts) a human-only request created by this rule accepts. A human-only request never goes below A2; dual_key_confirmation always requires A3."
+          }
         },
         "required": ["id", "requires_approval", "missing_requirements"]
       }
@@ -35,6 +40,17 @@
       "description": "When enabled, an approving decision whose decider identity equals the request's requester identity is refused with [POLICY_VIOLATION] and audited. Default off.",
       "properties": { "enabled": { "type": "boolean" } },
       "required": ["enabled"]
+    },
+    "assurance_mode": {
+      "type": "string",
+      "enum": ["warn", "enforce"],
+      "description": "HA-08: human-approval assurance rollout. warn accepts a human-only decision below its min_assurance and records assurance_shortfall (audit + operator alert); enforce rejects it. KYBERION_APPROVAL_ASSURANCE may tighten this to enforce but never relax it. Agent-path refusal (HA-02) is enforced in every mode."
+    },
+    "passkey_enrollment_cooldown_hours": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 720,
+      "description": "HA-07: hours (at least 1) before a member's first passkey (or one enrolled without a step-up from a usable passkey) can settle an A3 decision. Limits what a stolen session can do by enrolling its own passkey; register and revoke always notify the operator. Default 24."
     },
     "defaults": {
       "type": "object",

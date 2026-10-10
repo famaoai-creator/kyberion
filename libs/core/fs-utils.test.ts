@@ -20,4 +20,23 @@ describe('fs-utils traversal', () => {
 
     expect(getAllFiles(rootDir)).toEqual([target]);
   });
+
+  it('yields nothing for a missing root', () => {
+    expect(getAllFiles(`${rootDir}/missing`)).toEqual([]);
+  });
+
+  it('rethrows a refusal to list the walk root instead of returning []', () => {
+    // A data-only role may not list the personal tier.
+    const saved = { persona: process.env.KYBERION_PERSONA, role: process.env.MISSION_ROLE };
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'finance_controller';
+    try {
+      expect(() => getAllFiles(pathResolver.knowledge('personal'))).toThrow(/ROLE_VIOLATION/);
+    } finally {
+      if (saved.persona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = saved.persona;
+      if (saved.role === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = saved.role;
+    }
+  });
 });

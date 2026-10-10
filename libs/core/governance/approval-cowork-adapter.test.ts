@@ -172,6 +172,47 @@ describe('decideApprovalFromCowork()', () => {
     );
   });
 
+  it('HA-02: human_only の request は approve/reject とも [APPROVAL_HUMAN_PROOF_REQUIRED] で拒否する', () => {
+    const record = makePendingRecord({ accountability: { finalDecision: 'human_only' } });
+    mockListApprovalRequests.mockReturnValue([record]);
+
+    for (const decision of ['approved', 'rejected'] as const) {
+      expect(() =>
+        decideApprovalFromCowork({ requestId: 'req-uuid-001', decision, decidedBy: 'operator-1' })
+      ).toThrow('[APPROVAL_HUMAN_PROOF_REQUIRED]');
+    }
+    expect(mockDecideApprovalRequest).not.toHaveBeenCalled();
+    expect(mockAuditRecord).toHaveBeenLastCalledWith(
+      expect.objectContaining({ result: 'denied', action: 'cowork.approval.decide' })
+    );
+  });
+
+  it('HA-02: human_only 以外の決定は agent の決定として記録する', () => {
+    vi.stubEnv('KYBERION_AGENT_ID', 'cowork-test-agent');
+    try {
+      const record = makePendingRecord();
+      mockListApprovalRequests.mockReturnValue([record]);
+      mockDecideApprovalRequest.mockReturnValue({ ...record, status: 'approved' });
+
+      decideApprovalFromCowork({
+        requestId: 'req-uuid-001',
+        decision: 'approved',
+        decidedBy: 'operator-1',
+      });
+
+      const params = mockDecideApprovalRequest.mock.calls[0][1];
+      expect(params).toMatchObject({
+        decidedByType: 'ai_agent',
+        authenticated: false,
+        deciderIdentitySource: 'caller_supplied',
+        decidedInAgentSession: 'agent:cowork-test-agent',
+      });
+      expect(params.authMethod).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('decision が approved/rejected 以外はアダプタ自体では弾かない（zod バリデーションは MCP 層）', () => {
     const record = makePendingRecord();
     mockListApprovalRequests.mockReturnValue([record]);

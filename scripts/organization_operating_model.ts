@@ -1,3 +1,4 @@
+import { createManagedOrganization } from '@agent/core/organization/organization-management';
 import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
@@ -683,7 +684,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     if (!organizationId) throw new Error('--organization-id is required for init.');
     requireFlags('init', { '--name': parsed.name, '--tier': parsed.tier });
     const mode = resolveWriteMode(parsed, 'init');
-    const scaffold = buildOrganizationScaffold({
+    const input = {
       organizationId,
       name: parsed.name!,
       tier: parsed.tier!,
@@ -692,13 +693,12 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       principles: parsed.principles,
       ownerRole: parsed.ownerRole,
       parentOrganizationId: parsed.parentOrganizationId,
-    });
-    const savedPaths: string[] = [];
-    if (mode === 'apply') {
-      savedPaths.push(saveOrganizationOperationalState(scaffold.state));
-      if (scaffold.purpose) savedPaths.push(saveOrganizationPurpose(scaffold.purpose));
-    }
-    emit({ mode, ...scaffold, saved_paths: savedPaths }, parsed.json);
+    };
+    const scaffold =
+      mode === 'apply'
+        ? createManagedOrganization(input)
+        : { ...buildOrganizationScaffold(input), saved_paths: [] };
+    emit({ mode, ...scaffold }, parsed.json);
     return;
   },
   'parent set': (ctx) => {

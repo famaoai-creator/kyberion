@@ -61,13 +61,13 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     const me = read('src/app/api/me/route.ts');
     const nav = read('src/app/api/front-desk/nav/route.ts');
     for (const route of [me, nav]) {
-      expect(route).toContain('resolveConciergeViewer');
+      expect(route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
       expect(route).toMatch(/resolved\.response/);
       expect(route).toContain('no-store');
     }
-    // The tenant query param may only narrow — it is passed through as
-    // `requestedTenant`, never used to widen the server-resolved scope.
-    expect(me).toContain("searchParams.get('tenant')");
+    // The tenant hint (URL/cookie) may only narrow — /api/me takes the
+    // server-validated selection as `requestedTenant`, never widening the scope.
+    expect(me).toContain('resolveConciergeSelectedViewer(req)');
     expect(me).toContain('requestedTenant');
     expect(me).not.toContain('tenantSlugs: ');
   });
@@ -330,7 +330,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // In-process (no fetch to another surface), owner-gated per tenant the
     // overview actually covers — a resolved member sees progress only for
     // tenants where their membership is `owner` (F2).
-    expect(progressRoute).toContain('resolveConciergeViewer');
+    expect(progressRoute).toContain('resolveConciergeSelectedViewer(req)');
     expect(progressRoute).toContain('conciergeFrontDeskRoleForTenant');
     expect(progressRoute).toContain("=== 'owner'");
     expect(progressRoute).toContain('summarizeTrainingProgress');
@@ -349,7 +349,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
 
   it('FD-06: resolves the 管制塔 (chronos-mirror-v2) link server-side, guarded like every other read route', () => {
     const route = read('src/app/api/front-desk/links/route.ts');
-    expect(route).toContain('resolveConciergeViewer');
+    expect(route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
     expect(route).toMatch(/resolved\.response/);
     expect(route).toContain('no-store');
     expect(route).toContain('resolveSurfaceBrowserUrl');
@@ -379,7 +379,7 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(9);
+    expect(payload.items).toHaveLength(10);
     expect(payload.items.map((item) => item.id)).toEqual([
       'home',
       'ask',
@@ -389,6 +389,7 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
       'ingest',
       'first-job',
       'help',
+      'organization',
       'settings',
     ]);
 
@@ -396,11 +397,14 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
     expect(byId.home.label).toBe('ホーム');
     expect(byId.decide.label).toBe('決める');
 
-    // decide/settings are hosted on concierge itself: relative, not external.
+    // Decide, organization management, and settings are local Concierge destinations.
     expect(byId.decide.external).toBe(false);
     expect(byId.decide.href).toBe('/');
     expect(byId.settings.external).toBe(false);
     expect(byId.settings.href).toBe('/settings');
+    expect(byId.organization.external).toBe(false);
+    expect(byId.organization.href).toBe('/management');
+    expect(byId.organization.scope_query_style).toBe('camel');
 
     // home/ask/progress are hosted on presence-studio: absolute, same-tab.
     for (const id of ['home', 'ask', 'progress'] as const) {

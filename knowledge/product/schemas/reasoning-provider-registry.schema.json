@@ -186,6 +186,11 @@
                   }
                 }
               },
+              "install_path_markers": {
+                "description": "Path fragments of this CLI's install location (e.g. /@anthropic-ai/claude-code/). A parent process whose program or interpreter-run script path contains one is this CLI's agent session, even when the binary name is generic (node .../cli.js).",
+                "type": "array",
+                "items": { "type": "string", "pattern": "^/.*/$", "minLength": 3 }
+              },
               "session_principal": {
                 "description": "Name recorded as agent:<name> for a detected session; defaults to the mode.",
                 "type": "string",

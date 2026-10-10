@@ -5,6 +5,7 @@ import { readTrainingAssignments, upsertTrainingAssignment } from '@agent/core/t
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
 import { conciergeFrontDeskRoleForTenant } from '../../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
@@ -15,7 +16,7 @@ function allowedTenant(viewer: { tenantSlugs: string[] | 'all' }, tenant: string
 }
 
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const tenants =

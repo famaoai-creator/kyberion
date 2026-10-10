@@ -30,6 +30,11 @@
       "source": "libs/core/secure-io-path-guard.ts",
       "target": "libs/core/tier-guard.ts",
       "reason": "secure-io's permission guards (split out of secure-io.ts) check tier permissions on literal and canonical paths"
+    },
+    {
+      "source": "libs/core/secure-io-path-guard.ts",
+      "target": "libs/core/secret/vault-mount.ts",
+      "reason": "the opened-file pin identifies a vault mount target (the only readable location outside the repository) without following its leaf"
     }
   ],
   "patterns": [

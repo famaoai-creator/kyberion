@@ -7,6 +7,7 @@ import {
 } from '@agent/core/governance/approval-store';
 import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
 import { createSurfaceApprovalRequest } from '@agent/core/surface/channel-surface';
+import { compactApprovalPresentedDigest } from '@agent/core/governance/approval-presentation';
 import { withExecutionContext } from '@agent/core/authority';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
@@ -372,13 +373,14 @@ describe('telegram bridge decision cards', () => {
 
   it('lays out four card buttons two per row and keeps legacy requests at two', () => {
     const record = createRequest('markup');
+    const digest = compactApprovalPresentedDigest(record);
     expect(
       buildTelegramApprovalReplyMarkup(record).inline_keyboard.map((row) =>
         row.map((button) => button.callback_data)
       )
     ).toEqual([
-      [`appr:${record.id}:approve`, `appr:${record.id}:changes`],
-      [`appr:${record.id}:reject`, `appr:${record.id}:explain`],
+      [`appr:${record.id}:approve:${digest}`, `appr:${record.id}:changes`],
+      [`appr:${record.id}:reject:${digest}`, `appr:${record.id}:explain`],
     ]);
     const legacy = createRequest('markup-legacy', false);
     expect(buildTelegramApprovalReplyMarkup(legacy).inline_keyboard).toHaveLength(1);

@@ -7,7 +7,7 @@
  * for under separation of duties (`scripts/lib/approval-cli-decision.ts`) can
  * be answered by an agent driving a PTY (for example through
  * terminal-actuator). The strong path for a separated approval is an
- * authenticated surface (Chronos or presence-studio), which records
+ * signed-in Concierge or Chronos session, which records
  * `user:<member_id>` from a verified session.
  *
  * The terminal runs on this machine as its local owner — the same member the
@@ -29,8 +29,10 @@
  * recorded as before. With it on, a missing identity is reported instead of
  * silently recording a value that cannot prove separation.
  */
-import { getRegisteredEnvText } from '../foundation/env.js';
-import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
+import {
+  agentExecutionContextEnvNames,
+  detectAgentExecutionContext,
+} from '../agent-execution-context.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { resolveOperatorDisplayName } from '../surface/operator-identity.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
@@ -54,62 +56,19 @@ export interface CliOperatorIdentity {
 /** The command that provisions the owner member from the terminal. */
 export const CLI_OPERATOR_PROVISION_COMMAND = 'pnpm organization member ensure-owner';
 
-/**
- * Environment markers of an agent session. Kyberion's own agent runtime sets
- * `KYBERION_AGENT_ID` / `KYBERION_NHI_ID` / `KYBERION_RUN_ORIGIN=agent` (the
- * same signals `deriveTraceOrigin` classifies as `agent`); provider CLI
- * harnesses set their own marker in every child process they spawn. Those
- * harness markers come from the reasoning-provider registry
- * (`cli.session_markers` / `cli.session_principal` in
- * `knowledge/product/governance/reasoning-providers/`), read on use.
- */
-function agentHarnessMarkers(): Array<{ env: string; equals?: string; agent: string }> {
-  return listCliReasoningProviderDescriptors().flatMap((descriptor) =>
-    (descriptor.cli.session_markers ?? []).map((marker) => ({
-      env: marker.env,
-      ...(marker.equals !== undefined ? { equals: marker.equals.toLowerCase() } : {}),
-      agent: descriptor.cli.session_principal ?? descriptor.mode,
-    }))
-  );
-}
-
 /** Every environment variable {@link detectCliAgentPrincipal} reads (tests blank them). */
 export function cliAgentSessionEnv(): string[] {
-  return [
-    'KYBERION_AGENT_ID',
-    'KYBERION_NHI_ID',
-    'KYBERION_RUN_ORIGIN',
-    ...new Set(agentHarnessMarkers().map((marker) => marker.env)),
-    'AI_AGENT',
-  ];
-}
-
-function envText(env: Env, name: string): string {
-  return getRegisteredEnvText(name, { env })?.trim() ?? '';
+  return agentExecutionContextEnvNames();
 }
 
 /**
  * The agent principal this CLI process runs under, or null for a plain
- * terminal. A human typing a command into an agent session's shell is
- * indistinguishable from the agent and is treated as the agent.
+ * terminal (see `detectAgentExecutionContext`). A human typing a command into
+ * an agent session's shell is indistinguishable from the agent and is treated
+ * as the agent.
  */
 export function detectCliAgentPrincipal(env: Env = process.env): string | null {
-  const agentId = envText(env, 'KYBERION_AGENT_ID');
-  if (agentId) return agentId.includes(':') ? agentId : `agent:${agentId}`;
-  const nhiId = envText(env, 'KYBERION_NHI_ID');
-  if (nhiId) return nhiId;
-  if (envText(env, 'KYBERION_RUN_ORIGIN').toLowerCase() === 'agent') {
-    return 'agent:kyberion-runtime';
-  }
-  for (const marker of agentHarnessMarkers()) {
-    const value = envText(env, marker.env);
-    if (!value) continue;
-    if (marker.equals !== undefined && value.toLowerCase() !== marker.equals) continue;
-    return `agent:${marker.agent}`;
-  }
-  const generic = envText(env, 'AI_AGENT');
-  if (generic) return `agent:${generic.split(/[_\s]/u)[0] || 'unknown-harness'}`;
-  return null;
+  return detectAgentExecutionContext({ env }).principal;
 }
 
 /** The local owner member as the CLI's operator principal (never throws). */
@@ -193,13 +152,25 @@ export interface CliApprovalDecider {
  * With separation of duties on, an approval is refused when the identity is
  * missing, or when the terminal is an agent session — agents must not decide
  * for the human, and from inside the session the two cannot be told apart.
- * Rejections are never refused (declining only withdraws).
+ * Rejections are never refused (declining only withdraws) — except for a
+ * human-only request (`humanOnly`), which an agent session never settles in
+ * either direction and which is refused with `[APPROVAL_HUMAN_PROOF_REQUIRED]`
+ * (the one code every human-only refusal carries), whatever the
+ * separation-of-duties setting.
  */
 export function resolveCliApprovalDecider(
-  params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected' }
+  params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected'; humanOnly?: boolean }
 ): CliApprovalDecider {
   const identity = resolveCliOperatorIdentity(params);
   const agent = detectCliAgentPrincipal(params.env);
+  if (agent && params.humanOnly) {
+    throw new Error(
+      `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — this command runs inside an agent session (${agent}) and the request is human-only, ` +
+        'so the decider cannot be shown to be the human ' +
+        '| next: run the decision from your own terminal, outside the agent session, or decide it in a signed-in Concierge or Chronos session ' +
+        `| evidence: agent session marker resolved to ${agent}, accountability.finalDecision=human_only`
+    );
+  }
   if (params.decision === 'approved' && resolveSeparationOfDutiesPolicy().enabled) {
     if (agent) {
       throw new Error(

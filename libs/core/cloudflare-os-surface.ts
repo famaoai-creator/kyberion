@@ -89,6 +89,7 @@ export class CloudflareOsSurface {
       resolvedBy: requireHumanSurfaceActor(access.principalId),
       decidedByType: 'human',
       authenticated: true,
+      authMethod: 'surface_session',
       payloadHash: record.payloadHash,
       effectBinding: record.effectBinding,
     });

@@ -789,26 +789,37 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 - **Case-insensitive volumes judge the on-disk spelling.** Whether the root's volume folds case is
   probed once per root (on the nearest root component whose name has letters). In `leaf` mode the
   leaf takes its on-disk spelling (`knowledge/PERSONAL` is judged as `knowledge/personal`) from
-  `lstat` + realpath; the directory is listed only when the leaf is itself a symlink. In `follow`
+  `lstat` + realpath (trusted only if realpath reached the `lstat`'d entry); the directory is
+  listed only when the leaf is itself a symlink or was swapped in between. In `follow`
   mode the platform realpath already returns the on-disk case. Tier detection stays case-sensitive.
 - **Foreign hard links are refused for in-place access.** Read, size (`validateFileSize`),
   metadata (`safeStat`, `safeFileAgeMs`), copy source, append, open-for-append, chmod, fsync, move
   source and hard-link source refuse a regular file with `nlink > 1`, checked on the opened
   descriptor where the helper opens one (copies read from that descriptor; snapshots return bytes
   only from the vetted inode, and a file missing at check time must be single-link when opened).
-  There are two exceptions, both narrow on purpose (a broader "all links in one directory" rule
-  was defeated by moving the link next to its protected sibling):
+  Every exemption below is judged on the canonical path re-derived after the open, so it applies
+  only when that canonical path still names the inode the caller holds (`(dev, ino)` of
+  `stat(canonical)` equals the descriptor's). Without that pin, a symlink flipped between the open
+  and the check let a planted hard link be read as if it were a pnpm-store or out-of-repository
+  file. A multi-link file outside the repository (a vault mount target) gets no exemption. There are two exceptions, both
+  narrow on purpose (a broader "all links in one directory" rule was defeated by moving the link
+  next to its protected sibling):
   - _Lock recovery tombs, probe-only_: in `active/shared/runtime/locks/`, a file named
     `<base>.stale-<pid>-<ms>-<n>` with exactly two links whose other link is `<base>` (one `lstat`;
     no directory listing, so filling the directory cannot block it). The `<base>` side is refused —
-    finding its tomb would need a listing — and lock inspection treats an unreadable record as
-    live, which is the safe reading during the put-back window. A tomb may move only within its
+    finding its tomb would need a listing. `lock-utils` therefore reads a record through its
+    `.stale-*` tomb when the base side is refused as a hard link — only a tomb that is the
+    record's own inode (`LockIo.sameFile`, checked before and after the read), never a leftover
+    tomb from an older recovery — so `releaseLock` and lock inspection see the live owner during
+    the put-back window. A tomb may move only within its
     locks directory, never to another name such as `MEMORY.md`.
-  - _pnpm store reads_: decided on the **canonical** path, which must lie under the root
-    `node_modules/` (in practice `node_modules/.pnpm/`) or a workspace package's `node_modules/`,
-    at a location the caller cannot write. The literal prefix is not trusted: root `node_modules/`
-    holds pnpm's workspace links (`node_modules/@actuator/service -> libs/actuators/service-actuator`)
-    into trees a role may write.
+  - _pnpm store reads_: decided on the **canonical** path. The content store
+    (`node_modules/.pnpm/`, written only by the package manager) is exempt for every caller,
+    SUDO included. Elsewhere under the root `node_modules/` or a workspace package's
+    `node_modules/`, the canonical location must not be writable by the caller. The literal
+    prefix is never trusted: root `node_modules/` holds pnpm's workspace links
+    (`node_modules/@actuator/service -> libs/actuators/service-actuator`) into trees a role may
+    write.
 - **In-place opens never truncate.** `safeAppendFileSync` accepts only `a`, `a+`, `ax`, `ax+`;
   `openInPlace` rejects any other flag before opening, so a foreign hard link is never truncated
   before it is vetted. Writes that replace the entry — `safeWriteFile` and the copy destination
@@ -827,6 +838,54 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   and, once the temp descriptor is open, requires that directory to still be the same `(dev, ino)`,
   still canonicalize to itself, and to hold the descriptor just opened before renaming into place.
   An inode number of 0 (FAT/exFAT, some network shares) is unverifiable and fails closed.
+- **Authorize what was opened, not only what was checked.** The path check runs before
+  `open(2)`, which follows symlinks, so a link flipped in between hands over another file — a
+  `knowledge/personal/` file has one link, so no hard-link rule fires. Every in-place open
+  (`openInPlace`: read, range, tail, append, open-for-append, fsync, copy source) therefore vets
+  the descriptor (`vetOpenedFd`): the opened file's own location — `/proc/self/fd/<n>` on Linux,
+  otherwise the re-derived canonical path whose leaf (not followed) must be the inode held — is
+  re-authorized unless it is exactly the canonical path the caller's check approved, then the
+  hard-link rule runs on it. The identity pin covers the checkout root itself (a repository walk
+  starts by listing it). In-place opens are non-blocking with `O_NOCTTY` and refuse anything but
+  a regular file, so a FIFO (or a link flipped to one) cannot hang the caller. Range and tail open
+  no-follow. Errors from these opens and stats carry only the errno (`open failed (ENOENT)`),
+  never an absolute path.
+- **Appends create only inside the directory that was opened and authorized.** An append opens
+  without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
+  through a leaf link) after the parent directory is opened and its own location authorized for
+  the new name, so a parent component flipped to a link after the check cannot redirect it. On
+  Linux the create goes through that held descriptor (`/proc/self/fd/<n>/<name>`, an `openat`); on
+  macOS it opens the authorized physical path with `O_NOFOLLOW_ANY` (`0x20000000`, not exported by
+  Node; it replaces `O_NOFOLLOW`, since open(2) rejects both together with `EINVAL`), which fails
+  if any component is a link at create time. Elsewhere there is no `openat`: a create through a
+  linked parent directory is refused, and the parent must still be the inode held afterwards.
+  When a concurrent appender wins the create (`EEXIST`), the loser opens that file without
+  `O_CREAT` and appends, so no line is lost; a dangling leaf link is refused, even when its target
+  would be allowed. A created file whose vetting fails is left in place, empty, and the call
+  throws — secure-io never deletes it by path, because a flipped parent could redirect that
+  unlink onto a protected file.
+- **chmod only through a descriptor.** `safeChmodSync` opens files and directories
+  non-blocking, vets the descriptor and `fchmod`s it. Sockets, FIFOs and devices are refused:
+  Node has no `lchmod` on Linux, so a chmod by path could follow a leaf flipped to a link onto a
+  protected file. A process that needs a private Unix socket binds it under a restrictive umask
+  (the agent runtime supervisor binds with `umask 0177`, so the socket is created 0600).
+- **Listings and stats are pinned too.** `safeReaddir` lists the directory it opened and vetted
+  (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path otherwise); a pin that
+  does not hold throws. `walk` / `getAllFiles` yield nothing only for a missing root (`ENOENT`,
+  `ENOTDIR`) and rethrow every other failure to list it, so a refusal never becomes `[]`. Linux CI
+  runs the portable branch through the `setProcFdLookupDisabledForTesting` seam. `safeStat` and
+  `validateFileSize` stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs
+  and devices fall back to the leaf-identity pin). A target outside the repository is pinned only
+  under a registered vault mount (`vaultTargetIdentity`). Denial messages name only the caller's
+  path — never the resolved location or a tier-guard reason that embeds it — but keep the
+  reason's classification (`[RESOURCE_SCOPE_DENIED]`, `[POLICY_VIOLATION] tenant.scope_violation`;
+  `denialCode`), so callers that classify on the code still see it. Errnos libuv leaves unnamed
+  (macOS `EOPNOTSUPP` from opening a socket) are classified by number. Cost on the CI VM:
+  about +45 µs per read or stat, none for appends to an existing file (their canonical path is
+  passed through).
+- **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
+  `safeReadFileTail` throw `File not found` with `code: 'ENOENT'`, so callers that classify
+  errors by code (lock inspection: missing vs unreadable) see a missing file as missing.
 - **Missing parents are created one at a time.** `safeWriteFile`, `safeMkdir` (recursive),
   `safeOpenAppendFile`, `safeCreateExclusiveFileSync`, `safePublishExclusiveFileSync` and
   `safeSymlinkSync` create missing directories through `mkdirGuarded`, which takes the canonical
@@ -836,13 +895,21 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 
 **Residual risk (documented, not closed).**
 
-- _Check-to-use race._ Other helpers still run their syscall on the literal path after the check;
-  a concurrent process that swaps a component for a link between the two can redirect one
-  operation. `safeWriteFile` narrows the window to the rename after its re-verification.
+- _Check-to-use race._ In-place opens and stats are pinned to the descriptor (above) and
+  `safeWriteFile` re-verifies its directory before the rename. Path-only operations that cannot
+  hold a descriptor (rename, unlink, rm, mkdir, `safeLstat`, `safeReadlink`) still
+  act on the literal path after the check; a concurrent swap can redirect one such operation. On
+  platforms without `/proc/self/fd` the fallback pin re-derives the canonical path, so an
+  attacker would have to win two consecutive races.
+- _Append creates off Linux and macOS._ Without `openat` or `O_NOFOLLOW_ANY` (Windows, the BSDs)
+  the create is by path from a parent that was symlink-free at the check; a real parent directory
+  swapped for a link between the check and the create can still leave an empty file in another
+  directory (the call is refused, nothing is written, nothing is deleted). "Never creates through
+  a link" holds for every component on Linux and macOS.
 - _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
   hard links to files outside the repository (vault targets) are not detected. Path-only helpers
-  (`safeStat`, `safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked
-  file but no content.
+  (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
+  content.
 - _Per-process state_: nothing is cached, because cache clearing is per-process only and never
   sees a rename done through raw fs or by another process.
 - A raw-fs or out-of-process actor can always bypass secure-io; these rules govern what a persona
@@ -867,10 +934,16 @@ dangling link, copy/move through a linked parent, rm/unlink, reads into `knowled
 junction refusal, ancestor rename after an earlier resolution, hard-link append / copy / chmod /
 fsync / read / move / stat / snapshot, probe-only lock tomb rule and tomb moves, truncating append
 flags, `node_modules` planted in a writable tree, `node_modules/@actuator/service` workspace alias
-read as `software_developer`, `validateFileSize` tier and hard-link guard, directory
+read as `software_developer`, exemption pinned to the held inode (unit + bounded symlink-flip race),
+SUDO pnpm-store reads, ENOENT code, direct symlink flip between check and open for read / range /
+tail / stat / size, chmod of a file or directory, append-create through a dangling link and
+readdir (bounded races), append-create through a flipped parent and through a linked parent per
+platform, FIFO reads that must not block, denial messages without the resolved location but with
+the guard classification, `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
-(checkout behind a linked prefix) and the import boundary in
+(checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
+during the put-back window and with leftover tombs, against the real secure-io lock IO) and the import boundary in
 `libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---

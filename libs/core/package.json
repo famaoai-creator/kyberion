@@ -244,6 +244,10 @@
       "types": "./dist/agent/agent-adapter.d.ts",
       "default": "./dist/agent/agent-adapter.js"
     },
+    "./agent-execution-context": {
+      "types": "./dist/agent-execution-context.d.ts",
+      "default": "./dist/agent-execution-context.js"
+    },
     "./agent-registry": {
       "types": "./dist/agent/agent-registry.d.ts",
       "default": "./dist/agent/agent-registry.js"
@@ -3808,6 +3812,10 @@
       "types": "./dist/governance/approval-policy.d.ts",
       "default": "./dist/governance/approval-policy.js"
     },
+    "./governance/approval-presentation": {
+      "types": "./dist/governance/approval-presentation.d.ts",
+      "default": "./dist/governance/approval-presentation.js"
+    },
     "./governance/approval-store-hygiene": {
       "types": "./dist/governance/approval-store-hygiene.d.ts",
       "default": "./dist/governance/approval-store-hygiene.js"
@@ -3815,6 +3823,30 @@
     "./governance/approval-store": {
       "types": "./dist/governance/approval-store.d.ts",
       "default": "./dist/governance/approval-store.js"
+    },
+    "./governance/approval-store-paths": {
+      "types": "./dist/governance/approval-store-paths.d.ts",
+      "default": "./dist/governance/approval-store-paths.js"
+    },
+    "./governance/approval-passkey-challenge": {
+      "types": "./dist/governance/approval-passkey-challenge.d.ts",
+      "default": "./dist/governance/approval-passkey-challenge.js"
+    },
+    "./authn/webauthn-verifier": {
+      "types": "./dist/authn/webauthn-verifier.d.ts",
+      "default": "./dist/authn/webauthn-verifier.js"
+    },
+    "./authn/passkey-credential-store": {
+      "types": "./dist/authn/passkey-credential-store.d.ts",
+      "default": "./dist/authn/passkey-credential-store.js"
+    },
+    "./authn/passkey-step-up": {
+      "types": "./dist/authn/passkey-step-up.d.ts",
+      "default": "./dist/authn/passkey-step-up.js"
+    },
+    "./governance/approval-human-decision": {
+      "types": "./dist/governance/approval-human-decision.d.ts",
+      "default": "./dist/governance/approval-human-decision.js"
     },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
@@ -4571,6 +4603,18 @@
     "./organization/member-registry": {
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
+    },
+    "./organization/scim-protocol": {
+      "types": "./dist/organization/scim-protocol.d.ts",
+      "default": "./dist/organization/scim-protocol.js"
+    },
+    "./organization/scim-token-registry": {
+      "types": "./dist/organization/scim-token-registry.d.ts",
+      "default": "./dist/organization/scim-token-registry.js"
+    },
+    "./organization/scim-users": {
+      "types": "./dist/organization/scim-users.d.ts",
+      "default": "./dist/organization/scim-users.js"
     },
     "./organization/identity-directory": {
       "types": "./dist/organization/identity-directory.d.ts",
@@ -7212,6 +7256,10 @@
       "types": "./dist/governance/charter-call-site.d.ts",
       "default": "./dist/governance/charter-call-site.js"
     },
+    "./governance/charter-decision-vocabulary": {
+      "types": "./dist/governance/charter-decision-vocabulary.d.ts",
+      "default": "./dist/governance/charter-decision-vocabulary.js"
+    },
     "./governance/approval-digest": {
       "types": "./dist/governance/approval-digest.d.ts",
       "default": "./dist/governance/approval-digest.js"
@@ -7376,6 +7424,18 @@
       "types": "./dist/surface/front-desk-conversation-store.d.ts",
       "default": "./dist/surface/front-desk-conversation-store.js"
     },
+    "./surface/front-desk-request-result": {
+      "types": "./dist/surface/front-desk-request-result.d.ts",
+      "default": "./dist/surface/front-desk-request-result.js"
+    },
+    "./surface/front-desk-request-service": {
+      "types": "./dist/surface/front-desk-request-service.d.ts",
+      "default": "./dist/surface/front-desk-request-service.js"
+    },
+    "./surface/front-desk-request-projection": {
+      "types": "./dist/surface/front-desk-request-projection.d.ts",
+      "default": "./dist/surface/front-desk-request-projection.js"
+    },
     "./surface/surface-conversation-runtime-context": {
       "types": "./dist/surface/surface-conversation-runtime-context.d.ts",
       "default": "./dist/surface/surface-conversation-runtime-context.js"
@@ -7431,9 +7491,22 @@
     "./dot/dot-executor-reports": {
       "types": "./dist/dot/dot-executor-reports.d.ts",
       "default": "./dist/dot/dot-executor-reports.js"
+    },
+    "./foundation/resource-access-scope": {
+      "types": "./dist/foundation/resource-access-scope.d.ts",
+      "default": "./dist/foundation/resource-access-scope.js"
+    },
+    "./organization/organization-management": {
+      "types": "./dist/organization/organization-management.d.ts",
+      "default": "./dist/organization/organization-management.js"
+    },
+    "./surface/surface-management-mutations": {
+      "types": "./dist/surface/surface-management-mutations.d.ts",
+      "default": "./dist/surface/surface-management-mutations.js"
     }
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
     "axios": "^1.20.0",
     "chalk": "^6.0.0",
     "fontkit": "^2.0.4",

@@ -11,11 +11,14 @@ describe('Presence Studio route parameter boundary', () => {
     // FD-05 progress/:id and outcomes/:id/verdict moved into
     // `front-desk-routes.ts` (registered from `server.ts`) purely to keep
     // `server.ts` under the `max-file-lines` gate — the strict-reader
-    // requirement now spans both files.
+    // requirement now spans these files.
     const frontDeskRoutesSource = readRepoFile(
       'presence/displays/presence-studio/front-desk-routes.ts'
     );
-    const combined = `${serverSource}\n${frontDeskRoutesSource}`;
+    const approvalInboxRoutesSource = readRepoFile(
+      'presence/displays/presence-studio/approval-inbox-routes.ts'
+    );
+    const combined = `${serverSource}\n${frontDeskRoutesSource}\n${approvalInboxRoutesSource}`;
 
     expect(combined).not.toMatch(/String\(req\.params\.[^)]+\|\| ''\)\.trim\(\)/u);
     expect(combined.match(/readPresenceStudioStringParam\(req\.params\.[^)]+\)/gu)).toHaveLength(8);

@@ -113,6 +113,22 @@ describe('resolveAuthnSurfaceViewerScope', () => {
     expect(resolution.scope.role).toBe('localadmin');
   });
 
+  it('never accepts a SCIM provisioning token as a viewer credential, however configured', () => {
+    const scimToken = `kscim~tenant-a~scim-0123456789abcdef~${'s'.repeat(43)}`;
+    expect(() =>
+      resolveAuthnSurfaceViewerScope({
+        token: scimToken,
+        localadminToken: scimToken,
+        apiToken: scimToken,
+        configuredCredentials: [{ token: scimToken, role: 'localadmin' }],
+        registrations: [
+          { token_hash: tokenHash(scimToken), role: 'localadmin', tenant_slugs: ['tenant-a'] },
+        ],
+        serverTenant: 'tenant-a',
+      })
+    ).toThrow('Unknown viewer token');
+  });
+
   it('never lets ambient KYBERION_* env authenticate a surface that did not opt in', () => {
     process.env.KYBERION_API_TOKEN = 'ambient-token';
     expect(() => resolveAuthnSurfaceViewerScope({ token: 'ambient-token' })).toThrow(

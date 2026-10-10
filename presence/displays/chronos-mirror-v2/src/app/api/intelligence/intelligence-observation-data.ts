@@ -235,6 +235,7 @@ export interface PendingApprovalSummary {
   tenantSlug?: string;
   serviceId?: string;
   work_loop?: OrganizationWorkLoopSummary;
+  presentedDigest?: string;
 }
 
 export interface BrowserSessionView extends BrowserSessionSummary {}

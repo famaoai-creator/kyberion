@@ -31,6 +31,8 @@ export type ConciergeSummary = {
     mission_id?: string;
     tenant_slug?: string;
     organization_id?: string;
+    presented_digest?: string;
+    min_assurance?: string;
   }>;
   outcome_feed: Array<{
     entry_id: string;
@@ -125,7 +127,14 @@ export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | n
     !isSummaryItemArray(
       value.approval_queue,
       ['id', 'channel', 'storage_channel', 'title', 'reason', 'requested_at'],
-      ['expires_at', 'mission_id', 'tenant_slug', 'organization_id']
+      [
+        'expires_at',
+        'mission_id',
+        'tenant_slug',
+        'organization_id',
+        'presented_digest',
+        'min_assurance',
+      ]
     ) ||
     !isSummaryItemArray(
       value.outcome_feed,

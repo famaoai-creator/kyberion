@@ -60,8 +60,15 @@ import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
 import { DisplaySection } from './sections/DisplaySection';
+import { PasskeyPane } from './sections/PasskeyPane';
 import { FormScope } from './sections/form-scope';
 import { postSetupUpload, toUploadFile } from './settings-api';
+import {
+  SYSTEM_SELECTION,
+  withSelectedTenant,
+  readSelectedTenant,
+  readTenantSelection,
+} from '../../lib/tenant-context';
 import './settings.css';
 
 /**
@@ -493,7 +500,10 @@ export default function SettingsPage() {
         const response = await fetch(`/api/plugins/${encodeURIComponent(id)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify({
+            decision,
+            presentedDigest: plugins.find((plugin) => plugin.id === id)?.approval?.presented_digest,
+          }),
         });
         const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
         if (!response.ok || !parsed?.message) throw new Error('Plugin action failed');
@@ -506,7 +516,7 @@ export default function SettingsPage() {
         setBusy(false);
       }
     },
-    [refreshPlugins]
+    [plugins, refreshPlugins]
   );
 
   // CS-03 ガバナンス設定: filing only fires from the inline confirm step. The
@@ -1048,6 +1058,7 @@ export default function SettingsPage() {
             sectionRef={setSectionRef('profile')}
           >
             <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
+            <PasskeyPane locale={locale} t={t} />
           </ProfileSection>
         );
 
@@ -1202,6 +1213,16 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-page">
+      <div className="settings-inline-actions">
+        <Button
+          label={t('management.title')}
+          href={withSelectedTenant(
+            '/management',
+            readSelectedTenant() || meViewing?.tenant_slug || management.tenant_slug,
+            'snake'
+          )}
+        />
+      </div>
       {firstRun ? (
         <p className="settings-first-run-lead">
           {frontDeskText('settings_first_run_lead', locale)}
@@ -1265,6 +1286,10 @@ export default function SettingsPage() {
         <div role="status" aria-live="polite">
           <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} />
         </div>
+      ) : null}
+      {/* Personal view: company-scoped panes read nothing until a company is chosen. */}
+      {!meViewing && meTenants.length > 1 && readTenantSelection() !== SYSTEM_SELECTION ? (
+        <Callout tone="info" title={frontDeskText('personal_scope_hint', locale)} />
       ) : null}
 
       <div className="settings-layout">

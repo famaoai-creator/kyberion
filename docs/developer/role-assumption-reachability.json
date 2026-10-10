@@ -321,6 +321,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -1150,6 +1155,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-management-mutations.ts#audit",
+      "roles": [],
+      "unresolved": [
+        "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
+      ]
+    },
+    {
+      "site": "libs/core/surface/surface-management-mutations.ts#scoped",
+      "roles": ["concierge_management_reader", "concierge_management_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-mission-proposals.ts#<module>",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1435,6 +1452,21 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1496,6 +1528,16 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/invites/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/me/passkeys/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/me/passkeys/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1565,6 +1607,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/personal-summary/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1586,6 +1633,11 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/push/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/response-status/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1730,6 +1782,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/management-server.ts#readExact",
+      "roles": ["concierge_management_reader"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/outcome-files.ts#metadata",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1741,6 +1798,16 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/personal-avatar-access.ts#readConciergePersonal",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/scim-server.ts#withScimContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/selected-tenant.ts#conciergeAllowedTenants",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1757,6 +1824,16 @@
     {
       "site": "presence/displays/concierge/src/lib/work-inventory-member.ts#resolveWorkInventoryMember",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
@@ -1802,16 +1879,6 @@
     {
       "site": "presence/displays/presence-studio/server.ts#<module>",
       "roles": ["ecosystem_architect", "sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
-      "roles": ["surface_runtime"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
@@ -2406,6 +2473,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_scim_token.ts#runOrganizationScimToken",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/peer_network_register.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2659,6 +2731,9 @@
     ],
     "libs/core/shell/shell-streaming-stt-bridge.ts#ShellStreamingSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/surface/surface-management-mutations.ts#audit": [
+      "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
     ],
     "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
@@ -3570,6 +3645,7 @@
         "presence/displays/concierge/server/local-peer.ts",
         "presence/displays/concierge/server/local-server.ts",
         "presence/displays/concierge/src/app/api/agent-avatar/[expression]/route.ts",
+        "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts",
         "presence/displays/concierge/src/app/api/approvals/[id]/route.ts",
         "presence/displays/concierge/src/app/api/charters/route.ts",
         "presence/displays/concierge/src/app/api/charters/tripwire/route.ts",
@@ -3589,8 +3665,10 @@
         "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
+        "presence/displays/concierge/src/app/api/management/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/route.ts",
+        "presence/displays/concierge/src/app/api/me/passkeys/route.ts",
         "presence/displays/concierge/src/app/api/me/route.ts",
         "presence/displays/concierge/src/app/api/members/[id]/route.ts",
         "presence/displays/concierge/src/app/api/members/route.ts",
@@ -3604,6 +3682,7 @@
         "presence/displays/concierge/src/app/api/outcomes/[id]/files/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts",
+        "presence/displays/concierge/src/app/api/personal-summary/route.ts",
         "presence/displays/concierge/src/app/api/plugins/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/route.ts",
         "presence/displays/concierge/src/app/api/push/route.ts",
@@ -3643,10 +3722,20 @@
         "presence/displays/concierge/src/app/layout.tsx",
         "presence/displays/concierge/src/app/login/route.ts",
         "presence/displays/concierge/src/app/logout/route.ts",
+        "presence/displays/concierge/src/app/management/ManagementEditor.tsx",
+        "presence/displays/concierge/src/app/management/ManagementOverview.tsx",
+        "presence/displays/concierge/src/app/management/management-client.ts",
+        "presence/displays/concierge/src/app/management/page.tsx",
         "presence/displays/concierge/src/app/manifest.ts",
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
+        "presence/displays/concierge/src/app/personal-overview.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
+        "presence/displays/concierge/src/app/scim/v2/ResourceTypes/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Schemas/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/ServiceProviderConfig/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/[id]/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/route.ts",
         "presence/displays/concierge/src/app/settings/operator-services-api.ts",
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
@@ -3659,6 +3748,7 @@
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/OperatorServiceRegistrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
+        "presence/displays/concierge/src/app/settings/sections/PasskeyPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ProfileSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/PushPane.tsx",
@@ -3702,6 +3792,7 @@
         "presence/displays/concierge/src/lib/invite-server.ts",
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
+        "presence/displays/concierge/src/lib/management-server.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
         "presence/displays/concierge/src/lib/observation-review.ts",
@@ -3714,14 +3805,21 @@
         "presence/displays/concierge/src/lib/outcome-files-response.ts",
         "presence/displays/concierge/src/lib/outcome-files.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
+        "presence/displays/concierge/src/lib/passkey-client.ts",
+        "presence/displays/concierge/src/lib/passkey-server.ts",
+        "presence/displays/concierge/src/lib/personal-aggregate.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
         "presence/displays/concierge/src/lib/push-client.ts",
         "presence/displays/concierge/src/lib/push-server.ts",
         "presence/displays/concierge/src/lib/quiet-hours-view.ts",
+        "presence/displays/concierge/src/lib/rail-switcher.ts",
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
+        "presence/displays/concierge/src/lib/response-status-scope.ts",
         "presence/displays/concierge/src/lib/review-watch.ts",
+        "presence/displays/concierge/src/lib/scim-server.ts",
+        "presence/displays/concierge/src/lib/selected-tenant.ts",
         "presence/displays/concierge/src/lib/settings-types.ts",
         "presence/displays/concierge/src/lib/settings-view.ts",
         "presence/displays/concierge/src/lib/setup-auxiliary-response.ts",
@@ -3731,6 +3829,7 @@
         "presence/displays/concierge/src/lib/summary-watch.ts",
         "presence/displays/concierge/src/lib/surface-auth-route.ts",
         "presence/displays/concierge/src/lib/tenant-context.ts",
+        "presence/displays/concierge/src/lib/tenant-visibility.ts",
         "presence/displays/concierge/src/lib/use-concierge-i18n.ts",
         "presence/displays/concierge/src/lib/use-ingest-flow.ts",
         "presence/displays/concierge/src/lib/use-outcome-preview.ts",
@@ -3807,7 +3906,7 @@
       "reachable_roles": {
         "audit_mirror_writer": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/charters/route.ts#<module>",
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#<module>",
             "libs/core/authority.ts#<module>"
           ]
         },
@@ -3848,6 +3947,20 @@
           "example_path": [
             "presence/displays/concierge/src/lib/outcome-files.ts#listOutcomeFiles",
             "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
+          ]
+        },
+        "concierge_management_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/management/route.ts#POST",
+            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
+            "libs/core/surface/surface-management-mutations.ts#scoped"
+          ]
+        },
+        "concierge_management_writer": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/management/route.ts#POST",
+            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
+            "libs/core/surface/surface-management-mutations.ts#scoped"
           ]
         },
         "concierge_operator": {
@@ -3923,7 +4036,7 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4010,6 +4123,7 @@
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/surface/surface-management-mutations.ts#audit",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",

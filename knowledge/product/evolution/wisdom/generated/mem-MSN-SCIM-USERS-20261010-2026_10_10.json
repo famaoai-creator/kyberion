@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-SCIM-USERS-20261010-2026_10_10",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "SCIM provisioning must never outrank the token: role cap and provenance",
+  "summary": "An IdP-driven SCIM endpoint that can edit identity bindings or status of any member is an account-takeover path. Bound SCIM to members at or below the token role cap, never owners, and track provenance so it only moves bindings and reactivates suspensions it created.",
+  "candidate_id": "mem-MSN-SCIM-USERS-20261010-2026_10_10",
+  "evidence_refs": [
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/design-spec.json",
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-10T12:26:10.202Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "## Lesson\n\nWhen an external provisioner (SCIM, IdP sync) writes into the same member registry that authenticates users, treat every mutable attribute that affects sign-in or lifecycle as an authority boundary, not data:\n\n- **Role cap**: the provisioning token carries a default role; it may mutate only members whose roles in the tenant are non-owner and rank at or below that role. Unknown roles fail closed.\n- **Binding provenance**: record `provisioned_by` on identity bindings it creates. It may replace or remove only bindings its own tenant tokens created, and may attach an `externalId` only to members whose every identity it created (or who have none and no access token). Owner re-assertion of a binding strips the provenance.\n- **Suspension provenance**: record `suspended_by`; reactivate only what its own tenant tokens suspended; drop the field whenever the member becomes active so no write path leaves it stale.\n- **Issuer hygiene**: compare issuers through one normaliser, refuse chat-surface issuers, and refuse tokens for inactive tenants.\n- **PUT semantics**: an absent `externalId` on PUT means unchanged; only explicit null/remove unbinds, otherwise IdPs that omit it lock users out.\n\n## Process note\n\nTwo independent read-only reviews caught the takeover paths; a mutation sweep (disable each guard, confirm its test fails) proved the tests guard what they claim.\n\nOperator procedure: docs/developer/SCIM_PROVISIONING_OPERATIONS.ja.md."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/design-spec.json",
+    "active/missions/public/MSN-SCIM-USERS-20261010/evidence/test-report.md"
+  ],
+  "source_branch": "feat/scim-users-20261010",
+  "source_commit": "4f17ab8772640e7a3912731fecc64f5aed9632dd"
+}

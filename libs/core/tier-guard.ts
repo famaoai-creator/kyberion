@@ -24,6 +24,11 @@ import {
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
+import {
+  currentResourceAccessScope,
+  resourceAccessDenial,
+  type ResourceAccessOperation,
+} from './foundation/resource-access-scope.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -484,6 +489,35 @@ function checkTenantGroupScope(
  * Validates write permission based on security-policy.json ADF and Persona.
  */
 /**
+ * A scoped management write may need to create the shared structural tier
+ * directory before its own tenant directory exists. This is only a tenant
+ * classification exception; the ordinary role policy must still authorize it.
+ */
+function isScopedStructuralMkdir(
+  relativePath: string,
+  protectedPrefix: string,
+  tenantSlug: string | undefined,
+  access: { kind: 'read' | 'write' | 'mkdir'; role?: string }
+): boolean {
+  if (access.kind !== 'mkdir' || access.role !== 'concierge_management_writer') return false;
+  const resource = currentResourceAccessScope();
+  if (
+    !tenantSlug ||
+    !isValidTenantSlug(tenantSlug) ||
+    resource?.tenantSlug !== tenantSlug ||
+    relativePath !== normalizePath(protectedPrefix) ||
+    !resource.mkdirExact.includes(relativePath) ||
+    resourceAccessDenial(relativePath, 'mkdir') ||
+    !isRegisteredActiveTenant(tenantSlug)
+  )
+    return false;
+  const tenantPrefix = normalizePath(protectedPrefix) + '/' + tenantSlug + '/';
+  return resource.writeExact.some(
+    (target) => target.startsWith(tenantPrefix) && !resourceAccessDenial(target, 'write')
+  );
+}
+
+/**
  * Tenant scope check — when the active identity is bound to a tenant,
  * deny writes to other tenants' confidential prefixes (`knowledge/confidential/{other}/`
  * or `active/missions/confidential/{other}/`). SUDO bypasses this check
@@ -509,7 +543,7 @@ function checkTenantScope(
       }
     | undefined,
   authorities: Authority[],
-  access: { kind: 'read' | 'write'; role?: string } = { kind: 'write' }
+  access: { kind: 'read' | 'write' | 'mkdir'; role?: string } = { kind: 'write' }
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
   const cfg = tenantScopeConfig(policy);
@@ -572,6 +606,7 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
+    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access)) return null;
     // Pre-tenant migrations stored a mission directly under
     // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
     // only for an unmistakable legacy mission directory. A non-slug mission
@@ -782,8 +817,48 @@ function recordGroupAccess(input: {
   });
 }
 
-export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
+function requestResourceDenial(
+  relativePath: string,
+  operation: ResourceAccessOperation
+): { allowed: false; reason: string } | null {
+  const denial = resourceAccessDenial(relativePath, operation);
+  if (denial) return denial;
+  const role =
+    currentExecutionScope()?.assumedRole ||
+    getRegisteredEnvText('SYSTEM_ROLE') ||
+    getRegisteredEnvText('MISSION_ROLE');
+  const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  if (
+    normalizedRole === 'concierge_management_reader' &&
+    (!currentResourceAccessScope() || operation === 'write' || operation === 'mkdir')
+  ) {
+    return {
+      allowed: false,
+      reason: '[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability',
+    };
+  }
+  if (
+    normalizedRole === 'concierge_management_writer' &&
+    !currentResourceAccessScope()?.organizationId
+  ) {
+    return {
+      allowed: false,
+      reason: '[RESOURCE_SCOPE_REQUIRED] Management writer needs a bound request capability',
+    };
+  }
+  return null;
+}
+
+export function validateWritePermission(
+  filePath: string,
+  operation: 'write' | 'mkdir' = 'write'
+): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
+  const resourceDenial = requestResourceDenial(
+    normalizePath(path.relative(projectRoot(), resolvedPath)),
+    operation
+  );
+  if (resourceDenial) return resourceDenial;
   try {
     assertSandboxWriteAllowed(resolvedPath);
   } catch (error) {
@@ -827,7 +902,8 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-    authorities
+    authorities,
+    { kind: operation, role: currentRole }
   );
   if (tenantDenial) return tenantDenial;
 
@@ -845,8 +921,13 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
   if (
-    roleRules?.allow_write?.some((p: string) =>
-      policyPathMatches(relativePath, p, currentMission, tenantSlug)
+    roleRules?.allow_write?.some(
+      (p: string) =>
+        policyPathMatches(relativePath, p, currentMission, tenantSlug) ||
+        (operation === 'mkdir' &&
+          Boolean(currentResourceAccessScope()) &&
+          (expandPolicyPath(p, currentMission, tenantSlug)?.startsWith(relativePath + '/') ??
+            false))
     )
   ) {
     return { allowed: true };
@@ -902,9 +983,14 @@ export function detectTier(filePath: string): TierLevel {
 /**
  * Validates read permission based on security-policy.json ADF and Persona.
  */
-export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
+export function validateReadPermission(
+  filePath: string,
+  operation: 'read' | 'metadata' = 'read'
+): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
+  const resourceDenial = requestResourceDenial(relativePath, operation);
+  if (resourceDenial) return resourceDenial;
 
   if (isOutsideProjectRoot(relativePath)) {
     if (isAllowedVaultMountPath(resolvedPath)) {
@@ -1013,6 +1099,17 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   );
   if (tenantDenial) return tenantDenial;
 
+  if (operation === 'metadata' && currentResourceAccessScope() && identity.role) {
+    const rules = policy.authority_role_permissions?.[identity.role];
+    const patterns: string[] = [...(rules?.allow_read ?? []), ...(rules?.allow_write ?? [])];
+    if (
+      patterns.some((pattern) =>
+        expandPolicyPath(pattern, undefined, identity.tenantSlug)?.startsWith(relativePath + '/')
+      )
+    ) {
+      return { allowed: true };
+    }
+  }
   return personaTierReadDecision(policy, relativePath, identity);
 }
 

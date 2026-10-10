@@ -21,7 +21,7 @@ vi.mock('../../../lib/viewer-context', () => ({
   })),
   resolveConciergeViewer: vi.fn(() => ({ context: viewer })),
 }));
-vi.mock('../../../lib/conversation-store', async () => {
+vi.mock('@agent/core/surface/front-desk-conversation-store', async () => {
   const actual = await vi.importActual<
     typeof import('@agent/core/surface/front-desk-conversation-store')
   >('@agent/core/surface/front-desk-conversation-store');

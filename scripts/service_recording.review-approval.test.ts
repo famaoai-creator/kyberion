@@ -129,6 +129,12 @@ describe('service_recording review goes through the approval store', () => {
 
   const stored = (id: string) => loadApprovalRequest(SERVICE_RECORDING_REVIEW_CHANNEL, id)!;
 
+  const approveReviewAtTty = (argv: string[]) =>
+    withTtyAnswer(
+      (code) => code,
+      () => main(argv)
+    );
+
   beforeEach(() => {
     plainTerminal();
     useSeparationOfDutiesOverlay(path.join(overlayDir, `overlay-${Math.random()}.json`));
@@ -224,9 +230,20 @@ describe('service_recording review goes through the approval store', () => {
     expect(() => assertServiceRecordingReviewApproval(readRecording(ref), ref)).not.toThrow();
   });
 
-  it('with SoD off, keeps the single-command approve UX and records the decision in the store', async () => {
+  it('with SoD off, keeps the single-command approve UX (answering the human-only terminal challenge)', async () => {
     const { ref, requestId } = await capture();
-    const result = (await main(['review', '--recording', ref, '--approve', '--note', 'ok'])) as {
+    // The review approval is human-only: without a TTY the terminal refuses it (HA-04).
+    await expect(main(['review', '--recording', ref, '--approve'])).rejects.toThrow(
+      /^\[APPROVAL_HUMAN_PROOF_REQUIRED\].*not interactive/
+    );
+    const result = (await approveReviewAtTty([
+      'review',
+      '--recording',
+      ref,
+      '--approve',
+      '--note',
+      'ok',
+    ])) as {
       value: { status: string };
     };
     expect(result.value.status).toBe('approved');
@@ -247,7 +264,7 @@ describe('service_recording review goes through the approval store', () => {
     vi.stubEnv('CLAUDECODE', '1');
     const { ref, requestId } = await capture();
     plainTerminal();
-    await main(['review', '--recording', ref, '--approve']);
+    await approveReviewAtTty(['review', '--recording', ref, '--approve']);
     revokeApprovalAsLocalOwner('mission_controller', {
       channel: SERVICE_RECORDING_REVIEW_CHANNEL,
       requestId,
@@ -262,7 +279,7 @@ describe('service_recording review goes through the approval store', () => {
     vi.stubEnv('CLAUDECODE', '1');
     const { ref, requestId } = await capture();
     plainTerminal();
-    await main(['review', '--recording', ref, '--approve']);
+    await approveReviewAtTty(['review', '--recording', ref, '--approve']);
     consumeServiceRecordingReviewApproval(readRecording(ref), 'test-promotion');
     expect(stored(requestId).consumption).toMatchObject({
       consumer: 'service_recording_promotion',

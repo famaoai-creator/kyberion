@@ -272,4 +272,64 @@ describe('evaluateAgainstCharter', () => {
       run(act({ action_class: 'send_message_external' }), { availability: deputy }).decision
     ).toBe('allow');
   });
+  it('a vocabulary decision must be delegated by name; silence is never a grant', () => {
+    const scheduling = act({ decision_type: 'meeting_scheduling' });
+    const none = run(scheduling);
+    expect(none.decision).toBe('deny');
+    expect(none.amendment).toMatchObject({
+      field: 'envelope.delegated_decisions.meeting_scheduling',
+      current: 'forbid',
+      requested: 'allow',
+    });
+    const c = charter();
+    c.envelope.delegated_decisions = {
+      meeting_scheduling: 'allow',
+      external_reply: 'allow_with_review',
+    };
+    const evaluate = (action: CharterAction) =>
+      evaluateAgainstCharter({ charter: c, action, usage: USAGE, availability: HERE, now: NOW });
+    expect(evaluate(scheduling).decision).toBe('allow');
+    expect(evaluate(act({ decision_type: 'external_reply' })).decision).toBe('deny');
+    expect(
+      evaluate(act({ decision_type: 'external_reply', reviewed_by_other_provider: true })).decision
+    ).toBe('allow');
+    // Delegating the type does not waive the other limits.
+    expect(
+      evaluate(act({ decision_type: 'meeting_scheduling', blast_radius: { recipients: 51 } }))
+        .decision
+    ).toBe('deny');
+  });
+});
+
+describe('delegated decisions in a delegation chain', () => {
+  it('a child cannot delegate a decision the parent does not', () => {
+    const parent = charter().envelope;
+    parent.delegated_decisions = { meeting_scheduling: 'allow_with_review' };
+    const child = { ...parent, delegated_decisions: { meeting_scheduling: 'allow' as const } };
+    expect(envelopeExceeds(child, parent)).toContain(
+      'delegated_decisions.meeting_scheduling is more permissive than the parent envelope'
+    );
+    const extra = { ...parent, delegated_decisions: { external_reply: 'allow' as const } };
+    expect(envelopeExceeds(extra, parent)).toContain(
+      'delegated_decisions.external_reply is more permissive than the parent envelope'
+    );
+    expect(envelopeExceeds({ ...parent, delegated_decisions: {} }, parent)).toEqual([]);
+  });
+
+  it('an unknown policy value is refused by validation and grants nothing', () => {
+    const c = charter();
+    c.envelope.delegated_decisions = { meeting_scheduling: 'yes' as never };
+    const ctx = { holder_role: 'owner' as const, now: NOW };
+    expect(validateCharter(c, ctx).some((m) => m.includes('delegated_decisions.'))).toBe(true);
+    const evaluate = (type: string) =>
+      evaluateAgainstCharter({
+        charter: c,
+        action: act({ decision_type: type }),
+        usage: USAGE,
+        availability: HERE,
+        now: NOW,
+      }).decision;
+    expect(evaluate('meeting_scheduling')).toBe('deny');
+    expect(evaluate('constructor')).toBe('deny');
+  });
 });

@@ -89,7 +89,7 @@ describe('approved decision → mission', () => {
       createDiscussionRoom({
         id: ID,
         goal: 'Adopt staged rollout',
-        scope: { tenant_slug: 'demo', project_id: 'proj-m' },
+        scope: { tenant_slug: 'demo', organization_id: 'org-m', project_id: 'proj-m' },
         config: { turn_delay_ms: 0, speaker: 'scripted', locale: 'en' },
       })
     );
@@ -137,6 +137,16 @@ describe('approved decision → mission', () => {
       );
       expect(issued.mission_id).toBe('MSN-DISCUSSION-TEST');
       expect(issueChronosMissionFromProposal).toHaveBeenCalledTimes(1);
+      expect(issueChronosMissionFromProposal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: {
+            tenant_slug: 'demo',
+            organization_id: 'org-m',
+            project_id: 'proj-m',
+            tier: 'confidential',
+          },
+        })
+      );
 
       const room = readDiscussionRoom(ID)!;
       expect(room.outcomes.mission?.mission_id).toBe('MSN-DISCUSSION-TEST');
@@ -166,7 +176,7 @@ describe('approved decision → mission, separation of duties', () => {
       createDiscussionRoom({
         id: SOD_ID,
         goal: 'Adopt staged rollout',
-        scope: { tenant_slug: 'demo', project_id: 'proj-m' },
+        scope: { tenant_slug: 'demo', organization_id: 'org-m', project_id: 'proj-m' },
         config: { turn_delay_ms: 0, speaker: 'scripted', locale: 'en' },
       })
     );
