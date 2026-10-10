@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-APPROVAL-TRUST-20261010-2026_10_10",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Human-only approvals: refuse agent paths by entry point, grade proof by auth method",
+  "summary": "How Kyberion keeps agents from settling human-only approvals, and the pitfalls hit while tightening it (HA-01..03).",
+  "candidate_id": "mem-MSN-APPROVAL-TRUST-20261010-2026_10_10",
+  "evidence_refs": [
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/design-spec.json"
+  ],
+  "created_at": "2026-10-10T10:10:47.290Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Lessons from the first human-approval trust PR (MSN-APPROVAL-TRUST-20261010):\n\n1. Refuse at every agent-facing entry point, not only the obvious ones. MCP approval.decide and the actuator decide op were covered by the plan; the terminal command run inside an agent session was not, and the reviewer found it still recorded a human, authenticated decision. Enumerate entry points (MCP, actuator, CLI, HTTP routes, scripts) when adding a refusal and test each.\n2. Refuse rejects too. The first decision settles a record, so an agent reject blocks the real human approval.\n3. Environment markers are advisory. detectAgentExecutionContext() unifies detection, but any in-process caller can still pass decidedByType/authMethod to decideApprovalRequest, and an agent can unset KYBERION_APPROVAL_ASSURANCE. Treat env-based checks as one layer; store-level refusal and policy-sourced modes are the durable fix.\n4. Grade proof, do not trust a boolean. Map each authMethod to an assurance level (A0-A3), stamp min_assurance on creation (requesters may raise it, never lower it), and make the validator an allow-list so an unknown method is rejected.\n5. Roll out with warn, but make warn loud: record the shortfall on the record and event log, audit it, and alert the operator with a next step, deduplicated by correlation_id. Do not enable enforce until every legitimate human path reaches the required level.\n6. Re-checks of decided records must not re-grade assurance (phase recheck), or old decisions become unusable retroactively.\n7. The type-ratchet max-lines baseline is the largest source file; growing that file fails the gate. Move cohesive helpers or types into sibling modules (re-export for compatibility) instead of raising the baseline."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-APPROVAL-TRUST-20261010/evidence/design-spec.json"
+  ],
+  "source_branch": "feat/human-approval-trust-20261010",
+  "source_commit": "3db73c8b4955edc06d7c780a2cdb6178a61231ec"
+}

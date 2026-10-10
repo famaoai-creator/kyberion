@@ -1,8 +1,10 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { assertSensitivePathAllowed } from './sensitive-path-policy.js';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { vaultTargetIdentity } from './secret/vault-mount.js';
 
 /**
@@ -80,7 +82,22 @@ function errnoCode(error: unknown): string {
     'EOPNOTSUPP',
   ];
   for (const code of known) if (raw === code) return code;
+  // libuv has no name for some platform errnos (macOS EOPNOTSUPP, 102, from
+  // open(2) of a Unix socket): classify those by number.
+  const errno = -((error as NodeJS.ErrnoException | undefined)?.errno ?? 0);
+  if (errno !== 0 && errno === os.constants.errno.EOPNOTSUPP) return 'EOPNOTSUPP';
+  if (errno !== 0 && errno === os.constants.errno.ENXIO) return 'ENXIO';
   return 'EUNKNOWN';
+}
+
+/**
+ * The classification of a guard denial (`[POLICY_VIOLATION] tenant.scope_violation`,
+ * `[RESOURCE_SCOPE_DENIED]`) without the rest of its reason, which may name the
+ * resolved location; empty when the reason carries no code.
+ */
+function denialCode(reason: string | undefined): string {
+  const match = /^\[[A-Z][A-Z_]*\](?: [a-z][a-z_]*\.[a-z][a-z_]*)?/.exec(reason ?? '');
+  return match ? ` ${match[0]}` : '';
 }
 
 function rethrowAsErrno(error: unknown, operation: string): never {
@@ -298,6 +315,13 @@ export function canonicalGuardPath(resolved: string, mode: CanonicalMode): strin
   return toLogicalRoot(physical);
 }
 
+/** Inverse of toLogicalRoot: the same location under the realpath of the root (no linked prefix). */
+function toPhysicalRoot(logical: string): string {
+  const relative = isInside(path.resolve(pathResolver.rootDir()), logical);
+  if (relative === undefined) return logical;
+  return relative === '' ? realRoot().real : path.join(realRoot().real, relative);
+}
+
 /** Re-express a physical path under the logical root (see the block comment above). */
 function toLogicalRoot(physical: string): string {
   const relative = isInside(realRoot().real, physical);
@@ -314,15 +338,16 @@ function toLogicalRoot(physical: string): string {
 export function assertCanonicalWritable(
   resolved: string,
   displayPath: string,
-  mode: CanonicalMode = 'follow'
+  mode: CanonicalMode = 'follow',
+  operation: 'write' | 'mkdir' = 'write'
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
   if (canonical === path.resolve(resolved)) return canonical;
   assertSensitivePathAllowed(canonical, 'write', mediationProbe());
-  const guard = validateWritePermission(canonical);
+  const guard = validateWritePermission(canonical, operation);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to a location outside the caller's write scope`
+      `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to a location outside the caller's write scope${denialCode(guard.reason)}`
     );
   }
   return canonical;
@@ -332,15 +357,16 @@ export function assertCanonicalWritable(
 export function assertCanonicalReadable(
   resolved: string,
   displayPath: string,
-  mode: CanonicalMode = 'follow'
+  mode: CanonicalMode = 'follow',
+  operation: 'read' | 'metadata' = 'read'
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
   if (canonical === path.resolve(resolved)) return canonical;
   assertSensitivePathAllowed(canonical, 'read', mediationProbe());
-  const guard = validateReadPermission(canonical);
+  const guard = validateReadPermission(canonical, operation);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] Read through symbolic link denied: ${displayPath} resolves to a location outside the caller's read scope`
+      `[SECURITY] Read through symbolic link denied: ${displayPath} resolves to a location outside the caller's read scope${denialCode(guard.reason)}`
     );
   }
   return canonical;
@@ -358,7 +384,12 @@ export function guardWritePath(
   operation = 'write'
 ): { resolved: string; canonical: string } {
   const resolved = guardLiteralWritePath(filePath, operation);
-  const canonical = assertCanonicalWritable(resolved, filePath, mode);
+  const canonical = assertCanonicalWritable(
+    resolved,
+    filePath,
+    mode,
+    operation === 'mkdir' ? 'mkdir' : 'write'
+  );
   return { resolved, canonical };
 }
 
@@ -366,7 +397,7 @@ export function guardWritePath(
 export function guardLiteralWritePath(filePath: string, operation = 'write'): string {
   assertSensitivePathAllowed(filePath, operation, mediationProbe());
   const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
+  const guard = validateWritePermission(resolved, operation === 'mkdir' ? 'mkdir' : 'write');
   if (!guard.allowed) throw new Error(guard.reason);
   return resolved;
 }
@@ -479,12 +510,16 @@ function openExisting(resolved: string, open: number, missingOk: boolean): numbe
 
 /**
  * Create a new file (O_CREAT|O_EXCL|O_NOFOLLOW: never through a leaf link)
- * in the parent directory as opened and authorized, not as named later. On
- * Linux the create goes through the held directory descriptor
- * (/proc/self/fd/<n>/<name>, an openat), so a parent component flipped after
- * the check cannot redirect it; elsewhere the create is by path and the
- * parent must still be the inode held afterwards. Returns undefined on
- * EEXIST (a concurrent creator won).
+ * in the parent directory as opened and authorized, not as named later, so a
+ * parent component flipped to a link after the check cannot redirect it:
+ * - Linux: through the held directory descriptor (/proc/self/fd/<n>/<name>,
+ *   an openat).
+ * - macOS: at the authorized physical path with O_NOFOLLOW_ANY, which fails
+ *   if any component is a symbolic link at create time.
+ * - Elsewhere (no openat in Node): only when the literal parent already is
+ *   its own canonical path; a parent reached through a link is refused.
+ * Off Linux the parent must still be the inode held afterwards. Returns
+ * undefined on EEXIST (a concurrent creator won).
  */
 function createInVettedDir(
   resolved: string,
@@ -510,15 +545,33 @@ function createInVettedDir(
     if (dirAt === undefined) throw new Error(changed);
     assertAuthorizedAt(path.join(dirAt, name), displayPath, operation);
     const viaFd = procFdAvailable();
-    const exclusive = open | c.O_CREAT | c.O_EXCL | (c.O_NOFOLLOW ?? 0);
+    const noFollowAny = process.platform === 'darwin';
+    if (!viaFd && !noFollowAny && path.resolve(parent) !== dirAt) {
+      throw new Error(
+        `[SECURITY] Refusing to ${operation} ${displayPath}: creating a file through a linked parent directory cannot be pinned on this platform`
+      );
+    }
+    // macOS: O_NOFOLLOW_ANY (11+, not exported by Node) also covers the leaf,
+    // and combined with O_NOFOLLOW open(2) fails with EINVAL.
+    const noFollow = noFollowAny ? 0x20000000 : (c.O_NOFOLLOW ?? 0);
+    const exclusive = (open & ~(c.O_NOFOLLOW ?? 0)) | c.O_CREAT | c.O_EXCL | noFollow;
+    let target = resolved;
+    if (viaFd) target = `/proc/self/fd/${dirFd}/${name}`;
+    else if (noFollowAny) target = path.join(toPhysicalRoot(dirAt), name);
     let fd: number;
     try {
-      fd = fs.openSync(viaFd ? `/proc/self/fd/${dirFd}/${name}` : resolved, exclusive, mode);
+      fd = fs.openSync(target, exclusive, mode);
     } catch (error) {
-      if (errnoCode(error) === 'EEXIST') return undefined;
+      const code = errnoCode(error);
+      if (code === 'EEXIST') return undefined;
+      // A component of the authorized path became a link before the create.
+      if (noFollowAny && code === 'ELOOP') throw new Error(changed);
       rethrowAsErrno(error, 'open');
     }
-    if (!viaFd && !leafIsInode(canonicalGuardPath(parent, 'follow'), heldDir)) {
+    if (
+      !viaFd &&
+      !leafIsInode(noFollowAny ? dirAt : canonicalGuardPath(parent, 'follow'), heldDir)
+    ) {
       fs.closeSync(fd);
       throw new Error(`${changed} (an empty file may remain at ${displayPath})`);
     }
@@ -589,7 +642,8 @@ export function vetOpenedFd(
   resolved: string,
   displayPath: string,
   operation: HardLinkOperation,
-  authorizedCanonical?: string
+  authorizedCanonical?: string,
+  readOperation: 'read' | 'metadata' = 'read'
 ): fs.Stats {
   const held = fs.fstatSync(fd);
   const actual = openedLocation(fd, resolved, held);
@@ -599,7 +653,8 @@ export function vetOpenedFd(
     );
   }
   // Opened exactly what the caller's check authorized: no need to re-judge.
-  if (actual !== authorizedCanonical) assertAuthorizedAt(actual, displayPath, operation);
+  if (actual !== authorizedCanonical)
+    assertAuthorizedAt(actual, displayPath, operation, readOperation);
   assertNotForeignHardLink(held, actual, displayPath, operation);
   return held;
 }
@@ -609,7 +664,11 @@ export function vetOpenedFd(
  * files and directories are opened non-blocking and vetted through the fd;
  * anything else (sockets, FIFOs, devices) is pinned by path identity.
  */
-export function statVetted(resolved: string, displayPath: string): fs.Stats {
+export function statVetted(
+  resolved: string,
+  displayPath: string,
+  readOperation: 'read' | 'metadata' = 'read'
+): fs.Stats {
   let peek: fs.Stats;
   try {
     peek = fs.statSync(resolved);
@@ -620,7 +679,7 @@ export function statVetted(resolved: string, displayPath: string): fs.Stats {
     const { O_RDONLY, O_NONBLOCK, O_NOCTTY } = fs.constants;
     const fd = openOrErrno(resolved, O_RDONLY | (O_NONBLOCK ?? 0) | (O_NOCTTY ?? 0), 'stat');
     try {
-      return vetOpenedFd(fd, resolved, displayPath, 'read');
+      return vetOpenedFd(fd, resolved, displayPath, 'read', undefined, readOperation);
     } finally {
       fs.closeSync(fd);
     }
@@ -631,7 +690,7 @@ export function statVetted(resolved: string, displayPath: string): fs.Stats {
       `[SECURITY] Refusing to stat ${displayPath}: the entry changed between the permission check and the stat`
     );
   }
-  assertAuthorizedAt(canonical, displayPath, 'read');
+  assertAuthorizedAt(canonical, displayPath, 'read', readOperation);
   return peek;
 }
 
@@ -693,14 +752,17 @@ function leafIsInode(canonical: string, held: fs.Stats): boolean {
 function assertAuthorizedAt(
   actual: string,
   displayPath: string,
-  operation: HardLinkOperation
+  operation: HardLinkOperation,
+  readOperation: 'read' | 'metadata' = 'read'
 ): void {
   assertSensitivePathAllowed(actual, operation, mediationProbe());
   const guard =
-    operation === 'read' ? validateReadPermission(actual) : validateWritePermission(actual);
+    operation === 'read'
+      ? validateReadPermission(actual, readOperation)
+      : validateWritePermission(actual);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] ${operation === 'read' ? 'Read' : 'Write'} denied: ${displayPath} resolves to a location outside the caller's ${operation} scope`
+      `[SECURITY] ${operation === 'read' ? 'Read' : 'Write'} denied: ${displayPath} resolves to a location outside the caller's ${operation} scope${denialCode(guard.reason)}`
     );
   }
 }
@@ -709,14 +771,23 @@ function assertAuthorizedAt(
 export function guardReadPath(
   filePath: string,
   deny: (reason: string | undefined) => string,
-  mode: CanonicalMode = 'follow'
+  mode: CanonicalMode = 'follow',
+  operation: 'read' | 'metadata' = 'read'
 ): string {
   assertSensitivePathAllowed(filePath, 'read', mediationProbe());
   const resolved = pathResolver.resolve(filePath);
-  const guard = validateReadPermission(resolved);
+  const guard = validateReadPermission(resolved, operation);
   if (!guard.allowed) throw new Error(deny(guard.reason));
-  assertCanonicalReadable(resolved, filePath, mode);
+  assertCanonicalReadable(resolved, filePath, mode, operation);
   return resolved;
+}
+
+/** Metadata-only probes retain legacy behavior outside a request capability. */
+export function assertScopedMetadataReadable(resolved: string, displayPath: string): void {
+  if (!currentResourceAccessScope()) return;
+  const guard = validateReadPermission(resolved, 'metadata');
+  if (!guard.allowed) throw new Error(guard.reason);
+  assertCanonicalReadable(resolved, displayPath, 'follow', 'metadata');
 }
 
 /**
@@ -725,12 +796,13 @@ export function guardReadPath(
  * ancestor, so classification of a not-yet-written path still sees the real
  * parent. Fails closed: a symlink component that does not resolve (dangling,
  * looping) and a canonical path outside the repository both throw. Like
- * safeExistsSync it reveals no content, so only the sensitive-path deny list
- * applies (to the input and to the canonical path).
+ * safeExistsSync it reveals no content. Sensitive-path checks always apply;
+ * an active resource scope also confines literal and canonical metadata.
  */
 export function safeRealpath(filePath: string): string {
   assertSensitivePathAllowed(filePath, 'read', mediationProbe());
   const resolved = path.resolve(pathResolver.resolve(filePath));
+  assertScopedMetadataReadable(resolved, filePath);
   if (
     isInside(path.resolve(pathResolver.rootDir()), resolved) === undefined &&
     isInside(realRoot().real, resolved) === undefined
@@ -912,7 +984,7 @@ export function assertSymlinkTargetWritable(resolvedTarget: string, displayPath:
     const writeGuard = validateWritePermission(candidate);
     if (!writeGuard.allowed) {
       throw new Error(
-        `[SECURITY] Refusing to create a symbolic link to ${displayPath}: the target is outside the caller's write scope`
+        `[SECURITY] Refusing to create a symbolic link to ${displayPath}: the target is outside the caller's write scope${denialCode(writeGuard.reason)}`
       );
     }
   }
@@ -1017,6 +1089,17 @@ export function mkdirGuarded(
     existing = parent;
   }
   if (missing.length === 0) return;
+  if (currentResourceAccessScope()) {
+    // Check the complete missing chain before creating any directory. A file
+    // write capability never implicitly confers parent-directory creation.
+    let candidate = existing;
+    for (const name of missing) {
+      candidate = path.join(candidate, name);
+      const guard = validateWritePermission(candidate, 'mkdir');
+      if (!guard.allowed) throw new Error(guard.reason);
+      assertCanonicalWritable(candidate, displayPath, 'follow', 'mkdir');
+    }
+  }
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
   // Baseline = what the permission check judged, minus the missing tail.

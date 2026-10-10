@@ -24,7 +24,10 @@ vi.mock('../workforce/artifact-store.js', async (importOriginal) => ({
   appendGovernedArtifactJsonl: vi.fn(() => 'observability-path'),
 }));
 
-import { issueMissionFromProposal } from './surface-mission-proposals.js';
+import {
+  issueMissionFromProposal,
+  issueChronosMissionFromProposal,
+} from './surface-mission-proposals.js';
 
 const proposal = {
   title: 'Fix release notes',
@@ -75,4 +78,54 @@ describe('mission issuance scope', () => {
     const input = (mocks.enqueue.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(input.scope).toBeUndefined();
   });
+});
+
+const hierarchyScope = {
+  tenant_slug: 'acme',
+  organization_id: 'org-a',
+  project_id: 'prj-a',
+  tier: 'confidential' as const,
+};
+it('preserves Chronos hierarchy in named controller arguments and orchestration scope', async () => {
+  vi.clearAllMocks();
+  await issueChronosMissionFromProposal({
+    sessionId: 'discussion-1',
+    proposal: proposal as never,
+    scope: hierarchyScope,
+  });
+  const args = (mocks.safeExec.mock.calls[0] as unknown[])[1] as string[];
+  expect(args.slice(-6)).toEqual([
+    '--tenant-slug',
+    'acme',
+    '--organization-id',
+    'org-a',
+    '--project-id',
+    'prj-a',
+  ]);
+  expect(mocks.enqueue).toHaveBeenCalledWith(
+    expect.objectContaining({
+      scope: hierarchyScope,
+      payload: expect.objectContaining({ scope: hierarchyScope }),
+    })
+  );
+});
+it.each([
+  { tenant_slug: 'acme', project_id: 'prj-a' },
+  { tenant_slug: 'shared', organization_id: 'org-a' },
+  { tenant_slug: 'acme', organization_id: '' },
+  { tenant_slug: 'acme', organization_id: ' org-a ' },
+  { tenant_slug: 'acme', organization_id: 42 },
+  { tenant_slug: 'acme', organization_id: 'org/other' },
+  { tenant_slug: 'acme', mission_id: 'MSN-UNRELATED' },
+])('refuses malformed hierarchy %j before any mission ceremony', async (scope) => {
+  vi.clearAllMocks();
+  await expect(
+    issueChronosMissionFromProposal({
+      sessionId: 'discussion-1',
+      proposal: proposal as never,
+      scope: scope as never,
+    })
+  ).rejects.toThrow();
+  expect(mocks.safeExec).not.toHaveBeenCalled();
+  expect(mocks.enqueue).not.toHaveBeenCalled();
 });

@@ -81,7 +81,7 @@ function bearerToken(req: NextRequest): string | null {
   return conciergeCredential(req).token;
 }
 
-function conciergeClientAddress(req: NextRequest): string {
+export function conciergeClientAddress(req: NextRequest): string {
   const directIp = conciergePeerAddress(req)?.trim();
   if (directIp) return directIp;
   if (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true) {
@@ -102,7 +102,12 @@ function conciergeRateLimitKey(req: NextRequest): string {
 
 export function checkConciergeRateLimit(
   req: NextRequest,
-  options?: { limit?: number; windowMs?: number }
+  options?: {
+    limit?: number;
+    windowMs?: number;
+    /** Overrides the credential/address key (its method suffix is kept). */
+    key?: string;
+  }
 ): { ok: boolean; retryAfterSeconds?: number } {
   const method = String(req.method || 'GET').toUpperCase();
   const limit =
@@ -112,7 +117,7 @@ export function checkConciergeRateLimit(
       : CONCIERGE_RATE_LIMIT_MUTATION);
   const windowMs = options?.windowMs ?? CONCIERGE_RATE_LIMIT_WINDOW_MS;
   const now = Date.now();
-  const key = conciergeRateLimitKey(req);
+  const key = options?.key ? `${options.key}:${method}` : conciergeRateLimitKey(req);
   const current = conciergeRateLimitStore.get(key);
   const expired = !current || now - current.windowStart >= windowMs;
   const windowStart = expired ? now : current.windowStart;

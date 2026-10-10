@@ -101,7 +101,7 @@ describe('surface-approval-ui MO-11 cross-surface coherence', () => {
     expect(loadApprovalRequest('brief', record.id)?.status).toBe('pending');
   });
 
-  it('does not invent an auth strength for other surfaces (S-3 regression guard)', () => {
+  it('records chat bridges as channel_identity, never surface_session (S-3 / HA-03)', () => {
     const record = createSurfaceApprovalRequest({
       surface: 'telegram',
       channel: FIXTURE_CHANNEL,
@@ -118,9 +118,15 @@ describe('surface-approval-ui MO-11 cross-surface coherence', () => {
       threadTs: 'thread-strong',
       decidedBy: 'human-1',
     });
-    // Unchanged from before MO-11: claiming surface_session for every surface
-    // would be the same dishonesty as claiming it for brief.
-    expect(decided.decidedAuthMethod).toBeUndefined();
+    // A chat bridge vouches for the channel account only — not a session. The
+    // human-only request (A2) is let through in warn mode with the shortfall.
+    expect(decided.decidedAuthMethod).toBe('channel_identity');
+    expect(decided.assuranceShortfall).toMatchObject({
+      required: 'A2',
+      provided: 'A1',
+      authMethod: 'channel_identity',
+      mode: 'warn',
+    });
 
     // An explicit caller that knows its own strength still wins.
     const explicit = createSurfaceApprovalRequest({

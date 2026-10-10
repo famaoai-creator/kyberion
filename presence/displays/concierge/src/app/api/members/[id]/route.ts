@@ -9,6 +9,7 @@ import {
   type MemberExternalIdentity,
   type MemberProfile,
 } from '@agent/core/organization/member-registry';
+import { sameScimIssuer } from '@agent/core/organization/scim-token-registry';
 import { trimTrailingSlashes } from '@agent/core/surface/surface-session-cookie';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';
@@ -206,11 +207,19 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
       let externalIdentities = existing.external_identities;
       if (addIdentity) {
-        const already = (externalIdentities ?? []).some(
-          (identity) =>
-            identity.issuer === addIdentity.issuer && identity.subject === addIdentity.subject
-        );
-        if (!already) externalIdentities = [...(externalIdentities ?? []), addIdentity];
+        const same = (identity: { issuer: string; subject: string }) =>
+          (identity.issuer === addIdentity.issuer ||
+            sameScimIssuer(identity.issuer, addIdentity.issuer)) &&
+          identity.subject === addIdentity.subject;
+        // An owner re-asserting a SCIM-made binding takes it over: SCIM may no
+        // longer move or remove it.
+        externalIdentities = (externalIdentities ?? []).some(same)
+          ? (externalIdentities ?? []).map((identity) => {
+              if (!same(identity)) return identity;
+              const { provisioned_by: _scimProvenance, ...ownerHeld } = identity;
+              return ownerHeld;
+            })
+          : [...(externalIdentities ?? []), addIdentity];
       }
       if (removeIdentity) {
         externalIdentities = (externalIdentities ?? []).filter(
@@ -222,8 +231,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         );
       }
 
+      // An owner's status decision supersedes a SCIM suspension, so SCIM can
+      // no longer reactivate the member.
+      const { suspended_by: _scimSuspension, ...ownerDecided } = existing;
       const next: MemberProfile = {
-        ...existing,
+        ...(status !== undefined ? ownerDecided : existing),
         memberships,
         ...(externalIdentities !== existing.external_identities
           ? { external_identities: externalIdentities }

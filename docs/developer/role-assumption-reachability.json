@@ -1150,6 +1150,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-management-mutations.ts#audit",
+      "roles": [],
+      "unresolved": [
+        "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
+      ]
+    },
+    {
+      "site": "libs/core/surface/surface-management-mutations.ts#scoped",
+      "roles": ["concierge_management_reader", "concierge_management_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-mission-proposals.ts#<module>",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1730,6 +1742,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/management-server.ts#readExact",
+      "roles": ["concierge_management_reader"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/outcome-files.ts#metadata",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1741,6 +1758,11 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/personal-avatar-access.ts#readConciergePersonal",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/scim-server.ts#withScimContext",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2401,6 +2423,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_scim_token.ts#runOrganizationScimToken",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/peer_network_register.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2654,6 +2681,9 @@
     ],
     "libs/core/shell/shell-streaming-stt-bridge.ts#ShellStreamingSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/surface/surface-management-mutations.ts#audit": [
+      "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
     ],
     "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
@@ -3584,6 +3614,7 @@
         "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
+        "presence/displays/concierge/src/app/api/management/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/route.ts",
         "presence/displays/concierge/src/app/api/me/route.ts",
@@ -3638,10 +3669,19 @@
         "presence/displays/concierge/src/app/layout.tsx",
         "presence/displays/concierge/src/app/login/route.ts",
         "presence/displays/concierge/src/app/logout/route.ts",
+        "presence/displays/concierge/src/app/management/ManagementEditor.tsx",
+        "presence/displays/concierge/src/app/management/ManagementOverview.tsx",
+        "presence/displays/concierge/src/app/management/management-client.ts",
+        "presence/displays/concierge/src/app/management/page.tsx",
         "presence/displays/concierge/src/app/manifest.ts",
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
+        "presence/displays/concierge/src/app/scim/v2/ResourceTypes/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Schemas/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/ServiceProviderConfig/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/[id]/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/route.ts",
         "presence/displays/concierge/src/app/settings/operator-services-api.ts",
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
@@ -3697,6 +3737,7 @@
         "presence/displays/concierge/src/lib/invite-server.ts",
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
+        "presence/displays/concierge/src/lib/management-server.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
         "presence/displays/concierge/src/lib/observation-review.ts",
@@ -3717,6 +3758,7 @@
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
         "presence/displays/concierge/src/lib/review-watch.ts",
+        "presence/displays/concierge/src/lib/scim-server.ts",
         "presence/displays/concierge/src/lib/settings-types.ts",
         "presence/displays/concierge/src/lib/settings-view.ts",
         "presence/displays/concierge/src/lib/setup-auxiliary-response.ts",
@@ -3843,6 +3885,20 @@
           "example_path": [
             "presence/displays/concierge/src/lib/outcome-files.ts#listOutcomeFiles",
             "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
+          ]
+        },
+        "concierge_management_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/management/route.ts#POST",
+            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
+            "libs/core/surface/surface-management-mutations.ts#scoped"
+          ]
+        },
+        "concierge_management_writer": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/management/route.ts#POST",
+            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
+            "libs/core/surface/surface-management-mutations.ts#scoped"
           ]
         },
         "concierge_operator": {
@@ -4005,6 +4061,7 @@
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/surface/surface-management-mutations.ts#audit",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",

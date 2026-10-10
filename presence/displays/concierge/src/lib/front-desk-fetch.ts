@@ -1,5 +1,6 @@
 import { getFrontDeskAuthRevision, readFrontDeskRequestToken } from './front-desk-auth-token';
 const MEMBER_PATHS = [
+  '/api/management',
   '/api/me',
   '/api/front-desk/nav',
   '/api/front-desk/links',

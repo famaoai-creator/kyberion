@@ -1,0 +1,30 @@
+.management-page {
+  max-width: 64rem;
+}
+.management-editor {
+  padding: var(--kb-ui-space-5);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+}
+.management-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+}
+.management-page select,
+.management-editor input,
+.management-editor textarea {
+  color: var(--kb-ui-text);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  padding: var(--kb-ui-space-2);
+  max-width: 100%;
+}
+.management-editor textarea {
+  min-height: 7rem;
+}
+.management-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

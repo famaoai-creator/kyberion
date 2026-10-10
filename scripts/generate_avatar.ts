@@ -12,6 +12,7 @@ import type {
   ImageReference,
 } from '@agent/core/media/image-generation-types';
 import { createImageEgressConsent } from '@agent/core/media/image-reference-consent';
+import { detectAgentExecutionContext } from '@agent/core/agent-execution-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
@@ -74,17 +75,16 @@ function splitPreference(value: string | boolean | undefined, fallback: string[]
 }
 
 function deriveAutoPreference(requireHostBridge: boolean): string[] {
+  const { harnesses } = detectAgentExecutionContext();
   const bridgePreference =
+    harnesses.includes('cursor-cli') ||
     getRegisteredEnvText('CURSOR_CLI') ||
-    getRegisteredEnvText('CURSOR_AGENT') ||
     getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN') ||
     getRegisteredEnvText('CURSOR_API_KEY')
       ? ['cursor_host_bridge', 'codex_host_bridge', 'agy_host_bridge', 'host_agent']
-      : getRegisteredEnvText('CODEX_CLI') ||
-          getRegisteredEnvText('CODEX_VERSION') ||
-          getRegisteredEnvText('TERM_PROGRAM') === 'codex'
+      : harnesses.includes('codex-cli')
         ? ['codex_host_bridge', 'cursor_host_bridge', 'agy_host_bridge', 'host_agent']
-        : getRegisteredEnvText('AGY_CLI') || getRegisteredEnvText('ANTIGRAVITY_CLI')
+        : harnesses.includes('agy-cli')
           ? ['agy_host_bridge', 'cursor_host_bridge', 'codex_host_bridge', 'host_agent']
           : ['host_agent', 'cursor_host_bridge', 'codex_host_bridge', 'agy_host_bridge'];
   if (requireHostBridge) return bridgePreference;
