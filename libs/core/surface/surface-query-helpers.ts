@@ -376,13 +376,15 @@ function stripHtmlTags(value: string): string {
 }
 
 function decodeHtmlEntities(value: string): string {
+  // `&amp;` is decoded last so entity text like `&amp;lt;` is not unescaped
+  // into a second entity and decoded twice.
   return value
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
 }
 
 function extractDuckDuckGoResults(

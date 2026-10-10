@@ -864,6 +864,26 @@ function paragraphTexts(xml: string): string[] {
     .filter((text) => text.trim());
 }
 
+/** Slice each `<p:sp ...>...</p:sp>` block with a linear scan (no regex backtracking). */
+function shapeBlocks(xml: string): string[] {
+  const blocks: string[] = [];
+  let cursor = 0;
+  for (;;) {
+    const start = xml.indexOf('<p:sp', cursor);
+    if (start < 0) break;
+    const next = xml[start + '<p:sp'.length];
+    if (next !== ' ' && next !== '>') {
+      cursor = start + '<p:sp'.length;
+      continue;
+    }
+    const end = xml.indexOf('</p:sp>', start);
+    if (end < 0) break;
+    blocks.push(xml.slice(start, end + '</p:sp>'.length));
+    cursor = end + '</p:sp>'.length;
+  }
+  return blocks;
+}
+
 /**
  * Extract text per shape from raw slide XML.
  * Groups <a:t> text by their parent <p:sp> shape, returning one string per
@@ -872,7 +892,7 @@ function paragraphTexts(xml: string): string[] {
  */
 function extractTextFromSlideXml(xml: string): string[] {
   const results: string[] = [];
-  const shapes = xml.match(/<p:sp[ >][\s\S]*?<\/p:sp>/g) || [];
+  const shapes = shapeBlocks(xml);
   for (const shape of shapes) {
     const txBodyStart = shape.indexOf('<p:txBody>');
     const txBodyEnd = shape.indexOf('</p:txBody>');
