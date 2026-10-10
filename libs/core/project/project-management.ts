@@ -454,6 +454,7 @@ function createManagedProjectInternal(
   input: ManagedProjectCreateInput,
   deferAudit: boolean
 ): ProjectRecord {
+  assertProjectLifecycleOwner();
   const projectId = assertManagedProjectId(input.project_id);
   if (loadProjectRecord(projectId, { rootDir: input.rootDir }))
     throw new Error(`Project already exists: ${projectId}`);
@@ -569,10 +570,19 @@ function updateManagedProjectInternal(
     );
   }
   if (patch.status === 'archived') assertProjectCanArchive(current);
+  const enteringArchived = patch.status === 'archived' && current.status !== 'archived';
+  const nextMetadata =
+    patch.metadata || enteringArchived
+      ? {
+          ...(current.metadata || {}),
+          ...(patch.metadata || {}),
+          ...(enteringArchived ? { status_before_archive: current.status } : {}),
+        }
+      : undefined;
   const next = {
     ...current,
     ...patch,
-    ...(patch.metadata ? { metadata: { ...(current.metadata || {}), ...patch.metadata } } : {}),
+    ...(nextMetadata ? { metadata: nextMetadata } : {}),
     ...(patch.objective_ids ? { objective_ids: sortedUnique(patch.objective_ids) } : {}),
   } satisfies ProjectRecord;
   if (patch.objective_ids) assertProjectObjectiveLinks(next);
@@ -636,9 +646,17 @@ export function restoreManagedProject(
     if (!organization || organization.status !== 'active')
       throw new Error(`Activate organization before restoring project: ${current.organization_id}`);
   }
+  const priorStatus = current.metadata?.status_before_archive;
+  const restoredStatus =
+    priorStatus === 'draft' || priorStatus === 'active' || priorStatus === 'paused'
+      ? priorStatus
+      : 'active';
   return updateManagedProjectInternal(
     projectId,
-    { status: 'active', metadata: { lifecycle_reason: reason, restored_at: nowIso() } },
+    {
+      status: restoredStatus,
+      metadata: { lifecycle_reason: reason, restored_at: nowIso() },
+    },
     true
   );
 }
@@ -1214,6 +1232,7 @@ export async function reassignMissionToProject(input: {
 }
 
 export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBootstrapResult {
+  assertProjectLifecycleOwner();
   const projectId = normalizeId(input.project_id, 'project_id');
   const rootDir = input.rootDir || pathResolver.rootDir();
   if (loadProjectRecord(projectId, { rootDir }))
