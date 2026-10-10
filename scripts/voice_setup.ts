@@ -8,7 +8,10 @@ import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isWindows } from '@agent/core/platform';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
+import {
+  discoverLocalSttBackends,
+  resetLocalSttDiscoveryCache,
+} from '@agent/core/local-stt-discovery';
 
 const VOICE_TOOL_IDS = [
   'mlx_audio',
@@ -285,7 +288,13 @@ export async function runVoiceSetup(options: {
   for (const toolId of options.toolIds ?? VOICE_TOOL_IDS) {
     const current = inspectVoiceRuntime(toolId);
     if (options.apply && current.status === 'needs_install') {
-      rows.push(installManagedVoiceRuntime(toolId));
+      try {
+        rows.push(installManagedVoiceRuntime(toolId));
+      } finally {
+        // The runtime just installed may be a local STT backend (mlx_whisper,
+        // faster_whisper): drop the cached probe so this and later processes see it.
+        resetLocalSttDiscoveryCache({ disk: true });
+      }
     } else {
       rows.push(current);
     }

@@ -29,6 +29,7 @@ import {
 } from '@agent/core/tool/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeChmodSync, safeExecResult, safeMoveSync, safeWriteFile } from '@agent/core/secure-io';
+import { resetLocalSttDiscoveryCache } from '@agent/core/local-stt-discovery';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_TOOLS = ['herdr', 'imagesnap', 'blackhole-2ch'] as const;
@@ -353,7 +354,12 @@ export const runToolRuntimeSetup = defineScript({
         rows.push(inspectTool(toolId));
         continue;
       }
-      rows.push((await installManagedBinary(toolId)) ?? installTool(toolId));
+      try {
+        rows.push((await installManagedBinary(toolId)) ?? installTool(toolId));
+      } finally {
+        // A just-installed runtime may be a local STT backend: drop the cached probe.
+        resetLocalSttDiscoveryCache({ disk: true });
+      }
     }
 
     const report = {
