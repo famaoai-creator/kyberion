@@ -22654,6 +22654,61 @@
         "ja": "あなた：{role}",
         "qps-ploc": "⟦Ẏőů: {role} ŀőř⟧"
       },
+      "tenant_personal_label": {
+        "en": "Personal",
+        "ja": "個人",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ ŀőř⟧"
+      },
+      "tenant_personal_detail": {
+        "en": "Summary of {count} tenants",
+        "ja": "{count}テナントのまとめ",
+        "qps-ploc": "⟦Şůɱɱȧřẏ őƒ {count} ŧėñȧñŧş ŀőřėɱ ïṗ⟧"
+      },
+      "tenant_system_label": {
+        "en": "System (unassigned)",
+        "ja": "システム（未割当）",
+        "qps-ploc": "⟦Şẏşŧėɱ (ůñȧşşïɠñėḓ) ŀőřėɱ ⟧"
+      },
+      "tenant_system_detail": {
+        "en": "Items not assigned to any tenant",
+        "ja": "どのテナントにも属さない項目",
+        "qps-ploc": "⟦Ïŧėɱş ñőŧ ȧşşïɠñėḓ ŧő ȧñẏ ŧėñȧñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "personal_overview_title": {
+        "en": "By tenant",
+        "ja": "テナントごとのまとめ",
+        "qps-ploc": "⟦Ƀẏ ŧėñȧñŧ ŀőř⟧"
+      },
+      "personal_overview_lead": {
+        "en": "The personal view shows only counts for each tenant. Open a tenant to see and decide its items.",
+        "ja": "個人の表示では、テナントごとの件数だけを表示します。項目を見て決めるには、テナントを開いてください。",
+        "qps-ploc": "⟦Ŧħė ṗėřşőñȧŀ ṽïėẇ şħőẇş őñŀẏ ƈőůñŧş ƒőř ėȧƈħ ŧėñȧñŧ. Őṗėñ ȧ ŧėñȧñŧ ŧő şėė ȧñḓ ḓėƈïḓė ïŧş ïŧėɱş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "personal_overview_counts": {
+        "en": "Approvals waiting {approvals} · In progress {active} · Needs attention {exceptions} · New results {outcomes}",
+        "ja": "承認待ち {approvals} · 進行中 {active} · 要対応 {exceptions} · 新しい成果 {outcomes}",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ẇȧïŧïñɠ {approvals} · Ïñ ṗřőɠřėşş {active} · Ñėėḓş ȧŧŧėñŧïőñ {exceptions} · Ñėẇ řėşůŀŧş {outcomes} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "personal_overview_open": {
+        "en": "Open this tenant",
+        "ja": "このテナントを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħïş ŧėñȧñŧ ŀőřėɱ⟧"
+      },
+      "personal_overview_empty": {
+        "en": "There are no tenants to show.",
+        "ja": "表示できるテナントがありません。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ñő ŧėñȧñŧş ŧő şħőẇ. ŀőřėɱ ïṗş⟧"
+      },
+      "personal_overview_error": {
+        "en": "The summary could not be loaded.",
+        "ja": "まとめを読み込めませんでした。",
+        "qps-ploc": "⟦Ŧħė şůɱɱȧřẏ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "personal_scope_hint": {
+        "en": "You are in the personal view. Choose a tenant in the menu to see its settings.",
+        "ja": "個人の表示中です。テナントの設定を見るには、メニューでテナントを選んでください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ïñ ŧħė ṗėřşőñȧŀ ṽïėẇ. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė ɱėñů ŧő şėė ïŧş şėŧŧïñɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
       "role_owner": {
         "en": "Owner",
         "ja": "オーナー",

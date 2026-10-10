@@ -61,13 +61,13 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     const me = read('src/app/api/me/route.ts');
     const nav = read('src/app/api/front-desk/nav/route.ts');
     for (const route of [me, nav]) {
-      expect(route).toContain('resolveConciergeViewer');
+      expect(route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
       expect(route).toMatch(/resolved\.response/);
       expect(route).toContain('no-store');
     }
-    // The tenant query param may only narrow — it is passed through as
-    // `requestedTenant`, never used to widen the server-resolved scope.
-    expect(me).toContain("searchParams.get('tenant')");
+    // The tenant hint (URL/cookie) may only narrow — /api/me takes the
+    // server-validated selection as `requestedTenant`, never widening the scope.
+    expect(me).toContain('resolveConciergeSelectedViewer(req)');
     expect(me).toContain('requestedTenant');
     expect(me).not.toContain('tenantSlugs: ');
   });
@@ -349,7 +349,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
 
   it('FD-06: resolves the 管制塔 (chronos-mirror-v2) link server-side, guarded like every other read route', () => {
     const route = read('src/app/api/front-desk/links/route.ts');
-    expect(route).toContain('resolveConciergeViewer');
+    expect(route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
     expect(route).toMatch(/resolved\.response/);
     expect(route).toContain('no-store');
     expect(route).toContain('resolveSurfaceBrowserUrl');
