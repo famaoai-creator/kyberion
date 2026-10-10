@@ -70,14 +70,6 @@
   ],
   "scripts": [
     {
-      "id": "scripts/browser_actuator_usability_probe.ts",
-      "reason": "Operator-run isolated Chromium usability probe documented in actuator-agent-usage.md and operations-hygiene-runbook §10. Replays observation, input validation, click ambiguity, wait/tab recovery and state preservation without visiting external services; intentionally not scheduled or run in host-independent CI."
-    },
-    {
-      "id": "scripts/terminal_actuator_usability_probe.ts",
-      "reason": "Operator-run terminal capability and recovery probe documented in actuator-agent-usage.md and operations-hygiene-runbook §10. Exercises temporary shell sessions, bounded output, exit codes, missing sessions and resize diagnostics; host-native PTY results must be reported separately from deterministic mocked CI coverage."
-    },
-    {
       "id": "scripts/dev_oidc_idp.ts",
       "reason": "Operator-run local dev tool: a loopback-only throw-away OIDC IdP for trying the surface /login flow without a Google or Entra client. Started by hand per docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md (no package script, to stay under the SX-05 script ratchet); unit-tested by scripts/dev_oidc_idp.test.ts."
     }
