@@ -827,7 +827,8 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   no-follow. An append opens without `O_CREAT` first; a missing entry is created only with
   `O_CREAT|O_EXCL|O_NOFOLLOW` (never through a dangling link), and a created file whose vetting
   fails is removed again. `safeChmodSync` opens files and directories non-blocking, vets the
-  descriptor and `fchmod`s it; any other type is refused. `safeReaddir` lists the directory it
+  descriptor and `fchmod`s it; a Unix socket (which cannot be opened) is pinned by inode at its
+  canonical path and chmod'ed there; FIFOs and devices are refused. `safeReaddir` lists the directory it
   opened and vetted (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path
   otherwise). `safeStat` and `validateFileSize` stat through a vetted non-blocking descriptor
   (`statVetted`; sockets, FIFOs and devices fall back to the leaf-identity pin). A target outside
