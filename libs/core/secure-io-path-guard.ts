@@ -29,10 +29,26 @@ function mediationProbe(): boolean {
   return mediationProbeFn ? mediationProbeFn() : true;
 }
 
-/** True when an entry exists at p (a dangling symlink counts); throws on ELOOP and the like. */
+/**
+ * True when an entry exists at p (a dangling symlink counts); throws on ELOOP
+ * and the like. Only probes inside the checkout (logical or real root): the
+ * canonicalization walk never needs to look outside it, and a path outside
+ * is refused with code EOUTSIDE.
+ */
 export function entryExists(p: string): boolean {
+  const candidate = path.resolve(p);
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  const physicalRoot = realRoot().real;
+  if (
+    candidate !== logicalRoot &&
+    candidate !== physicalRoot &&
+    !candidate.startsWith(logicalRoot + path.sep) &&
+    !candidate.startsWith(physicalRoot + path.sep)
+  ) {
+    throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
+  }
   try {
-    fs.lstatSync(p);
+    fs.lstatSync(candidate);
     return true;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -164,8 +180,15 @@ function physicalPath(absPath: string, hops = 0): string {
     // it). A write through it would create its target, so follow it by hand,
     // relative to its real parent so `..` in the link text resolves the way
     // the OS resolves it.
-    const parentReal = fs.realpathSync.native(path.dirname(existing));
-    const target = path.resolve(parentReal, fs.readlinkSync(existing));
+    const link = path.resolve(existing);
+    const logicalRoot = path.resolve(pathResolver.rootDir());
+    const physicalRoot = realRoot().real;
+    if (!link.startsWith(logicalRoot + path.sep) && !link.startsWith(physicalRoot + path.sep)) {
+      // A dangling link outside the checkout is never followed.
+      throw Object.assign(new Error('dangling link outside the repository'), { code: 'EOUTSIDE' });
+    }
+    const parentReal = fs.realpathSync.native(path.dirname(link));
+    const target = path.resolve(parentReal, fs.readlinkSync(link));
     return physicalPath(path.join(target, ...missing), hops + 1);
   }
 }
@@ -194,10 +217,10 @@ export function canonicalGuardPath(resolved: string, mode: CanonicalMode): strin
       const realParent = physicalPath(path.dirname(absolute));
       physical = path.join(realParent, onDiskLeaf(realParent, path.basename(absolute)));
     }
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+  } catch {
+    // The errno is deliberately not echoed: these messages reach HTTP surfaces.
     throw new Error(
-      `[SECURITY] Refusing access to ${resolved}: a path component does not resolve (${code})`
+      `[SECURITY] Refusing access to ${resolved}: a path component does not resolve (symlink loop, dangling link, outside the repository or not permitted)`
     );
   }
   const relative = isInside(realRoot().real, physical);
@@ -315,12 +338,13 @@ export function openInPlace(
   mode?: number
 ): number {
   const fd = fs.openSync(resolved, flags, mode);
+  let accepted = false;
   try {
     assertNotForeignHardLink(fs.fstatSync(fd), resolved, displayPath, operation);
+    accepted = true;
     return fd;
-  } catch (error) {
-    fs.closeSync(fd);
-    throw error;
+  } finally {
+    if (!accepted) fs.closeSync(fd);
   }
 }
 
@@ -350,6 +374,12 @@ export function guardReadPath(
 export function safeRealpath(filePath: string): string {
   assertSensitivePathAllowed(filePath, 'read', mediationProbe());
   const resolved = path.resolve(pathResolver.resolve(filePath));
+  if (
+    isInside(path.resolve(pathResolver.rootDir()), resolved) === undefined &&
+    isInside(realRoot().real, resolved) === undefined
+  ) {
+    throw new Error(`[PATH_OUTSIDE_REPOSITORY] ${filePath} resolves outside the repository`);
+  }
   const missing: string[] = [];
   let existing = resolved;
   let real: string;
@@ -361,10 +391,9 @@ export function safeRealpath(filePath: string): string {
       existing = parent;
     }
     real = fs.realpathSync.native(existing);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+  } catch {
     throw new Error(
-      `[PATH_UNRESOLVABLE] ${filePath} has a component that does not resolve (${code})`
+      `[PATH_UNRESOLVABLE] ${filePath} has a component that does not resolve (symlink loop, dangling link or not permitted)`
     );
   }
   const canonical = path.join(real, ...missing);
@@ -468,12 +497,13 @@ export function copyReplacing(resolvedSrc: string, srcPath: string, resolvedDest
   }
   if (destIsLink) throw new Error(`[SECURITY] Refusing to replace symbolic link: ${resolvedDest}`);
   const temp = `${resolvedDest}.tmp.${process.pid}.${Math.random().toString(36).slice(2)}`;
+  let renamed = false;
   try {
     fs.copyFileSync(resolvedSrc, temp, fs.constants.COPYFILE_EXCL);
     fs.renameSync(temp, resolvedDest);
-  } catch (error) {
-    fs.rmSync(temp, { force: true });
-    throw error;
+    renamed = true;
+  } finally {
+    if (!renamed) fs.rmSync(temp, { force: true });
   }
 }
 
