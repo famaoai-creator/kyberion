@@ -70,6 +70,7 @@
             "notes": "Cursor Agent ask mode is Q&A-only and does not execute mutating tools."
           }
         },
+        "install_path_markers": ["/cursor-agent/"],
         "session_markers": [
           {
             "env": "CURSOR_AGENT"

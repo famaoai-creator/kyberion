@@ -1238,8 +1238,7 @@ async function start(_args: string[] = []) {
       if (!decidedBy) return;
       const updated = applySurfaceApprovalDecision({
         surface: 'slack',
-        requestId: payload.requestId,
-        decision: payload.decision,
+        ...payload,
         channel,
         threadTs,
         decidedBy,

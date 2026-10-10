@@ -4,6 +4,8 @@ import { pathResolver } from '../path-resolver.js';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  compactApprovalPresentedDigest,
+  computeApprovalPresentedDigest,
   createApprovalRequest,
   decideApprovalRequest,
   listApprovalRequests,
@@ -22,6 +24,7 @@ import {
 } from './surface-approval-ui.js';
 import {
   buildSlackApprovalAskWhyBlocks,
+  parseSlackApprovalAction,
   parseSlackAskWhyAction,
 } from '../integrations/slack-approval-ui.js';
 import { t } from '../t.js';
@@ -237,9 +240,10 @@ describe('surface-approval-ui', () => {
     });
     expect(buildSurfaceApprovalText('telegram', record)).toContain('1: 承認する');
     expect(buildSurfaceApprovalText('telegram', record)).toContain(`appr:${record.id}:approve`);
+    const digest = compactApprovalPresentedDigest(record);
     expect(buildSurfaceApprovalActions(record).map((action) => action.callbackData)).toEqual([
-      `appr:${record.id}:approve`,
-      `appr:${record.id}:reject`,
+      `appr:${record.id}:approve:${digest}`,
+      `appr:${record.id}:reject:${digest}`,
     ]);
 
     const result = resolveSurfaceApprovalReply({
@@ -570,9 +574,10 @@ describe('surface-approval-ui decision cards', () => {
       'explain',
     ]);
     const legacy = createCardRequest('legacy', false);
+    const digest = compactApprovalPresentedDigest(legacy);
     expect(buildDecisionCardActions(legacy).map((a) => a.callbackData)).toEqual([
-      `appr:${legacy.id}:approve`,
-      `appr:${legacy.id}:reject`,
+      `appr:${legacy.id}:approve:${digest}`,
+      `appr:${legacy.id}:reject:${digest}`,
     ]);
   });
 
@@ -643,5 +648,77 @@ describe('surface-approval-ui decision cards', () => {
       );
     }
     expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
+  });
+});
+
+describe('surface-approval-ui presented digest (HA-06)', () => {
+  function createDigestRequest(suffix: string) {
+    return createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: `thread-digest-${suffix}`,
+      correlationId: `surface-approval-test-${RUN_ID}-digest-${suffix}`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Deploy the reviewed change.' },
+    });
+  }
+
+  it('keeps every card token inside the 64-byte Telegram callback limit', () => {
+    const record = createDigestRequest('size');
+    for (const action of [
+      ...buildSurfaceApprovalActions(record),
+      ...buildDecisionCardActions(record),
+    ]) {
+      expect(Buffer.byteLength(action.callbackData, 'utf8')).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it('decides through a button token that carries the shown digest', () => {
+    const record = createDigestRequest('match');
+    const [approve] = buildSurfaceApprovalActions(record);
+    const result = resolveSurfaceApprovalReply({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: record.threadTs,
+      text: approve.callbackData,
+      decidedBy: 'human-1',
+    });
+    expect(result).toMatchObject({ handled: true, record: { status: 'approved' } });
+  });
+
+  it('refuses a button token whose digest no longer matches the request', () => {
+    const record = createDigestRequest('stale');
+    const result = resolveSurfaceApprovalReply({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: record.threadTs,
+      text: `appr:${record.id}:approve:000000000000`,
+      decidedBy: 'human-1',
+      locale: 'en',
+    });
+    expect(result.handled).toBe(true);
+    expect(result.reply).toBe(t('surface:approval_changed_since_shown', undefined, 'en'));
+    expect(result.record).toBeUndefined();
+    const reloaded = withExecutionContext('surface_runtime', () =>
+      loadApprovalRequest('telegram', record.id)
+    );
+    expect(reloaded?.status).toBe('pending');
+  });
+
+  it('carries the full digest in the Slack button value and validates it on parse', () => {
+    const digest = computeApprovalPresentedDigest(createDigestRequest('slack'));
+    expect(
+      parseSlackApprovalAction(
+        JSON.stringify({ requestId: 'r-1', decision: 'approved', presentedDigest: digest })
+      )
+    ).toEqual({ requestId: 'r-1', decision: 'approved', presentedDigest: digest });
+    expect(
+      parseSlackApprovalAction(JSON.stringify({ requestId: 'r-1', decision: 'rejected' }))
+    ).toEqual({ requestId: 'r-1', decision: 'rejected' });
+    expect(() =>
+      parseSlackApprovalAction(
+        JSON.stringify({ requestId: 'r-1', decision: 'approved', presentedDigest: 'nope' })
+      )
+    ).toThrow(/malformed presentedDigest/u);
   });
 });

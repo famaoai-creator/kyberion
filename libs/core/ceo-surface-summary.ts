@@ -16,6 +16,7 @@ import {
 import { listSurfaceNotificationsAcrossChannels } from './surface/surface-ux.js';
 import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
+import { computeApprovalPresentedDigest } from './governance/approval-presentation.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -38,6 +39,8 @@ export interface CeoApprovalItem {
   /** Whose decision this is. Lets a member of several organizations see which one is asking. */
   tenant_slug?: string;
   organization_id?: string;
+  /** HA-06: digest of what this item shows; the decision sends it back. */
+  presented_digest?: string;
 }
 
 export interface CeoOutcomeItem {
@@ -216,6 +219,9 @@ function toApprovalItem(
     organization_id: record.scope?.organization_id
       ? String(record.scope.organization_id)
       : undefined,
+    ...(record.id && record.title
+      ? { presented_digest: computeApprovalPresentedDigest(approval) }
+      : {}),
   };
 }
 

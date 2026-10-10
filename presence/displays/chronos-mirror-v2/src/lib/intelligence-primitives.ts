@@ -6,9 +6,12 @@ export {
 } from '@agent/core/sdlc-gate-readiness';
 export { createNextActionContract } from '@agent/core/next-action-contract';
 export {
+  computeApprovalPresentedDigest,
   decideApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
+  surfaceDecisionAuthMethod,
+  surfaceDecisionBinding,
 } from '@agent/core/governance/approval-store';
 export { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 export {

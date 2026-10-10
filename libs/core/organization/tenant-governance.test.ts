@@ -31,6 +31,7 @@ import {
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  computeApprovalPresentedDigest,
   decideApprovalRequest,
   loadApprovalRequest,
 } from '../governance/approval-store.js';
@@ -200,6 +201,7 @@ describe('training_use none attestations go through the human approval gate', ()
       authenticated: decider.authenticated,
       payloadHash: pending.accountability?.payloadHash,
       effectBinding: pending.accountability?.effectBinding,
+      presentedDigest: computeApprovalPresentedDigest(pending),
     });
   }
 

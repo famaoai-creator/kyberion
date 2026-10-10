@@ -88,6 +88,11 @@
             "notes": "plan mode produces a plan without executing any tool — matches \"no tool execution at all.\""
           }
         },
+        "install_path_markers": [
+          "/@anthropic-ai/claude-code/",
+          "/.local/share/claude/",
+          "/.claude/local/"
+        ],
         "session_markers": [
           {
             "env": "CLAUDECODE"
