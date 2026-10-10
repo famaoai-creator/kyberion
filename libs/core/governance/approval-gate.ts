@@ -5,6 +5,7 @@
  */
 
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { DEFAULT_HUMAN_ONLY_MIN_ASSURANCE, DUAL_KEY_MIN_ASSURANCE } from './approval-assurance.js';
 import { nowIso } from '../foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
@@ -683,6 +684,9 @@ export function enforceApprovalGate(
     source: params.source,
     accountability: {
       finalDecision: 'human_only',
+      min_assurance: policy.missingRequirements.includes('dual_key_confirmation')
+        ? DUAL_KEY_MIN_ASSURANCE
+        : DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
       payloadHash: computeApprovalPayloadHash(payload),
       effectBinding: operationId,
     },

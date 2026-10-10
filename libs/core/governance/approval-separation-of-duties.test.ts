@@ -64,6 +64,7 @@ function request(overrides: {
   requestedBy: string;
   actorId?: string;
   agentId?: string;
+  humanOnly?: boolean;
 }): ApprovalRequestRecord {
   const payloadHash = computeApprovalPayloadHash({ op: 'sod-probe' });
   return createApprovalRequest('mission_controller', {
@@ -83,7 +84,15 @@ function request(overrides: {
         }
       : {}),
     ...(overrides.agentId ? { source: { agentId: overrides.agentId } } : {}),
-    accountability: { finalDecision: 'human_only', payloadHash, effectBinding: 'sod:probe' },
+    ...(overrides.humanOnly === false
+      ? {}
+      : {
+          accountability: {
+            finalDecision: 'human_only' as const,
+            payloadHash,
+            effectBinding: 'sod:probe',
+          },
+        }),
   });
 }
 
@@ -265,15 +274,26 @@ describe('approval separation of duties', () => {
   });
 
   it('ON: a caller-supplied decider (MCP kyberion.approval.decide) is refused; OFF it passes', () => {
+    setSeparationOfDuties(false);
+    const humanOnly = track(request({ requestedBy: 'worker' }));
+    expect(() =>
+      decideApprovalFromCowork({
+        requestId: humanOnly.id,
+        decision: 'approved',
+        decidedBy: 'alice',
+      })
+    ).toThrow('[APPROVAL_HUMAN_PROOF_REQUIRED]');
+    expect(loadApprovalRequest(channel, humanOnly.id)?.status).toBe('pending');
+
     setSeparationOfDuties(true);
-    const refused = track(request({ requestedBy: 'worker' }));
+    const refused = track(request({ requestedBy: 'worker', humanOnly: false }));
     expect(() =>
       decideApprovalFromCowork({ requestId: refused.id, decision: 'approved', decidedBy: 'alice' })
     ).toThrow(/supplied by the caller, not resolved by the server/);
     expect(loadApprovalRequest(channel, refused.id)?.status).toBe('pending');
 
     setSeparationOfDuties(false);
-    const allowed = track(request({ requestedBy: 'worker' }));
+    const allowed = track(request({ requestedBy: 'worker', humanOnly: false }));
     expect(
       decideApprovalFromCowork({ requestId: allowed.id, decision: 'approved', decidedBy: 'alice' })
         .decision
