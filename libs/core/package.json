@@ -4560,6 +4560,18 @@
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
     },
+    "./organization/scim-protocol": {
+      "types": "./dist/organization/scim-protocol.d.ts",
+      "default": "./dist/organization/scim-protocol.js"
+    },
+    "./organization/scim-token-registry": {
+      "types": "./dist/organization/scim-token-registry.d.ts",
+      "default": "./dist/organization/scim-token-registry.js"
+    },
+    "./organization/scim-users": {
+      "types": "./dist/organization/scim-users.d.ts",
+      "default": "./dist/organization/scim-users.js"
+    },
     "./organization/identity-directory": {
       "types": "./dist/organization/identity-directory.d.ts",
       "default": "./dist/organization/identity-directory.js"
