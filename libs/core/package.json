@@ -7423,6 +7423,18 @@
     "./dot/dot-executor-reports": {
       "types": "./dist/dot/dot-executor-reports.d.ts",
       "default": "./dist/dot/dot-executor-reports.js"
+    },
+    "./foundation/resource-access-scope": {
+      "types": "./dist/foundation/resource-access-scope.d.ts",
+      "default": "./dist/foundation/resource-access-scope.js"
+    },
+    "./organization/organization-management": {
+      "types": "./dist/organization/organization-management.d.ts",
+      "default": "./dist/organization/organization-management.js"
+    },
+    "./surface/surface-management-mutations": {
+      "types": "./dist/surface/surface-management-mutations.d.ts",
+      "default": "./dist/surface/surface-management-mutations.js"
     }
   },
   "dependencies": {
