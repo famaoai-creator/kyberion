@@ -7,16 +7,25 @@ import * as pathResolver from './path-resolver.js';
 import './authority.js';
 import {
   safeAppendFileSync,
+  safeChmodSync,
   safeCopyFileSync,
+  safeFsyncFile,
   safeMkdir,
   safeMoveSync,
+  safeOpenAppendFile,
   safeReadFile,
   safeReaddir,
   safeRmSync,
   safeSymlinkSync,
   safeUnlinkSync,
   safeWriteFile,
+  validateFileSize,
 } from './secure-io.js';
+import {
+  assertTempInCheckedDir,
+  captureCheckedDir,
+  registerSensitivePathMediationProbe,
+} from './secure-io-path-guard.js';
 
 // Denials emit best-effort audit events; keep them off the real audit chain.
 vi.mock('./governance/audit-chain.js', () => ({
@@ -239,6 +248,59 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.existsSync(path.join(abs(protectedRel), 'moved', 'second.ts'))).toBe(false);
   });
 
+  it('does not trust an earlier resolution after an ancestor is renamed into a protected tree', () => {
+    // Resolve (and, before this fix, cache) tmp/anc/sub ...
+    safeMkdir(`${scratchRel}/anc/sub`);
+    safeWriteFile(`${scratchRel}/anc/sub/1.txt`, 'ok');
+    // ... then, outside secure-io, move the ANCESTOR into the protected tree
+    // and leave a link at its old path. The sub directory keeps its inode.
+    fs.renameSync(abs(`${scratchRel}/anc`), path.join(abs(protectedRel), 'anc'));
+    fs.symlinkSync(path.join(abs(protectedRel), 'anc'), abs(`${scratchRel}/anc`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/anc/sub/2.txt`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'anc', 'sub', '2.txt'))).toBe(false);
+  });
+
+  it('refuses in-place writes through a hard link to a protected file', () => {
+    const victim = path.join(abs(protectedRel), 'existing.txt');
+    fs.linkSync(victim, abs(`${scratchRel}/hl.txt`));
+    const hl = `${scratchRel}/hl.txt`;
+    expect(() => safeAppendFileSync(hl, 'pwned')).toThrow(/hard link/);
+    expect(() => safeOpenAppendFile(hl)).toThrow(/hard link/);
+    expect(() => safeChmodSync(hl, 0o777)).toThrow(/hard link/);
+    expect(() => safeFsyncFile(hl)).toThrow(/hard link/);
+    const modeBefore = fs.statSync(victim).mode;
+    // A copy replaces the destination entry; the protected inode is untouched.
+    fs.writeFileSync(abs(`${scratchRel}/src.txt`), 'copied');
+    safeCopyFileSync(`${scratchRel}/src.txt`, hl);
+    expect(fs.readFileSync(abs(hl), 'utf8')).toBe('copied');
+    expect(fs.readFileSync(victim, 'utf8')).toBe('protected');
+    expect(fs.statSync(victim).mode).toBe(modeBefore);
+    expect(fs.statSync(victim).nlink).toBe(1);
+  });
+
+  it('allows hard links whose names all live in one directory (lock recovery tombs)', () => {
+    fs.writeFileSync(abs(`${scratchRel}/lock.json`), '{"pid":1}');
+    fs.linkSync(abs(`${scratchRel}/lock.json`), abs(`${scratchRel}/lock.json.stale-1-2-3`));
+    expect(safeReadFile(`${scratchRel}/lock.json`)).toBe('{"pid":1}');
+    safeAppendFileSync(`${scratchRel}/lock.json`, '\n');
+    safeFsyncFile(`${scratchRel}/lock.json`);
+  });
+
+  it('refuses reads of a higher-tier file through a hard link', () => {
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/hl-secret.txt`));
+    expect(() => safeReadFile(`${scratchRel}/hl-secret.txt`)).toThrow(/hard link/);
+    expect(() =>
+      safeCopyFileSync(`${scratchRel}/hl-secret.txt`, `${scratchRel}/exfil2.txt`)
+    ).toThrow(/hard link/);
+    expect(fs.existsSync(abs(`${scratchRel}/exfil2.txt`))).toBe(false);
+  });
+
+  it('applies the tier read guard to validateFileSize', () => {
+    expect(() => validateFileSize(`${personalRel}/secret.txt`)).toThrow(/Read access denied/);
+  });
+
   it('keeps legitimate symlinks inside the caller write scope working', () => {
     safeMkdir(`${scratchRel}/real`);
     safeSymlinkSync(`${scratchRel}/real`, `${scratchRel}/alias`, 'dir');
@@ -298,5 +360,40 @@ describe('secure-io symlink canonicalization keeps the Vitest live-subtree remap
     );
     safeWriteFile(`${scratchRel2}/live-link/through.json`, '{}');
     expect(fs.existsSync(path.join(pathResolver.resolve(liveRel), 'through.json'))).toBe(true);
+  });
+});
+
+describe('secure-io guard internals', () => {
+  const dirRel = `active/shared/tmp/tests/secure-io-guard-${RUN}`;
+
+  afterAll(() => {
+    fs.rmSync(abs(dirRel), { recursive: true, force: true });
+    fs.rmSync(abs(`${dirRel}-moved`), { recursive: true, force: true });
+  });
+
+  it('detects a checked directory replaced between the check and the temp open', () => {
+    fs.mkdirSync(abs(dirRel), { recursive: true });
+    const checked = captureCheckedDir(abs(dirRel));
+    fs.renameSync(abs(dirRel), abs(`${dirRel}-moved`));
+    fs.mkdirSync(abs(dirRel));
+    const temp = path.join(abs(dirRel), 'x.tmp');
+    const fd = fs.openSync(temp, 'wx');
+    try {
+      expect(() => assertTempInCheckedDir(checked, temp, fd)).toThrow(/changed between/);
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+
+  it('keeps the first sensitive-path mediation probe registered', () => {
+    registerSensitivePathMediationProbe(() => true);
+    expect(() => safeReadFile('knowledge/personal/connections/slack.json')).toThrow(
+      '[SENSITIVE_PATH_DENIED]'
+    );
+  });
+
+  it('reads pnpm store files under node_modules despite their link count', () => {
+    const pkg = 'node_modules/vitest/package.json';
+    expect(() => safeReadFile(pkg)).not.toThrow();
   });
 });
