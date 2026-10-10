@@ -8128,6 +8128,11 @@
         "ja": "Chronos スケジューラーデーモンを実行",
         "qps-ploc": "⟦Řůñ ŧħė Ƈħřőñőş şƈħėḓůŀėř ḓȧėɱőñ ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_nhi": {
+        "en": "Issue and manage non-human identities (NHI ledger)",
+        "ja": "非人間アイデンティティ（NHI レジャー）の発行と管理",
+        "qps-ploc": "⟦Ïşşůė ȧñḓ ɱȧñȧɠė ñőñ-ħůɱȧñ ïḓėñŧïŧïėş (ÑĦÏ ŀėḓɠėř) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
       "cli_cmd_script_chronos_install": {
         "en": "Install the Chronos launchd agent",
         "ja": "Chronos の launchd エージェントをインストール",
@@ -8137,6 +8142,16 @@
         "en": "Show Chronos launchd uninstall steps",
         "ja": "Chronos の launchd アンインストール手順を表示",
         "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_chronos_restart": {
+        "en": "Restart the Chronos daemon via the host service manager",
+        "ja": "ホストのサービスマネージャ経由で Chronos デーモンを再起動",
+        "qps-ploc": "⟦Řėşŧȧřŧ ŧħė Ƈħřőñőş ḓȧėɱőñ ṽïȧ ŧħė ħőşŧ şėřṽïƈė ɱȧñȧɠėř ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_chronos_status": {
+        "en": "Show the Chronos daemon's service-manager status",
+        "ja": "Chronos デーモンのサービスマネージャ状態を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė Ƈħřőñőş ḓȧėɱőñ'ş şėřṽïƈė-ɱȧñȧɠėř şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "cli_cmd_script_learning_harvest": {
         "en": "Propose recurring runtime failures as learning candidates",
@@ -13850,6 +13865,66 @@
         "en": "Could not change notifications: {detail}",
         "ja": "通知を変更できませんでした: {detail}",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈħȧñɠė ñőŧïƒïƈȧŧïőñş: {detail} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "setup.passkey_title": {
+        "en": "Passkeys",
+        "ja": "パスキー",
+        "qps-ploc": "⟦Ṗȧşşķėẏş ŀőř⟧"
+      },
+      "setup.passkey_description": {
+        "en": "Approvals for secrets, policy changes and project trust are signed with a passkey on this device.",
+        "ja": "シークレット・ポリシー変更・プロジェクト信頼の承認は、この端末のパスキーで署名します。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ƒőř şėƈřėŧş, ṗőŀïƈẏ ƈħȧñɠėş ȧñḓ ṗřőĵėƈŧ ŧřůşŧ ȧřė şïɠñėḓ ẇïŧħ ȧ ṗȧşşķėẏ őñ ŧħïş ḓėṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "setup.passkey_none": {
+        "en": "No passkey registered yet.",
+        "ja": "まだパスキーが登録されていません。",
+        "qps-ploc": "⟦Ñő ṗȧşşķėẏ řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗ⟧"
+      },
+      "setup.passkey_label": {
+        "en": "Passkey name (e.g. work laptop)",
+        "ja": "パスキーの名前(例: 仕事用ノート PC)",
+        "qps-ploc": "⟦Ṗȧşşķėẏ ñȧɱė (ė.ɠ. ẇőřķ ŀȧṗŧőṗ) ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.passkey_add": {
+        "en": "Register a passkey",
+        "ja": "パスキーを登録する",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ ṗȧşşķėẏ ŀőřėɱ⟧"
+      },
+      "setup.passkey_added": {
+        "en": "Passkey registered.",
+        "ja": "パスキーを登録しました。",
+        "qps-ploc": "⟦Ṗȧşşķėẏ řėɠïşŧėřėḓ. ŀőřėɱ ⟧"
+      },
+      "setup.passkey_revoke": {
+        "en": "Remove",
+        "ja": "削除",
+        "qps-ploc": "⟦Řėɱőṽė ŀőř⟧"
+      },
+      "setup.passkey_revoked": {
+        "en": "Passkey removed.",
+        "ja": "パスキーを削除しました。",
+        "qps-ploc": "⟦Ṗȧşşķėẏ řėɱőṽėḓ. ŀőřėɱ⟧"
+      },
+      "setup.passkey_unsupported": {
+        "en": "This browser cannot use passkeys here (a secure https connection is required).",
+        "ja": "このブラウザではここでパスキーを使えません(安全な https 接続が必要です)。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ƈȧññőŧ ůşė ṗȧşşķėẏş ħėřė (ȧ şėƈůřė ħŧŧṗş ƈőññėƈŧïőñ ïş řėɋůïřėḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "setup.passkey_cooling": {
+        "en": "can approve high-assurance requests from {when}",
+        "ja": "{when} から高保証の承認に使えます",
+        "qps-ploc": "⟦ƈȧñ ȧṗṗřőṽė ħïɠħ-ȧşşůřȧñƈė řėɋůėşŧş ƒřőɱ {when} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.passkey_step_up_hint": {
+        "en": "Adding or removing a passkey is confirmed with one of your existing passkeys.",
+        "ja": "パスキーの追加・削除は、登録済みのパスキーで確認します。",
+        "qps-ploc": "⟦Ȧḓḓïñɠ őř řėɱőṽïñɠ ȧ ṗȧşşķėẏ ïş ƈőñƒïřɱėḓ ẇïŧħ őñė őƒ ẏőůř ėẋïşŧïñɠ ṗȧşşķėẏş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "setup.passkey_err": {
+        "en": "Could not complete the passkey step: {detail}",
+        "ja": "パスキーの操作を完了できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė ṗȧşşķėẏ şŧėṗ: {detail} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "setup.invite_link_once": {
         "en": "Share this link now. It is shown only once.",
@@ -22928,6 +23003,11 @@
         "en": "Approve",
         "ja": "承認する",
         "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "decide_approve_passkey": {
+        "en": "Approve with passkey",
+        "ja": "パスキーで承認する",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ẇïŧħ ṗȧşşķėẏ ŀőřėɱ ⟧"
       },
       "decide_reject": {
         "en": "Reject",

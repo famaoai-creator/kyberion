@@ -25,6 +25,8 @@ import {
   attestTenantProvider,
   mutateTenant,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+  deleteTenant,
+  renameTenant,
   requestTenantProviderAttestationApproval,
   shellQuoteArg,
 } from './tenant-governance.js';
@@ -37,7 +39,13 @@ import {
 } from '../governance/approval-store.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 
 describe('tenant lifecycle preserves provider policy state', () => {
   const parent = pathResolver.sharedTmp('tenant-governance-preserve-tests');
@@ -94,6 +102,30 @@ describe('tenant lifecycle preserves provider policy state', () => {
       allowed_reasoning_backends: ['claude'],
       provider_attestations: { claude: { training_use: 'none' } },
     });
+  });
+
+  it('rolls back the profile when knowledge-root creation fails on create', () => {
+    // A file where the root's parent must be a directory makes mkdir fail,
+    // which is exactly what a stale tenant scope denial looked like.
+    safeMkdir(path.join(rootDir, 'knowledge', 'confidential'), { recursive: true });
+    safeWriteFile(path.join(rootDir, 'knowledge', 'confidential', 'blocked'), 'not a directory', {
+      encoding: 'utf8',
+    });
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        mutateTenant({
+          verb: 'create',
+          slug: 'blocked',
+          knowledgeRoot: 'knowledge/confidential/blocked/tenant',
+          rootDir,
+          apply: true,
+        })
+      )
+    ).toThrow();
+    // The half-created profile must be gone so create can be retried.
+    expect(
+      withExecutionContext('sovereign_concierge', () => readTenantProfile('blocked', { rootDir }))
+    ).toBeNull();
   });
 
   it('creates new tenants strictly isolated so activation can pass memory_policy', () => {
@@ -446,5 +478,124 @@ describe('printed attestation commands (POSIX shell quoting)', () => {
       /--plan must not contain control characters/
     );
     expect(() => assertPrintableCommandValue('--basis', undefined)).not.toThrow();
+  });
+});
+
+describe('tenant rename and delete', () => {
+  const parent = pathResolver.sharedTmp('tenant-governance-rename-tests');
+  let rootDir = '';
+
+  const seed = (slug: string, status: 'active' | 'suspended' | 'archived', extra: object = {}) => {
+    safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'tenants'), { recursive: true });
+    safeMkdir(path.join(rootDir, 'knowledge', 'confidential', slug), { recursive: true });
+    withExecutionContext('sovereign_concierge', () =>
+      safeWriteFile(
+        path.join(rootDir, 'knowledge', 'personal', 'tenants', `${slug}.json`),
+        JSON.stringify({
+          tenant_slug: slug,
+          display_name: slug,
+          status,
+          assigned_role: 'owner',
+          ...extra,
+        })
+      )
+    );
+  };
+
+  beforeEach(() => {
+    rootDir = path.join(parent, `fixture-${process.pid}-${Date.now()}-${Math.random()}`);
+  });
+  afterEach(() => {
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('renames an archived tenant and moves the default knowledge root', () => {
+    seed('old-tenant', 'archived');
+    const result = withExecutionContext('sovereign_concierge', () =>
+      renameTenant({ slug: 'old-tenant', to: 'new-tenant', rootDir, apply: true })
+    );
+    expect(result.status).toBe('applied');
+    expect(result.knowledge_root_renamed).toBe(true);
+    expect(
+      withExecutionContext('mission_controller', () => readTenantProfile('old-tenant', { rootDir }))
+    ).toBeNull();
+    expect(
+      withExecutionContext('mission_controller', () => readTenantProfile('new-tenant', { rootDir }))
+    ).toMatchObject({ tenant_slug: 'new-tenant', status: 'archived' });
+    expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'new-tenant'))).toBe(
+      true
+    );
+    expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'old-tenant'))).toBe(
+      false
+    );
+  });
+
+  it('moves a nested custom knowledge_root along with the tenant dir', () => {
+    // knowledge_root is schema-bound under knowledge/confidential/<slug>, so a
+    // "custom" root is a nested path inside the tenant dir — it keeps its
+    // suffix under the new slug.
+    seed('custom-root', 'archived', {
+      knowledge_root: 'knowledge/confidential/custom-root/inner',
+    });
+    const result = withExecutionContext('sovereign_concierge', () =>
+      renameTenant({ slug: 'custom-root', to: 'renamed-root', rootDir, apply: true })
+    );
+    expect(result.knowledge_root_renamed).toBe(true);
+    expect(result.profile.knowledge_root).toBe('knowledge/confidential/renamed-root/inner');
+    expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'renamed-root'))).toBe(
+      true
+    );
+  });
+
+  it('refuses to rename onto an existing slug or an invalid one', () => {
+    seed('alpha', 'archived');
+    seed('beta', 'archived');
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        renameTenant({ slug: 'alpha', to: 'beta', rootDir, apply: true })
+      )
+    ).toThrow(/already exists/);
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        renameTenant({ slug: 'alpha', to: 'public', rootDir, apply: true })
+      )
+    ).toThrow(/not a valid tenant slug/);
+  });
+
+  it('delete refuses non-archived tenants and requires --accept', () => {
+    seed('live', 'active');
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        deleteTenant({ slug: 'live', rootDir, apply: true, accept: true })
+      )
+    ).toThrow(/archive it first/);
+
+    seed('dead', 'archived');
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        deleteTenant({ slug: 'dead', rootDir, apply: true })
+      )
+    ).toThrow(/--accept/);
+  });
+
+  it('deletes an archived profile and optionally purges the knowledge root', () => {
+    seed('gone', 'archived');
+    const keep = withExecutionContext('sovereign_concierge', () =>
+      deleteTenant({ slug: 'gone', rootDir, apply: true, accept: true })
+    );
+    expect(keep.status).toBe('applied');
+    expect(keep.removed_knowledge_root_path).toBeUndefined();
+    expect(
+      withExecutionContext('mission_controller', () => readTenantProfile('gone', { rootDir }))
+    ).toBeNull();
+    // Data survives a registry delete unless purge is requested.
+    expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'gone'))).toBe(true);
+
+    seed('purged', 'archived');
+    const purged = withExecutionContext('sovereign_concierge', () =>
+      deleteTenant({ slug: 'purged', rootDir, apply: true, accept: true, purgeData: true })
+    );
+    expect(purged.removed_knowledge_root_path).toBeDefined();
+    expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'purged'))).toBe(false);
   });
 });

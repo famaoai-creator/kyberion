@@ -50,6 +50,25 @@ first-work の開始までを含む標準順序は [オンボーディング標�
    customer overlay(`customer/{slug}/` が存在する場合)を一意に返せば完了。
    `suspended`/`archived` は tenant-bound write を fail-closed で拒否する。
 
+## registry の保守(rename / delete)
+
+スラッグの typo 修正や撤収は lifecycle verb ではなく保守 verb で行う(archived にも可)。
+
+```bash
+# slug の修正: プロファイルと knowledge/confidential/{slug} をまとめて新 slug へ移動
+pnpm tenant rename kybweion-services --to kyberion-services --apply
+
+# archived tenant の登録解除(不可逆): profile を消す。データは残る
+pnpm tenant delete <slug> --apply --accept
+# データも消す場合だけ --purge-data を付ける
+pnpm tenant delete <slug> --apply --accept --purge-data
+```
+
+- `rename` は `tenant_id`・`knowledge_root`・`knowledge/confidential/{slug}/` ディレクトリを
+  追随させる(knowledge_root が `{slug}/` 配下にネストしていても suffix は保持される)。
+- `delete` は `archived` 限定。active/suspended は先に `pnpm tenant archive <slug> --apply`。
+- どちらも監査イベント(`tenant.rename` / `tenant.delete`)を記録する。
+
 ## 意図的な非対称(例外)の扱い
 
 テスト用 sink・scaffold テンプレート・デモ用ディレクトリなど、テナントではない slug が
