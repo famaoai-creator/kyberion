@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { safeExistsSync } from '../secure-io.js';
+import { trimEndChars } from '../foundation/text.js';
 
 export const CLAUDE_CLI_PLACEHOLDER_SIGNATURE = 'claude native binary not installed';
 
@@ -15,7 +16,7 @@ export interface ClaudeCliFallbackCandidateOptions {
 }
 
 function isNodeModulesBinDir(entry: string): boolean {
-  const normalized = entry.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalized = trimEndChars(entry.replace(/\\/g, '/'), '/');
   return normalized.endsWith('/node_modules/.bin');
 }
 

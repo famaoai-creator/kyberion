@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import * as path from 'node:path';
+import { sanitizeIdSegment } from '../foundation/text.js';
 import { spawn } from 'node:child_process';
 import {
   createVirtualDeviceInventoryBridge,
@@ -167,7 +168,7 @@ function resolveAudioInputAdapter(
 }
 
 function safeSlug(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'input';
+  return sanitizeIdSegment(value, { separator: '_', fallback: 'input' });
 }
 
 function resolveRecordingPath(deviceName: string, requestedPath?: string): string {

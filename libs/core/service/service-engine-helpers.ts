@@ -151,7 +151,36 @@ function resolvePathToken(token: string): string | undefined {
  * Inline path tokens (`{{@domain:subPath}}`) resolve to machine-local absolute paths via
  * {@link resolvePathToken} so templates stay portable across machines.
  */
+/** `^{{\s*([^}]+)\s*}}$` without the regex: a single var spanning the whole input. */
+function extractWholeVarToken(trimmed: string): string | null {
+  if (!trimmed.startsWith('{{') || !trimmed.endsWith('}}')) return null;
+  const inner = trimmed.slice(2, -2);
+  if (!inner.trim() || inner.includes('}')) return null;
+  return inner.trim();
+}
+
+function replaceTemplateVars(
+  text: string,
+  replace: (match: string, key: string) => string
+): string {
+  const out: string[] = [];
+  let cursor = 0;
+  for (;;) {
+    const open = text.indexOf('{{', cursor);
+    if (open < 0) break;
+    const close = text.indexOf('}}', open + 2);
+    if (close < 0) break;
+    out.push(text.slice(cursor, open));
+    const match = text.slice(open, close + 2);
+    out.push(replace(match, text.slice(open + 2, close)));
+    cursor = close + 2;
+  }
+  out.push(text.slice(cursor));
+  return out.join('');
+}
+
 export function resolveVars(
+  /** Linear `{{…}}` scanner — the `{{(.*?)}}` lazy pattern is CodeQL-flagged. */
   input: string | undefined,
   vars: Record<string, unknown>,
   maxDepth = 8
@@ -159,7 +188,7 @@ export function resolveVars(
   if (!input) return '';
   let out = input;
   for (let pass = 0; pass < maxDepth; pass++) {
-    const next = out.replace(/{{(.*?)}}/g, (match, key) => {
+    const next = replaceTemplateVars(out, (match, key) => {
       const trimmedKey = key.trim();
       if (trimmedKey.startsWith('@')) {
         const resolved = resolvePathToken(trimmedKey);
@@ -171,7 +200,7 @@ export function resolveVars(
     if (next === out) return out; // fixpoint: nothing left to resolve
     out = next;
   }
-  if (/{{.*?}}/.test(out)) {
+  if (out.includes('{{')) {
     logger.warn(
       `[resolveVars] max expansion depth (${maxDepth}) reached without converging — possible variable cycle. Unresolved: "${out.slice(0, 120)}"`
     );
@@ -182,9 +211,9 @@ export function resolveVars(
 export function resolveTemplateValue(input: unknown, vars: Record<string, unknown>): unknown {
   if (typeof input === 'string') {
     const trimmed = input.trim();
-    const wholeVarMatch = trimmed.match(/^{{\s*([^}]+)\s*}}$/);
-    if (wholeVarMatch) {
-      const token = wholeVarMatch[1].trim();
+    const wholeVarToken = extractWholeVarToken(trimmed);
+    if (wholeVarToken !== null) {
+      const token = wholeVarToken;
       if (token.startsWith('@')) {
         const resolved = resolvePathToken(token);
         return resolved !== undefined ? resolved : input;
@@ -370,7 +399,7 @@ export function encodeFormBody(payload: Record<string, any>): string {
 
 export function stripUnresolvedTemplateValues(input: any): unknown {
   if (typeof input === 'string') {
-    return /^\{\{\s*[^}]+\s*\}\}$/.test(input.trim()) ? undefined : input;
+    return extractWholeVarToken(input.trim()) !== null ? undefined : input;
   }
   if (Array.isArray(input)) {
     return input

@@ -5,6 +5,7 @@
 
 import * as nodePath from 'node:path';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
+import { extractFencedBlock } from '../foundation/text.js';
 import { getA2ARoute } from '../mesh/a2a-route-port.js';
 import type { AgentExecutionPort, AgentExecutionReceipt } from '../agent/agent-execution-port.js';
 import type { AgentContextMode } from '../context-boundary.js';
@@ -745,8 +746,10 @@ export function isIndependentReviewRequired(item: WorkItem): boolean {
 
 export function extractJsonObject(text: string): string | null {
   const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/iu);
-  const content = fenced ? fenced[1].trim() : trimmed;
+  const fence =
+    trimmed.startsWith('```') && trimmed.endsWith('```') ? extractFencedBlock(trimmed) : null;
+  const content =
+    fence && (!fence.lang || fence.lang.toLowerCase() === 'json') ? fence.content.trim() : trimmed;
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   if (start === -1 || end === -1 || end <= start) return null;

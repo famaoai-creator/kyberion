@@ -150,7 +150,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           longitude: 139.6503,
         };
       }
-      if (url.includes('geocoding-api.open-meteo.com')) {
+      if (new URL(url).hostname === 'geocoding-api.open-meteo.com') {
         return {
           results: [
             {
@@ -161,7 +161,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           ],
         };
       }
-      if (url.includes('api.open-meteo.com')) {
+      if (new URL(url).hostname === 'api.open-meteo.com') {
         return {
           current: {
             temperature_2m: 18.5,
@@ -171,7 +171,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           },
         };
       }
-      if (url.includes('html.duckduckgo.com')) {
+      if (new URL(url).hostname === 'html.duckduckgo.com') {
         return [
           '<div class="result">',
           '<a class="result__a" href="https://example.com/result-1">Result One</a>',
@@ -464,7 +464,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     });
     mocks.secureFetch.mockImplementation(async (options: { url?: string }) => {
       const url = String(options.url || '');
-      if (url.includes('geocoding-api.open-meteo.com')) {
+      if (new URL(url).hostname === 'geocoding-api.open-meteo.com') {
         return { results: [] };
       }
       if (url.includes('ipapi.co/json')) {
@@ -479,7 +479,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           longitude: 139.6503,
         };
       }
-      if (url.includes('api.open-meteo.com')) {
+      if (new URL(url).hostname === 'api.open-meteo.com') {
         return {
           current: {
             temperature_2m: 18.5,

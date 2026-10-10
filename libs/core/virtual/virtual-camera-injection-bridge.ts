@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { sanitizeIdSegment } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExec, safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -130,7 +131,7 @@ function normalizePreference(value: unknown): string | undefined {
 }
 
 function safeSlug(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'camera';
+  return sanitizeIdSegment(value, { separator: '_', fallback: 'camera' });
 }
 
 function isAvailableCommand(command: string, args: string[]): boolean {

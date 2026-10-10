@@ -8,7 +8,7 @@ import { executeServicePreset } from '../service/service-engine.js';
 import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from '../foundation/json.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { clamp } from '../foundation/text.js';
+import { clamp, extractFencedBlock } from '../foundation/text.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { processUntrustedContent } from '../untrusted-content.js';
@@ -216,8 +216,11 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
   if (!trimmed) return null;
   const firstJsonToken = trimmed.search(/[\[{]/u);
   if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return null;
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = fenced ? [fenced[1], trimmed] : [trimmed];
+  const fence = extractFencedBlock(trimmed);
+  const candidates =
+    fence && (!fence.lang || fence.lang.toLowerCase() === 'json')
+      ? [fence.content, trimmed]
+      : [trimmed];
   for (const candidate of candidates) {
     try {
       const parsed = parseSafeJsonObjectInput(candidate, 'email JSON block');
@@ -261,8 +264,9 @@ export function extractBodyMarkdownFromDraft(draftMarkdown: string): string {
       }
       continue;
     }
-    const match = line.match(/^(To|Subject|Tone):\s*(.*)$/);
-    if (!match || !metadataLabels.has(match[1])) {
+    const colon = line.indexOf(':');
+    const label = colon > 0 ? line.slice(0, colon) : '';
+    if (!metadataLabels.has(label)) {
       return draftMarkdown;
     }
     sawMetadata = true;
@@ -296,12 +300,23 @@ function normalizeHeaderValue(value: string): string {
 
 export function parseEmailAddressHeader(value: string): { display_name: string; email: string } {
   const trimmed = normalizeHeaderValue(value);
-  const angled = trimmed.match(/^(.*)<([^>]+)>$/);
-  const emailMatch = trimmed.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  // `^(.*)<([^>]+)>$` rewritten without backtracking: the last `<` whose
+  // remainder is `>`-free wins.
+  let angled: [string, string] | null = null;
+  if (trimmed.endsWith('>')) {
+    for (let lt = trimmed.lastIndexOf('<'); lt > 0; lt = trimmed.lastIndexOf('<', lt - 1)) {
+      const inner = trimmed.slice(lt + 1, -1);
+      if (inner.length > 0 && !inner.includes('>')) {
+        angled = [trimmed.slice(0, lt), inner];
+        break;
+      }
+    }
+  }
+  const emailMatch = trimmed.match(/[\w.+%-]+@[\w-]+(?:\.[\w-]+)+/i);
 
   if (angled) {
-    const display_name = normalizeHeaderValue(angled[1].replace(/^"|"$/g, '')) || angled[2].trim();
-    const email = angled[2].trim().toLowerCase();
+    const display_name = normalizeHeaderValue(angled[0].replace(/^"|"$/g, '')) || angled[1].trim();
+    const email = angled[1].trim().toLowerCase();
     return { display_name, email };
   }
 

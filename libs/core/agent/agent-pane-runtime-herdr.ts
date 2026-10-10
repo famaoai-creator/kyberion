@@ -7,7 +7,7 @@
 
 import type { AgentAdapter, AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { isRecord } from '../foundation/text.js';
+import { isRecord, trimEndChars } from '../foundation/text.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExecResult } from '../secure-io.js';
@@ -134,11 +134,11 @@ export function sanitizeHerdrAgentName(agentId: string): string {
   const lowered = String(agentId || '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .split(/[^a-z0-9_]+/)
+    .filter(Boolean)
+    .join('-');
   const withLetter = /^[a-z]/.test(lowered) ? lowered : `a${lowered}`;
-  const clipped = withLetter.slice(0, 32).replace(/-+$/g, '');
+  const clipped = trimEndChars(withLetter.slice(0, 32), '-');
   return clipped || 'agent';
 }
 

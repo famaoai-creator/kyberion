@@ -1469,6 +1469,9 @@ export function safeLstat(filePath: string): fs.Stats {
     );
   }
   assertCanonicalReadable(resolved, filePath, 'leaf');
+  // codeql[js/path-injection] — `resolved` is produced by pathResolver and has
+  // passed validateReadPermission + assertCanonicalReadable above; this
+  // wrapper IS the path-injection sanitizer boundary.
   return fs.lstatSync(resolved);
 }
 
