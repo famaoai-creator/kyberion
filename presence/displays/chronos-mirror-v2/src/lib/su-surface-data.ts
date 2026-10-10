@@ -6,7 +6,10 @@ import {
   type GenerationCostSettlement,
 } from '@agent/core/generation-cost-settlement';
 import { resolveScopeForRecord } from '@agent/core/scope-migration';
-import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import {
+  computeApprovalPresentedDigest,
+  listApprovalRequests,
+} from '@agent/core/governance/approval-store';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { loadMissionManagementConfig } from '@agent/core/mission/mission-management-config';
 import { loadState, loadStateAtPath } from '@agent/core/mission/mission-state';
@@ -85,6 +88,8 @@ export interface CostSummary {
 
 export interface ApprovalQueueItem {
   id: string;
+  /** HA-06: digest of what this item shows; a decision sends it back. */
+  presentedDigest: string;
   channel: string;
   storageChannel: string;
   status: ApprovalRequestRecord['status'];
@@ -102,6 +107,8 @@ export interface ApprovalQueueItem {
   missionId?: string;
   tenantId?: string;
   tenantSlug?: string;
+  /** `mission` when `tenantSlug` comes from mission state, not from the request. */
+  tenantSource?: 'record' | 'mission';
   riskLevel?: string;
   serviceId?: string;
   mutation?: string;
@@ -110,7 +117,14 @@ export interface ApprovalQueueItem {
   decidedBy?: string;
 }
 
-export function resolveApprovalTenant(record: ApprovalRequestRecord): string | undefined {
+/**
+ * The request's tenant and where it came from. `record` values are all part
+ * of the presented digest; `mission` is read from the mission's current state,
+ * is not part of the request, and is shown as such.
+ */
+export function resolveApprovalTenantSource(
+  record: ApprovalRequestRecord
+): { tenantSlug: string; source: 'record' | 'mission' } | undefined {
   const context = record.requestedByContext as
     | (ApprovalRequestRecord['requestedByContext'] & {
         tenant_slug?: string;
@@ -118,21 +132,34 @@ export function resolveApprovalTenant(record: ApprovalRequestRecord): string | u
       })
     | undefined;
   const loopContext = record.work_loop?.context as Record<string, unknown> | undefined;
-  const direct =
+  const onRecord =
+    record.scope?.tenant_slug ||
     context?.tenant_slug ||
     context?.tenantSlug ||
     (typeof loopContext?.tenant_slug === 'string' ? loopContext.tenant_slug : undefined);
-  if (direct) return direct;
+  if (onRecord) return { tenantSlug: onRecord, source: 'record' };
   const missionId = context?.missionId || record.steering?.missionId;
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
   try {
     const state = loadState(missionId);
-    return state?.tenant_slug || state?.tenant_id;
+    const fromMission = state?.tenant_slug || state?.tenant_id;
+    return fromMission ? { tenantSlug: fromMission, source: 'mission' } : undefined;
   } catch {
     return undefined;
   }
+}
+
+export function resolveApprovalTenant(record: ApprovalRequestRecord): string | undefined {
+  return resolveApprovalTenantSource(record)?.tenantSlug;
+}
+
+function approvalTenantFields(
+  record: ApprovalRequestRecord
+): Pick<ApprovalQueueItem, 'tenantSlug' | 'tenantSource'> {
+  const tenant = resolveApprovalTenantSource(record);
+  return tenant ? { tenantSlug: tenant.tenantSlug, tenantSource: tenant.source } : {};
 }
 
 export interface ApprovalQueueQuery {
@@ -539,6 +566,7 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
     .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt))
     .slice(0, Math.max(1, query.limit || 24))
     .map((record) => ({
+      ...approvalTenantFields(record),
       id: record.id,
       channel: record.channel,
       storageChannel: record.storageChannel,
@@ -556,12 +584,12 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       requestedBy: record.requestedBy,
       missionId: record.requestedByContext?.missionId,
       tenantId: record.requestedByContext?.actorId,
-      tenantSlug: resolveApprovalTenant(record),
       riskLevel: record.risk?.level,
       serviceId: record.target?.serviceId,
       mutation: record.target?.mutation,
       correlationId: record.correlationId,
       decidedAt: record.decidedAt,
       decidedBy: record.decidedBy,
+      presentedDigest: computeApprovalPresentedDigest(record),
     }));
 }
