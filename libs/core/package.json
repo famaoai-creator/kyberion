@@ -7196,6 +7196,10 @@
       "types": "./dist/governance/charter-call-site.d.ts",
       "default": "./dist/governance/charter-call-site.js"
     },
+    "./governance/charter-decision-vocabulary": {
+      "types": "./dist/governance/charter-decision-vocabulary.d.ts",
+      "default": "./dist/governance/charter-decision-vocabulary.js"
+    },
     "./governance/approval-digest": {
       "types": "./dist/governance/approval-digest.d.ts",
       "default": "./dist/governance/approval-digest.js"

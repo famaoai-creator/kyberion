@@ -1403,6 +1403,10 @@
               "amount": {
                 "type": "number"
               },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -1542,6 +1546,10 @@
               "amount": {
                 "type": "number"
               },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -1679,6 +1687,10 @@
               },
               "amount": {
                 "type": "number"
+              },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
               },
               "tenant_slug": {
                 "type": "string"
@@ -1826,6 +1838,10 @@
               "amount": {
                 "type": "number"
               },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -1967,6 +1983,10 @@
               "amount": {
                 "type": "number"
               },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
+              },
               "tenant_slug": {
                 "type": "string"
               },
@@ -2106,6 +2126,10 @@
               },
               "amount": {
                 "type": "number"
+              },
+              "recipients": {
+                "type": "integer",
+                "minimum": 0
               },
               "tenant_slug": {
                 "type": "string"

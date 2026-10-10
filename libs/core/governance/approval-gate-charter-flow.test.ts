@@ -11,7 +11,7 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   isApprovalRequestExpired: (await importOriginal<typeof import('./approval-store.js')>())
     .isApprovalRequestExpired,
   expireApprovalRequest: vi.fn(),
-  createApprovalRequest: vi.fn(),
+  createApprovalRequest: vi.fn(() => ({ id: 'req-1', status: 'pending' })),
   listApprovalRequests: vi.fn(() => []),
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),
@@ -73,6 +73,27 @@ describe('enforceApprovalGate × accountability charter', () => {
     vi.mocked(evaluateDecisionRights).mockReturnValueOnce(null);
     enforceApprovalGate({ ...params, correlationId: 'corr-2' });
     expect(charterGate.mock.calls[1][0]).toMatchObject({ decisionRightsEscalates: false });
+  });
+
+  it('a charter may stand in only for a human-acceptance escalation the matrix marks delegable', () => {
+    charterGate.mockReturnValue({ kind: 'none' });
+    policy.mockReturnValue({ requiresApproval: false, missingRequirements: [] });
+    const cases = [
+      [{ escalationKind: 'human_acceptance', charterDelegable: true }, true],
+      [{ escalationKind: 'human_acceptance', charterDelegable: false }, false],
+      [{ escalationKind: 'over_threshold', charterDelegable: true }, false],
+      [{ escalationKind: 'role_mismatch', charterDelegable: true }, false],
+    ] as const;
+    cases.forEach(([evaluation, expected], i) => {
+      vi.mocked(evaluateDecisionRights).mockReturnValueOnce({
+        requiresEscalation: true,
+        ...evaluation,
+      } as never);
+      enforceApprovalGate({ ...params, correlationId: `corr-d${i}` });
+      expect(charterGate.mock.calls[i][0]).toMatchObject({
+        decisionRightsCharterDelegable: expected,
+      });
+    });
   });
 
   it('inside the charter: allowed without any approval request', () => {
