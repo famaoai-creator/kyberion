@@ -766,26 +766,35 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 - **Case-insensitive volumes judge the on-disk spelling.** Whether the root's volume folds case is
   probed once per root (on the nearest root component whose name has letters). In `leaf` mode the
   leaf takes its on-disk spelling (`knowledge/PERSONAL` is judged as `knowledge/personal`) from
-  `lstat` + realpath; the directory is listed only when the leaf is itself a symlink. In `follow`
+  `lstat` + realpath (trusted only if realpath reached the `lstat`'d entry); the directory is
+  listed only when the leaf is itself a symlink or was swapped in between. In `follow`
   mode the platform realpath already returns the on-disk case. Tier detection stays case-sensitive.
 - **Foreign hard links are refused for in-place access.** Read, size (`validateFileSize`),
   metadata (`safeStat`, `safeFileAgeMs`), copy source, append, open-for-append, chmod, fsync, move
   source and hard-link source refuse a regular file with `nlink > 1`, checked on the opened
   descriptor where the helper opens one (copies read from that descriptor; snapshots return bytes
   only from the vetted inode, and a file missing at check time must be single-link when opened).
-  There are two exceptions, both narrow on purpose (a broader "all links in one directory" rule
-  was defeated by moving the link next to its protected sibling):
+  Every exemption below is judged on the canonical path re-derived after the open, so it applies
+  only when that canonical path still names the inode the caller holds (`(dev, ino)` of
+  `stat(canonical)` equals the descriptor's). Without that pin, a symlink flipped between the open
+  and the check let a planted hard link be read as if it were a pnpm-store or out-of-repository
+  file. A multi-link file outside the repository (a vault mount target) gets no exemption. There are two exceptions, both
+  narrow on purpose (a broader "all links in one directory" rule was defeated by moving the link
+  next to its protected sibling):
   - _Lock recovery tombs, probe-only_: in `active/shared/runtime/locks/`, a file named
     `<base>.stale-<pid>-<ms>-<n>` with exactly two links whose other link is `<base>` (one `lstat`;
     no directory listing, so filling the directory cannot block it). The `<base>` side is refused —
-    finding its tomb would need a listing — and lock inspection treats an unreadable record as
-    live, which is the safe reading during the put-back window. A tomb may move only within its
+    finding its tomb would need a listing. `lock-utils` therefore reads a record through its
+    `.stale-*` tomb when the base side is refused as a hard link, so `releaseLock` and lock
+    inspection see the live owner during the put-back window. A tomb may move only within its
     locks directory, never to another name such as `MEMORY.md`.
-  - _pnpm store reads_: decided on the **canonical** path, which must lie under the root
-    `node_modules/` (in practice `node_modules/.pnpm/`) or a workspace package's `node_modules/`,
-    at a location the caller cannot write. The literal prefix is not trusted: root `node_modules/`
-    holds pnpm's workspace links (`node_modules/@actuator/service -> libs/actuators/service-actuator`)
-    into trees a role may write.
+  - _pnpm store reads_: decided on the **canonical** path. The content store
+    (`node_modules/.pnpm/`, written only by the package manager) is exempt for every caller,
+    SUDO included. Elsewhere under the root `node_modules/` or a workspace package's
+    `node_modules/`, the canonical location must not be writable by the caller. The literal
+    prefix is never trusted: root `node_modules/` holds pnpm's workspace links
+    (`node_modules/@actuator/service -> libs/actuators/service-actuator`) into trees a role may
+    write.
 - **In-place opens never truncate.** `safeAppendFileSync` accepts only `a`, `a+`, `ax`, `ax+`;
   `openInPlace` rejects any other flag before opening, so a foreign hard link is never truncated
   before it is vetted. Writes that replace the entry — `safeWriteFile` and the copy destination
@@ -804,6 +813,9 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   and, once the temp descriptor is open, requires that directory to still be the same `(dev, ino)`,
   still canonicalize to itself, and to hold the descriptor just opened before renaming into place.
   An inode number of 0 (FAT/exFAT, some network shares) is unverifiable and fails closed.
+- **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
+  `safeReadFileTail` throw `File not found` with `code: 'ENOENT'`, so callers that classify
+  errors by code (lock inspection: missing vs unreadable) see a missing file as missing.
 - **Missing parents are created one at a time.** `safeWriteFile`, `safeMkdir` (recursive),
   `safeOpenAppendFile`, `safeCreateExclusiveFileSync`, `safePublishExclusiveFileSync` and
   `safeSymlinkSync` create missing directories through `mkdirGuarded`, which takes the canonical
@@ -844,10 +856,12 @@ dangling link, copy/move through a linked parent, rm/unlink, reads into `knowled
 junction refusal, ancestor rename after an earlier resolution, hard-link append / copy / chmod /
 fsync / read / move / stat / snapshot, probe-only lock tomb rule and tomb moves, truncating append
 flags, `node_modules` planted in a writable tree, `node_modules/@actuator/service` workspace alias
-read as `software_developer`, `validateFileSize` tier and hard-link guard, directory
+read as `software_developer`, exemption pinned to the held inode (unit + bounded symlink-flip race),
+SUDO pnpm-store reads, ENOENT code, `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
-(checkout behind a linked prefix) and the import boundary in
+(checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
+during the put-back window, against the real secure-io lock IO) and the import boundary in
 `libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---

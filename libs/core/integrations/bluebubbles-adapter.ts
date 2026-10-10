@@ -1,3 +1,4 @@
+import { trimEndChars } from '../foundation/text.js';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import {
@@ -112,7 +113,7 @@ export function verifyBlueBubblesWebhookSecret(
 }
 
 function normalizeBaseUrl(value: string): string | null {
-  const raw = value.trim().replace(/\/+$/u, '');
+  const raw = trimEndChars(value.trim(), '/');
   if (!raw) return null;
   try {
     const parsed = new URL(raw);
