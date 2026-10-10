@@ -15,16 +15,16 @@
     {
       "id": "search_merchant",
       "role": "sink",
-      "op": "browser:fill_ref",
+      "op": "browser:fill",
       "params": {
         "selector": "{{point_site_search_input}}",
-        "value": "{{merchant_name}}"
+        "text": "{{merchant_name}}"
       }
     },
     {
       "id": "execute_search",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "{{point_site_search_button}}"
       }
@@ -32,7 +32,7 @@
     {
       "id": "click_merchant_link",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "{{point_site_merchant_link_selector}}",
         "wait_for_navigation": true

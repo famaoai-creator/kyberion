@@ -1,0 +1,18 @@
+{
+  "record_id": "mem-MSN-ACTUATOR-UX-20261010-2026_10_10",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Actuator discovery must be descriptive and fail closed",
+  "summary": "Keep discovery separate from execution and provide exact operation contracts alongside compact listings.",
+  "candidate_id": "mem-MSN-ACTUATOR-UX-20261010-2026_10_10",
+  "evidence_refs": ["active/missions/public/MSN-ACTUATOR-UX-20261010/evidence/distillation.md"],
+  "created_at": "2026-10-10T05:13:21.238Z",
+  "applicability": ["mission", "mission:MSN-ACTUATOR-UX-20261010"],
+  "reusable_steps": [
+    "Keep discovery separate from execution and provide exact operation contracts alongside compact listings"
+  ],
+  "expected_outcome": "Actuator list, describe, and check discovery operations must never invoke action handlers. Compact operation listings support browsing; authored schemas and examples provide exact parameter requirements for execution. Missing or invalid discovery metadata must fail closed with an actionable diagnostic rather than invoking a handler or presenting an unreliable contract.",
+  "source_branch": "fix/actuator-agent-usability-20261010",
+  "source_commit": "94eafe62023dc81ebee63412a8c38438bcfc0809"
+}

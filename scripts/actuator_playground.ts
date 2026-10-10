@@ -4,7 +4,6 @@ import {
   safeExec,
   safeLstat,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
@@ -20,6 +19,10 @@ import {
 import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import {
+  loadActuatorOpDiscoveryAtPath,
+  type ActuatorOpDiscoveryOperation,
+} from '@agent/core/actuator/actuator-op-discovery';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
@@ -101,32 +104,14 @@ export function loadDiscoveryOpsForActuator(actuatorId: string, dirId = ''): str
 export function loadDiscoveryOpDetailsForActuator(
   actuatorId: string,
   dirId = ''
-): Array<{ op: string; kind: string }> {
-  try {
-    const discoveryPath = pathResolver.rootResolve(
-      'knowledge/product/orchestration/actuator-op-discovery.json'
-    );
-    if (!safeExistsSync(discoveryPath)) return [];
-    const raw = String(safeReadFile(discoveryPath, { encoding: 'utf8' }));
-    const parsed = JSON.parse(raw) as {
-      actuators?: Array<{ n?: string; path?: string; ops?: Array<{ op?: string; kind?: string }> }>;
-    };
-    const entries = Array.isArray(parsed.actuators) ? parsed.actuators : [];
-    const match = entries.find(
-      (entry) =>
-        entry?.n === actuatorId ||
-        (dirId !== '' && (entry?.n === dirId || entry?.path?.endsWith(`/${dirId}`)))
-    );
-    if (!match || !Array.isArray(match.ops)) return [];
-    return match.ops
-      .map((op) => ({
-        op: typeof op?.op === 'string' ? op.op.trim() : '',
-        kind: typeof op?.kind === 'string' ? op.kind.trim() : 'capture',
-      }))
-      .filter((entry) => entry.op !== '');
-  } catch {
-    return [];
-  }
+): ActuatorOpDiscoveryOperation[] {
+  const catalog = loadActuatorOpDiscoveryAtPath();
+  const match = catalog.actuators.find(
+    (entry) =>
+      entry?.n === actuatorId ||
+      (dirId !== '' && (entry?.n === dirId || entry?.path?.endsWith(`/${dirId}`)))
+  );
+  return match?.ops || [];
 }
 
 export function lookupDiscoveryOpKind(actuatorId: string, op: string, dirId = ''): string | null {
@@ -196,12 +181,36 @@ export function evaluatePlaygroundDryRun(args: {
   operation: string;
   payload: Record<string, unknown>;
   contractSchemaPath?: string;
+  inputSchema?: Record<string, unknown>;
+  params?: Record<string, unknown>;
   mode?: 'dry-run' | 'check';
 }): Record<string, unknown> {
   const kind = resolveCliActionKind(args.payload);
   const plan = planActuatorDryRun({ kind, dryRun: true });
   let validated = true;
   let error: string | undefined;
+  const marker = args.inputSchema?.['x-kyberion-contract'];
+  const authoredSchema =
+    args.inputSchema && marker !== 'legacy-open' && marker !== 'inferred-legacy'
+      ? args.inputSchema
+      : undefined;
+  if (authoredSchema) {
+    try {
+      const validate = createAjv().compile(authoredSchema);
+      if (!validate(args.params)) {
+        validated = false;
+        error = (validate.errors || [])
+          .map(
+            (item) =>
+              `${item.instancePath || '/'} ${item.message || 'is invalid'} ${JSON.stringify(item.params)}`
+          )
+          .join('; ');
+      }
+    } catch (err) {
+      validated = false;
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
   if (args.contractSchemaPath) {
     try {
       const ajv = createAjv();
@@ -227,6 +236,7 @@ export function evaluatePlaygroundDryRun(args: {
     dry_run: true,
     handler: plan.skipHandler ? 'skipped' : 'capture',
     validated,
+    parameter_validation: authoredSchema ? 'authored-schema' : 'not-available',
     ...(error ? { error } : {}),
     payload: args.payload,
   };
@@ -264,7 +274,10 @@ export async function runPlayground(
   args: string[],
   options: PlaygroundRunOptions = {}
 ): Promise<Record<string, unknown> | undefined> {
-  const machineOutput = options.json === true || options.dryRun === true || options.check === true;
+  const cliParams = parseCliArgs(args);
+  const discoveryOnly = cliParams.list !== undefined || cliParams.describe !== undefined;
+  const machineOutput =
+    discoveryOnly || options.json === true || options.dryRun === true || options.check === true;
   const print = options.print ?? (() => undefined);
   const emit = (...values: unknown[]): void => values.forEach((value) => print(value));
   const log = (...values: unknown[]) => {
@@ -313,7 +326,6 @@ export async function runPlayground(
   }
 
   // 2. Parse CLI args for non-interactive mode
-  const cliParams = parseCliArgs(args);
   let targetActuatorId = cliParams.actuator;
   let targetOp = cliParams.op;
   let rawParamsStr = cliParams.params;
@@ -321,6 +333,64 @@ export async function runPlayground(
   let selectedActuator = actuators.find(
     (a) => a.id === targetActuatorId || a.manifest.actuator_id === targetActuatorId
   );
+
+  // Discovery never prompts, builds, writes scratch files or invokes a handler.
+  if (discoveryOnly) {
+    rl.close();
+    if (targetActuatorId && !selectedActuator) {
+      throw new ScriptExitError(1, `Unknown --actuator '${targetActuatorId}'. Use --list --json.`);
+    }
+    if (cliParams.describe !== undefined && (!selectedActuator || !targetOp)) {
+      throw new ScriptExitError(
+        1,
+        '--describe requires --actuator and --op; use --list --json first.'
+      );
+    }
+    const records = (selectedActuator ? [selectedActuator] : actuators)
+      .map((actuator) => {
+        const details = loadDiscoveryOpDetailsForActuator(
+          actuator.manifest.actuator_id,
+          actuator.id
+        );
+        const ops = resolvePlaygroundCapabilities(actuator.manifest, actuator.id)
+          .filter((entry) => !targetOp || entry.op === targetOp)
+          .filter(
+            (entry) =>
+              !cliParams.search ||
+              `${actuator.manifest.actuator_id} ${entry.op}`
+                .toLowerCase()
+                .includes(cliParams.search.toLowerCase())
+          )
+          .map((entry) => {
+            const detail = details.find((candidate) => candidate.op === entry.op);
+            return {
+              op: entry.op,
+              ...(entry.description ? { description: entry.description } : {}),
+              ...(cliParams.describe !== undefined ? detail : detail ? { kind: detail.kind } : {}),
+            };
+          });
+        return {
+          actuator_id: actuator.manifest.actuator_id,
+          description: actuator.manifest.description,
+          ops,
+        };
+      })
+      .filter((entry) => entry.ops.length > 0);
+    if (cliParams.describe !== undefined && records.length === 0) {
+      throw new ScriptExitError(
+        1,
+        `Unknown --op '${targetOp}'. Use --actuator ${targetActuatorId} --list --json.`
+      );
+    }
+    const result = {
+      ok: true,
+      mode: cliParams.describe !== undefined ? 'describe' : 'list',
+      handler_invoked: false,
+      actuators: records,
+    };
+    if (!options.json) emit(JSON.stringify(result, null, 2));
+    return result;
+  }
 
   // 3. Actuator Selection Wizard
   if (!selectedActuator) {
@@ -457,6 +527,26 @@ export async function runPlayground(
   const payload = isPipelineWrapped
     ? buildPipelineWrappedPayload(op, paramsObject, discoveryKind as string)
     : buildPlaygroundPayload(op, paramsObject);
+  const detail = loadDiscoveryOpDetailsForActuator(manifest.actuator_id, selectedActuator.id).find(
+    (entry) => entry.op === op
+  );
+  const plan = evaluatePlaygroundDryRun({
+    actuatorId: manifest.actuator_id,
+    operation: op,
+    payload,
+    inputSchema: detail?.input_schema,
+    params: paramsObject,
+    contractSchemaPath: isManifestOp ? manifest.contract_schema : undefined,
+    mode: options.check === true ? 'check' : 'dry-run',
+  });
+  if (plan.ok === false) {
+    rl.close();
+    if (options.check || options.dryRun) return { ...plan, handler_invoked: false };
+    throw new ScriptExitError(
+      1,
+      `Invalid parameters for ${manifest.actuator_id}:${op}: ${plan.error}. Use --actuator ${manifest.actuator_id} --op ${op} --describe --json.`
+    );
+  }
   if (isPipelineWrapped && !machineOutput) {
     log(
       chalk.gray(
@@ -481,15 +571,8 @@ export async function runPlayground(
   }
 
   if (options.check === true || options.dryRun === true) {
-    // Manifest contract_schema describes the coarse `pipeline` shape only.
-    // Single ops merged from describeOps must not be validated against it.
-    const plan = evaluatePlaygroundDryRun({
-      actuatorId: manifest.actuator_id,
-      operation: op,
-      payload,
-      contractSchemaPath: isManifestOp ? manifest.contract_schema : undefined,
-      mode: options.check === true ? 'check' : 'dry-run',
-    });
+    // Fine-grained params use their authored schema; the manifest schema
+    // validates only operations declared at the CLI boundary.
     // `--check` is schema/plan only. Apply/transform/control `--dry-run` also
     // stay validate-only. Capture `--dry-run` falls through and invokes the
     // compiled actuator with `--dry-run` so the capture handler actually runs.
@@ -572,7 +655,7 @@ export async function runPlayground(
       operation: op,
       kind: resolveCliActionKind(payload),
       dry_run: options.dryRun === true,
-      handler: 'capture',
+      handler: resolveCliActionKind(payload),
       handler_invoked: true,
       input_path: tempPath,
       executable_path: execPath,
@@ -589,6 +672,17 @@ export async function runPlayground(
       logError(chalk.yellow('\nStderr:'));
       logError(chalk.red(err.stderr.toString().trim()));
     }
+    rl.close();
+    return {
+      ok: false,
+      mode: options.dryRun === true ? 'dry-run' : 'execute',
+      actuator_id: manifest.actuator_id,
+      operation: op,
+      handler_invoked: true,
+      error: err.message,
+      ...(err.stdout ? { stdout: String(err.stdout).trim() } : {}),
+      ...(err.stderr ? { stderr: String(err.stderr).trim() } : {}),
+    };
   }
 
   rl.close();
@@ -601,6 +695,12 @@ const script = defineScript({
     runPlayground(stripSharedScriptFlags(argv), { dryRun, check, json, quiet, print }).then(
       (result) => {
         if (result && (json || dryRun || check)) print(result);
+        if (result?.ok === false)
+          throw new ScriptExitError(
+            1,
+            String(result.error || 'Actuator operation failed'),
+            json || dryRun || check
+          );
         return result;
       }
     ),

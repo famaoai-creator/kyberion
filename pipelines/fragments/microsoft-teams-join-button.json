@@ -15,25 +15,25 @@
     {
       "id": "fill_meeting_id",
       "role": "sink",
-      "op": "browser:fill_ref",
+      "op": "browser:fill",
       "params": {
         "selector": "input[pattern=\"[a-zA-Z\\d\\s]{9,}\"], input[aria-label*=\"会議 ID\" i], input[placeholder*=\"会議 ID\" i], input[aria-label*=\"Meeting ID\" i], input[placeholder*=\"Meeting ID\" i]",
-        "value": "{{meeting_id}}"
+        "text": "{{meeting_id}}"
       }
     },
     {
       "id": "fill_passcode",
       "role": "sink",
-      "op": "browser:fill_ref",
+      "op": "browser:fill",
       "params": {
         "selector": "input[pattern=\"[\\d\\w]+\"], input[aria-label*=\"会議パスコード\" i], input[placeholder*=\"会議パスコード\" i], input[aria-label*=\"passcode\" i], input[placeholder*=\"passcode\" i]",
-        "value": "{{passcode}}"
+        "text": "{{passcode}}"
       }
     },
     {
       "id": "click_join_button",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "button[type=\"submit\"][aria-label*=\"Teams 会議に今すぐ参加します\"], button[type=\"submit\"].btn-primary, button:has-text(\"会議に参加する\"), button:has-text(\"Join the meeting\")"
       }

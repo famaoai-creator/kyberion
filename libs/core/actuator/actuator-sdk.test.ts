@@ -287,10 +287,10 @@ describe('actuator SDK', () => {
 
   it('uses the catalog-provided legacy contract for runtime pipeline operations', async () => {
     const actuator = defineCatalogBackedActuator({
-      id: 'browser-actuator',
+      id: 'media-actuator',
       describeOps: () => [
-        withCatalogInputContract('browser', 'click_ref', 'apply', {
-          op: 'click_ref',
+        withCatalogInputContract('media', 'apply_pattern', 'apply', {
+          op: 'apply_pattern',
           kind: 'apply' as const,
           input_schema: {
             type: 'object',
@@ -302,7 +302,7 @@ describe('actuator SDK', () => {
       handleAction: (input) => ({ status: 'ok', input }),
     });
 
-    await expect(actuator.dispatch('click_ref', { legacy_ref: '@e1' })).resolves.toMatchObject({
+    await expect(actuator.dispatch('apply_pattern', { legacy_ref: '@e1' })).resolves.toMatchObject({
       ok: true,
       output: { status: 'ok' },
     });
