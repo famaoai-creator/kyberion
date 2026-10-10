@@ -830,9 +830,12 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 - **Appends create only inside the directory that was opened and authorized.** An append opens
   without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
   through a leaf link) after the parent directory is opened and its own location authorized for
-  the new name: on Linux the create goes through that held descriptor
-  (`/proc/self/fd/<n>/<name>`, an `openat`), so a parent component flipped after the check cannot
-  redirect it; elsewhere it is by path and the parent must still be the inode held afterwards.
+  the new name, so a parent component flipped to a link after the check cannot redirect it. On
+  Linux the create goes through that held descriptor (`/proc/self/fd/<n>/<name>`, an `openat`); on
+  macOS it opens the authorized physical path with `O_NOFOLLOW_ANY` (`0x20000000`, not exported by
+  Node; it replaces `O_NOFOLLOW`, since open(2) rejects both together with `EINVAL`), which fails
+  if any component is a link at create time. Elsewhere there is no `openat`: a create through a
+  linked parent directory is refused, and the parent must still be the inode held afterwards.
   When a concurrent appender wins the create (`EEXIST`), the loser opens that file without
   `O_CREAT` and appends, so no line is lost; a dangling leaf link is refused, even when its target
   would be allowed. A created file whose vetting fails is left in place, empty, and the call
@@ -851,7 +854,10 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   `validateFileSize` stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs
   and devices fall back to the leaf-identity pin). A target outside the repository is pinned only
   under a registered vault mount (`vaultTargetIdentity`). Denial messages name only the caller's
-  path — never the resolved location or a tier-guard reason that embeds it. Cost on the CI VM:
+  path — never the resolved location or a tier-guard reason that embeds it — but keep the
+  reason's classification (`[RESOURCE_SCOPE_DENIED]`, `[POLICY_VIOLATION] tenant.scope_violation`;
+  `denialCode`), so callers that classify on the code still see it. Errnos libuv leaves unnamed
+  (macOS `EOPNOTSUPP` from opening a socket) are classified by number. Cost on the CI VM:
   about +45 µs per read or stat, none for appends to an existing file (their canonical path is
   passed through).
 - **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
@@ -872,11 +878,11 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   act on the literal path after the check; a concurrent swap can redirect one such operation. On
   platforms without `/proc/self/fd` the fallback pin re-derives the canonical path, so an
   attacker would have to win two consecutive races.
-- _Append creates off Linux._ Without `/proc/self/fd` there is no `openat`: the create is by path,
-  so a parent directory flipped between the check and the create can leave an empty file in
-  another directory, `knowledge/personal/` included (the call is refused, nothing is written,
-  nothing is deleted). "Never creates through a link" holds for the leaf on every platform and
-  for parent components on Linux only.
+- _Append creates off Linux and macOS._ Without `openat` or `O_NOFOLLOW_ANY` (Windows, the BSDs)
+  the create is by path from a parent that was symlink-free at the check; a real parent directory
+  swapped for a link between the check and the create can still leave an empty file in another
+  directory (the call is refused, nothing is written, nothing is deleted). "Never creates through
+  a link" holds for every component on Linux and macOS.
 - _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
   hard links to files outside the repository (vault targets) are not detected. Path-only helpers
   (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
@@ -908,8 +914,9 @@ flags, `node_modules` planted in a writable tree, `node_modules/@actuator/servic
 read as `software_developer`, exemption pinned to the held inode (unit + bounded symlink-flip race),
 SUDO pnpm-store reads, ENOENT code, direct symlink flip between check and open for read / range /
 tail / stat / size, chmod of a file or directory, append-create through a dangling link and
-readdir (bounded races), FIFO reads that must not block, denial messages without the resolved
-location, `validateFileSize` tier and hard-link guard, directory
+readdir (bounded races), append-create through a flipped parent and through a linked parent per
+platform, FIFO reads that must not block, denial messages without the resolved location but with
+the guard classification, `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release

@@ -618,6 +618,9 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
 
       {consoleSection === 'organization' ? (
         <OrganizationOperatingModel
+          key={`${tenant}:${organizationId}:${projectId}`}
+          organizationId={organizationId || undefined}
+          projectId={projectId || undefined}
           tenant={tenant || undefined}
           onOpenOperations={() => openConsoleSection('operations')}
           onOpenGovernance={() => openConsoleSection('governance')}

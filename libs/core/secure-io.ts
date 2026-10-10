@@ -34,6 +34,7 @@ import { recordGovernanceAction } from './governance/governance-action-recorder.
 import { createLogger } from './logger.js';
 import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
 import {
+  assertScopedMetadataReadable,
   assertCanonicalReadable,
   assertCanonicalWritable,
   canonicalGuardPath,
@@ -751,7 +752,7 @@ export function safeMkdir(
   dirPath: string,
   options: fs.MakeDirectoryOptions = { recursive: true }
 ): void {
-  const { resolved, canonical } = guardWritePath(dirPath);
+  const { resolved, canonical } = guardWritePath(dirPath, 'follow', 'mkdir');
   if (fs.existsSync(resolved)) return;
   if (options.recursive) mkdirGuarded(resolved, canonical, dirPath, Number(options.mode ?? 0o777));
   else fs.mkdirSync(resolved, options);
@@ -919,6 +920,7 @@ export function safeExistsSync(filePath: string): boolean {
   if (!filePath) return false;
   assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
+  assertScopedMetadataReadable(resolved, filePath);
   return fs.existsSync(resolved);
 }
 
@@ -1434,33 +1436,30 @@ export function safeReaddir(dirPath: string): string[] {
 export function safeStat(filePath: string): fs.Stats {
   assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
-  const check = validateReadPermission(resolved);
+  const check = validateReadPermission(resolved, 'metadata');
   if (!check.allowed) {
     throw new Error(
       `[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
-  assertCanonicalReadable(resolved, filePath, 'follow');
+  assertCanonicalReadable(resolved, filePath, 'follow', 'metadata');
   // Pinned to what was stat'ed (and hard-link checked), like a read.
-  return statVetted(resolved, filePath);
+  return statVetted(resolved, filePath, 'metadata');
 }
 
 /**
  * Safely get symbolic-link-aware file status with permission validation.
  */
 export function safeLstat(filePath: string): fs.Stats {
-  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const check = validateReadPermission(resolved);
-  if (!check.allowed) {
-    throw new Error(
-      `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
-    );
-  }
-  assertCanonicalReadable(resolved, filePath, 'leaf');
-  // codeql[js/path-injection] — `resolved` is produced by pathResolver and has
-  // passed validateReadPermission + assertCanonicalReadable above; this
-  // wrapper IS the path-injection sanitizer boundary.
+  const resolved = guardReadPath(
+    filePath,
+    (reason) =>
+      `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`,
+    'leaf',
+    'metadata'
+  );
+  // `resolved` passed validateReadPermission + assertCanonicalReadable above;
+  // this wrapper IS the path-injection sanitizer boundary.
   return fs.lstatSync(resolved);
 }
 
