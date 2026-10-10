@@ -25,7 +25,7 @@
             "additionalProperties": { "type": "string" }
           },
           "shutdownPolicy": { "type": "string", "enum": ["manual", "idle", "detached"] },
-          "startupMode": { "type": "string", "enum": ["background", "workspace-app"] },
+          "startupMode": { "type": "string", "enum": ["background", "workspace-app", "on-demand"] },
           "ownerType": { "type": "string" },
           "port": { "type": "integer", "minimum": 1 },
           "healthPath": { "type": "string" },

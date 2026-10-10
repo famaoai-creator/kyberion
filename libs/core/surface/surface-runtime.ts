@@ -39,7 +39,14 @@ export interface SurfaceRuntimeDefinition {
   cwd?: string;
   env?: Record<string, string>;
   shutdownPolicy?: RuntimeShutdownPolicy;
-  startupMode?: 'background' | 'workspace-app';
+  /**
+   * `background`: supervisor keeps it resident. `workspace-app`: UI launched
+   * in the operator's workspace. `on-demand`: an external client spawns and
+   * owns the process (e.g. a stdio MCP server — supervising it would only
+   * respawn a process that exits on stdin EOF); the supervisor never starts
+   * it and a stale state record does not count as a defect.
+   */
+  startupMode?: 'background' | 'workspace-app' | 'on-demand';
   ownerType?: string;
   port?: number;
   healthPath?: string;

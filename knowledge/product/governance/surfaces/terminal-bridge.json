@@ -13,6 +13,8 @@
       },
       "cwd": ".",
       "shutdownPolicy": "detached",
+      "port": 4000,
+      "healthPath": "/health",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
       "enabled": true,

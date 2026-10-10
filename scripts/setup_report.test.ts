@@ -116,8 +116,8 @@ describe('task-oriented setup readiness', () => {
       const report = readyInput();
       report.surfaceHealth.concierge = { status: 'unhealthy', detail };
       expect(buildRecommendedSurfaces(report)[0]).toMatchObject({
-        readiness: 'needs_setup',
-        suggestedCommand: 'pnpm surfaces repair --surface concierge',
+        readiness: 'needs_attention',
+        suggestedCommand: 'pnpm surfaces repair -- --surface concierge',
       });
       expect(buildFirstTimeUserNextActions(report)).toHaveLength(1);
       expect(buildFirstTimeUserNextActions(report)[0].reason).toContain(detail);

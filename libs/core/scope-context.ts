@@ -1,6 +1,6 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
@@ -78,6 +78,12 @@ function scopeEnvPath(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
+  // Hermetic-test contract: under vitest the operator's persisted scope must
+  // not leak into test identity/tenant resolution. The VITEST marker lives on
+  // the real process env — `env` here is the caller's override — while the
+  // explicit fixture path is read from the override. Tests that need a
+  // persisted scope set KYBERION_SCOPE_ENV_PATH to their own fixture file.
+  if (isVitestProcess() && !envText(env, 'KYBERION_SCOPE_ENV_PATH')?.trim()) return {};
   const filePath = scopeEnvPath(env);
   if (!safeExistsSync(filePath)) return {};
   try {
