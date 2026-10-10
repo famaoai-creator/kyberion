@@ -651,6 +651,10 @@ export function vetOpenedFd(
   const actual = openedLocation(fd, resolved, held);
   const changed = `[SECURITY] Refusing to ${operation} ${displayPath}: the file changed between the permission check and the open`;
   if (actual === undefined) throw new Error(changed);
+  // A path whose leaf is being replaced can, rarely, open as its own parent
+  // directory (seen on ext4 under a rename-over loop): a directory must still
+  // be what the path names, or a chmod or listing would land on the parent.
+  if (held.isDirectory() && !namesInode(resolved, held)) throw new Error(changed);
   // Opened exactly what the caller's check authorized: no need to re-judge.
   if (actual !== authorizedCanonical)
     assertAuthorizedAt(actual, displayPath, operation, readOperation);
@@ -697,6 +701,16 @@ function pinnedLinkState(fd: number, resolved: string): fs.Stats | undefined {
   }
   if (after === link) return now;
   return after.endsWith(' (deleted)') ? unnamed(fd) : undefined;
+}
+
+/** `resolved` (followed) currently names the inode `held`. */
+function namesInode(resolved: string, held: fs.Stats): boolean {
+  try {
+    const now = fs.statSync(resolved);
+    return now.dev === held.dev && now.ino === held.ino;
+  } catch {
+    return false;
+  }
 }
 
 /** The descriptor's stats when it has no names left, else undefined. */

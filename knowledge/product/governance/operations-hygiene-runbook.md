@@ -872,6 +872,9 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
     stream of chmod/utimes/writes faster than a snapshot is refused rather than judged on its link
     count alone (lookups convoy behind the unlinker on the parent lock, so repeated link-count
     lookups can each catch a name mid-unlink).
+  - An opened directory must still be what the path names (`stat` of the path, same inode): under
+    a rename-over loop on ext4 an `open` of `dir/name` can, rarely, return `dir` itself, and a
+    chmod or listing would otherwise land on the parent.
   - Appends are vetted this way before any byte is written. Cost on the CI VM: about +5% per
     in-place read or stat, about +15% per append to a file changed in the last second.
 - **Appends create only inside the directory that was opened and authorized.** An append opens
