@@ -4,6 +4,8 @@ import { safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 
 const ALLOWLIST = [
   /\/libs\/core\/secure-io\.ts$/,
+  // secure-io's permission guards (literal + canonical symlink checks).
+  /\/libs\/core\/secure-io-path-guard\.ts$/,
   /\/libs\/core\/fs-primitives\.ts$/,
   /\/libs\/core\/mlx-embedding-backend\.ts$/,
   /\/libs\/core\/python-voice-bridge\.ts$/,
@@ -56,5 +58,23 @@ describe('security boundary contract', () => {
     });
 
     expect(offenders).toEqual([]);
+  });
+
+  it('lets only secure-io.ts import its permission guards (secure-io-path-guard)', () => {
+    const repoRoot = pathResolver.rootDir();
+    const importers = [
+      ...collectProductionTsFiles(`${repoRoot}/libs`),
+      ...collectProductionTsFiles(`${repoRoot}/scripts`),
+      ...collectProductionTsFiles(`${repoRoot}/satellites`),
+      ...collectProductionTsFiles(`${repoRoot}/presence`),
+    ]
+      .filter((filePath) => !filePath.endsWith('/libs/core/secure-io-path-guard.ts'))
+      .filter((filePath) =>
+        /['"][^'"]*secure-io-path-guard(?:\.js)?['"]/.test(
+          safeReadFile(filePath, { encoding: 'utf8' }) as string
+        )
+      )
+      .map((filePath) => filePath.slice(repoRoot.length + 1));
+    expect(importers).toEqual(['libs/core/secure-io.ts']);
   });
 });

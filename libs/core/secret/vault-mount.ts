@@ -16,6 +16,7 @@ import {
   rawReadlinkSync,
   rawStatSync,
   rawSymlinkSync,
+  rawRealpathSync,
   rawUnlinkSync,
 } from '../fs-primitives.js';
 
@@ -125,9 +126,20 @@ export function isAllowedVaultMountPath(targetPath: string): boolean {
   // Check against targets of all active mounts
   const mounts = listVaultMounts();
   for (const mount of mounts) {
-    const rel = path.relative(mount.targetPath, normalizedTarget);
-    if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
-      return true;
+    // secure-io checks the canonical (link-resolved) path of a read too, so
+    // also accept the mount target's own canonical form (a host path behind
+    // a linked prefix such as macOS /var -> /private/var).
+    const bases = [mount.targetPath];
+    try {
+      bases.push(rawRealpathSync(mount.targetPath));
+    } catch {
+      // broken mount: only the literal target applies
+    }
+    for (const base of bases) {
+      const rel = path.relative(base, normalizedTarget);
+      if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
+        return true;
+      }
     }
   }
 

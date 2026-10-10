@@ -200,6 +200,7 @@ export default [
       '**/*.test.ts',
       '**/*.spec.ts',
       'libs/core/secure-io.ts',
+      'libs/core/secure-io-path-guard.ts',
       'libs/core/fs-primitives.ts',
     ],
     rules: {
@@ -264,7 +265,11 @@ export default [
     },
   },
   {
-    files: ['libs/core/secure-io.ts', 'libs/core/fs-primitives.ts'],
+    files: [
+      'libs/core/secure-io.ts',
+      'libs/core/secure-io-path-guard.ts',
+      'libs/core/fs-primitives.ts',
+    ],
     rules: {
       'no-restricted-imports': 'off',
     },
