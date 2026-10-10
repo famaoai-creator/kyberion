@@ -62,6 +62,7 @@ import { AdvancedSection, type ManagementState } from './sections/AdvancedSectio
 import { DisplaySection } from './sections/DisplaySection';
 import { FormScope } from './sections/form-scope';
 import { postSetupUpload, toUploadFile } from './settings-api';
+import { withSelectedTenant, readSelectedTenant } from '../../lib/tenant-context';
 import './settings.css';
 
 /**
@@ -1202,6 +1203,16 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-page">
+      <div className="settings-inline-actions">
+        <Button
+          label={t('management.title')}
+          href={withSelectedTenant(
+            '/management',
+            readSelectedTenant() || meViewing?.tenant_slug || management.tenant_slug,
+            'snake'
+          )}
+        />
+      </div>
       {firstRun ? (
         <p className="settings-first-run-lead">
           {frontDeskText('settings_first_run_lead', locale)}

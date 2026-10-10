@@ -25,6 +25,7 @@ import {
   scopedAssumedRole,
   type ExecutionScope,
 } from './foundation/execution-scope.js';
+import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 const logger = createLogger('authority');
 
@@ -658,6 +659,31 @@ function prepareExecutionContext(
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
+  if (normalizedRole === 'concierge_management_reader') {
+    const resource = currentResourceAccessScope();
+    if (
+      !resource ||
+      resource.tenantSlug !== tenantSlug ||
+      resource.writeExact.length > 0 ||
+      resource.mkdirExact.length > 0
+    ) {
+      throw new Error(
+        '[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability'
+      );
+    }
+  }
+  if (normalizedRole === 'concierge_management_writer') {
+    const resource = currentResourceAccessScope();
+    if (
+      !resource?.organizationId ||
+      resource.tenantSlug !== tenantSlug ||
+      resource.organizationId !== organizationId
+    ) {
+      throw new Error(
+        '[RESOURCE_SCOPE_REQUIRED] Management writer needs matching tenant and organization capability'
+      );
+    }
+  }
   if (organizationId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(organizationId)) {
     throw new Error(`[SCOPE_CONTEXT_INVALID] organization id '${organizationId}' is invalid`);
   }

@@ -165,3 +165,49 @@ describe('su surface data', () => {
     expect(Array.isArray(approvals)).toBe(true);
   });
 });
+
+it('narrows mission history by all authorized hierarchy dimensions before the limit', () => {
+  const base = {
+    tier: 'confidential',
+    tenant_slug: 'acme',
+    status: 'active',
+    history: [],
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'operator',
+    confidence_score: 1,
+    git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+  };
+  const states = [
+    {
+      ...base,
+      mission_id: 'MSN-SIBLING',
+      organization_id: 'ORG-B',
+      relationships: { project: { project_id: 'PRJ-B' } },
+    },
+    { ...base, mission_id: 'MSN-UNSCOPED' },
+    {
+      ...base,
+      mission_id: 'MSN-MATCH',
+      organization_id: 'ORG-A',
+      relationships: { project: { project_id: 'PRJ-A' } },
+    },
+    {
+      ...base,
+      mission_id: 'MSN-OTHER-TENANT',
+      tenant_slug: 'other',
+      organization_id: 'ORG-A',
+      relationships: { project: { project_id: 'PRJ-A' } },
+    },
+  ] as Parameters<typeof projectMissionHistoryItems>[0];
+  expect(
+    projectMissionHistoryItems(states, [], {
+      tenantSlugs: ['acme'],
+      organizationIds: ['ORG-A'],
+      projectIds: ['PRJ-A'],
+      limit: 1,
+    }).map((item) => item.missionId)
+  ).toEqual(['MSN-MATCH']);
+  expect(projectMissionHistoryItems(states, [], { organizationIds: [] })).toEqual([]);
+  expect(projectMissionHistoryItems(states, [], { projectIds: [] })).toEqual([]);
+});

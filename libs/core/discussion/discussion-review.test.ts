@@ -28,7 +28,7 @@ async function concludedRoom(id: string, goal = 'Adopt staged rollout') {
     createDiscussionRoom({
       id,
       goal,
-      scope: { tenant_slug: 'demo', project_id: 'proj-r' },
+      scope: { tenant_slug: 'demo', organization_id: 'org-r', project_id: 'proj-r' },
       config: { turn_delay_ms: 0, speaker: 'scripted', locale: 'en' },
     })
   );

@@ -80,3 +80,16 @@ describe('front-desk destination scope parity', () => {
     );
   });
 });
+
+it('preserves the Management hierarchy when leaving and returning through the rail', () => {
+  browser('http://localhost:3050/management?tenant=alpha&organization_id=org-a&project_id=prj-a');
+  const destination = withSelectedTenant('/settings', 'alpha');
+  browser(new URL(destination, 'http://localhost:3050').href);
+  const returned = new URL(withSelectedTenant('/management', 'alpha'), 'http://localhost:3050');
+  expect(returned.pathname).toBe('/management');
+  expect(Object.fromEntries(returned.searchParams)).toEqual({
+    tenant: 'alpha',
+    organizationId: 'org-a',
+    projectId: 'prj-a',
+  });
+});

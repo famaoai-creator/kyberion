@@ -1,4 +1,6 @@
 import { withExecutionContext } from '../authority.js';
+import { parseEventScopeInput } from '../event-scope.js';
+import { assertScopeContext } from '../scope-context-validation.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import {
   createApprovalRequest,
@@ -25,6 +27,22 @@ function clip(text: string, max: number): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
+function discussionMissionScope(room: DiscussionRoomState) {
+  for (const [key, value] of Object.entries(room.scope)) {
+    if (
+      !['tenant_slug', 'organization_id', 'project_id', 'tier'].includes(key) ||
+      (value !== undefined &&
+        (typeof value !== 'string' || !value.trim() || value !== value.trim()))
+    ) {
+      throw new DiscussionUserError('The stored discussion scope is invalid: ' + key);
+    }
+  }
+  return assertScopeContext(
+    parseEventScopeInput({ ...room.scope, tier: room.scope.tier ?? 'confidential' }),
+    { requireTenant: true }
+  );
+}
+
 /**
  * An accepted decision does not start a mission by itself. It raises an
  * approval request that a human decides in the normal approvals queue; only
@@ -36,6 +54,7 @@ export function requestMissionStart(roomId: string, actor: string): { approval_i
   if (!room?.decision) throw new DiscussionUserError('The discussion has no decision yet');
   if (room.scope.mission_id) return null; // already part of a mission
   if (room.outcomes.mission?.approval_id) return { approval_id: room.outcomes.mission.approval_id };
+  const scope = discussionMissionScope(room);
   const locale = room.config.locale;
   const copy = loadDiscussionCopy().mission_request;
   // Mission ceremonies are written by mission_controller, the same governed role
@@ -57,14 +76,7 @@ export function requestMissionStart(roomId: string, actor: string): { approval_i
         severity: 'medium',
       },
       sourceText: room.goal,
-      scope: {
-        ...(room.scope.tenant_slug ? { tenant_slug: room.scope.tenant_slug } : {}),
-        ...(room.scope.organization_id ? { organization_id: room.scope.organization_id } : {}),
-        // The canonical chain forbids a project without its organization.
-        ...(room.scope.organization_id && room.scope.project_id
-          ? { project_id: room.scope.project_id }
-          : {}),
-      },
+      scope,
     })
   );
   appendDiscussionEvent(room.id, {
@@ -140,10 +152,27 @@ export async function issueMissionForDiscussion(
   if (approvalStatus(room) !== 'approved') {
     throw new DiscussionUserError('The mission start has not been approved yet');
   }
+  const scope = discussionMissionScope(room);
+  if (
+    !record?.scope ||
+    (['tenant_slug', 'organization_id', 'project_id', 'tier'] as const).some(
+      (key) => scope[key] !== record.scope?.[key]
+    )
+  ) {
+    throw new DiscussionUserError(
+      'The approved mission scope no longer matches this discussion. Request a new approval.'
+    );
+  }
   let issued: Awaited<ReturnType<typeof issueChronosMissionFromProposal>>;
   try {
     issued = await issueChronosMissionFromProposal({
       sessionId: `discussion-${room.id}`,
+      scope: {
+        tenant_slug: scope.tenant_slug!,
+        tier: scope.tier,
+        ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+        ...(scope.project_id ? { project_id: scope.project_id } : {}),
+      },
       proposal: {
         intent: 'create_mission',
         mission_type: 'development',
