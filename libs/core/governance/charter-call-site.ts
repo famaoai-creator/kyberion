@@ -57,13 +57,10 @@ export function charterInputForDecision(
     buildNhiId(input.tenantSlug, workerSlug(input.agentId)),
     charter.accountable.actor
   );
-  const amount =
-    entry.amount_semantics !== 'none' &&
-    typeof input.amount === 'number' &&
-    Number.isFinite(input.amount) &&
-    input.amount > 0
-      ? input.amount
-      : 0;
+  const usableAmount =
+    typeof input.amount === 'number' && Number.isFinite(input.amount) && input.amount >= 0;
+  const amount = entry.amount_semantics !== 'none' && usableAmount ? input.amount! : 0;
+  const amountUnknown = entry.amount_semantics !== 'none' && !usableAmount;
   const recipients =
     typeof input.recipients === 'number' &&
     Number.isInteger(input.recipients) &&
@@ -93,6 +90,7 @@ export function charterInputForDecision(
   return {
     scope,
     action,
+    ...(amountUnknown ? { amountUnknown: true } : {}),
     ...(options.rootDir ? { pathOptions } : {}),
   };
 }
