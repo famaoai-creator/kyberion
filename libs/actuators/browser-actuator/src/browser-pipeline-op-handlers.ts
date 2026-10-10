@@ -545,6 +545,7 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
     }
     await retry(async () => {
       await page.click(resolve(params.selector), {
+        strict: true,
         timeout: params.timeout || 5000,
       });
     }, buildRetryOptions(params));
@@ -584,6 +585,11 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       },
       { selectors, text, exact }
     );
+    if (clicked === null) {
+      throw new Error(
+        'No visible browser target matched click_first_match; capture a fresh snapshot and choose a matching selector/text.'
+      );
+    }
     return browserRuntimeHelpers.recordBrowserAction(
       { ...ctx, [params.export_as || 'clicked_match']: clicked },
       {
@@ -682,7 +688,7 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
     );
     const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
     await retry(async () => {
-      await page.click(selector, { timeout: params.timeout || 5000 });
+      await page.click(selector, { strict: true, timeout: params.timeout || 5000 });
     }, buildRetryOptions(params));
     return browserRuntimeHelpers.recordBrowserAction(
       { ...resolvedCtx, last_url: page.url() },
@@ -714,6 +720,10 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       : params.classification === 'secret_ref' && params.variable?.name
         ? String(resolve(params.variable.name))
         : undefined;
+    if (!secretKey && typeof params.text !== 'string')
+      throw new Error(
+        'fill_ref requires explicit text (use an empty string to clear) or a secret_ref.'
+      );
     // Secret-bearing fills must corroborate the role/name match against
     // dom_path (or fail closed if no dom_path was recorded) — a relabeled
     // live element must never receive a secret value. See
@@ -732,6 +742,10 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       : resolve(params.text);
     if (secretKey && text == null)
       throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
+    if (!secretKey && typeof text !== 'string')
+      throw new Error(
+        'fill_ref resolved text must be a string; use an explicit empty string to clear.'
+      );
     await retry(async () => {
       await page.fill(selector, String(text ?? ''), {
         timeout: params.timeout || 5000,

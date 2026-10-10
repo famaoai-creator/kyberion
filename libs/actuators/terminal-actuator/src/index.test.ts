@@ -204,6 +204,39 @@ describe('terminal-actuator SDK dispatch (pipeline / ADF path)', () => {
 });
 
 describe('terminal-actuator direct actions', () => {
+  it('explains unsupported resize on a running pipe fallback', async () => {
+    const { handleAction } = await import('./terminal-actuator-helpers.js');
+    const { ptyEngine } = await import('@agent/core/shell/pty-engine');
+    ptyState.sessions.set('pipe-session', {
+      status: 'running',
+      adapter: { supportsResize: false },
+    });
+    vi.mocked(ptyEngine.resize).mockReturnValueOnce(false);
+    const result = await handleAction({
+      action: 'resize',
+      params: { sessionId: 'pipe-session', cols: 100, rows: 30 },
+    });
+    expect(result.status).toBe('failed');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('pipe fallback that cannot resize');
+  });
+
+  it.each(['poll', 'write', 'resize', 'kill'] as const)(
+    'reports a missing session as a failed %s operation',
+    async (action) => {
+      const { handleAction } = await import('./terminal-actuator-helpers.js');
+      const { ptyEngine } = await import('@agent/core/shell/pty-engine');
+      if (action !== 'poll') vi.mocked(ptyEngine[action]).mockReturnValueOnce(false);
+      const result = await handleAction({
+        action,
+        params: { sessionId: 'nonexistent-session', data: 'x', cols: 100, rows: 30 },
+      });
+      expect(result.status).toBe('failed');
+      expect(result.error).toContain('nonexistent-session');
+      if (action !== 'poll') expect(result.success).toBe(false);
+    }
+  );
+
   beforeEach(() => {
     ptyState.sessions.clear();
   });

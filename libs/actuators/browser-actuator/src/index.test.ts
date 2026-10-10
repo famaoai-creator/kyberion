@@ -412,7 +412,10 @@ describe('browser-actuator v3 contract', () => {
     });
 
     expect(mocks.launchPersistentContext).toHaveBeenCalled();
-    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', {
+      strict: true,
+      timeout: 5000,
+    });
     expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'hello', {
       timeout: 5000,
     });
@@ -502,7 +505,10 @@ describe('browser-actuator v3 contract', () => {
     );
 
     expect(result.status).toBe('succeeded');
-    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', {
+      strict: true,
+      timeout: 5000,
+    });
   });
 
   it('does not remint @e1 onto a decoy when a later snapshot would remap the live page', async () => {
@@ -541,7 +547,10 @@ describe('browser-actuator v3 contract', () => {
       );
 
       expect(result.status).toBe('succeeded');
-      expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+      expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', {
+        strict: true,
+        timeout: 5000,
+      });
       expect(mocks.page.click).not.toHaveBeenCalledWith('input#decoy', expect.anything());
     } finally {
       if (originalEvaluate) {
@@ -565,7 +574,7 @@ describe('browser-actuator v3 contract', () => {
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalledWith(
       'a[href="https://www.iana.org/domains/example"]',
-      { timeout: 5000 }
+      { strict: true, timeout: 5000 }
     );
     expect(JSON.stringify(result.results)).not.toContain('Unknown browser ref');
   });
@@ -647,6 +656,24 @@ describe('browser-actuator v3 contract', () => {
     expect(result.url || result.summary?.url || result.context?.last_url).toBeTruthy();
   });
 
+  it('executes namespaced browser control and capture ops in one session', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-namespaced',
+      steps: [
+        { type: 'control', op: 'browser:open_tab', params: { url: 'https://example.com' } },
+        { type: 'capture', op: 'browser:snapshot', params: {} },
+      ],
+      options: { headless: true },
+    });
+    expect(result.status).toBe('succeeded');
+    expect(result.results.map((entry: { op: string }) => entry.op)).toEqual([
+      'open_tab',
+      'snapshot',
+    ]);
+  });
+
   it('routes click({ref}) through click_ref behavior', async () => {
     const { handleAction } = await import('./index');
     const result = await handleAction({
@@ -661,6 +688,36 @@ describe('browser-actuator v3 contract', () => {
 
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalled();
+  });
+
+  it('asks Playwright to reject ambiguous selector clicks', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-strict-click',
+      options: { headless: true },
+      steps: [{ type: 'apply', op: 'click', params: { selector: '.duplicate', max_retries: 0 } }],
+    });
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalledWith(
+      '.duplicate',
+      expect.objectContaining({ strict: true })
+    );
+  });
+
+  it('reports failure when click_first_match finds no visible target', async () => {
+    const { handleAction } = await import('./index');
+    mocks.page.evaluate.mockResolvedValueOnce(null);
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-missing-first-match',
+      options: { headless: true },
+      steps: [
+        { type: 'apply', op: 'click_first_match', params: { selector: '#absent', max_retries: 0 } },
+      ],
+    });
+    expect(result.status).toBe('failed');
+    expect(result.results[0].error).toContain('No visible browser target');
   });
 
   it('clicks a DOM-backed mark:<n> of the current snapshot through its @eN ref', async () => {
@@ -724,7 +781,10 @@ describe('browser-actuator v3 contract', () => {
     saveRefMarks(snapshotId);
     const result = await clickMark();
     expect(result.status).toBe('succeeded');
-    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', {
+      strict: true,
+      timeout: 5000,
+    });
     expect(mocks.page.mouse.click).not.toHaveBeenCalled();
   });
 
@@ -838,7 +898,10 @@ describe('browser-actuator v3 contract', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.results[0]).toMatchObject({ op: 'click_ref', status: 'success' });
-    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', {
+      strict: true,
+      timeout: 5000,
+    });
     expect(result.context.ref_map).toMatchObject({ '@from-recording': 'button:nth-of-type(1)' });
   });
 
@@ -924,6 +987,54 @@ describe('browser-actuator v3 contract', () => {
     expect(result.context.network).toEqual([
       expect.objectContaining({ tab_id: 'research', url: 'https://example.org/api' }),
     ]);
+  });
+
+  it.each([undefined, null, 42])(
+    'rejects invalid fill value %s before touching the field',
+    async (text) => {
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'fill_ref', params: { ref: '@e1', text } }],
+        options: { headless: true },
+      });
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toContain('explicit text');
+      expect(mocks.page.fill).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([null, 42])(
+    'rejects resolved non-string fill value %s without clearing',
+    async (value) => {
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        context: { value },
+        steps: [
+          { type: 'capture', op: 'snapshot', params: {} },
+          { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: '{{value}}' } },
+        ],
+        options: { headless: true },
+      });
+      expect(result.status).toBe('failed');
+      expect(result.results.at(-1).error).toContain('resolved text must be a string');
+      expect(mocks.page.fill).not.toHaveBeenCalled();
+    }
+  );
+
+  it('allows explicit empty text to clear a field', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        { type: 'capture', op: 'snapshot', params: {} },
+        { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: '' } },
+      ],
+      options: { headless: true },
+    });
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.fill).toHaveBeenCalledWith(expect.any(String), '', expect.any(Object));
   });
 
   it('records action trails and exports playwright/adf artifacts', async () => {
@@ -1054,6 +1165,7 @@ describe('browser-actuator v3 contract', () => {
     expect(mocks.page.click).toHaveBeenCalledWith(
       'a[href="https://www.iana.org/domains/example"]',
       {
+        strict: true,
         timeout: 5000,
       }
     );

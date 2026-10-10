@@ -361,6 +361,7 @@
 - [Actuator Intent Normalization](./product/orchestration/actuator-intent-normalization.md) (public | Unknown)
 - [Actuator to Pipeline Flow (use → collaborate → register)](./product/orchestration/actuator-to-pipeline-flow.md) (public | Kyberion)
 - [Actuatorからパイプライン登録までの流れ（利用→提携→登録）](./product/orchestration/actuator-to-pipeline-flow.ja.md) (public | Kyberion)
+- [Agent-facing actuator discovery and usage](./product/orchestration/actuator-agent-usage.md) (public | Unknown)
 - [Antigravity CLI Multi-Account Profile Operations](./product/orchestration/antigravity-multi-account-operations.md) (public | Unknown)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)

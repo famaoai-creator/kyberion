@@ -20,7 +20,7 @@ const BROWSER_REF_SCHEMA: InputSchema = {
     high_risk: { type: 'boolean' },
     key: { type: 'string' },
     name: { type: 'string' },
-    ref: { type: 'string' },
+    ref: { type: 'string', minLength: 1 },
     role: { type: 'string' },
     secret_ref: { type: 'string' },
     state: { type: 'string' },
@@ -28,7 +28,7 @@ const BROWSER_REF_SCHEMA: InputSchema = {
     timeout: { type: 'number' },
     variable: {},
   },
-  additionalProperties: false,
+  additionalProperties: true,
 };
 const BROWSER_EMPTY_SCHEMA: InputSchema = {
   type: 'object',
@@ -147,7 +147,24 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
     properties: { recording: {}, session: {} },
     additionalProperties: false,
   },
-  fill_ref: BROWSER_REF_SCHEMA,
+  fill_ref: {
+    ...BROWSER_REF_SCHEMA,
+    anyOf: [
+      { required: ['text'] },
+      { required: ['secret_ref'], properties: { secret_ref: { type: 'string', minLength: 1 } } },
+      {
+        required: ['classification', 'variable'],
+        properties: {
+          classification: { const: 'secret_ref' },
+          variable: {
+            type: 'object',
+            required: ['name'],
+            properties: { name: { type: 'string', minLength: 1 } },
+          },
+        },
+      },
+    ],
+  },
   import_session_handoff: {
     type: 'object',
     properties: {

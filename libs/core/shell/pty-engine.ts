@@ -25,6 +25,7 @@ export interface PtySession {
 }
 
 interface TerminalAdapter {
+  readonly supportsResize: boolean;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(): void;
@@ -42,6 +43,7 @@ export function parsePtyAdfPayload(raw: string): Record<string, unknown> | undef
 }
 
 class NativePtyAdapter implements TerminalAdapter {
+  readonly supportsResize = true;
   constructor(private pty: pty.IPty) {}
   write(data: string) {
     this.pty.write(data);
@@ -64,6 +66,7 @@ class NativePtyAdapter implements TerminalAdapter {
 }
 
 class ChildProcessAdapter implements TerminalAdapter {
+  readonly supportsResize = false;
   constructor(private child: ChildProcess) {}
   write(data: string) {
     this.child.stdin?.write(data);
@@ -384,7 +387,7 @@ class PtyRegistry {
 
   public resize(id: string, cols: number, rows: number): boolean {
     const session = this.sessions.get(id);
-    if (session && session.status === 'running') {
+    if (session && session.status === 'running' && session.adapter.supportsResize) {
       session.adapter.resize(cols, rows);
       session.lastUpdated = Date.now();
       runtimeSupervisor.touch(id);

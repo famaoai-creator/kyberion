@@ -254,8 +254,10 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   is rejected. CodeQL's context-insensitive `IndirectCommandArgument` model
   then treats every argument of those helpers as shell-interpreted and flags
   every caller (698 false alerts before the split).
-- Actuator CLIs exit 0 with `status:"failed"` in stdout — callers parse
-  the payload and verify artifacts; exit codes prove nothing.
+- Actuator one-shot CLIs preserve failed/denied result payloads and exit nonzero;
+  resident CLIs set `ok:false` on failed results. Callers still inspect command
+  exit codes within terminal results and verify artifacts. Follow
+  [operations-hygiene-runbook §10](./operations-hygiene-runbook.md#10-actuator-failure-receipts-and-terminal-capabilities).
 - Optional platform capabilities (Apple Intelligence, BlackHole, mlx)
   follow **probe-and-degrade**: cached availability probe, every helper
   returns null/skips on failure, an env kill-switch

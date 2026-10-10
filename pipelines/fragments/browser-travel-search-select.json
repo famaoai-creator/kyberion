@@ -19,7 +19,7 @@
     {
       "id": "trigger_search",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "params": {
         "selector": "{{search_button_selector}}"
       }
@@ -45,7 +45,7 @@
     {
       "id": "click_selection",
       "role": "sink",
-      "op": "browser:click_ref",
+      "op": "browser:click",
       "consumes": "selected_option",
       "params": {
         "selector": "{{selected_option.selector}}"

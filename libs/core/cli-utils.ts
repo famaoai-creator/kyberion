@@ -76,6 +76,28 @@ function formatUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function actuatorOutputFailed(output: unknown): boolean {
+  return (
+    isRecord(output) &&
+    (output.ok === false || output.status === 'failed' || output.status === 'denied')
+  );
+}
+
+function actuatorOutputFailureError(output: unknown): string {
+  const failedStep =
+    isRecord(output) && Array.isArray(output.results)
+      ? output.results.find(
+          (entry: unknown) =>
+            isRecord(entry) && (entry.status === 'failed' || entry.status === 'denied')
+        )
+      : undefined;
+  return (
+    (isRecord(output) && typeof output.error === 'string' && output.error) ||
+    (isRecord(failedStep) && typeof failedStep.error === 'string' && failedStep.error) ||
+    'actuator execution failed'
+  );
+}
+
 /** Run a package-local actuator entrypoint through one shared error boundary. */
 export async function runActuatorCliEntryPoint(
   run: () => Promise<void>,
@@ -121,11 +143,13 @@ async function runActuatorServeLoop(opts: {
       }
       const id = request.id ?? null;
       const result = await opts.actuator.dispatch('execute', request.input);
-      emit(
-        result.ok
-          ? { id, ok: true, result: result.output }
-          : { id, ok: false, error: result.error || 'actuator execution failed' }
-      );
+      const output = result.output;
+      if (result.ok && !actuatorOutputFailed(output)) {
+        emit({ id, ok: true, result: output });
+      } else {
+        const error = result.error || actuatorOutputFailureError(output);
+        emit({ id, ok: false, error, ...(output !== undefined ? { result: output } : {}) });
+      }
     }
   }
 }
@@ -233,13 +257,16 @@ export async function runActuatorCli(opts: {
     dryRun,
     dryRunKind: resolveCliActionKind(input, opts.resolveOpKind),
   });
-  if (!result.ok) {
-    const error = result.error || 'unknown error';
+  const printResult =
+    opts.printResult || ((value: unknown) => console.log(JSON.stringify(value, null, 2)));
+  if (!result.ok || actuatorOutputFailed(result.output)) {
+    if (result.output !== undefined) printResult(result.output);
+    const error = result.error || actuatorOutputFailureError(result.output);
     const label = error.startsWith('invalid input:') ? 'invalid input' : 'handleAction failed';
     console.error(
       `[${opts.name}] ${label}${label === 'invalid input' ? `: ${error.slice('invalid input:'.length).trim()}` : `: ${error}`}`
     );
     throw new Error(`${label}: ${error}`);
   }
-  (opts.printResult || ((value) => console.log(JSON.stringify(value, null, 2))))(result.output);
+  printResult(result.output);
 }
