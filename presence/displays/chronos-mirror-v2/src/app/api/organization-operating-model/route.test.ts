@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   requireChronosAccess: vi.fn(() => null),
   resolveViewerContextForRequest: vi.fn(),
   strictViewerScopeTenantSlugs: vi.fn(),
+  strictViewerScopeOrganizationIds: vi.fn(),
+  strictViewerScopeProjectIds: vi.fn(),
   withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
   viewerErrorResponse: vi.fn((error: Error) => new Response(error.message, { status: 403 })),
 }));
@@ -32,6 +34,8 @@ vi.mock('../../../lib/api-guard', () => ({
 vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds: mocks.strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds: mocks.strictViewerScopeProjectIds,
   withViewerExecutionContext: mocks.withViewerExecutionContext,
   viewerErrorResponse: mocks.viewerErrorResponse,
   ViewerContextError: class ViewerContextError extends Error {},
@@ -47,6 +51,9 @@ describe('organization-operating-model route', () => {
     mocks.requireChronosAccess.mockReset();
     mocks.resolveViewerContextForRequest.mockReset();
     mocks.strictViewerScopeTenantSlugs.mockReset();
+    mocks.strictViewerScopeOrganizationIds.mockReset();
+    mocks.strictViewerScopeProjectIds.mockReset();
+    mocks.strictViewerScopeProjectIds.mockReturnValue('all');
     mocks.withViewerExecutionContext.mockReset();
     mocks.viewerErrorResponse.mockReset();
     mocks.guardRequest.mockReturnValue(null);
@@ -71,6 +78,48 @@ describe('organization-operating-model route', () => {
         pending_human_decisions: 0,
       },
     });
+  });
+
+  it.each(['selected', 'grant'])(
+    'blocks the full overview for %s project scope before projection',
+    async (mode) => {
+      if (mode === 'grant') mocks.strictViewerScopeProjectIds.mockReturnValue(['PRJ-A']);
+      mocks.viewerErrorResponse.mockReturnValue(new Response('forbidden', { status: 403 }));
+      const suffix = mode === 'selected' ? '?project_id=PRJ-A' : '';
+      expect(
+        (await GET(new NextRequest('http://localhost/api/organization-operating-model' + suffix)))
+          .status
+      ).toBe(403);
+      expect(mocks.buildOrganizationManagementView).not.toHaveBeenCalled();
+      expect(mocks.resolveCompany).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reads the selected organization instead of the tenant default', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/organization-operating-model?tenant=acme&organization_id=ORG-A'
+      )
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenCalledWith(expect.anything(), 'ORG-A');
+    expect(mocks.buildOrganizationManagementView).toHaveBeenCalledWith({
+      organizationId: 'ORG-A',
+      tier: 'confidential',
+      tenantSlug: 'acme',
+    });
+  });
+
+  it('does not build a projection when the selected organization is denied', async () => {
+    mocks.strictViewerScopeOrganizationIds.mockImplementation(() => {
+      throw new Error('denied');
+    });
+    mocks.viewerErrorResponse.mockReturnValue(new Response('forbidden', { status: 403 }));
+    const response = await GET(
+      new NextRequest('http://localhost/api/organization-operating-model?organization_id=ORG-B')
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.buildOrganizationManagementView).not.toHaveBeenCalled();
   });
 
   it('returns the active tenant organization projection', async () => {

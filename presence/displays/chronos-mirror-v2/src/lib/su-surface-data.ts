@@ -31,6 +31,7 @@ export interface MissionHistoryEntry {
   tenantSlug?: string;
   tenantId?: string;
   persona?: string;
+  organizationId?: string;
   projectId?: string;
   trackId?: string;
   trackName?: string;
@@ -51,6 +52,8 @@ export interface MissionHistoryQuery {
   tier?: string;
   tenant?: string;
   tenantSlugs?: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
   kind?: string;
   missionId?: string;
   limit?: number;
@@ -249,6 +252,7 @@ export function projectMissionHistoryItems(
         tenantId: state.tenant_id,
         tenantSlug: state.tenant_slug,
         persona: state.assigned_persona,
+        organizationId: state.organization_id || state.relationships?.organization?.organization_id,
         projectId: state.relationships?.project?.project_id,
         trackId: state.relationships?.track?.track_id,
         trackName: state.relationships?.track?.track_name,
@@ -265,6 +269,18 @@ export function projectMissionHistoryItems(
       return item;
     })
     .filter((item) => {
+      if (
+        query.organizationIds &&
+        query.organizationIds !== 'all' &&
+        (!item.organizationId || !query.organizationIds.includes(item.organizationId))
+      )
+        return false;
+      if (
+        query.projectIds &&
+        query.projectIds !== 'all' &&
+        (!item.projectId || !query.projectIds.includes(item.projectId))
+      )
+        return false;
       if (missionIdFilter && item.missionId.toUpperCase() !== missionIdFilter) return false;
       if (statusFilter && item.status.toLowerCase() !== statusFilter) return false;
       if (tierFilter && item.tier.toLowerCase() !== tierFilter) return false;

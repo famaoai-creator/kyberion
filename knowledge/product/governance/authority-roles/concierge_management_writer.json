@@ -1,0 +1,16 @@
+{
+  "role": "concierge_management_writer",
+  "description": "Authenticated human-owner organization/project descriptive mutation role. Requires a matching immutable request resource capability; exact ceiling precedes all ambient/default grants. No lifecycle, membership, provisioning or deployment authority.",
+  "default_persona": "unknown",
+  "write_scopes": [
+    "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+    "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+    "active/projects/confidential/${KYBERION_TENANT}/",
+    "active/projects/public/${KYBERION_TENANT}/",
+    "active/shared/runtime/projects/",
+    "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+  ],
+  "scope_classes": ["organization_operating_model", "project_metadata"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}
