@@ -1080,7 +1080,7 @@ export function isSafeStructuralDomPath(value: string): boolean {
  */
 export function redactObservationText(value: string): string {
   return String(value)
-    .replace(/[\w.+%-]+@[\w-]+(?:\.[\w-]+)+/gi, '[redacted-email]')
+    .replace(/[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+/g, '[redacted-email]')
     .replace(/\b(?:\d[ -]?){13,16}\b/g, '[redacted-card]')
     .replace(/(?:\+?\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[redacted-phone]')
     .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')
