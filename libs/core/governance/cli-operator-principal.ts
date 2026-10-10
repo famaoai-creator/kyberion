@@ -7,7 +7,7 @@
  * for under separation of duties (`scripts/lib/approval-cli-decision.ts`) can
  * be answered by an agent driving a PTY (for example through
  * terminal-actuator). The strong path for a separated approval is an
- * authenticated surface (Chronos or presence-studio), which records
+ * signed-in Concierge or Chronos session, which records
  * `user:<member_id>` from a verified session.
  *
  * The terminal runs on this machine as its local owner — the same member the
@@ -152,13 +152,25 @@ export interface CliApprovalDecider {
  * With separation of duties on, an approval is refused when the identity is
  * missing, or when the terminal is an agent session — agents must not decide
  * for the human, and from inside the session the two cannot be told apart.
- * Rejections are never refused (declining only withdraws).
+ * Rejections are never refused (declining only withdraws) — except for a
+ * human-only request (`humanOnly`), which an agent session never settles in
+ * either direction and which is refused with `[APPROVAL_HUMAN_PROOF_REQUIRED]`
+ * (the one code every human-only refusal carries), whatever the
+ * separation-of-duties setting.
  */
 export function resolveCliApprovalDecider(
-  params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected' }
+  params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected'; humanOnly?: boolean }
 ): CliApprovalDecider {
   const identity = resolveCliOperatorIdentity(params);
   const agent = detectCliAgentPrincipal(params.env);
+  if (agent && params.humanOnly) {
+    throw new Error(
+      `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — this command runs inside an agent session (${agent}) and the request is human-only, ` +
+        'so the decider cannot be shown to be the human ' +
+        '| next: run the decision from your own terminal, outside the agent session, or decide it in a signed-in Concierge or Chronos session ' +
+        `| evidence: agent session marker resolved to ${agent}, accountability.finalDecision=human_only`
+    );
+  }
   if (params.decision === 'approved' && resolveSeparationOfDutiesPolicy().enabled) {
     if (agent) {
       throw new Error(
