@@ -14335,6 +14335,36 @@
         "en": "Open Requests",
         "ja": "依頼を開く",
         "qps-ploc": "⟦Őṗėñ Řėɋůėşŧş ŀőřė⟧"
+      },
+      "setup.quiet_hours_loading": {
+        "en": "Loading saved quiet hours…",
+        "ja": "保存済みのおやすみ時間を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şȧṽėḓ ɋůïėŧ ħőůřş… ŀőřėɱ ïṗ⟧"
+      },
+      "setup.quiet_hours_load_failed": {
+        "en": "Saved quiet hours could not be loaded. Reload them before making changes.",
+        "ja": "保存済みのおやすみ時間を読み込めませんでした。変更する前に再読み込みしてください。",
+        "qps-ploc": "⟦Şȧṽėḓ ɋůïėŧ ħőůřş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Řėŀőȧḓ ŧħėɱ ƀėƒőřė ɱȧķïñɠ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "setup.quiet_hours_reload": {
+        "en": "Reload saved quiet hours",
+        "ja": "保存済みのおやすみ時間を再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ şȧṽėḓ ɋůïėŧ ħőůřş ŀőřėɱ ï⟧"
+      },
+      "setup.quiet_hours_save_unverified": {
+        "en": "The save could not be confirmed. Reload saved quiet hours to check the result before saving again.",
+        "ja": "保存結果を確認できませんでした。再度保存する前に、保存済みのおやすみ時間を読み込んで結果を確認してください。",
+        "qps-ploc": "⟦Ŧħė şȧṽė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėŀőȧḓ şȧṽėḓ ɋůïėŧ ħőůřş ŧő ƈħėƈķ ŧħė řėşůŀŧ ƀėƒőřė şȧṽïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "setup.quiet_hours_custom_urgent": {
+        "en": "Keep the saved custom selection",
+        "ja": "保存済みの個別設定を維持",
+        "qps-ploc": "⟦Ķėėṗ ŧħė şȧṽėḓ ƈůşŧőɱ şėŀėƈŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.quiet_hours_saving": {
+        "en": "Saving quiet hours…",
+        "ja": "おやすみ時間を保存しています…",
+        "qps-ploc": "⟦Şȧṽïñɠ ɋůïėŧ ħőůřş… ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
