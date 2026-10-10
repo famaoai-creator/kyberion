@@ -321,6 +321,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -1447,6 +1452,21 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1508,6 +1528,16 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/invites/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/me/passkeys/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/me/passkeys/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3610,6 +3640,7 @@
         "presence/displays/concierge/server/local-peer.ts",
         "presence/displays/concierge/server/local-server.ts",
         "presence/displays/concierge/src/app/api/agent-avatar/[expression]/route.ts",
+        "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts",
         "presence/displays/concierge/src/app/api/approvals/[id]/route.ts",
         "presence/displays/concierge/src/app/api/charters/route.ts",
         "presence/displays/concierge/src/app/api/charters/tripwire/route.ts",
@@ -3632,6 +3663,7 @@
         "presence/displays/concierge/src/app/api/management/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/route.ts",
+        "presence/displays/concierge/src/app/api/me/passkeys/route.ts",
         "presence/displays/concierge/src/app/api/me/route.ts",
         "presence/displays/concierge/src/app/api/members/[id]/route.ts",
         "presence/displays/concierge/src/app/api/members/route.ts",
@@ -3711,6 +3743,7 @@
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/OperatorServiceRegistrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
+        "presence/displays/concierge/src/app/settings/sections/PasskeyPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ProfileSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/PushPane.tsx",
@@ -3767,6 +3800,8 @@
         "presence/displays/concierge/src/lib/outcome-files-response.ts",
         "presence/displays/concierge/src/lib/outcome-files.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
+        "presence/displays/concierge/src/lib/passkey-client.ts",
+        "presence/displays/concierge/src/lib/passkey-server.ts",
         "presence/displays/concierge/src/lib/personal-aggregate.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
@@ -3866,7 +3901,7 @@
       "reachable_roles": {
         "audit_mirror_writer": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/charters/route.ts#<module>",
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#<module>",
             "libs/core/authority.ts#<module>"
           ]
         },
@@ -3996,7 +4031,7 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",

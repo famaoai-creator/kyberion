@@ -13,7 +13,10 @@ import {
   loadApprovalRequest,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
-import { NON_HUMAN_PROOF_AUTH_METHODS } from '../governance/approval-assurance.js';
+import {
+  NON_HUMAN_PROOF_AUTH_METHODS,
+  PROJECT_TRUST_MIN_ASSURANCE,
+} from '../governance/approval-assurance.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   approvalRequesterActorId,
@@ -218,7 +221,12 @@ export function createProjectTrustApprovalRequest(params: {
       requestedEffects: [binding],
     },
     risk: { level: 'high', restartScope: 'none', requiresStrongAuth: true },
-    accountability: { finalDecision: 'human_only', payloadHash, effectBinding: binding },
+    accountability: {
+      finalDecision: 'human_only',
+      min_assurance: PROJECT_TRUST_MIN_ASSURANCE,
+      payloadHash,
+      effectBinding: binding,
+    },
   });
 }
 

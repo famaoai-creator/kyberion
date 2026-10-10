@@ -10,6 +10,7 @@
  * Chronos sovereign fallback) move to `local_admin_token` in HA-05.
  */
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolvePolicyApprovalAssuranceMode } from './approval-policy.js';
 
 export type ApprovalAssuranceLevel = 'A0' | 'A1' | 'A2' | 'A3';
 
@@ -57,14 +58,37 @@ export const NON_HUMAN_PROOF_AUTH_METHODS: ReadonlySet<ApprovalAuthMethod> = new
 ]);
 
 export const DEFAULT_HUMAN_ONLY_MIN_ASSURANCE: ApprovalAssuranceLevel = 'A2';
+/**
+ * HA-07: decisions that must survive a compromised terminal accept only a
+ * verified passkey assertion — dual-key secrets, policy changes (the
+ * approval-policy rule `min_assurance`) and project trust.
+ */
 export const DUAL_KEY_MIN_ASSURANCE: ApprovalAssuranceLevel = 'A3';
+export const PROJECT_TRUST_MIN_ASSURANCE: ApprovalAssuranceLevel = 'A3';
+
+/**
+ * Approval channels whose requests require at least this level at decision
+ * time, whatever `min_assurance` the record was created with — so a request
+ * still pending from before its class was raised is judged by today's rule
+ * (decided records are never re-graded).
+ */
+export const APPROVAL_CHANNEL_MIN_ASSURANCE: Readonly<Record<string, ApprovalAssuranceLevel>> = {
+  'project-trust': PROJECT_TRUST_MIN_ASSURANCE,
+};
 
 export type ApprovalAssuranceMode = 'warn' | 'enforce';
 
-/** Staged rollout: warn (default) records a shortfall, enforce rejects it. */
+/**
+ * Staged rollout: warn records a shortfall, enforce rejects it. The mode is
+ * the stricter of `approval-policy.json` `assurance_mode` (governed) and
+ * `KYBERION_APPROVAL_ASSURANCE`: the environment of the deciding process can
+ * tighten the policy to enforce, never relax it. Neither set: warn.
+ */
 export function resolveApprovalAssuranceMode(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  policyMode: ApprovalAssuranceMode | undefined = resolvePolicyApprovalAssuranceMode()
 ): ApprovalAssuranceMode {
+  if (policyMode === 'enforce') return 'enforce';
   return getRegisteredEnvText('KYBERION_APPROVAL_ASSURANCE', { env }) === 'enforce'
     ? 'enforce'
     : 'warn';
@@ -88,6 +112,13 @@ export function assuranceMeets(
   required: ApprovalAssuranceLevel
 ): boolean {
   return APPROVAL_ASSURANCE_LEVELS.indexOf(provided) >= APPROVAL_ASSURANCE_LEVELS.indexOf(required);
+}
+
+export function strongerAssurance(
+  left: ApprovalAssuranceLevel,
+  right: ApprovalAssuranceLevel
+): ApprovalAssuranceLevel {
+  return assuranceMeets(left, right) ? left : right;
 }
 
 /**

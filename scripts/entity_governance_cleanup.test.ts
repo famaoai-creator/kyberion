@@ -128,7 +128,7 @@ describe('EG-11 entity governance cleanup', () => {
           requestId: opened.requestId!,
           decision: 'approved',
           decidedBy: 'sovereign-acceptance',
-          authMethod: 'passkey',
+          authMethod: 'surface_session',
           decidedByType: 'human',
           authenticated: true,
           payloadHash: opened.payloadHash,

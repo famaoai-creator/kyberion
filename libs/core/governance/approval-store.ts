@@ -17,6 +17,7 @@ import {
   bindPresentedDecision,
   refuseHumanOnlyDecisionByAgentProcess,
   reportAssuranceShortfall,
+  settlePasskeyDecisionProof,
   settleUnpresentedHumanDecision,
   validateHumanFinalDecision,
   withDefaultMinAssurance,
@@ -36,7 +37,7 @@ import {
 } from '../workforce/artifact-store.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
-import { isVitestProcess } from '../foundation/env.js';
+import { approvalStoreRoots } from './approval-store-paths.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
 import { validateDecisionCard, type DecisionCard } from './decision-card.js';
@@ -167,6 +168,8 @@ export interface ApprovalAccountability {
    * creation (A2, or A3 for dual-key); a record without it is read as A2.
    */
   min_assurance?: assurance.ApprovalAssuranceLevel;
+  /** The approval-policy rule that required the request (decision-time floor, HA-08). */
+  policy_rule_id?: string;
   payloadHash?: string;
   effectBinding?: string;
 }
@@ -508,39 +511,7 @@ function enforceSeparationOfDutiesOnDecision(
   );
 }
 
-/**
- * Repo-relative root of the vitest-isolated approval store. Test runs write
- * here instead of the live store so fixture approvals never mix with real
- * operator decisions; the storage retention catalog expires it.
- */
-export const VITEST_APPROVAL_STORE_ROOT = 'active/shared/runtime/vitest-approvals';
-
-/**
- * Repo-relative roots of the approval store: request records live under
- * `coordination`, the append-only event log under `observability`.
- */
-export function approvalStoreRoots(env: Record<string, string | undefined> = process.env): {
-  coordination: string;
-  observability: string;
-} {
-  if (isVitestProcess(env)) {
-    // Per run (KYBERION_VITEST_RUN_ID, set by tests/vitest-run-id.ts) and per
-    // worker: two Vitest runs in one checkout, and parallel files that clear a
-    // channel, must not race each other.
-    const run = env.KYBERION_VITEST_RUN_ID
-      ? `/run-${env.KYBERION_VITEST_RUN_ID.replace(/[^\w-]/g, '')}`
-      : '';
-    const pool = env.VITEST_POOL_ID ? `/pool-${env.VITEST_POOL_ID.replace(/[^\w-]/g, '')}` : '';
-    return {
-      coordination: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/coordination/channels`,
-      observability: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/observability/channels`,
-    };
-  }
-  return {
-    coordination: 'active/shared/coordination/channels',
-    observability: 'active/shared/observability/channels',
-  };
-}
+export { approvalStoreRoots, VITEST_APPROVAL_STORE_ROOT } from './approval-store-paths.js';
 
 function approvalRequestsLogicalDir(storageChannel: string): string {
   return `${approvalStoreRoots().coordination}/${normalizeApprovalChannel(storageChannel)}/approvals/requests`;
@@ -1003,6 +974,8 @@ function decideApprovalRequestUnlocked(
     effectBinding?: string;
     /** HA-06: digest of what the surface showed the decider (approval-presentation.ts). */
     presentedDigest?: string;
+    /** HA-07: the verified challenge a `passkey` decision consumes (approval-passkey-challenge.ts). */
+    passkeyChallengeId?: string;
     /** The principal an HTTP route resolved for the decider; an agent principal is refused for human-only. */
     deciderPrincipal?: ApprovalDeciderPrincipal | null;
     note?: string;
@@ -1086,7 +1059,9 @@ function decideApprovalRequestUnlocked(
 
   refuseHumanOnlyDecisionByAgentProcess(record, { principal: params.deciderPrincipal });
   const bound = bindPresentedDecision(record, params);
+  settlePasskeyDecisionProof(role, record, { ...params, storageChannel });
   const assuranceShortfall = validateHumanFinalDecision({
+    channel: normalizeApprovalChannel(storageChannel),
     accountability: record.accountability,
     decidedByType: params.decidedByType,
     authenticated: params.authenticated,
@@ -1219,6 +1194,7 @@ function decideApprovalRequestUnlocked(
     payload_hash: bound.payloadHash,
     effect_binding: bound.effectBinding,
     ...(params.presentedDigest ? { presented_digest: params.presentedDigest } : {}),
+    ...(params.passkeyChallengeId ? { passkey_challenge_id: params.passkeyChallengeId } : {}),
     channel: updated.channel,
     thread_ts: updated.threadTs,
     // LC-10: the rejection rationale must survive into the event stream —
