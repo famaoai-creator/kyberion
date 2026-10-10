@@ -16,7 +16,9 @@ import {
   safeOpenAppendFile,
   safeFileAgeMs,
   safeReadFile,
+  safeReadFileRange,
   safeReadFileSnapshot,
+  safeReadFileTail,
   safeReaddir,
   safeRmSync,
   safeSpawn,
@@ -383,6 +385,66 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       fs.rmSync(outsideDir, { recursive: true, force: true });
     }
   });
+
+  it('never leaks through a symlink flipped between check and open (read, range, tail, stat, size)', async () => {
+    // No hard link: `sw` flips between a readable file, a regular file and a
+    // symlink straight to the personal-tier secret (nlink 1).
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    const secret = fs.statSync(secretPath);
+    const readable = abs(`${scratchRel}/readable.txt`);
+    fs.writeFileSync(readable, 'readable file, a different length');
+    const plain = abs(`${scratchRel}/plain.txt`);
+    fs.writeFileSync(plain, 'plain regular file contents');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(readable, sw);
+    const flipper = `
+      const fs = require('node:fs');
+      const [sw, readable, plain, secret] = process.argv.slice(1);
+      const end = Date.now() + 9000;
+      let i = 0;
+      while (Date.now() < end) {
+        const tmp = sw + '.tmp';
+        try {
+          fs.rmSync(tmp, { force: true });
+          const k = i++ % 3;
+          if (k === 0) fs.symlinkSync(readable, tmp);
+          else if (k === 1) fs.copyFileSync(plain, tmp);
+          else fs.symlinkSync(secret, tmp);
+          fs.renameSync(tmp, sw);
+        } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', flipper, sw, readable, plain, secretPath], {
+      stdio: 'ignore',
+    });
+    const leaks: Record<string, number> = { read: 0, range: 0, tail: 0, stat: 0, size: 0 };
+    const tries: Record<string, number> = { read: 0, range: 0, tail: 0, stat: 0, size: 0 };
+    const rel = `${scratchRel}/sw`;
+    const ops: Record<string, () => boolean> = {
+      read: () => String(safeReadFile(rel)).includes('personal-tier secret'),
+      range: () => safeReadFileRange(rel, 0, 64).toString().includes('personal-tier secret'),
+      tail: () => safeReadFileTail(rel, 64).buffer.toString().includes('personal-tier secret'),
+      stat: () => safeStat(rel).ino === secret.ino,
+      size: () => validateFileSize(rel) === secret.size,
+    };
+    try {
+      for (const [name, op] of Object.entries(ops)) {
+        const end = Date.now() + 1500;
+        while (Date.now() < end) {
+          tries[name] += 1;
+          try {
+            if (op()) leaks[name] += 1;
+          } catch {
+            // refused or raced: never a leak
+          }
+          if (tries[name] % 50 === 0) await new Promise((r) => setImmediate(r));
+        }
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    for (const name of Object.keys(ops)) expect(tries[name]).toBeGreaterThan(50);
+    expect(leaks).toEqual({ read: 0, range: 0, tail: 0, stat: 0, size: 0 });
+  }, 30000);
 
   it('never leaks a hard-linked secret while a symlink flips into the pnpm store (bounded race)', async () => {
     const planted = abs(`${scratchRel}/planted`);
