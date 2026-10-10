@@ -44,14 +44,20 @@ function formatSec(totalSec: number): string {
 }
 
 function stripCueMarkup(text: string): string {
-  return text
-    .replace(/<\s*v\s+([^<>]+)>/giu, '$1: ')
-    .replace(/<\/\s*v\s*>/giu, '')
-    .replace(/<[^<>]*>/gu, '')
+  let out = text.replace(/<\s*v\s+([^<>]+)>/giu, '$1: ').replace(/<\/\s*v\s*>/giu, '');
+  // Iterate the tag strip until stable so malformed markup such as `<<b>`
+  // cannot leave a re-formed tag behind.
+  while (out.includes('<')) {
+    const next = out.replace(/<[^<>]*>/gu, '');
+    if (next === out) break;
+    out = next;
+  }
+  // Decode &amp; last so entity text like `&amp;lt;` is not unescaped twice.
+  return out
     .replace(/&nbsp;/gu, ' ')
-    .replace(/&amp;/gu, '&')
     .replace(/&lt;/gu, '<')
     .replace(/&gt;/gu, '>')
+    .replace(/&amp;/gu, '&')
     .trim();
 }
 

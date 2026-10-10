@@ -36,6 +36,20 @@ function sanitizeXmlText(input: string): string {
     .replace(/>/g, '&gt;');
 }
 
+/**
+ * Remove tags until stable so malformed markup (`<<a:t>`) cannot leave a
+ * re-formed tag behind when comparing stored XML to user text.
+ */
+function stripTags(xml: string): string {
+  let out = xml;
+  while (out.includes('<')) {
+    const next = out.replace(/<[^<>]+>/g, '');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 function ptToEmu(pt: number): number {
   return Math.round(pt * 12700);
 }
@@ -204,9 +218,7 @@ export function buildShape(
     el.text !== undefined &&
     el.pXmlLst &&
     el.text.replace(/\s/g, '') !==
-      el.pXmlLst
-        .join('')
-        .replace(/<[^<>]+>/g, '')
+      stripTags(el.pXmlLst.join(''))
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&')

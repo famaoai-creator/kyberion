@@ -25,13 +25,12 @@ export interface OutputArtifactOptions {
 }
 
 function slug(value: string, fallback: string): string {
-  return (
-    String(value || '')
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, '-')
-      .replace(/^-+/, '')
-      .replace(/-+$/, '') || fallback
-  );
+  const sanitized = String(value || '')
+    .trim()
+    .split(/[^a-zA-Z0-9._-]+/)
+    .filter(Boolean)
+    .join('-');
+  return sanitized || fallback;
 }
 
 function previewText(text: string, maxChars: number): string {
