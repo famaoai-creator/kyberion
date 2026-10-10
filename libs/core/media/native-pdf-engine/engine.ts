@@ -724,7 +724,7 @@ function deriveEncryptionKey(password: string, salt: Buffer, uValue?: Buffer): B
   const pwBuf = Buffer.from(password, 'utf8').subarray(0, 127);
   const input = Buffer.concat([pwBuf, salt, uValue ?? Buffer.alloc(0)]);
   // The ISO 32000-2 §7.6.4.3.4 R=7 handler mandates SHA-256 — not a storage choice.
-  return crypto.createHash('sha256').update(input).digest(); // codeql[js/insufficient-password-hash]
+  return crypto.createHash('sha256').update(input).digest();
 }
 
 /**
@@ -747,7 +747,7 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): {
 
   // U hash: SHA256(userPw + vSalt) — spec-mandated, see deriveEncryptionKey note
   const uHash = crypto
-    .createHash('sha256') // codeql[js/insufficient-password-hash]
+    .createHash('sha256')
     .update(Buffer.from(userPw, 'utf8'))
     .update(vSalt)
     .digest();
@@ -762,7 +762,7 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): {
 
   // O hash: SHA256(ownerPw + vSalt + U-value) — spec-mandated
   const oHash = crypto
-    .createHash('sha256') // codeql[js/insufficient-password-hash]
+    .createHash('sha256')
     .update(Buffer.from(ownerPw, 'utf8'))
     .update(vSalt)
     .update(uHash)

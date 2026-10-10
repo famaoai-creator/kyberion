@@ -1471,7 +1471,7 @@ export function safeLstat(filePath: string): fs.Stats {
   assertCanonicalReadable(resolved, filePath, 'leaf');
   // `resolved` passed validateReadPermission + assertCanonicalReadable above;
   // this wrapper IS the path-injection sanitizer boundary.
-  return fs.lstatSync(resolved); // codeql[js/path-injection]
+  return fs.lstatSync(resolved);
 }
 
 /**
