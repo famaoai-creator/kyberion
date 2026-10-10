@@ -54,75 +54,38 @@ pnpm pipeline --input pipelines/verify-session.json
 
 ### Day-2 setup: AI company, tenant activation (optional)
 
-Skip this subsection for a first look — the first-win smoke in §2 needs none of it. Come back when you want a governed company, tenant or customer context.
-
-#### Start an AI company in one governed step
-
-For a solo founder whose main workforce is AI, run the company onboarding flow after the build:
+Skip this subsection for a first look — the first-win smoke in §2 needs none of it. Single-user rule: try `--dry-run` first; tenant activation is a separate human-accepted gate.
 
 ```bash
 pnpm onboarding company --vertical saas-product-company --slug acme-ai \
   --name "ACME AI" --owner-id human:founder \
   --goal "Define the first customer outcome and launch plan" --dry-run
-pnpm onboarding company --vertical saas-product-company --slug acme-ai \
-  --name "ACME AI" --owner-id human:founder \
-  --goal "Define the first customer outcome and launch plan"
 ```
 
-`pnpm onboarding` uses `customer/{slug}/ preferred when KYBERION_CUSTOMER is set` for the customer stance overlay.
+Full routes (personal-only / AI company / existing tenant), the `probe` → `activate` evidence flow, and Path B (`onboarding apply --identity <json>`) live in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md) and [INITIALIZATION](./INITIALIZATION.md). Start there, not here.
 
-The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding. Tenant activation is still a separate human-accepted gate.
-
-When `KYBERION_CUSTOMER` is set, `customer/{slug}/` is preferred for customer-specific identity and onboarding artifacts.
-
-Before starting the first work, run the readiness probes, activate the tenant with the evidence they record, then review its management unit. When every probe passes, `probe` prints the exact `activate` command that cites its evidence:
-
-```bash
-pnpm tenant:activation probe \
-  --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
-  --nhi-id kyberion://agent/acme-ai/<agent-slug>
-pnpm tenant:activation activate \
-  --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
-  --owner-id human:founder --nhi-id kyberion://agent/acme-ai/<agent-slug> \
-  --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<evidence-path> \
-  --probe-ref nhi_provisioned=<evidence-path> \
-  --probe-ref service_readiness=<evidence-path> \
-  --probe-ref isolation_probe=<evidence-path> \
-  --apply --accept
-```
-
-```bash
-pnpm onboarding:context first-work --customer-slug acme-ai \
-  --intent "Define the first customer outcome and launch plan" --dry-run --json
-```
-
-If you already have an onboarding payload, use Path B instead of the wizard:
-
-```bash
-pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
-```
-
-Copy the template, edit it, and rerun without `--dry-run` when you are ready to apply it.
+Customer-specific identity and onboarding artifacts: `customer/{slug}/ preferred when KYBERION_CUSTOMER is set`.
 
 ### Onboarding entry points
 
 Several commands and pipelines carry "onboarding" in their name. They are not alternatives for the same job; pick by what you want to achieve.
 
-| Entry point                                                    | What it does                                                                                                                                                                   | Use it when                                                                                                                                      |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm install` ... `pipelines/verify-session.json` (§2)        | The first-win smoke: install, build, doctor, one browser artifact.                                                                                                             | First run on a new machine. Needs no identity or tenant.                                                                                         |
-| `pnpm kyberion setup report --persona first-time-user`         | Read-only readiness report across surfaces, services, reasoning and doctor.                                                                                                    | After the first win, or whenever something feels unusable.                                                                                       |
-| `pnpm kyberion setup <area>`                                   | One short route into each setup tool: `onboarding`, `context`, `reasoning`, `env`, `services`, `tools`, `provider-cli`, `agy-sdk`, `voice`, `config`.                          | You know which area needs work. `pnpm kyberion setup` lists the areas; the table is in the [CLI Reference](./CLI_REFERENCE.md#scopes-and-areas). |
-| `pnpm onboarding` (wizard; the old name `onboard` still works) | Interactive identity wizard: name, language, vision, Agent ID, service connection candidates. Flags: `--express`, `--menu`, `--reconfig`, `--services-only`, `--service <id>`. | Saving your identity (standard flow Step 3). Run `pnpm stance:switch <slug>` first when acting as a customer.                                    |
-| `pnpm onboarding apply --identity <json> [--dry-run]`          | The same identity written from a JSON file, without prompts.                                                                                                                   | Non-interactive hosts and CI. Copy the template under `knowledge/public/templates/onboarding/`.                                                  |
-| `pnpm onboarding company ...` (and `company bootstrap`)        | Starts an AI company in one governed step: customer overlay, accountable human, first AI worker, paused first-work plan. Always try `--dry-run` first.                         | You are a solo founder whose workforce is AI (route 2 of the standard flow).                                                                     |
-| `pnpm onboarding reset`                                        | Deletes onboarding state and the generated identity / vision / agent files of the active profile.                                                                              | You want to start the identity step over.                                                                                                        |
-| `pnpm onboarding:context` (`show`, `bind`, `first-work`)       | Binds a tenant to an organization context and prepares the first work item. Read-only unless `--apply`.                                                                        | You work with tenants (routes 2 and 3). Also reachable as `pnpm kyberion setup context`.                                                         |
-| `pipelines/launch-first-run-onboarding.json`                   | Writes a canned identity input under `active/shared/tmp/` and applies it through `onboarding apply`. Deterministic, no questions asked.                                        | Demos and automated first-run checks. Not for a real identity.                                                                                   |
-| `pipelines/kyberion-autonomous-onboarding.json`                | Mines the environment and codebase, interviews you about knowledge sources, and proposes integrations and a profile. Run it explicitly; `pnpm onboarding` does not start it.   | After the identity exists and you want Kyberion to find your information assets.                                                                 |
-| `pipelines/platform-onboarding.json`                           | Organization-integration flow: discovery transcript, requirements draft, design spec, test plan, task plan. Task execution runs in downstream pipelines.                       | Taking on a customer integration engagement, not setting up your own machine.                                                                    |
-| `pipelines/voice-onboarding.json`                              | Records three reference voice samples, registers the voice profile, makes a short preview, grants per-mission voice consent. `dry_run=true` only validates.                    | You want Kyberion to speak in a registered voice. Check devices with `pnpm kyberion doctor --scope voice` first.                                 |
+| Entry point                                              | What it does                                                                                                                                                                   | Use it when                                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm install` ... `pipelines/verify-session.json` (§2)  | The first-win smoke: install, build, doctor, one browser artifact.                                                                                                             | First run on a new machine. Needs no identity or tenant.                                                                                         |
+| `pnpm kyberion setup report --persona first-time-user`   | Read-only readiness report across surfaces, services, reasoning and doctor.                                                                                                    | After the first win, or whenever something feels unusable.                                                                                       |
+| `pnpm kyberion setup <area>`                             | One short route into each setup tool: `onboarding`, `context`, `reasoning`, `env`, `services`, `tools`, `provider-cli`, `agy-sdk`, `voice`, `config`.                          | You know which area needs work. `pnpm kyberion setup` lists the areas; the table is in the [CLI Reference](./CLI_REFERENCE.md#scopes-and-areas). |
+| `pnpm onboarding` (wizard)                               | Interactive identity wizard: name, language, vision, Agent ID, service connection candidates. Flags: `--express`, `--menu`, `--reconfig`, `--services-only`, `--service <id>`. | Saving your identity (standard flow Step 3). Run `pnpm stance:switch <slug>` first when acting as a customer.                                    |
+| `pnpm onboarding apply --identity <json> [--dry-run]`    | The same identity written from a JSON file, without prompts.                                                                                                                   | Non-interactive hosts and CI. Copy the template under `knowledge/public/templates/onboarding/`.                                                  |
+| `pnpm onboarding company ...` (and `company bootstrap`)  | Starts an AI company in one governed step: customer overlay, accountable human, first AI worker, paused first-work plan. Always try `--dry-run` first.                         | You are a solo founder whose workforce is AI (route 2 of the standard flow).                                                                     |
+| `pnpm onboarding reset`                                  | Deletes onboarding state and the generated identity / vision / agent files of the active profile.                                                                              | You want to start the identity step over.                                                                                                        |
+| `pnpm onboarding:context` (`show`, `bind`, `first-work`) | Binds a tenant to an organization context and prepares the first work item. Read-only unless `--apply`.                                                                        | You work with tenants (routes 2 and 3). Also reachable as `pnpm kyberion setup context`.                                                         |
+| `pipelines/launch-first-run-onboarding.json`             | Writes a canned identity input under `active/shared/tmp/` and applies it through `onboarding apply`. Deterministic, no questions asked.                                        | Demos and automated first-run checks. Not for a real identity.                                                                                   |
+| `pipelines/kyberion-autonomous-onboarding.json`          | Mines the environment and codebase, interviews you about knowledge sources, and proposes integrations and a profile. Run it explicitly; `pnpm onboarding` does not start it.   | After the identity exists and you want Kyberion to find your information assets.                                                                 |
+| `pipelines/platform-onboarding.json`                     | Organization-integration flow: discovery transcript, requirements draft, design spec, test plan, task plan. Task execution runs in downstream pipelines.                       | Taking on a customer integration engagement, not setting up your own machine.                                                                    |
+| `pipelines/voice-onboarding.json`                        | Records three reference voice samples, registers the voice profile, makes a short preview, grants per-mission voice consent. `dry_run=true` only validates.                    | You want Kyberion to speak in a registered voice. Check devices with `pnpm kyberion doctor --scope voice` first.                                 |
+
+Acting as a customer (or company) writes into `customer/{slug}/` — customer/{slug}/ preferred when KYBERION_CUSTOMER is set; personal state stays under `knowledge/personal/` otherwise. Create the overlay with `pnpm stance:create <customer-slug>` and switch with `pnpm stance:switch <customer-slug>`.
 
 The order of the steps, and which route you need, is canonical in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md); the command-by-command detail is in [INITIALIZATION](./INITIALIZATION.md).
 

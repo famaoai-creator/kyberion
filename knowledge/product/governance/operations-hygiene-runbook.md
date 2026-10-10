@@ -785,8 +785,10 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
     `<base>.stale-<pid>-<ms>-<n>` with exactly two links whose other link is `<base>` (one `lstat`;
     no directory listing, so filling the directory cannot block it). The `<base>` side is refused —
     finding its tomb would need a listing. `lock-utils` therefore reads a record through its
-    `.stale-*` tomb when the base side is refused as a hard link, so `releaseLock` and lock
-    inspection see the live owner during the put-back window. A tomb may move only within its
+    `.stale-*` tomb when the base side is refused as a hard link — only a tomb that is the
+    record's own inode (`LockIo.sameFile`, checked before and after the read), never a leftover
+    tomb from an older recovery — so `releaseLock` and lock inspection see the live owner during
+    the put-back window. A tomb may move only within its
     locks directory, never to another name such as `MEMORY.md`.
   - _pnpm store reads_: decided on the **canonical** path. The content store
     (`node_modules/.pnpm/`, written only by the package manager) is exempt for every caller,
@@ -813,6 +815,18 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   and, once the temp descriptor is open, requires that directory to still be the same `(dev, ino)`,
   still canonicalize to itself, and to hold the descriptor just opened before renaming into place.
   An inode number of 0 (FAT/exFAT, some network shares) is unverifiable and fails closed.
+- **Authorize what was opened, not only what was checked.** The path check runs before
+  `open(2)`, which follows symlinks, so a link flipped in between hands over another file — a
+  `knowledge/personal/` file has one link, so no hard-link rule fires. Every in-place open
+  (`openInPlace`: read, append, open-for-append, fsync, chmod, copy source) therefore vets the
+  descriptor (`vetOpenedFd`): the opened file's own location — `/proc/self/fd/<n>` on Linux,
+  otherwise the re-derived canonical path whose leaf (not followed) must be the inode held — is
+  re-authorized unless it is exactly the canonical path the caller's check approved, then the
+  hard-link rule runs on it. Range and tail open no-follow. `safeStat` and `validateFileSize`
+  stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs and devices fall
+  back to the leaf-identity pin). A target outside the repository is pinned only under a
+  registered vault mount (`vaultTargetIdentity`). Cost on the CI VM: about +45 µs per read or
+  stat, none for appends (their canonical path is passed through).
 - **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
   `safeReadFileTail` throw `File not found` with `code: 'ENOENT'`, so callers that classify
   errors by code (lock inspection: missing vs unreadable) see a missing file as missing.
@@ -825,9 +839,12 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 
 **Residual risk (documented, not closed).**
 
-- _Check-to-use race._ Other helpers still run their syscall on the literal path after the check;
-  a concurrent process that swaps a component for a link between the two can redirect one
-  operation. `safeWriteFile` narrows the window to the rename after its re-verification.
+- _Check-to-use race._ In-place opens and stats are pinned to the descriptor (above) and
+  `safeWriteFile` re-verifies its directory before the rename. Path-only operations that cannot
+  hold a descriptor (rename, unlink, rm, mkdir, `safeLstat`, `safeReadlink`, `safeReaddir`) still
+  act on the literal path after the check; a concurrent swap can redirect one such operation. On
+  platforms without `/proc/self/fd` the fallback pin re-derives the canonical path, so an
+  attacker would have to win two consecutive races.
 - _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
   hard links to files outside the repository (vault targets) are not detected. Path-only helpers
   (`safeStat`, `safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked
@@ -857,11 +874,12 @@ junction refusal, ancestor rename after an earlier resolution, hard-link append 
 fsync / read / move / stat / snapshot, probe-only lock tomb rule and tomb moves, truncating append
 flags, `node_modules` planted in a writable tree, `node_modules/@actuator/service` workspace alias
 read as `software_developer`, exemption pinned to the held inode (unit + bounded symlink-flip race),
-SUDO pnpm-store reads, ENOENT code, `validateFileSize` tier and hard-link guard, directory
+SUDO pnpm-store reads, ENOENT code, direct symlink flip between check and open for read / range /
+tail / stat / size (bounded race), `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
-during the put-back window, against the real secure-io lock IO) and the import boundary in
+during the put-back window and with leftover tombs, against the real secure-io lock IO) and the import boundary in
 `libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---

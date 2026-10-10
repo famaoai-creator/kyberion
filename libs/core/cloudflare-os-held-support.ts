@@ -1,4 +1,21 @@
 import type { HeldActionRecord, HeldActionSummary } from './cloudflare-os-control-plane.js';
+import type { ApprovalAuthMethod } from './governance/approval-assurance.js';
+
+/** A human (or agent/service) decision on a held action. */
+export interface HeldActionDecision {
+  resolvedBy: string;
+  decidedByType: 'human' | 'ai_agent' | 'service';
+  authenticated: boolean;
+  /** HA-03: proof the human decider presented; required for human-only linked requests. */
+  authMethod?: ApprovalAuthMethod;
+  payloadHash: string;
+  effectBinding: string;
+  /**
+   * SC-04: set when the decision arrives from the held-effect bridge — the
+   * linked approval request already settled, so the plane only mirrors it.
+   */
+  viaApprovalRequest?: boolean;
+}
 
 /** Replace simulated (provisional) references in held params with the applied results. */
 export function resolveProvisionalReferences(value: unknown, refs: Map<string, unknown>): unknown {

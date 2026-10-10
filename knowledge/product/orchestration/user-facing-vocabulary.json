@@ -11911,6 +11911,16 @@
         "ja": "顧客宛のメッセージを、承認なしで送らせる",
         "qps-ploc": "⟦Ŀėŧ ɱėşşȧɠėş ŧő ƈůşŧőɱėřş ɠő őůŧ ẇïŧħőůŧ ȧşķïñɠ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
+      "setup.charter_decisions_title": {
+        "en": "Decisions you hand over",
+        "ja": "任せる判断",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ẏőů ħȧñḓ őṽėř ŀőřėɱ ï⟧"
+      },
+      "setup.charter_decisions_help": {
+        "en": "Turn on only the decisions the AI may make without asking. Each one still stays inside the limits above; anything you leave off comes to you.",
+        "ja": "AI が承認なしで行ってよい判断だけをオンにします。オンにしても上の金額や損失の上限は守られ、オフのものはこれまでどおりあなたに届きます。",
+        "qps-ploc": "⟦Ŧůřñ őñ őñŀẏ ŧħė ḓėƈïşïőñş ŧħė ȦÏ ɱȧẏ ɱȧķė ẇïŧħőůŧ ȧşķïñɠ. Ėȧƈħ őñė şŧïŀŀ şŧȧẏş ïñşïḓė ŧħė ŀïɱïŧş ȧƀőṽė; ȧñẏŧħïñɠ ẏőů ŀėȧṽė őƒƒ ƈőɱėş ŧő ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
       "setup.charter_supersedes": {
         "en": "Stand in for the decision-rights matrix within these limits",
         "ja": "decision-rights matrix の人の受け入れを、この範囲で代わりにする",
@@ -28548,6 +28558,16 @@
         "en": "- Messages to customers are NOT sent without approval",
         "ja": "・顧客宛のメッセージは、承認なしには送らせない",
         "qps-ploc": "⟦- Ɱėşşȧɠėş ŧő ƈůşŧőɱėřş ȧřė ÑŐŦ şėñŧ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "charter_statement_decisions_on": {
+        "en": "- These decisions MAY be made without approval within the limits above: {decisions}",
+        "ja": "・次の判断を、上の範囲内で承認なしに行わせる: {decisions}",
+        "qps-ploc": "⟦- Ŧħėşė ḓėƈïşïőñş ⱮȦẎ ƀė ɱȧḓė ẇïŧħőůŧ ȧṗṗřőṽȧŀ ẇïŧħïñ ŧħė ŀïɱïŧş ȧƀőṽė: {decisions} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "charter_statement_decisions_off": {
+        "en": "- No other business decision is made without approval",
+        "ja": "・それ以外の業務上の判断は、承認なしには行わせない",
+        "qps-ploc": "⟦- Ñő őŧħėř ƀůşïñėşş ḓėƈïşïőñ ïş ɱȧḓė ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "charter_statement_matrix_on": {
         "en": "- Where the decision-rights matrix requires a person to accept, this charter stands in for that within these limits",

@@ -204,8 +204,9 @@ function sanitizeMissionSlug(value: string): string {
   return (
     value
       .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
+      .split(/[^A-Z0-9]+/)
+      .filter(Boolean)
+      .join('-')
       .slice(0, 24) || 'REQUEST'
   );
 }

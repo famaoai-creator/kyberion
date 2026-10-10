@@ -5,6 +5,7 @@
  */
 
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { DEFAULT_HUMAN_ONLY_MIN_ASSURANCE, DUAL_KEY_MIN_ASSURANCE } from './approval-assurance.js';
 import { nowIso } from '../foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
@@ -338,6 +339,9 @@ export function enforceApprovalGate(
         correlationId,
         payload,
         decisionRightsEscalates: decisionRightsEvaluation?.requiresEscalation === true,
+        decisionRightsCharterDelegable:
+          decisionRightsEvaluation?.escalationKind === 'human_acceptance' &&
+          decisionRightsEvaluation.charterDelegable,
       })
     : ({ kind: 'none' } as const);
   if (charterOutcome.kind === 'stop') {
@@ -348,7 +352,10 @@ export function enforceApprovalGate(
   }
   // Outside the charter: a human decides, even where decision rights or the
   // legacy policy would have let the action through (the charter only tightens).
-  const forceApproval = charterOutcome.kind === 'require_approval';
+  // A matrix escalation needs a human whether or not a policy rule lists its type.
+  const charterForcesApproval = charterOutcome.kind === 'require_approval';
+  const decisionRightsForcesApproval = decisionRightsEvaluation?.requiresEscalation === true;
+  const forceApproval = charterForcesApproval || decisionRightsForcesApproval;
 
   if (
     !forceApproval &&
@@ -387,7 +394,9 @@ export function enforceApprovalGate(
       ? {
           requiresApproval: true,
           missingRequirements: ['approval_confirmation'],
-          matchedRuleId: 'charter-outside-envelope',
+          matchedRuleId: charterForcesApproval
+            ? 'charter-outside-envelope'
+            : 'decision-rights-escalation',
         }
       : resolvedPolicy;
 
@@ -683,6 +692,9 @@ export function enforceApprovalGate(
     source: params.source,
     accountability: {
       finalDecision: 'human_only',
+      min_assurance: policy.missingRequirements.includes('dual_key_confirmation')
+        ? DUAL_KEY_MIN_ASSURANCE
+        : DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
       payloadHash: computeApprovalPayloadHash(payload),
       effectBinding: operationId,
     },

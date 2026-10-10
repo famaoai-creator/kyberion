@@ -50,7 +50,7 @@ describe('kyberion script-command dispatch', () => {
     const otherEnv = mocks.spawnManagedProcess.mock.calls[1][0].spawnOptions.env;
     expect(otherEnv.GH_TOKEN).toBeUndefined();
     expect(otherEnv.GITHUB_TOKEN).toBeUndefined();
-    await main(['customer', 'list'], () => undefined);
+    await main(['stance', 'list'], () => undefined);
     expect(mocks.safeExecResultAsync.mock.calls[0][2].env).toEqual({});
   });
 
@@ -115,7 +115,7 @@ describe('kyberion script-command dispatch', () => {
 
   it('keeps short commands buffered through the printer', async () => {
     const output: unknown[] = [];
-    await main(['customer', 'list'], (value) => output.push(value));
+    await main(['stance', 'list'], (value) => output.push(value));
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
     expect(output).toEqual(['buffered']);
   });
@@ -200,9 +200,16 @@ describe('kyberion script-command dispatch', () => {
     expect(pnpmExecutable('darwin')).toBe('pnpm');
   });
 
-  it('routes a deprecated alias with its passthrough arguments (onboard apply --identity x)', async () => {
+  it('rejects a removed alias without spawning (onboard apply --identity x)', async () => {
+    await expect(main(['onboard', 'apply', '--identity', 'x'], () => undefined)).rejects.toThrow(
+      /onboard apply/u
+    );
+    expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+  });
+
+  it('routes a canonical command with its passthrough arguments (onboarding apply --identity x)', async () => {
     mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
-    await main(['onboard', 'apply', '--identity', 'x'], () => undefined);
+    await main(['onboarding', 'apply', '--identity', 'x'], () => undefined);
     const spec = mocks.spawnManagedProcess.mock.calls[0]?.[0];
     expect(spec.args.slice(-3)).toEqual(['apply', '--identity', 'x']);
   });
