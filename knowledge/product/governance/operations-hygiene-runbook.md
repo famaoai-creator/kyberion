@@ -144,6 +144,18 @@ For document ingest, exercise the parser and API together (`ingest-output-parser
 post-write receipts must stay uncertain (HTTP 502), never become a pre-execution rejection or
 trigger an automatic retry; keep the interrupted/repeated-flow tests in `ingest-ui.test.ts`.
 
+**Settings read-edit-save ownership.** Defaults are not saved preferences. A pane must wait for a
+complete successful read before enabling editing or saving; loading failures need an explicit
+read-only retry. Keep one request owner, cancel on unmount, and bind the loaded draft to the
+current sign-in context. Freeze controls during saving and show success only when the complete
+response matches the submitted snapshot. Clear success on a later edit. A definitive pre-write
+validation rejection leaves the draft correctable; a lost or unverified write result requires
+reading saved state before another write, never an automatic write retry. Preserve saved choices
+that do not map to a simplified preset. For quiet hours, run `quiet-hours-view.test.ts` and
+`quiet-hours-ui.test.ts` alongside the notification-preferences API tests, covering failed and
+malformed reads, delayed replies, reload, repeated clicks, sign-in changes, unmount, explicit
+validation rejection, malformed/mismatched saved receipts and overnight/timezone values.
+
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
 
