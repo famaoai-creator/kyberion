@@ -84,6 +84,7 @@ import type {
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import { t } from '../t.js';
+import { trimEndChars } from '../foundation/text.js';
 
 // ---------------------------------------------------------------------------
 // Verb classification — rule-based, no reasoning call.
@@ -111,8 +112,10 @@ function exactMatch(patterns: RegExp[]): (text: string) => SteeringRuleResult {
   return (text: string) => ({ matched: patterns.some((pattern) => pattern.test(text)) });
 }
 
+const TRAILING_SENTENCE_CHARS = '。.!！?？ \t\n\r\f\v\u00a0\u3000';
+
 function stripTrailingPunctuation(text: string): string {
-  return text.replace(/[。.!！?？\s]+$/u, '');
+  return trimEndChars(text, TRAILING_SENTENCE_CHARS);
 }
 
 const STEERING_RULES: SteeringRule[] = [

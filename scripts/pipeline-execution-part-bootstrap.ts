@@ -1223,6 +1223,9 @@ export async function runInlineCoreTransform(
       ),
   };
   const parsingContext = vm.createContext({});
+  // codeql[js/bad-code-sanitization] — the transform op's contract is to run
+  // pipeline-authored scripts inside vm.compileFunction with parameters (no
+  // string interpolation into generated code) and a sandboxed context.
   const transform = vm.compileFunction(script, ['input', 'ctx', 'Buffer', 'console'], {
     parsingContext,
   });

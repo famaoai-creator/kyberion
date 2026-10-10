@@ -148,11 +148,31 @@ export function selectMacPhysicalAudioDevice(listing: string): string | undefine
       continue;
     }
     if (!inAudioSection) continue;
-    const match = line.match(/\]\s+\[(\d+)\]\s+(.+?)\s*$/u);
+    // Parse `] [N] name` without a regex — an unanchored `$`-pattern scan is
+    // quadratic on attacker-controlled line text (polynomial-redos).
+    const ws = ' \t\n\r\v\f\u00a0';
+    let match: { index: string; name: string } | null = null;
+    for (
+      let bracket = line.indexOf(']');
+      bracket >= 0 && !match;
+      bracket = line.indexOf(']', bracket + 1)
+    ) {
+      let j = bracket + 1;
+      while (j < line.length && ws.includes(line[j])) j += 1;
+      if (line[j] !== '[') continue;
+      const numEnd = line.indexOf(']', j);
+      if (numEnd < 0) break;
+      const index = line.slice(j + 1, numEnd);
+      if (!/^\d+$/u.test(index)) continue;
+      let k = numEnd + 1;
+      while (k < line.length && ws.includes(line[k])) k += 1;
+      const name = line.slice(k).trim();
+      if (name) match = { index, name };
+    }
     if (!match) continue;
-    const name = match[2].trim();
+    const name = match.name;
     if (MAC_VIRTUAL_AUDIO_DEVICE_RE.test(name)) continue;
-    return `:${match[1]}`;
+    return `:${match.index}`;
   }
   return undefined;
 }

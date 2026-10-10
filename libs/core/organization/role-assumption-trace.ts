@@ -3,6 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { getFoundationIo } from '../foundation/io.js';
 import * as pathResolver from '../path-resolver.js';
 import { createLogger } from '../logger.js';
+import { trimEndChars } from '../foundation/text.js';
 
 const logger = createLogger('role-assumption-trace');
 
@@ -129,14 +130,41 @@ const AUTHORITY_FUNCTIONS = new Set([
 ]);
 
 /** Top-level repo directories used to relativise a frame outside libs/core. */
-const REPO_TOP_LEVEL =
-  /(?:^|[\\/])((?:libs|presence|satellites|scripts|dist|plugins|tests)[\\/].*)$/;
+const REPO_TOP_LEVEL_DIRS = [
+  'libs',
+  'presence',
+  'satellites',
+  'scripts',
+  'dist',
+  'plugins',
+  'tests',
+];
+
+function repoTopLevel(cleaned: string): string {
+  const normalized = cleaned.replace(/\\/g, '/');
+  for (const dir of REPO_TOP_LEVEL_DIRS) {
+    const marker = `${dir}/`;
+    if (normalized.startsWith(marker)) return normalized;
+    const index = normalized.indexOf(`/${marker}`);
+    if (index >= 0) return normalized.slice(index + 1);
+  }
+  return cleaned;
+}
 
 function parseFrame(frame: string): { fn: string | null; location: string } | null {
-  const withName = /^\s*at\s+(?:async\s+)?(.+?)\s+\(([^()]+)\)\s*$/.exec(frame);
-  if (withName) return { fn: withName[1].trim(), location: withName[2].trim() };
-  const bare = /^\s*at\s+(?:async\s+)?(.+)$/.exec(frame);
-  return bare ? { fn: null, location: bare[1].trim() } : null;
+  const trimmed = frame.trim();
+  if (!trimmed.startsWith('at ')) return null;
+  let rest = trimEndChars(trimmed.slice(3).trim(), ' \t');
+  if (rest.startsWith('async ')) rest = rest.slice(6).trim();
+  const paren = rest.lastIndexOf('(');
+  if (paren > 0 && rest.endsWith(')') && (rest[paren - 1] === ' ' || rest[paren - 1] === '\t')) {
+    const location = rest.slice(paren + 1, -1);
+    if (location && !location.includes('(') && !location.includes(')')) {
+      const fn = rest.slice(0, paren).trim();
+      return { fn: fn || null, location };
+    }
+  }
+  return { fn: null, location: rest };
 }
 
 const MAX_TRACE_FRAMES = 5;
@@ -167,7 +195,7 @@ export function callerFramesFromStack(stack: string | undefined): string[] {
     const relative =
       codeRoot && cleaned.startsWith(`${codeRoot}/`)
         ? cleaned.slice(codeRoot.length + 1)
-        : (REPO_TOP_LEVEL.exec(cleaned)?.[1] ?? cleaned);
+        : repoTopLevel(cleaned);
     frames.push(fnName ? `${relative} (${fnName})` : relative);
     if (frames.length >= MAX_TRACE_FRAMES) break;
   }

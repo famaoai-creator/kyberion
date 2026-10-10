@@ -163,6 +163,40 @@ export function forbiddenGitCoexecutionMutation(command: string): string | undef
   return checks.find(([pattern]) => pattern.test(command))?.[1];
 }
 
+const NODE_SCRIPT_PREFIXES = [
+  'dist/',
+  'scripts/',
+  'libs/actuators/',
+  'presence/',
+  'src/',
+  'test/',
+  'tests/',
+];
+
+function skipCliArg(rest: string): string {
+  const space = rest.search(/\s/u);
+  return space < 0 ? '' : rest.slice(space + 1).trimStart();
+}
+
+function isNodeScriptInvocation(command: string): boolean {
+  for (const segment of command.split(/[;&|]/u)) {
+    let rest = segment.trimStart();
+    if (!rest.toLowerCase().startsWith('node ')) continue;
+    rest = rest.slice(5).trimStart();
+    for (;;) {
+      if (rest.startsWith('--import ') || rest.startsWith('--require ')) {
+        rest = skipCliArg(rest.slice(rest.indexOf(' ') + 1).trimStart());
+        continue;
+      }
+      break;
+    }
+    if (rest.startsWith('./')) rest = rest.slice(2);
+    const firstToken = (rest.split(/\s/u, 1)[0] ?? '').toLowerCase();
+    if (NODE_SCRIPT_PREFIXES.some((prefix) => firstToken.startsWith(prefix))) return true;
+  }
+  return false;
+}
+
 export function isScriptWrapperCommand(command: string, args: readonly string[]): boolean {
   const normalizedCommand = [command, ...args].join(' ');
   const executable = command.trim().split(/[\\/]/).pop()?.toLowerCase();
@@ -182,9 +216,7 @@ export function isScriptWrapperCommand(command: string, args: readonly string[])
   // command/args shape above.
   return (
     typedWrapper ||
-    /(?:^|[;&|]\s*|\s)node\s+(?:(?:--import|--require)\s+[^;&|]+\s+)?(?:\.\/)?(?:dist|scripts|libs\/actuators|presence|src|tests?)\/[^;&|\s]+/iu.test(
-      normalizedCommand
-    ) ||
+    isNodeScriptInvocation(normalizedCommand) ||
     /(?:^|[;&|]\s*|\s)node\s+(?:-e|--eval)\b/iu.test(normalizedCommand) ||
     /(?:^|[;&|]\s*|\s)npx\s+tsx\b/iu.test(normalizedCommand) ||
     /(?:^|[;&|]\s*|\s)pnpm\s+(?:exec|dlx)\b/iu.test(normalizedCommand) ||

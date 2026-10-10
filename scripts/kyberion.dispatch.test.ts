@@ -206,4 +206,11 @@ describe('kyberion script-command dispatch', () => {
     );
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
   });
+
+  it('routes a canonical command with its passthrough arguments (onboarding apply --identity x)', async () => {
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
+    await main(['onboarding', 'apply', '--identity', 'x'], () => undefined);
+    const spec = mocks.spawnManagedProcess.mock.calls[0]?.[0];
+    expect(spec.args.slice(-3)).toEqual(['apply', '--identity', 'x']);
+  });
 });

@@ -377,17 +377,30 @@ function extractDuckDuckGoResults(
   html: string,
   limit = 3
 ): Array<{ title: string; url: string; snippet?: string }> {
-  const anchors = [
-    ...html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g),
-  ];
   const results: Array<{ title: string; url: string; snippet?: string }> = [];
 
-  for (let i = 0; i < anchors.length && results.length < limit; i++) {
-    const anchor = anchors[i];
-    const nextAnchorIndex = anchors[i + 1]?.index ?? html.length;
-    const block = html.slice(anchor.index || 0, nextAnchorIndex);
-    const snippetMatch = block.match(/result__snippet[^>]*>([\s\S]*?)<\/a>/);
-    const rawUrl = anchor[1];
+  for (let cursor = 0; results.length < limit;) {
+    const aStart = html.indexOf('<a', cursor);
+    if (aStart < 0) break;
+    const openEnd = html.indexOf('>', aStart);
+    if (openEnd < 0) break;
+    const openTag = html.slice(aStart, openEnd + 1);
+    const nextAnchorIndex = html.indexOf('<a', openEnd);
+    cursor = nextAnchorIndex > 0 ? nextAnchorIndex : html.length;
+    if (!openTag.includes('class="result__a"')) continue;
+    const hrefMatch = /href="([^"]*)"/u.exec(openTag);
+    if (!hrefMatch) continue;
+    const block = html.slice(aStart, nextAnchorIndex > 0 ? nextAnchorIndex : html.length);
+    const snippetStart = block.indexOf('result__snippet');
+    const snippetOpenEnd = snippetStart >= 0 ? block.indexOf('>', snippetStart) : -1;
+    const snippetClose = snippetOpenEnd >= 0 ? block.indexOf('</a>', snippetOpenEnd) : -1;
+    const anchorClose = block.indexOf('</a>');
+    const inner = anchorClose > 0 ? block.slice(block.indexOf('>') + 1, anchorClose) : '';
+    const snippetText =
+      snippetOpenEnd >= 0 && snippetClose > snippetOpenEnd
+        ? block.slice(snippetOpenEnd + 1, snippetClose)
+        : null;
+    const rawUrl = hrefMatch[1];
     const url = (() => {
       try {
         const parsed = new URL(rawUrl, 'https://duckduckgo.com');
@@ -398,9 +411,9 @@ function extractDuckDuckGoResults(
       }
     })();
     results.push({
-      title: decodeEntities(stripTags(anchor[2]).trim()),
+      title: decodeEntities(stripTags(inner).trim()),
       url,
-      snippet: snippetMatch ? decodeEntities(stripTags(snippetMatch[1]).trim()) : undefined,
+      snippet: snippetText ? decodeEntities(stripTags(snippetText).trim()) : undefined,
     });
   }
 

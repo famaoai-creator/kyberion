@@ -165,8 +165,8 @@ export function createScreenshotAnnotateRequestHandler(
         const buf = safeReadFile(envPath, { encoding: null }) as Buffer;
         if (!isPng(buf)) return { ok: false, error: 'KYBERION_SCREENSHOT_PATH is not a PNG' };
         return { ok: true, png_base64: buf.toString('base64') };
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      } catch {
+        return { ok: false, error: 'screenshot file read failed' };
       }
     }
     if (process.platform !== 'darwin') {
@@ -197,10 +197,10 @@ export function createScreenshotAnnotateRequestHandler(
         return { ok: false, error: 'screencapture did not produce a PNG' };
       }
       return { ok: true, png_base64: buf.toString('base64') };
-    } catch (error) {
+    } catch {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: 'screenshot capture failed',
       };
     }
   }
@@ -372,7 +372,11 @@ export function createScreenshotAnnotateRequestHandler(
               const message = error instanceof Error ? error.message : String(error);
               const status =
                 message === 'png_base64 required' || message === 'not a png' ? 400 : 500;
-              jsonResponse(res, status, { ok: false, error: message });
+              // Known validation strings pass through; anything else stays generic.
+              jsonResponse(res, status, {
+                ok: false,
+                error: status === 400 ? message : 'internal server error',
+              });
             }
           } catch (e: unknown) {
             if (e instanceof LocalPadRequestBodyTooLargeError) {
@@ -384,7 +388,7 @@ export function createScreenshotAnnotateRequestHandler(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal server error',
               });
             }
             print(`[screenshot-annotate] ${e instanceof Error ? e.message : String(e)}`);

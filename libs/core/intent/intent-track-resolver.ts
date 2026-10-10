@@ -238,8 +238,9 @@ function sanitizeIdFragment(value: string, fallback: string): string {
   const normalized = value
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean)
+    .join('-')
     .slice(0, 48);
   return normalized || fallback;
 }

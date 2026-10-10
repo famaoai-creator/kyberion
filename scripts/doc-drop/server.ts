@@ -389,9 +389,12 @@ export async function main(
             try {
               jsonResponse(res, 200, persistDrop(payload));
             } catch (error) {
+              print(
+                `[doc-drop] persist failed: ${error instanceof Error ? error.message : String(error)}`
+              );
               jsonResponse(res, 400, {
                 ok: false,
-                error: error instanceof Error ? error.message : String(error),
+                error: 'drop persist failed',
               });
             }
           } catch (e: unknown) {
@@ -404,7 +407,7 @@ export async function main(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal server error',
               });
             }
             print(`[doc-drop] ${e instanceof Error ? e.message : String(e)}`);

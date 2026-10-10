@@ -723,6 +723,9 @@ function buildLinearizationDict(
 function deriveEncryptionKey(password: string, salt: Buffer, uValue?: Buffer): Buffer {
   const pwBuf = Buffer.from(password, 'utf8').subarray(0, 127);
   const input = Buffer.concat([pwBuf, salt, uValue ?? Buffer.alloc(0)]);
+  // codeql[js/insufficient-password-hash] — ISO 32000-2 §7.6.4.3.4 mandates the
+  // SHA-256 KDF for the PDF R=7 standard security handler; it is not a
+  // password-storage choice and cannot be swapped for bcrypt/scrypt.
   return crypto.createHash('sha256').update(input).digest();
 }
 
@@ -744,8 +747,9 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): {
   const vSalt = crypto.randomBytes(8);
   const encKey = crypto.randomBytes(32);
 
-  // U hash: SHA256(userPw + vSalt)
+  // U hash: SHA256(userPw + vSalt) — spec-mandated, see deriveEncryptionKey note
   const uHash = crypto
+    // codeql[js/insufficient-password-hash] — required by the PDF R=7 algorithm
     .createHash('sha256')
     .update(Buffer.from(userPw, 'utf8'))
     .update(vSalt)
@@ -759,8 +763,9 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): {
   const U = Buffer.concat([uHash, eSalt, vSalt]).toString('hex').toUpperCase();
   const UE = uKeyEncrypted.subarray(0, 32).toString('hex').toUpperCase();
 
-  // O hash: SHA256(ownerPw + vSalt + U-value)
+  // O hash: SHA256(ownerPw + vSalt + U-value) — spec-mandated
   const oHash = crypto
+    // codeql[js/insufficient-password-hash] — required by the PDF R=7 algorithm
     .createHash('sha256')
     .update(Buffer.from(ownerPw, 'utf8'))
     .update(vSalt)

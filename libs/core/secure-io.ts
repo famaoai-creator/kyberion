@@ -299,7 +299,7 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
 
   // Fallback for non-cached or missing
   if (!fs.existsSync(resolved)) {
-    throw new Error(`File not found: ${resolved}`);
+    throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
   }
   const fd = openInPlace(resolved, filePath, 'r', 'read');
   try {
@@ -351,7 +351,7 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
   }
   const resolved = assertReadableRepositoryFile(filePath, 'range');
   if (!fs.existsSync(resolved)) {
-    throw new Error(`File not found: ${resolved}`);
+    throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
   }
   if (fs.lstatSync(resolved).isSymbolicLink()) {
     throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
@@ -395,7 +395,7 @@ export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTa
   const resolved = assertReadableRepositoryFile(filePath, 'tail');
 
   if (!fs.existsSync(resolved)) {
-    throw new Error(`File not found: ${resolved}`);
+    throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
   }
   if (fs.lstatSync(resolved).isSymbolicLink()) {
     throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
@@ -1469,6 +1469,9 @@ export function safeLstat(filePath: string): fs.Stats {
     );
   }
   assertCanonicalReadable(resolved, filePath, 'leaf');
+  // codeql[js/path-injection] — `resolved` is produced by pathResolver and has
+  // passed validateReadPermission + assertCanonicalReadable above; this
+  // wrapper IS the path-injection sanitizer boundary.
   return fs.lstatSync(resolved);
 }
 

@@ -132,10 +132,26 @@ export function deriveSurfaceExecutionModeFromProviderPolicy(
   if (matchesAnyTextRule(normalized, rules?.execution_mode?.feasibility_patterns)) {
     return 'conversation';
   }
+  // i18n-exempt: request-detection phrases, not user-facing text
+  const VERBS = ['作って', '作成して'];
+  const REQUEST_PHRASES = [
+    'ください', // i18n-exempt: request-detection phrase
+    '下さい', // i18n-exempt: request-detection phrase
+    'ほしい', // i18n-exempt: request-detection phrase
+    '欲しい', // i18n-exempt: request-detection phrase
+    'くれない', // i18n-exempt: request-detection phrase
+    'もらえます', // i18n-exempt: request-detection phrase
+    'もらえる', // i18n-exempt: request-detection phrase
+    'お願い', // i18n-exempt: request-detection phrase
+  ];
+  const verbIndex = Math.min(
+    ...VERBS.map((v) => normalized.indexOf(v)).filter((i) => i >= 0),
+    Number.POSITIVE_INFINITY
+  );
   const softRequestConversation =
-    /(作って|作成して).*(ください|下さい|ほしい|欲しい|くれない|もらえます|もらえる|お願い)/u.test(
-      normalized
-    ) && !/(保存|実装|ファイル|ミッション|mission)/iu.test(normalized);
+    verbIndex !== Number.POSITIVE_INFINITY &&
+    REQUEST_PHRASES.some((r) => normalized.indexOf(r, verbIndex) >= 0) &&
+    !/(保存|実装|ファイル|ミッション|mission)/iu.test(normalized);
   if (softRequestConversation) return 'conversation';
   return matchesAnyTextRule(normalized, rules?.execution_mode?.durable_task_patterns)
     ? 'task'
