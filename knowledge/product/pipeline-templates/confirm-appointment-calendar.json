@@ -1,12 +1,13 @@
 {
   "action": "pipeline",
   "pipeline_id": "confirm-appointment-calendar",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "Appointment Confirmation — Calendar & Email",
-  "description": "アポイントメント確認: カレンダーイベント作成 + 確認メール送信。sales_outbound の qualification-gate が passed になった後に実行する。",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "description": "アポイントメント確認: カレンダーイベント作成 + 確認メール送信。sales_outbound の qualification-gate が passed になった後に実行する。社外との日程の確定(meeting_scheduling)は、責任者憲章で委任されていれば承認なしで、そうでなければ人の承認後に作成する。",
+  "_migration_note": "v2.1: the event is created only after approval:evaluate_decision_rights (meeting_scheduling) allows it. v2: Typed Flow format (role/produces/consumes).",
   "context": {
     "mission_id": "",
+    "tenant_slug": "",
     "prospect_name": "",
     "prospect_org": "",
     "prospect_email": "",
@@ -27,52 +28,90 @@
       }
     },
     {
-      "id": "create_calendar_event",
+      "id": "evaluate_decision_rights",
       "role": "sink",
-      "op": "calendar:create_event",
+      "op": "approval:evaluate_decision_rights",
+      "produces": { "channel": "decision_rights_result", "type": "DecisionRightsApprovalResult" },
       "params": {
-        "calendar_names": ["{{calendar_name}}"],
-        "title": "{{appointment_title}}",
-        "start_date": "{{appointment_start_iso}}",
-        "end_date": "{{appointment_end_iso}}",
-        "location": "{{appointment_location}}",
-        "description": "{{appointment_description}}\n\nKyberion Mission: {{mission_id}}\nProspect: {{prospect_org}} / {{prospect_name}}"
+        "operation_id": "confirm-appointment-calendar:{{prospect_org}}",
+        "correlation_id": "confirm-appointment-calendar:{{mission_id}}:{{appointment_start_iso}}",
+        "decision_type": "meeting_scheduling",
+        "recipients": 1,
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{mission_id}}",
+        "channel": "mission",
+        "title": "Confirm meeting: {{appointment_title}}",
+        "summary": "Confirm {{appointment_title}} with {{prospect_org}} / {{prospect_name}} at {{appointment_start_iso}}."
       }
     },
     {
-      "id": "log_calendar",
-      "role": "sink",
-      "op": "system:log",
+      "id": "confirm_when_allowed",
+      "role": "gate",
+      "op": "core:if",
       "params": {
-        "message": "📅 [APPT] Calendar event created → {{appointment_title}} ({{appointment_start_iso}})"
-      }
-    },
-    {
-      "id": "write_confirmation_gate",
-      "role": "sink",
-      "op": "system:write_file",
-      "params": {
-        "path": "{{mission_evidence_dir}}/appointment-confirmation-gate.json",
-        "content": {
-          "gate": "APPOINTMENT_CONFIRMATION_GATE",
-          "track": "sales_outbound",
-          "status": "passed",
-          "prospect": "{{prospect_org}} / {{prospect_name}}",
-          "appointment_title": "{{appointment_title}}",
-          "appointment_start": "{{appointment_start_iso}}",
-          "appointment_end": "{{appointment_end_iso}}",
-          "calendar": "{{calendar_name}}",
-          "confirmed_at": "{{$now}}"
-        },
-        "format": "json"
-      }
-    },
-    {
-      "id": "log_done",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "🏁 [APPT] Appointment confirmed. Next: run discovery pipeline on meeting day → mission_controller checkpoint after meeting."
+        "condition": { "from": "decision_rights_result.allowed", "operator": "eq", "value": true },
+        "then": [
+          {
+            "id": "create_calendar_event",
+            "role": "sink",
+            "op": "calendar:create_event",
+            "params": {
+              "calendar_names": ["{{calendar_name}}"],
+              "title": "{{appointment_title}}",
+              "start_date": "{{appointment_start_iso}}",
+              "end_date": "{{appointment_end_iso}}",
+              "location": "{{appointment_location}}",
+              "description": "{{appointment_description}}\n\nKyberion Mission: {{mission_id}}\nProspect: {{prospect_org}} / {{prospect_name}}"
+            }
+          },
+          {
+            "id": "log_calendar",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "📅 [APPT] Calendar event created → {{appointment_title}} ({{appointment_start_iso}})"
+            }
+          },
+          {
+            "id": "write_confirmation_gate",
+            "role": "sink",
+            "op": "system:write_file",
+            "params": {
+              "path": "{{mission_evidence_dir}}/appointment-confirmation-gate.json",
+              "content": {
+                "gate": "APPOINTMENT_CONFIRMATION_GATE",
+                "track": "sales_outbound",
+                "status": "passed",
+                "prospect": "{{prospect_org}} / {{prospect_name}}",
+                "appointment_title": "{{appointment_title}}",
+                "appointment_start": "{{appointment_start_iso}}",
+                "appointment_end": "{{appointment_end_iso}}",
+                "calendar": "{{calendar_name}}",
+                "decision_rights_status": "{{decision_rights_result.status}}",
+                "confirmed_at": "{{$now}}"
+              },
+              "format": "json"
+            }
+          },
+          {
+            "id": "log_done",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "🏁 [APPT] Appointment confirmed. Next: run discovery pipeline on meeting day → mission_controller checkpoint after meeting."
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_pending_approval",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "⏸️ [APPT] Meeting not confirmed yet — waiting for a human decision (request {{decision_rights_result.request_id}}): {{decision_rights_result.message}}"
+            }
+          }
+        ]
       }
     }
   ]
