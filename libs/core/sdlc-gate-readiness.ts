@@ -122,9 +122,9 @@ function resolveTemplateRef(artifactId: string): string | undefined {
 function sanitizeSeedFragment(value: string): string {
   return String(value)
     .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean)
+    .join('-');
 }
 
 function inferSpecialistForArtifact(artifactId: string): string {

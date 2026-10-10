@@ -14,7 +14,7 @@ import {
 } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 import { readJsonLines } from '../foundation/json.js';
-import { isRecord } from '../foundation/text.js';
+import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type {
   MeshDeliveryRecord,
@@ -107,11 +107,7 @@ function randomId(prefix: string): string {
 }
 
 function normalizeNamespace(namespace?: string): string {
-  return String(namespace || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
+  return sanitizeIdSegment(namespace || '', { maxLength: 64 });
 }
 
 function meshHubRoot(namespace?: string): string {

@@ -16,6 +16,8 @@ import {
   resolveDefaultScheduleSource,
 } from '../contextual-intent-memory.js';
 import { recordConversationSignal } from '../intent/conversation-signals.js';
+import { stripTags } from '../html-sanitize.js';
+import { decodeEntities } from '../text-escaping.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from '../router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
@@ -371,20 +373,6 @@ function formatExecutionReceipt(params: {
   );
 }
 
-function stripHtmlTags(value: string): string {
-  return value.replace(/<[^>]+>/g, ' ');
-}
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ');
-}
-
 function extractDuckDuckGoResults(
   html: string,
   limit = 3
@@ -410,9 +398,9 @@ function extractDuckDuckGoResults(
       }
     })();
     results.push({
-      title: decodeHtmlEntities(stripHtmlTags(anchor[2]).trim()),
+      title: decodeEntities(stripTags(anchor[2]).trim()),
       url,
-      snippet: snippetMatch ? decodeHtmlEntities(stripHtmlTags(snippetMatch[1]).trim()) : undefined,
+      snippet: snippetMatch ? decodeEntities(stripTags(snippetMatch[1]).trim()) : undefined,
     });
   }
 
@@ -756,6 +744,6 @@ export {
   runWebSearch,
   structuredSurfaceQueryText,
   deriveSurfaceQueryRole,
-  stripHtmlTags,
-  decodeHtmlEntities,
+  stripTags,
+  decodeEntities,
 };

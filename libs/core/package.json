@@ -3444,6 +3444,10 @@
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
     },
+    "./html-sanitize": {
+      "types": "./dist/html-sanitize.d.ts",
+      "default": "./dist/html-sanitize.js"
+    },
     "./html-to-markdown": {
       "types": "./dist/html-to-markdown.d.ts",
       "default": "./dist/html-to-markdown.js"
