@@ -55,7 +55,7 @@ import {
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import { revokeApprovalAsLocalOwner } from '@agent/core/governance/approval-revocation';
-import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
+import { cliAgentSessionEnv } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { ServiceRecording } from '@agent/core/service/service-recording';
@@ -91,7 +91,7 @@ function clearSeparationOfDuties(): void {
 }
 
 function plainTerminal(): void {
-  for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
+  for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
 }
 
 const CALLS = JSON.stringify([

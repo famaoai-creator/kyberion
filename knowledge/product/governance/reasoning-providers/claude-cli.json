@@ -87,7 +87,13 @@
             "args": ["--permission-mode", "plan"],
             "notes": "plan mode produces a plan without executing any tool — matches \"no tool execution at all.\""
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "CLAUDECODE"
+          }
+        ],
+        "session_principal": "claude-code"
       },
       "runtime_instructions": [
         "Provider note: use the governed subagent/delegation boundary for child work; do not mutate mission-wide state directly.",
