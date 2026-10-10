@@ -834,12 +834,14 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   after the location check and refuses any change between the two (inode, link count, or a ctime
   that moved without the mtime — a data write moves both, `link`/`unlink` only the ctime), and
   judges hard links on that last `fstat`. It then requires the name opened through to be still
-  linked: on Linux its `/proc` entry is not `(deleted)`; for a single-link file the parent
-  directory is read once first, because `unlink(2)` drops the link count before it marks the name
-  deleted and both happen under the parent's lock, which `getdents` waits for. Off Linux the
-  canonical leaf must still be the inode with the same link count and ctime after that parent
-  read. Appends are vetted this way before any byte is written. Cost on the CI VM: about +40 µs
-  per in-place read.
+  linked: on Linux its `/proc` entry is not `(deleted)`. `unlink(2)` drops the link count before
+  it marks the name deleted, both under the parent directory's lock, so for a single-link file
+  whose ctime moved within the last second (an unlink in progress has just set it) the parent is
+  read once first — `getdents` waits for that lock — and the entry must read the same afterwards.
+  Off Linux the canonical leaf must still be the inode with the same link count and ctime, after
+  the same parent read for a recently changed file. Appends are vetted this way before any byte
+  is written. Cost on the CI VM: about +20 µs per in-place read, +15 µs more for a file changed in
+  the last second.
 - **Appends create only inside the directory that was opened and authorized.** An append opens
   without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
   through a leaf link) after the parent directory is opened and its own location authorized for

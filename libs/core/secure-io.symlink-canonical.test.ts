@@ -556,7 +556,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     const loader = path.join(ROOT, 'scripts/ts-loader.mjs');
     const runs = ['a', 'b', 'c'].map(
       (tag) =>
-        new Promise<number | null>((resolve) => {
+        new Promise<string>((resolve) => {
           const proc = safeSpawn(
             process.execPath,
             [
@@ -570,12 +570,14 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
               tag,
               String(files),
             ],
-            { stdio: 'ignore', cwd: ROOT }
+            { stdio: ['ignore', 'ignore', 'pipe'], cwd: ROOT }
           );
-          proc.on('exit', (code) => resolve(code));
+          let stderr = '';
+          proc.stderr?.on('data', (chunk) => (stderr += String(chunk)));
+          proc.on('close', (code) => resolve(code === 0 ? 'ok' : `exit ${code}: ${stderr}`));
         })
     );
-    expect(await Promise.all(runs)).toEqual([0, 0, 0]);
+    expect(await Promise.all(runs)).toEqual(['ok', 'ok', 'ok']);
     let lost = 0;
     for (let i = 0; i < files; i += 1) {
       const lines = fs

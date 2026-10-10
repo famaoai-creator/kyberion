@@ -697,7 +697,7 @@ function stillNamed(fd: number, resolved: string, held: fs.Stats): boolean {
       return stillNamedByPath(resolved, held);
     }
     if (!path.isAbsolute(link) || link.endsWith(' (deleted)')) return false;
-    if (!held.isFile() || held.nlink !== 1) return true;
+    if (!held.isFile() || held.nlink !== 1 || !recentlyChanged(held)) return true;
     if (!settleDirectory(path.dirname(link))) return false;
     try {
       return fs.readlinkSync(procFdPath(fd)) === link;
@@ -716,8 +716,20 @@ function stillNamed(fd: number, resolved: string, held: fs.Stats): boolean {
 function stillNamedByPath(resolved: string, held: fs.Stats): boolean {
   const canonical = canonicalGuardPath(resolved, 'follow');
   if (!held.isFile()) return leafIsInode(canonical, held);
-  if (!settleDirectory(toPhysicalRoot(path.dirname(canonical)))) return false;
+  if (recentlyChanged(held) && !settleDirectory(toPhysicalRoot(path.dirname(canonical)))) {
+    return false;
+  }
   return leafIsInode(canonical, held, true);
+}
+
+/**
+ * The inode's ctime moved within the last second. An unlink caught in
+ * progress has just set it (unlink(2) moves the ctime of a file it leaves
+ * linked), so a file untouched for longer cannot be mid-unlink; the margin
+ * covers the coarse clock the kernel stamps ctimes with.
+ */
+function recentlyChanged(held: fs.Stats): boolean {
+  return held.ctimeMs > Date.now() - 1000;
 }
 
 /**
