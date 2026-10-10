@@ -6262,7 +6262,7 @@ artifact、dependency pair を検証し、map が壊れている場合は不完�
 
 動的報告系 script、server／interactive entrypoint、script registry 全件化、SX-05 の scripts 数削減は引き続き未完了である。
 
-## 401. 2026-08-30 SX-06 `report:i18n-coverage` の output／副作用境界統合
+## 401. 2026-08-30 SX-06 `i18n:report` の output／副作用境界統合
 
 ### 対応内容
 
@@ -6274,9 +6274,9 @@ artifact、dependency pair を検証し、map が壊れている場合は不完�
 ### 検証
 
 - `pnpm exec vitest run scripts/report_i18n_translation_coverage.test.ts` — 13 tests passed。
-- `pnpm run report:i18n-coverage -- --json --dry-run` — structured report を出力。
-- `pnpm run report:i18n-coverage -- --json --dry-run --quiet` — 無出力で exit 0。
-- `pnpm run report:i18n-coverage -- --alert-on-regression --dry-run --quiet` — alert／history write なしで exit 0。
+- `pnpm run i18n:report -- --json --dry-run` — structured report を出力。
+- `pnpm run i18n:report -- --json --dry-run --quiet` — 無出力で exit 0。
+- `pnpm run i18n:report -- --alert-on-regression --dry-run --quiet` — alert／history write なしで exit 0。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0。
 

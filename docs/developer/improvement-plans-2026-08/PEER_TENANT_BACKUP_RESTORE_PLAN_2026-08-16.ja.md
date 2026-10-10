@@ -72,7 +72,7 @@ restore の整合性が弱くなるため採用しない。legacy root は移行
 
 - [x] peer messaging / conversation / Mesh Hub runtime を tenant namespace 化
 - [x] tenant backup allowlist に runtime と observability を追加
-- [x] legacy record migration と quarantine report を追加（`pnpm migrate:peer-tenant-runtime`。tenant を推定できない record は source ごと quarantine）
+- [x] legacy record migration と quarantine report を追加（`pnpm peer:migrate-tenant-runtime`。tenant を推定できない record は source ごと quarantine）
 - [x] tenant backup round-trip test を追加
 
 ### Wave 3: restore quarantine と通知
