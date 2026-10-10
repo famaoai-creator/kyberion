@@ -91,15 +91,34 @@ describe('inspect_browser_page', () => {
     });
 
     const print = vi.fn();
-    const result = await main(['https://example.com', '--json'], print, {
+    const result = await main(['https://example.com', '--locale', 'ja-JP', '--json'], print, {
       nodeVersion: 'v24.1.0',
       loadActuator: async () => ({ handleAction }),
     });
 
-    expect(handleAction).toHaveBeenCalled();
+    expect(handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ locale: 'ja-JP' }),
+      })
+    );
     expect(result.mode).toBe('browser');
     expect(result.title).toBe('Browser Rendered Page');
     expect(print).toHaveBeenCalledWith(expect.stringContaining('"title": "Browser Rendered Page"'));
+  });
+
+  it('surfaces browser navigation policy failures instead of reporting an empty page', async () => {
+    const handleAction = vi.fn().mockResolvedValue({
+      status: 'failed',
+      results: [{ op: 'goto', status: 'failed', error: 'Navigation blocked by browser policy' }],
+      context: {},
+    });
+
+    await expect(
+      main(['https://127.0.0.1:3051'], vi.fn(), {
+        nodeVersion: 'v24.1.0',
+        loadActuator: async () => ({ handleAction }),
+      })
+    ).rejects.toThrow('Browser inspection failed: Navigation blocked by browser policy');
   });
 
   it('runs cdp inspection mode attaching to existing browser', async () => {
