@@ -346,7 +346,7 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
     throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
   }
   if (fs.lstatSync(resolved).isSymbolicLink()) {
-    throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${filePath}`);
   }
   const fd = openInPlace(resolved, filePath, 'r', 'read', undefined, true);
   try {
@@ -389,7 +389,7 @@ export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTa
     throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
   }
   if (fs.lstatSync(resolved).isSymbolicLink()) {
-    throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${filePath}`);
   }
 
   const fd = openInPlace(resolved, filePath, 'r', 'read', undefined, true);

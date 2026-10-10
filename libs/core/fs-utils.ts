@@ -24,6 +24,16 @@ export interface WalkOptions {
 }
 
 /**
+ * A walk root that is missing (or not a directory) yields nothing; any other
+ * failure to list it — a refusal, a directory that changed under the check —
+ * is rethrown, so a walk never turns a denial into an empty result.
+ */
+function rethrowUnlessMissing(err: unknown): void {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code !== 'ENOENT' && code !== 'ENOTDIR') throw err;
+}
+
+/**
  * Recursively walk through a directory and yield file paths.
  */
 export function* walk(dir: string, options: WalkOptions = {}): Generator<string> {
@@ -33,7 +43,8 @@ export function* walk(dir: string, options: WalkOptions = {}): Generator<string>
   let entries: string[];
   try {
     entries = safeReaddir(dir);
-  } catch (_e) {
+  } catch (err) {
+    rethrowUnlessMissing(err);
     return;
   }
 
@@ -74,7 +85,8 @@ export async function* walkAsync(dir: string, options: WalkOptions = {}): AsyncG
   let entries: string[];
   try {
     entries = safeReaddir(dir);
-  } catch (_e) {
+  } catch (err) {
+    rethrowUnlessMissing(err);
     return;
   }
 

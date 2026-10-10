@@ -144,8 +144,8 @@ describe('agent_runtime_supervisor_daemon', () => {
   let instance: Awaited<ReturnType<typeof startAgentRuntimeSupervisorDaemon>> | null = null;
 
   beforeEach(() => {
-    // Keep the socket under the governed project temp root so secure-io can
-    // enforce the 0600 chmod in the same way production does. Ensure the
+    // Keep the socket under the governed project temp root, as production
+    // does (the daemon binds it 0600 under a restrictive umask). Ensure the
     // parent exists first: clean checkouts (CI) have no active/ tree yet and
     // mkdtempSync does not create missing parents.
     safeMkdir(pathResolver.sharedTmp(), { recursive: true });
