@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-10-08
+last_updated: 2026-10-11
 kind: governance
 scope: repository
 authority: standard
@@ -170,6 +170,13 @@ pnpm surfaces reconcile
 ```
 
 これで concierge（秘書室、`http://127.0.0.1:3050`）なども起動し、Step 3 の GUI 経路が使えるようになる。
+
+### ブラウザから初めて使う場合の owner 作成
+
+ブラウザからサインインできる owner がまだいない環境では、Step 3 の `/settings` より先に
+初回セットアップを完了する。ホストで一回限りのコードを発行し、`/setup/first-run` で owner を作成して
+サインインした後、SSO 設定と IdP への紐付けに進む。既に owner がいる環境ではこの手順を飛ばしてよい。
+コマンド、画面項目、コードの有効期限は[初回セットアップ運用手順](../../../docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md#初回セットアップ画面から設定する)を参照する。
 
 ### Step 3: stance を決め、identity を保存する（B）
 
