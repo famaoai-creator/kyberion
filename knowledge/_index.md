@@ -147,6 +147,7 @@
 - [Secret Mutation Approval Model](./product/architecture/secret-mutation-approval-model.md) (public | Ecosystem Architect)
 - [Sensory Bridge Protocol (GUSP v1.0)](./product/architecture/sensory-bridge-protocol.md) (public | Ecosystem Architect)
 - [Service Runtime Abstraction](./product/architecture/service-runtime-abstraction.md) (public | Unknown)
+- [Shared front-desk request application service](./product/architecture/front-desk-request-service.md) (public | Unknown)
 - [Simulation Findings](./product/architecture/simulation-findings.md) (public | Ecosystem Architect)
 - [Slack and Chronos Control Model](./product/architecture/slack-chronos-control-model.md) (public | Ecosystem Architect)
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./product/architecture/passkey-push-protocol.md) (public | Ecosystem Architect)
