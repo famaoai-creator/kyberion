@@ -5,6 +5,7 @@ import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  safeCopyFileSync,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
@@ -507,6 +508,10 @@ function installCleanCheckoutDependencies(target: string): void {
   const sourceNodeModules = path.join(pathResolver.rootDir(), 'node_modules');
   const targetNodeModules = path.join(target, 'node_modules');
   if (safeExistsSync(sourceNodeModules) && !safeExistsSync(targetNodeModules)) {
+    // Linked (2.5 GB, too large to copy). secure-io requires write scope on
+    // the link target, so this last-resort fallback only works for a caller
+    // that may write node_modules/ (SUDO); otherwise it fails like the
+    // install attempts above.
     safeSymlinkSync(sourceNodeModules, targetNodeModules, 'dir');
     return;
   }
@@ -531,13 +536,28 @@ function buildCleanCheckout(target: string): void {
     if (safeExistsSync(targetDist)) {
       safeRmSync(targetDist, { recursive: true, force: true });
     }
-    safeSymlinkSync(sourceDist, targetDist, 'dir');
+    // Copied, not linked: secure-io only links to targets the caller may
+    // write, and the drill must not grant the clean checkout write access to
+    // the live checkout's dist/. ~110 MB, a fallback path only.
+    copyTree(sourceDist, targetDist);
     return;
   }
 
   throw new Error(
     `clean checkout build failed: ${build.stderr || build.stdout || build.error?.message || 'failed'}`
   );
+}
+
+/** Recursive copy of regular files and directories (symlinks are skipped). */
+export function copyTree(source: string, target: string): void {
+  safeMkdir(target, { recursive: true });
+  for (const entry of safeReaddir(source)) {
+    const from = path.join(source, entry);
+    const to = path.join(target, entry);
+    const stat = safeLstat(from);
+    if (stat.isDirectory()) copyTree(from, to);
+    else if (stat.isFile()) safeCopyFileSync(from, to);
+  }
 }
 
 function tarExcludesFor(outPath: string, payloadPath?: string): string[] {

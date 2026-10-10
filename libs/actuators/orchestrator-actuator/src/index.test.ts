@@ -376,6 +376,29 @@ describe('orchestrator-actuator', () => {
     );
   });
 
+  it('refuses a junction (or any non file/dir) link type in the symlink op', async () => {
+    const { handleAction } = await import('./index.js');
+    mocks.safeSymlinkSync.mockClear();
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'symlink',
+          params: {
+            source: 'active/shared/tmp/real',
+            target: 'active/shared/tmp/link',
+            type: 'junction',
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof handleAction>[0]);
+    expect(result.results.find((entry: { error?: string }) => entry.error)?.error).toContain(
+      "type must be 'dir' or 'file'"
+    );
+    expect(mocks.safeSymlinkSync).not.toHaveBeenCalled();
+  });
+
   it('rejects a pipeline bundle template outside the repository before reading it', async () => {
     const { renderPipelineBundleJob } = await import('./orchestrator-execution-brief-helpers.js');
 
