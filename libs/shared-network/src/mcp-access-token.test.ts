@@ -595,10 +595,9 @@ describe('MCP access-token pinned verifier configuration', () => {
     }
   );
 
-  it('rejects private JWK exports and RSA keys below 2048 bits', () => {
-    const weak = generateKeyPairSync('rsa', { modulusLength: 1_024 }).publicKey.export({
-      format: 'jwk',
-    });
+  it('rejects private JWK exports and undersized RSA public material', () => {
+    // Exercise the public-material size guard without generating a weak private key.
+    const weak = { ...RSA_JWK, n: Buffer.alloc(128, 255).toString('base64url') };
     for (const key of [RSA.privateKey.export({ format: 'jwk' }), weak]) {
       expect(() =>
         createMcpAccessTokenVerifier(
