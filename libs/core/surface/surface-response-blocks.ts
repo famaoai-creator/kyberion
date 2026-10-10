@@ -422,12 +422,62 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
   const surfaceParseErrors: string[] = [];
 
   let text = raw;
+  /** Linear ``` fenced-block scanner — replaces `/```info\s*\n([\s\S]*?)```/g`. */
+  function replaceFencedText(
+    text: string,
+    markers: string[],
+    replace: (match: string, body: string) => string
+  ): string {
+    const out: string[] = [];
+    let cursor = 0;
+    let searchFrom = 0;
+    for (;;) {
+      const fenceStart = text.indexOf('```', searchFrom);
+      if (fenceStart < 0) break;
+      const nl = text.indexOf('\n', fenceStart + 3);
+      if (nl < 0) break;
+      const info = text.slice(fenceStart + 3, nl).trim();
+      if (!markers.includes(info)) {
+        searchFrom = fenceStart + 3;
+        continue;
+      }
+      const close = text.indexOf('```', nl + 1);
+      if (close < 0) break;
+      out.push(text.slice(cursor, fenceStart));
+      out.push(replace(text.slice(fenceStart, close + 3), text.slice(nl + 1, close)));
+      cursor = close + 3;
+      searchFrom = cursor;
+    }
+    out.push(text.slice(cursor));
+    return out.join('');
+  }
+
+  /** Linear `>>A2A{…}<<` scanner — replaces `/>>A2A(\{[\s\S]*?\})<</g`. */
+  function replaceLegacyA2ABlocks(
+    text: string,
+    replace: (match: string, body: string) => string
+  ): string {
+    const out: string[] = [];
+    let cursor = 0;
+    for (;;) {
+      const start = text.indexOf('>>A2A{', cursor);
+      if (start < 0) break;
+      const close = text.indexOf('}<<', start + 6);
+      if (close < 0) break;
+      out.push(text.slice(cursor, start));
+      out.push(replace(text.slice(start, close + 3), text.slice(start + 5, close + 1)));
+      cursor = close + 3;
+    }
+    out.push(text.slice(cursor));
+    return out.join('');
+  }
+
   const planningPacketBlocks = extractPlanningPacketBlocks(text);
   text = planningPacketBlocks.text;
   const taskResultBlocks = extractTaskResultBlocks(text);
   text = taskResultBlocks.text;
 
-  text = text.replace(/```a2ui\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['a2ui'], (_match, json) => {
     try {
       const message = parseBlock(json, normalizeA2UIMessage, 'a2ui block parse failed');
       if (message) a2uiMessages.push(message);
@@ -437,7 +487,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/```\s*a2ui\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['a2ui'], (_match, json) => {
     try {
       const message = parseBlock(json, normalizeA2UIMessage, 'a2ui block parse failed');
       if (message) a2uiMessages.push(message);
@@ -447,7 +497,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/```a2a\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['a2a'], (_match, json) => {
     try {
       const message = parseBlock(json, normalizeA2AMessage, 'a2a block parse failed');
       if (message) a2aMessages.push(message);
@@ -457,7 +507,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/```approval\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['approval'], (_match, json) => {
     try {
       const request = parseBlock(json, normalizeApprovalRequest, 'approval block parse failed');
       if (request) approvalRequests.push(request);
@@ -467,7 +517,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/```(?:nerve_route|route)\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['nerve_route', 'route'], (_match, json) => {
     try {
       const proposal = parseBlock(json, normalizeRoutingProposal, 'routing proposal parse failed');
       if (proposal) routingProposals.push(proposal);
@@ -477,7 +527,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/```mission_proposal\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedText(text, ['mission_proposal'], (_match, json) => {
     try {
       const proposal = parseBlock(json, normalizeMissionProposal, 'mission proposal parse failed');
       if (proposal) missionProposals.push(proposal);
@@ -487,7 +537,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
-  text = text.replace(/>>A2A(\{[\s\S]*?\})<</g, (_match, json) => {
+  text = replaceLegacyA2ABlocks(text, (_match, json) => {
     try {
       const message = parseBlock(json, normalizeA2AMessage, 'a2a legacy block parse failed');
       if (message) a2aMessages.push(message);
