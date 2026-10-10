@@ -248,7 +248,8 @@ describe('concierge surface contract', () => {
       'src/app/api/voice/status/route.ts',
     ]) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
-      expect(source, route).toContain('resolveConciergeViewer');
+      // The selected-company resolver wraps resolveConciergeViewer and only narrows it.
+      expect(source, route).toMatch(/resolveConcierge(Selected)?Viewer\(req\)/);
       expect(source, route).toMatch(/resolved\.response/);
     }
   });
@@ -263,8 +264,9 @@ describe('concierge surface contract', () => {
     expect(route).toContain("import('@agent/core/surface/channel-surface')");
     expect(route).toContain('runSurfaceMessageConversation');
     // Conversation execution receives a server-resolved, non-personal scope
-    // through the single supervised direct-conversation path.
-    expect(route).toContain('resolveConciergeViewer');
+    // through the single supervised direct-conversation path (narrowed to the
+    // selected company by conversationViewerForSelection).
+    expect(route).toContain('conversationViewerForSelection(req)');
     expect(route).toContain('frontDeskRuntimeScope');
     expect(route).toContain('scope');
     // An uncertain execution produces an actionable non-success 503.
@@ -298,8 +300,8 @@ describe('concierge surface contract', () => {
     expect(page).not.toContain('window.prompt');
     expect(page).toContain("t('home.change_send')");
     expect(page).toContain('startSummaryWatch');
-    expect(fs.readFileSync(path.join(appDir, 'src/lib/summary-watch.ts'), 'utf8')).toContain(
-      "new EventSource('/api/events')"
+    expect(fs.readFileSync(path.join(appDir, 'src/lib/summary-watch.ts'), 'utf8')).toMatch(
+      /new EventSource\(\s*selection[\s\S]*'\/api\/events'\s*\)/
     );
   });
 
