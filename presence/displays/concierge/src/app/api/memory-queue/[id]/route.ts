@@ -64,10 +64,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ ok: false, error: t('api.memory.invalid') }, { status: 400 });
     }
 
-    // Only candidates actually in the queue are actionable — the list pane and
-    // this guard read the same JSONL, so the route can never reach beyond what
-    // the operator was shown. Decisions are one-shot: a decided candidate is
-    // no longer pending.
+    // Only candidates actually in the queue are actionable, within the
+    // viewer's full authorized scope (not the rail's selected company — the
+    // list is narrowed, this write is not); the decision authorizes against
+    // the candidate's own tenant. Decisions are one-shot: a decided candidate
+    // is no longer pending.
     const candidate = withExecutionContext('sovereign_concierge', () =>
       loadMemoryPromotionCandidate(id)
     );

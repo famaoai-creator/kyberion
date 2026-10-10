@@ -9,6 +9,7 @@ import {
 } from '../../../lib/invite-server';
 import { readRequestObject } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ const asContext = <T>(fn: () => T): T =>
 
 /** Invites of the tenants where the viewer is an owner or approver. Never returns a code or its hash. */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const overview = asContext(() => readInviteOverview(resolved.context));

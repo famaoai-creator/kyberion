@@ -138,7 +138,7 @@ function nextActionJapanese(action: OperatorHomeSummary['nextAction']): string |
 }
 const EXCEPTION_NOTIFICATION_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
 
-function notificationMatchesScope(
+export function notificationMatchesScope(
   notification: Record<string, unknown>,
   scope?: OperatorHomeScopeFilter
 ): boolean {
@@ -150,16 +150,22 @@ function notificationMatchesScope(
   );
   if (!scoped) return true;
   const notificationScope = notification.scope;
-  if (!notificationScope || typeof notificationScope !== 'object') return false;
-  const scopedRecord = notificationScope as Record<string, unknown>;
+  const scopeless = !notificationScope || typeof notificationScope !== 'object';
+  if (scopeless && !scope?.includeUntenanted) return false;
+  // A legacy notification without a scope object is read from its own
+  // top-level fields; it is untenanted unless it names a tenant there.
+  const scopedRecord = scopeless ? notification : (notificationScope as Record<string, unknown>);
   if (
     Array.isArray(scope?.tiers) &&
+    !(scopeless && scopedRecord.tier === undefined) &&
     !scope.tiers.includes(scopedRecord.tier as 'personal' | 'confidential' | 'public')
   )
     return false;
+  const notificationTenant = String(scopedRecord.tenant_slug || '');
   if (
     Array.isArray(scope?.tenantSlugs) &&
-    !scope.tenantSlugs.includes(String(scopedRecord.tenant_slug || ''))
+    !scope.tenantSlugs.includes(notificationTenant) &&
+    !(scope.includeUntenanted && !notificationTenant)
   )
     return false;
   if (
