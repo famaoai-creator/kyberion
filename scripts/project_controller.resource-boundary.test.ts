@@ -12,6 +12,11 @@ describe('project controller resource boundaries', () => {
       ['track', 'update', 'TRK-NONEXISTENT', '--name'],
       ['restore', 'PRJ-NONEXISTENT', '--reason'],
       ['track', 'update', 'TRK-NONEXISTENT', '--name', 'New', '--reason', 'Reason'],
+      ['create', '--statsu', 'active'],
+      ['track', 'create', '--track-id'],
+      ['reconcile', '--bogus'],
+      ['bootstrap', '--project-id', 'PRJ-NONEXISTENT', '--dry-run'],
+      ['show', 'PRJ-NONEXISTENT', '--statuz'],
     ]) {
       await expect(main(args, () => undefined)).rejects.toThrow(
         /Unknown option|requires a value|requires a track lifecycle command/

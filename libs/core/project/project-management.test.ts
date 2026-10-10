@@ -298,6 +298,24 @@ describe('project-management facade', () => {
         summary: 'Denied',
       })
     ).toThrow('mission owner');
+    expect(() =>
+      createManagedProject({
+        project_id: 'PRJ-PMC-WORKER-CREATE',
+        name: 'Denied',
+        summary: 'Denied',
+        tier: 'confidential',
+        tenant_slug: 'tenant-pmc-test',
+      })
+    ).toThrow('mission owner');
+    expect(() =>
+      bootstrapManagedProject({
+        project_id: 'PRJ-PMC-WORKER-BOOTSTRAP',
+        name: 'Denied',
+        summary: 'Denied',
+        tier: 'confidential',
+        tenant_slug: 'tenant-pmc-test',
+      })
+    ).toThrow('mission owner');
   });
 
   it('rolls back project and operational state if lifecycle audit fails', () => {
@@ -366,6 +384,36 @@ describe('project-management facade', () => {
     );
     updateManagedProjectTrack(trackId, { status: 'archived' });
     expect(archiveManagedProject(PROJECT_ID).status).toBe('archived');
+  });
+
+  it('only reselects the default track when a track changes status', () => {
+    lifecycleProject();
+    const trackId = 'TRK-PMC-LIFECYCLE';
+    createManagedProjectTrack({
+      project_id: PROJECT_ID,
+      track_id: trackId,
+      name: 'Track',
+      summary: 'Delivery',
+    });
+    saveProjectRecord({
+      ...loadProjectRecord(PROJECT_ID)!,
+      default_track_id: 'TRK-PMC-MISSING',
+    });
+    updateManagedProjectTrack(trackId, { name: 'Renamed' });
+    expect(loadProjectRecord(PROJECT_ID)?.default_track_id).toBe('TRK-PMC-MISSING');
+    updateManagedProjectTrack(trackId, { status: 'paused' });
+    expect(loadProjectRecord(PROJECT_ID)?.default_track_id).toBeUndefined();
+    updateManagedProjectTrack(trackId, { status: 'active' });
+    expect(loadProjectRecord(PROJECT_ID)?.default_track_id).toBe(trackId);
+  });
+
+  it('restores the status recorded before archiving', () => {
+    lifecycleProject();
+    updateManagedProject(PROJECT_ID, { status: 'paused' });
+    archiveManagedProject(PROJECT_ID, 'Wind down');
+    expect(loadProjectRecord(PROJECT_ID)?.metadata?.status_before_archive).toBe('paused');
+    expect(restoreManagedProject(PROJECT_ID).status).toBe('paused');
+    expect(loadProjectRecord(PROJECT_ID)?.metadata?.lifecycle_reason).toBe('Project restored');
   });
 
   it('creates a managed Project and repairs registry drift', () => {
