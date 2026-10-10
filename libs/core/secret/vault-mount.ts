@@ -147,13 +147,17 @@ export function isAllowedVaultMountPath(targetPath: string): boolean {
 }
 
 /**
- * Identity (lstat, not followed) of a path under a registered vault mount
- * target, for secure-io's opened-file pin; undefined for any other path.
+ * Identity and link state (lstat, not followed) of a path under a registered
+ * vault mount target, for secure-io's opened-file pin; undefined for any
+ * other path.
  */
-export function vaultTargetIdentity(targetPath: string): { dev: number; ino: number } | undefined {
+export function vaultTargetIdentity(
+  targetPath: string
+): { dev: number; ino: number; nlink: number; ctimeMs: number; mtimeMs: number } | undefined {
   if (!isAllowedVaultMountPath(targetPath)) return undefined;
   const stat = rawLstatSync(path.resolve(targetPath));
-  return { dev: stat.dev, ino: stat.ino };
+  const { dev, ino, nlink, ctimeMs, mtimeMs } = stat;
+  return { dev, ino, nlink, ctimeMs, mtimeMs };
 }
 
 /**
