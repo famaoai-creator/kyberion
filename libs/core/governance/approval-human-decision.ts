@@ -156,7 +156,8 @@ export function reportAssuranceShortfall(
     body:
       `A human-only approval was accepted with ${shortfall.authMethod} (${shortfall.provided}) ` +
       `below the required ${shortfall.required}. It will be rejected once ` +
-      'KYBERION_APPROVAL_ASSURANCE=enforce.',
+      'KYBERION_APPROVAL_ASSURANCE=enforce. Next: decide human-only requests on a surface ' +
+      `that provides ${shortfall.required} before enabling enforce.`,
     correlation_id: `approval-assurance-shortfall:${shortfall.authMethod}:${shortfall.required}`,
   });
 }
