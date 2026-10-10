@@ -114,7 +114,11 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const current = readTenantProfile(input.slug, options);
   if (input.verb === 'create' && current) {
-    throw new Error(`Tenant '${input.slug}' already exists.`);
+    throw new Error(
+      `Tenant '${input.slug}' already exists. ` +
+        `If this is a partially created tenant (e.g. its knowledge root is missing), ` +
+        `repair it with 'pnpm tenant update ${input.slug} --knowledge-root ${current.knowledge_root || defaultTenantKnowledgeRoot(input.slug)} --apply'.`
+    );
   }
   if (input.verb !== 'create' && !current) {
     throw new Error(`Tenant '${input.slug}' does not exist.`);

@@ -95,6 +95,30 @@ describe('tenant lifecycle preserves provider policy state', () => {
     });
   });
 
+  it('rolls back the profile when knowledge-root creation fails on create', () => {
+    // A file where the root's parent must be a directory makes mkdir fail,
+    // which is exactly what a stale tenant scope denial looked like.
+    safeMkdir(path.join(rootDir, 'knowledge', 'confidential'), { recursive: true });
+    safeWriteFile(path.join(rootDir, 'knowledge', 'confidential', 'blocked'), 'not a directory', {
+      encoding: 'utf8',
+    });
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        mutateTenant({
+          verb: 'create',
+          slug: 'blocked',
+          knowledgeRoot: 'knowledge/confidential/blocked/tenant',
+          rootDir,
+          apply: true,
+        })
+      )
+    ).toThrow();
+    // The half-created profile must be gone so create can be retried.
+    expect(
+      withExecutionContext('sovereign_concierge', () => readTenantProfile('blocked', { rootDir }))
+    ).toBeNull();
+  });
+
   it('creates new tenants strictly isolated so activation can pass memory_policy', () => {
     const result = withExecutionContext('sovereign_concierge', () =>
       mutateTenant({ verb: 'create', slug: 'beta', displayName: 'Beta', rootDir, apply: true })
