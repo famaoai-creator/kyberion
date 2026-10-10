@@ -46,6 +46,7 @@ import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from '../host-image-handoff.js';
 import { isAppleSilicon } from '../platform.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import { isInsideProviderHarness } from '../agent-execution-context.js';
 import {
   explainSeamProviderDecision,
   listSeamSelectionPurposes,
@@ -1076,10 +1077,6 @@ function envAnyEnabled(names: string[]): boolean {
   return names.some((name) => Boolean(getRegisteredEnvText(name)));
 }
 
-function envEquals(name: string, expected: string): boolean {
-  return getRegisteredEnvText(name) === expected;
-}
-
 export class HostAgentImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
   readonly id = 'host_agent';
   readonly backendIds = ['media-generation.host_agent'];
@@ -1101,8 +1098,7 @@ export class CodexHostBridgeImageGenerationProvider extends BaseHostBridgeImageG
     displayName: 'Codex host bridge',
     requestFileName: 'codex_host_bridge_image_request.json',
     errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
-    availability: () =>
-      envAnyEnabled(['CODEX_CLI', 'CODEX_VERSION']) || envEquals('TERM_PROGRAM', 'codex'),
+    availability: () => isInsideProviderHarness('codex-cli'),
   };
 }
 
@@ -1114,7 +1110,7 @@ export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGen
     displayName: 'AGY host bridge',
     requestFileName: 'agy_host_bridge_image_request.json',
     errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
-    availability: () => envAnyEnabled(['AGY_CLI', 'ANTIGRAVITY_CLI']),
+    availability: () => isInsideProviderHarness('agy-cli'),
   };
 }
 
@@ -1128,7 +1124,8 @@ export class CursorHostBridgeImageGenerationProvider extends BaseHostBridgeImage
     requestFileName: 'cursor_host_bridge_image_request.json',
     errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
     availability: () =>
-      envAnyEnabled(['CURSOR_CLI', 'CURSOR_AGENT', 'KYBERION_CURSOR_CLI_BIN', 'CURSOR_API_KEY']),
+      isInsideProviderHarness('cursor-cli') ||
+      envAnyEnabled(['CURSOR_CLI', 'KYBERION_CURSOR_CLI_BIN', 'CURSOR_API_KEY']),
   };
 }
 

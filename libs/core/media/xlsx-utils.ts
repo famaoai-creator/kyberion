@@ -915,7 +915,7 @@ async function extractTables(zip: JSZip, sheetPath: string): Promise<XlsxTable[]
       ? target.substring(1)
       : resolveZipEntryPath(sheetDir, target);
 
-    const tableFile = zip.file(tablePath) || zip.file('xl/' + target.replace('../', ''));
+    const tableFile = zip.file(tablePath) || zip.file('xl/' + target.replaceAll('../', ''));
     if (!tableFile) continue;
 
     const tableXml = await tableFile.async('string');

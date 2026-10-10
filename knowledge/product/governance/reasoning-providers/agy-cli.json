@@ -68,7 +68,15 @@
           "planner": {
             "refused": "agy CLI headless invocations always pass --dangerously-skip-permissions and have no verified no-exec mode. Refusing delegation rather than granting an under-restricted approximation."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "AGY_CLI"
+          },
+          {
+            "env": "ANTIGRAVITY_CLI"
+          }
+        ]
       },
       "runtime_instructions": [
         "Provider note: keep worker output structured and bounded; hand off durable work through the task contract.",

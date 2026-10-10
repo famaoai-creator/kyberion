@@ -61,12 +61,16 @@ export interface MemberExternalIdentity {
   issuer: string;
   subject: string;
   email?: string;
+  /** `scim:<token_id>` when SCIM provisioning created the binding. */
+  provisioned_by?: string;
 }
 
 export interface MemberProfile {
   member_id: string;
   display_name: string;
   status: MemberStatus;
+  /** `scim:<token_id>` while a suspension made by SCIM provisioning is in effect. */
+  suspended_by?: string;
   memberships: MemberMembership[];
   access_registrations: MemberAccessRegistration[];
   external_identities?: MemberExternalIdentity[];
@@ -246,9 +250,13 @@ export function readMemberProfile(
  * inside an authorized (personal-tier) execution context.
  */
 export function writeMemberProfile(
-  profile: MemberProfile,
+  input: MemberProfile,
   options: MemberRegistryPathOptions = {}
 ): MemberProfile {
+  // Suspension provenance never outlives the suspension: a member
+  // reactivated by any writer loses it, so a later suspension starts clean.
+  const { suspended_by: _suspendedBy, ...withoutProvenance } = input;
+  const profile: MemberProfile = input.status === 'suspended' ? input : withoutProvenance;
   assertMemberId(profile.member_id);
   assertMemberProfileShape(profile);
   // External identities must be unique across members: the first match wins

@@ -650,6 +650,38 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(message).not.toContain('vitest-secure-io-symlink');
   });
 
+  it('keeps the guard classification, but not the location it names, in a denial', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/to-protected`));
+    let message = '';
+    try {
+      safeWriteFile(`${scratchRel}/to-protected/x.txt`, 'x');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/Write through symbolic link denied: .*\[POLICY_VIOLATION\]$/);
+    expect(message).not.toContain('coordination');
+  });
+
+  it('creates through a linked parent only where the create can be pinned to it', () => {
+    fs.mkdirSync(abs(`${scratchRel}/real`));
+    fs.symlinkSync(abs(`${scratchRel}/real`), abs(`${scratchRel}/alias`));
+    const previous = setProcFdLookupDisabledForTesting(true);
+    try {
+      const append = () => safeAppendFileSync(`${scratchRel}/alias/new.log`, 'x');
+      if (process.platform === 'darwin') {
+        // O_NOFOLLOW_ANY at the authorized physical path.
+        append();
+        expect(fs.readFileSync(abs(`${scratchRel}/real/new.log`), 'utf8')).toBe('x');
+      } else {
+        // No openat and no O_NOFOLLOW_ANY: refused, nothing created.
+        expect(append).toThrow(/linked parent directory cannot be pinned/);
+        expect(fs.existsSync(abs(`${scratchRel}/real/new.log`))).toBe(false);
+      }
+    } finally {
+      setProcFdLookupDisabledForTesting(previous);
+    }
+  });
+
   it('never leaks through a symlink flipped between check and open (read, range, tail, stat, size)', async () => {
     // No hard link: `sw` flips between a readable file, a regular file and a
     // symlink straight to the personal-tier secret (nlink 1).

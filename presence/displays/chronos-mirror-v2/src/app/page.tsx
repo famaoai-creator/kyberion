@@ -289,6 +289,8 @@ function ChronosMirrorV2Content() {
     if (missionHistoryStatus) params.set('status', missionHistoryStatus);
     if (missionHistoryTier) params.set('tier', missionHistoryTier);
     if (tenant) params.set('tenant', tenant);
+    if (organizationId) params.set('organization_id', organizationId);
+    if (projectId) params.set('project_id', projectId);
     void fetch(`/api/missions/search?${params.toString()}`, {
       headers: { 'Cache-Control': 'no-cache' },
     })
@@ -311,7 +313,14 @@ function ChronosMirrorV2Content() {
     return () => {
       cancelled = true;
     };
-  }, [missionHistoryQuery, missionHistoryStatus, missionHistoryTier, tenant]);
+  }, [
+    missionHistoryQuery,
+    missionHistoryStatus,
+    missionHistoryTier,
+    tenant,
+    organizationId,
+    projectId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;

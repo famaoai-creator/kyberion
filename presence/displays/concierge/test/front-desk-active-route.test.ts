@@ -5,6 +5,7 @@ describe('front-desk nested setup navigation', () => {
   it.each([
     ['/', 'decide'],
     ['/ingest', 'ingest'],
+    ['/management', 'organization'],
     ['/settings', 'settings'],
     ['/setup', 'settings'],
     ['/setup/sso', 'settings'],

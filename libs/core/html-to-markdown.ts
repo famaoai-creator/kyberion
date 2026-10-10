@@ -63,7 +63,7 @@ function convertTable(tableHtml: string): string {
     );
     for (const cellHtml of cellBlocks) {
       const body = cellHtml.slice(cellHtml.indexOf('>') + 1, cellHtml.lastIndexOf('</'));
-      cells.push(inlineText(convertInline(body)).replace(/\|/g, '\\|'));
+      cells.push(inlineText(convertInline(body)).replace(/\\/g, '\\\\').replace(/\|/g, '\\|'));
     }
     if (cells.length > 0) rows.push(cells);
   }

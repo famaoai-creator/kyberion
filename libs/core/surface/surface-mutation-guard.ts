@@ -17,6 +17,7 @@ import {
 } from '../chronos-access-registry.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import { isScimProvisioningTokenFormat } from '../organization/scim-protocol.js';
 
 export interface SurfaceMutationRequest {
   url: string;
@@ -45,6 +46,10 @@ export function authorizeSurfaceMutation(request: SurfaceMutationRequest): Surfa
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
   const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
   const token = resolveBearerToken(request);
+  // A SCIM provisioning token reaches /scim/v2 only, whatever it is configured as.
+  if (isScimProvisioningTokenFormat(token)) {
+    return { ok: false, status: 403, reason: 'Forbidden. SCIM tokens are valid only for SCIM.' };
+  }
   if (matchesChronosToken(token, apiToken) || matchesChronosToken(token, localadminToken)) {
     return { ok: true, status: 200, reason: 'token' };
   }
@@ -131,7 +136,7 @@ export function resolveSurfaceViewerToken(
     configuredCredentials?: readonly SurfaceViewerConfiguredCredential[];
   } = {}
 ): SurfaceViewerTokenResolution | null {
-  if (!token) return null;
+  if (!token || isScimProvisioningTokenFormat(token)) return null;
   const registration = options.registrations
     ? findChronosTokenRegistration(token, [...options.registrations])
     : null;
