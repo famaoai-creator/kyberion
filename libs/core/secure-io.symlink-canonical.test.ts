@@ -36,6 +36,7 @@ import {
   captureCheckedDir,
   registerSensitivePathMediationProbe,
   setProcFdLookupDisabledForTesting,
+  setProcFdRootForTesting,
 } from './secure-io-path-guard.js';
 import { getAllFiles } from './fs-utils.js';
 
@@ -110,6 +111,37 @@ async function hammer(ms: number, op: () => void): Promise<number> {
     if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
   }
   return tries;
+}
+
+/**
+ * Hard-link churn: a child loops `rm name; ln secret name` while reads and
+ * appends go through `name`. Returns how often the secret was read or grew.
+ */
+async function hardLinkChurn(ms: number): Promise<Record<string, number>> {
+  const secretPath = path.join(abs(personalRel), 'secret.txt');
+  const before = fs.statSync(secretPath).size;
+  const name = abs(`${scratchRel}/churn.log`);
+  const churn = `
+    const fs = require('node:fs');
+    const [name, secret] = process.argv.slice(1);
+    const end = Date.now() + ${2 * ms + 2000};
+    while (Date.now() < end) {
+      try { fs.rmSync(name, { force: true }); } catch {}
+      try { fs.linkSync(secret, name); } catch {}
+    }`;
+  const child = safeSpawn(process.execPath, ['-e', churn, name, secretPath], { stdio: 'ignore' });
+  const result = { reads: 0, readLeaks: 0, appends: 0, secretGrew: 0 };
+  const rel = `${scratchRel}/churn.log`;
+  try {
+    result.reads = await hammer(ms, () => {
+      if (String(safeReadFile(rel)).includes('personal-tier secret')) result.readLeaks += 1;
+    });
+    result.appends = await hammer(ms, () => safeAppendFileSync(rel, 'X'));
+  } finally {
+    child.kill('SIGKILL');
+  }
+  result.secretGrew = fs.statSync(secretPath).size - before;
+  return result;
 }
 
 describe('secure-io symlink canonicalization (data-only persona)', () => {
@@ -460,6 +492,57 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(tries).toBeGreaterThan(50);
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
   }, 20000);
+
+  it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+    const result = await hardLinkChurn(2500);
+    expect(result.reads).toBeGreaterThan(50);
+    expect(result.appends).toBeGreaterThan(50);
+    expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+      readLeaks: 0,
+      secretGrew: 0,
+    });
+  }, 30000);
+
+  it('reads a file another process keeps appending to', async () => {
+    const log = abs(`${scratchRel}/busy.log`);
+    fs.writeFileSync(log, 'start\n');
+    const writer = `
+      const fs = require('node:fs');
+      const [log] = process.argv.slice(1);
+      const end = Date.now() + 5000;
+      while (Date.now() < end) fs.appendFileSync(log, 'line\\n');`;
+    const child = safeSpawn(process.execPath, ['-e', writer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          safeReadFile(`${scratchRel}/busy.log`);
+          read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('creates new files when /proc is unavailable on Linux', () => {
+    setProcFdRootForTesting('/nonexistent-proc-self-fd');
+    try {
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'a');
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'b');
+      expect(safeReadFile(`${scratchRel}/no-proc.log`)).toBe('ab');
+      expect(safeReaddir(scratchRel)).toContain('no-proc.log');
+    } finally {
+      setProcFdRootForTesting(undefined);
+    }
+  });
 
   it('loses no line when concurrent appenders create the same new files', async () => {
     // Each child appends its tag to the same 400 new files in turn: the
@@ -847,6 +930,16 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     afterEach(() => {
       setProcFdLookupDisabledForTesting(previous);
     });
+
+    it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+      const result = await hardLinkChurn(2500);
+      expect(result.reads).toBeGreaterThan(50);
+      expect(result.appends).toBeGreaterThan(50);
+      expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+        readLeaks: 0,
+        secretGrew: 0,
+      });
+    }, 30000);
 
     it('lists and stats the checkout root (a repository walk starts there)', () => {
       expect(safeReaddir(ROOT)).toContain('package.json');
