@@ -13,9 +13,12 @@ import {
   draftFromProposal,
   draftToForm,
   isManuallyStopped,
+  parseCharterDecisionOptions,
   parseCharterOverview,
   proposalDraftField,
+  setDelegatedDecision,
   usagePercent,
+  type CharterDecisionOption,
   type CharterFormDraft,
   type CharterTenantView,
 } from '../../../lib/charter-view';
@@ -32,6 +35,7 @@ type Message = { text: string; error?: boolean } | null;
 export function CharterPane({ t }: { t: SettingsTranslate }) {
   const { locale } = useConciergeI18n();
   const [tenants, setTenants] = React.useState<CharterTenantView[]>([]);
+  const [decisionOptions, setDecisionOptions] = React.useState<CharterDecisionOption[]>([]);
   const [tenant, setTenant] = React.useState('');
   const [draft, setDraft] = React.useState<CharterFormDraft>(DEFAULT_CHARTER_DRAFT);
   const [preview, setPreview] = React.useState<{ statement: string; sha: string } | null>(null);
@@ -44,9 +48,11 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   const load = React.useCallback(async () => {
     try {
       const response = await fetch(`/api/charters?locale=${locale}`, { cache: 'no-store' });
-      const parsed = parseCharterOverview(await response.json().catch(() => null));
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = parseCharterOverview(body);
       if (!response.ok || !parsed) return;
       setTenants(parsed);
+      setDecisionOptions(parseCharterDecisionOptions(body));
       setTenant((prev) =>
         parsed.some((e) => e.tenant_slug === prev) ? prev : (parsed[0]?.tenant_slug ?? '')
       );
@@ -213,6 +219,13 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
         'charter.supersedes_decision_rights': (v) =>
           setDraft((d) => ({ ...d, supersedes_decision_rights: asText(v) === 'on' })),
         'charter.agree': (v) => setAgreed(asText(v) === 'on'),
+        ...Object.fromEntries(
+          decisionOptions.map((option) => [
+            `charter.decision.${option.decision_type}`,
+            (v: unknown) =>
+              setDraft((d) => setDelegatedDecision(d, option.decision_type, asText(v) === 'on')),
+          ])
+        ),
       }}
     >
       <SettingsGroup
@@ -390,6 +403,24 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
                 options={yesNo}
               />
             </SettingRow>
+            {decisionOptions.length > 0 ? (
+              <>
+                <h4>{t('setup.charter_decisions_title')}</h4>
+                <p>{t('setup.charter_decisions_help')}</p>
+                {decisionOptions.map((option) => (
+                  <SettingRow key={option.decision_type} label={option.label}>
+                    <Select
+                      id={`charter-decision-${option.decision_type}`}
+                      name={`charter.decision.${option.decision_type}`}
+                      label={option.label}
+                      hide_label
+                      value={onOff(draft.delegated_decisions.includes(option.decision_type))}
+                      options={yesNo}
+                    />
+                  </SettingRow>
+                ))}
+              </>
+            ) : null}
             <SettingRow label={t('setup.charter_supersedes')}>
               <Select
                 id="charter-supersedes"

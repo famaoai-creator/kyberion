@@ -118,7 +118,7 @@ describe('charterInputForDecision', () => {
       )
     ).toBeUndefined();
     // No envelope vocabulary for these: "the charter says nothing" must never mean "allowed".
-    for (const decisionType of ['headcount_expansion', 'secret_mutation', 'anything-new']) {
+    for (const decisionType of ['secret_mutation', 'anything-new']) {
       expect(
         charterInputForDecision({ tenantSlug: 'acme', decisionType, amount: 1 }, opts(), NOW)
       ).toBeUndefined();
@@ -131,6 +131,49 @@ describe('charterInputForDecision', () => {
         new Date('2027-01-01T00:00:00.000Z')
       )
     ).toBeUndefined();
+  });
+
+  it('maps vocabulary decisions with their own facts and a named decision type', () => {
+    const hire = charterInputForDecision(
+      { tenantSlug: 'acme', decisionType: 'headcount_expansion', amount: 6_000_000 },
+      opts(),
+      NOW
+    );
+    // A commitment, not a payment: counted as worst-case loss, never as spend.
+    expect(hire?.action).toMatchObject({
+      action_class: 'sign_contract',
+      decision_type: 'headcount_expansion',
+      reversible: false,
+      irreversible_action_name: 'headcount_expansion',
+      estimated_loss: 6_000_000,
+      reputational_class: 'B',
+      blast_radius: { recipients: 1 },
+    });
+    expect(hire?.action.amount).toBeUndefined();
+
+    const meeting = charterInputForDecision(
+      { tenantSlug: 'acme', decisionType: 'meeting_scheduling', amount: 99, recipients: 4 },
+      opts(),
+      NOW
+    );
+    expect(meeting?.action).toMatchObject({
+      action_class: 'send_message_external',
+      decision_type: 'meeting_scheduling',
+      reversible: true,
+      estimated_loss: 0,
+      blast_radius: { recipients: 4 },
+    });
+    expect(meeting?.action.amount).toBeUndefined();
+    expect(meeting?.action.irreversible_action_name).toBeUndefined();
+
+    // The two pre-vocabulary types keep their exact legacy facts (no per-type delegation).
+    const spend = charterInputForDecision(
+      { tenantSlug: 'acme', decisionType: 'operational_spend', amount: 10 },
+      opts(),
+      NOW
+    );
+    expect(spend?.action.decision_type).toBeUndefined();
+    expect(spend?.action.blast_radius).toBeUndefined();
   });
 
   it('maps a customer message to an irreversible send_message_external naming customer_outbound', () => {

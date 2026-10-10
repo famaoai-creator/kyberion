@@ -156,6 +156,30 @@ describe('runCharterGate', () => {
     expect(run(undefined).kind).toBe('allow');
   });
 
+  it('a named, organization-delegable decision type stands in for a human-acceptance escalation only', () => {
+    const named = {
+      ...CHARTER,
+      envelope: { delegated_decisions: { meeting_scheduling: 'allow' } },
+    } as unknown as Charter;
+    const gate = (action: CharterAction, delegable: boolean) =>
+      runCharterGate({
+        decisionRightsEscalates: true,
+        decisionRightsCharterDelegable: delegable,
+        charter: { scope: { kind: 'organization', tenant_slug: 'acme' }, action },
+        agentId: 'agent-1',
+        operationId: 'calendar:confirm',
+        correlationId: 'corr-2',
+        now: new Date('2026-10-01T00:00:00.000Z'),
+      });
+    evaluate.mockReturnValue({ charter: named, decision: decision({}) });
+    const scheduling = { ...ACTION, decision_type: 'meeting_scheduling' };
+    expect(gate(scheduling, true).kind).toBe('allow');
+    // Organization did not mark it delegable (or escalates for another reason).
+    expect(gate(scheduling, false).kind).toBe('require_approval');
+    // A legacy action without a named decision type never stands in.
+    expect(gate(ACTION, true).kind).toBe('require_approval');
+  });
+
   it('near the budget edge → allow and notify', () => {
     evaluate.mockReturnValue({
       charter: CHARTER,

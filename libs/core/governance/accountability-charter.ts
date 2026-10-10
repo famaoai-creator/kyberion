@@ -71,6 +71,12 @@ export interface CharterEnvelope {
    * the matrix is organizational governance, not a personal preference.
    */
   supersedes_decision_rights?: boolean;
+  /**
+   * Business decision types (charter-decision-vocabulary.json) the accountable
+   * human delegates by name. A type that is not listed is forbidden: silence is
+   * never a grant.
+   */
+  delegated_decisions?: Partial<Record<string, ExternalEffectPolicy>>;
 }
 
 export interface CharterAppetite {
@@ -109,6 +115,11 @@ export interface CharterAction {
   /** The executing actor. Agents must name the accountable human (or a deputy) in `on_behalf_of`. */
   actor: ActorRef;
   action_class: string;
+  /**
+   * Set for vocabulary decisions that need a per-type delegation; checked
+   * against `envelope.delegated_decisions` in addition to every other limit.
+   */
+  decision_type?: string;
   amount?: number;
   currency?: string;
   data?: { tier: DataTier; tenant_slug?: string; mode: 'read' | 'write' };
@@ -174,6 +185,13 @@ function effectPolicy(env: CharterEnvelope, cls: string): ExternalEffectPolicy {
   return (
     (env.external_effects as Record<string, ExternalEffectPolicy | undefined>)[cls] ?? 'forbid'
   );
+}
+
+export function delegatedDecisionPolicy(
+  env: CharterEnvelope,
+  decisionType: string
+): ExternalEffectPolicy {
+  return env.delegated_decisions?.[decisionType] ?? 'forbid';
 }
 
 function dataScopeToken(tier: DataTier, tenant?: string): string {
@@ -317,6 +335,18 @@ export function envelopeExceeds(child: CharterEnvelope, parent: CharterEnvelope)
   if (child.supersedes_decision_rights === true && parent.supersedes_decision_rights !== true) {
     out.push('supersedes_decision_rights is not granted by the parent envelope');
   }
+  const decisionTypes = new Set<string>([
+    ...Object.keys(child.delegated_decisions ?? {}),
+    ...Object.keys(parent.delegated_decisions ?? {}),
+  ]);
+  for (const type of decisionTypes) {
+    if (
+      EFFECT_RANK[delegatedDecisionPolicy(child, type)] >
+      EFFECT_RANK[delegatedDecisionPolicy(parent, type)]
+    ) {
+      out.push(`delegated_decisions.${type} is more permissive than the parent envelope`);
+    }
+  }
   return out;
 }
 
@@ -393,6 +423,23 @@ export function evaluateAgainstCharter(input: {
   }
 
   // 4. Envelope.
+  if (action.decision_type) {
+    const policy = delegatedDecisionPolicy(envelope, action.decision_type);
+    if (policy === 'forbid') {
+      return deny([`delegated_decisions.${action.decision_type} not delegated`], {
+        field: `envelope.delegated_decisions.${action.decision_type}`,
+        current: 'forbid',
+        requested: 'allow',
+        reason: 'decision type not delegated by the accountable human',
+      });
+    }
+    if (policy === 'allow_with_review' && !action.reviewed_by_other_provider) {
+      return deny([
+        `delegated_decisions.${action.decision_type} requires cross-provider review first`,
+      ]);
+    }
+  }
+
   if (money > 0) {
     if (action.currency && action.currency !== envelope.money.currency) {
       return deny([`currency_mismatch: envelope is ${envelope.money.currency}`]);

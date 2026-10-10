@@ -43,6 +43,7 @@ const APPROVAL_PROPERTIES = {
   agent_id: { type: 'string' },
   caller_role: { type: 'string' },
   amount: { type: 'number' },
+  recipients: { type: 'integer', minimum: 0 },
   tenant_slug: { type: 'string' },
   mission_id: { type: 'string' },
   title: { type: 'string' },
