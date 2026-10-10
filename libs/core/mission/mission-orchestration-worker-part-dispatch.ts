@@ -1,3 +1,4 @@
+import { sanitizeIdSegment } from '../foundation/text.js';
 import { agentRegistry } from '../agent/agent-registry.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';
 import { tryResolveOwnerScope } from '../owner-scope.js';
@@ -244,9 +245,7 @@ export function goalIdForWorkItem(missionId: string, taskId: string): string {
 /** Mission-local KD-03 journal path (per work item). Created lazily on first append. */
 export function goalJournalPath(missionId: string, taskId: string): string {
   const missionPath = resolvedMissionDir(missionId);
-  const safeTaskId = String(taskId)
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const safeTaskId = sanitizeIdSegment(String(taskId));
   return `${missionPath}/coordination/goal-journal-${safeTaskId || 'task'}.jsonl`;
 }
 

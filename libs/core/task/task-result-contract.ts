@@ -1,6 +1,7 @@
 import { TaskResultSchema, formatZodIssues } from '../structured-output-contracts.js';
 import type { TaskResultBlock } from '../surface/channel-surface-types.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { replaceFencedBlocks } from '../foundation/text.js';
 
 export interface TaskResultValidationResult {
   valid: boolean;
@@ -65,7 +66,9 @@ export function extractTaskResultBlocks(raw: string): {
   let taskResultRepairRequiresReview = false;
   let text = raw;
 
-  text = text.replace(/```task_result\s*\n([\s\S]*?)```/g, (_match, json) => {
+  text = replaceFencedBlocks(text, (lang, content, block) => {
+    if (lang.toLowerCase() !== 'task_result') return block;
+    const json = content;
     const trimmed = String(json).trim();
     if (!trimmed) {
       taskResultErrors.push('task_result block was empty');

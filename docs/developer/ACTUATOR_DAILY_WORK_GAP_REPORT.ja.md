@@ -406,7 +406,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 | P1-4                       | **done** | `schedule-summary-and-coordination.json` v3。`calendar:list_calendars` / `calendar:list_events`。`node dist/.../calendar-actuator` の shell を削除                                                                                                            |
 | P1-5                       | **done** | `github-mcp.json` を deprecated external-MCP example として残す。正本は REST `github`。MCP `create_issue` を apply/write に直し(以前は method 無しで capture と誤分類)。テスト用 3 op は維持                                                                  |
 | P1-6                       | **done** | `libs/actuators/README.md` の Core Nine を削除し CAPABILITIES_GUIDE / `pnpm capabilities` / `pnpm playground` へリダイレクト                                                                                                                                  |
-| P1-7                       | **done** | SX-05 のため `kyberion:doctor` package script は追加しない。OPERATOR_UX / INITIALIZATION / CLI help / kyberion_cli_entry で `pnpm run doctor` を強制。first-win 契約の `pnpm doctor` 文言は維持(契約テスト固定)                                               |
+| P1-7                       | **done** | SX-05 のため `kyberion:doctor` package script は追加しない。OPERATOR_UX / INITIALIZATION / CLI help / kyberion_cli_entry で `pnpm run doctor` を強制。first-win 契約の `pnpm kyberion doctor` 文言は維持(契約テスト固定)                                      |
 
 ### P0 — 日常がアクチュエータに乗らない直接因
 

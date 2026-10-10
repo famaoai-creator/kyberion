@@ -454,7 +454,10 @@ async function evaluateGateCheck(
               ? params.model_tier
               : 'standard',
         });
-        const jsonMatch = response.match(/\{[\s\S]*\}/u);
+        const jsonStart = response.indexOf('{');
+        const jsonEnd = response.lastIndexOf('}');
+        const jsonMatch =
+          jsonStart >= 0 && jsonEnd > jsonStart ? [response.slice(jsonStart, jsonEnd + 1)] : null;
         if (!jsonMatch) {
           return {
             passed: false,
