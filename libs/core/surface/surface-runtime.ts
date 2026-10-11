@@ -522,7 +522,20 @@ export function saveSurfaceManifest(
   }
 
   ensureParentDir(resolvedManifestPath);
-  safeWriteFile(resolvedManifestPath, JSON.stringify({ version: 1, surfaces }, null, 2));
+  // Keep the declared $schema — the governance-catalog gate rejects the
+  // manifest without it, and every regeneration must not drop it.
+  safeWriteFile(
+    resolvedManifestPath,
+    JSON.stringify(
+      {
+        $schema: '../schemas/runtime-surface-manifest.schema.json',
+        version: 1,
+        surfaces,
+      },
+      null,
+      2
+    )
+  );
 }
 
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
