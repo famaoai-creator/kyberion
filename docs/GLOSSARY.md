@@ -63,7 +63,7 @@ The acting identity of the system as a whole — the agent organization operatin
 
 ### Charter
 
-The binding rules in `AGENTS.md` (the Kyberion Operating Guide). These rules define safety invariants, lifecycle, tier/tenant isolation, and execution constraints.
+The binding rules in `AGENTS.md` (the Kyberion Operating Guide). These rules define safety invariants, lifecycle, tier/tenant isolation, and execution constraints. Not to be confused with a **dot charter** (see [Dot](#dot-resident-dot)) or an **accountability charter** (see [Accountability Charter](#accountability-charter)).
 
 ### Actuator
 
@@ -200,7 +200,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 | A named conversation/delivery route             | **Channel**    | surface channel, outbox channel                         | advanced  |
 | A local capture screen                          | **Pad**        | capture pad, Capture desk                               | first-win |
 | The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
-| The shared 5-verb menu rail                     | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
+| The shared menu rail (5 core verbs + groups)    | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
 | A runtime identity overlay                      | **Stance**     | customer overlay, `customer/{slug}/`                    | advanced  |
 
 ### Surface
@@ -233,11 +233,11 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Concierge
 
-**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding. It answers "what do I need to decide now?" and hosts the 決める and 設定 items of the Front Desk.
+**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding (first-run code, SSO), `/management` (organizations and projects) and `/ingest`. A company switcher in the rail narrows 決める, settings and the conversation to the selected tenant. It answers "what do I need to decide now?" and hosts the 決める, 設定, 組織 and 資料の取込 items of the Front Desk.
 
 ### Front Desk
 
-**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: five human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings). One implementation, two hosting surfaces, so a person sees one menu.
+**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
 
 ### Stance (vs tenant customer)
 
@@ -467,6 +467,34 @@ The control plane for running an organization beyond individual missions: purpos
 
 The `work_shape` field classifying a work item's operating mode: `solution_project`, `service_operation`, `routine_operation`, `incident_response`, `governance_cadence`, or `improvement_experiment`. It distinguishes running the organization from building solutions.
 
+### Dot (Resident Dot)
+
+An always-on resident agent holding a standing responsibility across sessions, declared by a **dot charter** (`dots/*.json`, schema `knowledge/product/schemas/dot-charter.schema.json`): goal (with key results), attention triggers (`cron` / `watch` / `wake` / `probe`), an _existing_ authority role (a charter never grants authority), a decision floor over the autonomous-ops gate, and notification routing. Acts as `dot:<id>` on WorkItems, approvals and the audit chain; inspected via `pnpm kyberion dot list` and `dot status`. → [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md) · [dots/README](../dots/README.md)
+
+### Accountability Charter
+
+A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). Inside an active charter the approval gate lets an action run without a per-action approval, audited against the responsible human; outside it a human decides, and hardened policies are never delegable. Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
+
+### Scope Envelope
+
+The two-layer record (`identity` snapshot + attenuable `policy`) minted at dispatch boundaries so a delegation can only narrow, never enlarge, its parent's scope. → [scope-governance-plane](../knowledge/product/architecture/scope-governance-plane.md)
+
+### Decision Card
+
+The plain-language card on an approval request: the question, recommendation, why a human is needed, reversibility and what happens if nobody answers. The autonomous-ops gate assigns each decision one of four levels: `none` / `fyi` (run, appear in the digest), `veto` (proceeds unless the operator objects within a veto window), `decide` (waits). Chat surfaces accept `appr:<id>:approve|reject|changes|explain` replies.
+
+### Discussion Room / Dialogue Room
+
+A Chronos surface (`/?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md)
+
+### Team Channel
+
+A shared Slack channel declared `team` in `KYBERION_SURFACE_CHANNEL_MODES` (`tenant_slug`, `max_tier`, `approvers`). Kyberion answers only when @mentioned or inside joined threads, resolves speakers to organization members (`pnpm organization member link-identity`), runs each turn on a tool-less per-tenant/tier runtime, and routes real work through tenant-scoped mission proposals.
+
+### Event Intake
+
+The loopback, HMAC-authenticated `event-intake-surface` (`POST /events/<source>`) that turns external events (e.g. GitHub `workflow_run`) into resident-dot wakes. Sources are disabled in `event-intake-policy.json` until enabled per host with `KYBERION_EVENT_INTAKE_SOURCES`. Exposed publicly only through **public ingress** (`pnpm kyberion ingress up`, manifest `ingress.allowed` opt-in plus an approved `ingress:expose` request).
+
 ### Execution Shape
 
 The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs; `work_shape` describes the operating mode of a `WorkItem`, so the two fields are not interchangeable.
@@ -479,7 +507,7 @@ The canonical unit of executable work shared by all views and surfaces (`libs/co
 
 ### WorkItem Context
 
-The typed identity chain on a work item: `tenant_slug → organization_id → project_id → mission_id → task_id`, plus `work_shape`. This is the canonical containment order — the same one `ENTITY_SCOPE_HIERARCHY` declares and `normalizeWorkItemContext` serializes ([entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+The typed identity chain on a work item: `tenant_slug → organization_id → project_id → mission_id → task_id`, plus `work_shape` (`session` is the innermost key of `ENTITY_SCOPE_HIERARCHY`). This is the canonical containment order — the same one `ENTITY_SCOPE_HIERARCHY` declares and `normalizeWorkItemContext` serializes ([entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
 
 ### Work Visibility Scope
 
@@ -495,11 +523,15 @@ An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,
 
 ### Tenant Registry
 
-The single source of tenant definitions (`libs/core/organization/tenant-registry.ts`; profiles under `knowledge/personal/tenants/`). Unregistered tenants cannot be silently operated on; CI guards drift via `check:tenant-registry`.
+The single source of tenant definitions (`libs/core/organization/tenant-registry.ts`; profiles under `knowledge/personal/tenants/`). Unregistered tenants cannot be silently operated on; CI guards drift via the `tenant-registry` gate (`pnpm check --only tenant-registry`).
 
 ### Tenant Group
 
 A named set of tenants sharing a `knowledge/confidential/tenant-groups/{group}/` prefix for deliberately shared knowledge, without weakening per-tenant isolation.
+
+### Peer Messaging vs Co-Session
+
+Two different coordination surfaces — choose by participant type, shared state and trust boundary, not by `localhost`. **Co-Session** (`knowledge/product/architecture/co-session-coordination.md`) is the thin, mission-optional layer (presence, path leases, blackboard, handoff) for provider CLIs (`claude` / `codex` / `agy` / …) sharing one checkout. **Peer Messaging** (see Tenant Peer Mesh below) is signed transport between distinct Kyberion runtimes. Durable ownership stays with WorkItems and `mission_controller`. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
 ### Tenant Peer Mesh
 
@@ -583,7 +615,7 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 ### Volatile Knowledge / Working Memory
 
-The set of structured surfaces (`MEMORY.md`, `NOW.md`, daily journals, TODO, weekly reviews) that hold in-progress work context and decay over time. Distinguished from `knowledge/` (permanent, distilled) by their explicit lifetime and automatic GC. Physical root: `active/`. Schema: `schemas/volatile-knowledge.schema.json`.
+The set of structured surfaces (`MEMORY.md`, `NOW.md`, daily journals, TODO, weekly reviews) that hold in-progress work context and decay over time. Distinguished from `knowledge/` (permanent, distilled) by their explicit lifetime and automatic GC. Physical root: `active/`. Schema: `knowledge/product/schemas/volatile-knowledge.schema.json`.
 
 ### Scope (Volatile)
 
