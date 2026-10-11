@@ -786,22 +786,27 @@ async function showMissionStatus(id: string, follow: boolean = false) {
 }
 
 async function showReasoningBackendStatus(): Promise<void> {
-  const [{ getInstalledReasoningMode }, { discoverProviders }, { discoverReasoningEndpoints }] =
-    await Promise.all([
-      import('@agent/core/reasoning/reasoning-bootstrap'),
-      import('@agent/core/provider/provider-discovery'),
-      import('@agent/core/reasoning/reasoning-endpoint-discovery'),
-    ]);
+  const [
+    { getInstalledReasoningMode },
+    { discoverProviders, peekProviderDiscovery },
+    { discoverReasoningEndpoints },
+  ] = await Promise.all([
+    import('@agent/core/reasoning/reasoning-bootstrap'),
+    import('@agent/core/provider/provider-discovery'),
+    import('@agent/core/reasoning/reasoning-endpoint-discovery'),
+  ]);
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
     activeMissionControllerArgs.includes('--refresh-providers') ||
     registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
-  const providers = discoverProviders(forceRefresh).filter((provider) =>
+  const observed = forceRefresh ? discoverProviders(true) : peekProviderDiscovery().providers;
+  const providers = observed.filter((provider) =>
     ['claude', 'gemini', 'codex'].includes(provider.provider)
   );
 
   printOutput('');
   printOutput('  Reasoning Backend:');
+  if (!forceRefresh) printOutput('    Cached observations only; current readiness was not probed.');
   printOutput(
     `    Selected: ${selectedMode || registeredEnv('KYBERION_REASONING_BACKEND') || 'auto'}`
   );
