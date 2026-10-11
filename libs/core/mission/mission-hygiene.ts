@@ -6,6 +6,7 @@ import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
+import { boundTenant } from '../owner-scope.js';
 import {
   loadMissionNextTaskRecordsAtPath,
   type MissionNextTaskRecord,
@@ -99,7 +100,17 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
     try {
       entries = safeReaddir(safeRoot);
     } catch {
-      continue;
+      // Bound processes cannot enumerate a protected tier root — probe their
+      // own tenant partition instead; other tenants are invisible by policy.
+      const bound = boundTenant();
+      if (!bound) continue;
+      const partition = safeMissionPath(path.join(safeRoot, bound));
+      try {
+        if (!partition || !safeExistsSync(partition)) continue;
+        entries = safeReaddir(partition).map((entry) => path.join(bound, entry));
+      } catch {
+        continue;
+      }
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
@@ -109,6 +120,21 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
         : null;
       if (missionPath && statePath && safeExistsSync(statePath)) {
         found.push({ missionPath, tier: root.tier });
+      }
+      // Tenant partitions hold missions one level deeper.
+      if (!missionPath) continue;
+      try {
+        for (const nested of safeReaddir(missionPath)) {
+          const nestedPath = safeMissionPath(path.join(missionPath, nested));
+          const nestedState = nestedPath
+            ? safeMissionPath(path.join(nestedPath, 'mission-state.json'))
+            : null;
+          if (nestedPath && nestedState && safeExistsSync(nestedState)) {
+            found.push({ missionPath: nestedPath, tier: root.tier });
+          }
+        }
+      } catch {
+        continue;
       }
     }
   }
