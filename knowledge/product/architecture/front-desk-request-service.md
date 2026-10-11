@@ -49,17 +49,23 @@ No MCP identity is relabeled as a Web user, token identity or loopback operator.
 The diagnostic first-job admission remains public-input-only and explicitly
 loopback/localadmin-bound. General conversation entry does not broaden it.
 
-## MCP integration remains a separate authorization step
+## MCP authorization adapter and remaining integration
 
 The current inbound MCP server uses stdio and server-bound identity. It does not
 yet expose these Web-owned request operations. A production cross-entry adapter
-requires an approved authenticated principal binding; this extraction does not
-claim that binding or enable a listener.
+requires an approved authenticated principal binding. A subsequent
+[default-disabled HTTP adapter](./mcp-http-human-requests.md) now implements a
+strict verified identity boundary and request-only catalog as a router factory.
+It has no listener, provider configuration, or live Web login integration.
 
 The installed MCP SDK is 1.31.0 and advertises protocol 2025-11-25. Adoption of an
 OAuth authorization profile is distinct from upgrading protocol lifecycle,
 per-request metadata or transport semantics. Do not advertise 2026-07-28 protocol
 support without a compatible SDK/implementation and interoperability tests.
+
+The legacy fingerprint above remains unchanged. New opt-in canonical-human
+viewers use a distinct versioned ownership namespace with all effective
+restrictions retained. Existing history is never automatically migrated.
 
 For a future remote HTTP adapter, the design target is a distinct OAuth protected
 resource with discovery, an audience-bound MCP access token, issuer/signature/
