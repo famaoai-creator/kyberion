@@ -31,6 +31,9 @@ const allowedCoreFsImports = [
   'libs/core/surface/operator-home-summary.test.ts',
   'libs/core/surface/operator-notifications.test.ts',
   'libs/core/mission/mission-retrospective.test.ts',
+  // Writes mission fixtures via raw fs because the whole point is that a
+  // tenant-bound process may not touch another tenant's partition.
+  'libs/core/mission/mission-tier-scan.test.ts',
   'libs/core/mission/mission-hygiene.test.ts',
   'libs/core/mission/mission-lifecycle-service.test.ts',
   'libs/core/pipeline/pipeline-scheduler.test.ts',
