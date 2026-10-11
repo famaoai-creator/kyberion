@@ -182,6 +182,10 @@ export default defineConfig({
         statements: 65,
       },
     },
+    // Persist transforms across runs (node_modules/.vitest-cache). On CI the
+    // directory is restored from actions/cache, so repeat runs skip the
+    // ~20-30% transform share reported in vitest run summaries.
+    fsModuleCache: true,
     // Shared CI runners are 3-8x slower than a dev Mac; the 10s default
     // produced a steady drip of per-suite timeout whack-a-mole (see
     // kyberion-development-practices §2). Locally the tight bound stays so

@@ -49,6 +49,16 @@ typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tes
 still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
 check which workflow already owns that suite for pull requests.
 
+**Suite sharding.** `ci.yml` shards `scripts` (3-ways) and `integration` (2-ways) through vitest
+`--shard=N/M` passed as `pnpm test -- --suite <s> --shard=N/M` — the dispatcher forwards Vitest
+options unchanged. `pr-validation.yml` shards the core suite 4-ways the same way. Sharded matrix
+entries carry a `shard` key so job names stay distinct (`test (scripts, 1/3)`).
+
+**Vitest transform cache.** `vitest.config.mts` sets `fsModuleCache: true`
+(`node_modules/.vitest-cache`, content-hashed). `setup-kyberion` restores that directory from
+`actions/cache`, so CI test jobs reuse prior-run transforms instead of re-transforming every
+source (transform was ~20-30% of suite wall time).
+
 ## CI Workflow
 
 `ci.yml` performs:
