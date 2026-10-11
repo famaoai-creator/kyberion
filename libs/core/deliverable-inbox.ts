@@ -436,12 +436,16 @@ export function repointMissionInboxPaths(
   const upperId = String(missionId || '')
     .trim()
     .toUpperCase();
-  const normalize = (value: string) =>
-    pathResolver
+  const normalize = (value: string) => {
+    // No trailing-slash regex: stored values are untrusted input and a
+    // `\/+$` pattern is a CodeQL polynomial-ReDoS flag; a loop is linear.
+    let normalized = pathResolver
       .toRepoRelative(String(value || '').trim())
       .split(path.sep)
-      .join('/')
-      .replace(/\/+$/, '');
+      .join('/');
+    while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+    return normalized;
+  };
   const from = normalize(fromDir);
   const to = normalize(toDir);
   if (!upperId || !from || !to || from === to) return 0;
