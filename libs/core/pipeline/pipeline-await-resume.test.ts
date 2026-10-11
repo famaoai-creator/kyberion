@@ -30,7 +30,7 @@ vi.mock('../secure-io.js', () => ({
   safeReaddir: mocks.readdir,
 }));
 vi.mock('../owner-scope.js', () => ({
-  boundTenant: vi.fn(() => undefined),
+  missionTierScanDirs: vi.fn((root: string) => [root]),
 }));
 
 import { resetAwaitResumeState, sweepAwaitStateRuns } from './pipeline-await-resume.js';

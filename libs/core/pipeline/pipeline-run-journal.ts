@@ -18,7 +18,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
-import { boundTenant } from '../owner-scope.js';
+import { missionTierScanDirs } from '../owner-scope.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,
@@ -255,10 +255,13 @@ function candidateJournalPaths(runId: string): string[] {
   for (const tier of ['confidential', 'public'] as const) {
     const base = path.join(rootDir(), 'active', 'missions', tier);
     const missionDirs: string[] = [];
-    try {
-      if (safeExistsSync(base)) {
-        for (const entry of safeReaddir(base)) {
-          const dir = path.join(base, entry);
+    // missionTierScanDirs: bound processes scan only their own partition
+    // (they may not enumerate the protected tier root); unbound scan all.
+    for (const root of missionTierScanDirs(base)) {
+      try {
+        if (!safeExistsSync(root)) continue;
+        for (const entry of safeReaddir(root)) {
+          const dir = path.join(root, entry);
           // Flat layout: <tier>/<id>. Partitioned: <tier>/<tenant|shared>/<id>.
           missionDirs.push(dir);
           try {
@@ -270,20 +273,8 @@ function candidateJournalPaths(runId: string): string[] {
             // above already covered the mission-dir case.
           }
         }
-      }
-    } catch {
-      // Bound processes cannot enumerate a protected tier root — probe their
-      // own tenant partition instead; other tenants are invisible by policy.
-      const bound = boundTenant();
-      if (bound) {
-        const partition = path.join(base, bound);
-        try {
-          for (const nested of safeReaddir(partition)) {
-            missionDirs.push(path.join(partition, nested));
-          }
-        } catch {
-          // Partition missing or unreadable — no mission journals there.
-        }
+      } catch {
+        continue;
       }
     }
     for (const missionDir of missionDirs) {

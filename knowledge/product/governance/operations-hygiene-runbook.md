@@ -464,6 +464,21 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.
+- **A protected tier root is not enumerable — probe the bound partition.** When a path lands
+  under `tenant_scope.protected_prefixes` (`active/missions/<tier>/`,
+  `active/archive/missions/<tier>/`), a tenant-bound process can no longer `safeReaddir` the
+  tier root: `existsSync` reads "missing", `lstat`/`readdir` throw `scope_invalid_prefix`, and
+  any enumerator that lists the root silently sees nothing — or crashes the sweep that calls
+  it. Every enumerator of a mission tier root must route through
+  `missionTierScanDirs` (`libs/core/owner-scope.ts`), which returns `<root>/<bound>` for a
+  bound identity on protected tiers and the whole root otherwise — never a hand-rolled
+  try-readdir/probe-bound fallback per site. Flat (untenanted-dir) entries are unreachable by
+  enumeration under a bound identity by design; they stay resolvable by id and through
+  recorded ids (`project.active_missions` → `loadState`). Verify by binding a tenant via
+  `scope.env` or `KYBERION_TENANT` (both flow through `resolveProjectScope` — env alone is
+  NOT the only binding) and running the sweep: the chronos daemon's await-state sweep was the
+  incident that proved this (2026-10, `boundTenant`/`missionTierScanDirs` consolidate the fix).
+  Regression coverage: `libs/core/mission/mission-tier-scan.test.ts`.
 
 **Procedure:**
 

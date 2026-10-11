@@ -6,7 +6,7 @@ import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
-import { boundTenant } from '../owner-scope.js';
+import { missionTierScanDirs } from '../owner-scope.js';
 import {
   loadMissionNextTaskRecordsAtPath,
   type MissionNextTaskRecord,
@@ -96,45 +96,39 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   for (const root of roots) {
     const safeRoot = safeMissionPath(root.dir);
     if (!safeRoot || !safeExistsSync(safeRoot)) continue;
-    let entries: string[] = [];
-    try {
-      entries = safeReaddir(safeRoot);
-    } catch {
-      // Bound processes cannot enumerate a protected tier root — probe their
-      // own tenant partition instead; other tenants are invisible by policy.
-      const bound = boundTenant();
-      if (!bound) continue;
-      const partition = safeMissionPath(path.join(safeRoot, bound));
+    // missionTierScanDirs: a bound process scans only its own partition —
+    // the protected tier root is not enumerable under its io scope.
+    for (const scanRoot of missionTierScanDirs(safeRoot)) {
+      const entries: string[] = [];
       try {
-        if (!partition || !safeExistsSync(partition)) continue;
-        entries = safeReaddir(partition).map((entry) => path.join(bound, entry));
+        entries.push(...safeReaddir(scanRoot));
       } catch {
         continue;
       }
-    }
-    for (const entry of entries) {
-      if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
-      const missionPath = safeMissionPath(path.join(safeRoot, entry));
-      const statePath = missionPath
-        ? safeMissionPath(path.join(missionPath, 'mission-state.json'))
-        : null;
-      if (missionPath && statePath && safeExistsSync(statePath)) {
-        found.push({ missionPath, tier: root.tier });
-      }
-      // Tenant partitions hold missions one level deeper.
-      if (!missionPath) continue;
-      try {
-        for (const nested of safeReaddir(missionPath)) {
-          const nestedPath = safeMissionPath(path.join(missionPath, nested));
-          const nestedState = nestedPath
-            ? safeMissionPath(path.join(nestedPath, 'mission-state.json'))
-            : null;
-          if (nestedPath && nestedState && safeExistsSync(nestedState)) {
-            found.push({ missionPath: nestedPath, tier: root.tier });
-          }
+      for (const entry of entries) {
+        if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
+        const missionPath = safeMissionPath(path.join(scanRoot, entry));
+        const statePath = missionPath
+          ? safeMissionPath(path.join(missionPath, 'mission-state.json'))
+          : null;
+        if (missionPath && statePath && safeExistsSync(statePath)) {
+          found.push({ missionPath, tier: root.tier });
         }
-      } catch {
-        continue;
+        // Tenant partitions hold missions one level deeper.
+        if (!missionPath) continue;
+        try {
+          for (const nested of safeReaddir(missionPath)) {
+            const nestedPath = safeMissionPath(path.join(missionPath, nested));
+            const nestedState = nestedPath
+              ? safeMissionPath(path.join(nestedPath, 'mission-state.json'))
+              : null;
+            if (nestedPath && nestedState && safeExistsSync(nestedState)) {
+              found.push({ missionPath: nestedPath, tier: root.tier });
+            }
+          }
+        } catch {
+          continue;
+        }
       }
     }
   }

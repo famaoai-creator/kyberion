@@ -162,6 +162,30 @@ function visibleToProcess(tenant: string): boolean {
   return !bound || tenant === SHARED_TENANT || tenant === bound;
 }
 
+/**
+ * Directories to scan for mission entries under a mission tier root
+ * (`active/[archive/]missions/<tier>`).
+ *
+ * A tenant-bound process may not enumerate a protected tier root — the
+ * tenant list itself is out of its io scope — so it scans only its own
+ * partition (`<root>/<bound>`). Other tenants are invisible by policy
+ * anyway, and flat (untenanted-dir) entries stay reachable by id, never
+ * by enumeration. Public tier roots are not protected and stay fully
+ * enumerable. Unbound processes keep the whole root.
+ *
+ * Centralizing this rule keeps every enumerator — state scans, journal
+ * sweeps, hygiene, indexes — on the same visibility contract instead of
+ * repeating a try-readdir/probe-bound fallback.
+ */
+export function missionTierScanDirs(tierRoot: string): string[] {
+  const bound = boundTenant();
+  const tier = /(?:^|[\\/])(personal|confidential|public)[\\/]?$/.exec(tierRoot)?.[1];
+  if (bound && tier && tier !== 'public') {
+    return [path.join(tierRoot, bound)];
+  }
+  return [tierRoot];
+}
+
 function isDirectory(candidate: string): boolean {
   try {
     return safeExistsSync(candidate) && safeLstat(candidate).isDirectory();
