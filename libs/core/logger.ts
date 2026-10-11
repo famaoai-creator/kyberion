@@ -55,11 +55,32 @@ interface RepeatState {
 const repeatState = new Map<ConsoleStream, RepeatState>();
 let exitFlushRegistered = false;
 
+// Console streams that threw on write (EIO on a closed/daemonized stderr,
+// …). Writes to a broken stream are skipped for the rest of the process;
+// file-sink recording is unaffected. See writeLine.
+const brokenConsoleStreams = new Set<ConsoleStream>();
+
+/** Test hook: forget broken-stream state between cases. */
+export function resetBrokenConsoleStreamsForTests(): void {
+  brokenConsoleStreams.clear();
+}
+
 function writeLine(stream: ConsoleStream, line: string): void {
-  if (stream === 'stdout') {
-    process.stdout.write(line + '\n');
-  } else {
-    process.stderr.write(line + '\n');
+  if (brokenConsoleStreams.has(stream)) return;
+  try {
+    if (stream === 'stdout') {
+      process.stdout.write(line + '\n');
+    } else {
+      process.stderr.write(line + '\n');
+    }
+  } catch {
+    // A dead console (daemonized without a TTY, EIO on a closed pipe, …)
+    // must never break the process that is logging, and must never feed a
+    // throw → uncaughtException → logger.error → throw feedback loop
+    // (observed: nexus-daemon EIO storm, ~90 lines/s). Mark the stream
+    // broken for the rest of the process lifetime; the file sink
+    // (recordLogLine) keeps recording everything.
+    brokenConsoleStreams.add(stream);
   }
 }
 
@@ -67,7 +88,13 @@ function flushRepeat(stream: ConsoleStream): void {
   const state = repeatState.get(stream);
   if (!state) return;
   repeatState.delete(stream);
-  if (state.count > 1) writeLine(stream, state.marker(state.count));
+  if (state.count > 1) {
+    try {
+      writeLine(stream, state.marker(state.count));
+    } catch {
+      // writeLine already swallows; this guards custom markers that throw.
+    }
+  }
 }
 
 /** Flush any pending "repeated ×N" marker on both streams (safe to call anytime). */
@@ -126,21 +153,27 @@ export function emitConsoleLine(
 ): void {
   const dedup = options.dedup !== false && options.key !== undefined;
   registerExitFlush();
-  const state = repeatState.get(stream);
-  if (dedup && state && state.key === options.key) {
-    state.count += 1;
-    return;
-  }
-  flushRepeat(stream);
-  writeLine(stream, line);
-  if (dedup) {
-    repeatState.set(stream, {
-      key: options.key!,
-      count: 1,
-      // `count` is total occurrences including the already-printed line, so
-      // every emitter's marker reads "repeated ×N" with the same meaning.
-      marker: options.marker ?? ((count) => `[${nowIso()}] … (previous line repeated ×${count})`),
-    });
+  try {
+    const state = repeatState.get(stream);
+    if (dedup && state && state.key === options.key) {
+      state.count += 1;
+      return;
+    }
+    flushRepeat(stream);
+    writeLine(stream, line);
+    if (dedup) {
+      repeatState.set(stream, {
+        key: options.key!,
+        count: 1,
+        // `count` is total occurrences including the already-printed line, so
+        // every emitter's marker reads "repeated ×N" with the same meaning.
+        marker: options.marker ?? ((count) => `[${nowIso()}] … (previous line repeated ×${count})`),
+      });
+    }
+  } catch {
+    // Console output must never throw into the logging call site: a throwing
+    // console (EIO) previously re-entered via uncaughtException handlers and
+    // self-amplified into a log storm. The file sink already has the record.
   }
 }
 
