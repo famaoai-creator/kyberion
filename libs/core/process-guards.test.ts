@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installProcessGuards, resetProcessGuardsForTests } from './process-guards.js';
+import {
+  installProcessGuards,
+  resetProcessGuardDedupForTests,
+  resetProcessGuardsForTests,
+} from './process-guards.js';
 import { logger } from './core.js';
 
 // IP-08 Task 6: recording guards for long-lived processes.
 describe('installProcessGuards', () => {
   afterEach(() => {
     resetProcessGuardsForTests();
+    resetProcessGuardDedupForTests();
     vi.restoreAllMocks();
   });
 
@@ -34,6 +39,29 @@ describe('installProcessGuards', () => {
       expect(exitSpy).not.toHaveBeenCalled();
     } finally {
       // detach the real listeners we just registered
+      process.removeAllListeners('unhandledRejection');
+      process.removeAllListeners('uncaughtException');
+    }
+  });
+
+  it('dedupes an identical storm: one line per window, count on re-emit', () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const onSpy = vi.spyOn(process, 'on');
+    try {
+      installProcessGuards('storm-server');
+      const exceptionHandler = onSpy.mock.calls.find(
+        (call) => call[0] === 'uncaughtException'
+      )?.[1] as (error: unknown) => void;
+
+      exceptionHandler(new Error('EIO: i/o error, write'));
+      exceptionHandler(new Error('EIO: i/o error, write'));
+      exceptionHandler(new Error('EIO: i/o error, write'));
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+
+      // A different failure is a different signature and is still reported.
+      exceptionHandler(new Error('something else entirely'));
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+    } finally {
       process.removeAllListeners('unhandledRejection');
       process.removeAllListeners('uncaughtException');
     }
