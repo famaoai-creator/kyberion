@@ -43,7 +43,7 @@ The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope 
   builds every workspace package).
 
 **One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of the core suite
-(4 shards), the actuator suite, governance boundary tests, lint, typecheck and format. On
+(6 shards), the actuator suite, governance boundary tests, lint, typecheck and format. On
 `pull_request` events `ci.yml` skips its `core`/`actuators` matrix entries and its lint/format/
 typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
 still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
@@ -51,13 +51,21 @@ check which workflow already owns that suite for pull requests.
 
 **Suite sharding.** `ci.yml` shards `scripts` (3-ways) and `integration` (2-ways) through vitest
 `--shard=N/M` passed as `pnpm test -- --suite <s> --shard=N/M` — the dispatcher forwards Vitest
-options unchanged. `pr-validation.yml` shards the core suite 4-ways the same way. Sharded matrix
+options unchanged. `pr-validation.yml` shards the core suite 6-ways the same way. Sharded matrix
 entries carry a `shard` key so job names stay distinct (`test (scripts, 1/3)`).
 
 **Vitest transform cache.** `vitest.config.mts` sets `fsModuleCache: true`
 (`node_modules/.vitest-cache`, content-hashed). `setup-kyberion` restores that directory from
 `actions/cache`, so CI test jobs reuse prior-run transforms instead of re-transforming every
 source (transform was ~20-30% of suite wall time).
+
+**Shared build artifact.** Both `ci.yml` and `pr-validation.yml` run one `build-artifacts`
+job that uploads the owned compiler outputs (`dist/`, `libs/*/dist`, package dists, knowledge
+manifest — the same set declared in `scripts/build-output-layout.ts`, minus the multi-GB
+`.next` UI bundles). Downstream jobs declare `needs: build-artifacts` and restore with
+`actions/download-artifact` instead of re-running `pnpm run build` (~4min per job).
+`first-win-clean-clone` keeps its own build — a clean checkout build IS the check there.
+Jobs that need `.next` must build it locally with `pnpm run build:ui`.
 
 ## CI Workflow
 

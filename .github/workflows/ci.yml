@@ -23,9 +23,43 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Single build for the run: every downstream job downloads the owned
+  # compiler outputs (declared in scripts/build-output-layout.ts) instead of
+  # re-running the ~4min pnpm build per job. UI bundles (.next) stay out —
+  # they are too large and only surface checks need them.
+  build-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Upload compiler outputs
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-outputs
+          retention-days: 1
+          if-no-files-found: warn
+          path: |
+            dist/
+            libs/core/dist/
+            libs/shared-*/dist/
+            presence/displays/terminal-hud/dist/
+            plugins/dist/
+            satellites/*/dist/
+            knowledge/_integrity-manifest.json
+
   lint-and-validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: build-artifacts
     strategy:
       matrix:
         node-version: [24]
@@ -38,8 +72,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
           install-playwright: 'true'
 
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
+
+      # chronos-dom-contrast starts `next start` — the .next bundles are
+      # deliberately excluded from the shared artifact (multi-GB), so this
+      # job builds the UI locally (~1min vs ~4min for the full build).
+      - name: Build UI for surface-dependent gates
+        run: pnpm run build:ui
 
       # PI-12: prove the source distribution is self-contained in a clean
       # governed staging directory and publish a checksum downstream can pin.
@@ -147,7 +189,7 @@ jobs:
 
   intent-smoke:
     runs-on: ubuntu-latest
-    needs: lint-and-validate
+    needs: [lint-and-validate, build-artifacts]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -157,8 +199,10 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Run lightweight intent smoke suite
         run: pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke
@@ -174,7 +218,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [lint-and-validate, intent-smoke]
+    needs: [lint-and-validate, intent-smoke, build-artifacts]
     strategy:
       fail-fast: false
       matrix:
@@ -267,9 +311,11 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Build project
+      - name: Download compiler outputs
         if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
-        run: pnpm run build
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Run ${{ matrix.test-suite }} tests
         if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
@@ -290,6 +336,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: build-artifacts
     steps:
       - uses: actions/checkout@v5
 
@@ -298,8 +345,10 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Security audit (blocking on critical)
         # pnpm 11 uses npm's supported bulk advisory endpoint.
