@@ -18,6 +18,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
+import { boundTenant } from '../owner-scope.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,
