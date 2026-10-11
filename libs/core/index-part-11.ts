@@ -192,3 +192,4 @@ export {
   type LearningSignalWindow,
   type LearningSourceReport,
 } from './knowledge/learning-signal-adapter.js';
+export * from './surface/verified-human-request-identity.js';

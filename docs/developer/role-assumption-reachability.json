@@ -1278,6 +1278,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/verified-human-request-identity.ts#strictMember",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/task/task-scoped-grants.ts#appendGrantRecord",
       "roles": ["mission_controller"],
       "unresolved": []
