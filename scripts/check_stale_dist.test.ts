@@ -203,13 +203,13 @@ describe('check_stale_dist', () => {
     // outside that program, not stale.
     write('src/tracked.ts', 'const a = 1;\n');
     write('src/outside.ts', 'const o = 1;\n');
-    write('dist/a.js');
+    write('dist/tracked.js', '// emitted\n');
     writeBuildInfo('.tsbuildinfo', {
       [pathResolver.sharedTmp('check-stale-dist/src/tracked.ts')]: sha256('const a = 1;\n'),
     });
     setMtime('src/tracked.ts', T_OLD);
     setMtime('src/outside.ts', T_OLD);
-    setMtime('dist/a.js', T_OLD);
+    setMtime('dist/tracked.js', T_OLD);
     setMtime('.tsbuildinfo', T_NEW);
 
     const scan = findStaleDistTargets({
@@ -254,6 +254,45 @@ describe('check_stale_dist', () => {
     });
     expect(scan.stale).toHaveLength(1);
     expect(scan.stale[0].reason).toBe('source_newer_than_dist');
+  });
+
+  it('flags a recorded source whose emitted .js is missing (partial dist wipe)', () => {
+    // A stale tsbuildinfo can credit a source whose emit was skipped — the
+    // hash check cannot see the missing output.
+    write('src/a.ts', 'const a = 1;\n');
+    write('dist/other.js', '// unrelated emit survives the wipe\n');
+    writeBuildInfo('.tsbuildinfo', {
+      [pathResolver.sharedTmp('check-stale-dist/src/a.ts')]: sha256('const a = 1;\n'),
+    });
+    setMtime('src/a.ts', T_OLD);
+    setMtime('dist/other.js', T_NEW);
+    setMtime('.tsbuildinfo', T_NEW);
+
+    const scan = findStaleDistTargets({
+      targets: [spec({ buildInfo: [`${FIXTURE_ROOT}/.tsbuildinfo`] })],
+    });
+    expect(scan.stale).toHaveLength(1);
+    expect(scan.stale[0].reason).toBe('emit_missing');
+    expect(scan.stale[0].dist_file).toBe(`${FIXTURE_ROOT}/dist/a.js`);
+  });
+
+  it('does not flag emit_missing for a tracked source that was deleted', () => {
+    // The buildinfo still records a source removed from disk — its stale
+    // emit expectation must not fire.
+    write('src/a.ts', 'const a = 1;\n');
+    write('dist/a.js');
+    writeBuildInfo('.tsbuildinfo', {
+      [pathResolver.sharedTmp('check-stale-dist/src/a.ts')]: sha256('const a = 1;\n'),
+      [pathResolver.sharedTmp('check-stale-dist/src/gone.ts')]: sha256('const g = 1;\n'),
+    });
+    setMtime('src/a.ts', T_OLD);
+    setMtime('dist/a.js', T_OLD);
+    setMtime('.tsbuildinfo', T_NEW);
+
+    const scan = findStaleDistTargets({
+      targets: [spec({ buildInfo: [`${FIXTURE_ROOT}/.tsbuildinfo`] })],
+    });
+    expect(scan.stale).toEqual([]);
   });
 
   it('formats a warning naming the stale target and the rebuild fix', () => {

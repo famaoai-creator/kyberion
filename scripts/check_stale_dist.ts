@@ -77,6 +77,7 @@ export interface StaleDistTarget {
     | 'unrecorded_source'
     | 'source_newer_than_dist'
     | 'dist_missing'
+    | 'emit_missing'
     | 'scan_failed';
   detail?: string;
 }
@@ -269,6 +270,28 @@ function evaluateTarget(
           source_file: toRepoRelative(filePath),
           reason: 'source_changed_since_build',
           detail: 'content hash differs from the last recorded build input',
+        };
+      }
+    }
+    // Completeness pass: a buildinfo that still credits a source it never
+    // re-emitted (incremental emit after a partial dist wipe) leaves the
+    // recorded output absent on disk — the freshness check above cannot see
+    // that. Verify every tracked source's expected .js exists.
+    const onDisk = new Set(source.files);
+    for (const filePath of tracked) {
+      if (!onDisk.has(filePath)) continue;
+      const emitted = path.join(
+        distRoot,
+        path.relative(sourceRoot, filePath).replace(/\.[cm]?tsx?$/u, '.js')
+      );
+      if (!safeExistsSync(emitted)) {
+        return {
+          ...base,
+          source_file: toRepoRelative(filePath),
+          dist_file: toRepoRelative(emitted),
+          reason: 'emit_missing' as const,
+          detail:
+            'buildinfo records the source but its emitted .js is absent — likely a stale incremental emit after a partial dist wipe',
         };
       }
     }
