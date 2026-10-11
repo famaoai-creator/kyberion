@@ -76,17 +76,20 @@ function collectMissionDirs(
       if (root.tier === 'legacy' && tierSegments.has(entry)) continue;
       const candidate = safeMissionDir(path.join(absRoot, entry));
       if (!candidate) continue;
-      if (isMissionDir(candidate)) {
-        found.push({ missionPath: candidate, tier: root.tier, archived: root.archived });
-        continue;
-      }
-      // Not a mission dir → treat as a tenant segment and probe one level in.
-      for (const nested of tryReaddir(candidate)) {
-        const nestedPath = safeMissionDir(path.join(candidate, nested));
-        if (nestedPath && isMissionDir(nestedPath)) {
-          found.push({ missionPath: nestedPath, tier: root.tier, archived: root.archived });
+      // Depth-bounded walk: mission dirs sit flat (<id>), under a tenant
+      // segment (<tenant>/<id>), or in the archive under <tier>/<tenant>/<id>.
+      const visit = (dir: string, depth: number): void => {
+        if (isMissionDir(dir)) {
+          found.push({ missionPath: dir, tier: root.tier, archived: root.archived });
+          return;
         }
-      }
+        if (depth >= 3) return;
+        for (const nested of tryReaddir(dir)) {
+          const nestedPath = safeMissionDir(path.join(dir, nested));
+          if (nestedPath) visit(nestedPath, depth + 1);
+        }
+      };
+      visit(candidate, 0);
     }
   }
   return found;

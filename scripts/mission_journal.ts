@@ -154,20 +154,39 @@ export function scanMissions(
     }
     for (const item of items) {
       try {
-        const missionDir = assertSafeRepositoryPath(path.join(safeDir, item), {
+        const startDir = assertSafeRepositoryPath(path.join(safeDir, item), {
           allowMissingLeaf: true,
         });
-        if (!safeLstat(missionDir).isDirectory()) continue;
-        const statePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
-          allowMissingLeaf: true,
-        });
-        if (!safeExistsSync(statePath)) continue;
-        const mission = normalizeMission(loadStateAtPath(statePath));
-        if (!mission) continue;
-        if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
-          continue;
-        }
-        missions.push(mission);
+        if (!safeLstat(startDir).isDirectory()) continue;
+        // Bounded walk — mission dirs sit flat, under <tenant>/<id>, or in the
+        // archive under <tier>/<tenant|shared>/<id>.
+        const visit = (dir: string, depth: number): void => {
+          const statePath = assertSafeRepositoryPath(path.join(dir, 'mission-state.json'), {
+            allowMissingLeaf: true,
+          });
+          if (safeExistsSync(statePath)) {
+            const mission = normalizeMission(loadStateAtPath(statePath));
+            if (
+              mission &&
+              (!tenantSlug || (mission.tenant_slug || mission.scope?.tenant_slug) === tenantSlug)
+            ) {
+              missions.push(mission);
+            }
+            return;
+          }
+          if (depth >= 3) return;
+          for (const nested of safeReaddir(dir)) {
+            try {
+              const nestedDir = assertSafeRepositoryPath(path.join(dir, nested), {
+                allowMissingLeaf: true,
+              });
+              if (safeLstat(nestedDir).isDirectory()) visit(nestedDir, depth + 1);
+            } catch (err) {
+              logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
+            }
+          }
+        };
+        visit(startDir, 0);
       } catch (err) {
         logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
       }

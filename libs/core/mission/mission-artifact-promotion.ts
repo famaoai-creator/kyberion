@@ -184,7 +184,12 @@ function promote(
     if (!byPath.has(record.path)) continue;
     recordsByPath.set(record.path, [...(recordsByPath.get(record.path) || []), record]);
   }
-  const archiveDir = pathResolver.toRepoRelative(pathResolver.archivedMissionDir(missionId));
+  const archiveDir = pathResolver.toRepoRelative(
+    pathResolver.archivedMissionDir(missionId, {
+      tier: input.state.tier,
+      tenant: stringOrEmpty(input.state.tenant_slug),
+    })
+  );
   for (const [entryPath, records] of recordsByPath) {
     const entry = byPath.get(entryPath) as ScopedArtifactIndexEntry;
     try {
@@ -314,7 +319,9 @@ function promoteToOwnerFloor(
     if (!byPath.has(record.path)) continue;
     recordsByPath.set(record.path, [...(recordsByPath.get(record.path) || []), record]);
   }
-  const archiveDir = pathResolver.toRepoRelative(pathResolver.archivedMissionDir(missionId));
+  const archiveDir = pathResolver.toRepoRelative(
+    pathResolver.archivedMissionDir(missionId, { tier: missionTier, tenant: stateTenant })
+  );
   for (const [entryPath, records] of recordsByPath) {
     const entry = byPath.get(entryPath) as ScopedArtifactIndexEntry;
     try {
