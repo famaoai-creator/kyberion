@@ -89,7 +89,13 @@ vi.mock('./secure-io.js', async () => {
       }
       return resolved;
     },
-    safeReaddir: (dir: string) => actual.readdirSync(dir),
+    safeReaddir: (dir: string) => {
+      const denied = (globalThis as Record<string, unknown>).__kyberion_al04_deny_readdir__;
+      if (typeof denied === 'string' && path.resolve(dir) === path.resolve(denied)) {
+        throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dir}'`);
+      }
+      return actual.readdirSync(dir);
+    },
     safeStat: (p: string) => actual.statSync(p),
     safeLstat: (p: string) => actual.lstatSync(p),
     safeUnlinkSync: (p: string) => actual.unlinkSync(p),
@@ -722,6 +728,20 @@ describe('AL-04 tenant/project offboarding', () => {
     ).toEqual({
       a: 1,
     });
+  });
+
+  it('never verifies a scope clean when a listing is refused', () => {
+    writeJson(abs('active/shared/data-vault/other-entry.json'), { projectId: 'someone-else' });
+    expect(verifyScopeOffboarded('tenant', 'tenant-alpha')).toEqual({ clean: true, leftovers: [] });
+    const state = globalThis as Record<string, unknown>;
+    state.__kyberion_al04_deny_readdir__ = abs('active/shared/data-vault');
+    try {
+      const verification = verifyScopeOffboarded('tenant', 'tenant-alpha');
+      expect(verification.clean).toBe(false);
+      expect(verification.leftovers.join('\n')).toMatch(/ROLE_VIOLATION/);
+    } finally {
+      delete state.__kyberion_al04_deny_readdir__;
+    }
   });
 
   it('reports not_found for an unknown scope and error for a blank id', () => {
