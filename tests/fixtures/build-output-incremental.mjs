@@ -73,7 +73,10 @@ const freshness = () =>
     ],
   }).stale;
 io.safeRmSync(root, { recursive: true, force: true });
-write('package.json', { type: 'module' });
+write('package.json', {
+  type: 'module',
+  imports: { '#fixture-value': './libs/core/dist/value.js' },
+});
 const common = {
   target: 'ES2022',
   module: 'Node16',
@@ -106,7 +109,7 @@ write('tsconfig.json', {
   references: [{ path: './libs/core' }],
 });
 write('libs/core/src/value.ts', 'export const value = 31;\n');
-write('src/main.ts', "import { value } from '../libs/core/dist/value.js';\nconsole.log(value);\n");
+write('src/main.ts', "import { value } from '#fixture-value';\nconsole.log(value);\n");
 compile('tsconfig.json');
 smoke();
 const initial = manifest();
