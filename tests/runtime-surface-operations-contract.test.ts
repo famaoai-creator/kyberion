@@ -14,7 +14,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts.surfaces).toContain('scripts/run_with_env.ts');
     expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker');
     expect(pkg.scripts.surfaces).toContain('SYSTEM_ROLE=surface_runtime');
-    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.js');
+    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.bundle.js');
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
       expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
     expect(pkg.scripts['channels:list']).toBe(
