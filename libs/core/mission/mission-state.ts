@@ -33,7 +33,7 @@ import { loadMissionManagementConfig } from './mission-management-config.js';
 // Registers the owner-scope mission locator behind findMissionPath, so every
 // state lookup here resolves an existing mission from its own record.
 import '../owner-scope.js';
-import { boundTenant } from '../owner-scope.js';
+import { boundTenant, missionTierScanDirs } from '../owner-scope.js';
 import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
@@ -266,7 +266,7 @@ function findMissionPathAtRoot(
         return candidate;
       // A tenant-bound process cannot enumerate a tier root — probe its own
       // partition directly; other tenants are invisible by policy anyway.
-      const bound = boundTenantSegment();
+      const bound = boundTenant();
       if (
         bound &&
         MISSION_TIER_ROOT_RE.test(
@@ -616,12 +616,6 @@ export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): st
  * out of its io scope. */
 const MISSION_TIER_ROOT_RE = /^active\/(?:archive\/)?missions\/(?:personal|confidential|public)$/;
 
-function boundTenantSegment(): string | undefined {
-  // Same binding the io layer and owner-scope use — covers the persisted
-  // scope file (scope.env) and execution scope, not just KYBERION_TENANT.
-  return boundTenant();
-}
-
 export function listMissionsInSearchDirs(
   options: { rootDir?: string; directories?: string[] } = {}
 ): Array<{ missionId: string; missionPath: string }> {
@@ -638,13 +632,12 @@ export function listMissionsInSearchDirs(
     // "missing"). Probe its own partition instead; other tenants are
     // invisible by policy anyway.
     const probeBoundPartition = (): boolean => {
-      const bound = boundTenantSegment();
       const rel = path.relative(pathResolver.rootDir(), safeDirectory).split(path.sep).join('/');
-      if (bound && MISSION_TIER_ROOT_RE.test(rel)) {
-        scan(path.join(safeDirectory, bound), depth + 1);
-        return true;
-      }
-      return false;
+      if (!MISSION_TIER_ROOT_RE.test(rel)) return false;
+      const probe = missionTierScanDirs(safeDirectory)[0];
+      if (probe === safeDirectory) return false; // unbound or public root
+      scan(probe, depth + 1);
+      return true;
     };
     try {
       if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) {
