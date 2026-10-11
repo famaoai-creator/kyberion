@@ -23,6 +23,16 @@ runs:
         node-version: ${{ inputs.node-version }}
         cache: pnpm
 
+    - name: Restore vitest transform cache
+      uses: actions/cache@v5
+      with:
+        path: node_modules/.vitest-cache
+        # Content-hash keyed by vitest — a stale restore only causes misses.
+        key: vitest-${{ runner.os }}-${{ hashFiles('vitest.config.mts') }}
+        restore-keys: |
+          vitest-${{ runner.os }}-
+          vitest-
+
     - name: Install dependencies
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: pnpm install --frozen-lockfile

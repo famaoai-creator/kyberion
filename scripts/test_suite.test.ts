@@ -42,6 +42,17 @@ describe('test suite dispatcher', () => {
     });
   });
 
+  it('forwards --shard through to vitest for sharded CI jobs', () => {
+    const { suite, vitestArgs } = parseTestSuiteArgs(['--suite', 'scripts', '--shard=1/3']);
+    expect(suite).toBe('scripts');
+    expect(buildVitestArgs(suite, vitestArgs)).toEqual([
+      'vitest',
+      'run',
+      'scripts/',
+      '--shard=1/3',
+    ]);
+  });
+
   it('rejects missing and unknown suite names', () => {
     expect(() => parseTestSuiteArgs(['--suite'])).toThrow('--suite requires a suite name');
     expect(() => parseTestSuiteArgs(['--suite', 'unknown'])).toThrow('unknown test suite');
