@@ -382,6 +382,47 @@ describe('writeScopedArtifact (AL-02)', () => {
     });
   });
 
+  it('publish: stamps slides_count from the written pptx when the caller omits it', async () => {
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    zip.addFile('ppt/presentation.xml', Buffer.from('<p:presentation/>'));
+    zip.addFile('ppt/slides/slide1.xml', Buffer.from('<p:sld/>'));
+    zip.addFile('ppt/slides/slide2.xml', Buffer.from('<p:sld/>'));
+    zip.addFile('ppt/slides/_rels/slide1.xml.rels', Buffer.from('<rels/>'));
+
+    const result = store.writeScopedArtifact({
+      scope: { mission: 'M-AL02-A' },
+      artifact_class: 'export',
+      name: 'deck/slides.pptx',
+      format: 'buffer',
+      content: zip.toBuffer(),
+      publish: { kind: 'deck' },
+    });
+
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    const record = loadArtifactRecord(result.artifact_id as string);
+    expect(record?.metadata).toMatchObject({ slides_count: 2 });
+  });
+
+  it('publish: keeps a caller-provided slides_count over the derived one', async () => {
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    zip.addFile('ppt/slides/slide1.xml', Buffer.from('<p:sld/>'));
+
+    const result = store.writeScopedArtifact({
+      scope: { mission: 'M-AL02-A' },
+      artifact_class: 'export',
+      name: 'deck/counted.pptx',
+      format: 'buffer',
+      content: zip.toBuffer(),
+      publish: { kind: 'deck', metadata: { slides_count: 7 } },
+    });
+
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    const record = loadArtifactRecord(result.artifact_id as string);
+    expect(record?.metadata).toMatchObject({ slides_count: 7 });
+  });
+
   it('tenant scope: rejects reserved or malformed tenant slugs', () => {
     for (const tenant of ['shared', 'public', 'Bad Slug']) {
       expect(() =>

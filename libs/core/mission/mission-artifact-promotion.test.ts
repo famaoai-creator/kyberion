@@ -78,19 +78,11 @@ describe('mission artifact promotion', () => {
     registerProject('proj-conf', 'confidential', 'acme');
     // Owned writes are placed by the owner's record: the missions and the
     // digest's organizations exist.
-    for (const missionId of [
-      'MSN-PROMOTE-A',
-      'MSN-PROMOTE-SCOPE',
-      'MSN-PROMOTE-REPUB',
-      'MSN-PROMOTE-FORGED',
-    ]) {
-      const dir = path.join(tmpRoot, 'active/missions', missionId);
+    const seedMission = (dir: string, state: Record<string, unknown>) => {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(
         path.join(dir, 'mission-state.json'),
         JSON.stringify({
-          mission_id: missionId,
-          tier: 'public',
           status: 'completed',
           execution_mode: 'local',
           priority: 1,
@@ -98,9 +90,32 @@ describe('mission artifact promotion', () => {
           confidence_score: 1,
           git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
           history: [],
+          ...state,
         })
       );
+    };
+    for (const missionId of [
+      'MSN-PROMOTE-A',
+      'MSN-PROMOTE-SCOPE',
+      'MSN-PROMOTE-REPUB',
+      'MSN-PROMOTE-FORGED',
+    ]) {
+      seedMission(path.join(tmpRoot, 'active/missions', missionId), {
+        mission_id: missionId,
+        tier: 'public',
+      });
     }
+    // A tenant-bound mission lives in its tenant partition; an untenanted
+    // public one has no tenant partition at all.
+    seedMission(path.join(tmpRoot, 'active/missions/acme/MSN-PROMOTE-FLOOR'), {
+      mission_id: 'MSN-PROMOTE-FLOOR',
+      tier: 'confidential',
+      tenant_slug: 'acme',
+    });
+    seedMission(path.join(tmpRoot, 'active/missions/MSN-PROMOTE-FLOOR-PUB'), {
+      mission_id: 'MSN-PROMOTE-FLOOR-PUB',
+      tier: 'public',
+    });
     for (const [tier, tenant, org] of [
       ['confidential', 'acme', 'org-a'],
       ['public', 'shared', 'org-b'],
@@ -313,6 +328,100 @@ describe('mission artifact promotion', () => {
         state: missionState('MSN-NO-TREE', 'proj-a'),
       })
     ).toMatchObject({ status: 'nothing_to_promote', promoted: [], failed: [] });
+  });
+
+  it("hands a tenant mission's deliverables to the tenant floor (no project)", () => {
+    const missionId = 'MSN-PROMOTE-FLOOR';
+    const written = store.writeScopedArtifact({
+      scope: { mission: missionId },
+      tier: 'confidential',
+      artifact_class: 'export',
+      name: 'deliverables/report.md',
+      content: 'confidential deliverable',
+      publish: { kind: 'report' },
+    });
+    const state = {
+      mission_id: missionId,
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      status: 'completed',
+    } as unknown as MissionState;
+
+    const result = promotion.promoteMissionArtifactsToOwnerFloor({
+      missionId,
+      missionDir: path.join(tmpRoot, 'active/missions/acme', missionId),
+      state,
+    });
+
+    expect(result.status).toBe('promoted');
+    expect(result.failed).toEqual([]);
+    expect(result.promoted[0]?.to).toBe(
+      'active/shared/artifacts/confidential/acme/export/missions/MSN-PROMOTE-FLOOR/deliverables/report.md'
+    );
+    const record = records.loadArtifactRecord(written.artifact_id as string);
+    expect(record).toMatchObject({
+      mission_id: missionId,
+      tenant_slug: 'acme',
+      path: result.promoted[0]?.to,
+      metadata: expect.objectContaining({
+        tier: 'confidential',
+        scope_kind: 'tenant',
+        promoted_from_mission: missionId,
+        promoted_from:
+          'active/archive/missions/MSN-PROMOTE-FLOOR/artifacts/export/deliverables/report.md',
+      }),
+    });
+    expect(fs.existsSync(path.join(tmpRoot, record?.path as string))).toBe(true);
+    // The mission-tree original still exists for the archive move.
+    expect(fs.existsSync(written.absolute_path)).toBe(true);
+  });
+
+  it("hands an untenanted public mission's deliverables to the system floor", () => {
+    const missionId = 'MSN-PROMOTE-FLOOR-PUB';
+    const written = store.writeScopedArtifact({
+      scope: { mission: missionId },
+      tier: 'public',
+      artifact_class: 'export',
+      name: 'brief.md',
+      content: 'public deliverable',
+      publish: { kind: 'report' },
+    });
+    const state = {
+      mission_id: missionId,
+      tier: 'public',
+      status: 'completed',
+    } as unknown as MissionState;
+
+    const result = promotion.promoteMissionArtifactsToOwnerFloor({
+      missionId,
+      missionDir: path.join(tmpRoot, 'active/missions', missionId),
+      state,
+    });
+
+    expect(result.status).toBe('promoted');
+    expect(result.promoted[0]?.to).toBe(
+      'active/shared/artifacts/system/export/missions/MSN-PROMOTE-FLOOR-PUB/brief.md'
+    );
+    const record = records.loadArtifactRecord(written.artifact_id as string);
+    expect(record?.tenant_slug).toBeUndefined();
+    expect(record?.metadata).toMatchObject({
+      tier: 'public',
+      scope_kind: 'system',
+      promoted_from_mission: missionId,
+    });
+  });
+
+  it('leaves a non-public mission without an owner scope in the archive', () => {
+    const result = promotion.promoteMissionArtifactsToOwnerFloor({
+      missionId: 'MSN-PROMOTE-NOSCOPE',
+      missionDir: path.join(tmpRoot, 'active/missions/MSN-PROMOTE-NOSCOPE'),
+      state: {
+        mission_id: 'MSN-PROMOTE-NOSCOPE',
+        tier: 'confidential',
+        status: 'completed',
+      } as unknown as MissionState,
+    });
+    expect(result).toMatchObject({ status: 'skipped', reason: 'no_durable_scope' });
   });
 
   it("files each organization's digest entry in that organization's own scope", () => {
