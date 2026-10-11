@@ -1,3 +1,4 @@
+import { assertWorkClaimsAllowed } from '@agent/core/workforce/work-coordination-error';
 import {
   findDotCharter,
   isFrontDeskDiagnosticDot,
@@ -65,7 +66,9 @@ export interface DotExecutorStepDeps extends DotExecutorDeps {
   executePipeline?: (
     ref: string,
     ctx: Record<string, unknown>,
-    charter: DotCharter
+    charter: DotCharter,
+    signal?: AbortSignal,
+    assertExecutionCurrent?: () => void
   ) => Promise<{ status: 'succeeded' | 'failed'; summary: string }>;
   maxPerSweep?: number;
 }
@@ -129,7 +132,8 @@ async function defaultExecutePipeline(
   ref: string,
   ctx: Record<string, unknown>,
   charter: DotCharter,
-  deps: DotExecutorStepDeps = {}
+  deps: DotExecutorStepDeps = {},
+  assertExecutionCurrent?: () => void
 ): Promise<{ status: 'succeeded' | 'failed'; summary: string }> {
   const { executePipelineFile } = await import('./pipeline-execution-part-results.js');
   try {
@@ -157,6 +161,7 @@ async function defaultExecutePipeline(
   }
   const diagnostic = isFrontDeskDiagnosticDot(charter);
   const result = await executePipelineFile(ref, {
+    assertExecutionCurrent,
     ...(diagnostic
       ? {
           executionMode: 'front_desk_diagnostic' as const,
@@ -293,14 +298,29 @@ export function buildDotExecutorPorts(
       }
       return await delegateDotText(resolved, prompt, timeoutMs, signal);
     },
-    runPipeline: async (ref, ctx) => {
+    runPipeline: async (ref, ctx, signal) => {
+      const assertCurrent = () => {
+        signal?.throwIfAborted();
+        const id = typeof ctx.work_item_id === 'string' ? ctx.work_item_id : '';
+        const item = id ? getWorkItem(id) : null;
+        if (
+          !item ||
+          !ctx.attempt_id ||
+          item.current_attempt_id !== ctx.attempt_id ||
+          !ctx.lease_id ||
+          item.lease_id !== ctx.lease_id ||
+          item.status !== 'in_progress'
+        )
+          throw new Error('dot pipeline attempt is no longer current');
+        assertWorkClaimsAllowed(id);
+      };
       if (diagnostic && ref !== FRONT_DESK_RECEIPT_PIPELINE)
         throw new DotExecutorPreEffectError(
           'diagnostic supports only the front-desk receipt pipeline'
         );
       return deps.executePipeline
-        ? deps.executePipeline(ref, ctx, charter)
-        : defaultExecutePipeline(ref, ctx, charter, deps);
+        ? deps.executePipeline(ref, ctx, charter, signal, assertCurrent)
+        : defaultExecutePipeline(ref, ctx, charter, deps, assertCurrent);
     },
   };
 }
