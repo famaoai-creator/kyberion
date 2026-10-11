@@ -152,3 +152,7 @@ CLI 入口より先に概念の決定（何を working memory に置き、何を
   ない。perception playbook に既記載。
 - **物理的な移動** — ロボティクス／GPS の層はない。「移動」は hands 実行系の中での
   フォーカス変更。action playbook に既記載。
+
+## HTTP MCP 依頼ランタイム
+
+`pnpm kyberion mcp http --check` は、初期無効の共通依頼設定を listener を開かずに検証する。`--start` には、有効化されたレビュー済み設定と明示的なループバック・リバースプロキシ構成が必要。既存の stdio `mcp server` は変更せず、実認証基盤を選択しない。[運用説明](../../../docs/developer/HUMAN_REQUEST_RUNTIME_OPERATIONS.ja.md)を参照。
