@@ -16,10 +16,40 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Single build for the run: downstream jobs download the owned compiler
+  # outputs (scripts/build-output-layout.ts) instead of rebuilding (~4min
+  # each). UI bundles (.next) stay out — too large and not needed here.
+  build-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Build project
+        run: pnpm run build
+      - name: Upload compiler outputs
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-outputs
+          retention-days: 1
+          if-no-files-found: warn
+          path: |
+            dist/
+            libs/core/dist/
+            libs/shared-*/dist/
+            presence/displays/terminal-hud/dist/
+            plugins/dist/
+            satellites/*/dist/
+            knowledge/_integrity-manifest.json
+
   gates:
     name: pr-gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: build-artifacts
     permissions:
       contents: read
       pull-requests: write
@@ -29,8 +59,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
       - name: Run manifest-driven PR checks
         run: pnpm run check -- --scope pr
 
@@ -38,6 +70,7 @@ jobs:
     name: static-checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: build-artifacts
     permissions:
       contents: read
     steps:
@@ -46,8 +79,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
       - name: Check PR title
         # Pass the title through env: interpolating it into the script would let
         # a crafted PR title run shell commands.
@@ -65,6 +100,7 @@ jobs:
     name: core-tests (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    needs: build-artifacts
     permissions:
       contents: read
     strategy:
@@ -124,8 +160,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Run core tests (shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
@@ -137,6 +175,7 @@ jobs:
     name: actuator/boundary/security tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: build-artifacts
     permissions:
       contents: read
     steps:
@@ -145,8 +184,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Run actuator tests
         run: pnpm test -- --suite actuators
@@ -162,6 +203,7 @@ jobs:
     name: vital-check
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: build-artifacts
     permissions:
       contents: read
       pull-requests: write
@@ -171,8 +213,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build project
-        run: pnpm run build
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
 
       - name: Vital check
         id: build-size
