@@ -9,7 +9,7 @@ import {
 } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
-import { setLogFileSink } from './logger.js';
+import { setLogFileSink, resetBrokenConsoleStreamsForTests } from './logger.js';
 
 vi.mock('./secure-io.js', async () => {
   const fsModule = await import('node:fs');
@@ -592,6 +592,9 @@ describe('tier-guard tenant scope (IP-1)', () => {
       // Earlier permission tests intentionally leave best-effort audits queued.
       // Drain those before installing this test's failure/reentrancy behavior.
       await settleAudits();
+      // A console failure in one case parks the stream process-wide
+      // (logger broken-stream parking); reset so each case starts unparked.
+      resetBrokenConsoleStreamsForTests();
       const { auditChain } = await import('./governance/audit-chain.js');
       vi.mocked(auditChain.record).mockReset();
       process.env.KYBERION_TENANT = 'acme-corp';
@@ -850,6 +853,9 @@ describe('tier-guard brokered missions (C8)', () => {
     savedTenant = process.env.KYBERION_TENANT;
     savedPersona = process.env.KYBERION_PERSONA;
     savedMission = process.env.MISSION_ID;
+    // Console failures in earlier suites park the stream process-wide
+    // (logger broken-stream parking); reset so this suite starts unparked.
+    resetBrokenConsoleStreamsForTests();
     // Build a fake mission state at active/missions/public/<MSN>/mission-state.json
     // so resolveIdentityContext picks up the brokerage.
     const fs = await import('node:fs');
