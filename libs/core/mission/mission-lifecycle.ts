@@ -4,7 +4,11 @@
  */
 
 import * as path from 'node:path';
-import { addInboxEntry } from '../deliverable-inbox.js';
+import {
+  addInboxEntry,
+  normalizeStoredInboxPaths,
+  repointMissionInboxPaths,
+} from '../deliverable-inbox.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from '../path-resolver.js';
@@ -42,7 +46,10 @@ import {
 } from '../secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
-import { promoteMissionArtifactsToProject } from './mission-artifact-promotion.js';
+import {
+  promoteMissionArtifactsToOwnerFloor,
+  promoteMissionArtifactsToProject,
+} from './mission-artifact-promotion.js';
 import {
   reconcileCompletion,
   reconcileCompletionStructurally,
@@ -1033,6 +1040,9 @@ export async function finishMission(
       addInboxEntry({
         missionId: upperId,
         title: completionGoal.summary,
+        // Tenant-bound missions must stamp their tenant — an untenanted entry
+        // is invisible to every tenant-scoped outcome feed it belongs to.
+        tenantSlug: state.tenant_slug || undefined,
         artifactPaths: evidenceRefs,
         summary:
           (typeof completionNextAction === 'string'
@@ -1186,7 +1196,17 @@ export async function finishMission(
   // Best-effort like closure — never fails a finish that already succeeded.
   traceCtx.startSpan('mission:artifact-promotion');
   try {
-    const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
+    const projectPromotion = promoteMissionArtifactsToProject({
+      missionId: upperId,
+      missionDir,
+      state,
+    });
+    // No project to hand deliverables to: land them on the owner's durable
+    // floor instead so published records survive the archive move.
+    const promotion =
+      projectPromotion.reason === 'no_project'
+        ? promoteMissionArtifactsToOwnerFloor({ missionId: upperId, missionDir, state })
+        : projectPromotion;
     if (promotion.status !== 'skipped' || promotion.reason !== 'no_project') {
       state.context = {
         ...(state.context || {}),
@@ -1257,6 +1277,23 @@ export async function finishMission(
   traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeRmSync(archivePath, { recursive: true, force: true });
   safeMoveSync(missionDir, archivePath);
+  // The mission dir just moved: entry refs pointing inside it are rewritten to
+  // the archived location (deliverables were already promoted out), and any
+  // legacy machine-absolute refs are normalized while the store is touched.
+  try {
+    repointMissionInboxPaths(
+      upperId,
+      pathResolver.toRepoRelative(missionDir),
+      pathResolver.toRepoRelative(archivePath)
+    );
+    normalizeStoredInboxPaths();
+  } catch (error) {
+    logger.warn(
+      `[deliverable-inbox] post-archive repoint for ${upperId} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   traceCtx.endSpan('ok');
 
   state.status = args.transitionStatus(state.status, 'archived');

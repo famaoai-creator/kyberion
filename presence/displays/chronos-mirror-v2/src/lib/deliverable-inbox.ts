@@ -257,9 +257,13 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
+    // A record with no tenant is org-shared: admitted to a finite scope at
+    // public tier only; confidential/personal without an owner stays hidden.
     .filter((item) =>
       input.tenantSlugs && input.tenantSlugs !== 'all'
-        ? Boolean(item.tenantSlug && input.tenantSlugs.includes(item.tenantSlug))
+        ? item.tenantSlug
+          ? input.tenantSlugs.includes(item.tenantSlug)
+          : item.tier === 'public'
         : true
     )
     .filter((item) =>

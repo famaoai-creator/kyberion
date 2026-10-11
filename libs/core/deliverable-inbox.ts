@@ -282,14 +282,18 @@ export function addInboxEntry(input: {
   integratedSummary?: string;
 }): DeliverableInboxEntry {
   const now = nowIso();
+  // Persisted paths are repo-relative and portable: an absolute path embeds
+  // the operator's machine layout in the shared store and dies on any host
+  // whose checkout lives elsewhere. Non-path refs (trace:, receipt:, …) pass
+  // through unchanged.
+  const normalizeStoredRef = (ref: unknown): string =>
+    pathResolver.toRepoRelative(String(ref).trim()).split(path.sep).join('/');
   const entry: DeliverableInboxEntry = {
     entry_id: input.entryId || `INBOX-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId?.trim() || undefined,
     title: input.title.trim() || input.missionId?.trim() || 'Deliverable',
     artifact_paths: Array.from(
-      new Set(
-        (input.artifactPaths || []).map((artifact) => String(artifact).trim()).filter(Boolean)
-      )
+      new Set((input.artifactPaths || []).map(normalizeStoredRef).filter(Boolean))
     ),
     summary: input.summary?.trim() || '',
     created_at: input.createdAt || now,
@@ -301,7 +305,7 @@ export function addInboxEntry(input: {
       ? {
           role_sections: input.roleSections.map((section) => ({
             ...section,
-            evidence_refs: [...section.evidence_refs],
+            evidence_refs: section.evidence_refs.map(normalizeStoredRef),
           })),
         }
       : {}),
@@ -368,6 +372,93 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
       return rightTime.localeCompare(leftTime);
     })
     .slice(0, Math.max(1, query.limit || 50));
+}
+
+/**
+ * Rewrite one entry's stored refs through `map`; returns true when anything
+ * changed. Covers both `artifact_paths` and role-section `evidence_refs` —
+ * the two are bound by exact-match validation and must move together.
+ */
+function rewriteEntryRefs(entry: DeliverableInboxEntry, map: (ref: string) => string): boolean {
+  let changed = false;
+  const nextPaths = entry.artifact_paths.map((ref) => {
+    const next = map(ref);
+    if (next !== ref) changed = true;
+    return next;
+  });
+  if (changed) entry.artifact_paths = nextPaths;
+  if (entry.role_sections?.length) {
+    const nextSections = entry.role_sections.map((section) => {
+      let sectionChanged = false;
+      const evidence_refs = section.evidence_refs.map((ref) => {
+        const next = map(ref);
+        if (next !== ref) sectionChanged = true;
+        return next;
+      });
+      if (sectionChanged) changed = true;
+      return sectionChanged ? { ...section, evidence_refs } : section;
+    });
+    entry.role_sections = nextSections;
+  }
+  return changed;
+}
+
+/**
+ * The stored path form is repo-relative: older entries persisted
+ * machine-absolute paths, which break on other hosts. Rewrites any absolute
+ * stored ref that resolves under the repository root. Idempotent.
+ */
+export function normalizeStoredInboxPaths(): number {
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const changed = entries.filter((entry) =>
+      rewriteEntryRefs(entry, (ref) =>
+        path.isAbsolute(String(ref || '').trim())
+          ? pathResolver.toRepoRelative(String(ref).trim()).split(path.sep).join('/')
+          : ref
+      )
+    ).length;
+    if (changed > 0) writeInboxEntries(entries);
+    return changed;
+  });
+}
+
+/**
+ * Mission finish moves `<…>/missions/…/<id>` under `active/archive/missions/`:
+ * refs pointing into the moved tree are rewritten to the archived location so
+ * the entry keeps resolving (its owner's files still exist — just elsewhere).
+ */
+export function repointMissionInboxPaths(
+  missionId: string,
+  fromDir: string,
+  toDir: string
+): number {
+  const upperId = String(missionId || '')
+    .trim()
+    .toUpperCase();
+  const normalize = (value: string) => {
+    // No trailing-slash regex: stored values are untrusted input and a
+    // `\/+$` pattern is a CodeQL polynomial-ReDoS flag; a loop is linear.
+    let normalized = pathResolver
+      .toRepoRelative(String(value || '').trim())
+      .split(path.sep)
+      .join('/');
+    while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+    return normalized;
+  };
+  const from = normalize(fromDir);
+  const to = normalize(toDir);
+  if (!upperId || !from || !to || from === to) return 0;
+  const repoint = (ref: string) =>
+    ref === from ? to : ref.startsWith(`${from}/`) ? `${to}${ref.slice(from.length)}` : ref;
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const changed = entries.filter(
+      (entry) => entry.mission_id?.toUpperCase() === upperId && rewriteEntryRefs(entry, repoint)
+    ).length;
+    if (changed > 0) writeInboxEntries(entries);
+    return changed;
+  });
 }
 
 export function markInboxEntry(

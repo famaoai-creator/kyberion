@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   safePath: vi.fn(),
   stat: vi.fn(),
   snapshot: vi.fn(),
+  exists: vi.fn(),
 }));
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
@@ -21,6 +22,15 @@ vi.mock('@agent/core/entity-scope', () => ({
 vi.mock('@agent/core/owner-scope', () => ({
   clearOwnerScopeCache: mocks.clear,
   resolveOwnerScope: mocks.owner,
+  SHARED_TENANT: 'shared',
+  OwnerScopeError: class OwnerScopeError extends Error {
+    readonly code: string;
+    constructor(input: { code: string; what?: string; why?: string; remedy?: string }) {
+      super(`[${input.code}] ${input.what ?? ''}`);
+      this.name = 'OwnerScopeError';
+      this.code = input.code;
+    }
+  },
 }));
 vi.mock('@agent/core/mission/mission-state-reader', () => ({
   loadMissionStateAtPath: mocks.state,
@@ -32,6 +42,8 @@ vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
     rootDir: () => '/repo',
     missionDir: (id: string, tier: string) => '/repo/active/missions/' + tier + '/' + id,
+    archivedMissionsRoot: () => '/repo/active/archive/missions',
+    archivedMissionDir: (id: string) => '/repo/active/archive/missions/' + id,
   },
 }));
 vi.mock('@agent/core/surface/surface-authn', () => ({
@@ -40,10 +52,12 @@ vi.mock('@agent/core/surface/surface-authn', () => ({
 vi.mock('@agent/core/secure-io', () => ({
   withSensitivePathMediation: (fn: () => unknown) => fn(),
   assertSafeRepositoryPath: mocks.safePath,
+  safeExistsSync: mocks.exists,
   safeLstat: mocks.stat,
   safeReadFileSnapshot: mocks.snapshot,
 }));
 vi.mock('./viewer-context', () => ({ toSurfaceAuthorizationContext: (viewer: unknown) => viewer }));
+import { OwnerScopeError } from '@agent/core/owner-scope';
 import {
   listOutcomeFiles,
   readOutcomeFile,
@@ -308,6 +322,43 @@ describe('mission-owned outcome files', () => {
       );
     }
   );
+  const notFoundError = () =>
+    new OwnerScopeError({
+      code: 'OWNER_NOT_FOUND',
+      owner: { kind: 'mission', id: 'MSN-TEST' },
+      what: 'mission MSN-TEST not found',
+      why: 'the mission dir moved to the archive',
+      remedy: 'resolve via the archived mission dir',
+    });
+  it('serves files after the mission dir moved to the archive', async () => {
+    const archive = '/repo/active/archive/missions/MSN-TEST';
+    // Owner resolution fails for a mission whose dir was archived; the inbox
+    // entry still lists its pre-move (active) paths.
+    mocks.owner.mockImplementation(() => {
+      throw notFoundError();
+    });
+    mocks.exists.mockImplementation((file: string) => file === archive);
+    state.relationships = { project: { project_id: 'PRJ' } };
+    const tail = '/artifacts/report/report.pdf';
+    contents.delete(root + tail);
+    contents.set(archive + tail, Buffer.from('%PDF-1.7 archived'));
+    const file = available(list());
+    expect(readOutcomeFile(reader, 'INBOX-TEST', file.id)).toMatchObject({
+      bytes: Buffer.from('%PDF-1.7 archived'),
+      contentType: 'application/pdf',
+    });
+  });
+  it('still enforces tenant membership on an archived mission', async () => {
+    const archive = '/repo/active/archive/missions/MSN-TEST';
+    mocks.owner.mockImplementation(() => {
+      throw notFoundError();
+    });
+    mocks.exists.mockImplementation((file: string) => file === archive);
+    state.relationships = { project: { project_id: 'PRJ' } };
+    member.memberships = [{ tenant_slug: 'acme', role: 'viewer' }];
+    expect(() => list()).toThrow();
+    expect(mocks.snapshot).not.toHaveBeenCalled();
+  });
   it('binds file IDs to their inbox entry and sends inert attachment headers', () => {
     const file = available();
     expect(file.id.slice(64)).toBe(

@@ -157,6 +157,68 @@ describe('path-resolver portability helpers', () => {
   });
 });
 
+describe('findMissionPath tenant-partition scan', () => {
+  const tenant = `scan-tenant-${process.pid}`;
+  const missionId = `MSN-SCAN-${process.pid}`;
+
+  const tenantDir = () => path.join(rootDir(), 'active/missions/confidential', tenant, missionId);
+  const seedTenantMission = (withState = true) => {
+    safeMkdir(tenantDir(), { recursive: true });
+    if (withState) {
+      safeWriteFile(
+        path.join(tenantDir(), 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tier: 'confidential', tenant_slug: tenant })
+      );
+    }
+  };
+  const cleanup = (dir: string) => safeRmSync(dir, { recursive: true, force: true });
+
+  it('finds a tenant-bound mission from a process with no tenant scope', () => {
+    withExecutionContext('mission_controller', () => {
+      seedTenantMission();
+      try {
+        expect(findMissionPath(missionId)).toBe(tenantDir());
+      } finally {
+        cleanup(tenantDir());
+      }
+    });
+  });
+
+  it('resolves to the stated dir when a stateless skeleton shadows it', () => {
+    withExecutionContext('mission_controller', () => {
+      const skeleton = path.join(rootDir(), 'active/missions/confidential', missionId);
+      seedTenantMission(true);
+      safeMkdir(skeleton, { recursive: true });
+      safeWriteFile(path.join(skeleton, 'NOW.md'), '# now');
+      try {
+        expect(findMissionPath(missionId)).toBe(tenantDir());
+      } finally {
+        cleanup(skeleton);
+        cleanup(tenantDir());
+      }
+    });
+  });
+
+  it('fails closed when the same id exists under two tenant partitions', () => {
+    withExecutionContext('mission_controller', () => {
+      const other = `scan-other-${process.pid}`;
+      const otherDir = path.join(rootDir(), 'active/missions/confidential', other, missionId);
+      seedTenantMission(true);
+      safeMkdir(otherDir, { recursive: true });
+      safeWriteFile(
+        path.join(otherDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tier: 'confidential', tenant_slug: other })
+      );
+      try {
+        expect(() => findMissionPath(missionId)).toThrow(/OWNER_AMBIGUOUS/);
+      } finally {
+        cleanup(otherDir);
+        cleanup(tenantDir());
+      }
+    });
+  });
+});
+
 describe('assertVolatileId', () => {
   it.each(['session-1', 'vision.s_2', 'A'])('accepts session id %j unchanged', (id) => {
     expect(assertVolatileId('session', id)).toBe(id);
