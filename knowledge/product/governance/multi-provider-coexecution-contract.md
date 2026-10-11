@@ -3,7 +3,7 @@ title: Multi-Provider Co-Execution Contract
 category: Governance
 tags: [governance, multi-provider, cli, co-execution, xp-04, so-03]
 importance: 9
-last_updated: 2026-09-26
+last_updated: 2026-10-11
 ---
 
 # Multi-Provider Co-Execution Contract
@@ -46,6 +46,24 @@ gates, or baseline checks; a baseline-check L2 failure with
 `dist_import_violations` in the report means exactly this. Rebuilding after a
 branch switch is cheap insurance and never harms an in-flight claim holder —
 dist contents are derived state, not authored state.
+
+## Shared-checkout live verification
+
+Source-run CLIs (`ts-loader` entrypoints such as `pnpm organization` /
+`pnpm scope`) execute working-tree source directly, so **uncommitted edits
+affect every provider sharing the checkout** — unlike `dist/`, there is no
+build step isolating them. Live verification in a shared checkout follows:
+
+- Prefer `--dry-run` first on every authoring command; real applies only for
+  the operator's own tenant/org scope, never another session's.
+- Isolate scope and paths: drive CLI probes with `KYBERION_SCOPE_ENV_PATH`
+  pointed at `active/shared/tmp/` instead of mutating the shared `scope.env`;
+  `scope push` / `pop` only around the operator's own tick sequence.
+- Never hand-edit shared queues or ledgers (promotion queues, usage ledgers,
+  mission state of other missions) — governed facades only.
+- PR work happens in a dedicated worktree; the shared `main` checkout is
+  reverted to clean once the branch carries the change, so other sessions
+  stop executing your draft source.
 
 ## The read/write matrix
 
