@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./",
@@ -11,10 +11,11 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "baseUrl": ".",
-    "paths": {
-      "@agent/core": ["../libs/core/dist/index.d.ts"],
-      "@agent/core/*": ["../libs/core/dist/*"]
-    }
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
   "include": ["*.ts"],
   "exclude": ["node_modules", "dist"]

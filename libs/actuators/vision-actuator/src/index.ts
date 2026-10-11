@@ -17,7 +17,7 @@ import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import {
   runActuatorPipeline,
   defineCatalogBackedActuator,
-} from '../../../core/actuator/actuator-sdk.js';
+} from '@agent/core/actuator/actuator-sdk';
 import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
 import { handleDescribeImage } from './describe-image.js';
 import { handleMarkElements } from './mark-elements.js';

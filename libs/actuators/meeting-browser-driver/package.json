@@ -7,7 +7,7 @@
   "main": "../../../dist/libs/actuators/meeting-browser-driver/src/index.js",
   "types": "../../../dist/libs/actuators/meeting-browser-driver/src/index.d.ts",
   "scripts": {
-    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "build": "pnpm --dir ../../.. run build:repo",
     "test": "vitest run"
   },
   "dependencies": {

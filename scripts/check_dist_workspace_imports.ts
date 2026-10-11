@@ -35,11 +35,13 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { builtinModules } from 'node:module';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeExec } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { readSafeJsonFile } from './lib/json-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+import { PACKAGE_BUILD_OUTPUTS } from './build-output-layout.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -48,7 +50,13 @@ const DEFAULT_PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites'];
 // there and is imported by pipeline ADF ops at runtime — a stale build from a
 // different branch (e.g. one importing a since-removed @agent/core subpath)
 // fails pipelines with ERR_PACKAGE_PATH_NOT_EXPORTED far from the cause.
-const DEFAULT_SCAN_ROOTS = ['dist/presence', 'dist/satellites', 'dist/scripts', 'dist/libs'];
+const DEFAULT_SCAN_ROOTS = [
+  'dist/presence',
+  'dist/satellites',
+  'dist/scripts',
+  'dist/libs',
+  ...PACKAGE_BUILD_OUTPUTS.map(({ id }) => id + '/dist'),
+];
 
 const STATIC_FROM_IMPORT_RE =
   /(?:^|\n)[^\n]*?\b(?:import|export)\b[^\n]*?\bfrom\s*['"]([^'"]+)['"]/g;
@@ -88,10 +96,32 @@ function isNodeBuiltinSpecifier(specifier: string): boolean {
   return NODE_BUILTIN_MODULES.has(bare);
 }
 
-function resolutionFailureReason(error: unknown): string {
-  return error instanceof Error
-    ? (error as NodeJS.ErrnoException).code || error.message
-    : String(error);
+interface ResolutionRequest {
+  specifier: string;
+  parentUrl: string;
+  label: string;
+}
+
+// Node ignores import.meta.resolve's parent URL unless this flag is enabled.
+// Resolve the entire batch in one isolated ESM process with the real import
+// conditions; createRequire would incorrectly use require-only export branches.
+function resolveImports(requests: ResolutionRequest[]): string[] {
+  if (requests.length === 0) return [];
+  const source = `let input = '';
+for await (const chunk of process.stdin) input += chunk;
+const failures = [];
+for (const request of JSON.parse(input)) {
+  try { import.meta.resolve(request.specifier, request.parentUrl); }
+  catch (error) { failures.push(request.label + ' (' + (error.code || error.message) + ')'); }
+}
+process.stdout.write(JSON.stringify(failures));`;
+  return JSON.parse(
+    safeExec(
+      process.execPath,
+      ['--experimental-import-meta-resolve', '--input-type=module', '--eval', source],
+      { input: JSON.stringify(requests), timeoutMs: 120_000, maxOutputMB: 16 }
+    )
+  );
 }
 
 /**
@@ -233,7 +263,7 @@ export function checkDistWorkspaceImports(options: DistWorkspaceImportsOptions =
   const allowlist = options.thirdPartyAllowlist ?? OPTIONAL_THIRD_PARTY_IMPORT_ALLOWLIST;
   const scanRoots = options.scanRoots ?? DEFAULT_SCAN_ROOTS;
   const workspaceOnlyRoots = new Set(options.workspaceOnlyScanRoots ?? ['dist/libs']);
-  const violations: string[] = [];
+  const requests: ResolutionRequest[] = [];
 
   for (const root of scanRoots) {
     const workspaceOnly = workspaceOnlyRoots.has(root);
@@ -247,39 +277,23 @@ export function checkDistWorkspaceImports(options: DistWorkspaceImportsOptions =
       const parentUrl = pathToFileURL(filePath).href;
 
       for (const specifier of extractBareImportSpecifiers(source)) {
-        if (isWorkspaceScoped(specifier, packageNames)) {
-          try {
-            // Ask Node's own ESM resolver, from this exact dist file, the
-            // same question `node <this-file>` would ask at process startup.
-            import.meta.resolve(specifier, parentUrl);
-          } catch (error) {
-            violations.push(
-              `${toRepoRelative(filePath)}: cannot resolve workspace import '${specifier}' (${resolutionFailureReason(error)})`
-            );
-          }
-          continue;
+        const workspace = isWorkspaceScoped(specifier, packageNames);
+        if (!workspace) {
+          if (workspaceOnly || isNodeBuiltinSpecifier(specifier)) continue;
+          const packageName = thirdPartyPackageName(specifier);
+          if (!declaredThirdPartyNames.has(packageName)) continue;
+          if (allowlist.has(specifier) || allowlist.has(packageName)) continue;
         }
-
-        if (workspaceOnly) continue;
-
-        if (isNodeBuiltinSpecifier(specifier)) continue;
-
-        const packageName = thirdPartyPackageName(specifier);
-        if (!declaredThirdPartyNames.has(packageName)) continue;
-        if (allowlist.has(specifier) || allowlist.has(packageName)) continue;
-
-        try {
-          import.meta.resolve(specifier, parentUrl);
-        } catch (error) {
-          violations.push(
-            `${toRepoRelative(filePath)}: cannot resolve third-party import '${specifier}' (${resolutionFailureReason(error)})`
-          );
-        }
+        requests.push({
+          specifier,
+          parentUrl,
+          label: `${toRepoRelative(filePath)}: cannot resolve ${workspace ? 'workspace' : 'third-party'} import '${specifier}'`,
+        });
       }
     }
   }
 
-  return violations.sort();
+  return resolveImports(requests).sort();
 }
 
 export const runCheckDistWorkspaceImports = defineScript({

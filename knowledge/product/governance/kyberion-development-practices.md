@@ -197,25 +197,33 @@ not drop silently.
 
 ## 4. Build & verification order — run the check CI runs
 
-- `pnpm typecheck` resolves `@agent/core` via source paths;
-  `pnpm run build:actuators` resolves via dist exports. **They catch
-  different errors** — an actuator importing a not-yet-exported core symbol
-  passes typecheck and fails the build. Before pushing actuator/core
-  boundary changes: `pnpm --filter @agent/core build && pnpm run
-build:actuators`.
-- Anything invoking `node dist/scripts/...` tests the LAST build. Rebuild
-  before trusting behavior. Scratch scripts run via `node --import
-./scripts/ts-loader.mjs` hit the same rule: `@agent/core/*` specifiers
-  resolve to `libs/core/dist/` whenever a build exists, so edits under
-  `libs/core/src/` are invisible until `pnpm --filter @agent/core build`.
-- **A fresh freshness check does not prove emit completeness.** Incremental
-  `tsc` can credit a source whose `.js` it never re-emitted (partial `dist/`
-  wipe, stale `tsBuildInfoFile` surviving a clean) — `check_stale_dist`'s
-  `emit_missing` reason now verifies every buildinfo-tracked source's
-  expected output exists. `node dist/scripts/<x>.js` failing
-  `MODULE_NOT_FOUND` right after a successful `pnpm build` is the signature;
-  `rm dist/.tsbuildinfo && pnpm run build:repo` is the fix (seen 2026-10 on
-  `chronos_daemon`).
+- **One compiler owns each output.** tsconfig.base.json contains language
+  options only. tsconfig.packages.json builds core/shared libraries and
+  terminal-hud into package-local dist/, each with its own .tsbuildinfo.
+  The root runtime compiler owns scripts, remaining presence sources, satellites
+  and actuators together: system-actuator and root scripts import each other, so
+  splitting those projects would create a reference cycle. Actuator and satellite
+  package build commands delegate this same runtime target rather than emitting
+  a second tree. Cross-owner imports use package exports, never relative source.
+- **Build, clean and freshness checks share ownership.** Keep
+  scripts/build-output-layout.ts, project references and package entrypoints
+  aligned. Clean removes only declared output directories and legacy incremental
+  records; it never searches other worktrees or arbitrary user buildinfo files.
+  The physical source-shadow guard sees ignored and untracked JS/declarations/maps,
+  with exact documented exceptions for intentional source inputs.
+- **An incremental build is not a clean build.** TypeScript can retain obsolete
+  outputs after deletion/rename, or trust buildinfo after a partial output wipe.
+  Freshness checks verify input hashes, required emits and obsolete outputs;
+  use pnpm build to clean all owned outputs and metadata together.
+  tests/build-output-incremental.test.ts exercises clean, ordered, incremental,
+  add/delete/rename and runtime behavior with the real compiler.
+- **Bundles are a final, separate output stage.** build:repo builds the runtime
+  graph and then emits explicit .bundle.js siblings. It never overwrites tsc
+  output. Original dist/scripts/*.js launch paths remain valid; package commands
+  select registered bundles whose direct-entry guards accept their exact names.
+- Anything invoking node dist/scripts/... tests the LAST build. Rebuild
+  before trusting behavior. The source loader also resolves existing workspace
+  dist exports, so a stale library must be rebuilt before a source CLI is tested.
 - **Never mix ts-loader source imports with `@agent/core` dist imports in
   one process** — dual module registries mean two copies of every
   singleton (registered backends silently fall back to stub).

@@ -2,8 +2,8 @@
 // Keep this list aligned with the OPS dispatch table in index.ts and the
 // capabilities declared in manifest.json.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const WORKING_MEMORY_INPUT_SCHEMA = {
   type: 'object',

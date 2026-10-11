@@ -6,6 +6,7 @@ import { safeExistsSync, safeLstat, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
+import { BUNDLED_SCRIPT_NAMES, ROOT_SOURCE_EXCLUSIONS } from './build-output-layout.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -52,7 +53,10 @@ function existingRepoPath(
 function sourceForDistScript(repoRelativePath: string): string | null {
   const match = repoRelativePath.match(/^dist\/scripts\/(.+)\.js$/);
   if (!match) return null;
-  return `scripts/${match[1]}.ts`;
+  const name = match[1].replace(/\.bundle$/u, '');
+  if (match[1].endsWith('.bundle') && !(BUNDLED_SCRIPT_NAMES as readonly string[]).includes(name))
+    return `scripts/${match[1]}.ts`;
+  return `scripts/${name}.ts`;
 }
 
 function distForSourceScript(repoRelativePath: string): string | null {
@@ -87,6 +91,7 @@ function validateScriptBuildTarget(
   pathExists: (repoRelativePath: string) => boolean
 ): void {
   const normalized = reference.replace(/^\.\//, '');
+  if (ROOT_SOURCE_EXCLUSIONS.scripts.some((file) => normalized === 'scripts/' + file)) return;
   const distPath = distForSourceScript(normalized);
   if (!distPath) return;
   if (!existingRepoPath(normalized, pathExists)) return;
