@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-DELIVERABLE-SURFACE-FIX-20261011-2026_10_11",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Surface-visible deliverables: publish, scope, and lifecycle rules",
+  "summary": "How mission/task-session artifacts reach the deliverable inbox and mission-asset surface intact across tenants and archive.",
+  "candidate_id": "mem-MSN-DELIVERABLE-SURFACE-FIX-20261011-2026_10_11",
+  "evidence_refs": [
+    "active/missions/public/MSN-DELIVERABLE-SURFACE-FIX-20261011/evidence/implementation-report.md",
+    "active/missions/public/MSN-DELIVERABLE-SURFACE-FIX-20261011/evidence/design-spec.json"
+  ],
+  "created_at": "2026-10-11T01:29:27.165Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Rules learned while making mission deliverables visible on surfaces: (1) publish with a tenant for tenant missions — an ArtifactRecord or inbox entry without tenant_slug is org-shared, visible only at public tier, and invisible to every tenant-scoped outcome feed; (2) deck-kind records need metadata.slides_count at publish or the DELIVERABLE_QUALITY finish gate blocks the mission; (3) deliverables must be promoted to a durable floor before the archive move — report/export records re-point to the tenant or system artifact floor, so they survive finish; (4) persist repo-relative paths — machine-absolute paths in the shared inbox store embed host layout and die on other machines; (5) mission ids are not tenants — any code that derives a tenant from missions/<tier>/<seg>/ must validate the segment with isValidTenantSlug; (6) write volatile faces with the caller-resolved missionDir — volatile() fallback lands in the unqualified layout and materializes a shadowing skeleton."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-DELIVERABLE-SURFACE-FIX-20261011/evidence/implementation-report.md",
+    "active/missions/public/MSN-DELIVERABLE-SURFACE-FIX-20261011/evidence/design-spec.json"
+  ],
+  "source_branch": "fix/surface-artifact-visibility-20261011",
+  "source_commit": "329fb8e99f3dfa1972da3594afd76cb2d4e1bde5"
+}

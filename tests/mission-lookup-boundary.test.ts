@@ -67,7 +67,6 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/visual-raster.ts': 'scope-derivation',
   'presence/displays/chronos-mirror-v2/src/app/api/deliverable-preview/route.ts':
     'scope-derivation',
-  'presence/displays/chronos-mirror-v2/src/app/api/mission-asset/helpers.ts': 'scope-derivation',
   'presence/displays/chronos-mirror-v2/src/lib/su-surface-data.ts': 'scope-derivation',
   'presence/displays/presence-studio/hearing-mission-routes.ts': 'scope-derivation',
   // placement

@@ -587,7 +587,10 @@ describe('mission lifecycle finish gate', () => {
     expect(state.context.mission_completion_next_action).toMatchObject({
       title: t('next_action:completion_confirmed'),
       satisfied: true,
-      evidence_refs: expect.arrayContaining([`${missionPath}/evidence/closeout.md`]),
+      // Persisted refs are repo-relative — the mission dir may sit on any host.
+      evidence_refs: expect.arrayContaining([
+        `active/missions/public/${missionId}/evidence/closeout.md`,
+      ]),
     });
   });
 

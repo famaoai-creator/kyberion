@@ -685,6 +685,30 @@ function missionNotVisibleError(missionId: string): Error {
   return error;
 }
 
+/** The same id exists under several tenant partitions — callers must not pick one. */
+function missionAmbiguousError(missionId: string, candidates: string[]): Error {
+  const error = new Error(
+    `[OWNER_AMBIGUOUS] mission ${missionId} matches ${candidates.length} tenant partitions — ` +
+      'a plain scan cannot tell them apart | ' +
+      'next: resolve through the registered mission locator or scope the process to a tenant'
+  );
+  (error as Error & { code: string }).code = 'OWNER_AMBIGUOUS';
+  (error as Error & { candidates: string[] }).candidates = candidates;
+  return error;
+}
+
+/** Tenant partitions under a mission tier dir (`missions/<tier>/<tenant>/`). */
+function missionTenantPartitions(tierDir: string): string[] {
+  if (!rawExistsSync(tierDir)) return [];
+  try {
+    return rawReaddir(tierDir)
+      .filter((entry) => isValidTenantSlug(entry))
+      .sort();
+  } catch (_) {
+    return [];
+  }
+}
+
 export function findMissionPath(missionId: string): string | null {
   assertMissionIdArgument(missionId);
   // The locator reads through secure-io, whose permission check resolves the
@@ -725,8 +749,37 @@ export function findMissionPath(missionId: string): string | null {
         const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
         if (accept(scopedPath)) return scopedPath;
       }
-      const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-      if (accept(fullPath)) return fullPath;
+      // Tenant-bound missions live at `missions/<tier>/<tenant>/<id>`: an
+      // UNBOUND process must still find them, else a caller falls back to the
+      // unqualified `<tier>/<id>` layout and materializes a skeleton that
+      // shadows the real mission. A tenant-bound process sees only its own
+      // partition — another tenant's missions are invisible, never ambiguous.
+      // Bare and tenant-qualified hits for the same id are ambiguous unless
+      // exactly one carries a state — never pick silently.
+      const barePath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
+      const tierMatches: string[] = [];
+      if (isMissionDirectory(barePath)) tierMatches.push(barePath);
+      if (!tenant) {
+        for (const partition of missionTenantPartitions(path.join(PROJECT_ROOT_DIR, subPath))) {
+          const candidate = path.join(PROJECT_ROOT_DIR, subPath, partition, missionId);
+          if (isMissionDirectory(candidate)) tierMatches.push(candidate);
+        }
+      }
+      if (tierMatches.length > 1) {
+        // A dir holding mission-state.json outranks stateless shells (e.g. a
+        // skeleton left by a failed kickoff or a volatile-face write): exactly
+        // one stated dir resolves, several stated dirs are genuinely ambiguous.
+        const stated = tierMatches.filter((candidate) =>
+          rawExistsSync(path.join(candidate, 'mission-state.json'))
+        );
+        if (stated.length === 1) {
+          if (accept(stated[0])) return stated[0];
+        } else {
+          throw missionAmbiguousError(missionId, tierMatches);
+        }
+      } else if (tierMatches.length === 1 && accept(tierMatches[0])) {
+        return tierMatches[0];
+      }
     }
   }
 

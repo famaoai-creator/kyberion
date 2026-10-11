@@ -37,6 +37,7 @@ vi.mock('@agent/core/workforce/artifact-record', () => ({
 
 import { GET } from './route';
 import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
+import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 
 describe('mission-asset viewer tier authorization', () => {
   it('rejects a confidential asset for a public-only viewer before reading it', async () => {
@@ -102,5 +103,72 @@ describe('mission-asset viewer tier authorization', () => {
     );
     // Within scope: authorization passes and the (absent) file is a 404.
     expect(own.status).toBe(404);
+  });
+});
+
+describe('mission-asset untenanted assets', () => {
+  const scopedViewer = {
+    context: {
+      role: 'readonly',
+      tenantSlugs: ['tenant-a'],
+      tierAccess: ['public', 'confidential'],
+      principalId: 'test-viewer',
+      source: 'loopback',
+    },
+  } as const;
+
+  it('admits an untenanted public-tier asset to a tenant-scoped viewer', async () => {
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/missions/public/MSN-UNBOUND/evidence/missing.md'
+      )
+    );
+    // Auth passes — the path's <id> segment is no longer read as a tenant.
+    expect(response.status).toBe(404);
+  });
+
+  it('denies an untenanted confidential asset to a tenant-scoped viewer', async () => {
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/missions/confidential/MSN-UNBOUND/evidence/x.md'
+      )
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('admits an untenanted public record by artifactId', async () => {
+    vi.mocked(loadArtifactRecord).mockReturnValueOnce({
+      artifact_id: 'ART-UNBOUND',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/system/public/note.md',
+      metadata: { tier: 'public' },
+    } as never);
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?artifactId=ART-UNBOUND&path=active/shared/artifacts/system/public/note.md'
+      )
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('serves only the artifacts subtree of a runtime session dir', async () => {
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const artifact = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/shared/runtime/session/TSK-1/artifacts/export/report.md'
+      )
+    );
+    expect(artifact.status).not.toBe(400);
+
+    const state = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/shared/runtime/session/TSK-1/session.json'
+      )
+    );
+    expect(state.status).toBe(400);
   });
 });
