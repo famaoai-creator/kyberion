@@ -57,6 +57,7 @@ vi.mock('@agent/core/secure-io', () => ({
   safeReadFileSnapshot: mocks.snapshot,
 }));
 vi.mock('./viewer-context', () => ({ toSurfaceAuthorizationContext: (viewer: unknown) => viewer }));
+import { OwnerScopeError } from '@agent/core/owner-scope';
 import {
   listOutcomeFiles,
   readOutcomeFile,
@@ -321,31 +322,36 @@ describe('mission-owned outcome files', () => {
       );
     }
   );
+  const notFoundError = () =>
+    new OwnerScopeError({
+      code: 'OWNER_NOT_FOUND',
+      owner: { kind: 'mission', id: 'MSN-TEST' },
+      what: 'mission MSN-TEST not found',
+      why: 'the mission dir moved to the archive',
+      remedy: 'resolve via the archived mission dir',
+    });
   it('serves files after the mission dir moved to the archive', async () => {
-    const { OwnerScopeError } = await import('@agent/core/owner-scope');
     const archive = '/repo/active/archive/missions/MSN-TEST';
     // Owner resolution fails for a mission whose dir was archived; the inbox
     // entry still lists its pre-move (active) paths.
     mocks.owner.mockImplementation(() => {
-      throw new OwnerScopeError({ code: 'OWNER_NOT_FOUND', what: 'not found' });
+      throw notFoundError();
     });
     mocks.exists.mockImplementation((file: string) => file === archive);
     state.relationships = { project: { project_id: 'PRJ' } };
     const tail = '/artifacts/report/report.pdf';
     contents.delete(root + tail);
     contents.set(archive + tail, Buffer.from('%PDF-1.7 archived'));
-    const page = list();
-    expect(page.files[0]?.status).toBe('available');
-    expect(readOutcomeFile(reader, 'INBOX-TEST', page.files[0]!.id!)).toMatchObject({
+    const file = available(list());
+    expect(readOutcomeFile(reader, 'INBOX-TEST', file.id)).toMatchObject({
       bytes: Buffer.from('%PDF-1.7 archived'),
       contentType: 'application/pdf',
     });
   });
   it('still enforces tenant membership on an archived mission', async () => {
-    const { OwnerScopeError } = await import('@agent/core/owner-scope');
     const archive = '/repo/active/archive/missions/MSN-TEST';
     mocks.owner.mockImplementation(() => {
-      throw new OwnerScopeError({ code: 'OWNER_NOT_FOUND', what: 'not found' });
+      throw notFoundError();
     });
     mocks.exists.mockImplementation((file: string) => file === archive);
     state.relationships = { project: { project_id: 'PRJ' } };
