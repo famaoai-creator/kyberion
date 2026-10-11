@@ -211,10 +211,10 @@ export function resolveVerifiedHumanRequestIdentity(
 }
 
 /**
- * Future browser adapters must construct this proof only from a verified
- * browser session. These structural fields are not cryptographic evidence.
- * Existing browser principals do not retain claims.sub, so this slice does not
- * wire the helper into live UI routes or fall back to their raw principalId.
+ * Browser adapters must construct this proof only from a verified browser
+ * session. These structural fields are not cryptographic evidence. The live
+ * request adapter obtains them from the private principal-bound handoff at the
+ * browser-session verification boundary, never raw principalId or wire claims.
  */
 export interface VerifiedBrowserHumanProof extends VerifiedHumanClaims {
   provider: 'browser-session';

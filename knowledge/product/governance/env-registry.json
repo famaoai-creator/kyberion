@@ -1705,6 +1705,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_HUMAN_REQUEST_CONFIG",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "subsystem": "human-requests",
+      "description": "Explicit nonsecret human-request server configuration path. Unset disables canonical browser ownership and HTTP MCP; malformed or unreadable configured files fail closed. Never an OIDC client credential.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_IMAGESNAP_BIN",
       "category": "path",
       "type": "path",

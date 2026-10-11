@@ -169,3 +169,7 @@ Record these so they are not re-investigated:
   analysis engine. Already noted in the perception playbook.
 - **Physical movement** — no robotics or GPS layer; "move" is a focus change inside a
   hands executor. Already noted in the action playbook.
+
+## HTTP MCP request runtime
+
+The explicit `pnpm kyberion mcp http --check` entry validates the default-off human-request configuration without a listener. `--start` requires an enabled, reviewed config and an explicit loopback reverse-proxy deployment profile. It does not replace the existing stdio `mcp server` command or select a real authorization provider. See [runtime operations](../../../docs/developer/HUMAN_REQUEST_RUNTIME_OPERATIONS.ja.md).
