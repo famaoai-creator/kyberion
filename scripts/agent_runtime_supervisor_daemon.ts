@@ -1390,10 +1390,7 @@ export async function startAgentRuntimeSupervisorDaemon(
       clearTimeout(timeout);
       resolve();
     };
-    // Bind the Unix socket private (0600) under a restrictive umask; bind(2) is
-    // synchronous in listen(). A later chmod by path could follow a flipped link.
-    const previousUmask = transport === 'unix' ? process.umask(0o177) : undefined;
-    server.listen(listenTarget, () => {
+    const onListening = () => {
       try {
         const address = server.address();
         if (transport === 'tcp' && typeof address === 'object' && address) {
@@ -1412,8 +1409,15 @@ export async function startAgentRuntimeSupervisorDaemon(
       } finally {
         finish();
       }
-    });
-    if (previousUmask !== undefined) process.umask(previousUmask);
+    };
+    // Bind the socket 0600 (bind is synchronous in listen); the process-wide umask
+    // also hits threadpool fs work racing this startup-only call (runbook §10).
+    const previousUmask = transport === 'unix' ? process.umask(0o177) : undefined;
+    try {
+      server.listen(listenTarget, onListening);
+    } finally {
+      if (previousUmask !== undefined) process.umask(previousUmask);
+    }
     timeout.unref?.();
   });
 

@@ -118,8 +118,12 @@ function listDirEntries(dir: string): string[] {
   if (!safeExistsSync(safeDir)) return [];
   try {
     return safeReaddir(safeDir);
-  } catch {
-    return [];
+  } catch (error) {
+    // Only a directory that vanished is empty. A refused or changed listing
+    // is rethrown, so verification reports it instead of claiming clean.
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return [];
+    throw error;
   }
 }
 
