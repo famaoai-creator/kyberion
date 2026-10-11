@@ -1057,6 +1057,11 @@ describe('mission lifecycle finish gate', () => {
     expect(state.status).toBe('active');
     expect(state.context.goal_reconciliation_round).toBe(1);
     expect(state.history.some((entry: any) => entry.event === 'GOAL_GAP_REALIGN')).toBe(true);
+    // The dispatch records a fresh gate reason so the controller reports the
+    // real outcome instead of "archive was not confirmed".
+    expect(state.context.mission_finish_gate_last_reason).toContain('goal gaps remain (round 1/2)');
+    expect(state.context.mission_finish_gate_last_reason).toContain('goal-gap-r1-1');
+    expect(typeof state.context.mission_finish_gate_last_checked_at).toBe('string');
     const nextTasks = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
