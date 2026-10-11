@@ -208,6 +208,14 @@ build:actuators`.
 ./scripts/ts-loader.mjs` hit the same rule: `@agent/core/*` specifiers
   resolve to `libs/core/dist/` whenever a build exists, so edits under
   `libs/core/src/` are invisible until `pnpm --filter @agent/core build`.
+- **A fresh freshness check does not prove emit completeness.** Incremental
+  `tsc` can credit a source whose `.js` it never re-emitted (partial `dist/`
+  wipe, stale `tsBuildInfoFile` surviving a clean) — `check_stale_dist`'s
+  `emit_missing` reason now verifies every buildinfo-tracked source's
+  expected output exists. `node dist/scripts/<x>.js` failing
+  `MODULE_NOT_FOUND` right after a successful `pnpm build` is the signature;
+  `rm dist/.tsbuildinfo && pnpm run build:repo` is the fix (seen 2026-10 on
+  `chronos_daemon`).
 - **Never mix ts-loader source imports with `@agent/core` dist imports in
   one process** — dual module registries mean two copies of every
   singleton (registered backends silently fall back to stub).
