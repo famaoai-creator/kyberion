@@ -25,7 +25,6 @@ describe('concierge surface contract', () => {
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/setup/route.ts',
       'src/app/api/notification-preferences/route.ts',
-      'src/app/api/message/route.ts',
       'src/app/api/voice/listen-once/route.ts',
       'src/app/api/voice/stop/route.ts',
       'src/app/api/voice/synthesize/route.ts',
@@ -38,6 +37,22 @@ describe('concierge surface contract', () => {
     for (const route of mutatingRoutes) {
       const source = fs.readFileSync(path.join(appDir, route), 'utf8');
       expect(source, route).toContain('requireConciergeMutationAccess');
+    }
+  });
+
+  it('keeps the request-only canonical exception behind transport and legacy guards', () => {
+    const route = safeReadFile(path.join(appDir, 'src/app/api/message/route.ts'));
+    const adapter = safeReadFile(path.join(appDir, 'src/lib/browser-human-request.ts'));
+    expect(route).toContain('prepareConciergeHumanRequest(req, true)');
+    expect(route).toContain('authorizeConciergeHumanRequest(');
+    for (const guard of [
+      'requireConciergeMutationAccess(req)',
+      'guardConciergeRequest(req)',
+      'authorizeSurfaceMutation(',
+      'isSameOriginMutation(',
+      'authorizeBrowserHumanRequest(',
+    ]) {
+      expect(adapter).toContain(guard);
     }
   });
 
@@ -266,7 +281,7 @@ describe('concierge surface contract', () => {
         encoding: 'utf8',
       })
     );
-    expect(route).toContain('requireConciergeMutationAccess');
+    expect(route).toContain('prepareConciergeHumanRequest(req, true)');
     // Durable scoped requests execute once; bridge timeouts cannot safely retry.
     expect(route).not.toContain('/api/ingest-text');
     expect(route).toContain('runFrontDeskRequest(viewer,');
@@ -279,7 +294,9 @@ describe('concierge surface contract', () => {
     // Conversation execution receives a server-resolved, non-personal scope
     // through the single supervised direct-conversation path (narrowed to the
     // selected company by conversationViewerForSelection).
-    expect(route).toContain('conversationViewerForSelection(req)');
+    expect(safeReadFile(path.join(appDir, 'src/lib/browser-human-request.ts'))).toContain(
+      'conversationViewerForSelection(req)'
+    );
     expect(service).toContain('frontDeskRuntimeScope(viewer)');
     expect(service).toContain('scope,');
     // An uncertain execution produces an actionable non-success 503.

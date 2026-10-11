@@ -7507,6 +7507,14 @@
     "./surface/surface-management-mutations": {
       "types": "./dist/surface/surface-management-mutations.d.ts",
       "default": "./dist/surface/surface-management-mutations.js"
+    },
+    "./surface/browser-human-request": {
+      "types": "./dist/surface/browser-human-request.d.ts",
+      "default": "./dist/surface/browser-human-request.js"
+    },
+    "./surface/human-request-runtime-config": {
+      "types": "./dist/surface/human-request-runtime-config.d.ts",
+      "default": "./dist/surface/human-request-runtime-config.js"
     }
   },
   "dependencies": {

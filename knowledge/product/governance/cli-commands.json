@@ -3144,6 +3144,17 @@
       "long_running": true
     },
     {
+      "id": "script.mcp.http",
+      "module": "scripts/mcp_http_server.ts",
+      "command": "mcp http",
+      "noun": "mcp",
+      "verb": "http",
+      "audience": "operator",
+      "description": "cli_cmd_script_mcp_http",
+      "group": "operate",
+      "long_running": true
+    },
+    {
       "id": "script.knowledge.cowork-sync",
       "script": "knowledge:cowork-sync",
       "command": "knowledge cowork-sync",

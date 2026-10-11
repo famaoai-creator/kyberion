@@ -6,3 +6,5 @@ export type {
   McpHttpResourceServerDependencies,
   McpRequestAudit,
 } from './mcp-http-resource-server.js';
+export { createMcpHttpRuntime } from './mcp-http-runtime.js';
+export type { McpHttpRuntime, McpHttpRuntimeHandle } from './mcp-http-runtime.js';
