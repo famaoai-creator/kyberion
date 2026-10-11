@@ -131,16 +131,27 @@ function reviewEvidence(candidate: MemoryCandidate): MemoryPromotionEvidenceRevi
     } catch {
       return { ref, kind: 'path', status: 'missing', resolved_path: ref };
     }
-    const activePublicMissionPrefix = 'active/missions/public/';
-    if (!safeExistsSync(resolvedPath) && ref.startsWith(activePublicMissionPrefix)) {
-      const archiveRef = `active/archive/missions/${ref.slice(activePublicMissionPrefix.length)}`;
-      try {
-        const archivedPath = assertSafeRepositoryPath(pathResolver.rootResolve(archiveRef), {
-          allowMissingLeaf: true,
-        });
-        if (safeExistsSync(archivedPath)) resolvedPath = archivedPath;
-      } catch {
-        // Keep the safe active-path result as missing; never follow an unsafe archive alias.
+    // A finished mission's dir moved to the archive — resolve the ref through
+    // whichever segment names an archived mission dir (works for every tier
+    // layout: flat and partitioned archives, tenant and untenanted sources).
+    if (!safeExistsSync(resolvedPath) && ref.startsWith('active/missions/')) {
+      const segments = ref.split('/');
+      for (let i = 2; i < segments.length - 1; i++) {
+        try {
+          const dir = pathResolver.findArchivedMissionDir(segments[i], {
+            archiveRoot: pathResolver.archivedMissionsRoot(),
+          });
+          if (!dir) continue;
+          const archivedPath = assertSafeRepositoryPath(path.join(dir, ...segments.slice(i + 1)), {
+            allowMissingLeaf: true,
+          });
+          if (safeExistsSync(archivedPath)) {
+            resolvedPath = archivedPath;
+            break;
+          }
+        } catch {
+          // Keep the safe active-path result; never follow an unsafe archive alias.
+        }
       }
     }
     return {
