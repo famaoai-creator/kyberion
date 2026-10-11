@@ -1,6 +1,8 @@
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
 import { loadState } from '@agent/core/mission/mission-state';
 import { classifyStorageFloorPath } from '@agent/core/storage-layout';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 
 export type AssetTier = 'personal' | 'confidential' | 'public';
@@ -48,11 +50,13 @@ export function tenantFromPath(value: string | undefined): string | undefined {
   const match = normalized?.match(
     /^active\/(?:missions|projects|organizations)\/(?:personal|confidential|public)\/([^/]+)\//
   );
-  return match?.[1] && match[1] !== 'shared' ? match[1] : undefined;
+  // `missions/<tier>/<id>` is the unqualified layout — the id segment is not a
+  // tenant. Only a real tenant slug (lowercase, registered-name check) binds.
+  return match?.[1] && match[1] !== 'shared' && isValidTenantSlug(match[1]) ? match[1] : undefined;
 }
 
 function missionTier(missionId: string): AssetTier | undefined {
-  const missionPath = findMissionPath(missionId);
+  const missionPath = missionPathOrNull(findMissionPath, missionId);
   if (!missionPath) return undefined;
   try {
     const state = loadState(missionId);
@@ -71,7 +75,7 @@ export function artifactTenant(artifact: {
 }): string | undefined {
   if (artifact.tenant_slug) return artifact.tenant_slug;
   if (!artifact.mission_id) return undefined;
-  const missionPath = findMissionPath(artifact.mission_id);
+  const missionPath = missionPathOrNull(findMissionPath, artifact.mission_id);
   if (!missionPath) return undefined;
   try {
     const state = loadState(artifact.mission_id);

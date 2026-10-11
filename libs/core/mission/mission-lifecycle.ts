@@ -42,7 +42,10 @@ import {
 } from '../secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
-import { promoteMissionArtifactsToProject } from './mission-artifact-promotion.js';
+import {
+  promoteMissionArtifactsToOwnerFloor,
+  promoteMissionArtifactsToProject,
+} from './mission-artifact-promotion.js';
 import {
   reconcileCompletion,
   reconcileCompletionStructurally,
@@ -1033,6 +1036,9 @@ export async function finishMission(
       addInboxEntry({
         missionId: upperId,
         title: completionGoal.summary,
+        // Tenant-bound missions must stamp their tenant — an untenanted entry
+        // is invisible to every tenant-scoped outcome feed it belongs to.
+        tenantSlug: state.tenant_slug || undefined,
         artifactPaths: evidenceRefs,
         summary:
           (typeof completionNextAction === 'string'
@@ -1186,7 +1192,17 @@ export async function finishMission(
   // Best-effort like closure — never fails a finish that already succeeded.
   traceCtx.startSpan('mission:artifact-promotion');
   try {
-    const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
+    const projectPromotion = promoteMissionArtifactsToProject({
+      missionId: upperId,
+      missionDir,
+      state,
+    });
+    // No project to hand deliverables to: land them on the owner's durable
+    // floor instead so published records survive the archive move.
+    const promotion =
+      projectPromotion.reason === 'no_project'
+        ? promoteMissionArtifactsToOwnerFloor({ missionId: upperId, missionDir, state })
+        : projectPromotion;
     if (promotion.status !== 'skipped' || promotion.reason !== 'no_project') {
       state.context = {
         ...(state.context || {}),
