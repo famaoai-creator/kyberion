@@ -930,6 +930,11 @@ export async function finishMission(
         ...(state.context || {}),
         goal_reconciliation_round: nextRound,
         goal_reconciliation_last_gaps: completionReconciliation.gaps.slice(0, 5),
+        // Record a fresh gate reason so the controller reports the real
+        // outcome (gap tasks dispatched, realigned to active) instead of the
+        // misleading "archive was not confirmed" fallback.
+        mission_finish_gate_last_reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary} — gap tasks dispatched (${gapTaskIds.join(', ')}), mission realigned to active for rework`,
+        mission_finish_gate_last_checked_at: nowIso(),
       };
       state.status = 'active';
       state.history.push({

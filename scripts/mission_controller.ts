@@ -370,12 +370,16 @@ async function finishMission(id: string, seal: boolean = false) {
     (finalState && finalState.status !== 'archived') ||
     (!finalState && !safeExistsSync(archivedPath))
   ) {
+    const reason =
+      finishReason ||
+      `finish() returned without archiving and recorded no gate reason (status: ${finalState?.status || 'unknown'}). ` +
+        `Inspect the mission gates and history for a goal-gap dispatch or worker re-activity, then run \`pnpm mission triage ${id.toUpperCase()}\`. Archive path checked: ${archivedPath}`;
     printOutput(
       JSON.stringify({
         status: 'blocked',
         mission_id: id.toUpperCase(),
         gate_id: finishReason ? 'finish-gate' : 'lifecycle',
-        reason: finishReason || `Mission archive was not confirmed at ${archivedPath}`,
+        reason,
       })
     );
     throw new DiagnosticError({
@@ -545,7 +549,7 @@ async function recordArtifactReview(
   logger.info(
     `[review-task] ${reviewTaskId}: status=${result.status}${result.taskCompleted ? ' (task completed)' : ''}${
       result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''
-    }`
+    }${result.next_step ? ` — next: ${result.next_step}` : ''}`
   );
   return result;
 }
