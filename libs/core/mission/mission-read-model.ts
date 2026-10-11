@@ -7,6 +7,11 @@ import { findMissionPath } from '../path-resolver.js';
 import { listMissionsInSearchDirs, loadState } from './mission-state.js';
 import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import type { MissionState } from './mission-types.js';
+import { collectMissionTriageReport } from './mission-triage.js';
+import {
+  formatMissionFlowNextAction,
+  type MissionFlowProjection,
+} from './mission-flow-projection.js';
 
 export interface MissionSummary {
   id: string;
@@ -32,6 +37,7 @@ export interface MissionStatusView {
   state: MissionState;
   missionPath: string | null;
   nextAction: string;
+  flow: MissionFlowProjection;
   recentHistory: MissionState['history'];
 }
 
@@ -88,21 +94,13 @@ export function buildMissionStatusView(id: string): MissionStatusView | null {
   const state = loadState(upperId);
   if (!state) return null;
 
-  const nextActions: Record<string, string> = {
-    planned: 'start',
-    active: 'checkpoint / verify / delegate',
-    validating: 'distill',
-    distilling: 'distill',
-    completed: 'finish [--seal]',
-    paused: 'start (resume)',
-    failed: 'start (retry)',
-    archived: '(terminal — no further actions)',
-  };
+  const { flow } = collectMissionTriageReport(upperId);
 
   return {
     state,
     missionPath: findMissionPath(upperId),
-    nextAction: nextActions[state.status] || '-',
+    nextAction: formatMissionFlowNextAction(flow),
+    flow,
     recentHistory: state.history.slice(-5),
   };
 }

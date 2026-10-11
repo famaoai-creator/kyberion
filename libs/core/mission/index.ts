@@ -253,6 +253,7 @@ export * from './mission-ticket-dispatch-manifest.js';
 export * from './mission-ticket-dispatch.js';
 export * from './mission-ticket-provider-artifact.js';
 export * from './mission-triage.js';
+export * from './mission-flow-projection.js';
 export * from './mission-types.js';
 export * from './mission-work-reconciliation.js';
 export * from './mission-workflow-catalog.js';
