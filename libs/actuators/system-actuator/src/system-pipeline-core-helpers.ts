@@ -844,18 +844,41 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
     const requestedStatus =
       typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
     const allMissions: Record<string, unknown>[] = [];
+    const { safeReaddir } = await import('@agent/core/secure-io');
+    const { missionTierScanDirs } = await import('@agent/core/owner-scope');
+    // Protected tier roots must never be enumerated directly: bound processes
+    // probe only their own partition, and tier-partitioned layouts nest
+    // missions as <tier>/<tenant>/<id> — a flat listing would report tenant
+    // directories as missions.
+    const collectMissionDirs = (dir: string): string[] => {
+      const found: string[] = [];
+      let entries: string[];
+      try {
+        entries = safeReaddir(dir);
+      } catch {
+        return found;
+      }
+      for (const entry of entries.filter((m) => !m.startsWith('.'))) {
+        const entryPath = path.join(dir, entry);
+        try {
+          if (!safeLstat(entryPath).isDirectory()) continue;
+        } catch {
+          continue;
+        }
+        if (safeExistsSync(path.join(entryPath, 'mission-state.json'))) found.push(entryPath);
+        else found.push(...collectMissionDirs(entryPath));
+      }
+      return found;
+    };
     for (const tier of tiers) {
       const tierPath = path.join(missionRoot, tier);
-      if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
-        const { safeReaddir } = await import('@agent/core/secure-io');
-        const missions = safeReaddir(tierPath);
-        for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
-          const missionPath = path.join(tierPath, missionId);
-          if (!safeLstat(missionPath).isDirectory()) continue;
+      for (const scanDir of missionTierScanDirs(tierPath)) {
+        for (const missionPath of collectMissionDirs(scanDir)) {
+          const missionId = path.basename(missionPath);
           const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
             allowMissingLeaf: true,
           });
-          const state = safeExistsSync(statePath) ? loadStateAtPath(statePath) : null;
+          const state = loadStateAtPath(statePath);
           if (!state) continue;
           if (requestedStatus && state?.status !== requestedStatus) continue;
           allMissions.push({

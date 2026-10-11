@@ -55,3 +55,51 @@ describe('system pipeline path boundaries', () => {
     ).toBe(false);
   });
 });
+
+describe('list_missions tenant-bound enumeration', () => {
+  const tenantBoundMissionId = `MSN-LIST-BOUND-${process.pid}-${Date.now()}`;
+  const boundTenantDir = pathResolver.rootResolve(
+    `active/missions/confidential/kyberion/${tenantBoundMissionId}`
+  );
+
+  afterEach(() => {
+    delete process.env.KYBERION_TENANT;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(boundTenantDir, { recursive: true, force: true });
+    });
+  });
+
+  it('does not throw scope_invalid_prefix and still sees bound-partition missions', async () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(boundTenantDir, { recursive: true });
+      safeWriteFile(
+        `${boundTenantDir}/mission-state.json`,
+        JSON.stringify({
+          mission_id: tenantBoundMissionId,
+          tier: 'confidential',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 50,
+          assigned_persona: 'worker',
+          confidence_score: 80,
+          tenant_slug: 'kyberion',
+          git: { branch: '', start_commit: '', latest_commit: '', checkpoints: [] },
+          history: [],
+        })
+      );
+    });
+
+    process.env.KYBERION_TENANT = 'kyberion';
+    let result: any;
+    await expect(
+      (async () => {
+        result = await opCapture('list_missions', {}, {}, (value) => value);
+      })()
+    ).resolves.not.toThrow();
+    expect(
+      result.mission_list_data.mission_list.some(
+        (mission: { id?: string }) => mission.id === tenantBoundMissionId
+      )
+    ).toBe(true);
+  });
+});
