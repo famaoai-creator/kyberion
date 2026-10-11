@@ -636,11 +636,12 @@ export function loadOrganizationCatalog(query: {
 /**
  * Evidence refs recorded against a live mission point under
  * `active/missions/<tier>/[<tenant>/]<ID>/...`, and `mission finish` moves the
- * whole directory to the flat archive (`directories.archive`, default
+ * whole directory under `directories.archive` (default
+ * `active/archive/missions/<tier>/<tenant|shared>/<ID>`, or the legacy flat
  * `active/archive/missions/<ID>`). The ref stays valid evidence — resolve it
  * through the archive before reporting it missing. The mission-id segment is
  * located by probing which segment names an existing archived mission dir, so
- * both `<tier>/<ID>` and `<tier>/<tenant>/<ID>` layouts resolve.
+ * both `<tier>/<ID>` and `<tier>/<tenant>/<ID>` source layouts resolve.
  */
 function organizationEvidenceRefExists(ref: string, rootDir: string, archiveRel: string): boolean {
   if (safeExistsSync(path.resolve(rootDir, ref))) return true;
@@ -653,9 +654,13 @@ function organizationEvidenceRefExists(ref: string, rootDir: string, archiveRel:
   ) {
     return false;
   }
+  const archiveRoot = path.resolve(rootDir, archiveRel);
   for (let i = 2; i < segments.length; i++) {
-    const archivedMissionDir = path.resolve(rootDir, archiveRel, segments[i]);
-    if (!safeExistsSync(archivedMissionDir)) continue;
+    let archivedMissionDir: string | undefined = path.resolve(archiveRoot, segments[i]);
+    if (!safeExistsSync(archivedMissionDir)) {
+      archivedMissionDir = pathResolver.findArchivedMissionDir(segments[i], { archiveRoot });
+      if (!archivedMissionDir) continue;
+    }
     if (safeExistsSync(path.join(archivedMissionDir, ...segments.slice(i + 1)))) return true;
   }
   return false;

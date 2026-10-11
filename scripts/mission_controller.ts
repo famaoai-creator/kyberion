@@ -357,7 +357,9 @@ async function finishMission(id: string, seal: boolean = false) {
   const attemptStartedAt = nowIso();
   const result = await missionLifecycleService.finish(id, seal);
   const finalState = loadState(id.toUpperCase());
-  const archivedPath = pathResolver.archivedMissionDir(id.toUpperCase());
+  const archivedPath =
+    pathResolver.findArchivedMissionDir(id.toUpperCase()) ||
+    pathResolver.archivedMissionDir(id.toUpperCase());
   const finishCtx = finalState?.context as Record<string, unknown> | undefined;
   const lastCheckedAt = String(finishCtx?.mission_finish_gate_last_checked_at || '');
   const finishReason =

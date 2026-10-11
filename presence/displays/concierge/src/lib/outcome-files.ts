@@ -108,11 +108,7 @@ function authorize(viewer: ConciergeViewerContext, entryId: string): Snapshot {
       throw new OutcomeFileError(403);
     // The state cannot relabel a physical confidential mission as public, or change its tenant.
     if (archived) {
-      if (
-        path.dirname(owner.dir) !== pathResolver.archivedMissionsRoot() ||
-        path.basename(owner.dir) !== entry.mission_id
-      )
-        throw new OutcomeFileError(403);
+      if (!isArchivedOwnerDir(owner.dir, entry.mission_id ?? '')) throw new OutcomeFileError(403);
     } else {
       const tierRoot = path.dirname(pathResolver.missionDir(entry.mission_id, owner.tier));
       const relative = path.relative(tierRoot, owner.dir).split(path.sep);
@@ -176,10 +172,22 @@ function readAsViewer<T>(viewer: ConciergeViewerContext, owner: OwnerScope, fn: 
     owner.organization_id
   );
 }
+const ARCHIVE_TIER_SEGMENTS = new Set(['public', 'confidential', 'personal', 'ephemeral']);
+/** `<root>/<id>` (legacy flat) or `<root>/<tier>/<tenant|shared>/<id>` (partitioned). */
+function isArchivedOwnerDir(dir: string, missionId: string): boolean {
+  const relative = path.relative(pathResolver.archivedMissionsRoot(), dir).split(path.sep);
+  if (relative[relative.length - 1] !== missionId) return false;
+  if (relative.length === 1) return true;
+  return (
+    relative.length === 3 &&
+    ARCHIVE_TIER_SEGMENTS.has(relative[0]) &&
+    (relative[1] === 'shared' || isValidTenantSlug(relative[1]))
+  );
+}
 /** An archived mission's owner scope, rebuilt from its preserved state. */
 function archivedMissionOwner(missionId: string): OwnerScope | undefined {
-  const dir = pathResolver.archivedMissionDir(missionId);
-  if (!io.safeExistsSync(dir)) return undefined;
+  const dir = pathResolver.findArchivedMissionDir(missionId);
+  if (!dir || !io.safeExistsSync(dir)) return undefined;
   const state = loadMissionStateAtPath(
     io.assertSafeRepositoryPath(path.join(dir, 'mission-state.json'))
   );
@@ -211,9 +219,7 @@ function artifactPath(snapshot: Snapshot, raw: string): string {
     throw new OutcomeFileError(404);
   let resolved = path.resolve(pathResolver.rootDir(), raw);
   let relative = path.relative(snapshot.owner.dir, resolved);
-  const archivedOwner =
-    path.dirname(snapshot.owner.dir) === pathResolver.archivedMissionsRoot() &&
-    path.basename(snapshot.owner.dir) === snapshot.entry.mission_id;
+  const archivedOwner = isArchivedOwnerDir(snapshot.owner.dir, snapshot.entry.mission_id ?? '');
   if (archivedOwner && (path.isAbsolute(relative) || relative.split(path.sep)[0] === '..')) {
     // The mission dir moved to the archive after the entry was written: refs
     // still name the old location — resolve the in-mission tail under the

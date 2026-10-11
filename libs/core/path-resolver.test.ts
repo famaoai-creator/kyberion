@@ -13,6 +13,8 @@ import {
   missionDir,
   projectWorkspaceDir,
   findMissionPath,
+  archivedMissionDir,
+  findArchivedMissionDir,
   isSafeMissionManagementPath,
   assertVolatileId,
   volatile,
@@ -214,6 +216,71 @@ describe('findMissionPath tenant-partition scan', () => {
       } finally {
         cleanup(otherDir);
         cleanup(tenantDir());
+      }
+    });
+  });
+});
+
+describe('archived mission layout', () => {
+  const missionId = `MSN-ARCH-${process.pid}`;
+  const archiveRoot = () => path.join(rootDir(), 'active/archive/missions');
+  const seed = (dir: string, withState = true) => {
+    safeMkdir(dir, { recursive: true });
+    if (withState)
+      safeWriteFile(
+        path.join(dir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId })
+      );
+  };
+  const cleanup = (target: string) => {
+    try {
+      safeRmSync(target, { recursive: true, force: true });
+    } catch {
+      // best-effort test cleanup
+    }
+  };
+
+  it('computes the partitioned location and the legacy flat fallback', () => {
+    expect(archivedMissionDir(missionId)).toBe(path.join(archiveRoot(), missionId));
+    expect(archivedMissionDir(missionId, { tier: 'confidential', tenant: 'acme' })).toBe(
+      path.join(archiveRoot(), 'confidential', 'acme', missionId)
+    );
+    expect(archivedMissionDir(missionId, { tier: 'public' })).toBe(
+      path.join(archiveRoot(), 'public', 'shared', missionId)
+    );
+  });
+
+  it('resolves partitioned, shared, and legacy archive dirs', () => {
+    withExecutionContext('mission_controller', () => {
+      const partitioned = path.join(archiveRoot(), 'confidential', 'acme', missionId);
+      const shared = path.join(archiveRoot(), 'public', 'shared', `${missionId}-S`);
+      const flat = path.join(archiveRoot(), `${missionId}-F`);
+      seed(partitioned);
+      seed(shared);
+      seed(flat);
+      try {
+        expect(findArchivedMissionDir(missionId)).toBe(partitioned);
+        expect(findArchivedMissionDir(`${missionId}-S`)).toBe(shared);
+        expect(findArchivedMissionDir(`${missionId}-F`)).toBe(flat);
+        expect(findArchivedMissionDir('MSN-NO-SUCH-ARCHIVE')).toBeUndefined();
+      } finally {
+        cleanup(path.join(archiveRoot(), 'confidential'));
+        cleanup(path.join(archiveRoot(), 'public'));
+        cleanup(flat);
+      }
+    });
+  });
+
+  it('fails closed when the id is archived under two partitions', () => {
+    withExecutionContext('mission_controller', () => {
+      const a = path.join(archiveRoot(), 'confidential', 'acme', missionId);
+      const b = path.join(archiveRoot(), 'confidential', 'other-co', missionId);
+      seed(a);
+      seed(b);
+      try {
+        expect(() => findArchivedMissionDir(missionId)).toThrow(/OWNER_AMBIGUOUS/);
+      } finally {
+        cleanup(path.join(archiveRoot(), 'confidential'));
       }
     });
   });

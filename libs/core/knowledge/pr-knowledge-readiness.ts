@@ -270,7 +270,14 @@ function rootHasMissionCandidateRecords(root: string, missionId: string): boolea
  */
 function rootHasMission(root: string, missionId: string): boolean {
   if (!missionId) return false;
-  if (safeExistsSync(path.join(root, ARCHIVE_MISSIONS_RELATIVE_PATH, missionId))) return true;
+  // Covers both archive layouts — partitioned <tier>/<tenant|shared>/<id> and
+  // the pre-partition flat <id>.
+  if (
+    pathResolver.findArchivedMissionDir(missionId, {
+      archiveRoot: path.join(root, ARCHIVE_MISSIONS_RELATIVE_PATH),
+    })
+  )
+    return true;
   const missionsDir = path.join(root, MISSIONS_RELATIVE_PATH);
   if (safeExistsSync(missionsDir)) {
     let tiers: string[] = [];

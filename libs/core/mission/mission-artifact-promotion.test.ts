@@ -176,7 +176,8 @@ describe('mission artifact promotion', () => {
         scope_kind: 'project',
         promoted_from_mission: missionId,
         // The mission tree moves to the archive right after promotion.
-        promoted_from: 'active/archive/missions/MSN-PROMOTE-A/artifacts/report/summary.md',
+        promoted_from:
+          'active/archive/missions/public/shared/MSN-PROMOTE-A/artifacts/report/summary.md',
       }),
     });
     expect(fs.readFileSync(path.join(tmpRoot, promotedReport?.path as string), 'utf8')).toBe(
@@ -368,7 +369,7 @@ describe('mission artifact promotion', () => {
         scope_kind: 'tenant',
         promoted_from_mission: missionId,
         promoted_from:
-          'active/archive/missions/MSN-PROMOTE-FLOOR/artifacts/export/deliverables/report.md',
+          'active/archive/missions/confidential/acme/MSN-PROMOTE-FLOOR/artifacts/export/deliverables/report.md',
       }),
     });
     expect(fs.existsSync(path.join(tmpRoot, record?.path as string))).toBe(true);

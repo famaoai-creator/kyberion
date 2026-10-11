@@ -44,6 +44,28 @@ vi.mock('@agent/core/path-resolver', () => ({
     missionDir: (id: string, tier: string) => '/repo/active/missions/' + tier + '/' + id,
     archivedMissionsRoot: () => '/repo/active/archive/missions',
     archivedMissionDir: (id: string) => '/repo/active/archive/missions/' + id,
+    // Mirrors the real resolver: legacy flat first, then <tier>/<seg>/<id>
+    // partitions discovered from the fixture's file map + the exists mock.
+    findArchivedMissionDir: (id: string) => {
+      const base = '/repo/active/archive/missions';
+      if (mocks.exists(`${base}/${id}`)) return `${base}/${id}`;
+      const partitions = new Set(
+        [...contents.keys()]
+          .map((key) =>
+            key
+              .slice(base.length + 1)
+              .split('/')
+              .slice(0, 2)
+              .join('/')
+          )
+          .filter((rel) => rel.includes('/'))
+      );
+      for (const rel of partitions) {
+        const candidate = `${base}/${rel}/${id}`;
+        if (mocks.exists(candidate)) return candidate;
+      }
+      return undefined;
+    },
   },
 }));
 vi.mock('@agent/core/surface/surface-authn', () => ({
@@ -345,6 +367,25 @@ describe('mission-owned outcome files', () => {
     const file = available(list());
     expect(readOutcomeFile(reader, 'INBOX-TEST', file.id)).toMatchObject({
       bytes: Buffer.from('%PDF-1.7 archived'),
+      contentType: 'application/pdf',
+    });
+  });
+  it('serves files from the tier/tenant-partitioned archive layout', async () => {
+    const archive = '/repo/active/archive/missions/confidential/acme/MSN-TEST';
+    mocks.owner.mockImplementation(() => {
+      throw notFoundError();
+    });
+    mocks.exists.mockImplementation((file: string) => file === archive);
+    state.relationships = { project: { project_id: 'PRJ' } };
+    state.tier = 'confidential';
+    owner.tier = 'confidential';
+    viewer.tierAccess = ['public', 'confidential'];
+    const tail = '/artifacts/report/report.pdf';
+    contents.delete(root + tail);
+    contents.set(archive + tail, Buffer.from('%PDF-1.7 partitioned'));
+    const file = available(list());
+    expect(readOutcomeFile(reader, 'INBOX-TEST', file.id)).toMatchObject({
+      bytes: Buffer.from('%PDF-1.7 partitioned'),
       contentType: 'application/pdf',
     });
   });
