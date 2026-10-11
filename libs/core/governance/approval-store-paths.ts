@@ -1,3 +1,6 @@
+/** Storage channel for autonomous-operation decisions. */
+export const AUTONOMY_APPROVAL_CHANNEL = 'autonomy';
+
 import { isVitestProcess } from '../foundation/env.js';
 
 /**

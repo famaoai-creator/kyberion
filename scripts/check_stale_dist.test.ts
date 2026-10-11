@@ -7,6 +7,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/cor
 import {
   findStaleDistTargets,
   formatStaleDistWarning,
+  listRootEmittedPackageTargets,
   type StaleTargetSpec,
 } from './check_stale_dist.js';
 
@@ -123,6 +124,32 @@ describe('check_stale_dist', () => {
     const fileInfos = Object.values(entries).map((version) => ({ version }));
     write(relativePath, JSON.stringify({ fileNames, fileInfos }));
   }
+
+  it.each(['src', '.'])('preserves root-emitter layout for package rootDir %s', (rootDir) => {
+    const source = `libs/example/${rootDir}/entry.ts`;
+    const emitted = `root-dist/libs/example/${rootDir}/entry.js`;
+    write('libs/example/tsconfig.json', JSON.stringify({ compilerOptions: { rootDir } }));
+    const sourcePath = write(source, 'export const value = 1;\n');
+    write(emitted);
+    write(`root-dist/libs/example/${rootDir}/other.js`);
+    write('root-dist/libs/example/root-output.js');
+    writeBuildInfo('root-dist/.tsbuildinfo', { [sourcePath]: sha256('export const value = 1;\n') });
+    const targets = listRootEmittedPackageTargets(
+      `${FIXTURE_ROOT}/libs`,
+      `${FIXTURE_ROOT}/root-dist/libs`
+    ).map((target) => ({ ...target, buildInfo: [`${FIXTURE_ROOT}/root-dist/.tsbuildinfo`] }));
+    expect(findStaleDistTargets({ targets }).stale).toEqual([]);
+    safeRmSync(pathResolver.sharedTmp(`check-stale-dist/${emitted}`));
+    const missing = findStaleDistTargets({ targets }).stale;
+    expect(missing).toHaveLength(1);
+    expect(missing[0].reason).toBe('emit_missing');
+    if (rootDir === 'src') {
+      safeRmSync(pathResolver.sharedTmp('check-stale-dist/root-dist/libs/example/src'), {
+        recursive: true,
+      });
+      expect(findStaleDistTargets({ targets }).stale[0]?.reason).toBe('emit_missing');
+    }
+  });
 
   function sha256(contents: string): string {
     return createHash('sha256').update(contents, 'utf8').digest('hex');
