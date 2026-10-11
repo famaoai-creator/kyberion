@@ -178,7 +178,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-suite: [smoke, core, actuators, scripts, integration]
+        test-suite: [smoke, core, actuators]
         include:
           - test-suite: smoke
             command: pnpm run test
@@ -188,10 +188,23 @@ jobs:
           - test-suite: actuators
             command: pnpm test -- --suite actuators
             pr-duplicate: true
+          # scripts was the longest suite (~11min) — shard it 3-ways so the
+          # per-PR tail drops to ~4min. `shard` stays unset for single jobs.
           - test-suite: scripts
-            command: pnpm test -- --suite scripts
+            shard: '1/3'
+            command: pnpm test -- --suite scripts --shard=1/3
+          - test-suite: scripts
+            shard: '2/3'
+            command: pnpm test -- --suite scripts --shard=2/3
+          - test-suite: scripts
+            shard: '3/3'
+            command: pnpm test -- --suite scripts --shard=3/3
           - test-suite: integration
-            command: pnpm test -- --suite integration
+            shard: '1/2'
+            command: pnpm test -- --suite integration --shard=1/2
+          - test-suite: integration
+            shard: '2/2'
+            command: pnpm test -- --suite integration --shard=2/2
     steps:
       # core and actuators run in pr-validation.yml on pull requests; keep the
       # job (and its check name) but skip the duplicate work there.
