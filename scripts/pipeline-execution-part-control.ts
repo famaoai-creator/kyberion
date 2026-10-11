@@ -25,6 +25,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
+  assertPipelineExecutionCurrent,
   resolveStepType,
   resolveExportKey,
   buildReasoningPolicyNote,
@@ -867,6 +868,7 @@ export async function dispatchLeafOp(
   // before any inline, composite (ptc / run_pipeline) or real actuator
   // dispatch, so an op a fixture was approved for is always fixture-served.
   // Unregistered -> null.
+  assertPipelineExecutionCurrent(opts);
   const scenarioOperation = resolveScenarioOpOverride(domain, action);
   if (scenarioOperation) {
     if (opts.executionMode)
@@ -957,6 +959,7 @@ async function dispatchResolvedActuatorOperation(
   }
   const effectiveType = resolveStepType(step);
   const dispatch = await loadActuatorDispatch(domain, resolvedOperation);
+  assertPipelineExecutionCurrent(opts);
   const result = await dispatch(
     action,
     {

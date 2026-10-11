@@ -50,7 +50,7 @@ pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. Use `pnpm kyberion doctor` for the readiness check: bare `pnpm doctor` is pnpm's own built-in diagnostic and does not run Kyberion's checks.
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. Use `pnpm kyberion doctor` for the readiness check: bare `pnpm doctor` is pnpm's own built-in diagnostic and does not run Kyberion's checks. If a later `baseline-check` reports `needs_recovery` because `dist/` is older than its sources, rebuild with `pnpm build`.
 
 ### Day-2 setup: AI company, tenant activation (optional)
 
@@ -145,7 +145,7 @@ Wait for a surface's health to become `healthy` in `pnpm surfaces status` before
 
 Choose the surface for the task (full role map: [SURFACES](./SURFACES.md)):
 
-- **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want.
+- **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want. On a fresh install with no owner yet, run `pnpm organization first-run code` on the host first and open the printed `/setup/first-run` URL once ([operations](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md)).
 - **Inspect a runtime or investigate a failure:** Chronos at `http://127.0.0.1:3000`.
 - **Try voice and live transcripts:** Presence Studio at `http://127.0.0.1:3031`, with a healthy `voice-hub` and the voice prerequisites reported by `pnpm kyberion doctor --runtime voice`.
 - **Use a terminal control view:** `pnpm tui`.
@@ -339,13 +339,15 @@ pnpm run kyberion -- search browser
 ### Mission lifecycle
 
 ```bash
-MC="node dist/scripts/mission_controller.js"
-$MC start MY-TASK --tier confidential --persona ecosystem_architect
-$MC status MY-TASK
-$MC checkpoint MY-TASK step-1 "Progress note"
-$MC verify MY-TASK verified "Verification summary"
-$MC finish MY-TASK
+pnpm mission kickoff MSN-DEMO-20261012 --tier confidential --tenant-slug <tenant> \
+  --goal "<what you actually want>" --success-condition "<observable acceptance criteria>"
+pnpm mission status MSN-DEMO-20261012
+pnpm mission checkpoint MSN-DEMO-20261012 step-1 "Progress note"
+pnpm mission verify MSN-DEMO-20261012 verified "Verification summary"
+pnpm mission finish MSN-DEMO-20261012
 ```
+
+`kickoff` creates the mission if absent and activates it (IDs follow `MSN-<TOPIC>-<YYYYMMDD>`; repo-internal work uses `--tier public`, which needs no tenant). The full sequence (evidence, review, distill) is in the [mission kickoff playbook](../knowledge/product/orchestration/mission-kickoff-playbook.md).
 
 These are operator tools.
 They are not the normal end-user interface.

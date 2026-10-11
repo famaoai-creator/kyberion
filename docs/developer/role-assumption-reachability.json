@@ -257,6 +257,11 @@
       ]
     },
     {
+      "site": "libs/core/dot/dot-executor-scheduling.ts#guarded",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
       "roles": [],
       "unresolved": [

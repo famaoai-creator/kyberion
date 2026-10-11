@@ -23,6 +23,8 @@ export interface WorkItemContext {
 }
 
 export interface WorkItem {
+  /** Effect ownership outlives the scheduling lease; archive is not proof of stop. */
+  effect_ownership?: WorkEffectOwnership;
   item_id: string;
   title: string;
   description: string;
@@ -55,6 +57,18 @@ export interface WorkItem {
   attempts?: WorkItemAttempt[];
   context?: WorkItemContext;
   metadata?: Record<string, unknown>;
+}
+
+export interface WorkEffectOwnership {
+  target: string;
+  attempt_id: string;
+  actor_id: string;
+  tenant_slug?: string;
+  state: 'held' | 'settled';
+  acquired_at: string;
+  settled_at?: string;
+  settlement?: 'completed' | 'pre_effect' | 'human_verified';
+  approval_request_id?: string;
 }
 
 export type WorkItemAttemptStatus =
@@ -243,6 +257,8 @@ export interface ClaimWorkItemInput {
 }
 
 export interface ReleaseWorkItemInput {
+  /** Trusted executor result, persisted before this exact-lease release. */
+  effectDisposition?: 'completed' | 'pre_effect';
   itemId: string;
   leaseId: string;
   actorPeerId: string;

@@ -465,6 +465,7 @@ describe('dot executor end to end', () => {
       metadata: {
         dot_id: 'exec-it',
         action_ref: actionRef,
+        target: 'service:release-evaluation',
         requested_work_shape: 'pipeline',
         pipeline_ref: 'pipelines/ok.json',
       },
