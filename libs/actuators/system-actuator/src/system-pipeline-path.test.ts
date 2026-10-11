@@ -90,12 +90,10 @@ describe('list_missions tenant-bound enumeration', () => {
     });
 
     process.env.KYBERION_TENANT = 'kyberion';
-    let result: any;
-    await expect(
-      (async () => {
-        result = await opCapture('list_missions', {}, {}, (value) => value);
-      })()
-    ).resolves.not.toThrow();
+    // A bound process listing a protected tier root threw
+    // scope_invalid_prefix before this fix — the call itself is the
+    // assertion surface here.
+    const result = await opCapture('list_missions', {}, {}, (value) => value);
     expect(
       result.mission_list_data.mission_list.some(
         (mission: { id?: string }) => mission.id === tenantBoundMissionId
