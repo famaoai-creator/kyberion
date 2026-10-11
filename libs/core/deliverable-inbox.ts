@@ -74,6 +74,8 @@ export interface HumanDeliveryReceipt {
 }
 
 export interface DeliverableInboxQuery {
+  /** Exact durable identity, applied before sorting and result limits. */
+  entryId?: string;
   query?: string;
   missionId?: string;
   tenant?: string;
@@ -277,6 +279,8 @@ export function addInboxEntry(input: {
   kind?: string;
   status?: DeliverableInboxStatus;
   entryId?: string;
+  /** Atomically return an existing entry with this explicit identity. */
+  ifAbsent?: boolean;
   createdAt?: string;
   roleSections?: DeliverableRoleSection[];
   integratedSummary?: string;
@@ -317,6 +321,25 @@ export function addInboxEntry(input: {
 
   return withInboxLock(() => {
     const entries = readInboxEntries();
+    const existing =
+      input.ifAbsent && input.entryId
+        ? entries.find((item) => item.entry_id === input.entryId)
+        : undefined;
+    if (existing) {
+      if (
+        existing.title !== entry.title ||
+        existing.summary !== entry.summary ||
+        existing.kind !== entry.kind ||
+        existing.mission_id !== entry.mission_id ||
+        existing.tenant_slug !== entry.tenant_slug ||
+        JSON.stringify(existing.artifact_paths) !== JSON.stringify(entry.artifact_paths) ||
+        JSON.stringify(existing.role_sections) !== JSON.stringify(entry.role_sections) ||
+        existing.integrated_summary !== entry.integrated_summary
+      ) {
+        throw new Error('[DELIVERABLE_INBOX] idempotency identity conflicts with existing entry');
+      }
+      return existing;
+    }
     entries.push(entry);
     writeInboxEntries(entries);
     return entry;
@@ -351,6 +374,7 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
   const tenantFilter = query.tenant?.trim().toLowerCase() || '';
   const textFilter = query.query?.trim().toLowerCase() || '';
   const entries = readInboxEntries().filter((entry) => {
+    if (query.entryId !== undefined && entry.entry_id !== query.entryId) return false;
     if (statusFilter && !statusFilter.has(entry.status)) return false;
     if (missionFilter && entry.mission_id?.toUpperCase() !== missionFilter) return false;
     if (

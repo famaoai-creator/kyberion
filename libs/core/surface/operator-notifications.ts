@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { parseSafeJsonObjectValue } from '../foundation/json.js';
+import { parseSafeJsonObjectValue, readJsonIfPresent } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -12,11 +12,16 @@ import {
   safeLstat,
   safeMkdir,
   safeWriteFile,
+  safePublishExclusiveFileSync,
+  safeUnlinkSync,
 } from '../secure-io.js';
 import { logger } from '../core.js';
 import { t, type VocabularyKey } from '../t.js';
 import { formatDiagnostic } from '../logger.js';
-import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
+import {
+  enqueueSurfaceOutboxMessage,
+  listSurfaceOutboxMessages,
+} from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import { getChannelAdapter, listOperatorNotificationChannels } from './channel-adapter-registry.js';
 import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
@@ -394,6 +399,8 @@ export function resolveOperatorNotificationRoute(
 export interface OperatorNotificationOptions {
   route?: NotificationChannelTarget;
   quietHours?: NotificationQuietHours;
+  /** Stable identity for one logical notification; never reuse for different content. */
+  deduplicationKey?: string;
 }
 
 export function resolveCallerNotificationRoute(
@@ -413,8 +420,9 @@ function deliver(
   route: NotificationChannelTarget,
   text: string,
   correlationId: string,
-  title: string
-): Promise<void> {
+  title: string,
+  deduplicationKey?: string
+): void {
   // Delivery mechanics are declared per channel in the adapter registry (RS-06);
   // an unregistered surface fails closed in getChannelAdapter.
   const delivery = getChannelAdapter(route.surface).operator_notification?.delivery;
@@ -433,12 +441,12 @@ function deliver(
       // silently no-op behind the first. Hashing keeps one entry per alert
       // instance while staying deterministic for retries of the same alert.
       const entryId = `INBOX-N-${createHash('sha256')
-        .update(correlationId)
+        .update(deduplicationKey || correlationId)
         .digest('hex')
         .slice(-20)
         .toUpperCase()}`;
       withExecutionContext('surface_runtime', () => {
-        const alreadyQueued = listInboxEntries({ limit: 500 }).some(
+        const alreadyQueued = listInboxEntries({ entryId: entryId, limit: 1 }).some(
           (entry) => entry.entry_id === entryId
         );
         if (!alreadyQueued) {
@@ -448,6 +456,7 @@ function deliver(
             summary: text,
             kind: 'operator_notification',
             status: 'unread',
+            ifAbsent: true,
           });
         }
       });
@@ -463,6 +472,7 @@ function deliver(
         threadTs: '',
         text,
         source: 'system',
+        deduplicationKey,
       });
       return;
     default:
@@ -498,59 +508,220 @@ function fanOutWebPush(event: OperatorEvent, dedupeKey: string): boolean {
   }
 }
 
-/** Synchronous delivery path used when a caller must return an honest receipt. */
+/** A durable handoff is acceptance, not proof of delivery to the user. */
+export interface OperatorNotificationReceipt {
+  status: 'accepted' | 'suppressed' | 'retryable' | 'uncertain';
+  reason?: string;
+  retryAfterMs?: number;
+}
+
+interface NotificationClaim {
+  fingerprint: string;
+  surface: NotificationChannelTarget['surface'];
+  delivery: string;
+  entryId: string;
+}
+
+const digestIdentity = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+/**
+ * Receipt and intent tombstones are never automatically expired. Removing them
+ * removes replay protection even if a bridge has already drained its outbox.
+ * An intent without a receipt is reconciled only by positive durable evidence;
+ * absence is NOT proof that an external effect did not happen.
+ */
+function stableNotificationAttempt(
+  event: OperatorEvent,
+  payload: OperatorNotificationPayload,
+  route: NotificationChannelTarget | null,
+  key: string,
+  attempt: (durableKey: string) => OperatorNotificationReceipt
+): OperatorNotificationReceipt {
+  return withExecutionContext('surface_runtime', () => {
+    const identity = digestIdentity(JSON.stringify([event, key]));
+    const durableKey = 'operator:' + identity;
+    const base = pathResolver.shared('runtime/operator-notification-receipts/' + identity);
+    const claimPath = assertSafeRepositoryPath(base + '.intent.json', { allowMissingLeaf: true });
+    const receiptPath = assertSafeRepositoryPath(base + '.accepted.json', {
+      allowMissingLeaf: true,
+    });
+    const fingerprint = digestIdentity(
+      JSON.stringify([event, payload.title, payload.body, payload.link_hint || ''])
+    );
+    const existing = readJsonIfPresent<NotificationClaim>(claimPath);
+    if (safeExistsSync(claimPath)) {
+      if (!existing || existing.fingerprint !== fingerprint) {
+        return { status: 'uncertain', reason: 'deduplication_identity_conflict' };
+      }
+      const accepted = readJsonIfPresent<{ fingerprint: string }>(receiptPath);
+      if (accepted?.fingerprint === fingerprint)
+        return { status: 'accepted', reason: 'durable_replay' };
+      const queued =
+        existing.delivery === 'local-inbox'
+          ? listInboxEntries({ entryId: existing.entryId, limit: 1 }).some(
+              (entry) => entry.entry_id === existing.entryId
+            )
+          : existing.delivery === 'surface-outbox'
+            ? listSurfaceOutboxMessages(existing.surface as SurfaceAsyncChannel).some(
+                (message) => message.deduplication_key === durableKey
+              )
+            : false;
+      if (queued) {
+        // The accepted marker is advisory; a concurrent reconciler may publish it.
+        try {
+          safePublishExclusiveFileSync(receiptPath, JSON.stringify({ fingerprint }));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        }
+        return { status: 'accepted', reason: 'durable_reconciled' };
+      }
+      return { status: 'uncertain', reason: 'prior_attempt_outcome_unknown' };
+    }
+    const claim: NotificationClaim = {
+      fingerprint,
+      surface: route?.surface || 'inbox',
+      delivery: route
+        ? getChannelAdapter(route.surface).operator_notification?.delivery || ''
+        : 'webpush-direct',
+      entryId: 'INBOX-N-' + digestIdentity(durableKey).slice(-20).toUpperCase(),
+    };
+    try {
+      safePublishExclusiveFileSync(claimPath, JSON.stringify(claim));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        return { status: 'uncertain', reason: 'concurrent_attempt' };
+      }
+      return { status: 'retryable', reason: 'intent_not_created' };
+    }
+    const receipt = attempt(durableKey);
+    if (receipt.status === 'accepted') {
+      try {
+        safePublishExclusiveFileSync(receiptPath, JSON.stringify({ fingerprint }));
+      } catch {
+        /* Keep the intent: a retry must reconcile, never blindly resend. */
+      }
+    } else if (receipt.status === 'retryable' || receipt.status === 'suppressed') {
+      safeUnlinkSync(claimPath); // Only definite no-effect outcomes release ownership.
+    }
+    return receipt;
+  });
+}
+
+/** Compatible boolean: true still means a delivery path was handed the event. */
 export function notifyOperatorSync(
   event: OperatorEvent,
   payload: OperatorNotificationPayload,
   options: OperatorNotificationOptions = {}
 ): boolean {
-  // Tests exercising real mission flows must not pollute the operator's
-  // real inbox/channels (81 phantom entries taught us this). Suites that
-  // genuinely test delivery mock this module or set the override.
+  const receipt = notifyOperatorWithReceiptSync(event, payload, options);
+  return receipt.status === 'accepted' || receipt.reason === 'direct_delivery_attempted';
+}
+
+/** Never retries an uncertain external effect; caller may retry only retryable. */
+export function notifyOperatorWithReceiptSync(
+  event: OperatorEvent,
+  payload: OperatorNotificationPayload,
+  options: OperatorNotificationOptions = {}
+): OperatorNotificationReceipt {
   if (isVitestProcess() && getRegisteredEnvText('KYBERION_ALLOW_TEST_NOTIFICATIONS') !== '1') {
-    return false;
+    return { status: 'suppressed', reason: 'test_notifications_disabled' };
   }
   try {
     const prefs = loadNotificationPreferences();
     const route = options.route
       ? resolveCallerNotificationRoute(event, options.route, options.quietHours, prefs)
       : resolveOperatorNotificationRoute(event, prefs);
-    if (route === 'mute') return false;
-    if (!route) {
-      // Web Push is its own opt-in channel (a device subscribed): it needs no
-      // configured route. Content-free, rate-limited like any other delivery.
-      const pushed = fanOutWebPush(
-        event,
-        `webpush:${event}:${payload.correlation_id || payload.title}`
-      );
-      if (!pushed) recordUndeliveredNotification(event, payload, 'no_channel_configured');
-      return pushed;
+    if (prefs.per_event?.[event] === 'mute' || route === 'mute')
+      return { status: 'suppressed', reason: 'muted' };
+    const key = options.deduplicationKey?.trim();
+    if (
+      options.deduplicationKey !== undefined &&
+      (!key || key.length > 500 || key.includes('\u0000'))
+    ) {
+      return { status: 'suppressed', reason: 'invalid_deduplication_key' };
     }
-    // EV-09: when this notification is a consequence of a trigger firing,
-    // inherit that delivery id so the operator can trace the notification back
-    // to its cause in one hop. An explicit correlation_id still wins.
+    if (!route) {
+      const pushOnly = (): OperatorNotificationReceipt => {
+        const pushed = fanOutWebPush(
+          event,
+          'webpush:' + event + ':' + (payload.correlation_id || payload.title)
+        );
+        if (pushed) return { status: 'uncertain', reason: 'direct_delivery_attempted' };
+        recordUndeliveredNotification(event, payload, 'no_channel_configured');
+        return {
+          status: 'retryable',
+          reason: 'no_channel_configured',
+          retryAfterMs: DEFAULT_NOTIFY_INTERVAL_MS,
+        };
+      };
+      return key ? stableNotificationAttempt(event, payload, null, key, pushOnly) : pushOnly();
+    }
     const correlationId =
       payload.correlation_id ||
       currentTriggerDeliveryId() ||
-      `notify:${event}:${Date.now().toString(36)}`;
-    // Dedupe on the resolved correlation: two notifications from one firing are
-    // the same event, which the title-only fallback could not express.
-    const dedupeKey = `${event}:${payload.correlation_id || currentTriggerDeliveryId() || payload.title}`;
-    if (!shouldNotifyOperator(dedupeKey)) return false;
-    deliver(route, formatNotificationText(event, payload), correlationId, payload.title);
-    // Quiet hours defer to the inbox; a phone must not buzz then either.
-    if (route.target !== 'quiet-hours') fanOutWebPush(event, `webpush:${dedupeKey}`);
-    return true;
+      'notify:' + event + ':' + Date.now().toString(36);
+    const rateKey =
+      event + ':' + (payload.correlation_id || currentTriggerDeliveryId() || payload.title);
+    const attempt = (durableKey?: string): OperatorNotificationReceipt => {
+      if (!shouldNotifyOperator(rateKey)) {
+        return {
+          status: 'retryable',
+          reason: 'rate_limited',
+          retryAfterMs: Math.max(
+            1,
+            DEFAULT_NOTIFY_INTERVAL_MS - (Date.now() - (lastNotifiedAt.get(rateKey) || 0))
+          ),
+        };
+      }
+      let delivery: string | undefined;
+      try {
+        delivery = getChannelAdapter(route.surface).operator_notification?.delivery;
+        if (!delivery) {
+          lastNotifiedAt.delete(rateKey);
+          return { status: 'retryable', reason: 'no_delivery_adapter' };
+        }
+        deliver(
+          route,
+          formatNotificationText(event, payload),
+          correlationId,
+          payload.title,
+          durableKey
+        );
+        if (route.target !== 'quiet-hours') fanOutWebPush(event, 'webpush:' + rateKey);
+        return delivery === 'imessage-direct'
+          ? { status: 'uncertain', reason: 'direct_delivery_attempted' }
+          : {
+              status: 'accepted',
+              reason: delivery === 'local-inbox' ? 'local_inbox' : 'durable_outbox',
+            };
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        recordUndeliveredNotification(event, payload, 'delivery_failed:' + detail.slice(0, 200));
+        // This error is thrown before outbox creation; other transport/storage
+        // errors may happen after an effect and are deliberately not retryable.
+        if (delivery === 'surface-outbox' && detail.startsWith('surface_target_dead:')) {
+          lastNotifiedAt.delete(rateKey);
+          return {
+            status: 'retryable',
+            reason: 'surface_target_dead',
+            retryAfterMs: DEFAULT_NOTIFY_INTERVAL_MS,
+          };
+        }
+        return { status: 'uncertain', reason: 'delivery_outcome_unknown' };
+      }
+    };
+    if (key) return stableNotificationAttempt(event, payload, route, key, attempt);
+    return attempt();
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(
       formatDiagnostic({
         component: 'operator-notifications',
-        what: `delivery failed for ${event}`,
+        what: 'delivery failed for ' + event,
         why: detail,
       })
     );
-    recordUndeliveredNotification(event, payload, `delivery_failed:${detail.slice(0, 200)}`);
-    return false;
+    recordUndeliveredNotification(event, payload, 'delivery_failed:' + detail.slice(0, 200));
+    return { status: 'uncertain', reason: 'notification_outcome_unknown' };
   }
 }

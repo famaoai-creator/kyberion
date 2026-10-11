@@ -105,7 +105,8 @@ function dispatchDeps(): DotDispatchDeps {
       notified: false,
     }),
     // Real store (namespaced); counted with dispatch's open-status semantics.
-    createWorkItem: (input) => createWorkItem(input),
+    // This fixture isolates ledgers via rootDir and WorkItems via its existing store namespace.
+    createWorkItem: ({ rootDir: _ledgerRoot, ...input }) => createWorkItem(input),
     countOpenWorkItems: countOpen,
     listCharters: () => [CHARTER],
     audit: () => {},
