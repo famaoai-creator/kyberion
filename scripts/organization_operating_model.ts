@@ -1111,6 +1111,12 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       throw new Error(
         '--request-approval needs --chosen-option <option>: the human approves one named option.'
       );
+    // Re-request: already pending_approval + --request-approval opens a new
+    // approval request without status churn (no deferred detour needed).
+    const isRerequest =
+      !!parsed.requestApproval &&
+      current.status === 'pending_approval' &&
+      target === 'pending_approval';
     const approvalRef =
       target === 'approved' || target === 'rejected'
         ? verifyDecisionApprovalRef(
@@ -1121,10 +1127,11 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
           )
         : undefined;
     const decision = transitionOrganizationDecision(current, target, {
-      chosenOption: target === 'pending_approval' ? undefined : parsed.chosenOption,
+      chosenOption: target === 'pending_approval' && !isRerequest ? undefined : parsed.chosenOption,
       rationale: parsed.rationale,
       approvalRef,
       followUpRefs: parsed.followUpRefs,
+      rerequest: isRerequest,
     });
     // One-shot: the approval is consumed before the approved decision is saved,
     // so it cannot settle a decision twice and a later revoke reports it used.
@@ -1149,6 +1156,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         mode,
         decision,
         saved_path: savedPath,
+        ...(isRerequest ? { re_request: true } : {}),
         ...(approvalRequest
           ? {
               approval_request: {

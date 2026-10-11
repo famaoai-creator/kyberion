@@ -277,6 +277,10 @@ export interface MissionState {
     /** LC-11: last human-review re-entry gaps dispatched as rework tasks. */
     review_reentry_last_gaps?: string[];
     mission_finish_gate_requires_operator?: boolean;
+    /** Fresh reason/checked-at of the last finish-gate outcome (fail or gap-dispatch). */
+    mission_finish_gate_last_reason?: string;
+    mission_finish_gate_last_checked_at?: string;
+    mission_finish_gate_failure_count?: number;
     mission_finish_recovered_commit?: string;
     /** AL-03: outcome of the finish-time retention closure. */
     mission_artifact_closure?: {

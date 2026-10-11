@@ -12,6 +12,8 @@ import {
   validateScopeContext,
   writeScopeEnv,
   clearScopeEnv,
+  pushScopeEnv,
+  popScopeEnv,
 } from './scope-context.js';
 
 describe('scope-context', () => {
@@ -173,6 +175,48 @@ describe('scope-context', () => {
     expect(() =>
       writeScopeEnv({ tier: 'public' }, { KYBERION_SCOPE_ENV_PATH: '../../outside-scope.env' })
     ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('pushes and pops the persisted scope', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-push-pop-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv(
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+      },
+      env
+    );
+    try {
+      expect(pushScopeEnv(env)).toEqual({ depth: 1 });
+      writeScopeEnv({ tier: 'public' }, env);
+      expect(resolveScopeResolution({}, env).scope.tier).toBe('public');
+      expect(popScopeEnv(env)).toMatchObject({ depth: 0, restored: true });
+      expect(resolveScopeResolution({}, env).scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+      });
+      expect(() => popScopeEnv(env)).toThrow('[SCOPE_STACK_EMPTY]');
+    } finally {
+      clearScopeEnv(env);
+    }
+  });
+
+  it('clear discards stashed scopes and push is depth-capped', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-stack-limit-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv({ tier: 'public' }, env);
+    try {
+      expect(pushScopeEnv(env)).toEqual({ depth: 1 });
+      clearScopeEnv(env);
+      expect(() => popScopeEnv(env)).toThrow('[SCOPE_STACK_EMPTY]');
+      for (let i = 0; i < 10; i++) pushScopeEnv(env);
+      expect(() => pushScopeEnv(env)).toThrow('[SCOPE_STACK_FULL]');
+    } finally {
+      clearScopeEnv(env);
+    }
   });
 
   it('rejects a scope.env directory instead of falling back to public scope', () => {

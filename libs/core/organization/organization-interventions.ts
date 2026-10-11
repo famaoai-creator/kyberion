@@ -114,7 +114,8 @@ const DECISION_NEXT: Record<
 };
 
 const DECISION_LIFECYCLE =
-  'proposed -> pending_approval -> approved -> implemented (side branches: proposed/pending_approval -> deferred -> pending_approval; pending_approval -> rejected [terminal])';
+  'proposed -> pending_approval -> approved -> implemented (side branches: proposed/pending_approval -> deferred -> pending_approval; pending_approval -> rejected [terminal]). ' +
+  'Re-request: repeat pending_approval with --request-approval --chosen-option to open a new approval request without changing status.';
 
 function describeDecisionTransition(
   current: OrganizationDecisionRecord['status'],
@@ -137,10 +138,13 @@ export function transitionOrganizationDecision(
     rationale?: string;
     approvalRef?: string;
     followUpRefs?: string[];
+    rerequest?: boolean;
   },
   now = nowIso()
 ): OrganizationDecisionRecord {
-  if (!DECISION_NEXT[current.status].includes(status))
+  const isRerequest =
+    !!input.rerequest && current.status === 'pending_approval' && status === 'pending_approval';
+  if (!isRerequest && !DECISION_NEXT[current.status].includes(status))
     throw new Error(describeDecisionTransition(current.status, status));
   const chosenOption = input.chosenOption || current.chosen_option;
   const rationale = input.rationale || current.rationale;
