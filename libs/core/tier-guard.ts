@@ -1060,13 +1060,14 @@ export function validateReadPermission(
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
   const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
-  // Archived mission dirs partition the same way as active ones —
-  // <tier>/<tenant|shared>/<id> — so archived confidential/personal mission
-  // content is gated at the io layer instead of depending on app-level checks
-  // alone. (Active mission dirs keep their existing io posture: tenant checks
-  // on writes, owner-scope on lookup.)
+  // Mission dirs (active and archived) partition as <tier>/<tenant|shared>/<id>
+  // — putting confidential/personal mission paths on the protected set makes
+  // checkTenantScope deny cross-tenant reads at the io layer. The tier block in
+  // personaTierReadDecision stays archive-only: active mission dirs keep their
+  // app-layer (owner-scope) authorization for persona/tier, so own-tenant and
+  // unbound readers behave exactly as before.
   const missionTier = relativePath.match(
-    /^active\/archive\/missions\/(personal|confidential|public)(?:\/|$)/
+    /^active\/(?:archive\/)?missions\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
   const protectedMissionPath = missionTier === 'personal' || missionTier === 'confidential';
   const floorTier = storageFloorTier(relativePath);

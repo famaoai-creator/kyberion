@@ -226,6 +226,7 @@ interface MissionCandidate {
 function missionCandidates(missionId: string): MissionCandidate[] {
   const found: MissionCandidate[] = [];
   const seen = new Set<string>();
+  const bound = boundTenant();
   for (const tier of OWNER_TIERS) {
     // missionDir() applies the configured tier root (mission-management-config).
     const tierRoot = path.dirname(pathResolver.missionDir(missionId, tier));
@@ -238,6 +239,13 @@ function missionCandidates(missionId: string): MissionCandidate[] {
     };
     try {
       consider(path.join(tierRoot, missionId), SHARED_TENANT);
+      if (bound) {
+        // A bound process may not enumerate the tier root — the tenant list is
+        // out of its scope (io denies `active/missions/<tier>` itself). Probe
+        // only its own partition; other tenants are filtered anyway.
+        consider(path.join(tierRoot, bound, missionId), bound);
+        continue;
+      }
       if (!isDirectory(tierRoot)) continue;
       // Only tenant-slug names are tenant partitions: mission ids (uppercase)
       // are skipped by name, without a stat per mission directory.
@@ -321,7 +329,11 @@ function stateMtime(dir: string): number {
 const missionLocationCache = new Map<string, { at: number; locations: MissionLocation[] }>();
 
 function missionLocations(missionId: string): MissionLocation[] {
-  const cached = missionLocationCache.get(missionId);
+  // A bound identity probes only its own partition, so the cached view is
+  // scope-relative: key it by the bound tenant, else a bound lookup would
+  // leak its narrowed view into a later unbound lookup.
+  const cacheKey = `${boundTenant() || ''} ${missionId}`;
+  const cached = missionLocationCache.get(cacheKey);
   if (
     cached &&
     Date.now() - cached.at < MISSION_LOCATION_TTL_MS &&
@@ -334,9 +346,9 @@ function missionLocations(missionId: string): MissionLocation[] {
     .filter((location): location is MissionLocation => Boolean(location));
   // Never memoize "not found": a mission created right after must resolve.
   if (locations.length > 0) {
-    missionLocationCache.set(missionId, { at: Date.now(), locations });
+    missionLocationCache.set(cacheKey, { at: Date.now(), locations });
   } else {
-    missionLocationCache.delete(missionId);
+    missionLocationCache.delete(cacheKey);
   }
   return locations;
 }

@@ -87,8 +87,24 @@ export function projectMissions(
     rootDir,
     ...(missionDirectories ? { directories: missionDirectories } : {}),
   };
-  return listMissionsInSearchDirs(missionOptions)
-    .map(({ missionId }) => loadState(missionId, missionOptions))
+  // A tenant-bound process cannot enumerate the tier root, so flat
+  // (untenanted-dir) missions are unreachable by scanning — resolve the
+  // project record's mission ids directly too; by-id lookup handles both
+  // layouts under a bound identity.
+  const missionIds = new Set([
+    ...listMissionsInSearchDirs(missionOptions).map(({ missionId }) => missionId),
+    ...(project?.active_missions || []),
+  ]);
+  return [...missionIds]
+    .map((missionId) => {
+      try {
+        return loadState(missionId, missionOptions);
+      } catch {
+        // Stale ids in the record (mission moved/deleted) must not break the
+        // view — the scan-driven paths only ever feed ids that exist on disk.
+        return null;
+      }
+    })
     .filter((state): state is MissionState => Boolean(state))
     .filter((state) => state.relationships?.project?.project_id === projectId);
 }

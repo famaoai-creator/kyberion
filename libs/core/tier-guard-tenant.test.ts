@@ -209,6 +209,47 @@ describe('tier-guard tenant scope (IP-1)', () => {
     );
   });
 
+  it('denies cross-tenant reads of confidential/personal active mission dirs at the io layer', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    for (const relativePath of [
+      'active/missions/confidential/beta-co/MSN-FOO/evidence/leak.json',
+      'active/missions/personal/beta-co/MSN-FOO/evidence/leak.json',
+    ]) {
+      const result = validateReadPermission(path.join(ROOT, relativePath));
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/tenant\.scope_violation/);
+    }
+  });
+
+  it('keeps own-tenant, unbound, untenanted, and public mission reads on the prior posture', () => {
+    const confidential = (tenant?: string) =>
+      path.join(
+        ROOT,
+        tenant
+          ? `active/missions/confidential/${tenant}/MSN-FOO/evidence/note.json`
+          : 'active/missions/confidential/MSN-FOO/evidence/note.json'
+      );
+
+    // Bound to the owning tenant — same as before (no new tier block on active dirs).
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    expect(validateReadPermission(confidential('acme-corp')).allowed).toBe(true);
+    // Untenanted flat confidential missions stay resolvable (legacy exemption).
+    expect(validateReadPermission(confidential()).allowed).toBe(true);
+    // Public missions remain outside the protected set entirely.
+    expect(
+      validateReadPermission(
+        path.join(ROOT, 'active/missions/public/beta-co/MSN-FOO/evidence/note.json')
+      ).allowed
+    ).toBe(true);
+
+    // Unbound system processes keep reading either tenant's mission dirs.
+    delete process.env.KYBERION_TENANT;
+    expect(validateReadPermission(confidential('acme-corp')).allowed).toBe(true);
+    expect(validateReadPermission(confidential('beta-co')).allowed).toBe(true);
+  });
+
   it('limits worker public project writes to the bound project and public partition', () => {
     process.env.KYBERION_PERSONA = 'worker';
     process.env.MISSION_ROLE = 'worker';
