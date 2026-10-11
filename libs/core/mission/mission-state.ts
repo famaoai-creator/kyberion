@@ -442,9 +442,10 @@ export function loadMissionStateIncludingArchive(
 }
 
 /**
- * The archive is one flat directory for every tier and tenant: apply the same
- * visibility as active lookup (findMissionPath) — a tenant mission is visible
- * only to that tenant (explicit `tenantSlug`, else the KYBERION_TENANT binding).
+ * The archive partitions by tier/tenant (`<root>/<tier>/<tenant|shared>/<id>`,
+ * with legacy flat `<root>/<id>` still resolvable): apply the same visibility
+ * as active lookup (findMissionPath) — a tenant mission is visible only to
+ * that tenant (explicit `tenantSlug`, else the KYBERION_TENANT binding).
  */
 function isArchivedMissionVisible(archived: MissionState, tenantSlug?: string): boolean {
   if (!archived.tenant_slug) return true;
@@ -456,9 +457,9 @@ function isArchivedMissionVisible(archived: MissionState, tenantSlug?: string): 
 
 function loadArchivedMissionState(upperId: string): MissionState | null {
   try {
-    const statePath = assertSafeRepositoryPath(
-      path.join(pathResolver.archivedMissionDir(upperId), 'mission-state.json')
-    );
+    const dir = pathResolver.findArchivedMissionDir(upperId);
+    if (!dir) return null;
+    const statePath = assertSafeRepositoryPath(path.join(dir, 'mission-state.json'));
     return safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
   } catch {
     return null;
@@ -510,7 +511,9 @@ export function assertMissionNotArchived(
   }
   throw new Error(
     `[MISSION_ARCHIVED] Mission ${upperId} is archived at ` +
-      `${pathResolver.toRepoRelative(pathResolver.archivedMissionDir(upperId))}; archived missions ` +
+      `${pathResolver.toRepoRelative(
+        pathResolver.findArchivedMissionDir(upperId) || pathResolver.archivedMissionDir(upperId)
+      )}; archived missions ` +
       'are read-only history. Start a new mission with a new id.'
   );
 }
@@ -615,7 +618,9 @@ export function listMissionsInSearchDirs(
         });
         return;
       }
-      if (depth >= 2) return;
+      // Depth 3 covers the partitioned archive layout
+      // (active/archive/missions/<tier>/<tenant|shared>/<id>).
+      if (depth >= 3) return;
       for (const entry of safeReaddir(safeDirectory)) {
         try {
           const candidate = path.join(safeDirectory, entry);

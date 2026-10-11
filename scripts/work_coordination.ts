@@ -135,7 +135,7 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
   const roots = [pathResolver.active('missions'), pathResolver.active('archive/missions')];
   const states: Array<{ missionId: string; state: any }> = [];
   const seen = new Set<string>();
-  const visit = (root: string, nested = false): void => {
+  const visit = (root: string, depth = 0): void => {
     let safeRoot: string;
     try {
       safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
@@ -173,7 +173,8 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
           }
           continue;
         }
-        if (!nested) visit(missionDir, true);
+        // The archive nests three levels deeper (<tier>/<tenant|shared>/<id>).
+        if (depth < 3) visit(missionDir, depth + 1);
       } catch {
         // Ignore unsafe or malformed mission entries; keep safe history visible.
       }

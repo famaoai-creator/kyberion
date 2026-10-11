@@ -576,9 +576,78 @@ export function archivedMissionsRoot(): string {
   );
 }
 
-export function archivedMissionDir(missionId: string): string {
+/**
+ * Where a finished mission's directory is moved at archive time. The canonical
+ * layout mirrors the active one — `archiveRoot/<tier>/<tenant|shared>/<ID>` —
+ * so archived confidential/personal content falls under the same
+ * `tenant_scope.protected_prefixes` as active missions. Without `options`, the
+ * legacy flat `<root>/<ID>` location is returned (pre-partition archives).
+ */
+export function archivedMissionDir(
+  missionId: string,
+  options: { tier?: string; tenant?: string } | undefined = undefined
+): string {
   assertMissionIdArgument(missionId);
-  return path.join(archivedMissionsRoot(), missionId.toUpperCase());
+  const id = missionId.toUpperCase();
+  if (options === undefined) return path.join(archivedMissionsRoot(), id);
+  const tier = options.tier && ARCHIVE_TIER_DIRS.has(options.tier) ? options.tier : 'public';
+  return path.join(
+    archivedMissionsRoot(),
+    tier,
+    normalizeTenantWorkspaceSegment(options.tenant || 'shared'),
+    id
+  );
+}
+
+const ARCHIVE_TIER_DIRS = new Set(['public', 'confidential', 'personal', 'ephemeral']);
+
+/** Tenant partition names inside an archive tier dir — slugs plus `shared`. */
+function archiveTenantSegments(tierDir: string): string[] {
+  if (!rawExistsSync(tierDir)) return [];
+  try {
+    return rawReaddir(tierDir)
+      .filter((entry) => entry === 'shared' || isValidTenantSlug(entry))
+      .sort();
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Locates an archived mission directory across both layouts:
+ * `<root>/<tier>/<tenant|shared>/<id>` (canonical) and `<root>/<id>`
+ * (pre-partition legacy). Prefers a dir carrying mission-state.json when both
+ * exist; several stated dirs throw OWNER_AMBIGUOUS. Returns undefined when
+ * nothing matches — archived missions are looked up explicitly, never found
+ * through findMissionPath.
+ */
+export function findArchivedMissionDir(
+  missionId: string,
+  options: { archiveRoot?: string } = {}
+): string | undefined {
+  const root = options.archiveRoot ?? archivedMissionsRoot();
+  const id = missionId.toUpperCase();
+  const candidates: string[] = [];
+  const consider = (dir: string) => {
+    if (isMissionDirectory(dir)) candidates.push(dir);
+  };
+  consider(path.join(root, id));
+  try {
+    for (const tier of rawReaddir(root).filter((entry) => ARCHIVE_TIER_DIRS.has(entry))) {
+      for (const segment of archiveTenantSegments(path.join(root, tier))) {
+        consider(path.join(root, tier, segment, id));
+      }
+    }
+  } catch (_) {
+    // An unreadable archive root still reports whatever the flat probe saw.
+  }
+  if (candidates.length === 0) return undefined;
+  const stated = candidates.filter((candidate) =>
+    rawExistsSync(path.join(candidate, 'mission-state.json'))
+  );
+  if (stated.length === 1) return stated[0];
+  if (stated.length > 1) throw missionAmbiguousError(id, stated);
+  return candidates[0];
 }
 
 /**
@@ -877,6 +946,7 @@ export const pathResolver = {
   findMissionPath,
   archivedMissionsRoot,
   archivedMissionDir,
+  findArchivedMissionDir,
   volatile,
   resolve,
   rootResolve,
