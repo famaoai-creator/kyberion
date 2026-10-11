@@ -16,6 +16,7 @@ import {
 } from './mission-flow-projection.js';
 import type { MissionState } from './mission-types.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import { buildArtifactReviewReceipt, hashArtifactForReview } from '../workforce/artifact-review.js';
 
 const missionId = 'MSN-FLOW-UNIT';
 const dir = pathResolver.sharedTmp(`mission-flow-projection/${missionId}`);
@@ -217,12 +218,210 @@ describe('mission flow read-only observations', () => {
     expect(observe().candidates).toEqual(flow.candidates);
     expect(hash()).toBe(withEvidence);
   });
-  it('distinguishes terminal lifecycle from merge and deployment', () => {
-    expect(observe({ status: 'completed' })).toMatchObject({
-      disposition: 'terminal',
-      completion: { merge: 'not_assessed', deployment: 'not_assessed' },
+  it.each(['archived', 'failed'] as const)(
+    'keeps %s terminal without inspecting closure',
+    (status) => {
+      write('NEXT_TASKS.json', 'invalid');
+      expect(observe({ status })).toMatchObject({
+        disposition: 'terminal',
+        task_board: 'not_inspected',
+        completion: { merge: 'not_assessed', deployment: 'not_assessed' },
+      });
+    }
+  );
+  it('inspects completed lifecycle closure without changing the lifecycle or task evidence', () => {
+    write('NEXT_TASKS.json', [
+      { task_id: 'delivery', status: 'planned', deliverable: 'evidence/delivery.md' },
+      { task_id: 'retrospective', status: 'planned', dependencies: ['delivery'] },
+    ]);
+    write('evidence/delivery.md', 'Delivered verified change');
+    const before = hash();
+    const flow = observe({ status: 'completed' });
+    expect(flow).toMatchObject({
+      observed_status: 'completed',
+      disposition: 'requires_work',
+      authority: 'none',
     });
+    expect(flow.candidates[0]).toMatchObject({ action: 'continue_task', task_id: 'delivery' });
+    expect(flow.candidates[0].reason).toContain('record-evidence');
+    expect(hash()).toBe(before);
   });
+  it('fails closed for completed missions with missing or malformed closure proof', () => {
+    expect(observe({ status: 'completed' }).task_board).toBe('missing');
+    write('NEXT_TASKS.json', [{ task_id: 'a', dependencies: ['a'] }]);
+    expect(observe({ status: 'completed' })).toMatchObject({
+      disposition: 'unknown',
+      task_board: 'unreadable',
+    });
+    write('NEXT_TASKS.json', [{ task_id: 'a', phase_kind: 'unrecognized' }]);
+    expect(observe({ status: 'completed' }).task_board).toBe('unreadable');
+    write('NEXT_TASKS.json', [{ task_id: 'a', status: 'completed' }]);
+    expect(observe({ status: 'completed' })).toMatchObject({
+      completion: { structural: 'unsatisfied' },
+    });
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_evidence_gap');
+  });
+  it('requires governed independent review evidence before suggesting completed mission closure', () => {
+    write('NEXT_TASKS.json', [
+      { task_id: 'implement', status: 'completed' },
+      {
+        task_id: 'review',
+        status: 'completed',
+        assigned_to: { role: 'reviewer' },
+        review_target: 'implement',
+        dependencies: ['implement'],
+        deliverable: 'evidence/REVIEW-implement.md',
+        artifact_review_profile: { independence_required: true },
+      },
+    ]);
+    write('evidence/REVIEW-implement.md', 'A review-looking file alone is not a receipt');
+    write('evidence/tests.md', 'Unit tests pass');
+    const before = hash();
+    expect(observe({ status: 'completed' }).candidates[0]).toMatchObject({
+      action: 'inspect_artifact_review',
+      task_id: 'review',
+    });
+    expect(hash()).toBe(before);
+  });
+  it('offers only an advisory finish after completed task and structural proof are observed', () => {
+    write('NEXT_TASKS.json', [{ task_id: 'a', status: 'completed' }]);
+    write('evidence/tests.md', 'Unit tests pass');
+    const before = hash();
+    expect(observe({ status: 'completed' })).toMatchObject({
+      observed_status: 'completed',
+      disposition: 'candidate',
+      authority: 'none',
+      completion: { structural: 'satisfied', merge: 'not_assessed', deployment: 'not_assessed' },
+      candidates: [{ action: 'finish', kind: 'lifecycle' }],
+      runtime: { state: 'unknown' },
+    });
+    expect(hash()).toBe(before);
+  });
+  it('accepts current bound review proof and rejects stale or cross-mission receipts without repair', () => {
+    write('evidence/tests.md', 'Unit tests pass');
+    const artifact = {
+      path: pathResolver.toRepoRelative(path.join(dir, 'evidence/tests.md')),
+      sha256: hashArtifactForReview(path.join(dir, 'evidence/tests.md')),
+      kind: 'doc' as const,
+    };
+    const receipt = buildArtifactReviewReceipt({
+      reviewId: 'review-1',
+      missionId,
+      reviewTaskId: 'review',
+      reviewTargetTaskId: 'implement',
+      artifact,
+      reviewerAgentId: 'independent-reviewer',
+      reviewerTeamRole: 'reviewer',
+      specialistRoles: ['code-reviewer'],
+      independentFrom: ['implementer'],
+      findings: [],
+      acceptanceCriteria: ['Unit tests pass'],
+    });
+    write('evidence/review.json', receipt);
+    write('evidence/REVIEW-implement.md', 'Independent review recorded');
+    write('NEXT_TASKS.json', [
+      { task_id: 'implement', status: 'completed' },
+      {
+        task_id: 'review',
+        status: 'completed',
+        assigned_to: { role: 'reviewer' },
+        review_target: 'implement',
+        dependencies: ['implement'],
+        deliverable: 'evidence/REVIEW-implement.md',
+        artifact_review_receipt: 'evidence/review.json',
+        artifact_review_profile: {
+          independence_required: true,
+          implementer_agent_ids: ['implementer'],
+        },
+      },
+    ]);
+    const before = hash();
+    expect(observe({ status: 'completed' }).blockers).toEqual([]);
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('finish');
+    expect(hash()).toBe(before);
+    write('evidence/tests.md', 'Unit tests pass with modified artifact');
+    const stale = hash();
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+    expect(hash()).toBe(stale);
+    write('evidence/tests.md', 'Unit tests pass');
+    write('evidence/review.json', { ...receipt, mission_id: 'MSN-OTHER' });
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+    write('evidence/review.json', { ...receipt, review_task_id: 'other-review' });
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+    write('evidence/review.json', { ...receipt, version: 'invalid' });
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+    write('evidence/review.json', receipt);
+    write('NEXT_TASKS.json', [
+      { task_id: 'implement', status: 'completed' },
+      {
+        task_id: 'review',
+        status: 'completed',
+        phase_kind: 'review',
+        review_target: 'implement',
+        dependencies: ['implement'],
+        deliverable: 'evidence/REVIEW-implement.md',
+        artifact_review_receipt: 'evidence/review.json',
+      },
+    ]);
+    expect(observe({ status: 'completed' }).candidates[0].action).toBe('finish');
+    for (const mismatch of [
+      { mission_id: 'MSN-OTHER' },
+      { review_task_id: 'other-review' },
+      { version: 'invalid' },
+      { artifact: { ...receipt.artifact, kind: 'code' } },
+    ]) {
+      write('evidence/review.json', { ...receipt, ...mismatch });
+      const mismatched = hash();
+      expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+      expect(hash()).toBe(mismatched);
+    }
+    write('evidence/review.json', receipt);
+    for (const profile of [
+      { artifact_path: 'wrong.md' },
+      { artifact_sha256: 'b'.repeat(64) },
+      { artifact_kind: 'code' },
+    ]) {
+      write('NEXT_TASKS.json', [
+        { task_id: 'implement', status: 'completed' },
+        {
+          task_id: 'review',
+          status: 'completed',
+          phase_kind: 'review',
+          review_target: 'implement',
+          dependencies: ['implement'],
+          deliverable: 'evidence/REVIEW-implement.md',
+          artifact_review_receipt: 'evidence/review.json',
+          artifact_review_profile: profile,
+        },
+      ]);
+      const mismatch = hash();
+      expect(observe({ status: 'completed' }).candidates[0].action).toBe('inspect_artifact_review');
+      expect(hash()).toBe(mismatch);
+    }
+  });
+  it.each([{ phase_kind: 'review' }, { review_target: 'implement' }])(
+    'requires receipt proof for unprofiled review tasks %j',
+    (reviewKind) => {
+      write('evidence/tests.md', 'Unit tests pass');
+      write('evidence/review.md', 'Review-looking file');
+      write('NEXT_TASKS.json', [
+        { task_id: 'implement', status: 'completed' },
+        {
+          task_id: 'review',
+          status: 'completed',
+          dependencies: ['implement'],
+          deliverable: 'evidence/review.md',
+          ...reviewKind,
+        },
+      ]);
+      expect(observe({ status: 'completed' }).candidates[0]).toMatchObject({
+        action: 'inspect_artifact_review',
+        task_id: 'review',
+      });
+      write('NEXT_TASKS.json', [{ task_id: 'review', status: 'planned', phase_kind: 'review' }]);
+      expect(observe({ status: 'completed' }).candidates[0].reason).toContain('review-task');
+    }
+  );
 });
 
 describe('approval observation projection (in-memory, no approval store writes)', () => {
