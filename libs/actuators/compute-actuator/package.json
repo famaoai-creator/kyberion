@@ -7,7 +7,7 @@
   "types": "../../../dist/libs/actuators/compute-actuator/src/index.d.ts",
   "private": true,
   "scripts": {
-    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "build": "pnpm --dir ../../.. run build:repo",
     "test": "vitest run src/"
   },
   "dependencies": {

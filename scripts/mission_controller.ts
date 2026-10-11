@@ -1531,6 +1531,7 @@ export const runMissionController = defineScript({
 
 if (
   isDirectScript(import.meta.url, 'mission_controller.ts') ||
-  isDirectScript(import.meta.url, 'mission_controller.js')
+  isDirectScript(import.meta.url, 'mission_controller.js') ||
+  isDirectScript(import.meta.url, 'mission_controller.bundle.js')
 )
   void runMissionController();

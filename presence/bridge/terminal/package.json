@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Terminal bridge service workspace for Kyberion runtime sessions",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/terminal/server.js",
+    "build": "pnpm --dir ../../.. run build:repo",
+    "start": "node ../../../dist/presence/bridge/terminal/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
