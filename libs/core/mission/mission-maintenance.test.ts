@@ -502,6 +502,35 @@ describe('direct-CLI usage accounting', () => {
       scope: { task_id: 'impl-review' },
       metadata: { task_id: 'impl-review', provider: 'claude' },
     });
+    expect(result.next_step).toBeUndefined();
+  });
+
+  it('review-task guides close-out when the REVIEW deliverable is still missing', async (ctx) => {
+    const { missionId } = seedMission(
+      ctx,
+      [
+        { task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' },
+        {
+          task_id: 'impl-review',
+          status: 'planned',
+          review_target: 'impl',
+          deliverable: 'evidence/review.md',
+          dependencies: ['impl'],
+        },
+      ],
+      ['evidence/report.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    const result = await recordArtifactReview({
+      missionId,
+      reviewTaskId: 'impl-review',
+      reviewerAgentId: 'claude-reviewer',
+      findings: [],
+      getGitHash: () => 'hash',
+    });
+    expect(result.status).toBe('recorded');
+    expect(result.taskCompleted).toBe(false);
+    expect(result.next_step).toMatch(/evidence\/review\.md.*record-evidence.*impl-review/s);
   });
 });
 

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-import { clearScopeEnv, resolveScopeResolution, writeScopeEnv } from '@agent/core/scope-context';
+import {
+  clearScopeEnv,
+  popScopeEnv,
+  pushScopeEnv,
+  resolveScopeResolution,
+  writeScopeEnv,
+} from '@agent/core/scope-context';
 import type { ScopeContextInput } from '@agent/core/scope-context';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -40,6 +46,17 @@ export const main = defineScript({
       context.print({ ...resolution, persisted_path: filePath });
       return;
     }
+    if (command === 'push') {
+      const { depth } = pushScopeEnv();
+      context.print(`Stashed current scope (depth=${depth}). Restore with \`pnpm scope pop\`.`);
+      return;
+    }
+    if (command === 'pop') {
+      const { depth } = popScopeEnv();
+      const resolution = resolveScopeResolution();
+      context.print({ ...resolution, restored: true, depth });
+      return;
+    }
     if (command === 'show') {
       const resolution = resolveScopeResolution();
       if (context.json) {
@@ -55,7 +72,7 @@ export const main = defineScript({
       return;
     }
     throw new Error(
-      'Usage: pnpm scope show [--json] | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope clear'
+      'Usage: pnpm scope show [--json] | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
     );
   },
 });

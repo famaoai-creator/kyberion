@@ -80,6 +80,34 @@ describe('organization interventions', () => {
     );
   });
 
+  it('allows a same-status re-request on pending_approval decisions', () => {
+    const decision = {
+      version: '1.0.0',
+      decision_id: 'DEC-1',
+      organization_id: 'ORG-1',
+      cadence_id: 'CAD-1',
+      title: 'Proceed?',
+      status: 'pending_approval',
+      decision_owner: 'operator',
+      due_at: '2026-10-01T00:00:00.000Z',
+      options: ['yes', 'no'],
+      follow_up_refs: [],
+      tier: 'public',
+      updated_at: '2026-09-24T00:00:00.000Z',
+    } as OrganizationDecisionRecord;
+    expect(() => transitionOrganizationDecision(decision, 'pending_approval', {})).toThrow(
+      /Invalid decision transition/
+    );
+    const rerequested = transitionOrganizationDecision(decision, 'pending_approval', {
+      chosenOption: 'yes',
+      rationale: 'Re-requesting approval',
+      rerequest: true,
+    });
+    expect(rerequested.status).toBe('pending_approval');
+    expect(rerequested.chosen_option).toBe('yes');
+    expect(rerequested.rationale).toBe('Re-requesting approval');
+  });
+
   it('guides operators with allowed states and the lifecycle on invalid incident transitions', () => {
     const incident = createOrganizationIncident({
       incidentId: 'INC-1',

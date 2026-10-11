@@ -334,6 +334,8 @@ export function usage(): string {
     '  - decision lifecycle: proposed -> pending_approval -> approved -> implemented (side branches:',
     '    proposed/pending_approval -> deferred -> pending_approval; pending_approval -> rejected [terminal]).',
     '    New decisions always start as proposed; approving requires --rationale and --approval-ref <channel:id>.',
+    '    Already pending_approval with no open request? Repeat the transition with --request-approval',
+    '    --chosen-option <o> to open a new approval request without changing status.',
     '  - project create with --organization-id attaches the project automatically; a separate project attach',
     '    is only needed for projects created without an organization.',
     '  - operation tick/execute on confidential/personal tiers require a matching `pnpm scope use --tier <tier>`',

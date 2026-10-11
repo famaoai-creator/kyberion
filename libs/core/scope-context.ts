@@ -1,4 +1,5 @@
 import type { TierLevel } from './types.js';
+import path from 'node:path';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
@@ -320,6 +321,81 @@ export function writeScopeEnv(
 export function clearScopeEnv(env: NodeJS.ProcessEnv = process.env): void {
   const filePath = scopeEnvPath(env);
   if (safeExistsSync(filePath)) safeUnlinkSync(filePath);
+  // An explicit clear discards stashed scopes too — otherwise a later `pop`
+  // would resurrect a scope the operator intentionally cleared.
+  const stackPath = scopeStackPath(env);
+  if (safeExistsSync(stackPath)) safeUnlinkSync(stackPath);
+}
+
+/** Maximum stashed scopes; push beyond this is an operator error, not growth. */
+const SCOPE_STACK_MAX_DEPTH = 10;
+
+/** Sibling stack file for `scope push` / `scope pop` (same runtime floor as scope.env). */
+function scopeStackPath(env: NodeJS.ProcessEnv = process.env): string {
+  return assertSafeRepositoryPath(path.join(path.dirname(scopeEnvPath(env)), 'scope-stack.json'), {
+    allowMissingLeaf: true,
+  });
+}
+
+function readScopeStack(env: NodeJS.ProcessEnv = process.env): Array<string | null> {
+  const stackPath = scopeStackPath(env);
+  if (!safeExistsSync(stackPath)) return [];
+  try {
+    const parsed: unknown = JSON.parse(readTextFile(stackPath));
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((entry) => typeof entry === 'string' || entry === null)
+    )
+      throw new Error('invalid stack');
+    return parsed as Array<string | null>;
+  } catch {
+    throw new Error('[SCOPE_STACK_INVALID] Scope stack file is corrupt; remove it and push again.');
+  }
+}
+
+/**
+ * Stash the current persisted scope (raw file text, or null when absent) so a
+ * temporary `scope use` for tick/execute can be undone with `scope pop`.
+ */
+export function pushScopeEnv(env: NodeJS.ProcessEnv = process.env): { depth: number } {
+  const filePath = scopeEnvPath(env);
+  const stack = readScopeStack(env);
+  if (stack.length >= SCOPE_STACK_MAX_DEPTH)
+    throw new Error(
+      `[SCOPE_STACK_FULL] Scope stack holds ${stack.length} entries (max ${SCOPE_STACK_MAX_DEPTH}) — pop or clear before pushing again.`
+    );
+  stack.push(safeExistsSync(filePath) ? readTextFile(filePath) : null);
+  safeWriteFile(scopeStackPath(env), JSON.stringify(stack), {
+    encoding: 'utf8',
+    mkdir: true,
+    mode: 0o600,
+  });
+  return { depth: stack.length };
+}
+
+/** Restore the most recently pushed scope; throws on an empty stack. */
+export function popScopeEnv(env: NodeJS.ProcessEnv = process.env): {
+  depth: number;
+  restored: boolean;
+} {
+  const stack = readScopeStack(env);
+  const entry = stack.pop();
+  if (entry === undefined)
+    throw new Error(
+      '[SCOPE_STACK_EMPTY] Scope stack is empty — nothing to pop (run `pnpm scope push` first).'
+    );
+  if (entry === null) {
+    clearScopeEnv(env);
+  } else {
+    safeWriteFile(scopeEnvPath(env), entry, { encoding: 'utf8', mkdir: true, mode: 0o600 });
+  }
+  safeWriteFile(scopeStackPath(env), JSON.stringify(stack), {
+    encoding: 'utf8',
+    mkdir: true,
+    mode: 0o600,
+  });
+  resetCurrentScope();
+  return { depth: stack.length, restored: true };
 }
 
 let cachedCurrentScope: ScopeContext | undefined;
