@@ -245,7 +245,8 @@ export function collectTenantPipelineFiles(
       );
     } catch (err: any) {
       // Suspended/archived/invalid tenants are simply not scheduled.
-      logger.info(`[CHRONOS] tenant ${slug} pipelines not scanned: ${err?.message ?? err}`);
+      // Routine skip (logging-policy: quiet by default) — debug, not info.
+      logger.debug(`[CHRONOS] tenant ${slug} pipelines not scanned: ${err?.message ?? err}`);
     }
   }
   return found;
@@ -548,6 +549,35 @@ function syncSchedulesFromAdf(): void {
 // Tick: find due pipelines and run them
 // ---------------------------------------------------------------------------
 
+// Identical await-state scan errors (a corrupt journal that stays corrupt,
+// a schema mismatch that stays mismatched) recur on every tick. Warn once
+// per runId+reason per window and count the suppressed repeats into the
+// next emission so the log stays a signal, not a metronome.
+const awaitScanErrorState = new Map<string, { count: number; lastWarnAt: number }>();
+
+/** Re-warn window for an identical await-state scan error. */
+const AWAIT_SCAN_ERROR_WINDOW_MS = 60 * 60 * 1000;
+
+/** Test hook. */
+export function resetAwaitScanErrorDedupForTests(): void {
+  awaitScanErrorState.clear();
+}
+
+function reportAwaitScanError(runId: string, reason: string | undefined): void {
+  const key = `${runId} ${reason ?? ''}`;
+  const now = Date.now();
+  const seen = awaitScanErrorState.get(key);
+  if (seen && now - seen.lastWarnAt < AWAIT_SCAN_ERROR_WINDOW_MS) {
+    seen.count += 1;
+    return;
+  }
+  const suppressed = seen?.count ?? 0;
+  awaitScanErrorState.set(key, { count: 0, lastWarnAt: now });
+  const suffix =
+    suppressed > 0 ? ` (plus ×${suppressed} identical suppressed in the last hour)` : '';
+  logger.warn(`[CHRONOS] await-state scan error for ${runId}: ${reason}${suffix}`);
+}
+
 async function tickAsLeader(): Promise<void> {
   const now = new Date();
   recordDaemonHeartbeat('chronos-daemon', {
@@ -566,7 +596,7 @@ async function tickAsLeader(): Promise<void> {
       if (outcome.status === 'resumed') {
         logger.info(`[CHRONOS] await-state resume spawned: ${outcome.runId} (${outcome.reason})`);
       } else if (outcome.status === 'error') {
-        logger.warn(`[CHRONOS] await-state scan error for ${outcome.runId}: ${outcome.reason}`);
+        reportAwaitScanError(outcome.runId, outcome.reason);
       }
     }
   } catch (error) {
