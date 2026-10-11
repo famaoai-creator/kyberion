@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=kyberion
-WorkingDirectory=/home/kyberion/kyberion
+WorkingDirectory=%h/kyberion
 Environment=NODE_ENV=production
 Environment=KYBERION_CUSTOMER=customer-slug
 EnvironmentFile=-/etc/kyberion/env

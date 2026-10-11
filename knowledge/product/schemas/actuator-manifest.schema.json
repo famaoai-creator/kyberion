@@ -89,6 +89,16 @@
                   "type": "string"
                 }
               },
+              "bin_by_platform": {
+                "type": "object",
+                "description": "Executable prerequisites selected by the current host platform.",
+                "properties": {
+                  "darwin": { "type": "array", "items": { "type": "string" } },
+                  "linux": { "type": "array", "items": { "type": "string" } },
+                  "win32": { "type": "array", "items": { "type": "string" } }
+                },
+                "additionalProperties": false
+              },
               "lib": {
                 "type": "array",
                 "items": {
@@ -99,6 +109,13 @@
                 "type": "array",
                 "items": {
                   "type": "string"
+                }
+              },
+              "env_platforms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["darwin", "linux", "win32"]
                 }
               }
             }
