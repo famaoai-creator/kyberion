@@ -1,5 +1,5 @@
 ---
-category: Performance
+category: Changed
 ---
 
 - **CI test matrix sharding** — `test (scripts)` (~11min tail) splits into `--shard=1/3…3/3` and `test (integration)` into 2 shards via vitest `--shard`, cutting the per-PR critical path by roughly half.

@@ -24,7 +24,7 @@ runs:
         cache: pnpm
 
     - name: Restore vitest transform cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: node_modules/.vitest-cache
         # Content-hash keyed by vitest — a stale restore only causes misses.
