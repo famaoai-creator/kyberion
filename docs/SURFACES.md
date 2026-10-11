@@ -26,19 +26,19 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 
 スクリーンショット付きの一覧は [README の Surfaces](../README.md#surfaces--one-role-per-screen)(画像: `docs/assets/surfaces/`)。
 
-| サーフェス            | 役割                                                                                                                                                                                           | 答える問い                                     | port | 書き込み                                       | 起動                                                                                                                       |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **concierge(秘書室)** | **CEO秘書** — 依頼・承認・成果・例外(+ `/setup` オンボーディング/拡張設定)                                                                                                                     | 「私は今なにを判断すればよいか」               | 3050 | scoped(依頼・承認・受領・取込・プラグイン承認) | `active-surfaces.json`(`pnpm surfaces reconcile`)                                                                          |
-| **presence-studio**   | **相棒** — ホーム(今日のブリーフィング)・頼む(会話)・進み具合・使い方を見る。`/work` は音声・メール・議事録の実行画面(開発者向けパネルは管制塔へ移設済み、FD-08)                               | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                                                                     |
-| **chronos-mirror-v2** | **管制塔** — 監視と介入(プラン→起動、承認、成果物レビュー、**組織運営モデル+6つの可視化スコープ(organization / home / work_items / operations / missions / governance)による work item 投影**) | 「システムは何をしていて、どこに介入すべきか」 | 3000 | 介入                                           | `pnpm chronos:dev` / `active-surfaces.json`                                                                                |
-| **operator-surface**  | **監査モニタ**(読み取り専用: ミッション・監査チェーン・ヘルス)                                                                                                                                 | 「何が起きたかを証跡で確認したい」             | 3331 | なし(inbox既読化のみ例外)                      | `pnpm --dir presence/displays/operator-surface dev`(マニフェストには `enabled:false` で登録済み。`reconcile` は起動しない) |
-| **computer-surface**  | **作業の手元ミラー** — ブラウザ/ターミナルのいまの手元を映す                                                                                                                                   | 「Kyberion はいま手元で何をしているか」        | 3040 | なし                                           | `active-surfaces.json`                                                                                                     |
+| サーフェス            | 役割                                                                                                                                                                                                                                                                                                                                                        | 答える問い                                     | port | 書き込み                                       | 起動                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **concierge(秘書室)** | **CEO秘書** — 依頼・承認・成果・例外(+ `/setup` オンボーディング/初回セットアップ・SSO 設定、`/management` 組織・プロジェクト管理、`/ingest` 資料の取込)。レールの会社スイッチャーが「決める」・設定・会話を選択した会社(tenant)に絞る。PWA としてインストール可・Web Push 通知(任意)                                                                       | 「私は今なにを判断すればよいか」               | 3050 | scoped(依頼・承認・受領・取込・プラグイン承認) | `active-surfaces.json`(`pnpm surfaces reconcile`)                                                                          |
+| **presence-studio**   | **相棒** — ホーム(今日のブリーフィング)・頼む(会話)・進み具合・使い方を見る。`/work` は音声・メール・議事録の実行画面(開発者向けパネルは管制塔へ移設済み、FD-08)                                                                                                                                                                                            | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                                                                     |
+| **chronos-mirror-v2** | **管制塔** — 監視と介入(プラン→起動、承認、成果物レビュー、**Discussion / Dialogue Room**(`/?section=discussion`。複数エージェントの議論、または目標カードを一緒に固める対話から、承認制の WorkItem・ミッション起動へ)、**組織運営モデル+6つの可視化スコープ(organization / home / work_items / operations / missions / governance)による work item 投影**) | 「システムは何をしていて、どこに介入すべきか」 | 3000 | 介入                                           | `pnpm chronos:dev` / `active-surfaces.json`                                                                                |
+| **operator-surface**  | **監査モニタ**(読み取り専用: ミッション・監査チェーン・ヘルス)                                                                                                                                                                                                                                                                                              | 「何が起きたかを証跡で確認したい」             | 3331 | なし(inbox既読化のみ例外)                      | `pnpm --dir presence/displays/operator-surface dev`(マニフェストには `enabled:false` で登録済み。`reconcile` は起動しない) |
+| **computer-surface**  | **作業の手元ミラー** — ブラウザ/ターミナルのいまの手元を映す                                                                                                                                                                                                                                                                                                | 「Kyberion はいま手元で何をしているか」        | 3040 | なし                                           | `active-surfaces.json`                                                                                                     |
 
 ### サーフェス登録簿(単一の正本)
 
 port・health path・URL 上書き用 env・運用メモ(vocabulary キー)・復旧コマンドは、サーフェス manifest(`knowledge/product/governance/surfaces/*.json`。`active-surfaces.json` はその互換スナップショット)だけに書く。コードは `resolveSurfaceUrl(id)` / `resolveSurfacePort(id)`(`@agent/core/surface/surface-url`)で解決し、`127.0.0.1:<port>` を直書きしない(`urlEnv` が設定されていればそちらが優先)。`surface-roles.json` の port は manifest と一致させる(`tests/surface-registry-consistency.test.ts` が検査する)。
 
-既定で `enabled:false` のサーフェス: 認証情報が必要な `slack-bridge` / `telegram-bridge` / `discord-bridge`、macOS 専用の `imessage-bridge`、および手動起動の `operator-surface` / `personal-pads`(8160。旧個別 pad の 8137 / 8147-8154 は登録しない) / `terminal-hud`(ポートなしの TUI)。新規インストールで `pnpm surfaces reconcile` がこれらを起動することはない。必要になったら認証を整えたうえで `pnpm surfaces enable --surface <id>` で有効化する(`pnpm surfaces setup` が無効行にこのコマンドを表示し、`setup-messaging-bridge` テンプレートも slack / imessage で自動実行する)。
+既定で `enabled:false` のサーフェス: 認証情報が必要な `slack-bridge` / `telegram-bridge` / `discord-bridge`、macOS 専用の `imessage-bridge`、および手動起動の `operator-surface` / `event-intake-surface`(8791。HMAC 認証の受信イベントで常駐 dot を起こす loopback 専用サービス。source は `event-intake-policy.json` で既定無効、ホストごとに `KYBERION_EVENT_INTAKE_SOURCES` で有効化) / `personal-pads`(8160。旧個別 pad の 8137 / 8147-8154 は登録しない) / `terminal-hud`(ポートなしの TUI)。新規インストールで `pnpm surfaces reconcile` がこれらを起動することはない。必要になったら認証を整えたうえで `pnpm surfaces enable --surface <id>` で有効化する(`pnpm surfaces setup` が無効行にこのコマンドを表示し、`setup-messaging-bridge` テンプレートも slack / imessage で自動実行する)。
 
 ### 共有 UI(A2UI kyberion-base)
 
@@ -56,7 +56,7 @@ Chronos の `/api/headless/a2ui/plugin-views` は承認済みプラグインの�
 
 **UI から呼ばない(headless 専用)API**: Chronos の `/api/os/share-grants`(share grant の読み取り)と `/api/headless/*`(`libs/core/headless-surface-contract.ts` が契約を定義する外部・自動化クライアント向けの面)は、Chronos の画面からは呼ばれない。画面を持たない呼び出し元(CLI・他ランタイム・自動化)のための API として意図的に残している。同じ viewer / scope 認可が適用される。
 
-presence-studio の `/ui-gallery` は開発者向けのコンポーネントギャラリー、`/work` は進み具合ページ(`/progress`)から深くリンクされる作業台であり、いずれも共有ナビ(`libs/core/front-desk-nav.ts`)には載せない。ナビのリンク先 URL は surface manifest(`active-surfaces.json`)のポートから導出する。
+presence-studio の `/ui-gallery` は開発者向けのコンポーネントギャラリーであり、共有ナビ(`libs/core/front-desk-nav.ts`)には載せない。`/work`(作業台)はナビの「作業スペース」として載る。ナビのリンク先 URL は surface manifest(`active-surfaces.json`)のポートから導出する。
 
 ## フロントデスク(共有レール)
 
@@ -69,6 +69,16 @@ presence-studio の `/ui-gallery` は開発者向けのコンポーネントギ�
 | **決める**   | いま何を判断する? | 秘書室(concierge)     | `/`         |
 | **進み具合** | どこまで進んだ?   | 相棒(presence-studio) | `/progress` |
 | **設定**     | ふだんは触らない  | 秘書室(concierge)     | `/settings` |
+
+上の 5 項目が中核で、レールには既存機能への行き先も 3 グループ(仕事 / 資料・学習 / 管理。件数の上限なし)として並ぶ。いずれも role gate つき。
+
+| グループ   | 項目(ホスト)                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 仕事       | 上の 4 項目 + 作業スペース(相棒 `/work`)・ミッション・作業一覧(管制塔 `?section=missions` / `work-items`)                              |
+| 資料・学習 | 成果物・ナレッジ・ディスカッション(管制塔)、資料の取込(秘書室 `/ingest`)、はじめての仕事・使い方を見る(相棒 `/first-job` `/help`)      |
+| 管理       | 組織(秘書室 `/management`)、エージェント運用・画面の管理・診断(管制塔 `?section=operations` / `surface-control` / `diagnostics`)、設定 |
+
+管制塔(chronos-mirror-v2)ホストの行き先は、そのエンドポイントの有界チェックに成功した場合だけ表示される(`availableSurfaces`)。
 
 レールの実装は 1 つ(`libs/core/front-desk-nav.ts`)を両サーフェスが読む。ラベル・href・許可(role gate)はすべて `GET /api/front-desk/nav` から、「私は誰でどのテナントを見ているか」は `GET /api/me` から取得する(`?tenant=` クエリは許可集合を狭めるだけで、絶対に拡大しない)。相棒の `/help`(使い方を見る)もこのレールの一部で、5 項目のメニューには含めないヘルプリンクとして両サーフェスから同じ定義で描画される。
 
@@ -90,6 +100,12 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居                                                                                                                                             | 迷ったらまずこれ                                                                                                                                                                                                                              |
 | **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作、パネル 9「連携」で mission→task→agent→child agent の連携ツリーと待ち関係(承認待ち/子の完了待ち/クレーム待ち/ブロック)を表示([README](../presence/displays/terminal-hud/README.md))                                    | 常駐監視向け                                                                                                                                                                                                                                  |
 | MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign)。**discover** (`capability.*` / `skill.*` / knowledge) · **act** (allowlist pipeline / `service.*` / bounded `actuator.invoke`) · **govern** (mission / approval / audit)。モデル: [mcp-facade-model](../knowledge/product/architecture/mcp-facade-model.md) | `pnpm mcp:server`                                                                                                                                                                                                                             |
+
+**共有 Slack チャンネルの `team` モード**: `KYBERION_SURFACE_CHANNEL_MODES` でチャンネルを `team`(`tenant_slug` / `max_tier` / `approvers`)と宣言すると、@メンションまたは参加済みスレッドにだけ応答し、発話者をメンバー registry で組織メンバーに解決して役割に応じた操作(承認 / 依頼 / 質問)だけを許す。ターンは tenant・tier ごとの tool-less runtime で動き、実作業は tenant スコープのミッション提案を経由する。メモリは `覚えて:` / `remember:` の明示時のみ保存する。
+
+**公開 ingress**: `pnpm kyberion ingress probe` / `ingress status` / `ingress up` / `ingress down` は、manifest の `ingress.allowed` で opt-in した 1 つの loopback サーフェス(例: event-intake は `/events` のみ)を公開 HTTPS URL へ出す(承認済み `ingress:expose` が必要。Tailscale Funnel が最初の実プロバイダ)。
+
+**常駐サービス(UI なし)**: `voice-hub`(3032)、`oauth-callback-surface`(8787。Personal tier の接続へトークン交換を完了する loopback 受信)、`terminal-bridge`(4000)、`nexus-daemon`(刺激ルーティング)。いずれも manifest で有効(`enabled:true`)。
 
 ### サテライト(`satellites/`)
 
