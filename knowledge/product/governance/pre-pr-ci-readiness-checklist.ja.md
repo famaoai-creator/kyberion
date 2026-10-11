@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-10-08
+last_updated: 2026-10-11
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -161,6 +161,8 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 | `active/shared/runtime/` に新しい store を追加        | 同じ PR で `storage-retention-catalog.json` に entry を追加し、`pnpm check -- --scope pr --only runtime-store-retention` を緑にする。hot path で増え続ける ledger を全件読みしない（`readJsonLinesCached`）。→ [operations-hygiene-runbook §2](./operations-hygiene-runbook.md)                                                                                                                                  |
 | daemon、常駐 loop、child process                      | in-flight guard、SIGTERM/SIGINT 処理、停止 heartbeat、child の deadline と `'error'` listener を確認する。library は stdout に書かない（`no-console`）。→ [operations-hygiene-runbook §3–§4](./operations-hygiene-runbook.md)                                                                                                                                                                                    |
 | テスト追加・変更                                      | 実行後に `active/shared/tmp/vitest-active-leaks.json` が空であること（CI は strict）。host binary 依存は所有 module の probe で skip する。→ [operations-hygiene-runbook §5](./operations-hygiene-runbook.md)                                                                                                                                                                                                    |
+| `type-ratchet` の上限に触れる実装変更                 | 先に `prettier --check` を通し、**整形後の行数**で上限に収める（pre-commit hook が整形し直すため、手詰めの行数は無効）。helper 抽出等の正直な縮減で対応し、baseline を安易に上げない。                                                                                                                                                                                                                           |
+| golden snapshot に差分が出た変更                      | まずクリーンツリー対照（`git stash -u` → check → `git stash pop`）で環境由来（他セッションの runtime state 等）を証明する。環境由来なら rebaseline しない。意図的な出力変更のみ rebaseline して理由を PR に記録する。                                                                                                                                                                                            |
 | モジュール全体に効く状態の新設・変更                  | 影響面を共有する全テストファイルを列挙実行する（例: `grep -rln "process.stderr" --include="*.test.ts"` → `vitest run` で該当全ファイル）。自分の新規テストが緑なのは必要条件。リセットフックは作成だけでなく既存テストの `beforeEach`/`afterEach` への組込み完了を Done 条件にする。失敗模擬（`throw` するモック）を含むファイルは要注意箇所として必ず含める。                                                   |
 | `libs/core` の振る舞い変更                            | 変更モジュールを import するテストファイル群をファイル全体で実行する（単体 `it` ではなくファイル全体。順序依存・共有状態の検出のため）。                                                                                                                                                                                                                                                                         |
 | mission `evidence/` に書く generator                  | template が `deliverable` として宣言する path に書かない（存在しないときに作るのも禁止）。生成物には別のファイル名を使い、手書き deliverable が byte 単位で残る test を追加する。→ [operations-hygiene-runbook §8](./operations-hygiene-runbook.md)                                                                                                                                                              |

@@ -255,6 +255,85 @@ describe('memory-promotion-queue', () => {
     ]);
   });
 
+  it('merges same candidate_id and scope with different summaries (distill + finish)', () => {
+    const scope = { tier: 'public', mission_id: 'MSN-TEST-IDENTITY' } as const;
+    enqueueMemoryPromotionCandidate(
+      createMemoryPromotionCandidate({
+        candidateId: 'mem-MSN-TEST-IDENTITY-2026_10_11',
+        sourceType: 'mission',
+        sourceRef: 'mission:MSN-TEST-IDENTITY',
+        proposedMemoryKind: 'heuristic',
+        summary: 'Distilled wisdom summary.',
+        evidenceRefs: ['active/missions/MSN-TEST-IDENTITY/evidence/distillation.md'],
+        sensitivityTier: 'public',
+        scope: { ...scope },
+        queuedAt: '2026-10-11T00:00:00.000Z',
+      })
+    );
+    enqueueMemoryPromotionCandidate(
+      createMemoryPromotionCandidate({
+        candidateId: 'mem-MSN-TEST-IDENTITY-2026_10_11',
+        sourceType: 'mission',
+        sourceRef: 'mission:MSN-TEST-IDENTITY',
+        proposedMemoryKind: 'heuristic',
+        summary: 'Finish-time MEMORY.md summary with different words.',
+        evidenceRefs: ['active/missions/MSN-TEST-IDENTITY/evidence/report.md'],
+        sensitivityTier: 'public',
+        scope: { ...scope },
+        queuedAt: '2026-10-11T01:00:00.000Z',
+      })
+    );
+
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.candidate_id).toBe('mem-MSN-TEST-IDENTITY-2026_10_11');
+    expect(rows[0]?.occurrences).toBe(2);
+    expect(rows[0]?.evidence_refs).toEqual([
+      'active/missions/MSN-TEST-IDENTITY/evidence/distillation.md',
+      'active/missions/MSN-TEST-IDENTITY/evidence/report.md',
+    ]);
+    // The retained summary keeps its own hash: re-queueing the original
+    // summary still matches by content hash after an identity merge.
+    enqueueMemoryPromotionCandidate(
+      createMemoryPromotionCandidate({
+        sourceType: 'mission',
+        sourceRef: 'mission:MSN-TEST-IDENTITY',
+        proposedMemoryKind: 'heuristic',
+        summary: 'Distilled wisdom summary.',
+        evidenceRefs: ['active/missions/MSN-TEST-IDENTITY/evidence/again.md'],
+        sensitivityTier: 'public',
+        scope: { tier: 'public', mission_id: 'MSN-TEST-IDENTITY' },
+        queuedAt: '2026-10-11T02:00:00.000Z',
+      })
+    );
+    const again = listMemoryPromotionCandidates();
+    expect(again).toHaveLength(1);
+    expect(again[0]?.occurrences).toBe(3);
+  });
+
+  it('queueMission reuses candidateId and scope across distill and finish calls', () => {
+    const scope = { tier: 'public', mission_id: 'MSN-TEST-FLOW' } as const;
+    queueMissionMemoryPromotionCandidate({
+      missionId: 'MSN-TEST-FLOW',
+      tier: 'public',
+      summary: 'Distilled wisdom summary with enough words.',
+      evidenceRefs: ['active/missions/MSN-TEST-FLOW/evidence/d.md'],
+      scope: { ...scope },
+      candidateId: 'mem-MSN-TEST-FLOW-2026_10_11',
+    });
+    queueMissionMemoryPromotionCandidate({
+      missionId: 'MSN-TEST-FLOW',
+      tier: 'public',
+      summary: 'Finish-time promotable memory with different words.',
+      evidenceRefs: ['active/missions/MSN-TEST-FLOW/evidence/r.md'],
+      scope: { ...scope },
+      candidateId: 'mem-MSN-TEST-FLOW-2026_10_11',
+    });
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.occurrences).toBe(2);
+  });
+
   it('deduplicates against legacy queue rows without content_hash', () => {
     safeWriteFile(
       queuePath,

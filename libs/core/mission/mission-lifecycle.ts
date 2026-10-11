@@ -1134,6 +1134,19 @@ export async function finishMission(
           state.outcome_contract?.requested_result ||
           `Mission ${upperId} completed and yielded reusable operational memory.`,
         evidenceRefs: memoryEvidenceRefs,
+        // R6: share the distill-path identity (candidate_id + scope) so the
+        // enqueue merge finds the distill row instead of appending a duplicate.
+        candidateId: `mem-${upperId}-${nowIso().slice(0, 10).replace(/-/g, '_')}`,
+        ...(state.tenant_slug
+          ? {
+              scope: {
+                tier: state.tier,
+                tenant_slug: state.tenant_slug,
+                mission_id: upperId,
+                ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+              },
+            }
+          : {}),
       });
     if (memorySummary) updateMissionMemorySidecar(safeMemoryPath, queued.candidate_id);
     logger.info(

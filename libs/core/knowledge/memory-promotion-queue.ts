@@ -495,12 +495,30 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
   const normalizedScopeKey = resolveScopeKey(normalizedCandidate.scope);
   const now = normalizedCandidate.last_seen || normalizedCandidate.queued_at || nowIso();
-  const existingIndex = rows.findIndex(
+  const contentMatchIndex = rows.findIndex(
     (row) =>
       String(row.source_ref || '').trim() === normalizedSourceRef &&
       resolveContentHash(row) === contentHash &&
       resolveScopeKey(row.scope) === normalizedScopeKey
   );
+  // Identity fallback (R6): distill and finish queue the same logical
+  // candidate (same candidate_id + scope) with different summaries, so the
+  // content-hash match above never fires and the review layer reports
+  // duplicate_records. Merge on identity too — the read-side groupKey is
+  // already candidate_id + scopeKey, so write and read now agree.
+  const normalizedCandidateId = String(normalizedCandidate.candidate_id || '').trim();
+  const identityMatchIndex =
+    contentMatchIndex >= 0 || normalizedCandidateId === ''
+      ? contentMatchIndex
+      : rows.findIndex(
+          (row) =>
+            String(row.candidate_id || '').trim() === normalizedCandidateId &&
+            String(row.source_ref || '').trim() === normalizedSourceRef &&
+            row.sensitivity_tier === normalizedCandidate.sensitivity_tier &&
+            resolveScopeKey(row.scope) === normalizedScopeKey
+        );
+  const existingIndex = contentMatchIndex >= 0 ? contentMatchIndex : identityMatchIndex;
+  const identityMatched = existingIndex >= 0 && contentMatchIndex < 0;
   if (existingIndex >= 0) {
     const current = rows[existingIndex] as MemoryCandidate;
     const nextOccurrences = normalizeOccurrenceCount(current.occurrences) + 1;
@@ -525,12 +543,16 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       ratification_required: current.ratification_required,
       status: current.status,
       queued_at: current.queued_at || normalizedCandidate.queued_at,
-      content_hash: contentHash,
+      // The retained summary keeps its own hash: adopting the incoming hash
+      // alongside the old summary would leave the row internally inconsistent
+      // (content lookups and audits compare hash against the stored summary).
+      content_hash: identityMatched ? computeContentHash(current) : contentHash,
       occurrences: nextOccurrences,
       last_seen: now,
       ...(current.scope ? { scope: current.scope } : {}),
       ...(current.promotion ? { promotion: current.promotion } : {}),
     };
+    assertPublicTierReferencesSafe(next);
     const updatedValidation = validateMemoryPromotionCandidate(next);
     if (!updatedValidation.valid) {
       throw new Error(
@@ -787,6 +809,7 @@ export function queueMissionMemoryPromotionCandidate(input: {
   summary: string;
   evidenceRefs: Array<string | MemoryEvidenceRef>;
   scope?: MemoryScopeEnvelope;
+  candidateId?: string;
 }): MemoryCandidate {
   const assessment = assessMissionMemoryCandidate({
     missionId: input.missionId,
@@ -805,6 +828,7 @@ export function queueMissionMemoryPromotionCandidate(input: {
     summary: input.summary,
     evidenceRefs: input.evidenceRefs,
     sensitivityTier: input.tier,
+    ...(input.candidateId ? { candidateId: input.candidateId } : {}),
     ...(input.scope ? { scope: input.scope } : {}),
   });
   enqueueMemoryPromotionCandidate(candidate);
