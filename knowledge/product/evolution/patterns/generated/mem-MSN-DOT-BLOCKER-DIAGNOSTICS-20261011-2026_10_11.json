@@ -1,0 +1,27 @@
+{
+  "record_id": "mem-MSN-DOT-BLOCKER-DIAGNOSTICS-20261011-2026_10_11",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Read-only execution status must separate current ownership, history and unknown evidence",
+  "summary": "Scope exact records before projection; retain effect-owner attempt identity after timeout; validate before record folding and keep malformed history from hiding current evidence. Scheduling format and stored running status do not establish liveness.",
+  "candidate_id": "mem-MSN-DOT-BLOCKER-DIAGNOSTICS-20261011-2026_10_11",
+  "evidence_refs": [
+    "active/missions/public/MSN-DOT-BLOCKER-DIAGNOSTICS-20261011/evidence/cli-evaluation-compiled.json",
+    "active/missions/public/MSN-DOT-BLOCKER-DIAGNOSTICS-20261011/evidence/actual-late-effect.json",
+    "active/missions/public/MSN-DOT-BLOCKER-DIAGNOSTICS-20261011/evidence/actual-normal-progression.json",
+    "active/missions/public/MSN-DOT-BLOCKER-DIAGNOSTICS-20261011/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-11T20:48:19.243Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-DOT-BLOCKER-DIAGNOSTICS-20261011"
+  ],
+  "reusable_steps": [
+    "Scope exact records before projection; retain effect-owner attempt identity after timeout; validate before record folding and keep malformed history from hiding current evidence",
+    "Scheduling format and stored running status do not establish liveness"
+  ],
+  "expected_outcome": "Operational status should report what persisted evidence establishes, without performing recovery. Match typed tenant and organization context before projecting identifiers, and keep current, latest-recorded and held attempt references distinct. Finalization can clear the current pointer while effect ownership survives timeout and late writes. Validate base records before latest-record folding, then separately validate execution identities and timestamps. A malformed historical summary must not erase current inventory or cursor findings. Optional JSON readers may silently treat malformed syntax as absence; a read-only diagnostic must distinguish missing cursor, invalid truthy shape, and unknown continuation without changing scheduler behavior. A running or ready snapshot is not proof of liveness or claimability: uncorrelated terminal receipts, leases, approvals and budgets remain relevant. Preserve existing human reconciliation and release gates. Test both JSON and plain CLI output in isolated synthetic roots and compare complete state hashes; exercise a delayed local effect after timeout and normal ready/in_progress/done progression. Keep large store facades within their source-size ratchet by extracting unchanged pure record folding alongside the new read-only inventory logic, rather than raising the threshold.",
+  "source_branch": "feat/dot-blocker-diagnostics-20261011",
+  "source_commit": "59ef44f592de3342eed12914b8971b23ab50d530"
+}
