@@ -8987,6 +8987,11 @@
         "en": "Request human approval to release a quarantined dot WorkItem after verifying its effects (--reason)",
         "ja": "効果を確認した上で、隔離中の dot WorkItem の解放を人間の承認に依頼する（--reason）",
         "qps-ploc": "⟦Řėɋůėşŧ ħůɱȧñ ȧṗṗřőṽȧŀ ŧő řėŀėȧşė ȧ ɋůȧřȧñŧïñėḓ ḓőŧ ẆőřķÏŧėɱ ȧƒŧėř ṽėřïƒẏïñɠ ïŧş ėƒƒėƈŧş (--řėȧşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "cli_cmd_script_mcp_http": {
+        "en": "Validate or explicitly start the default-off HTTP MCP resource server",
+        "ja": "初期無効の HTTP MCP リソースサーバーを検証または明示的に起動",
+        "qps-ploc": "⟦Ṽȧŀïḓȧŧė őř ėẋṗŀïƈïŧŀẏ şŧȧřŧ ŧħė ḓėƒȧůŀŧ-őƒƒ ĦŦŦṖ ⱮƇṖ řėşőůřƈė şėřṽėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       }
     },
     "recorder": {

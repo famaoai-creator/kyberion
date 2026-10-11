@@ -1151,6 +1151,28 @@ export interface BrowserSessionPayload {
   sid: string;
 }
 
+/** Server-internal proof. Neither serialized claims nor a copied principal can recreate it. */
+export interface VerifiedBrowserSessionIdentity {
+  readonly issuer: string;
+  readonly subject: string;
+  readonly expiresAt: string;
+  readonly provider: 'browser-session';
+  readonly source: 'oidc';
+}
+const verifiedBrowserSessionIdentities = new WeakMap<
+  ResolvedPrincipal,
+  VerifiedBrowserSessionIdentity
+>();
+
+/** Only the exact principal returned after session verification carries this evidence. */
+export function verifiedBrowserSessionIdentity(
+  principal: ResolvedPrincipal | undefined
+): VerifiedBrowserSessionIdentity | undefined {
+  return principal?.provider === 'browser-session' && principal.source === 'oidc'
+    ? verifiedBrowserSessionIdentities.get(principal)
+    : undefined;
+}
+
 function signBrowserSessionPayload(payloadB64: string, key: Buffer): string {
   return createHmac('sha256', key)
     .update(`${BROWSER_SESSION_PREFIX}${payloadB64}`)
@@ -1271,11 +1293,22 @@ const browserSessionProvider: AuthnProvider = {
     if (!principal.memberId) {
       throw new AuthnError(403, 'scope_denied', 'browser session subject is not a bound member');
     }
-    return {
+    const verifiedPrincipal: ResolvedPrincipal = {
       ...principal,
       provider: 'browser-session',
       claims: { ...principal.claims, sid: payload.sid },
     };
+    verifiedBrowserSessionIdentities.set(
+      verifiedPrincipal,
+      Object.freeze({
+        issuer: payload.idp_iss,
+        subject: payload.sub,
+        expiresAt: new Date(payload.exp * 1000).toISOString(),
+        provider: 'browser-session',
+        source: 'oidc',
+      })
+    );
+    return verifiedPrincipal;
   },
 };
 

@@ -217,6 +217,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion knowledge sync`                | `pnpm knowledge:sync`               | Run the knowledge sync pipeline                                                                                       |
 | `pnpm kyberion manifests sign`                | `pnpm manifests:sign`               | Sign governed environment manifests                                                                                   |
 | `pnpm kyberion marketing publish-dry-run`     |                                     | Rehearse a marketing publish without sending anything.                                                                |
+| `pnpm kyberion mcp http`                      |                                     | Validate or explicitly start the default-off HTTP MCP resource server                                                 |
 | `pnpm kyberion mcp server`                    | `pnpm mcp:server`                   | Run the MCP server on stdio                                                                                           |
 | `pnpm kyberion media visual-proof-ds04`       |                                     | Generate the DS-04 video visual proof                                                                                 |
 | `pnpm kyberion meeting consent`               | `pnpm meeting:consent`              | Capture voice consent                                                                                                 |
