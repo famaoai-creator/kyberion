@@ -36,6 +36,7 @@ import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {
+  assertPipelineExecutionCurrent,
   registeredEnv,
   tryPermissionFallback,
   finalizePipelineTrace,
@@ -159,6 +160,8 @@ async function recordPipelineFeedback(
 }
 
 export interface ExecutePipelineFileOptions {
+  /** Trusted caller ownership/deadline fence, inherited by nested pipelines. */
+  assertExecutionCurrent?: () => void;
   executionMode?: PipelineExecutionMode;
   /** Validate the exact loaded JSON bytes against the approved caller binding. */
   validateLoadedPipeline?: (pipeline: unknown, sourceText: string) => void;
@@ -197,6 +200,7 @@ export async function executePipelineFile(
   let diagnosticSource: string | undefined;
   if (options.executionMode && !options.validateLoadedPipeline)
     throw new Error('Diagnostic execution requires an approved pipeline snapshot validator');
+  assertPipelineExecutionCurrent(options);
   const pipeline = await readValidatedWorkflowAdf(inputPath, {
     trustResolved: options.trustResolved,
     projectTrustApprovalId: options.projectTrustApprovalId,
@@ -266,6 +270,7 @@ export async function executePipelineFile(
   trace.addArtifact('file', inputPath, 'Pipeline ADF input');
   const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
   if (!options.executionMode) await installReasoningBackendsForSteps(steps);
+  assertPipelineExecutionCurrent(options);
   const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,
@@ -276,6 +281,7 @@ export async function executePipelineFile(
       `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
     );
   }
+  assertPipelineExecutionCurrent(options);
   const beforeAgentStart = await firePipelineLifecycleHooks(
     options.executionMode,
     'before_agent_start',
@@ -301,6 +307,7 @@ export async function executePipelineFile(
       trace,
       pipelinePath: inputPath,
       executionMode: options.executionMode,
+      assertExecutionCurrent: options.assertExecutionCurrent,
       ...(options.executionMode
         ? {
             validateDiagnosticEffect: () =>
@@ -314,6 +321,7 @@ export async function executePipelineFile(
       runPipelineFile: (nestedPath, nestedOptions = {}) =>
         executePipelineFile(nestedPath, {
           ...nestedOptions,
+          assertExecutionCurrent: options.assertExecutionCurrent,
           trustResolved: effectiveTrustResolved,
           projectTrustApprovalId: options.projectTrustApprovalId,
         }),
@@ -345,6 +353,7 @@ export async function executePipelineFile(
   const diagnosticPersisted = options.executionMode
     ? finalizePipelineTrace(trace, !failed, { localOnly: true })
     : undefined;
+  assertPipelineExecutionCurrent(options);
   const settled = await firePipelineLifecycleHooks(options.executionMode, 'task_settled', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,

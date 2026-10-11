@@ -1,3 +1,4 @@
+import { finalizeWorkItemAttempt } from './work-item-attempt.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
@@ -20,6 +21,15 @@ import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
+import { settledWorkEffect, workEffectOwnership } from './work-effect-ownership.js';
+import {
+  assertEffectClaimable,
+  claimedEffectOwnership,
+  prepareEffectSettlement,
+  prepareHumanEffectRelease,
+  effectReleaseEvent,
+  type EffectReleaseInput,
+} from './work-effect-transitions.js';
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import {
   assertOriginalWorkItemIdentity,
@@ -301,41 +311,6 @@ function createWorkItemAttempt(input: {
     ...(input.traceId ? { trace_id: input.traceId } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
-}
-
-function finalizeWorkItemAttempt(
-  current: WorkItem,
-  nextStatus: Exclude<WorkItemAttemptStatus, 'running'>,
-  input: {
-    summary?: string;
-    blockedReason?: string;
-    failureReason?: string;
-    traceId?: string;
-    metadata?: Record<string, unknown>;
-  } = {}
-): { attempts: WorkItemAttempt[]; currentAttemptId?: string; attempt: WorkItemAttempt | null } {
-  const attempts = [...(current.attempts || [])];
-  const now = nowIso();
-  const index = current.current_attempt_id
-    ? attempts.findIndex((attempt) => attempt.run_id === current.current_attempt_id)
-    : attempts.length - 1;
-  if (index < 0) {
-    return { attempts, currentAttemptId: undefined, attempt: null };
-  }
-
-  const previous = attempts[index];
-  const attempt: WorkItemAttempt = {
-    ...previous,
-    status: nextStatus,
-    ended_at: now,
-    ...(input.summary ? { summary: input.summary } : {}),
-    ...(input.blockedReason ? { blocked_reason: input.blockedReason } : {}),
-    ...(input.failureReason ? { failure_reason: input.failureReason } : {}),
-    ...(input.traceId ? { trace_id: input.traceId } : {}),
-    ...(input.metadata ? { metadata: { ...(previous.metadata || {}), ...input.metadata } } : {}),
-  };
-  attempts[index] = attempt;
-  return { attempts, currentAttemptId: undefined, attempt };
 }
 
 function appendWorkItemAttemptEvent(
@@ -770,6 +745,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
   const next = updateItemSnapshot(
     current,
     {
+      ...(workEffectOwnership(current) ? { effect_ownership: workEffectOwnership(current) } : {}),
       ...(input.title ? { title: String(input.title) } : {}),
       ...(input.description ? { description: String(input.description) } : {}),
       status: nextStatus,
@@ -987,6 +963,8 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lea
     );
   }
 
+  const target = assertEffectClaimable(current, currentWorkItems());
+
   const now = nowIso();
   const lease: WorkLease = {
     lease_id: randomId('wlease'),
@@ -1025,6 +1003,13 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lea
     ...(input.actorUserId ? { claimed_by_user_id: input.actorUserId } : {}),
     current_attempt_id: attempt.run_id,
     attempts: [...(current.attempts || []), attempt],
+    effect_ownership: claimedEffectOwnership(
+      current,
+      target,
+      attempt.run_id,
+      input.actorPeerId,
+      now
+    ),
   });
 
   appendLeaseEvent(
@@ -1088,6 +1073,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   }
 
   const now = nowIso();
+  const effectOwnership = prepareEffectSettlement(current, input, now);
   const released: WorkLease = {
     ...activeLease,
     status: 'released',
@@ -1105,6 +1091,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   const next: WorkItem = appendItemSnapshot({
     ...current,
     status: input.nextStatus || 'ready',
+    effect_ownership: effectOwnership,
     version: current.version + 1,
     updated_at: now,
     ...(input.metadata ? { metadata: { ...(current.metadata || {}), ...input.metadata } } : {}),
@@ -1136,6 +1123,17 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     input.expectedVersion
   );
   return { item: next, lease: released };
+}
+
+/** Approval is reloaded inside the same fence as the one-snapshot ownership/status transition. */
+export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkItem {
+  return withCoordinationMutation(() => {
+    const updated = appendItemSnapshot(
+      prepareHumanEffectRelease(currentWorkItem(input.itemId), input, nowIso())
+    );
+    appendEvent(effectReleaseEvent(updated));
+    return updated;
+  });
 }
 
 export function renewWorkItemLease(input: RenewWorkItemLeaseInput): WorkLease {
@@ -1268,6 +1266,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
       const next = appendItemSnapshot({
         ...item,
         status: 'done',
+        effect_ownership: settledWorkEffect(item, 'completed', now),
         version: item.version + 1,
         updated_at: now,
         lease_id: undefined,
@@ -1309,6 +1308,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
 
     const next: WorkItem = appendItemSnapshot({
       ...item,
+      ...(workEffectOwnership(item) ? { effect_ownership: workEffectOwnership(item) } : {}),
       status: shouldPark ? 'blocked' : 'ready',
       version: item.version + 1,
       updated_at: now,

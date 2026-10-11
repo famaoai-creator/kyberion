@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-10
+last_updated: 2026-10-11
 ---
 
 # Operations Hygiene Runbook
@@ -1037,3 +1037,13 @@ Recovery reconciles creation only. Recheck current tenant, charter, approval and
 Digest completion requires a matching terminal execution receipt, current attempt identity and no superseding operator release. Missing or inaccessible evidence stays queued. Notification acceptance means durable outbox/inbox acceptance, not confirmed user delivery. Save a pending digest with frozen content in its tenant-scoped dot state directory before calling the notification port. The shared legacy ledger is metadata-only and read-only. Keep the content snapshot cutoff when delivery is delayed so later execution results remain visible. Stable delivery keys reconcile queue evidence and retained acceptance receipts; unknown external effects remain uncertain. Muted notifications settle as suppressed. Retry only definite no-effect failures, with finite attempts and age, and catch up only the newest scheduled minute inside the bounded window.
 
 When changing these paths, run dot admission/recovery, digest/recovery and operator-notification/inbox suites, including crash-before/after-create, process races, semantic mismatch, archived work, tenant isolation, revoked authority, stale attempts/releases, missed cron, restart, mute and enqueue-before-receipt failures. Preserve intent/acceptance tombstones under review-required retention; deleting them invalidates replay protection. Keep tests isolated from live channels and run them separately from builds and aggregate gates.
+
+## §13 Timed-out effects and executor continuation
+
+A pipeline timeout requests cancellation; it does not prove that an already-running operation stopped. Retain the owning attempt and original declared target independently of archived status, lease expiry, charter presence, proposal priority and age. Both proposal admission and the atomic execution claim refuse overlapping work in the same tenant, including work from the same dot and work queued before the timeout. Targetless work cannot receive cross-dot target protection; adapters must declare their actual effect targets.
+
+The trusted pipeline runner checks the current attempt, lease and halt state at each dispatch boundary and before lifecycle/step hooks. An operation already dispatched may still finish. Do not replay it automatically. Recovery requires existing authenticated, version-bound human approval after confirming execution stopped and reconciling partial effects; archive or missing process liveness is insufficient. Ordinary metadata edits cannot clear ownership. A successful trusted executor receipt or definite pre-effect failure settles only its own current attempt.
+
+Persist the last eligible executor turn before awaiting work, and resume with its stable successor on the next sweep or process restart. Keep per-dot caps and tenant checks. The fairness bound is at most N eligible turns for a stable set of N dots across budgeted sweeps, not a wall-clock deadline: an individual operation may exceed the sweep budget. Diagnostic scoped passes do not modify the global cursor.
+
+Gate with dot-executor-ownership.integration.test.ts, work-effect-ownership.integration.test.ts, the existing human-release integration suite, and tests/fixtures/dot-executor-behavior.mjs. Measure actual isolated writes, conflicting commits, later steps, attempts and restart order; do not substitute mocked invocation counts for effect evidence.
