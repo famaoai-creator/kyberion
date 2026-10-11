@@ -347,6 +347,24 @@ describe('check_stale_dist', () => {
     expect(scan.stale).toEqual([]);
   });
 
+  it('resolves emits below emitPrefix for package-rooted targets', () => {
+    // Root-emitted package trees keep the package source rootDir (e.g. src/)
+    // under dist/libs/<pkg>/ — the emit check must look below that prefix.
+    write('src/a.ts', 'const a = 1;\n');
+    write('dist/src/a.js', '// emitted under the rootDir prefix\n');
+    writeBuildInfo('.tsbuildinfo', {
+      [pathResolver.sharedTmp('check-stale-dist/src/a.ts')]: sha256('const a = 1;\n'),
+    });
+    setMtime('src/a.ts', T_OLD);
+    setMtime('dist/src/a.js', T_OLD);
+    setMtime('.tsbuildinfo', T_NEW);
+
+    const scan = findStaleDistTargets({
+      targets: [spec({ buildInfo: [`${FIXTURE_ROOT}/.tsbuildinfo`], emitPrefix: 'src' })],
+    });
+    expect(scan.stale).toEqual([]);
+  });
+
   it('formats a warning naming the stale target and the rebuild fix', () => {
     write('src/a.ts');
     write('dist/a.js');
