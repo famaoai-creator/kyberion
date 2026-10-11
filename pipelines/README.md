@@ -5,8 +5,9 @@
 ```
 pipelines/
   *.json          ← Kyberion system operation pipelines (self-ops only)
-  *.yml           ← Legacy YAML skill-chain files (system scope)
   fragments/      ← Reusable step groups (core:include targets)
+  browser/        ← Recording-backed browser procedures (draft; lease-gated by the browser extension)
+  config/         ← Config flows (surface-registration, tenant-onboarding, voice-engine-setup)
 
 knowledge/product/pipeline-templates/
                   ← Canonical user-facing pipeline patterns (parameterized, no personal data)
@@ -299,10 +300,10 @@ Pipelines promoted from successful one-off runs (LC-02). Provenance is recorded 
 Step-group building blocks consumed via `core:include`. Fragments contain no personal data and are safe to compose into any pipeline or template.
 
 ```json
-{ "op": "core:include", "params": { "path": "pipelines/fragments/common/log-lifecycle.json" } }
+{ "op": "core:include", "params": { "fragment": "fragments/provider-preflight.json" } }
 ```
 
-See `pipelines/fragments/` for the full catalog.
+See `pipelines/fragments/` for the full catalog and [`fragments/README.md`](./fragments/README.md) for composition rules.
 
 ---
 
