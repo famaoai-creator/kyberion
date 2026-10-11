@@ -1,3 +1,4 @@
+import { latestById, readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
 import { finalizeWorkItemAttempt } from './work-item-attempt.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import * as crypto from 'node:crypto';
@@ -240,17 +241,6 @@ function writeJson(logicalPath: string, value: unknown): void {
       JSON.stringify(value, null, 2)
     );
   });
-}
-
-function latestById<T extends Record<string, any>>(records: T[], key: string): T[] {
-  const index = new Map<string, T>();
-  for (const record of records) {
-    const value = record[key];
-    if (typeof value === 'string' && value) {
-      index.set(value, record);
-    }
-  }
-  return Array.from(index.values());
 }
 
 function currentWorkItems(): WorkItem[] {
@@ -533,6 +523,14 @@ export function listWorkItems(
     const items = applyWorkItemFilters(currentWorkItems(), filter);
     return sortItems(items, 'updated_at');
   });
+}
+
+/** Read-only base-schema inventory; diagnostic consumers validate execution evidence. */
+export function readWorkItemInventory(options: { rootDir?: string } = {}): {
+  present: boolean;
+  items: WorkItem[];
+} {
+  return withCoordinationRoot(options.rootDir, () => readWorkItemInventoryAtPath(itemsPath()));
 }
 
 export function getWorkItem(itemId: string, options: { rootDir?: string } = {}): WorkItem | null {

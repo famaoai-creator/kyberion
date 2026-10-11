@@ -1,0 +1,227 @@
+{
+  "mission": "MSN-DOT-BLOCKER-DIAGNOSTICS-20261011",
+  "baseline_commit": "59ef44f592de3342eed12914b8971b23ab50d530",
+  "entrypoint": "node scripts/run_built.mjs dist/scripts/dot_charters.js status diagnostic-fixture [--json]",
+  "fixtures": "Synthetic isolated root; process file logging disabled. Late port wrote after a valid 1000ms budget; normal port progressed ready/in_progress/done with settled effects. No live providers or notifications.",
+  "before": "Existing executor section showed historical result counts but no current ownership or cursor diagnostics.",
+  "cases": [
+    {
+      "case": "actual-late-effect",
+      "expected": {
+        "inventory": "observed",
+        "reason": "retained_effect_hold",
+        "cursor": "recorded"
+      },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        },
+        { "id": "normal-progression-fixture", "state": "recorded", "reason": "recorded_state" }
+      ],
+      "history_status": "historical",
+      "before_sha256": "75043c71339f1621ba238fa8e6e55f73b31df5b23072cb7428c568d6171ae665",
+      "after_sha256": "75043c71339f1621ba238fa8e6e55f73b31df5b23072cb7428c568d6171ae665",
+      "unchanged": true
+    },
+    {
+      "case": "invalid-cursor-shape",
+      "expected": { "cursor": "blocked", "reason": "retained_effect_hold" },
+      "inventory": "observed",
+      "cursor": "blocked",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        },
+        { "id": "normal-progression-fixture", "state": "recorded", "reason": "recorded_state" }
+      ],
+      "history_status": "historical",
+      "before_sha256": "933f07838201a4b480e59134c783580f1f21d6c2925c1acf2fa418dcd2da974b",
+      "after_sha256": "933f07838201a4b480e59134c783580f1f21d6c2925c1acf2fa418dcd2da974b",
+      "unchanged": true
+    },
+    {
+      "case": "malformed-cursor-json",
+      "expected": { "cursor": "unknown" },
+      "inventory": "observed",
+      "cursor": "unknown",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        },
+        { "id": "normal-progression-fixture", "state": "recorded", "reason": "recorded_state" }
+      ],
+      "history_status": "historical",
+      "before_sha256": "9e235b4cda9a603705eb4ca7933ade7b5a9307843d3d10994c2f2ea730348e6e",
+      "after_sha256": "9e235b4cda9a603705eb4ca7933ade7b5a9307843d3d10994c2f2ea730348e6e",
+      "unchanged": true
+    },
+    {
+      "case": "falsy-cursor",
+      "expected": { "cursor": "unknown" },
+      "inventory": "observed",
+      "cursor": "unknown",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        },
+        { "id": "normal-progression-fixture", "state": "recorded", "reason": "recorded_state" }
+      ],
+      "history_status": "historical",
+      "before_sha256": "342230610d0b0671cb1171e1c014a677dbaf4f22789e6113317decc998d6db80",
+      "after_sha256": "342230610d0b0671cb1171e1c014a677dbaf4f22789e6113317decc998d6db80",
+      "unchanged": true
+    },
+    {
+      "case": "missing-cursor",
+      "expected": { "cursor": "unrecorded" },
+      "inventory": "observed",
+      "cursor": "unrecorded",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        },
+        { "id": "normal-progression-fixture", "state": "recorded", "reason": "recorded_state" }
+      ],
+      "history_status": "historical",
+      "before_sha256": "6d17a6828161ec6f24e0028089190062c545d3a9adaaf5ccb3aa783de1218765",
+      "after_sha256": "6d17a6828161ec6f24e0028089190062c545d3a9adaaf5ccb3aa783de1218765",
+      "unchanged": true
+    },
+    {
+      "case": "superseded-blocked-metadata",
+      "expected": { "reason": "ready_snapshot" },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [{ "id": "ready-fixture", "state": "queued", "reason": "ready_snapshot" }],
+      "history_status": "historical",
+      "before_sha256": "62e88cb52ccff2427b8a40cabe30a91f362764624a81b03272bb0c412eb4bcd9",
+      "after_sha256": "62e88cb52ccff2427b8a40cabe30a91f362764624a81b03272bb0c412eb4bcd9",
+      "unchanged": true
+    },
+    {
+      "case": "running-owner-snapshot",
+      "expected": { "reason": "running_owner_snapshot" },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [
+        {
+          "id": "running-fixture",
+          "current_attempt": "wrun-8dcf7841",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "running",
+          "reason": "running_owner_snapshot"
+        }
+      ],
+      "history_status": "historical",
+      "before_sha256": "092700ab2789c09cb27a47f25ba6a2b484ab8c2a0ce729a0d8987c37f765c5c5",
+      "after_sha256": "092700ab2789c09cb27a47f25ba6a2b484ab8c2a0ce729a0d8987c37f765c5c5",
+      "unchanged": true
+    },
+    {
+      "case": "older-retained-owner",
+      "expected": { "reason": "held_evidence_inconsistent" },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [
+        {
+          "id": "running-fixture",
+          "current_attempt": "new-run",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "unknown",
+          "reason": "held_evidence_inconsistent"
+        }
+      ],
+      "history_status": "historical",
+      "before_sha256": "57716cde9aafd6a79b9f0e814bfb6509f4f0a78f8b6c1fa8bb45373be16f04a1",
+      "after_sha256": "57716cde9aafd6a79b9f0e814bfb6509f4f0a78f8b6c1fa8bb45373be16f04a1",
+      "unchanged": true
+    },
+    {
+      "case": "foreign-scope-excluded",
+      "expected": { "reason": "ready_snapshot" },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [{ "id": "ready-fixture", "state": "queued", "reason": "ready_snapshot" }],
+      "history_status": "historical",
+      "before_sha256": "2d5259dc01de8532410f0bdad79b2dd28ee80a1e1e6b232e2f699377eb57987f",
+      "after_sha256": "2d5259dc01de8532410f0bdad79b2dd28ee80a1e1e6b232e2f699377eb57987f",
+      "unchanged": true
+    },
+    {
+      "case": "malformed-items",
+      "expected": { "inventory": "unknown" },
+      "inventory": "unknown",
+      "cursor": "recorded",
+      "items": [],
+      "history_status": "historical",
+      "before_sha256": "febf755067af413391aebd19162840e37ea5a0b99dd67aaaf2630d9e9be7f7b4",
+      "after_sha256": "febf755067af413391aebd19162840e37ea5a0b99dd67aaaf2630d9e9be7f7b4",
+      "unchanged": true
+    },
+    {
+      "case": "missing-items",
+      "expected": { "inventory": "unknown" },
+      "inventory": "unknown",
+      "cursor": "recorded",
+      "items": [],
+      "history_status": "historical",
+      "before_sha256": "44f1d418c5d0466de4d978614db4b2fee63e2a5f52df9c05b1f82fa319567843",
+      "after_sha256": "44f1d418c5d0466de4d978614db4b2fee63e2a5f52df9c05b1f82fa319567843",
+      "unchanged": true
+    },
+    {
+      "case": "malformed-history",
+      "expected": { "reason": "retained_effect_hold", "history": "unavailable" },
+      "inventory": "observed",
+      "cursor": "recorded",
+      "items": [
+        {
+          "id": "late-effect-fixture",
+          "held_attempt": "wrun-8dcf7841",
+          "state": "blocked",
+          "reason": "retained_effect_hold"
+        }
+      ],
+      "history_status": "unavailable",
+      "before_sha256": "59e04ec39ca3ee781796d82cb977e97ef5a8070f7cf19e67887f7fbbf621feee",
+      "after_sha256": "59e04ec39ca3ee781796d82cb977e97ef5a8070f7cf19e67887f7fbbf621feee",
+      "unchanged": true
+    },
+    {
+      "case": "actual-normal-progression",
+      "items": [
+        {
+          "work_item_id": "normal-progression-fixture",
+          "item_status": "done",
+          "state": "recorded",
+          "reason_code": "recorded_state",
+          "reason": "Persisted item state only; current executor liveness is not established.",
+          "observed_since": "2026-10-11T20:27:55.143Z",
+          "age_ms": 983401,
+          "next": "Review current evidence; this status command never executes or resumes work.",
+          "latest_recorded_attempt_id": "wrun-c7fab733"
+        }
+      ],
+      "before_sha256": "75043c71339f1621ba238fa8e6e55f73b31df5b23072cb7428c568d6171ae665",
+      "after_sha256": "75043c71339f1621ba238fa8e6e55f73b31df5b23072cb7428c568d6171ae665",
+      "unchanged": true
+    }
+  ]
+}
