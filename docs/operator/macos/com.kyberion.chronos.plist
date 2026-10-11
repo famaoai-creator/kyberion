@@ -6,10 +6,10 @@
   <key>Label</key>
   <string>com.kyberion.chronos</string>
   <key>WorkingDirectory</key>
-  <string>/Users/kyberion/kyberion</string>
+  <string>__KYBERION_REPOSITORY_ROOT__</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/pnpm</string>
+    <string>__PNPM_EXECUTABLE_PATH__</string>
     <string>scheduler</string>
   </array>
   <key>EnvironmentVariables</key>
@@ -29,8 +29,8 @@
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/Users/kyberion/Library/Logs/kyberion-chronos.log</string>
+  <string>__OPERATOR_HOME__/Library/Logs/kyberion-chronos.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/kyberion/Library/Logs/kyberion-chronos.err.log</string>
+  <string>__OPERATOR_HOME__/Library/Logs/kyberion-chronos.err.log</string>
 </dict>
 </plist>

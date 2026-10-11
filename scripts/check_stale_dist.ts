@@ -131,9 +131,17 @@ function loadBuildInfoVersions(buildInfoPath: string): Map<string, string> | nul
     const info = parsed.fileInfos[i] as { version?: unknown } | string | undefined;
     const version = typeof info === 'string' ? info : info?.version;
     if (typeof version !== 'string') continue;
-    versions.set(path.resolve(baseDir, name), version);
+    versions.set(pathKey(path.resolve(baseDir, name)), version);
   }
   return versions;
+}
+
+function pathKey(filePath: string): string {
+  const resolved = path.resolve(filePath);
+  // TypeScript lowercases paths in Windows tsbuildinfo while directory scans
+  // retain the on-disk spelling. Windows paths are case-insensitive, so use
+  // the same identity for buildinfo and scanned source paths.
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function hashFile(filePath: string): string | null {
@@ -228,7 +236,7 @@ function evaluateTarget(
     const versions = buildInfoCache.get(buildInfoPath)!;
     if (!versions) continue;
     const tracked = [...versions.keys()].filter((filePath) =>
-      filePath.startsWith(sourceRoot + path.sep)
+      filePath.startsWith(pathKey(sourceRoot + path.sep))
     );
     if (tracked.length === 0) continue;
     // Only a buildinfo that actually tracks this sourceRoot may join the
@@ -238,7 +246,7 @@ function evaluateTarget(
     buildInfoMs = Math.max(buildInfoMs, thisBuildInfoMs);
     const trackedSet = new Set(tracked);
     for (const filePath of source.files) {
-      if (!trackedSet.has(filePath)) {
+      if (!trackedSet.has(pathKey(filePath))) {
         // A file absent from fileInfos either arrived after this build, or
         // sits outside the program that wrote this buildinfo — the shared
         // `dist/.tsbuildinfo` mixes both build:repo and build:actuators
@@ -257,7 +265,7 @@ function evaluateTarget(
           detail: 'source file has no tsbuildinfo entry — newer than the last build',
         };
       }
-      if (hashFile(filePath) !== versions.get(filePath)) {
+      if (hashFile(filePath) !== versions.get(pathKey(filePath))) {
         return {
           ...base,
           source_file: toRepoRelative(filePath),
@@ -270,9 +278,9 @@ function evaluateTarget(
     // re-emitted (incremental emit after a partial dist wipe) leaves the
     // recorded output absent on disk — the freshness check above cannot see
     // that. Verify every tracked source's expected .js exists.
-    const onDisk = new Set(source.files);
+    const onDisk = new Set(source.files.map(pathKey));
     for (const filePath of tracked) {
-      if (!onDisk.has(filePath)) continue;
+      if (!onDisk.has(pathKey(filePath))) continue;
       const emitted = path.join(
         distRoot,
         spec.emitPrefix || '',

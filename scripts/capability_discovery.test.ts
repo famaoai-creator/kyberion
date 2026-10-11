@@ -75,13 +75,18 @@ describe('capability_discovery', () => {
         capabilities: [],
       })
     );
-    fs.symlinkSync(path.dirname(target), path.dirname(linked), 'dir');
+    fs.symlinkSync(
+      path.dirname(target),
+      path.dirname(linked),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
 
     try {
       const report = discoverCapabilities({ actuatorsDir: path.join(root, 'actuators') });
       expect(report.actuators).toEqual([]);
     } finally {
-      fs.unlinkSync(path.dirname(linked));
+      if (process.platform === 'win32') fs.rmdirSync(path.dirname(linked));
+      else fs.unlinkSync(path.dirname(linked));
       safeRmSync(root, { recursive: true, force: true });
     }
   });
@@ -118,6 +123,28 @@ describe('capability_discovery', () => {
       missingEnv: [],
       available: true,
     });
+  });
+
+  it('checks only the executable prerequisites for the selected platform', () => {
+    const capability = {
+      op: 'set',
+      platforms: ['darwin', 'win32', 'linux'],
+      requirements: {
+        bin_by_platform: {
+          darwin: ['security', 'swift'],
+          win32: ['powershell.exe'],
+        },
+      },
+    };
+
+    const darwin = evaluateCapability(capability, 'darwin', (bin) => bin === 'security');
+    expect(darwin).toMatchObject({ missingBins: ['swift'], available: false });
+
+    const win32 = evaluateCapability(capability, 'win32', (bin) => bin === 'powershell.exe');
+    expect(win32).toMatchObject({ missingBins: [], available: true });
+
+    const linux = evaluateCapability(capability, 'linux', () => false);
+    expect(linux).toMatchObject({ missingBins: [], available: true });
   });
 
   it('renders missing env in red in the human-readable report', () => {

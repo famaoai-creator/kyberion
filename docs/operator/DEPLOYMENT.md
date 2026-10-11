@@ -115,9 +115,10 @@ If Kyberion should auto-start on login, install a launchd plist:
 #   docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist
 #   docs/operator/macos/com.kyberion.chronos.plist
 #
-# Copy them to ~/Library/LaunchAgents/, then edit:
-#   - WorkingDirectory
-#   - ProgramArguments[0] if pnpm is not /opt/homebrew/bin/pnpm
+# Copy them to ~/Library/LaunchAgents/, replace every __...__ placeholder, then edit:
+#   - __KYBERION_REPOSITORY_ROOT__ with the checkout path
+#   - __PNPM_EXECUTABLE_PATH__ with the absolute path returned by `command -v pnpm`
+#   - __OPERATOR_HOME__ with the operator's home directory
 #   - KYBERION_CUSTOMER
 #   - log paths
 cp docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist ~/Library/LaunchAgents/
@@ -172,11 +173,11 @@ pnpm build
 
 Linux has no built-in OS keychain equivalent to macOS Keychain. Use one of:
 
-1. **`pass` + GPG** — GNU password store, supported by `secret-actuator` if configured.
-2. **systemd `LoadCredential=`** — encrypted secrets at unit startup.
-3. **`customer/{slug}/secrets.json`** — only if the file is on an encrypted volume and accessible to the kyberion user only (`chmod 600`).
+1. **systemd `LoadCredential=`** — secrets are exposed to the service as credential files; map the needed values into the process environment with a protected wrapper or environment file.
+2. **`secret-actuator` opt-in file backend** — set `KYBERION_ALLOW_FILE_SECRETS=1`; Kyberion stores this backend under `vault/secrets/` with owner-only permissions.
+3. **Environment variables** — inject service-scoped values through a protected systemd environment file.
 
-For production, prefer option 1 or 2.
+For production, prefer `LoadCredential=` or a protected environment file. The opt-in file backend is intended for hosts where its local file permissions and storage protection meet the operator's policy.
 
 ### 2.4 systemd units
 
@@ -199,8 +200,9 @@ sudo journalctl -u kyberion-chronos -f
 sudo systemctl status kyberion-daemon-watchdog.timer
 ```
 
-Edit `User`, `WorkingDirectory`, `KYBERION_CUSTOMER`, `EnvironmentFile`, and the `pnpm`
-path before installing if the defaults do not match the target host. Repeat the same
+Edit `User`, `KYBERION_CUSTOMER`, `EnvironmentFile`, and the `pnpm` executable path
+before installing if the defaults do not match the target host. `%h/kyberion` resolves
+the selected service user's home directory. Repeat the same
 pattern for `mission:orchestrator` if needed.
 
 ### 2.5 Verify
@@ -213,7 +215,7 @@ pnpm kyberion doctor
 
 ## Windows Workstation
 
-For: Windows operators and developers using PowerShell with the Windows Package Manager (`winget`).
+For: Windows operators and developers using PowerShell with the Windows Package Manager (`winget`). The schedule actuator stores and fires declarations on Windows, but Kyberion does not currently provide a Windows service installer for the unattended Chronos daemon; run it under an operator-managed service host if persistent execution is required. The ADF Replay Chrome Native Messaging host installer supports macOS and Linux only; it is not currently available on Windows.
 
 ### Prerequisites
 

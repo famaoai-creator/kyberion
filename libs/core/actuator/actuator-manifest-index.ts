@@ -7,6 +7,8 @@ import { logger } from '../core.js';
 
 export interface ActuatorManifestCapabilityRequirements {
   bin?: string[];
+  /** Executable prerequisites selected by host platform (e.g. swift on macOS, PowerShell on Windows). */
+  bin_by_platform?: Partial<Record<'darwin' | 'linux' | 'win32', string[]>>;
   lib?: string[];
   env?: string[];
   /** When set, `env` is required only on these platforms (e.g. Linux file-secret opt-in). */

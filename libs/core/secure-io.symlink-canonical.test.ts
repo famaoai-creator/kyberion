@@ -791,7 +791,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.existsSync(abs(`${scratchRel}/not-yet.log`))).toBe(false);
   });
 
-  it('refuses to chmod a Unix socket, and never chmods a protected file through a flipped one', async () => {
+  it.skipIf(process.platform === 'win32')('refuses to chmod a Unix socket', async () => {
     const sock = abs(`${scratchRel}/sk`);
     const server = net.createServer();
     // Bind by a short relative path (sun_path is ~104 bytes); bind is synchronous.
@@ -805,41 +805,56 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     await new Promise<void>((resolve) => server.once('listening', () => resolve()));
     try {
       expect(() => safeChmodSync(`${scratchRel}/sk`, 0o600)).toThrow(/not a file or directory/);
-      const secretPath = path.join(abs(personalRel), 'secret.txt');
-      fs.chmodSync(secretPath, 0o644);
-      // `sw` flips between the socket itself (a hard link to it) and a
-      // symlink to the secret: a chmod by path after an identity pin follows it.
-      const sw = abs(`${scratchRel}/sw`);
-      fs.linkSync(sock, sw);
-      const flipper = `
+    } finally {
+      server.close();
+    }
+  });
+
+  it('never chmods a protected file through a path flipped between allowed and protected directories', async () => {
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    const allowedDir = abs(`${scratchRel}/allowed-dir`);
+    fs.mkdirSync(allowedDir, { recursive: true });
+    fs.writeFileSync(path.join(allowedDir, 'secret.txt'), 'allowed');
+    fs.chmodSync(secretPath, 0o644);
+    // Windows reports only the readonly bit through Node's POSIX mode view;
+    // compare against the platform's actual baseline instead of assuming 0644.
+    const secretModeBefore = fs.statSync(secretPath).mode & 0o777;
+    const scratchModeBefore = fs.statSync(abs(scratchRel)).mode & 0o700;
+    // Directory links need no Developer Mode on Windows when created as
+    // junctions. Flip the parent between an allowed directory and the
+    // protected directory while chmod resolves its child path.
+    const sw = abs(`${scratchRel}/sw`);
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+    fs.symlinkSync(allowedDir, sw, linkType);
+    const flipper = `
         const fs = require('node:fs');
-        const [sw, sock, secret] = process.argv.slice(1);
+        const [sw, allowed, secret, linkType] = process.argv.slice(1);
         const end = Date.now() + 9000;
         let i = 0;
         while (Date.now() < end) {
           const tmp = sw + '.tmp';
           try {
             fs.rmSync(tmp, { force: true });
-            if (i++ % 2) fs.linkSync(sock, tmp);
-            else fs.symlinkSync(secret, tmp);
+            fs.symlinkSync(i++ % 2 ? allowed : secret, tmp, linkType);
             fs.renameSync(tmp, sw);
           } catch {}
         }`;
-      const child = safeSpawn(process.execPath, ['-e', flipper, sw, sock, secretPath], {
+    const child = safeSpawn(
+      process.execPath,
+      ['-e', flipper, sw, allowedDir, abs(personalRel), linkType],
+      {
         stdio: 'ignore',
-      });
-      let tries = 0;
-      try {
-        tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o600));
-      } finally {
-        await stopFlipper(child);
       }
-      expect(tries).toBeGreaterThan(50);
-      expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
-      expect(fs.statSync(abs(scratchRel)).mode & 0o700).toBe(0o700);
+    );
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw/secret.txt`, 0o600));
     } finally {
-      server.close();
+      await stopFlipper(child);
     }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.statSync(secretPath).mode & 0o777).toBe(secretModeBefore);
+    expect(fs.statSync(abs(scratchRel)).mode & 0o700).toBe(scratchModeBefore);
   }, 20000);
 
   it('never creates in, nor deletes from, a protected directory flipped in as a parent', async () => {

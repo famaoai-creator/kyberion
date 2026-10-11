@@ -225,9 +225,9 @@ function formatGuardedScriptHelp(scriptCommand: CliScriptCommand): string {
   ].join('\n');
 }
 
-/** The pnpm launcher for this platform (Windows ships a `pnpm.cmd` shim, not `pnpm`). */
+/** The pnpm launcher for this platform (use the native Windows executable, not a .cmd shim). */
 export function pnpmExecutable(platform: NodeJS.Platform = process.platform): string {
-  return platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  return platform === 'win32' ? 'pnpm.exe' : 'pnpm';
 }
 
 /**
