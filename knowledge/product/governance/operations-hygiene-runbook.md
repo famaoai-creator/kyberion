@@ -1047,3 +1047,13 @@ The trusted pipeline runner checks the current attempt, lease and halt state at 
 Persist the last eligible executor turn before awaiting work, and resume with its stable successor on the next sweep or process restart. Keep per-dot caps and tenant checks. The fairness bound is at most N eligible turns for a stable set of N dots across budgeted sweeps, not a wall-clock deadline: an individual operation may exceed the sweep budget. Diagnostic scoped passes do not modify the global cursor.
 
 Gate with dot-executor-ownership.integration.test.ts, work-effect-ownership.integration.test.ts, the existing human-release integration suite, and tests/fixtures/dot-executor-behavior.mjs. Measure actual isolated writes, conflicting commits, later steps, attempts and restart order; do not substitute mocked invocation counts for effect evidence.
+
+## §14 Mission-flow observations are advisory
+
+Mission status and triage share `collectMissionFlowProjection`. Keep this path read-only: no runtime startup, model calls, approval expiry writes, task repair, gate execution, or lifecycle mutation. A candidate is neither permission nor completion evidence; the existing governed facade must revalidate state and authority when executing it. Legacy triage lifecycle categories and command examples are compatibility hints, not readiness decisions.
+
+Missing or malformed task boards must stay unknown rather than becoming zero pending tasks. Reuse the dispatcher's normalized graph validation and exact dependency-completion rule. Preserve recorded gate timestamps, distinguish unknown chronology, and do not turn a historical pass or override into current authorization. Structural completion checks may expose evidence gaps; they cannot establish external merge or deployment.
+
+Associate approvals only through matching explicit scope, never a mission-name-only legacy record. Pending and expired requests are observations; an approved record is not thereby usable, and a successfully applied request must not later demand another decision merely because its expiry passed. Report incomplete legacy coverage. A team roster or historical launch is not runtime readiness; leave unobserved readiness unknown.
+
+Regression gate: run `libs/core/mission/mission-flow-projection.test.ts` and `mission-triage.test.ts`, then execute the status read model and CLI on isolated synthetic stores. Compare recursive file hashes before and after reads, check repeated and transitioned observations, and distinguish real-store evaluations from in-memory approval fixtures. Verify the existing terminal-HUD consumer receives the same next-action projection.
