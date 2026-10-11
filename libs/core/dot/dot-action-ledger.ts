@@ -24,9 +24,19 @@ export interface DotActionLedgerDeps {
   now?: () => Date;
 }
 
-export type DotActionStatus = 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
+export type DotActionStatus =
+  'admitted' | 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
 
 export interface DotActionRecord {
+  /** Immutable generic operation identity, persisted before an executable item exists. */
+  admission?: {
+    scope_hash: string;
+    semantic_hash: string;
+    operation_key?: string;
+    ordinal: number;
+    authority_role: string;
+    proposal: DotProposal;
+  };
   recovery_receipt?: FrontDeskExecutionRecoveryReceipt;
   front_desk_execution?: FrontDeskExecutionBinding;
   action_ref: string;
@@ -67,6 +77,23 @@ export interface DotActionRecord {
   at: string;
 }
 
+export function isDotAdmissionIdentity(
+  value: unknown
+): value is NonNullable<DotActionRecord['admission']> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    ['scope_hash', 'semantic_hash', 'authority_role'].every(
+      (key) => typeof row[key] === 'string' && Boolean(row[key])
+    ) &&
+    Boolean(row.proposal && typeof row.proposal === 'object' && !Array.isArray(row.proposal)) &&
+    Number.isInteger(row.ordinal) &&
+    Number(row.ordinal) >= 0 &&
+    (row.operation_key === undefined ||
+      (typeof row.operation_key === 'string' && Boolean(row.operation_key)))
+  );
+}
+
 function ledgerFile(deps: DotActionLedgerDeps): string {
   return path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_ACTION_LEDGER_PATH);
 }
@@ -99,7 +126,9 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
       ].every((key) => typeof value[key] === 'string' && (value[key] as string).trim()) ||
       !Number.isFinite(Date.parse(value.at as string)) ||
       !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(String(value.work_shape)) ||
-      !['dispatched', 'parked', 'refused', 'shadow', 'declined'].includes(String(value.status)) ||
+      !['admitted', 'dispatched', 'parked', 'refused', 'shadow', 'declined'].includes(
+        String(value.status)
+      ) ||
       !['decision', 'gate_decision', 'floor'].every(
         (key) =>
           value[key] === undefined || ['auto', 'notify', 'approve'].includes(String(value[key]))
@@ -115,6 +144,7 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
         'rationale',
         'disposition_by',
       ].every((key) => value[key] === undefined || typeof value[key] === 'string') ||
+      (value.admission !== undefined && !isDotAdmissionIdentity(value.admission)) ||
       (value.front_desk_execution !== undefined &&
         !parseFrontDeskExecutionBinding(value.front_desk_execution)) ||
       (value.recovery_receipt !== undefined &&

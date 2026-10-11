@@ -1,3 +1,4 @@
+import { appendActionRecord } from './dot-action-ledger.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
@@ -38,6 +39,7 @@ import {
   maybeSendDotDigest,
   runDotHousekeeping,
   settleDotParkedActions,
+  reconcileDotAdmissions,
   supersedeDotParkedAction,
   type DotDispatchDeps,
 } from './dot-dispatch.js';
@@ -826,5 +828,83 @@ describe('supersedeDotParkedAction', () => {
     expect(supersedeDotParkedAction(CHARTER, parked.action_ref, by, h.deps)).toBeUndefined();
     expect(currentDotActions('org-ops', h.deps)[0].status).toBe('parked');
     expect(h.audits.at(-1)).toMatchObject({ operation: 'supersede_skipped', result: 'denied' });
+  });
+});
+
+describe('admission approval recovery and wake dedupe', () => {
+  it('recovers approval-required allowed:false after a valid human decision', () => {
+    const h = harness('approve', {}, { allowed: false });
+    const create = h.deps.createWorkItem!;
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', approval('approved'));
+    h.deps.createWorkItem = () => {
+      throw new Error('interrupted before creation');
+    };
+    expect(settleDotParkedActions(CHARTER, h.deps)[0].status).toBe('admitted');
+    h.deps.createWorkItem = create;
+    expect(reconcileDotAdmissions(CHARTER, h.deps)[0].status).toBe('dispatched');
+    expect(h.items).toHaveLength(1);
+  });
+  it('binds a pre-upgrade parked row before a crash and recovers it', () => {
+    const h = harness('approve', {}, { allowed: false });
+    const parked = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    const { admission: _identity, ...legacy } = parked;
+    appendActionRecord(legacy, h.deps);
+    h.approvals.set('req-1', approval('approved'));
+    const create = h.deps.createWorkItem!;
+    h.deps.createWorkItem = () => {
+      throw new Error('before creation');
+    };
+    expect(settleDotParkedActions(CHARTER, h.deps)[0]).toMatchObject({
+      status: 'admitted',
+      action_ref: parked.action_ref,
+      admission: { authority_role: CHARTER.authority.authority_role },
+    });
+    h.deps.createWorkItem = create;
+    expect(reconcileDotAdmissions(CHARTER, h.deps)[0].status).toBe('dispatched');
+    expect(h.items).toHaveLength(1);
+  });
+  it.each(['revoked', 'unavailable'] as const)('holds approved admission after %s', (kind) => {
+    const h = harness('approve', {}, { allowed: false });
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', approval('approved'));
+    const create = h.deps.createWorkItem!;
+    h.deps.createWorkItem = () => {
+      throw new Error('interrupted');
+    };
+    settleDotParkedActions(CHARTER, h.deps);
+    h.deps.createWorkItem = create;
+    if (kind === 'revoked') h.approvals.set('req-1', approval('rejected'));
+    else
+      h.deps.gate = (input) =>
+        gateResult(input, 'approve', {
+          allowed: false,
+          score: Infinity,
+          policyVersion: 'unavailable',
+        });
+    expect(reconcileDotAdmissions(CHARTER, h.deps)[0].status).toBe('admitted');
+    expect(h.items).toHaveLength(0);
+  });
+  it('one unchanged pending proposal across wakes settles into one WorkItem', () => {
+    const h = harness('approve');
+    const first = dispatchDotProposals(CHARTER, [PROPOSAL], { ...h.deps, operationKey: 'wake-one' })
+      .records[0];
+    expect(
+      dispatchDotProposals(CHARTER, [PROPOSAL], { ...h.deps, operationKey: 'wake-two' }).duplicates
+    ).toEqual([first.action_ref]);
+    expect(h.routed).toHaveLength(1);
+    h.approvals.set('req-1', approval('approved'));
+    expect(settleDotParkedActions(CHARTER, h.deps)).toHaveLength(1);
+    expect(h.items).toHaveLength(1);
+  });
+  it('a new wake never re-asks an unchanged recent rejection', () => {
+    const h = harness('approve');
+    dispatchDotProposals(CHARTER, [PROPOSAL], { ...h.deps, operationKey: 'wake-one' });
+    h.approvals.set('req-1', approval('rejected'));
+    settleDotParkedActions(CHARTER, h.deps);
+    expect(
+      dispatchDotProposals(CHARTER, [PROPOSAL], { ...h.deps, operationKey: 'wake-two' }).records
+    ).toHaveLength(0);
+    expect(h.routed).toHaveLength(1);
   });
 });

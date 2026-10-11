@@ -1005,3 +1005,13 @@ When a defect class not listed here recurs:
 3. Record the incident in the mission's retrospective.
 
 A rule without an enforcing check is a candidate for the next gate.
+
+## §12 Dot admission and operator digest evidence
+
+A dispatched proposal is queued work, never evidence that its effects finished. Generic dot operations bind the tenant/dot scope, originating wake key and original proposal ordinal before publishing a deterministic WorkItem. The admitted record must survive every interruption until reconciliation. Changed semantics under an existing operation identity fail closed. A new intentional wake has a new operation key; identical work repeats only after matching successful terminal evidence. Unresolved admission, queued/running work and uncertain archived work never expire into automatic retries. Pending or rejected approval proposals retain their semantic suppression window across wake keys.
+
+Recovery reconciles creation only. Recheck current tenant, charter, approval and gate authority before creating a missing item. Reuse immutable creation identity for existing, running, done or archived items; never reopen or retry uncertain effects. Pre-upgrade parked work binds an admission before creation; an existing legacy random-ID item is adopted only after verifying its original creation snapshot. Handoff wakes use the same action identity.
+
+Digest completion requires a matching terminal execution receipt, current attempt identity and no superseding operator release. Missing or inaccessible evidence stays queued. Notification acceptance means durable outbox/inbox acceptance, not confirmed user delivery. Save a pending digest with frozen content in its tenant-scoped dot state directory before calling the notification port. The shared legacy ledger is metadata-only and read-only. Keep the content snapshot cutoff when delivery is delayed so later execution results remain visible. Stable delivery keys reconcile queue evidence and retained acceptance receipts; unknown external effects remain uncertain. Muted notifications settle as suppressed. Retry only definite no-effect failures, with finite attempts and age, and catch up only the newest scheduled minute inside the bounded window.
+
+When changing these paths, run dot admission/recovery, digest/recovery and operator-notification/inbox suites, including crash-before/after-create, process races, semantic mismatch, archived work, tenant isolation, revoked authority, stale attempts/releases, missed cron, restart, mute and enqueue-before-receipt failures. Preserve intent/acceptance tombstones under review-required retention; deleting them invalidates replay protection. Keep tests isolated from live channels and run them separately from builds and aggregate gates.

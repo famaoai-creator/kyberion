@@ -123,7 +123,8 @@ function dispatchDeps(): DotDispatchDeps {
       shadow: false,
       notified: false,
     }),
-    createWorkItem: (input) => createWorkItem(input),
+    // This fixture isolates ledgers via rootDir and WorkItems via its existing store namespace.
+    createWorkItem: ({ rootDir: _ledgerRoot, ...input }) => createWorkItem(input),
     countOpenWorkItems: countOpen,
     listCharters: () => [charter],
     audit: () => {},

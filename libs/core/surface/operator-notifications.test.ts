@@ -47,6 +47,11 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
   },
+  safePublishExclusiveFileSync: (filePath: string, data: string) => {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, data, { flag: 'wx' });
+  },
+  safeUnlinkSync: (filePath: string) => fs.unlinkSync(filePath),
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
@@ -99,7 +104,16 @@ vi.mock('../core.js', () => ({
 }));
 
 const enqueue = vi.hoisted(() => vi.fn());
-vi.mock('./surface-coordination-store.js', () => ({ enqueueSurfaceOutboxMessage: enqueue }));
+const queuedMessages = vi.hoisted(() => vi.fn(() => [] as Array<{ deduplication_key: string }>));
+vi.mock('./surface-coordination-store.js', () => ({
+  enqueueSurfaceOutboxMessage: enqueue,
+  listSurfaceOutboxMessages: queuedMessages,
+}));
+const webpush = vi.hoisted(() => ({
+  webPushWouldDeliver: vi.fn(() => false),
+  sendWebPushForEvent: vi.fn(async () => undefined),
+}));
+vi.mock('./web-push.js', () => webpush);
 
 const imessage = vi.hoisted(() => vi.fn());
 vi.mock('../imessage-bridge.js', () => ({ sendIMessage: imessage }));
@@ -134,6 +148,9 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     mod = await import('./operator-notifications.js');
     mod.resetOperatorNotificationRateLimiter();
     enqueue.mockReset();
+    queuedMessages.mockReset().mockReturnValue([]);
+    webpush.webPushWouldDeliver.mockReset().mockReturnValue(false);
+    webpush.sendWebPushForEvent.mockClear();
     imessage.mockReset();
     inbox.addInboxEntry.mockReset();
     inbox.listInboxEntries.mockReset().mockReturnValue([]);
@@ -380,6 +397,144 @@ describe('operator notifications (E2E-04 Task 2)', () => {
       expect(() => mod.saveNotificationPreferences({ urgent_events: ['bogus'] as never })).toThrow(
         'Invalid notification preferences'
       );
+    });
+  });
+  describe('durable notification receipts', () => {
+    const payload = { title: 'digest', body: 'one decision', correlation_id: 'DIGEST-1' };
+    const options = { deduplicationKey: 'digest-1' };
+
+    it('distinguishes muted, test-suppressed, no-route and rate-limit outcomes', () => {
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload)).toMatchObject({
+        status: 'retryable',
+        reason: 'no_channel_configured',
+      });
+      writePrefs({ per_event: { decision_digest: 'mute' } });
+      expect(
+        mod.notifyOperatorWithReceiptSync('decision_digest', payload, {
+          route: { surface: 'slack', target: 'C1' },
+        })
+      ).toMatchObject({ status: 'suppressed', reason: 'muted' });
+      delete process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS;
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload)).toMatchObject({
+        status: 'suppressed',
+        reason: 'test_notifications_disabled',
+      });
+      process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS = '1';
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload).status).toBe('accepted');
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload)).toMatchObject({
+        status: 'retryable',
+        reason: 'rate_limited',
+      });
+    });
+
+    it('survives module restart and drained outbox without enqueueing twice', async () => {
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'accepted'
+      );
+      expect(enqueue.mock.calls[0][0].deduplicationKey).toMatch(/^operator:[a-f0-9]{64}$/);
+      vi.resetModules();
+      mod = await import('./operator-notifications.js');
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options)).toMatchObject({
+        status: 'accepted',
+        reason: 'durable_replay',
+      });
+      expect(enqueue).toHaveBeenCalledTimes(1);
+      expect(
+        mod.notifyOperatorWithReceiptSync(
+          'decision_digest',
+          { ...payload, body: 'changed' },
+          options
+        )
+      ).toMatchObject({ status: 'uncertain', reason: 'deduplication_identity_conflict' });
+    });
+
+    it('reconciles enqueue completed before caller receipt was persisted', () => {
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      enqueue.mockImplementationOnce((record) => {
+        queuedMessages.mockReturnValue([{ deduplication_key: record.deduplicationKey }]);
+        throw new Error('crash after durable enqueue');
+      });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'uncertain'
+      );
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options)).toMatchObject({
+        status: 'accepted',
+        reason: 'durable_reconciled',
+      });
+      expect(enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not resend concurrent or retained unknown attempts', () => {
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      enqueue.mockImplementationOnce(() => {
+        expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+          'uncertain'
+        );
+        throw new Error('outcome unknown');
+      });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'uncertain'
+      );
+      mod.resetOperatorNotificationRateLimiter();
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'uncertain'
+      );
+      expect(enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases only definite no-effect failures for safe retry', () => {
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      enqueue.mockImplementationOnce(() => {
+        throw new Error('surface_target_dead:slack:C1:invalid');
+      });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options)).toMatchObject({
+        status: 'retryable',
+        reason: 'surface_target_dead',
+      });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'accepted'
+      );
+      expect(enqueue).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses targeted inbox identity lookup beyond the former 500-item window', () => {
+      writePrefs({ default_channel: { surface: 'inbox', target: 'operator' } });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'accepted'
+      );
+      const entry = inbox.addInboxEntry.mock.calls[0][0];
+      expect(entry.ifAbsent).toBe(true);
+      expect(inbox.listInboxEntries).toHaveBeenCalledWith({ entryId: entry.entryId, limit: 1 });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'accepted'
+      );
+      expect(inbox.addInboxEntry).toHaveBeenCalledTimes(1);
+    });
+
+    it('direct iMessage and webpush outcomes are uncertain and not replayed', () => {
+      writePrefs({ default_channel: { surface: 'imessage', target: '+819012345678' } });
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options)).toMatchObject({
+        status: 'uncertain',
+        reason: 'direct_delivery_attempted',
+      });
+      mod.resetOperatorNotificationRateLimiter();
+      expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload, options).status).toBe(
+        'uncertain'
+      );
+      expect(imessage).toHaveBeenCalledTimes(1);
+      writePrefs({});
+      webpush.webPushWouldDeliver.mockReturnValue(true);
+      const pushOptions = { deduplicationKey: 'push-1' };
+      expect(
+        mod.notifyOperatorWithReceiptSync('decision_digest', payload, pushOptions).status
+      ).toBe('uncertain');
+      mod.resetOperatorNotificationRateLimiter();
+      expect(
+        mod.notifyOperatorWithReceiptSync('decision_digest', payload, pushOptions).status
+      ).toBe('uncertain');
+      expect(webpush.sendWebPushForEvent).toHaveBeenCalledTimes(1);
     });
   });
 });
