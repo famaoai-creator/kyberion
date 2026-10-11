@@ -7,6 +7,7 @@ import {
   writeGovernedArtifactJson,
 } from '../workforce/artifact-store.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
+import { canonicalHumanOwner } from './verified-human-request-identity.js';
 import type { EventScopeInput } from '../event-scope.js';
 import { isFirstJobDiagnosticMapping } from './first-job-admission.js';
 import {
@@ -125,12 +126,17 @@ export function conversationRef(viewer: FrontDeskConversationViewer) {
     throw new ConversationStoreError('identity_required');
   }
   const scope = frontDeskConversationScope(viewer);
+  const human = canonicalHumanOwner(viewer);
   const key = createHash('sha256')
     .update(
       JSON.stringify({
-        principal: viewer.principalId,
-        member: viewer.memberId ?? null,
-        source: viewer.source,
+        ...(human
+          ? { human }
+          : {
+              principal: viewer.principalId,
+              member: viewer.memberId ?? null,
+              source: viewer.source,
+            }),
         role: viewer.role,
         tenants: canonicalScope(viewer.tenantSlugs),
         organizations: canonicalScope(viewer.organizationIds),
