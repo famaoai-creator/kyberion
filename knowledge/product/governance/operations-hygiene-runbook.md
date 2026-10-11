@@ -262,6 +262,13 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
     meant for one artifact, also answered the media-backend registry's directory check. The test
     passed only when an earlier test had already cached the registry. Route governed catalog paths
     (`knowledge/product/`) to the real implementation inside the mock.
+  - **A liveness threshold on a fixed wall-clock window.** `expect(ops).toBeGreaterThan(N)` where
+    `ops` is counted inside a fixed `ms` window is load-sensitive: a shared CI shard can run the
+    op ~10× slower and still be correct (`secure-io.symlink-canonical.test.ts` fell to 29/50,
+    2026-10). Make the exercise helper repeat the window until the floor is met, capped by a
+    bounded deadline (`minOps`/`ms * 4` in `hammer`), so a genuinely dead op still fails while a
+    merely slow runner passes. Keep the semantic assertions (`refused`, `torn`, `otherErrors`)
+    strict — only the liveness floor tolerates load.
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 

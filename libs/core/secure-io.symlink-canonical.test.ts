@@ -126,16 +126,24 @@ function restoreOwnerAccess(root: string): void {
 /** Run `op` for `ms`, yielding now and then; returns how many calls ran. */
 async function hammer(ms: number, op: () => void): Promise<number> {
   let tries = 0;
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    tries += 1;
-    try {
-      op();
-    } catch {
-      // refused or raced
+  // Liveness floor: every assertion wants >50 ops. A loaded CI runner can
+  // fall below that inside a single window without the op being broken, so
+  // keep running windows until the floor is met or a bounded deadline hits —
+  // a genuinely dead op still fails, just after bounded retries.
+  const minOps = 51;
+  const deadline = Date.now() + ms * 4;
+  do {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      tries += 1;
+      try {
+        op();
+      } catch {
+        // refused or raced
+      }
+      if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
     }
-    if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
-  }
+  } while (tries <= minOps && Date.now() < deadline);
   return tries;
 }
 
