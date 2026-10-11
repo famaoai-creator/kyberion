@@ -7,7 +7,7 @@
   "types": "../../../dist/libs/actuators/secret-actuator/src/index.d.ts",
   "private": true,
   "scripts": {
-    "build": "tsc -p ../../../tsconfig.actuators.json"
+    "build": "pnpm --dir ../../.. run build:repo"
   },
   "dependencies": {
     "@agent/core": "workspace:*"

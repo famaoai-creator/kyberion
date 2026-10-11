@@ -3,8 +3,8 @@
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const VISION_SCHEMA = {
   type: 'object',

@@ -78,11 +78,7 @@ knowledge/_integrity-manifest.json
 tools/chronos-mirror/public/knowledge_index.json
 presence/displays/chronos-mirror/public/stimuli_feed.json
 
-# libs/core compiled output (in-place build)
-libs/core/**/*.js
-libs/core/**/*.js.map
-libs/core/**/*.d.ts
-libs/core/**/*.d.ts.map
+# Build outputs live only in owned dist directories. Source shadows stay visible.
 libs/core/tsconfig.tsbuildinfo
 # Workspace package build artifacts (TypeScript incremental build info)
 libs/shared-*/tsconfig.tsbuildinfo
@@ -113,16 +109,6 @@ last_session_diff.patch
 # Local coverage output
 coverage/
 test-results/
-
-# In-place build output accidentally emitted in actuator source trees
-libs/actuators/presence-actuator/src/*.js
-libs/actuators/presence-actuator/src/*.js.map
-libs/actuators/presence-actuator/src/*.d.ts
-libs/actuators/presence-actuator/src/*.d.ts.map
-libs/actuators/media-generation-actuator/src/*.js
-libs/actuators/media-generation-actuator/src/*.js.map
-libs/actuators/media-generation-actuator/src/*.d.ts
-libs/actuators/media-generation-actuator/src/*.d.ts.map
 
 # Repo-local generated notes that should not be committed
 vision/famaocloud.md

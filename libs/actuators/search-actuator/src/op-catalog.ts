@@ -6,8 +6,8 @@
 // a bounded plain-text reader (fetch_reader). General fetch / A2A transport
 // pipelines stay with network-actuator (network-pipeline.schema.json).
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const SEARCH_SCHEMA = {
   type: 'object',

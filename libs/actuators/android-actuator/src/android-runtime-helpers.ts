@@ -17,8 +17,8 @@ import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
-import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
-import type { AdfEngineContext } from '../../../core/pipeline/adf-engine.js';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';

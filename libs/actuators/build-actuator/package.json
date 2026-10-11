@@ -6,7 +6,7 @@
   "main": "../../../dist/libs/actuators/build-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/build-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "build": "pnpm --dir ../../.. run build:repo",
     "test": "vitest run"
   },
   "dependencies": {

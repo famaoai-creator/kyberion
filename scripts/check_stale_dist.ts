@@ -1,49 +1,9 @@
 #!/usr/bin/env node
 /**
- * Detects stale build artifacts: a dist tree whose newest .js is older than
- * the newest TypeScript source it was built from. The ts-loader resolves
- * workspace specifiers like `@agent/core/*` to `<pkg>/dist/` whenever it
- * exists, so a stale package dist serves old exports and surfaces far from
- * the cause (e.g. `pnpm organization` dying with "does not provide an export
- * named ..." while baseline-check reported all_clear).
- *
- * Complements check_dist_workspace_imports.ts: that gate proves dist imports
- * resolve; this one proves dist is as new as its sources.
- *
- * Targets scanned:
- *  - root build (build:repo): scripts/, presence/, satellites/ -> dist/<name>.
- *    The four presence/displays/* surfaces excluded from the root tsconfig
- *    (they build via build:ui) are excluded from the source side.
- *  - actuator build (build:actuators): libs/actuators/** -> dist/libs/actuators.
- *  - package builds (build:packages): each libs/<pkg>/ that has a dist/ dir ->
- *    libs/<pkg>/dist. A package with no dist/ is skipped: the ts-loader falls
- *    back to source in that case, so absence cannot serve stale exports.
- *  - root-emitted package trees (build:repo): tsconfig `paths` pulls
- *    @agent/shared-* / transitively-imported libs sources into the root
- *    program and emits them under dist/libs/<pkg>/ — the `main` of
- *    shared-{media,nerve,network,vision} resolves here, not to libs/<pkg>/dist.
- *    Each dist/libs/<pkg>/ dir present gets its own target vs the package's
- *    tsconfig rootDir, proven against the shared `dist/.tsbuildinfo`.
- *
- * Freshness is proven two ways, most precise first:
- *  1. tsbuildinfo content-hash compare — every tsconfig here is incremental
- *     or composite, and fileInfos[].version is a SHA-256 of file contents.
- *     Any source file whose hash differs from (or is missing among) the
- *     entries recorded under the target's sourceRoot means the last build
- *     never saw that content — regardless of mtime games (`touch`, branch
- *     checkouts that restore identical content, dist hand-touched newer).
- *  2. mtime fallback — when a target's buildinfo is absent or records no
- *     entries under its sourceRoot, stale iff max(source .ts mtime) >
- *     max(newest dist .js mtime, buildinfo mtime). The buildinfo-mtime union
- *     keeps a `touch`ed source from staying flagged once a rebuild ran but
- *     skipped re-emitting identical files. (build:actuators now writes its
- *     own dist/.tsbuildinfo.actuators — before that split, `dist/.tsbuildinfo`
- *     was shared and the last writer's program could starve the other's
- *     hash coverage.)
- *
- * `*.test.ts` is excluded only where the owning tsconfig excludes it
- * (derived per package from its tsconfig exclude list; the root build emits
- * tests, several shared-* package builds compile them too).
+ * Verify every owned compiler tree against its own input hashes and emits.
+ * The runtime compiler owns scripts/presence/satellites/actuators; libraries
+ * own package-local dist and buildinfo. Physical source shadows are checked
+ * separately, including ignored and untracked files.
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -53,18 +13,13 @@ import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
+import {
+  BUNDLED_SCRIPT_NAMES,
+  PACKAGE_BUILD_OUTPUTS,
+  ROOT_SOURCE_EXCLUSIONS,
+} from './build-output-layout.js';
 
-// Mirrors tsconfig.json `exclude` for presence/displays: those surfaces build
-// through `pnpm run build:ui`, not `build:repo`.
-const ROOT_BUILD_EXCLUDED_DIRS: Readonly<Record<string, readonly string[]>> = {
-  presence: [
-    'displays/chronos-mirror-v2',
-    'displays/terminal-hud',
-    'displays/operator-surface',
-    'displays/concierge',
-  ],
-};
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 
 export interface StaleDistTarget {
   target: string;
@@ -78,6 +33,7 @@ export interface StaleDistTarget {
     | 'source_newer_than_dist'
     | 'dist_missing'
     | 'emit_missing'
+    | 'orphaned_emit'
     | 'scan_failed';
   detail?: string;
 }
@@ -98,6 +54,10 @@ export interface StaleTargetSpec {
   // joins the freshness marker (see module doc for the incremental-emit case).
   buildInfo?: readonly string[];
   excludeSourceDirs?: readonly string[];
+  excludeSourceFiles?: readonly string[];
+  required?: boolean;
+  checkOrphans?: boolean;
+  extraEmits?: readonly string[];
   excludeTests?: boolean;
 }
 
@@ -194,8 +154,19 @@ function evaluateTarget(
 ): StaleDistTarget | null {
   const sourceRoot = pathResolver.rootResolve(spec.sourceRoot);
   const distRoot = pathResolver.rootResolve(spec.distRoot);
-  if (!safeExistsSync(sourceRoot)) return null;
-  if (!safeExistsSync(distRoot)) return null;
+  if (!safeExistsSync(sourceRoot)) {
+    if (!spec.required) return null;
+    return {
+      target: spec.id,
+      source_file: null,
+      source_mtime_ms: null,
+      dist_file: null,
+      dist_mtime_ms: null,
+      reason: 'scan_failed',
+      detail: 'required compiler source root is missing: ' + spec.sourceRoot,
+    };
+  }
+  if (!safeExistsSync(distRoot) && !spec.required) return null;
 
   const excluded = (spec.excludeSourceDirs ?? []).map((rel) =>
     path.join(sourceRoot, ...rel.split('/'))
@@ -205,11 +176,13 @@ function evaluateTarget(
     sourceRoot,
     (filePath) =>
       isSourceFile(filePath, excludeTests) &&
-      !excluded.some((dir) => filePath.startsWith(dir + path.sep))
+      !excluded.some((dir) => filePath.startsWith(dir + path.sep)) &&
+      !(spec.excludeSourceFiles ?? []).some((file) => filePath === path.join(sourceRoot, file))
   );
-  const dist = newestMtime(distRoot, (filePath) => path.extname(filePath) === '.js');
+  const dist = safeExistsSync(distRoot)
+    ? newestMtime(distRoot, (filePath) => path.extname(filePath) === '.js')
+    : { file: null, mtimeMs: null };
 
-  if (source.newestMs === null) return null;
   const base = {
     target: spec.id,
     source_file: source.newestFile ? toRepoRelative(source.newestFile) : null,
@@ -217,6 +190,24 @@ function evaluateTarget(
     dist_file: dist.file ? toRepoRelative(dist.file) : null,
     dist_mtime_ms: dist.mtimeMs,
   };
+  if (spec.checkOrphans && safeExistsSync(distRoot)) {
+    const emitted = scanSources(distRoot, (file) => file.endsWith('.js'));
+    for (const file of emitted.files) {
+      const relative = path.relative(distRoot, file).split(path.sep).join('/');
+      if ((spec.extraEmits ?? []).includes(relative)) continue;
+      const sourceStem = path.join(sourceRoot, relative.replace(/\.js$/u, ''));
+      if (!['.ts', '.tsx'].some((extension) => safeExistsSync(sourceStem + extension))) {
+        return {
+          ...base,
+          dist_file: toRepoRelative(file),
+          reason: 'orphaned_emit',
+          detail:
+            'compiler output has no source; run the owned-output clean build after a delete or rename',
+        };
+      }
+    }
+  }
+  if (source.newestMs === null) return null;
   if (dist.mtimeMs === null) return { ...base, reason: 'dist_missing' as const };
 
   // Precise pass: a buildinfo that records entries under this sourceRoot lets
@@ -258,7 +249,7 @@ function evaluateTarget(
         } catch {
           continue;
         }
-        if (fileMs <= thisBuildInfoMs) continue;
+        if (fileMs <= thisBuildInfoMs && !spec.required) continue;
         return {
           ...base,
           source_file: toRepoRelative(filePath),
@@ -324,56 +315,6 @@ function readPackageTsconfig(pkgDir: string): PackageTsconfig | null {
   }
 }
 
-function listPackageDistTargets(libsRootRel = 'libs'): StaleTargetSpec[] {
-  const libsRoot = pathResolver.rootResolve(libsRootRel);
-  if (!safeExistsSync(libsRoot)) return [];
-  let entries: string[];
-  try {
-    entries = safeReaddir(libsRoot);
-  } catch {
-    return [];
-  }
-  const specs: StaleTargetSpec[] = [];
-  for (const entry of entries) {
-    if (entry === 'actuators') continue;
-    const pkgDir = path.join(libsRoot, entry);
-    let isDir = false;
-    try {
-      isDir = safeStat(pkgDir).isDirectory();
-    } catch {
-      continue;
-    }
-    if (!isDir) continue;
-    if (!safeExistsSync(path.join(pkgDir, 'dist'))) continue;
-    // The tsconfig decides where the build's source root is and whether test
-    // files are real build inputs — e.g. shared-* compile src/** (tests
-    // included) while libs/core and libs/shared-ui exclude them.
-    const tsconfig = readPackageTsconfig(pkgDir);
-    const rootDir = tsconfig?.compilerOptions?.rootDir?.replace(/^\.\//u, '').replace(/\/$/u, '');
-    const sourceRoot = rootDir ? `${libsRootRel}/${entry}/${rootDir}` : `${libsRootRel}/${entry}`;
-    // `extends` is intentionally not resolved: today every libs/*/tsconfig
-    // extends the root, whose exclude list has no test patterns — so an
-    // absent child exclude means tests are real build inputs.
-    const excludeTests =
-      tsconfig === null
-        ? true
-        : (tsconfig.exclude ?? []).some((pattern) => /test|__tests__/u.test(pattern));
-    specs.push({
-      id: `libs/${entry}`,
-      sourceRoot,
-      distRoot: `${libsRootRel}/${entry}/dist`,
-      // Package builds park their tsbuildinfo in one of these two places
-      // (libs/core: dist/.tsbuildinfo; libs/shared-*: tsconfig.tsbuildinfo).
-      buildInfo: [
-        `${libsRootRel}/${entry}/dist/.tsbuildinfo`,
-        `${libsRootRel}/${entry}/tsconfig.tsbuildinfo`,
-      ],
-      excludeTests,
-    });
-  }
-  return specs;
-}
-
 /**
  * The root build (build:repo) emits package sources it reaches through
  * tsconfig `paths` into dist/libs/<pkg>/ — e.g. shared-{media,nerve,network,
@@ -423,32 +364,46 @@ export function defaultStaleDistTargets(): StaleTargetSpec[] {
       sourceRoot: 'scripts',
       distRoot: 'dist/scripts',
       buildInfo: ['dist/.tsbuildinfo'],
+      excludeSourceFiles: ROOT_SOURCE_EXCLUSIONS.scripts,
+      extraEmits: BUNDLED_SCRIPT_NAMES.map((name) => name + '.bundle.js'),
+      required: true,
+      checkOrphans: true,
     },
     {
       id: 'root:presence',
       sourceRoot: 'presence',
       distRoot: 'dist/presence',
       buildInfo: ['dist/.tsbuildinfo'],
-      excludeSourceDirs: ROOT_BUILD_EXCLUDED_DIRS.presence,
+      excludeSourceDirs: ROOT_SOURCE_EXCLUSIONS.presence,
+      required: true,
+      checkOrphans: true,
     },
     {
       id: 'root:satellites',
       sourceRoot: 'satellites',
       distRoot: 'dist/satellites',
       buildInfo: ['dist/.tsbuildinfo'],
+      required: true,
+      checkOrphans: true,
     },
     {
       id: 'libs/actuators',
       sourceRoot: 'libs/actuators',
       distRoot: 'dist/libs/actuators',
-      // Own buildinfo since tsconfig.actuators.json sets tsBuildInfoFile;
-      // the shared dist/.tsbuildinfo remains as fallback for trees built
-      // before the split.
-      buildInfo: ['dist/.tsbuildinfo.actuators', 'dist/.tsbuildinfo'],
+      buildInfo: ['dist/.tsbuildinfo'],
       excludeTests: true,
+      required: true,
+      checkOrphans: true,
     },
-    ...listPackageDistTargets(),
-    ...listRootEmittedPackageTargets(),
+    ...PACKAGE_BUILD_OUTPUTS.map(({ id, sourceRoot, excludeTests }) => ({
+      id,
+      sourceRoot,
+      excludeTests,
+      distRoot: id + '/dist',
+      buildInfo: [id + '/dist/.tsbuildinfo'],
+      required: true,
+      checkOrphans: true,
+    })),
   ];
 }
 
