@@ -39,7 +39,12 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
-import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
+import { getWorkItem, updateWorkItem, listWorkItems } from '../workforce/work-coordination.js';
+import {
+  findHeldWorkTarget,
+  workTargetsOverlap,
+  workTargetPatternCovers,
+} from '../workforce/work-effect-ownership.js';
 import type { UpdateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import { listDotCharters, type DotCharter } from './dot-charter.js';
 import {
@@ -80,6 +85,7 @@ const OPPOSING_INTENTS: ReadonlyArray<readonly [DotProposalIntent, DotProposalIn
 const LIVE_WORK_ITEM_STATUSES: readonly string[] = ['backlog', 'ready', 'in_progress', 'review'];
 
 export interface DotArbitrationDeps {
+  listWorkItems?: () => WorkItem[];
   rootDir?: string;
   /** Every known charter (any status) — the other dot's tenant, owns and priority come from here. */
   listCharters?: () => DotCharter[];
@@ -95,69 +101,11 @@ export interface DotArbitrationDeps {
 // target / intent matching
 // ---------------------------------------------------------------------------
 
-function splitTarget(target: string): { kind: string; value: string } {
-  const index = target.indexOf(':');
-  return index < 0
-    ? { kind: '', value: target }
-    : { kind: target.slice(0, index), value: target.slice(index + 1) };
-}
+export const dotTargetsOverlap = workTargetsOverlap;
 
-const GLOB_CHARS = /[*?[{]/;
-
-/** `**` crosses segments, `*` / `?` stay within one; everything else is literal. */
-function globRegExp(glob: string): RegExp {
-  let source = '';
-  for (let i = 0; i < glob.length; i += 1) {
-    const ch = glob[i];
-    if (ch === '*' && glob[i + 1] === '*') {
-      source += '.*';
-      i += 1;
-    } else if (ch === '*') {
-      source += '[^/]*';
-    } else if (ch === '?') {
-      source += '[^/]';
-    } else {
-      source += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-    }
-  }
-  return new RegExp(`^${source}$`);
-}
-
-function literalPrefix(glob: string): string {
-  const match = GLOB_CHARS.exec(glob);
-  return match ? glob.slice(0, match.index) : glob;
-}
-
-/**
- * Equal targets overlap; `path:` globs overlap when either matches the other
- * or (both wildcarded) their literal prefixes nest — a deliberate
- * over-approximation, since a false conflict only costs an operator decision.
- */
-export function dotTargetsOverlap(a: string, b: string): boolean {
-  if (a === b) return true;
-  const left = splitTarget(a);
-  const right = splitTarget(b);
-  if (left.kind !== right.kind || left.kind !== 'path') return false;
-  const leftGlob = GLOB_CHARS.test(left.value);
-  const rightGlob = GLOB_CHARS.test(right.value);
-  if (leftGlob && globRegExp(left.value).test(right.value)) return true;
-  if (rightGlob && globRegExp(right.value).test(left.value)) return true;
-  if (leftGlob && rightGlob) {
-    const lp = literalPrefix(left.value);
-    const rp = literalPrefix(right.value);
-    return lp.startsWith(rp) || rp.startsWith(lp);
-  }
-  return false;
-}
-
-/** True when an owns pattern (same `kind:` form, glob value) covers the target. */
+/** True when an owns pattern covers the target. */
 export function dotOwnsTarget(charter: DotCharter, target: string): boolean {
-  const wanted = splitTarget(target);
-  return (charter.team?.owns ?? []).some((pattern) => {
-    if (pattern === target) return true;
-    const owned = splitTarget(pattern);
-    return owned.kind === wanted.kind && globRegExp(owned.value).test(wanted.value);
-  });
+  return (charter.team?.owns ?? []).some((pattern) => workTargetPatternCovers(pattern, target));
 }
 
 /**
@@ -300,6 +248,21 @@ export function checkDotArbitration(
   ctx: DotExtCtx,
   deps: DotArbitrationDeps = {}
 ): ReturnType<DotPreGateCheck['check']> {
+  // Execution ownership is stronger than proposal priority: no charter lookup,
+  // action-age window or same-dot exception can establish that effects stopped.
+  if (proposal.target) {
+    const rootDir = deps.rootDir ?? ctx.rootDir;
+    const held = findHeldWorkTarget(
+      deps.listWorkItems?.() ?? listWorkItems({}, rootDir ? { rootDir } : {}),
+      proposal.target,
+      charter.scope.tenant_slug
+    );
+    if (held)
+      return {
+        ok: false,
+        reason: `target ownership retained by ${held.item_id}; verify stopped execution and use governed human release before conflicting work`,
+      };
+  }
   const conflicts = dotArbitrationConflicts(charter, proposal, ctx, deps);
   if (conflicts.length === 0) return { ok: true };
   const rootDir = deps.rootDir ?? ctx.rootDir;
