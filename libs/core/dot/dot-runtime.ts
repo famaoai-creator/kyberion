@@ -1,11 +1,7 @@
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 /**
- * Dot runtime — evaluates charter attention triggers for due-ness and executes
- * one bounded goal turn per wake.
- *
- * The resident loop lives in `agent-runtime-supervisor`'s daemon sweep; this
- * module is the pure, testable core it calls. Two ledgers under
- * `active/shared/runtime/` give the loop memory:
+ * Dot runtime: due-ness and one bounded goal turn per wake, called by the supervisor.
+ * Durable loop memory under `active/shared/runtime/`:
  *
  * - `dot-wake-ledger.jsonl` — one row per wake attempt, keyed by a trigger key
  *   (`cron:<expr>@<minute>`, `watch:<path>@<mtime>:<size>`, `wake:<line-hash>`,
@@ -1105,11 +1101,15 @@ function wakePrompt(
 function governProposals(
   charter: DotCharter,
   proposals: readonly DotProposal[],
-  deps: DotRuntimeDeps
+  deps: DotRuntimeDeps & { trigger?: DueDotTrigger }
 ): DotActionRecord[] {
   if (proposals.length === 0) return [];
   if (deps.dispatch) return deps.dispatch(charter, proposals);
-  return dispatchDotProposals(charter, proposals, { rootDir: deps.rootDir, now: deps.now }).records;
+  return dispatchDotProposals(charter, proposals, {
+    rootDir: deps.rootDir,
+    now: deps.now,
+    operationKey: deps.trigger?.key,
+  }).records;
 }
 
 /** Parsed wake-tool values collected during one wake, keyed by tool name. */

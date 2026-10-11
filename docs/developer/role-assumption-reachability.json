@@ -946,6 +946,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/operator-notifications.ts#stableNotificationAttempt",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/operator-provider-preferences.ts#loadOperatorProviderPreferences",
       "roles": ["sovereign_concierge"],
       "unresolved": []
