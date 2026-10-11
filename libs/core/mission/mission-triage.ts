@@ -14,7 +14,7 @@
  */
 
 import * as path from 'node:path';
-import { archivedMissionDir, findMissionPath } from '../path-resolver.js';
+import { archivedMissionDir, findArchivedMissionDir, findMissionPath } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { loadMissionStateIncludingArchive, loadState } from './mission-state.js';
 import {
@@ -275,7 +275,7 @@ export function collectMissionTriageReport(missionId: string): MissionTriageRepo
     const archived = loadMissionStateIncludingArchive(upperId);
     if (archived) {
       state = archived;
-      missionDir = archivedMissionDir(upperId);
+      missionDir = findArchivedMissionDir(upperId) || archivedMissionDir(upperId);
     }
   }
   const { classification, recommendation } = classify(upperId, state, missionDir);

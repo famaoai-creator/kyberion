@@ -41,15 +41,20 @@ function assertMissionIdPathSegment(missionId: string): string {
   return normalized;
 }
 
-export function missionSealArchiveDir(missionId: string): string {
+export function missionSealArchiveDir(
+  missionId: string,
+  options: { tier?: string; tenant?: string } = {}
+): string {
   const safeMissionId = assertMissionIdPathSegment(missionId);
   let archiveSubPath = 'active/archive/missions';
   const config = loadMissionManagementConfig();
   archiveSubPath = config?.directories.archive || archiveSubPath;
-  return assertSafeRepositoryPath(
-    path.join(pathResolver.rootResolve(archiveSubPath), safeMissionId, 'seal'),
-    { allowMissingLeaf: true }
-  );
+  const archiveRoot = pathResolver.rootResolve(archiveSubPath);
+  const missionDir =
+    options.tier || options.tenant
+      ? pathResolver.archivedMissionDir(safeMissionId, options)
+      : path.join(archiveRoot, safeMissionId);
+  return assertSafeRepositoryPath(path.join(missionDir, 'seal'), { allowMissingLeaf: true });
 }
 
 export async function sealMission(id: string): Promise<string | undefined> {

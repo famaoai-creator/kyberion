@@ -1060,12 +1060,22 @@ export function validateReadPermission(
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
   const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
+  // Archived mission dirs partition the same way as active ones —
+  // <tier>/<tenant|shared>/<id> — so archived confidential/personal mission
+  // content is gated at the io layer instead of depending on app-level checks
+  // alone. (Active mission dirs keep their existing io posture: tenant checks
+  // on writes, owner-scope on lookup.)
+  const missionTier = relativePath.match(
+    /^active\/archive\/missions\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
+  const protectedMissionPath = missionTier === 'personal' || missionTier === 'confidential';
   const floorTier = storageFloorTier(relativePath);
   const protectedFloorPath = isProtectedStorageFloorTier(floorTier);
   if (
     !pathStartsWith(relativePath, 'knowledge') &&
     !organizationStatePath &&
     !protectedProjectPath &&
+    !protectedMissionPath &&
     !protectedFloorPath
   )
     return { allowed: true };
@@ -1076,6 +1086,7 @@ export function validateReadPermission(
     !pathStartsWith(relativePath, 'knowledge/confidential') &&
     !organizationStatePath &&
     !protectedProjectPath &&
+    !protectedMissionPath &&
     !protectedFloorPath
   ) {
     return { allowed: true };
@@ -1230,6 +1241,15 @@ function personaTierReadDecision(
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (projectTier === 'confidential') {
+    return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
+  }
+  const archiveMissionTier = relativePath.match(
+    /^active\/archive\/missions\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
+  if (archiveMissionTier === 'personal') {
+    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+  }
+  if (archiveMissionTier === 'confidential') {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
   if (floorTier === 'personal') {

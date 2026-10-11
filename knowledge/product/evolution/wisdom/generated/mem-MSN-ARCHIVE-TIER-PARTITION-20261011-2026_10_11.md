@@ -1,0 +1,41 @@
+---
+record_id: mem-MSN-ARCHIVE-TIER-PARTITION-20261011-2026_10_11
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ARCHIVE-TIER-PARTITION-20261011-2026_10_11
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-11T08:01:09.350Z
+source_branch: fix/surface-artifact-visibility-20261011
+source_commit: 69f9d920c25027fdb22259ae54200937392f2c1a
+---
+
+# Tier-partitioned mission archive: layout, io enforcement, and compat resolution
+
+Rules for moving the mission archive to active/archive/missions/<tier>/<tenant|shared>/<id> so archived confidential content gets io-layer tenant enforcement.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- (1) Mirror the active layout in the archive — <tier>/<tenant|shared>/<id> — so tenant_scope.protected_prefixes and the same slug extraction apply with no new machinery; an untenanted confidential archive goes under <tier>/shared/ where the invalid-slug path fails closed for bound processes. (2) validateReadPermission early-allows everything outside knowledge/organizations/projects/floors — new protected roots must also join that read gate, not only tenant_scope.protected_prefixes, or reads keep default-allow. (3) Scope a new protected root conservatively: gating active/missions/ reads broke readers legitimately governed at the app layer; gating archive reads only preserved behavior. (4) A partitioned store needs one resolver that probes both layouts — findArchivedMissionDir returns the flat or partitioned dir, prefers stated dirs, and throws OWNER_AMBIGUOUS — then repoint writers and let scanners depth-walk. (5) Migrating existing dirs is mechanical: tier+tenant come from each dir's mission-state.json; stateless legacy dirs stay flat and remain resolvable.
+
+## Recommended References
+
+- active/missions/public/MSN-ARCHIVE-TIER-PARTITION-20261011/evidence/implementation-report.md
+- active/missions/public/MSN-ARCHIVE-TIER-PARTITION-20261011/evidence/design-spec.json
+
+## Evidence
+
+- active/missions/public/MSN-ARCHIVE-TIER-PARTITION-20261011/evidence/implementation-report.md
+- active/missions/public/MSN-ARCHIVE-TIER-PARTITION-20261011/evidence/design-spec.json
+
+## Artifacts
