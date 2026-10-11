@@ -5,6 +5,7 @@ import {
   flushRepeatMarkers,
   formatDiagnostic,
   recordLogLine,
+  resetBrokenConsoleStreamsForTests,
   resolveLogThreshold,
   setLogFileSink,
   type LogRecord,
@@ -209,6 +210,42 @@ describe('logger', () => {
 
       expect(() => createLogger('svc').warn('outer')).not.toThrow();
       expect(calls).toBe(1);
+    });
+  });
+
+  describe('broken console streams', () => {
+    afterEach(() => {
+      resetBrokenConsoleStreamsForTests();
+    });
+
+    it('never throws when stderr write fails (EIO), and parks the stream', () => {
+      const eio = new Error('EIO: i/o error, write');
+      errSpy.mockImplementation(((_chunk: unknown) => {
+        throw eio;
+      }) as never);
+      const log = createLogger('parked');
+
+      expect(() => log.error('first')).not.toThrow();
+      expect(() => log.error('second')).not.toThrow();
+      // First call attempted the write and failed; the second was skipped.
+      expect(errSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('resumes console output after the test-hook reset', () => {
+      errSpy.mockImplementation(((_chunk: unknown) => {
+        throw new Error('EIO: i/o error, write');
+      }) as never);
+      const log = createLogger('resumed');
+      expect(() => log.error('parked once')).not.toThrow();
+      expect(errSpy).toHaveBeenCalledTimes(1);
+
+      resetBrokenConsoleStreamsForTests();
+      errSpy.mockImplementation(((chunk: unknown) => {
+        stderr.push(String(chunk));
+        return true;
+      }) as never);
+      log.error('back online');
+      expect(stderr.join('')).toContain('back online');
     });
   });
 });
