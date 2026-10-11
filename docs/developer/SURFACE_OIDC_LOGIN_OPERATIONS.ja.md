@@ -58,6 +58,7 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 ## 初回セットアップ(画面から設定する)
 
 ブラウザからサインインできる owner がまだ居ない環境では、concierge の画面で owner の作成・アクセストークンの発行・SSO 設定までを済ませられます。環境変数の編集とサーフェスの再起動は要りません。
+画面言語はブラウザーの言語設定から選ばれ、ヘッダーの表示設定で日本語・英語を切り替えられます。自動検査で言語を固定する場合は `pnpm kyberion browser inspect <url> --locale ja-JP` のように指定します。
 
 ```bash
 # ホストで実行(一回限りのセットアップコードと URL が表示される)
