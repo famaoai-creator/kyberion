@@ -302,7 +302,9 @@ describe('buildDotExecutorPorts', () => {
     expect(executePipeline).toHaveBeenCalledWith(
       'pipelines/ok.json',
       { dot_id: 'step-dot' },
-      CHARTER
+      CHARTER,
+      undefined,
+      expect.any(Function)
     );
   });
 });

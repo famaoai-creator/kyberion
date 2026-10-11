@@ -21,7 +21,12 @@ import {
 } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { createLogger } from '../logger.js';
-import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
+import {
+  getWorkItem,
+  updateWorkItem,
+  releaseWorkItemEffectOwnership,
+} from '../workforce/work-coordination.js';
+import { workEffectOwnership } from '../workforce/work-effect-ownership.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import {
@@ -190,6 +195,7 @@ export function requestDotWorkItemRelease(
     `attempts: ${attempts.length}${attempts.length ? ` (last: ${attempts.at(-1)?.failure_reason ?? attempts.at(-1)?.status ?? 'unknown'})` : ''}`,
     ...(terminal ? [`recorded result: ${terminal.status} (${terminal.mode})`] : []),
     `requester's verification: ${bounded(reason, 300)}`,
+    'Verify that the prior execution is stopped and partial effects are reconciled. Archive, lease expiry and a missing process alone do not prove this.',
     'Approving returns the item to ready; the dot executor re-runs it under a new attempt id.',
   ].join('\n');
   const request = withExecutionContext(GOVERNED_STORE_ROLE, () =>
@@ -365,7 +371,14 @@ export function applyApprovedDotReleases(
     let updated: WorkItem;
     try {
       updated = withExecutionContext(GOVERNED_STORE_ROLE, () =>
-        (deps.update ?? updateWorkItem)({
+        (workEffectOwnership(item!)?.state === 'held'
+          ? (input: Parameters<typeof updateWorkItem>[0]) =>
+              releaseWorkItemEffectOwnership({
+                itemId: input.itemId,
+                expectedVersion: item!.version,
+                approvalRequestId: record.id,
+              })
+          : (deps.update ?? updateWorkItem))({
           itemId: item!.item_id,
           expectedVersion: item!.version,
           status: 'ready',
