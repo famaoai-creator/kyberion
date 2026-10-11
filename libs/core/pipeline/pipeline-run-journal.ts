@@ -18,6 +18,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
+import { boundTenant } from '../owner-scope.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,
@@ -253,12 +254,43 @@ function candidateJournalPaths(runId: string): string[] {
   const candidates = [pipelineRunJournalPath(id)];
   for (const tier of ['confidential', 'public'] as const) {
     const base = path.join(rootDir(), 'active', 'missions', tier);
-    if (!safeExistsSync(base)) continue;
-    for (const missionId of safeReaddir(base)) {
+    const missionDirs: string[] = [];
+    try {
+      if (safeExistsSync(base)) {
+        for (const entry of safeReaddir(base)) {
+          const dir = path.join(base, entry);
+          // Flat layout: <tier>/<id>. Partitioned: <tier>/<tenant|shared>/<id>.
+          missionDirs.push(dir);
+          try {
+            for (const nested of safeReaddir(dir)) {
+              missionDirs.push(path.join(dir, nested));
+            }
+          } catch {
+            // Flat mission dir, or an unreadable partition — the flat probe
+            // above already covered the mission-dir case.
+          }
+        }
+      }
+    } catch {
+      // Bound processes cannot enumerate a protected tier root — probe their
+      // own tenant partition instead; other tenants are invisible by policy.
+      const bound = boundTenant();
+      if (bound) {
+        const partition = path.join(base, bound);
+        try {
+          for (const nested of safeReaddir(partition)) {
+            missionDirs.push(path.join(partition, nested));
+          }
+        } catch {
+          // Partition missing or unreadable — no mission journals there.
+        }
+      }
+    }
+    for (const missionDir of missionDirs) {
       let candidate: string;
       try {
         candidate = assertSafeRepositoryPath(
-          path.join(base, missionId, 'coordination', 'pipeline-runs', `${id}.jsonl`),
+          path.join(missionDir, 'coordination', 'pipeline-runs', `${id}.jsonl`),
           { allowMissingLeaf: true }
         );
       } catch {
