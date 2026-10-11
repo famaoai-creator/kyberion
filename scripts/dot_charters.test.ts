@@ -41,6 +41,7 @@ vi.mock('@agent/core/dot/dot-inbox', async (importOriginal) => ({
 vi.mock('./daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: [] }));
 
 import { runDotCharters } from './dot_charters.js';
+import { DOT_STATUS_SECTIONS } from '@agent/core/dot/dot-extension-registry';
 
 const TEST_ROOT = mocks.rootDir;
 const CHARTER: DotCharter = {
@@ -216,5 +217,64 @@ describe('dot release', () => {
     expect(process.exitCode).toBe(1);
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--reason'));
     expect(mocks.release).not.toHaveBeenCalled();
+  });
+});
+
+describe('dot execution diagnostic CLI presentation', () => {
+  it('keeps exact evidence and full recovery guidance in JSON and plain text', async () => {
+    writeCharter(CHARTER, 'status');
+    const section = DOT_STATUS_SECTIONS.find((s) => s.id === 'executor')!;
+    const next =
+      'Verify stopped execution and reconcile partial effects before requesting human approval. ' +
+      'Evidence must remain intact. '.repeat(15);
+    const execution = {
+      inventory: 'observed',
+      reason: 'Current scoped evidence',
+      scheduling: {
+        state: 'blocked',
+        reason: 'Invalid cursor shape',
+        next: 'Operator inspects executor-schedule.json',
+      },
+      items: [
+        {
+          state: 'blocked',
+          work_item_id: 'exact-item',
+          item_status: 'archived',
+          reason_code: 'retained_effect_hold',
+          current_attempt_id: 'new-run',
+          latest_recorded_attempt_id: 'new-run',
+          held_attempt_id: 'old-run',
+          age_ms: 1234,
+          reason: 'Retained old attempt ownership',
+          next,
+        },
+      ],
+      items_omitted: 0,
+      limitations: 'Read-only evidence, no liveness guarantee',
+    };
+    vi.spyOn(section, 'collect').mockReturnValue({
+      execution,
+      history_status: 'historical',
+      results_total: 1,
+    });
+    const result = await runDotCharters(['status', 'collision', '--json', '--quiet']);
+    expect(result).toMatchObject({ dots: [{ sections: { executor: { execution } } }] });
+    await runDotCharters(['status', 'collision']);
+    const lines = vi.mocked(console.log).mock.calls.map((args) => String(args[0]));
+    expect(lines).toContain('        next: ' + next);
+    expect(
+      lines.some((line) =>
+        line.includes(
+          'current_attempt=new-run latest_recorded_attempt=new-run held_attempt=old-run age_ms=1234'
+        )
+      )
+    ).toBe(true);
+    expect(lines.some((line) => line.includes('scheduling blocked: Invalid cursor shape'))).toBe(
+      true
+    );
+    expect(mocks.wake).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
+    expect(mocks.install).not.toHaveBeenCalled();
+    expect(mocks.appendInbox).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { inspectDotExecution } from './dot-executor-diagnostics.js';
 import { orderExecutorCharters, recordExecutorTurn } from './dot-executor-scheduling.js';
 import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
 import { loadApprovalRequest } from '../governance/approval-store.js';
@@ -903,26 +904,55 @@ export function dotExecutorStatusSection(): DotStatusSection {
   return {
     id: 'executor',
     collect(c, ctx) {
-      const rows = readDotWorkResults(c, { rootDir: ctx.rootDir });
-      const escalations = rows.filter(
-        (row) => row.status === 'blocked' || (row.status === 'failed' && row.mode === 'escalated')
-      );
-      const byStatus: Record<string, number> = {};
-      for (const row of rows) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
-      return {
-        results_total: rows.length,
-        by_status: byStatus,
-        ...(rows.length ? { last_completed_at: rows[rows.length - 1].completed_at } : {}),
-        escalations_total: escalations.length,
-        recent_escalations: escalations.slice(-DOT_EXECUTOR_STATUS_ESCALATION_LIMIT).map((row) => ({
-          work_item_id: row.work_item_id,
-          action_ref: row.action_ref,
-          status: row.status,
-          mode: row.mode,
-          completed_at: row.completed_at,
-          summary: bounded(row.summary, 160),
-        })),
-      };
+      const execution = inspectDotExecution(c, ctx);
+      try {
+        const rows = readDotWorkResults(c, { rootDir: ctx.rootDir });
+        if (
+          rows.some(
+            (row) =>
+              typeof row.summary !== 'string' ||
+              typeof row.action_ref !== 'string' ||
+              typeof row.completed_at !== 'string' ||
+              !Number.isFinite(Date.parse(row.completed_at)) ||
+              !['done', 'blocked', 'failed', 'skipped'].includes(row.status) ||
+              !['goal_turn', 'delegated', 'pipeline', 'escalated'].includes(row.mode)
+          )
+        )
+          throw Error('Malformed history');
+
+        const escalations = rows.filter(
+          (row) => row.status === 'blocked' || (row.status === 'failed' && row.mode === 'escalated')
+        );
+        const byStatus: Record<string, number> = {};
+        for (const row of rows) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+        return {
+          execution,
+          history_status: 'historical',
+          history_note:
+            'Recorded results only; malformed historical rows may be skipped. These totals do not establish current blockers or completion.',
+          results_total: rows.length,
+          by_status: byStatus,
+          ...(rows.length ? { last_completed_at: rows[rows.length - 1].completed_at } : {}),
+          escalations_total: escalations.length,
+          recent_escalations: escalations
+            .slice(-DOT_EXECUTOR_STATUS_ESCALATION_LIMIT)
+            .map((row) => ({
+              work_item_id: row.work_item_id,
+              action_ref: row.action_ref,
+              status: row.status,
+              mode: row.mode,
+              completed_at: row.completed_at,
+              summary: bounded(row.summary, 160),
+            })),
+        };
+      } catch {
+        return {
+          execution,
+          history_status: 'unavailable',
+          history_note:
+            'Historical results are malformed or unreadable; current diagnostics remain available.',
+        };
+      }
     },
   };
 }
