@@ -1,5 +1,5 @@
 import { handleDeploymentAction } from './deployment-actuator-helpers.js';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 
 export const handleAction = handleDeploymentAction;

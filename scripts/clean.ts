@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '../libs/core/authority.js';
 import { safeRmSync } from '../libs/core/secure-io.js';
 import { pathResolver } from '../libs/core/path-resolver.js';
-import { getAllFiles } from '../libs/core/fs-utils.js';
+import { OWNED_BUILD_DIRECTORIES, OWNED_BUILD_METADATA } from './build-output-layout.js';
 import { findSensitivePathMatch } from '../libs/core/sensitive-path-policy.js';
 import { getRegisteredEnvText, setRegisteredEnv } from '../libs/core/foundation/env.js';
 
@@ -28,18 +28,13 @@ function isProjectGeneratedFile(filePath: string): boolean {
   return findSensitivePathMatch(candidate) === null;
 }
 
-function main(): void {
+function main(rootDir: string): void {
   withExecutionContext('mission_controller', () => {
     const previousSudo = getRegisteredEnvText('KYBERION_SUDO');
     setRegisteredEnv('KYBERION_SUDO', 'true');
     try {
-      removeIfExists(pathResolver.rootResolve('dist'));
-      removeIfExists(pathResolver.rootResolve('coverage'));
-
-      for (const file of getAllFiles(pathResolver.rootDir())) {
-        if (file.endsWith('.tsbuildinfo') && isProjectGeneratedFile(file)) {
-          safeRmSync(file, { force: true });
-        }
+      for (const output of [...OWNED_BUILD_DIRECTORIES, ...OWNED_BUILD_METADATA]) {
+        removeIfExists(path.resolve(rootDir, output));
       }
     } finally {
       setRegisteredEnv('KYBERION_SUDO', previousSudo);
@@ -48,6 +43,6 @@ function main(): void {
 }
 
 /** Clean must remain runnable before any workspace package has been built. */
-export function runClean(): void {
-  main();
+export function runClean(rootDir = pathResolver.rootDir()): void {
+  main(rootDir);
 }

@@ -1,14 +1,11 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true,
     "useUnknownInCatchVariables": true,
     "noEmit": true,
-    "paths": {
-      "@agent/core": ["../../libs/core/dist/index.d.ts"],
-      "@agent/core/*": ["../../libs/core/dist/*"]
-    }
+    "incremental": false
   },
   "include": [
     "mission-types.ts",
@@ -17,9 +14,5 @@
     "mission-ticket-dispatch.ts",
     "mission-workitem-dispatch.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

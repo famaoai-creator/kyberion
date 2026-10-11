@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-BUILD-OWNERSHIP-20261011-2026_10_11",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Treat compiler output ownership as one contract",
+  "summary": "A monorepo build is consistent only when compiler scope, output paths, incremental records, runtime resolution and cleanup agree on the same owner.",
+  "candidate_id": "mem-MSN-BUILD-OWNERSHIP-20261011-2026_10_11",
+  "evidence_refs": [
+    "active/missions/public/MSN-BUILD-OWNERSHIP-20261011/evidence/implementation-report.md",
+    "active/missions/public/MSN-BUILD-OWNERSHIP-20261011/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-11T15:51:12.900Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-BUILD-OWNERSHIP-20261011"
+  ],
+  "reusable_steps": [
+    "A monorepo build is consistent only when compiler scope, output paths, incremental records, runtime resolution and cleanup agree on the same owner"
+  ],
+  "expected_outcome": "Apply this pattern when package builds and repository builds emit overlapping source trees or share incremental metadata. Keep common TypeScript language options separate from emitting project options. Give each acyclic library its own dist and buildinfo, consume its published exports through project references, and keep mutually dependent runtime code under one explicit compiler until that cycle is deliberately redesigned. Package commands should delegate to that graph without recursion. Share an exact ownership definition with clean and freshness checks; do not recursively delete arbitrary dist or buildinfo files. Scan physical source trees for generated JS/declaration/map twins, including ignored and untracked files, with narrowly documented handwritten exceptions. Keep bundle outputs separate from compiler outputs. Validate package-local imports from the emitted owner under Node ESM import conditions; Node parent-URL resolution needs the appropriate resolver flag. Compare clean, ordered-package and no-change incremental output hashes, then exercise source addition, rename and deletion in an isolated real-compiler fixture. Also verify package entry builds perform required post-build scope setup. Report unavailable browser or remote checks explicitly rather than treating them as passed.",
+  "source_branch": "fix/build-output-ownership-20261011",
+  "source_commit": "3149517ea106b5278b7b1c45ebe425d7f2a0f9c9"
+}

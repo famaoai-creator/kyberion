@@ -6,8 +6,8 @@
 // is strictly additive — determineActuatorStepType previously threw
 // unknown-op for all of them.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const CALENDAR_PROPERTIES = {
   attendees: { type: 'array', items: { type: 'string' } },

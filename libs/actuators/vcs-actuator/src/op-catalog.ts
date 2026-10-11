@@ -2,8 +2,8 @@
 // discovery index are generated from. Keep in sync with the dispatch switch
 // in vcs-helpers.ts; check:op-registry fails on drift.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const VCS_PROPERTIES = {
   cwd: { type: 'string' },

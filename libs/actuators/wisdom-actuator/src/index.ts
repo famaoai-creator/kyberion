@@ -1,6 +1,6 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { handleAction } from './wisdom-pipeline-helpers.js';
 import { describeOps } from './op-catalog.js';
 import { readWisdomJsonObjectAtPath } from './wisdom-persisted-json.js';

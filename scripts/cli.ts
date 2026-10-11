@@ -1341,5 +1341,9 @@ export const runCli = defineScript({
   run: ({ argv, print }) => main(argv, print),
 });
 
-if (isDirectScript(import.meta.url, 'cli.ts') || isDirectScript(import.meta.url, 'cli.js'))
+if (
+  isDirectScript(import.meta.url, 'cli.ts') ||
+  isDirectScript(import.meta.url, 'cli.js') ||
+  isDirectScript(import.meta.url, 'cli.bundle.js')
+)
   void runCli();

@@ -109,6 +109,40 @@ describe('check_script_integrity', () => {
     ]);
   });
 
+  it('maps only registered bundle outputs and permits source-only build bootstrap', () => {
+    const packageJsonPath = writeJson('package.json', {
+      scripts: {
+        mission: 'node scripts/run_built.mjs dist/scripts/mission_controller.bundle.js',
+        clean: 'node --import ./scripts/ts-loader.mjs scripts/clean_entrypoint.ts',
+      },
+    });
+    const present = new Set([
+      'scripts/run_built.mjs',
+      'scripts/ts-loader.mjs',
+      'scripts/mission_controller.ts',
+      'scripts/clean_entrypoint.ts',
+    ]);
+    expect(
+      checkScriptIntegrity({
+        packageJsonPath,
+        pipelineRoots: [],
+        pathExists: (file) => present.has(file),
+      })
+    ).toEqual([]);
+    const unknown = writeJson('unknown.json', {
+      scripts: { bad: 'node dist/scripts/unknown.bundle.js' },
+    });
+    expect(
+      checkScriptIntegrity({
+        packageJsonPath: unknown,
+        pipelineRoots: [],
+        pathExists: (file) => file === 'scripts/unknown.ts',
+      })
+    ).toEqual([
+      'package.json scripts.bad: dist/scripts/unknown.bundle.js has no source scripts/unknown.bundle.ts',
+    ]);
+  });
+
   it('flags TypeScript execution scripts without build output', () => {
     const packageJsonPath = writeJson('package.json', {
       scripts: {

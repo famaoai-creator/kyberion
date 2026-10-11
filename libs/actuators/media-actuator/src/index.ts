@@ -8,7 +8,7 @@ import {
 import { opCapture } from './media-action-capture.js';
 import { opTransform } from './media-action-transform.js';
 import { opApply } from './media-action-apply.js';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 
 async function handleAction(input: MediaAction) {

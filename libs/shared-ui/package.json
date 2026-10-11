@@ -20,8 +20,8 @@
     "vanilla"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run",
+    "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile ./dist/.tsbuildinfo.typecheck"
   },
   "dependencies": {
     "@agent/core": "workspace:*"

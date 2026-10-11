@@ -8,24 +8,20 @@
  * handful of user-facing entry points collapses that into one read each —
  * measured: `run_pipeline --dry-run` 0.66s -> 0.37s.
  *
- * Bundles are written over their dist entry in place so every caller
- * (`pnpm kyberion`, `pnpm pipeline`, spawn paths) benefits unchanged.
+ * Bundles are written as sibling .bundle.js files. Compiler emits are never
+ * overwritten, so package-ordered and incremental builds have the same inputs.
+ * Existing .js launch paths remain usable; selected package commands use bundles.
  * External packages stay external — only repo-internal code is inlined.
  * Libraries and tests keep per-file output so module-level imports and
  * vitest resolution are unaffected.
  */
-import { existsSync, renameSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BUNDLED_SCRIPT_NAMES } from './build-output-layout.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ENTRY_POINTS = [
-  'dist/scripts/cli.js',
-  'dist/scripts/run_pipeline.js',
-  'dist/scripts/mission_controller.js',
-  'dist/scripts/surface_runtime.js',
-  'dist/scripts/chronos_daemon.js',
-];
+const ENTRY_POINTS = BUNDLED_SCRIPT_NAMES.map((name) => 'dist/scripts/' + name + '.js');
 
 async function main() {
   const { build } = await import('esbuild');
@@ -33,8 +29,7 @@ async function main() {
   for (const entry of ENTRY_POINTS) {
     const input = resolve(ROOT, entry);
     if (!existsSync(input)) {
-      console.log(`[bundle-entrypoints] skip missing ${entry}`);
-      continue;
+      throw new Error(`[bundle-entrypoints] missing compiler input ${entry}; run build:repo first`);
     }
     const out = resolve(ROOT, entry.replace(/\.js$/, '.bundle.js'));
     await build({
@@ -48,7 +43,7 @@ async function main() {
       logLevel: 'warning',
       banner: { js: '// bundled by scripts/bundle_entrypoints.mjs — do not edit' },
     });
-    renameSync(out, input);
+    // Keep compiler-owned input intact: the bundle is a separate final-stage artifact.
     bundled += 1;
   }
   console.log(`[bundle-entrypoints] bundled ${bundled} entry point(s)`);

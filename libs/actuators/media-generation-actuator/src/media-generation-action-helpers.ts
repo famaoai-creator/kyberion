@@ -8,7 +8,7 @@ import { classifyError } from '@agent/core/error-classifier';
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import { runActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import type { GenerationJob } from '@agent/core/contracts/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
