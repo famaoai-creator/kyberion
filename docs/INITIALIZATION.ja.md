@@ -102,7 +102,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
   - `dist/` ディレクトリが生成されます。
   - Chronos（`presence/displays/chronos-mirror-v2/.next/`）と concierge の UI がビルドされます（`build:ui`）。
   - workspace 間の runtime contract が再構築されます。
-- **ステップ構成**: `build:packages` → `build:actuators` → terminal-hud → `build:repo` → `build:ui`。
+- **ステップ構成**: `build:packages` → `build:actuators` → terminal-hud → `build:repo` → `build:bundle` → knowledge index manifest → `build:ui`。
   UI だけを作り直す場合は `pnpm build:ui` を使います。
 
 ### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
@@ -144,6 +144,8 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 #### 4b. External Service Setup と Preflight
 
+新しい **service 連携を Kyberion に追加する**場合（catalog 契約、生成 registry、検証、セキュリティ境界）は [Service Integration and Connection Guide](../knowledge/product/orchestration/service-integration-guide.md) に従ってください。
+
 - **実行コマンド**: `pnpm service:setup`
 - **目的**: GitHub、Google Workspace、Slack、Notion、Jira などの service preset について、必要な secret、CLI 代替、customer/personal connection の置き場を先に確認します。実体の変更は行いません。
 - **実行直前の確認**: `pnpm service:preflight -- --service <service-id>`。`service:setup` が「準備」、`service:preflight` が「いま使えるか」です。auth が不足していれば失敗します。
@@ -161,7 +163,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 - **実行コマンド**: `pnpm reasoning:setup`
 - **目的**: 現在の host で使える reasoning backend を確認します。候補は `knowledge/product/governance/reasoning-backend-policy.json` の `allowed_modes` が正本で、主に次のものがあります。
-  - ローカル CLI: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli`
+  - ローカル CLI: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli` / `devin-cli`
   - API: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`
   - ローカルモデル: `local` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai`
   - オフライン・テスト用: `stub`
@@ -201,6 +203,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
   - `pnpm onboarding apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — 意図的に default 値で進める（評価環境向け）
+- **ブラウザから初めてサインインする前に**: owner がまだいないホストでは、`pnpm organization first-run code` が一回限りのセットアップ URL（concierge の `/setup/first-run`）を表示します。ここで tenant と owner member を作成し、その後は閉じます。詳細: [SURFACE_OIDC_LOGIN_OPERATIONS](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md)。
 - **承認に使う operator の identity**: 端末は承認を local owner member（`user:owner`、`knowledge/personal/members/owner.json`）として記録し、onboarding の名前は表示用に別に残します。concierge か presence-studio を開くとこの member が作られます。端末だけで使う場合は `pnpm organization member ensure-owner`（冪等）を実行します。職務分離（`approval-policy.json` の `separation_of_duties.enabled`）を有効にするときに必要で、無いと端末からの承認依頼と承認は診断メッセージを出して止まります。
 - **やり直す場合**: `pnpm onboarding reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
 - **物理的変化**:
@@ -216,7 +219,9 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 - **目的**: 判定層 L0〜L11 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
 - **初回に落ちやすい層**:
   - **L8（storage janitor）**: baseline-check が janitor を自動で投入します。完了後に再実行すれば通ります。手動で走らせる場合は `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'` を使います。
-  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm scheduler` です。`--daemon generation-schedule` / `--daemon daemon-watchdog` でメディア生成スケジューラーとデーモン監視（5 分間隔の one-shot）も同じ儀式で登録できます。launchd に渡る node は `<prefix>/opt/node/bin/node`（バージョン非依存の symlink）に解決されるため、`brew upgrade node` で壊れません。
+  - **L2（stale build）**: `dist/` がソースより古いと `needs_recovery` を返します。`pnpm build` で再ビルドして再実行してください（runbook: [stale-build-troubleshooting-runbook](../knowledge/product/orchestration/stale-build-troubleshooting-runbook.md)）。
+  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。`pnpm kyberion scheduler install` で内容を確認し、`--apply` でホストのユーザーサービスマネージャー（macOS は launchd、Linux は `systemd --user` — `libs/core/daemon/service-manager.ts`）に登録します。その場で動かすだけなら `pnpm scheduler` です。`--daemon generation-schedule` / `--daemon daemon-watchdog` でメディア生成スケジューラーとデーモン監視（5 分間隔の one-shot）も同じ儀式で登録できます。macOS では node が `<prefix>/opt/node/bin/node`（バージョン非依存の symlink）に解決されるため、`brew upgrade node` で壊れません。
+  - **L10（stale heartbeat、daemon は生存）**: `pnpm kyberion scheduler status` が daemon の稼働を示すのに heartbeat が古く、エラーログに repo パスへの `EPERM` が繰り返される場合、daemon が OS のファイルアクセス許可を失っています。再インストールではなく `pnpm kyberion scheduler restart --apply`（launchd kickstart / `systemctl --user restart`）で再起動します（[runbook](../knowledge/product/governance/operations-hygiene-runbook.md)）。
   - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちます。Stage 7 などの governed 操作で記録されます。
 
 ### Stage 9: tenant・organization・activation（必要な場合のみ）
@@ -257,4 +262,4 @@ baseline-check の `status` が `all_clear` であれば完了です。
 ---
 
 _Status: Mandated by AGENTS.md — day-2 command reference (ONB-02)_
-_Last Updated: 2026-09-22_
+_Last Updated: 2026-10-12_

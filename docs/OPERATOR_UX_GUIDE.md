@@ -103,6 +103,8 @@ It is not the durable mission owner.
 Slack threads should be read as incoming conversation turns, not as the operator's request by default.
 If the speaker is someone other than the operator, Kyberion should preserve that speaker identity and keep the reply authority separate from the mission owner.
 
+For a shared channel, declare it a `team` channel in `KYBERION_SURFACE_CHANNEL_MODES` (`tenant_slug`, `max_tier`, `approvers`). Kyberion then answers only when @mentioned or inside a thread it already joined, resolves each speaker to an organization member (`pnpm organization member link-identity <member-id> --slack <user-id>`), and lets only the channel's approvers decide approvals.
+
 ### Chronos Mirror
 
 Use when you want:
@@ -112,6 +114,7 @@ Use when you want:
 - intervention points
 - delivery inspection
 - project, track, gate, and mission-seed control
+- the Discussion Room (`/?section=discussion`): a facilitated multi-agent discussion, or a Dialogue Room goal card worked out with you, that ends in a decision brief and approval-gated WorkItems / mission start
 
 Chronos is the control surface.
 It explains and intervenes, but it does not replace the durable control plane.
@@ -124,10 +127,14 @@ Use when you want (as the CEO / sovereign):
 - ご承認待ちの判断(承認する / 差し戻す)
 - お届けした成果の受領・修正依頼・差し戻し
 - 通常フローから外れた例外の確認
+- 組織・プロジェクトの管理(`/management`)、資料の取込(`/ingest`)、設定(`/settings`: メンバー・SSO・通知・責任チャーター)
 
 The concierge is the executive secretary (`http://127.0.0.1:3050`,
 `presence/displays/concierge`). It never shows execution machinery —
-only decisions and outcomes, in polite Japanese.
+only decisions and outcomes, in polite language (Japanese or English by locale).
+The rail's company switcher narrows 決める, settings and the conversation to the
+selected tenant; it can only narrow what the server already allows the viewer to
+see.
 
 ### Presence Studio
 
@@ -174,8 +181,14 @@ Typical managed entries include:
 - `discord-bridge`
 - `telegram-bridge`
 - `chronos-mirror-v2`
+- `concierge`
+- `presence-studio`
+- `computer-surface`
+- `voice-hub`
 - `nexus-daemon`
 - `terminal-bridge`
+
+`slack-bridge`, `telegram-bridge`, `discord-bridge` and `imessage-bridge` ship disabled (`enabled:false`) so a fresh `reconcile` never starts a credential-dependent gateway; turn one on with `pnpm surfaces enable --surface <id>`. `operator-surface`, `personal-pads`, `event-intake-surface` and `terminal-hud` are likewise started manually.
 
 Typical service presets include:
 
@@ -592,8 +605,23 @@ deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜co
 ```bash
 pnpm surfaces reconcile
 pnpm surfaces status
+pnpm surfaces enable --surface <id>
 pnpm surfaces stop
 ```
+
+### Resident dots, decisions and public ingress
+
+```bash
+pnpm kyberion dot list                # resident agents (dot charters under dots/)
+pnpm kyberion dot status              # wakes, heartbeat, budget, key results, autonomy
+pnpm kyberion approvals digest        # pending decisions + what ran automatically
+pnpm kyberion ingress probe           # public-ingress provider readiness
+pnpm kyberion ingress up --surface <id>   # expose one opted-in surface (needs approval)
+```
+
+A dot never grants itself authority: it acts under an existing role and the
+autonomous-ops gate decides, per action, between run / notify / veto window /
+human decision. See [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md).
 
 ### Chronos
 
@@ -749,10 +777,10 @@ If you have to explain Kyberion quickly, explain it like this:
 The simplest stable split is:
 
 - `Presence Studio`
-  - concierge surface for live conversation and immediate work detail
+  - companion (相棒) surface for live conversation and immediate work detail
 - `Chronos`
   - management control plane for state, intervention, risk, and accountability
-- `CEO UX`
+- `Concierge` (CEO UX)
   - executive surface for outcome review and approvals
 
 This split matters because it keeps:
@@ -770,14 +798,14 @@ iOS/Android アプリの AI-DLC/SDLC を回す標準手順(コピペ可):
 pnpm kyberion doctor -- --runtime app --platform android        # or ios / all
 
 # 1. code_change ミッションを作成(レビュー必須クラス)
-pnpm mission create --type code_change --goal "FixtureApp にログイン機能を追加"
+pnpm mission create MSN-FIXTUREAPP-LOGIN-<YYYYMMDD> --mission-type code_change
 
 # 2. SDLC 取り込み: 意図 → 要件 → 設計 → タスク分解 → NEXT_TASKS → テスト計画
 pnpm pipeline --input pipelines/sdlc-cycle.json \
   --context '{"mission_id":"MSN-XXXX","project_name":"FixtureApp","intent_text":"ログイン機能を追加したい。..."}'
 
 # 3. 実装(orchestration worker が E2E-03 の協調 — PR 協調・review 往復 — で回す)
-pnpm mission start MSN-XXXX
+pnpm mission start MSN-XXXX --goal "FixtureApp にログイン機能を追加"
 
 # 4. 新規アプリなら scaffold(fixture 方式、外部ツール不要)
 echo '{"op":"scaffold_app","platform":"android","app_name":"FixtureApp","bundle_id":"dev.example.fixture","dest_dir":"active/shared/tmp/fixture-app"}' > /tmp/build-input.json
