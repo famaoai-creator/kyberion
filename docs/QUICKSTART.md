@@ -339,15 +339,15 @@ pnpm run kyberion -- search browser
 ### Mission lifecycle
 
 ```bash
-pnpm mission start MY-TASK --tier confidential \
+pnpm mission kickoff MSN-DEMO-20261012 --tier confidential --tenant-slug <tenant> \
   --goal "<what you actually want>" --success-condition "<observable acceptance criteria>"
-pnpm mission status MY-TASK
-pnpm mission checkpoint MY-TASK step-1 "Progress note"
-pnpm mission verify MY-TASK verified "Verification summary"
-pnpm mission finish MY-TASK
+pnpm mission status MSN-DEMO-20261012
+pnpm mission checkpoint MSN-DEMO-20261012 step-1 "Progress note"
+pnpm mission verify MSN-DEMO-20261012 verified "Verification summary"
+pnpm mission finish MSN-DEMO-20261012
 ```
 
-The full sequence (evidence, review, distill) is in the [mission kickoff playbook](../knowledge/product/orchestration/mission-kickoff-playbook.md).
+`kickoff` creates the mission if absent and activates it (IDs follow `MSN-<TOPIC>-<YYYYMMDD>`; repo-internal work uses `--tier public`, which needs no tenant). The full sequence (evidence, review, distill) is in the [mission kickoff playbook](../knowledge/product/orchestration/mission-kickoff-playbook.md).
 
 These are operator tools.
 They are not the normal end-user interface.

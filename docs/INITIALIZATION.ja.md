@@ -198,7 +198,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 
 - **実行コマンド**: `pnpm onboarding`（`dist/` が必要です）
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
-- **GUI で行う場合**: concierge の `/settings` を開きます（旧 `/setup` と `/onboarding` はここへリダイレクトされます）。「あなたのこと」で identity を保存し、「組織とメンバー」でメンバーと承認者を登録します。承認者は後の tenant activation で `--owner-id` に指定します。
+- **GUI で行う場合**: concierge の `/settings` を開きます（旧 concierge `/setup` と presence-studio `/onboarding` はここへリダイレクトされます）。「あなたのこと」で identity を保存し、「組織とメンバー」でメンバーと承認者を登録します。承認者は後の tenant activation で `--owner-id` に指定します。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboarding` は exit 2 で停止します。代わりに以下のいずれかを使用します。
   - `pnpm onboarding apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。

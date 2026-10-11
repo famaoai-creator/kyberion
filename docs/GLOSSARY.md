@@ -469,7 +469,7 @@ The `work_shape` field classifying a work item's operating mode: `solution_proje
 
 ### Dot (Resident Dot)
 
-An always-on resident agent holding a standing responsibility across sessions, declared by a **dot charter** (`dots/*.json`, schema `knowledge/product/schemas/dot-charter.schema.json`): goal (with key results), attention triggers (`cron` / `watch` / `wake` / `probe`), an _existing_ authority role (a charter never grants authority), a decision floor over the autonomous-ops gate, and notification routing. Acts as `dot:<id>` on WorkItems, approvals and the audit chain; inspected via `pnpm kyberion dot list` and `dot status`. → [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md) · [dots/README](../dots/README.md)
+An always-on resident agent holding a standing responsibility across sessions, declared by a **dot charter** (`dots/*.json`, schema `knowledge/product/schemas/dot-charter.schema.json`): goal (with key results), attention triggers (`cron` / `watch` / `wake` / `probe` / `event`), an _existing_ authority role (a charter never grants authority), a decision floor over the autonomous-ops gate, and notification routing. Acts as `dot:<id>` on WorkItems, approvals and the audit chain; inspected via `pnpm kyberion dot list` and `dot status`. → [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md) · [dots/README](../dots/README.md)
 
 ### Accountability Charter
 
@@ -485,7 +485,7 @@ The plain-language card on an approval request: the question, recommendation, wh
 
 ### Discussion Room / Dialogue Room
 
-A Chronos surface (`/?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md)
+A Chronos surface (`/?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md) · Dialogue Room: `presence/displays/chronos-mirror-v2/src/components/DialogueRoom.tsx`
 
 ### Team Channel
 
