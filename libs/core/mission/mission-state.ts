@@ -263,6 +263,23 @@ function findMissionPathAtRoot(
         safeHistoryPath(candidate)
       )
         return candidate;
+      // A tenant-bound process cannot enumerate a tier root — probe its own
+      // partition directly; other tenants are invisible by policy anyway.
+      const bound = boundTenantSegment();
+      if (
+        bound &&
+        MISSION_TIER_ROOT_RE.test(
+          path.relative(pathResolver.rootDir(), safeDirectory).split(path.sep).join('/')
+        )
+      ) {
+        const scopedProbe = path.join(safeDirectory, bound, id);
+        if (
+          safeExistsSync(scopedProbe) &&
+          safeLstat(scopedProbe).isDirectory() &&
+          safeHistoryPath(scopedProbe)
+        )
+          return scopedProbe;
+      }
       if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) continue;
       for (const scopeEntry of safeReaddir(safeDirectory)) {
         const scopedCandidate = path.join(safeDirectory, scopeEntry, id);
@@ -593,6 +610,18 @@ export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): st
   return [pathResolver.active('missions')];
 }
 
+/** Tier root under the mission trees (active + archive) — the levels a
+ * tenant-bound process may not enumerate because the tenant list itself is
+ * out of its io scope. */
+const MISSION_TIER_ROOT_RE = /^active\/(?:archive\/)?missions\/(?:personal|confidential|public)$/;
+
+function boundTenantSegment(): string | undefined {
+  const bound = String(getRegisteredEnvText('KYBERION_TENANT') || '')
+    .trim()
+    .toLowerCase();
+  return bound || undefined;
+}
+
 export function listMissionsInSearchDirs(
   options: { rootDir?: string; directories?: string[] } = {}
 ): Array<{ missionId: string; missionPath: string }> {
@@ -604,10 +633,28 @@ export function listMissionsInSearchDirs(
     } catch {
       return;
     }
+    // A tenant-bound process cannot enumerate a tier root — the tenant list
+    // is out of its io scope (the lstat/existsSync denial reads as
+    // "missing"). Probe its own partition instead; other tenants are
+    // invisible by policy anyway.
+    const probeBoundPartition = (): boolean => {
+      const bound = boundTenantSegment();
+      const rel = path.relative(pathResolver.rootDir(), safeDirectory).split(path.sep).join('/');
+      if (bound && MISSION_TIER_ROOT_RE.test(rel)) {
+        scan(path.join(safeDirectory, bound), depth + 1);
+        return true;
+      }
+      return false;
+    };
     try {
-      if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) return;
+      if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) {
+        probeBoundPartition();
+        return;
+      }
     } catch (err) {
-      logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+      if (!probeBoundPartition()) {
+        logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+      }
       return;
     }
     try {
@@ -632,7 +679,9 @@ export function listMissionsInSearchDirs(
         }
       }
     } catch (err) {
-      logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+      if (!probeBoundPartition()) {
+        logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+      }
     }
   };
   for (const dir of options.directories || getActiveMissionSearchDirs(options.rootDir)) {

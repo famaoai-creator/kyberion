@@ -804,6 +804,9 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       status: 'active',
     });
+    // Bound tenants cannot enumerate the confidential tier root — a flat
+    // (untenanted-dir) mission is reachable only via its recorded id.
+    saveProjectRecord({ ...project, active_missions: ['MSN-PMC-TIER-COLLISION'] });
     const mission: MissionState = {
       mission_id: 'MSN-PMC-TIER-COLLISION',
       mission_type: 'development',
