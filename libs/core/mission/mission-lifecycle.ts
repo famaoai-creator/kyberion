@@ -4,7 +4,11 @@
  */
 
 import * as path from 'node:path';
-import { addInboxEntry } from '../deliverable-inbox.js';
+import {
+  addInboxEntry,
+  normalizeStoredInboxPaths,
+  repointMissionInboxPaths,
+} from '../deliverable-inbox.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from '../path-resolver.js';
@@ -1273,6 +1277,23 @@ export async function finishMission(
   traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeRmSync(archivePath, { recursive: true, force: true });
   safeMoveSync(missionDir, archivePath);
+  // The mission dir just moved: entry refs pointing inside it are rewritten to
+  // the archived location (deliverables were already promoted out), and any
+  // legacy machine-absolute refs are normalized while the store is touched.
+  try {
+    repointMissionInboxPaths(
+      upperId,
+      pathResolver.toRepoRelative(missionDir),
+      pathResolver.toRepoRelative(archivePath)
+    );
+    normalizeStoredInboxPaths();
+  } catch (error) {
+    logger.warn(
+      `[deliverable-inbox] post-archive repoint for ${upperId} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   traceCtx.endSpan('ok');
 
   state.status = args.transitionStatus(state.status, 'archived');
