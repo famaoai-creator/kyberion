@@ -222,7 +222,8 @@ function asCharter<T>(charter: DotCharter, fn: () => T): T {
     charter.authority.authority_role,
     fn,
     undefined,
-    charter.scope.tenant_slug
+    charter.scope.tenant_slug,
+    charter.scope.organization_id
   );
 }
 
@@ -466,7 +467,51 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
       for (const [id, section] of Object.entries(
         (dot.sections ?? {}) as Record<string, Record<string, unknown>>
       )) {
-        print(`    ${id}: ${compact(section)}`);
+        if (id === 'executor' && section.execution) {
+          const { execution, ...history } = section;
+          print('    executor history: ' + compact(history));
+          const current = execution as Record<string, unknown>;
+          print('    execution: ' + String(current.inventory) + ' | ' + String(current.reason));
+          const scheduling = current.scheduling as Record<string, unknown>;
+          print('      scheduling ' + String(scheduling.state) + ': ' + String(scheduling.reason));
+          print('        next: ' + String(scheduling.next));
+          for (const item of (current.items ?? []) as Array<Record<string, unknown>>) {
+            print(
+              '      ' +
+                String(item.state) +
+                ' ' +
+                String(item.work_item_id) +
+                ' [' +
+                String(item.reason_code) +
+                '] status=' +
+                String(item.item_status)
+            );
+            print(
+              '        current_attempt=' +
+                String(item.current_attempt_id ?? 'none') +
+                ' latest_recorded_attempt=' +
+                String(item.latest_recorded_attempt_id ?? 'none') +
+                ' held_attempt=' +
+                String(item.held_attempt_id ?? 'none') +
+                (item.blocking_work_item_id
+                  ? ' blocking_item=' + String(item.blocking_work_item_id)
+                  : '') +
+                ' age_ms=' +
+                String(item.age_ms ?? 'unknown')
+            );
+            print('        reason: ' + String(item.reason));
+            print('        next: ' + String(item.next));
+          }
+          if (Number(current.items_omitted) > 0)
+            print(
+              '      ' +
+                String(current.items_omitted) +
+                ' additional items omitted; inspect exact work items separately.'
+            );
+          print('      ' + String(current.limitations));
+        } else {
+          print(`    ${id}: ${compact(section)}`);
+        }
       }
     }
     print(`-- ${(report.dots as unknown[]).length} dot(s)`);

@@ -180,6 +180,26 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   invalid, goal driver failing before its first model call), which returns the
   item to `ready` for up to 3 attempts and then ends as an escalated failure.
   Recovery reconciles the original action/attempt without re-executing it.
+  Read-only execution evidence is available through `pnpm kyberion dot status <dot_id>`
+  (or `--json`, under `sections.executor.execution`). It distinguishes a normal
+  running owner, a retained effect hold, an exact-scope target conflict, queued
+  work, and unknown evidence. Current, latest-recorded, and held attempt IDs are
+  separate: a finalized item may have no current pointer while its old effect
+  ownership remains. Ages describe persisted evidence, not a stale-execution
+  threshold. An operator must verify the execution stopped and reconcile partial
+  or late effects before using the existing human recovery flow.
+
+  The same view reads the scheduling cursor without acquiring a lock. Missing
+  cursor means initial order; an invalid truthy JSON shape blocks normal sweeps;
+  malformed JSON, unreadable evidence, or a falsy JSON value means continuation
+  is unknown (the existing optional scheduler reader may default to initial
+  order). No cursor is reset, repaired or advanced. Valid format does not prove
+  executor liveness. Missing or malformed WorkItem inventories remain unknown;
+  older result rows are labeled historical and cannot establish current health.
+  Item references are projected only after exact typed tenant and organization
+  matches. The view does not infer missions from labels or claim that approvals,
+  budgets, dependencies, or ownership outside the visible scope are clear.
+
   Quarantine ends only by a human-approved release:
   `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>"` only
   creates a human-only approval request (autonomy channel, shown by
@@ -203,6 +223,7 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   is reclaimed automatically after 30 s, never a live holder's lock. Restart
   competing workers on upgrade so they all use the repaired primitive in the
   same PID/filesystem namespace.
+
 - **Key results (DL-03)**: `goal.key_results` are measured per sweep
   (`probe`, `file`, `signal_ratio`, `org_metric`) into `kr-ledger.jsonl`; gaps
   to target are injected into the wake prompt. Organization objectives roll up
