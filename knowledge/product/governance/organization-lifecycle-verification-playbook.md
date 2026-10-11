@@ -1,7 +1,7 @@
 ---
 title: Organization Lifecycle Verification Playbook
 tags: [organization, project, operation, verification, governance, onboarding]
-last_updated: 2026-10-06
+last_updated: 2026-10-11
 ---
 
 # Organization lifecycle verification playbook
@@ -197,6 +197,21 @@ advancing decisions.
   tenant paths (`*/shared/`) or unregistered slugs is rejected by current
   validation and only confuses operators.
 
+## Retiring residue (never `rm`)
+
+Retire — never delete — organization residue (typo slugs, empty tenant dirs,
+superseded verification orgs). Move the whole subtree to the mission-archive
+mirror layout so tenant scope and dates stay visible and no ad-hoc root appears:
+
+```bash
+mv active/organizations/<tier>/<tenant>/<residue> \
+  active/archive/organizations/<tier>/<tenant>/<residue>-<yyyymmdd>/
+```
+
+`active/archive/organizations/` mirrors `active/archive/missions/<tier>/<tenant|shared>/`.
+A future `organization archive` facade may govern this; until then this
+documented move is the standard procedure.
+
 ## Troubleshooting (first-run friction log, 2026-09-28)
 
 | Symptom                                                                            | Cause                                                                           | Fix applied                                                                                                                                                                                       |
@@ -210,3 +225,8 @@ advancing decisions.
 | `execution ref must be an existing path within the operation scope: pipelines/...` | Run refs are scope-restricted; `pipelines/` belongs on the operation definition | Error now lists the allowed prefixes and explains the definition-vs-evidence split                                                                                                                |
 | `operation tick` → scope error (even `--dry-run`)                                  | Confidential/personal execution needs `pnpm scope use` first                    | Error now prints expected vs actual scope and the exact `scope use` command; `usage()` Notes document it                                                                                          |
 | `Invalid organization learning candidate: /source_type ...`                        | Closed enum vocabularies                                                        | Error appends the allowed values; `usage()` line shows the enums inline                                                                                                                           |
+| `pending_approval -> pending_approval --request-approval` rejected (2026-10-11)    | Same-status transition refused; requests opened only on status change           | Repeat `pending_approval` with `--request-approval --chosen-option` now re-requests (`re_request:true`), no deferred detour                                                                       |
+| `finish` blocked, then status active again + `archive not confirmed` (2026-10-11)  | Goal-gap dispatch realigns to active silently with no fresh gate reason         | Gap dispatch records a fresh gate reason; controller reports it instead of the archive fallback                                                                                                   |
+| `finish` blocked on review task despite `review-task` success (2026-10-11)         | Receipt ≠ task completion; REVIEW deliverable + `record-evidence` still needed  | `review-task` prints next-step guidance and warns when the REVIEW doc is missing                                                                                                                  |
+| `scope use` clobbers the current scope before `tick` (2026-10-11)                  | No stash/restore; `clear` only deletes                                          | `pnpm scope push` / `pnpm scope pop` stash and restore scope.env                                                                                                                                  |
+| Residue org dirs removed with `rm` (2026-10-11)                                    | Deletion loses evidence; ad-hoc dirs violate the layout                         | Retire to `active/archive/organizations/<tier>/<tenant>/<slug>-<yyyymmdd>/` per §Retiring residue                                                                                                 |

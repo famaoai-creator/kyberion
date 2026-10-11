@@ -28,6 +28,7 @@ import {
   appendMissionExecutionLedgerEntry,
   type MissionActorType,
 } from './mission-team-binding.js';
+import { buildReviewCloseOutStep } from './mission-review-close-out.js';
 import { TraceContext, persistTrace } from '../analysis/trace.js';
 import { loadMissionOrchestrationReplayPlan } from './mission-orchestration-journal.js';
 import {
@@ -1012,6 +1013,8 @@ export interface RecordArtifactReviewResult {
   /** Non-empty only when status === 'blocked' — why the receipt doesn't clear the gate. */
   reasons: string[];
   receiptPath: string;
+  /** Close-out guidance; see buildReviewCloseOutStep. Present while the task is open. */
+  next_step?: string;
 }
 
 /**
@@ -1209,6 +1212,7 @@ export async function recordArtifactReview(args: {
     taskCompleted,
     reasons: evaluation.reasons,
     receiptPath: receiptRelPath,
+    ...(taskCompleted ? {} : { next_step: buildReviewCloseOutStep(args, task, missionPath) }),
   };
 }
 
