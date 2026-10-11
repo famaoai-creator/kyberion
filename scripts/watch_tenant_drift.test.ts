@@ -44,3 +44,31 @@ describe('watch_tenant_drift audit metadata', () => {
     );
   });
 });
+
+describe('watch_tenant_drift tier-root walk', () => {
+  it('under a bound tenant, probes only the bound partition — never the protected tier root', async () => {
+    vi.resetModules();
+    const getAllFilesMock = vi.fn((_dir: string) => [] as string[]);
+    vi.doMock('@agent/core/fs-utils', () => ({ getAllFiles: getAllFilesMock }));
+    vi.doMock('@agent/core/secure-io', async () => {
+      const actual =
+        await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+      return { ...actual, safeExistsSync: vi.fn(() => true) };
+    });
+    process.env.KYBERION_TENANT = 'acme-tenant';
+    try {
+      const { scanTenantDrift } = await import('./watch_tenant_drift.js');
+      const report = scanTenantDrift();
+      expect(report.scanned_paths).toBe(0);
+      expect(getAllFilesMock).toHaveBeenCalledTimes(1);
+      const walked = String(getAllFilesMock.mock.calls[0]?.[0] || '');
+      expect(walked).toMatch(/missions[/\\]confidential[/\\]acme-tenant$/);
+      expect(walked).not.toMatch(/missions[/\\]confidential$/);
+    } finally {
+      delete process.env.KYBERION_TENANT;
+      vi.doUnmock('@agent/core/fs-utils');
+      vi.doUnmock('@agent/core/secure-io');
+      vi.resetModules();
+    }
+  });
+});

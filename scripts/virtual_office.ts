@@ -43,6 +43,7 @@ import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { readOpsAlertLogRecords } from '@agent/core/ops-alert';
 import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
 import { pathResolver } from '@agent/core/path-resolver';
+import { missionTierScanDirs } from '@agent/core/owner-scope';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -171,31 +172,43 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
     { dir: pathResolver.rootResolve('active/missions/personal'), tier: 'personal' },
   ];
   const found: Array<{ missionPath: string; tier: string }> = [];
-  for (const root of roots) {
-    let safeRoot: string;
-    try {
-      safeRoot = assertSafeRepositoryPath(root.dir, { allowMissingLeaf: true });
-      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
-    } catch {
-      continue;
-    }
+  const collect = (dir: string, tier: string): void => {
     let entries: string[] = [];
     try {
-      entries = safeReaddir(safeRoot);
+      entries = safeReaddir(dir);
     } catch {
-      continue;
+      return;
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
       try {
-        const missionPath = assertSafeRepositoryPath(path.join(safeRoot, entry), {
+        const missionPath = assertSafeRepositoryPath(path.join(dir, entry), {
           allowMissingLeaf: true,
         });
+        if (!safeLstat(missionPath).isDirectory()) continue;
         const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
           allowMissingLeaf: true,
         });
-        if (!safeLstat(missionPath).isDirectory() || !safeExistsSync(statePath)) continue;
-        found.push({ missionPath, tier: root.tier });
+        if (safeExistsSync(statePath)) {
+          found.push({ missionPath, tier });
+        } else {
+          // Tier-partitioned layout: <tier>/<tenant>/<mission-id> — descend
+          // one level when the entry has no mission-state.json.
+          collect(missionPath, tier);
+        }
+      } catch {
+        continue;
+      }
+    }
+  };
+  for (const root of roots) {
+    // A bound process may not enumerate a protected tier root — probe only
+    // the bound partition instead (unbound keeps the whole root).
+    for (const scanDir of missionTierScanDirs(root.dir)) {
+      try {
+        const safeRoot = assertSafeRepositoryPath(scanDir, { allowMissingLeaf: true });
+        if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
+        collect(safeRoot, root.tier);
       } catch {
         continue;
       }
