@@ -59,6 +59,14 @@ entries carry a `shard` key so job names stay distinct (`test (scripts, 1/3)`).
 `actions/cache`, so CI test jobs reuse prior-run transforms instead of re-transforming every
 source (transform was ~20-30% of suite wall time).
 
+**Shared build artifact.** Both `ci.yml` and `pr-validation.yml` run one `build-artifacts`
+job that uploads the owned compiler outputs (`dist/`, `libs/*/dist`, package dists, knowledge
+manifest — the same set declared in `scripts/build-output-layout.ts`, minus the multi-GB
+`.next` UI bundles). Downstream jobs declare `needs: build-artifacts` and restore with
+`actions/download-artifact` instead of re-running `pnpm run build` (~4min per job).
+`first-win-clean-clone` keeps its own build — a clean checkout build IS the check there.
+Jobs that need `.next` must build it locally with `pnpm run build:ui`.
+
 ## CI Workflow
 
 `ci.yml` performs:
