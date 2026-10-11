@@ -5,9 +5,12 @@ import {
   type FrontDeskRequestOutcome,
 } from '@agent/core/surface/front-desk-request-service';
 import { readFrontDeskRequest } from '@agent/core/surface/front-desk-request-result';
-import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import {
+  prepareConciergeHumanRequest,
+  authorizeConciergeHumanRequest,
+  humanRequestError,
+} from '../../../lib/browser-human-request';
 import { readRequestObject } from '../../../lib/request-input';
-import { conversationViewerForSelection } from '../../../lib/selected-tenant';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
 import { CONVERSATION_MAX_INPUT } from '../../../lib/conversation-history';
 import {
@@ -21,7 +24,7 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 
 /** Restore only the current server-owned conversation; query IDs never select an owner. */
 export function GET(req: NextRequest) {
-  const resolved = conversationViewerForSelection(req);
+  const resolved = prepareConciergeHumanRequest(req, false);
   if (resolved.response) return resolved.response;
   let viewer: ReturnType<typeof narrowFrontDeskConversationViewer>;
   try {
@@ -45,6 +48,17 @@ export function GET(req: NextRequest) {
       { ok: false, error: 'invalid_request_id' },
       { status: 400, headers: NO_STORE }
     );
+  }
+  try {
+    viewer = authorizeConciergeHumanRequest(
+      resolved.context,
+      viewer,
+      resolved.config,
+      requestId !== null ? 'result' : 'history',
+      requestId ?? undefined
+    );
+  } catch (error) {
+    return humanRequestError(error);
   }
   try {
     if (requestId !== null) {
@@ -200,10 +214,7 @@ function requestResponse(result: FrontDeskRequestOutcome, locale: ConciergeLocal
 
 // Text clients share the authenticated durable partition. A timeout never starts a second execution.
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
-  if (denied) return denied;
-
-  const resolved = conversationViewerForSelection(req);
+  const resolved = prepareConciergeHumanRequest(req, true);
   if (resolved.response) return resolved.response;
   let viewer: ReturnType<typeof narrowFrontDeskConversationViewer> = resolved.context;
   const parsedBody = await readRequestObject(req, 'request body', [
@@ -292,6 +303,18 @@ export async function POST(req: NextRequest) {
       { ok: false, error: 'conversation_scope_changed', retry_safe: true },
       { status: 409, headers: NO_STORE }
     );
+  }
+
+  try {
+    viewer = authorizeConciergeHumanRequest(
+      resolved.context,
+      viewer,
+      resolved.config,
+      'receive',
+      typeof body.requestId === 'string' ? body.requestId : undefined
+    );
+  } catch (error) {
+    return humanRequestError(error);
   }
 
   return requestResponse(
