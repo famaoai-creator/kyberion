@@ -1,7 +1,7 @@
 ---
 title: Default-disabled HTTP MCP human request resource server
 tags: [architecture, mcp, authorization, identity, front-desk]
-last_updated: 2026-10-10
+last_updated: 2026-10-11
 ---
 
 # HTTP MCP human request resource server
@@ -11,8 +11,12 @@ last_updated: 2026-10-10
 `createMcpHttpResourceServer` is an Express router factory in shared-network.
 Without `enabled: true`, it exposes no routes. It never opens a listener, changes
 an existing surface, registers a provider/client, or reads a Web cookie.
-No shipped runtime calls this factory. Deployment, authorization-server setup,
-credential introduction, and real-provider interoperability are separate work.
+The explicit default-off HTTP composition and check/start entrypoint call this
+factory at the application root. Startup requires a separately reviewed config
+and an explicit loopback-only reverse-proxy deployment profile; imports and
+check-only validation never listen. Deployment, authorization-server setup,
+credential introduction, and real-provider interoperability remain separate work.
+See [runtime operations](../../../docs/developer/HUMAN_REQUEST_RUNTIME_OPERATIONS.ja.md).
 
 The existing stdio MCP catalog and identities are unchanged. The new factory
 exposes only `kyberion.request.receive`, `kyberion.request.status`, and
@@ -89,11 +93,13 @@ transport are excluded. Verified issuer/subject and transport are separately
 audited with the request ID. Audit failure prevents operation invocation.
 
 `resolveVerifiedBrowserHumanRequestIdentity` is an explicit opt-in **trusted
-in-process seam** for future browser adapters. The caller must already verify a
+in-process seam** for browser adapters. The caller must already verify a
 browser session and provide its issuer/subject/expiry proof; the helper does not
-authenticate structural proof by itself. The current Web login/UI is not wired
-to this seam. Pairwise subjects require explicit registry alias bindings, never
-email matching. Tests prove seam-level parity, not live browser/AS integration.
+authenticate structural proof by itself. The opt-in Concierge request route obtains proof from a private WeakMap keyed
+by the exact authenticated browser principal, then intersects current viewer
+restrictions with the server policy and strict registry. Copies or serialized
+principals cannot recreate proof. Read/receive audit failures are terminal. Pairwise subjects require explicit registry alias bindings, never
+email matching. Tests include authenticated synthetic transport parity, not live browser/AS integration.
 
 Legacy conversations retain byte-identical ownership hashing. Existing history
 is not migrated. New canonical-human requests occupy a distinct namespace;
