@@ -5,8 +5,8 @@
 // step-type inference is unchanged; all other ops were previously
 // unclassifiable (determineActuatorStepType threw unknown-op).
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 type InputSchema = Record<string, unknown>;
 

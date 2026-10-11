@@ -25,7 +25,7 @@ import { stalenessReport, type IngestSourceObservation } from '@agent/core/inges
 import {
   defineCatalogBackedActuator,
   runActuatorPipeline,
-} from '../../../core/actuator/actuator-sdk.js';
+} from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 import { commitIngest, type IngestCommitInput } from './commit.js';
 import { dedupContent, type DedupInput } from './dedup.js';

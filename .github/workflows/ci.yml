@@ -94,29 +94,15 @@ jobs:
       - name: Validate surface runtime contract
         run: node dist/scripts/surface_runtime.js --action status > /dev/null
 
-      - name: Verify no build artifacts in source control
+      - name: Verify no build artifacts shadow source
         run: |
-          STALE=$(git diff --name-only -- 'libs/' 'presence/displays/' 'satellites/' | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5)
+          CHANGED=$(git diff --name-only -- 'libs/' 'presence/displays/' 'satellites/')
+          STALE=$(printf '%s\n' "$CHANGED" | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5 || true)
           if [ -n "$STALE" ]; then
-            echo "::error::Build artifacts detected in source tree: $STALE"
+            echo "::error::Build artifacts changed tracked source files: $STALE"
             exit 1
           fi
-          # Compiled shadows committed next to .ts sources shadow the module
-          # at runtime and pollute boundary baselines (2026-07-08 incident).
-          SHADOWS=$(git ls-files '*.js' '*.js.map' '*.d.ts' | grep -Ev '^(dist|docs|tools|knowledge|plugins)/' | while read -r f; do
-            base="$f"
-            case "$f" in
-              *.d.ts.map) base="${f%.d.ts.map}" ;;
-              *.d.ts) base="${f%.d.ts}" ;;
-              *.js.map) base="${f%.js.map}" ;;
-              *.js) base="${f%.js}" ;;
-            esac
-            if [ -f "${base}.ts" ] || [ -f "${base}.tsx" ]; then echo "$f"; fi
-          done | head -10)
-          if [ -n "$SHADOWS" ]; then
-            echo "::error::Compiled artifacts shadow TypeScript sources: $SHADOWS"
-            exit 1
-          fi
+          node --import ./scripts/ts-loader.mjs scripts/check_source_shadows.ts
 
   first-win-clean-clone:
     runs-on: ubuntu-latest

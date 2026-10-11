@@ -110,7 +110,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
       main: `../../../dist/libs/actuators/${fullName}/src/index.js`,
       types: `../../../dist/libs/actuators/${fullName}/src/index.d.ts`,
       scripts: {
-        build: 'tsc -p ../../../tsconfig.actuators.json',
+        build: 'pnpm --dir ../../.. run build:repo',
         test: 'vitest run',
       },
       dependencies: {

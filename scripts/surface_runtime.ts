@@ -1191,6 +1191,7 @@ export const runSurfaceRuntime = defineScript({
 if (
   isDirectScript(import.meta.url, 'surface_runtime.ts') ||
   isDirectScript(import.meta.url, 'surface_runtime.js') ||
+  isDirectScript(import.meta.url, 'surface_runtime.bundle.js') ||
   isDirectScript(import.meta.url, 'surface_runtime.mts')
 )
   void runSurfaceRuntime();

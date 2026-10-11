@@ -98,6 +98,29 @@ describe('check_dist_workspace_imports', () => {
   });
 
   describe('checkDistWorkspaceImports', () => {
+    it('resolves package-local dependencies from the emitted owner using import conditions', () => {
+      write(
+        'packages/owner/package.json',
+        JSON.stringify({ name: '@fixture/owner', dependencies: { 'fixture-local-dep': '1.0.0' } })
+      );
+      write('packages/owner/dist/entry.js', "import 'fixture-local-dep';\n");
+      write(
+        'packages/owner/node_modules/fixture-local-dep/package.json',
+        JSON.stringify({
+          name: 'fixture-local-dep',
+          type: 'module',
+          exports: { import: './entry.js', require: null },
+        })
+      );
+      write('packages/owner/node_modules/fixture-local-dep/entry.js', 'export default 1;\n');
+      expect(
+        checkDistWorkspaceImports({
+          packageScanRoots: [FIXTURE_ROOT + '/packages'],
+          scanRoots: [FIXTURE_ROOT + '/packages/owner/dist'],
+        })
+      ).toEqual([]);
+    });
+
     it('flags a workspace-scoped bare import that pnpm never linked', () => {
       write(
         'packages/broken-actuator/package.json',

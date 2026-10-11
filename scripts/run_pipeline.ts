@@ -59,7 +59,8 @@ import { main as runPipelineMain } from './pipeline-execution-part-results.js';
 
 const isDirectRun =
   isDirectScript(import.meta.url, 'run_pipeline.ts') ||
-  isDirectScript(import.meta.url, 'run_pipeline.js');
+  isDirectScript(import.meta.url, 'run_pipeline.js') ||
+  isDirectScript(import.meta.url, 'run_pipeline.bundle.js');
 if (isDirectRun) {
   void defineScript({
     name: 'pipeline',

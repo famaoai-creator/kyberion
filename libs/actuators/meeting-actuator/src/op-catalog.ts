@@ -1,12 +1,12 @@
-import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
+import { withCatalogInputContract } from '@agent/core/actuator/actuator-sdk';
 
 // AR-02: self-described op catalog — one entry per dispatch-table op in
 // meeting-op-dispatch.ts. Session transport ops and intelligence ops share
 // the catalog so `meeting:<op>` resolves identically from pipelines, ADF,
 // and `actuator.dispatch()`.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const BASE_PROPERTIES = {
   export_as: { type: 'string' },

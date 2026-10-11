@@ -1,8 +1,6 @@
 {
-  "extends": "../../../tsconfig.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "../",
     "module": "NodeNext",
     "target": "ES2022",
     "moduleResolution": "NodeNext",
@@ -10,10 +8,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    "paths": {
-      "@agent/core": ["../../../libs/core/dist/index.d.ts"],
-      "@agent/core/*": ["../../../libs/core/dist/*"]
-    }
+    "noEmit": true,
+    "incremental": false
   },
   "include": ["server.ts"]
 }

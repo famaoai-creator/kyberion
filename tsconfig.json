@@ -1,35 +1,24 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "Node16",
     "outDir": "./dist",
     "rootDir": ".",
-    "strict": false,
-    "noImplicitAny": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "paths": {
-      "@agent/core": ["./libs/core/index.ts"],
-      "@agent/core/*": ["./libs/core/*.ts", "./libs/core/*"],
-      "@agent/shared-media": ["./libs/shared-media/src/index.ts"],
-      "@agent/shared-vision": ["./libs/shared-vision/src/index.ts"],
-      "@agent/shared-network": ["./libs/shared-network/src/index.ts"],
-
-      "@agent/shared-nerve": ["./libs/shared-nerve/src/index.ts"],
       "@actuator/service": ["./libs/actuators/service-actuator/src/index.ts"],
       "@actuator/system": ["./libs/actuators/system-actuator/src/index.ts"],
       "@actuator/meeting-browser-driver": ["./libs/actuators/meeting-browser-driver/src/index.ts"]
     }
   },
-  "include": ["scripts/**/*.ts", "presence/**/*.ts", "satellites/**/*.ts"],
+  "include": [
+    "scripts/**/*.ts",
+    "presence/**/*.ts",
+    "satellites/**/*.ts",
+    "libs/actuators/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
@@ -38,6 +27,33 @@
     "presence/displays/chronos-mirror-v2/",
     "presence/displays/terminal-hud/",
     "presence/displays/operator-surface/",
-    "presence/displays/concierge/"
+    "presence/displays/concierge/",
+    "libs/actuators/**/*.test.ts",
+    "scripts/clean.ts",
+    "scripts/clean_entrypoint.ts"
+  ],
+  "extends": "./tsconfig.base.json",
+  "references": [
+    {
+      "path": "./libs/core"
+    },
+    {
+      "path": "./libs/shared-ui"
+    },
+    {
+      "path": "./libs/shared-media"
+    },
+    {
+      "path": "./libs/shared-nerve"
+    },
+    {
+      "path": "./libs/shared-network"
+    },
+    {
+      "path": "./libs/shared-vision"
+    },
+    {
+      "path": "./presence/displays/terminal-hud"
+    }
   ]
 }

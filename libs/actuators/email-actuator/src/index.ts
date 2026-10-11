@@ -26,7 +26,7 @@ import {
 import {
   defineCatalogBackedActuator,
   runActuatorPipeline,
-} from '../../../core/actuator/actuator-sdk.js';
+} from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 
 interface EmailParams {

@@ -191,7 +191,7 @@ jobs:
         run: |
           # Verify customer overlay path resolution doesn't panic on either OS.
           node -e "
-          const r = require('./dist/libs/core/customer-resolver.js');
+          const r = require('./libs/core/dist/customer-resolver.js');
           if (!r.activeCustomer({ KYBERION_CUSTOMER: 'smoke-test' })) {
             console.error('customer resolver failed to detect active slug');
             process.exit(1);

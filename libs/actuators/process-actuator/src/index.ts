@@ -7,7 +7,7 @@ import { isDirectEntry } from '@agent/core/direct-entry';
 import * as pathResolver from '@agent/core/path-resolver';
 import { handleAction, readProcessJsonObject } from './process-actuator-helpers.js';
 import { parseProcessAction } from './process-action-input.js';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 
 async function main() {

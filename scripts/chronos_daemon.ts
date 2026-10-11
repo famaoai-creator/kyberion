@@ -880,7 +880,8 @@ const runChronosDaemon = defineScript({
 
 if (
   isDirectScript(import.meta.url, 'chronos_daemon.ts') ||
-  isDirectScript(import.meta.url, 'chronos_daemon.js')
+  isDirectScript(import.meta.url, 'chronos_daemon.js') ||
+  isDirectScript(import.meta.url, 'chronos_daemon.bundle.js')
 ) {
   void runChronosDaemon();
 }

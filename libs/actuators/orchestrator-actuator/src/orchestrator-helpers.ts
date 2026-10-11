@@ -32,8 +32,8 @@ import type { ActuatorPipelineBundle } from '@agent/core/contracts/actuator-pipe
 import type { ActuatorResolutionPlan } from '@agent/core/contracts/actuator-resolution-plan';
 import type { SystemStatusBrief } from '@agent/core/contracts/system-status-brief';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
-import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
-import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/pipeline/adf-engine.js';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,

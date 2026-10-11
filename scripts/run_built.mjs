@@ -42,7 +42,7 @@ try {
   }
   try {
     const { renderScriptError } = await import(
-      pathToFileURL(resolve(ROOT, 'dist/libs/core/script-harness.js')).href
+      pathToFileURL(resolve(ROOT, 'libs/core/dist/script-harness.js')).href
     );
     const report = renderScriptError(error, { debug: DEBUG });
     console.error(`[${target}] ${report.message}`);
