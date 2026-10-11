@@ -1271,11 +1271,28 @@ export async function finishMission(
 
   const safeArchiveDir = assertSafeRepositoryPath(args.archiveDir, { allowMissingLeaf: true });
   if (!safeExistsSync(safeArchiveDir)) safeMkdir(safeArchiveDir, { recursive: true });
-  const archivePath = assertSafeRepositoryPath(path.join(safeArchiveDir, upperId), {
-    allowMissingLeaf: true,
-  });
+  // Canonical archive layout mirrors the active one — <root>/<tier>/<tenant|shared>/<id> —
+  // so archived confidential/personal content stays under tenant_scope's protected prefixes.
+  const archiveTier = ['personal', 'confidential', 'public', 'ephemeral'].includes(
+    String(state.tier || '')
+  )
+    ? String(state.tier)
+    : 'public';
+  const archivePath = assertSafeRepositoryPath(
+    path.join(
+      safeArchiveDir,
+      archiveTier,
+      String(state.tenant_slug || '')
+        .trim()
+        .toLowerCase() || 'shared',
+      upperId
+    ),
+    { allowMissingLeaf: true }
+  );
   traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeRmSync(archivePath, { recursive: true, force: true });
+  const archiveParent = path.dirname(archivePath);
+  if (!safeExistsSync(archiveParent)) safeMkdir(archiveParent, { recursive: true });
   safeMoveSync(missionDir, archivePath);
   // The mission dir just moved: entry refs pointing inside it are rewritten to
   // the archived location (deliverables were already promoted out), and any

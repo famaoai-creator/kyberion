@@ -115,7 +115,11 @@ const DEFAULT_LIVE_READERS: FirstWinLifecycleLiveReaders = {
   archiveMission: (missionId) =>
     (() => {
       try {
-        return safeExistsSync(resolveFirstWinResourcePath(`active/archive/missions/${missionId}`));
+        return Boolean(
+          pathResolver.findArchivedMissionDir(missionId, {
+            archiveRoot: resolveFirstWinResourcePath('active/archive/missions'),
+          })
+        );
       } catch {
         return false;
       }

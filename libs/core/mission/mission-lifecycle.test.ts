@@ -64,7 +64,9 @@ const demoTenantMissionPath = pathResolver.missionDir(missionId, 'public', 'demo
 // finishMission persists the post-archive state in the archive copy and
 // leaves no stub at the active path.
 const archivedStatePath = () =>
-  pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}/mission-state.json`);
+  pathResolver.rootResolve(
+    `active/shared/tmp/mission-archives/public/shared/${missionId}/mission-state.json`
+  );
 const personalRepairMissionId = 'MSN-LIFECYCLE-REPAIR-PERSONAL-001';
 const personalRepairMissionPath = pathResolver.missionDir(personalRepairMissionId, 'personal');
 const promotionQueuePath = pathResolver.sharedTmp(
@@ -153,6 +155,14 @@ beforeEach(() => {
 
 afterEach(() => {
   safeRmSync(pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`));
+  safeRmSync(pathResolver.rootResolve('active/shared/tmp/mission-archives/public'), {
+    recursive: true,
+    force: true,
+  });
+  safeRmSync(pathResolver.rootResolve('active/shared/tmp/mission-archives/personal'), {
+    recursive: true,
+    force: true,
+  });
   safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(demoTenantMissionPath, { recursive: true, force: true });
@@ -916,7 +926,9 @@ describe('mission lifecycle finish gate', () => {
       transitionStatus,
     });
 
-    const archivePath = pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`);
+    const archivePath = pathResolver.rootResolve(
+      `active/shared/tmp/mission-archives/public/shared/${missionId}`
+    );
     // Disposable classes deleted; deliverable/evidence kept; index rewritten.
     expect(safeExistsSync(`${archivePath}/artifacts/cache`)).toBe(false);
     expect(safeExistsSync(`${archivePath}/artifacts/report/final.md`)).toBe(true);

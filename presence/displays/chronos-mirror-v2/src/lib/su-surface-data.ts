@@ -199,18 +199,34 @@ function collectMissionStates(): MissionState[] {
     try {
       const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
       if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
-      for (const entry of safeReaddir(safeRoot)) {
-        const statePath = assertSafeRepositoryPath(`${safeRoot}/${entry}/mission-state.json`, {
+      // Bounded walk — mission dirs sit flat, under <tenant>/<id>, or in the
+      // archive under <tier>/<tenant|shared>/<id>.
+      const visit = (dir: string, depth: number): void => {
+        const statePath = assertSafeRepositoryPath(path.join(dir, 'mission-state.json'), {
           allowMissingLeaf: true,
         });
-        if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) continue;
-        try {
-          const state = loadStateAtPath(statePath);
-          if (state) states.push(state);
-        } catch {
-          // Ignore malformed mission state files.
+        if (safeExistsSync(statePath) && safeLstat(statePath).isFile()) {
+          try {
+            const state = loadStateAtPath(statePath);
+            if (state) states.push(state);
+          } catch {
+            // Ignore malformed mission state files.
+          }
+          return;
         }
-      }
+        if (depth >= 3) return;
+        for (const entry of safeReaddir(dir)) {
+          const child = assertSafeRepositoryPath(path.join(dir, entry), {
+            allowMissingLeaf: true,
+          });
+          try {
+            if (safeLstat(child).isDirectory()) visit(child, depth + 1);
+          } catch {
+            // Ignore unreadable entries; the feed stays best-effort.
+          }
+        }
+      };
+      visit(safeRoot, 0);
     } catch {
       // Ignore unauthorized or inaccessible mission roots.
     }

@@ -5,7 +5,7 @@ import { listArtifactRecords } from '../workforce/artifact-record.js';
 import { buildNextAction, type NextAction } from '../next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from '../deliverable-inbox.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { loadSoftwareQualityReportAtPath } from '../software-quality-report-reader.js';
 import { loadMissionStaffingAssignments } from '../mission/mission-team-binding.js';
@@ -282,10 +282,28 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
   for (const root of readMissionManagementDirs()) {
     if (!safeExistsSync(root)) continue;
     try {
-      for (const entry of safeReaddir(root)) {
-        const statePath = safeOptionalRepositoryPath(path.join(root, entry, 'mission-state.json'));
-        if (!statePath) continue;
-        if (!safeExistsSync(statePath)) continue;
+      // Bounded walk — mission dirs sit flat, under <tenant>/<id>, or in the
+      // archive under <tier>/<tenant|shared>/<id>.
+      const statePaths: string[] = [];
+      const collect = (dir: string, depth: number): void => {
+        const statePath = safeOptionalRepositoryPath(path.join(dir, 'mission-state.json'));
+        if (statePath && safeExistsSync(statePath)) {
+          statePaths.push(statePath);
+          return;
+        }
+        if (depth >= 3) return;
+        for (const entry of safeReaddir(dir)) {
+          const child = safeOptionalRepositoryPath(path.join(dir, entry));
+          if (!child) continue;
+          try {
+            if (safeLstat(child).isDirectory()) collect(child, depth + 1);
+          } catch {
+            // Ignore unreadable entries; the summary stays best-effort.
+          }
+        }
+      };
+      collect(root, 0);
+      for (const statePath of statePaths) {
         try {
           const state = loadMissionStateAtPath(statePath) as
             (ReturnType<typeof loadMissionStateAtPath> & { project_id?: string }) | null;
