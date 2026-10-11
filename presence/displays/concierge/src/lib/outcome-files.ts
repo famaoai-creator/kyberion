@@ -4,7 +4,13 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core/deliverable-inbox';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
-import { clearOwnerScopeCache, resolveOwnerScope, type OwnerScope } from '@agent/core/owner-scope';
+import {
+  clearOwnerScopeCache,
+  OwnerScopeError,
+  resolveOwnerScope,
+  SHARED_TENANT,
+  type OwnerScope,
+} from '@agent/core/owner-scope';
 import { loadMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -72,7 +78,19 @@ function authorize(viewer: ConciergeViewerContext, entryId: string): Snapshot {
     if (!entry.mission_id || !ENTRY_ID.test(entry.mission_id)) throw new OutcomeFileError(403);
     if (entry.artifact_paths.length > OUTCOME_FILE_LIMIT) throw new OutcomeFileError(413);
     clearOwnerScopeCache();
-    const owner = resolveOwnerScope({ kind: 'mission', id: entry.mission_id });
+    let owner: OwnerScope;
+    let archived = false;
+    try {
+      owner = resolveOwnerScope({ kind: 'mission', id: entry.mission_id });
+    } catch (error) {
+      // A finished mission's dir moved under active/archive/missions/ — its
+      // entry still delivers files, resolved from the preserved state there.
+      if (!(error instanceof OwnerScopeError && error.code === 'OWNER_NOT_FOUND')) throw error;
+      const archivedOwner = archivedMissionOwner(entry.mission_id);
+      if (!archivedOwner) throw new OutcomeFileError(404);
+      owner = archivedOwner;
+      archived = true;
+    }
     const statePath = io.assertSafeRepositoryPath(path.join(owner.dir, 'mission-state.json'));
     const state = loadMissionStateAtPath(statePath);
     if (
@@ -89,13 +107,21 @@ function authorize(viewer: ConciergeViewerContext, entryId: string): Snapshot {
     )
       throw new OutcomeFileError(403);
     // The state cannot relabel a physical confidential mission as public, or change its tenant.
-    const tierRoot = path.dirname(pathResolver.missionDir(entry.mission_id, owner.tier));
-    const relative = path.relative(tierRoot, owner.dir).split(path.sep);
-    if (
-      !(relative.length === 1 && relative[0] === entry.mission_id) &&
-      !(relative.length === 2 && relative[0] === owner.tenant && relative[1] === entry.mission_id)
-    )
-      throw new OutcomeFileError(403);
+    if (archived) {
+      if (
+        path.dirname(owner.dir) !== pathResolver.archivedMissionsRoot() ||
+        path.basename(owner.dir) !== entry.mission_id
+      )
+        throw new OutcomeFileError(403);
+    } else {
+      const tierRoot = path.dirname(pathResolver.missionDir(entry.mission_id, owner.tier));
+      const relative = path.relative(tierRoot, owner.dir).split(path.sep);
+      if (
+        !(relative.length === 1 && relative[0] === entry.mission_id) &&
+        !(relative.length === 2 && relative[0] === owner.tenant && relative[1] === entry.mission_id)
+      )
+        throw new OutcomeFileError(403);
+    }
     if (
       !contains(viewer.tenantSlugs, owner.tenant) ||
       !contains(viewer.organizationIds, owner.organization_id) ||
@@ -150,6 +176,30 @@ function readAsViewer<T>(viewer: ConciergeViewerContext, owner: OwnerScope, fn: 
     owner.organization_id
   );
 }
+/** An archived mission's owner scope, rebuilt from its preserved state. */
+function archivedMissionOwner(missionId: string): OwnerScope | undefined {
+  const dir = pathResolver.archivedMissionDir(missionId);
+  if (!io.safeExistsSync(dir)) return undefined;
+  const state = loadMissionStateAtPath(
+    io.assertSafeRepositoryPath(path.join(dir, 'mission-state.json'))
+  );
+  if (!state || state.mission_id !== missionId) return undefined;
+  const tier = String(state.tier || '');
+  if (tier !== 'public' && tier !== 'confidential' && tier !== 'personal') return undefined;
+  const recordedTenant = String(state.tenant_slug || state.tenant_id || '').trim();
+  const tenant = isValidTenantSlug(recordedTenant) ? recordedTenant : SHARED_TENANT;
+  const organizationId =
+    state.organization_id || state.relationships?.organization?.organization_id;
+  const projectId = state.relationships?.project?.project_id;
+  return {
+    owner: { kind: 'mission', id: missionId },
+    tier: tier as OwnerScope['tier'],
+    tenant,
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+    dir,
+  };
+}
 function artifactPath(snapshot: Snapshot, raw: string): string {
   if (
     !raw ||
@@ -159,8 +209,23 @@ function artifactPath(snapshot: Snapshot, raw: string): string {
     raw.split('/').some((segment) => segment === '..' || segment === '.')
   )
     throw new OutcomeFileError(404);
-  const resolved = path.resolve(pathResolver.rootDir(), raw);
-  const relative = path.relative(snapshot.owner.dir, resolved);
+  let resolved = path.resolve(pathResolver.rootDir(), raw);
+  let relative = path.relative(snapshot.owner.dir, resolved);
+  const archivedOwner =
+    path.dirname(snapshot.owner.dir) === pathResolver.archivedMissionsRoot() &&
+    path.basename(snapshot.owner.dir) === snapshot.entry.mission_id;
+  if (archivedOwner && (path.isAbsolute(relative) || relative.split(path.sep)[0] === '..')) {
+    // The mission dir moved to the archive after the entry was written: refs
+    // still name the old location — resolve the in-mission tail under the
+    // archived dir instead. (For an active owner an out-of-tree ref is simply
+    // invalid; only the move makes it legitimate.)
+    const normalized = path.relative(pathResolver.rootDir(), resolved).split(path.sep).join('/');
+    const marker = `/${snapshot.entry.mission_id}/`;
+    const at = normalized.indexOf(marker);
+    if (at < 0) throw new OutcomeFileError(404);
+    resolved = path.join(snapshot.owner.dir, normalized.slice(at + marker.length));
+    relative = path.relative(snapshot.owner.dir, resolved);
+  }
   const segments = relative.split(path.sep);
   if (path.isAbsolute(relative) || segments.length < 2 || !DELIVERY_ROOTS.has(segments[0]))
     throw new OutcomeFileError(404);

@@ -15,8 +15,10 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeReadFile,
   safeWriteFile,
 } from '../secure-io.js';
+import { countPptxSlides } from '../media/pptx-slide-count.js';
 import {
   STORAGE_FLOOR_ROOTS,
   SYSTEM_PARTITION,
@@ -688,6 +690,25 @@ function publishScopedArtifact(
   // The owner's organization wins over any caller-supplied one.
   const organizationId =
     root.organizationId ?? input.scope.organization ?? publication.organization_id;
+  const metadata = { ...(publication.metadata || {}) };
+  // Deck records fail the quality gate without a slide count — stamp it from
+  // the written pptx when the caller didn't provide one.
+  if (
+    /\.pptx$/i.test(repoRelativePath) &&
+    metadata.slides_count === undefined &&
+    metadata.slide_count === undefined &&
+    metadata.total_slides === undefined &&
+    !Array.isArray(metadata.slides)
+  ) {
+    try {
+      const slides = countPptxSlides(
+        safeReadFile(pathResolver.rootResolve(repoRelativePath), { encoding: null }) as Buffer
+      );
+      if (slides !== undefined) metadata.slides_count = slides;
+    } catch {
+      // A missing/unreadable artifact body must not block publication.
+    }
+  }
   const record = createArtifactRecord({
     ...(publication.artifact_id ? { artifact_id: publication.artifact_id } : {}),
     kind: publication.kind,
@@ -701,7 +722,7 @@ function publishScopedArtifact(
     ...(publication.task_session_id ? { task_session_id: publication.task_session_id } : {}),
     ...(publication.preview_text ? { preview_text: publication.preview_text } : {}),
     metadata: {
-      ...(publication.metadata || {}),
+      ...metadata,
       tier,
       artifact_class: input.artifact_class,
       scope_kind: kind,

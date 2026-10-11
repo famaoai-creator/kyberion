@@ -214,6 +214,65 @@ describe('deliverable inbox', () => {
     ]);
   });
 
+  it('repoints a finished mission\u2019s stored refs to the archive location', async () => {
+    const { addInboxEntry, repointMissionInboxPaths, listInboxEntries } =
+      await import('./deliverable-inbox.js');
+    const relative = 'active/missions/public/MSN-R/evidence/closeout.md';
+    addInboxEntry({
+      missionId: 'MSN-R',
+      title: 'Pre-move refs',
+      artifactPaths: [relative, 'trace:run-2'],
+      roleSections: [{ role: 'implementer', summary: 'wrote it', evidence_refs: [relative] }],
+    });
+
+    const rewritten = repointMissionInboxPaths(
+      'MSN-R',
+      'active/missions/public/MSN-R',
+      'active/archive/missions/MSN-R'
+    );
+    expect(rewritten).toBe(1);
+
+    const [stored] = listInboxEntries({ missionId: 'MSN-R' });
+    expect(stored.artifact_paths).toEqual([
+      'active/archive/missions/MSN-R/evidence/closeout.md',
+      'trace:run-2',
+    ]);
+    expect(stored.role_sections?.[0]?.evidence_refs).toEqual([
+      'active/archive/missions/MSN-R/evidence/closeout.md',
+    ]);
+  });
+
+  it('normalizes legacy machine-absolute stored refs in place', async () => {
+    const { normalizeStoredInboxPaths, listInboxEntries } = await import('./deliverable-inbox.js');
+    const absolute = path.join(tmpRoot, 'active/missions/public/MSN-L/evidence/legacy.md');
+    const legacy = {
+      entry_id: 'INBOX-LEGACY',
+      mission_id: 'MSN-L',
+      title: 'Legacy absolute entry',
+      artifact_paths: [absolute, 'trace:t-1'],
+      summary: 'stored before repo-relative normalization',
+      created_at: '2026-10-10T00:00:00Z',
+      updated_at: '2026-10-10T00:00:00Z',
+      status: 'unread',
+      role_sections: [{ role: 'implementer', summary: 's', evidence_refs: [absolute] }],
+    };
+    const inboxDir = path.join(tmpRoot, 'active/shared/inbox');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(path.join(inboxDir, 'entries.jsonl'), `${JSON.stringify(legacy)}\n`);
+
+    expect(normalizeStoredInboxPaths()).toBe(1);
+    const [stored] = listInboxEntries({ missionId: 'MSN-L' });
+    expect(stored.artifact_paths).toEqual([
+      'active/missions/public/MSN-L/evidence/legacy.md',
+      'trace:t-1',
+    ]);
+    expect(stored.role_sections?.[0]?.evidence_refs).toEqual([
+      'active/missions/public/MSN-L/evidence/legacy.md',
+    ]);
+    // Second run is a no-op — the store is already clean.
+    expect(normalizeStoredInboxPaths()).toBe(0);
+  });
+
   it('requires an authenticated human receipt for final acceptance', async () => {
     const { acceptInboxEntryWithHumanReceipt, addInboxEntry, finalizeAcceptedDeliverable } =
       await import('./deliverable-inbox.js');

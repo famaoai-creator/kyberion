@@ -374,6 +374,89 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
     .slice(0, Math.max(1, query.limit || 50));
 }
 
+/**
+ * Rewrite one entry's stored refs through `map`; returns true when anything
+ * changed. Covers both `artifact_paths` and role-section `evidence_refs` —
+ * the two are bound by exact-match validation and must move together.
+ */
+function rewriteEntryRefs(entry: DeliverableInboxEntry, map: (ref: string) => string): boolean {
+  let changed = false;
+  const nextPaths = entry.artifact_paths.map((ref) => {
+    const next = map(ref);
+    if (next !== ref) changed = true;
+    return next;
+  });
+  if (changed) entry.artifact_paths = nextPaths;
+  if (entry.role_sections?.length) {
+    const nextSections = entry.role_sections.map((section) => {
+      let sectionChanged = false;
+      const evidence_refs = section.evidence_refs.map((ref) => {
+        const next = map(ref);
+        if (next !== ref) sectionChanged = true;
+        return next;
+      });
+      if (sectionChanged) changed = true;
+      return sectionChanged ? { ...section, evidence_refs } : section;
+    });
+    entry.role_sections = nextSections;
+  }
+  return changed;
+}
+
+/**
+ * The stored path form is repo-relative: older entries persisted
+ * machine-absolute paths, which break on other hosts. Rewrites any absolute
+ * stored ref that resolves under the repository root. Idempotent.
+ */
+export function normalizeStoredInboxPaths(): number {
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const changed = entries.filter((entry) =>
+      rewriteEntryRefs(entry, (ref) =>
+        path.isAbsolute(String(ref || '').trim())
+          ? pathResolver.toRepoRelative(String(ref).trim()).split(path.sep).join('/')
+          : ref
+      )
+    ).length;
+    if (changed > 0) writeInboxEntries(entries);
+    return changed;
+  });
+}
+
+/**
+ * Mission finish moves `<…>/missions/…/<id>` under `active/archive/missions/`:
+ * refs pointing into the moved tree are rewritten to the archived location so
+ * the entry keeps resolving (its owner's files still exist — just elsewhere).
+ */
+export function repointMissionInboxPaths(
+  missionId: string,
+  fromDir: string,
+  toDir: string
+): number {
+  const upperId = String(missionId || '')
+    .trim()
+    .toUpperCase();
+  const normalize = (value: string) =>
+    pathResolver
+      .toRepoRelative(String(value || '').trim())
+      .split(path.sep)
+      .join('/')
+      .replace(/\/+$/, '');
+  const from = normalize(fromDir);
+  const to = normalize(toDir);
+  if (!upperId || !from || !to || from === to) return 0;
+  const repoint = (ref: string) =>
+    ref === from ? to : ref.startsWith(`${from}/`) ? `${to}${ref.slice(from.length)}` : ref;
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const changed = entries.filter(
+      (entry) => entry.mission_id?.toUpperCase() === upperId && rewriteEntryRefs(entry, repoint)
+    ).length;
+    if (changed > 0) writeInboxEntries(entries);
+    return changed;
+  });
+}
+
 export function markInboxEntry(
   entryId: string,
   status: DeliverableInboxStatus,
