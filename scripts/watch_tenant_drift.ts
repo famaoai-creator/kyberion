@@ -26,6 +26,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { missionTierScanDirs } from '@agent/core/owner-scope';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { nowIso } from '@agent/core/foundation/time';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
@@ -104,8 +105,18 @@ function* walkConfidentialMissionDirs(): Generator<{ relPath: string; expectedTe
   } catch {
     return;
   }
-  if (!safeExistsSync(root)) return;
-  const all = getAllFiles(root);
+  const all: string[] = [];
+  // Bound processes may not enumerate the protected tier root itself
+  // (scope_invalid_prefix); missionTierScanDirs narrows the scan to the
+  // bound tenant partition, unbound keeps the whole root.
+  for (const scanDir of missionTierScanDirs(root)) {
+    if (!safeExistsSync(scanDir)) continue;
+    try {
+      all.push(...getAllFiles(scanDir));
+    } catch {
+      continue;
+    }
+  }
   const seen = new Set<string>();
   for (const absFile of all) {
     if (!absFile.endsWith('mission-state.json')) continue;

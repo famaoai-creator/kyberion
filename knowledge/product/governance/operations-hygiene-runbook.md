@@ -485,7 +485,15 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
   `scope.env` or `KYBERION_TENANT` (both flow through `resolveProjectScope` — env alone is
   NOT the only binding) and running the sweep: the chronos daemon's await-state sweep was the
   incident that proved this (2026-10, `boundTenant`/`missionTierScanDirs` consolidate the fix).
-  Regression coverage: `libs/core/mission/mission-tier-scan.test.ts`.
+  The defect recurred in enumerators that predated the rule — `system:list_missions`,
+  `watch_tenant_drift`'s confidential walk, `virtual_office.listMissionDirs` — surfacing as a
+  **golden-gate drift on live checkouts** (`baseline-check`/`vital-check` step failing with
+  ROLE_VIOLATION only where `active/missions/{confidential,personal}` exists). A second,
+  quieter symptom: post-partition layouts (`<tier>/<tenant>/<id>`) made flat enumerations
+  report tenant directories as missions. Coverage:
+  `libs/core/mission/mission-tier-scan.test.ts`,
+  `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
+  `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
 
 **Procedure:**
 
