@@ -33,6 +33,7 @@ import { loadMissionManagementConfig } from './mission-management-config.js';
 // Registers the owner-scope mission locator behind findMissionPath, so every
 // state lookup here resolves an existing mission from its own record.
 import '../owner-scope.js';
+import { boundTenant } from '../owner-scope.js';
 import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
@@ -616,10 +617,9 @@ export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): st
 const MISSION_TIER_ROOT_RE = /^active\/(?:archive\/)?missions\/(?:personal|confidential|public)$/;
 
 function boundTenantSegment(): string | undefined {
-  const bound = String(getRegisteredEnvText('KYBERION_TENANT') || '')
-    .trim()
-    .toLowerCase();
-  return bound || undefined;
+  // Same binding the io layer and owner-scope use — covers the persisted
+  // scope file (scope.env) and execution scope, not just KYBERION_TENANT.
+  return boundTenant();
 }
 
 export function listMissionsInSearchDirs(

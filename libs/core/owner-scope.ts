@@ -142,9 +142,11 @@ function isTenantDirectoryName(name: string): boolean {
 /**
  * Tenant the current identity is bound to: the execution scope first (e.g. a
  * surface request), then the process scope (`KYBERION_TENANT`) — the same
- * order identity resolution (authority.ts) uses.
+ * order identity resolution (authority.ts) uses. Exported for enumerators
+ * that must probe the bound partition instead of listing a protected tier
+ * root.
  */
-function boundTenant(): string | undefined {
+export function boundTenant(): string | undefined {
   const executionScope = currentExecutionScope();
   const value = String(
     (executionScope?.tenantBound ? executionScope.tenantSlug : resolveProjectScope().tenantSlug) ||
