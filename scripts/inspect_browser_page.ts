@@ -6,7 +6,7 @@
  * without requiring hand-authored ADF files.
  *
  * Usage:
- *   pnpm kyberion browser inspect <url> [--mode browser|fetch] [--headed] [--json]
+ *   pnpm kyberion browser inspect <url> [--mode browser|fetch] [--locale ja|en] [--headed] [--json]
  */
 
 import http from 'node:http';
@@ -214,6 +214,7 @@ export async function inspectWithBrowser(
   options: {
     waitMs: number;
     headed: boolean;
+    locale?: string;
     screenshotPath?: string;
   },
   deps: InspectBrowserPageDeps = {}
@@ -225,6 +226,7 @@ export async function inspectWithBrowser(
     options: {
       headless: !options.headed,
       keep_alive: false,
+      ...(options.locale ? { locale: options.locale } : {}),
     },
     steps: [
       {
@@ -296,6 +298,22 @@ export async function inspectWithBrowser(
   const raw = await withExecutionContextAsync('surface_runtime', () =>
     actuator.handleAction(pipeline)
   );
+  if (raw.status === 'failed') {
+    const failedResult = raw.results?.find((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      return (entry as Record<string, unknown>).status === 'failed';
+    }) as Record<string, unknown> | undefined;
+    const context =
+      raw.context && typeof raw.context === 'object'
+        ? (raw.context as Record<string, unknown>)
+        : undefined;
+    const reason =
+      failedResult?.error ??
+      context?.error ??
+      raw.errors?.[0] ??
+      'browser actuator reported a failed pipeline';
+    throw new Error(`Browser inspection failed: ${String(reason)}`);
+  }
   const resContext = (raw.context as Record<string, unknown> | undefined) || {};
   const analysis = (resContext.page_analysis as Record<string, unknown> | undefined) || {};
 
@@ -538,6 +556,10 @@ export async function main(
       description:
         'Inspection engine: browser (Playwright), fetch (fast HTML), cdp (existing Chrome), extension (Chrome Extension bridge)',
     })
+    .option('locale', {
+      type: 'string',
+      description: 'Locale for a new Playwright browser context (for example, ja-JP)',
+    })
     .option('cdp-port', {
       type: 'number',
       default: 9222,
@@ -621,6 +643,7 @@ export async function main(
       {
         waitMs: argv.wait,
         headed: Boolean(argv.headed),
+        locale: argv.locale ? String(argv.locale) : undefined,
         screenshotPath: argv.screenshot ? String(argv.screenshot) : undefined,
       },
       deps
