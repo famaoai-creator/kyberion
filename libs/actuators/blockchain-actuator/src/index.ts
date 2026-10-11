@@ -15,7 +15,7 @@ import {
 } from '@agent/core/cli-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 
 /**

@@ -1,4 +1,4 @@
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { handleAction } from './code-pipeline-helpers.js';
 import {

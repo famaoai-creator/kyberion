@@ -125,6 +125,31 @@ describe('check_stale_dist', () => {
     write(relativePath, JSON.stringify({ fileNames, fileInfos }));
   }
 
+  it('detects required missing output trees and obsolete compiler output after rename', () => {
+    write('src/current.ts', 'export const value = 1;\n');
+    expect(findStaleDistTargets({ targets: [spec({ required: true })] }).stale[0]?.reason).toBe(
+      'dist_missing'
+    );
+    write('dist/current.js');
+    write('dist/deleted.js');
+    expect(findStaleDistTargets({ targets: [spec({ checkOrphans: true })] }).stale[0]?.reason).toBe(
+      'orphaned_emit'
+    );
+  });
+
+  it('does not let an old mtime hide a new source in a required owned project', () => {
+    const original = 'export const current = 1;\n';
+    const current = write('src/current.ts', original);
+    write('dist/current.js');
+    write('src/old-mtime-new.ts');
+    setMtime('src/old-mtime-new.ts', T_OLD);
+    writeBuildInfo('dist/.tsbuildinfo', { [current]: sha256(original) });
+    const scan = findStaleDistTargets({
+      targets: [spec({ required: true, buildInfo: [FIXTURE_ROOT + '/dist/.tsbuildinfo'] })],
+    });
+    expect(scan.stale[0]?.reason).toBe('unrecorded_source');
+  });
+
   it.each(['src', '.'])('preserves root-emitter layout for package rootDir %s', (rootDir) => {
     const source = `libs/example/${rootDir}/entry.ts`;
     const emitted = `root-dist/libs/example/${rootDir}/entry.js`;

@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
@@ -12,8 +12,14 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": [],
-    "paths": {}
+    "composite": true,
+    "incremental": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    {
+      "path": "../core"
+    }
+  ]
 }

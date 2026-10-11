@@ -43,7 +43,7 @@ import {
   foldCapture,
   normalize as normalizeBullet,
 } from '@agent/core/knowledge/memory-notebook';
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
 const pr = pathResolver;
 

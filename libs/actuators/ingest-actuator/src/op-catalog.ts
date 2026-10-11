@@ -11,8 +11,8 @@
 
 import { getOpInputContract } from '@agent/core/pipeline/op-input-contracts';
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 export const INGEST_ACTUATOR_CAPTURE_OPS = ['parse_document', 'sync_source'] as const;
 

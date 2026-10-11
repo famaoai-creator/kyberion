@@ -11,7 +11,7 @@
   "description": "Core utilities and wrappers for Kyberion.",
   "scripts": {
     "build": "tsc -p tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile ./dist/.tsbuildinfo.typecheck"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -7515,6 +7515,14 @@
     "./surface/human-request-runtime-config": {
       "types": "./dist/surface/human-request-runtime-config.d.ts",
       "default": "./dist/surface/human-request-runtime-config.js"
+    },
+    "./surface/surface-viewer-scope-contract": {
+      "types": "./dist/surface/surface-viewer-scope-contract.d.ts",
+      "default": "./dist/surface/surface-viewer-scope-contract.js"
+    },
+    "./identity-context-bridge": {
+      "types": "./dist/identity-context-bridge.d.ts",
+      "default": "./dist/identity-context-bridge.js"
     }
   },
   "dependencies": {

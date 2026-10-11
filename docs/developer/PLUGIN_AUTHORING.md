@@ -45,15 +45,17 @@ Create the package `package.json`:
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "../../../dist/libs/actuators/weather-actuator/src/index.js",
   "scripts": {
-    "build": "tsc -p ../../tsconfig.actuators.json"
+    "build": "pnpm --dir ../../.. run build:repo"
   },
   "dependencies": {
     "@agent/core": "workspace:*"
   }
 }
 ```
+
+The actuator delegates to the shared runtime compiler. Its output stays under the repository-level `dist/libs/actuators/`; package builds use the same non-recursive graph as the full build.
 
 ### Step 2 — Manifest (2 min)
 

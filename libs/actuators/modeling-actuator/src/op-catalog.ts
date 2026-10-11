@@ -1,11 +1,11 @@
-import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
+import { withCatalogInputContract } from '@agent/core/actuator/actuator-sdk';
 
 // AR-02: self-described op catalog — the single source the registry and
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
+import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 type InputSchema = Record<string, unknown>;
 const MODELING_CONTRACTS: Record<string, InputSchema> = {

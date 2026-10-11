@@ -43,7 +43,7 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import {
   runActuatorPipeline,
   defineCatalogBackedActuator,
-} from '../../../core/actuator/actuator-sdk.js';
+} from '@agent/core/actuator/actuator-sdk';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {

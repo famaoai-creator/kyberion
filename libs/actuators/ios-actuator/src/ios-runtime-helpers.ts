@@ -15,8 +15,8 @@ import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
-import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
-import type { AdfEngineContext } from '../../../core/pipeline/adf-engine.js';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
