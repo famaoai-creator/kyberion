@@ -196,3 +196,5 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 - [PR template](../../../.github/PULL_REQUEST_TEMPLATE.md)
 - [Kyberion development practices](./kyberion-development-practices.md)
 - [EXTENSION_POINTS.md](../../../docs/developer/EXTENSION_POINTS.md)
+
+Dot 実行の変更では、[タイムアウト後の副作用所有権と実行順の継続](./operations-hygiene-runbook.md#13-timed-out-effects-and-executor-continuation)を維持し、隔離した遅延書き込みとプロセス再起動の評価証跡を残す。

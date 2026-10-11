@@ -32,7 +32,7 @@ export type { InterventionLevel } from './decision-card.js';
 export type InterventionTiming = 'immediate' | 'digest';
 
 /** Storage channel for decisions raised by autonomous operations. */
-export const AUTONOMY_APPROVAL_CHANNEL = 'autonomy';
+export { AUTONOMY_APPROVAL_CHANNEL } from './approval-store-paths.js';
 
 export const INTERVENTION_LEVELS: readonly InterventionLevel[] = ['decide', 'veto', 'fyi', 'none'];
 

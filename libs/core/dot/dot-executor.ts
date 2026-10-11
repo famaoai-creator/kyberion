@@ -1,3 +1,4 @@
+import { orderExecutorCharters, recordExecutorTurn } from './dot-executor-scheduling.js';
 import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
 import { loadApprovalRequest } from '../governance/approval-store.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
@@ -315,6 +316,8 @@ async function routeItem(
         dot_id: c.dot_id,
         actor_id: actorOf(c),
         work_item_id: item.item_id,
+        attempt_id: item.current_attempt_id,
+        lease_id: item.lease_id,
         ...(prepared
           ? {
               front_desk_output_path: prepared.outputPath,
@@ -691,6 +694,11 @@ export async function executeDotWorkItem(
       leaseId: lease.lease_id,
       actorPeerId: actor,
       nextStatus,
+      ...(outcome.status === 'done'
+        ? { effectDisposition: 'completed' as const }
+        : preEffect
+          ? { effectDisposition: 'pre_effect' as const }
+          : {}),
       // The WorkItem store is a shared floor: tenant prose stays in the dot state path.
       summary: tenantBound
         ? `dot executor: ${outcome.status} (${outcome.mode})${escalated ? ', escalated to the dot' : ''}; details in the dot work results`
@@ -704,6 +712,7 @@ export async function executeDotWorkItem(
           completed_at: completedAt,
           ...(escalated ? { escalated: true } : {}),
           ...(retryable ? { retryable: true } : {}),
+          ...(outcome.reason_code ? { reason_code: outcome.reason_code } : {}),
           ...operatorVerification(item),
         },
       },
@@ -984,7 +993,18 @@ export async function runDotExecutorSweep(
   reconcileExecutorReports(active, deps);
   // Human-approved quarantine releases take effect here, before any claim.
   applyApprovedDotReleases(active, deps);
-  for (const { charter } of active) {
+  let ordered: readonly LoadedDotCharter[];
+  try {
+    ordered = deps.scopeToActiveCharters ? active : orderExecutorCharters(active, deps.rootDir);
+  } catch (error) {
+    logger.warn(
+      'executor scheduling state unavailable — ' +
+        (error instanceof Error ? error.message : String(error)) +
+        ' | next: recover the scheduling cursor before another sweep | evidence: executor-schedule.json'
+    );
+    return rows;
+  }
+  for (const { charter } of ordered) {
     if (charter.status !== 'active') continue;
     if (clock() - sweepStart >= sweepBudget) {
       logger.info(
@@ -1020,6 +1040,7 @@ export async function runDotExecutorSweep(
         (item) => !denyCrossTenantItem(charter, item, deps)
       );
       if (candidates.length === 0) continue;
+      if (!deps.scopeToActiveCharters) recordExecutorTurn(charter, deps.rootDir);
       let charterPorts: DotExecutorPorts | undefined;
       for (const item of candidates.slice(0, max)) {
         if (clock() - sweepStart >= sweepBudget) break;

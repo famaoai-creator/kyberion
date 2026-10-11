@@ -92,6 +92,8 @@ export interface StaleTargetSpec {
   // Repo-relative roots; resolved via pathResolver.rootResolve.
   sourceRoot: string;
   distRoot: string;
+  /** Root-program emit retains this prefix below distRoot (e.g. a package's src/). */
+  emitPrefix?: string;
   // Repo-relative tsbuildinfo candidates; the newest existing one's mtime
   // joins the freshness marker (see module doc for the incremental-emit case).
   buildInfo?: readonly string[];
@@ -282,6 +284,7 @@ function evaluateTarget(
       if (!onDisk.has(filePath)) continue;
       const emitted = path.join(
         distRoot,
+        spec.emitPrefix || '',
         path.relative(sourceRoot, filePath).replace(/\.[cm]?tsx?$/u, '.js')
       );
       if (!safeExistsSync(emitted)) {
@@ -377,7 +380,7 @@ function listPackageDistTargets(libsRootRel = 'libs'): StaleTargetSpec[] {
  * vision} package.json `main` resolves to ../../../dist/libs/<pkg>/src/index.js.
  * Those trees are distinct stale targets from the packages' own libs/<pkg>/dist.
  */
-function listRootEmittedPackageTargets(
+export function listRootEmittedPackageTargets(
   libsRootRel = 'libs',
   distLibsRel = 'dist/libs'
 ): StaleTargetSpec[] {
@@ -401,6 +404,9 @@ function listRootEmittedPackageTargets(
       id: `dist/libs/${entry}`,
       sourceRoot,
       distRoot: `${distLibsRel}/${entry}`,
+      // Keep the discovered dist root: a missing whole src/ subtree must fail,
+      // not disappear via evaluateTarget's absent-target compatibility path.
+      emitPrefix: rootDir || undefined,
       buildInfo: ['dist/.tsbuildinfo'],
       // The root program admits package sources only via imports — tests are
       // never reachable, matching the package builds' own exclusion for core.
