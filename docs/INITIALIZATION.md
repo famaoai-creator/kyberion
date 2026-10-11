@@ -196,7 +196,7 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
 
 - **Command**: `pnpm onboarding` (needs `dist/`)
 - **Purpose**: make the system remember the sovereign's name, language, interaction style, specialty, and vision.
-- **To do it in the GUI**: open the concierge `/settings` (the old `/setup` and `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.
+- **To do it in the GUI**: open the concierge `/settings` (the old Concierge `/setup` and the Presence Studio `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.
 - **In a non-interactive environment**: without a TTY, `pnpm onboarding` stops with exit 2. Use one of these instead:
   - `pnpm onboarding apply --identity <path/to/identity.json>` — apply the identity from a JSON file (Path B)
     - Copy the template [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json). Validating with `--dry-run` first is safest.
