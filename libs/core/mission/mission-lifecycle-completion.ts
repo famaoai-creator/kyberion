@@ -29,6 +29,7 @@ import {
 import {
   evaluateArtifactReviews,
   hashArtifactForReview,
+  inferArtifactReviewKind,
   loadArtifactReviewReceipt,
   receiptToArtifactReviewDecision,
 } from '../workforce/artifact-review.js';
@@ -424,7 +425,7 @@ export const MISSION_TASK_COMPLETED_STATUSES = new Set([
  * (process-template expansion always sets `phase_kind`; hand-authored /
  * dispatched tasks may only set `assigned_to.role` or `review_target`).
  */
-function isReviewKindTask(task: Record<string, unknown>): boolean {
+export function isReviewKindTask(task: Record<string, unknown>): boolean {
   if (task.phase_kind === 'review') return true;
   const role = String((task.assigned_to as { role?: string } | undefined)?.role || '')
     .trim()
@@ -448,7 +449,11 @@ function isReviewKindTask(task: Record<string, unknown>): boolean {
  * through `recordArtifactReview`, so it has no receipt either and this
  * returns false regardless.
  */
-function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>): boolean {
+function isReviewTaskSatisfied(
+  missionDir: string,
+  task: Record<string, unknown>,
+  requireIdentityBinding = false
+): boolean {
   const receiptRef = String(task.artifact_review_receipt || '').trim();
   if (!receiptRef) return false;
   let receiptPath: string;
@@ -461,6 +466,12 @@ function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>
 
   try {
     const receipt = loadArtifactReviewReceipt(receiptPath);
+    if (
+      requireIdentityBinding &&
+      (receipt.mission_id.toUpperCase() !== path.basename(missionDir).toUpperCase() ||
+        receipt.review_task_id !== task.task_id)
+    )
+      return false;
     const reviewTargetId = String(task.review_target || '');
     if (reviewTargetId && receipt.review_target_task_id !== reviewTargetId) return false;
 
@@ -476,8 +487,21 @@ function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>
           implementer_agent_ids?: string[];
           independence_required?: boolean;
           required_reviewer_roles?: string[];
+          artifact_path?: string;
+          artifact_sha256?: string;
+          artifact_kind?: string;
         }
       | undefined;
+
+    // Exact projection binding is opt-in; legacy mutation semantics are unchanged.
+    if (
+      requireIdentityBinding &&
+      (receipt.artifact.kind !== inferArtifactReviewKind(receipt.artifact.path) ||
+        (profile?.artifact_path && receipt.artifact.path !== profile.artifact_path) ||
+        (profile?.artifact_sha256 && receipt.artifact.sha256 !== profile.artifact_sha256) ||
+        (profile?.artifact_kind && receipt.artifact.kind !== profile.artifact_kind))
+    )
+      return false;
 
     const evaluation = evaluateArtifactReviews({
       artifacts: [
@@ -506,11 +530,15 @@ function isReviewTaskSatisfied(missionDir: string, task: Record<string, unknown>
  * Review-kind tasks are held to a strictly higher bar (see
  * `isReviewTaskSatisfied`): deliverable existence is necessary but not
  * sufficient for them.
+ * Read-only closure projections additionally require exact receipt mission/task
+ * identity via `requireReviewIdentityBinding`; the legacy mutation callers keep
+ * their existing semantics and their independent finish-time governance gate.
  */
 export function isTaskDeliverableSatisfied(
   missionDir: string,
   task: Record<string, unknown>,
-  statusByTaskId: Map<string, string>
+  statusByTaskId: Map<string, string>,
+  options: { requireReviewIdentityBinding?: boolean } = {}
 ): boolean {
   const taskId = String(task.task_id || '');
   const dependencies = Array.isArray(task.dependencies)
@@ -532,7 +560,8 @@ export function isTaskDeliverableSatisfied(
   }
   const deliverableExists = Boolean(deliverablePath && safeExistsSync(deliverablePath));
   if (!dependenciesComplete || !deliverableExists) return false;
-  if (isReviewKindTask(task)) return isReviewTaskSatisfied(missionDir, task);
+  if (isReviewKindTask(task))
+    return isReviewTaskSatisfied(missionDir, task, options.requireReviewIdentityBinding);
   return true;
 }
 

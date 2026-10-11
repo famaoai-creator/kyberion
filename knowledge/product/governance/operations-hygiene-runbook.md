@@ -695,6 +695,16 @@ call fails.
 
 ## §8 Mission evidence: generated files and recorded deliverables
 
+**Closure observations:** `completed` can precede delivery, retrospective, or independent review
+evidence. Read-only status and triage must inspect the strict task graph before suggesting
+`finish`; they must not translate this lifecycle label directly into archive advice. Missing or
+malformed boards remain unknown. Review-kind tasks (including phase-only and unprofiled tasks)
+require current, mission/task-bound receipts and independent review proof. Use `record-evidence`
+for direct work and `review-task` for reviews; never repair tasks during a read. `archived` stays
+terminal. An advisory finish candidate is neither authorization nor merge/deployment proof, and
+the finish facade revalidates all gates. Regression gates: `mission-flow-projection.test.ts` and
+`mission-triage.test.ts`; hash an isolated fixture tree around real status/triage CLI reads.
+
 **Rule:** a generator never writes to a path that a task records as its deliverable. Generated
 artifacts (stats, reports, manifests written by `finish`, `verify`, dispatch or any other automatic
 step) get their own file names.

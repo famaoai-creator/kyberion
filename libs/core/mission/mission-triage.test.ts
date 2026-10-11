@@ -114,12 +114,45 @@ describe('collectMissionTriageReport', () => {
     expect(commands).toContain('cancel');
   });
 
-  it('classifies a completed mission still on disk as terminal with archive advice', () => {
+  it('preserves completed lifecycle but requires closure inspection instead of archive advice', () => {
     prepareMission('completed');
     const report = collectMissionTriageReport(missionId);
     expect(report.classification).toBe('terminal');
-    expect(report.recommendation.action).toBe('archive');
-    expect(report.recommendation.commands.join(' ')).toContain('archive --mission');
+    expect(report.flow).toMatchObject({
+      observed_status: 'completed',
+      disposition: 'unknown',
+      task_board: 'missing',
+    });
+    expect(report.recommendation.action).toBe('inspect');
+    expect(report.recommendation.commands).toEqual([]);
+  });
+
+  it('aligns completed legacy recommendation with pending closure work', () => {
+    prepareMission('completed', {}, [pendingTask]);
+    const report = collectMissionTriageReport(missionId);
+    expect(report.recommendation.action).toBe('continue');
+    expect(report.recommendation.reason).toBe(report.flow.candidates[0].reason);
+    expect(report.recommendation.commands).toEqual([]);
+  });
+
+  it('offers governed finish only after completed closure proof is observed', () => {
+    prepareMission(
+      'completed',
+      {
+        intent: {
+          goal_summary: 'original mission goal',
+          success_condition: 'original mission goal',
+        },
+      },
+      [doneTask]
+    );
+    safeWriteFile(nodePath.join(missionPath, 'evidence/tests.md'), 'original mission goal', {
+      mkdir: true,
+    });
+    const report = collectMissionTriageReport(missionId);
+    expect(report.flow.candidates[0].action).toBe('finish');
+    expect(report.recommendation.action).toBe('finish');
+    expect(report.recommendation.commands).toEqual([`pnpm mission finish ${missionId}`]);
   });
 
   it('finds a finished mission in the archive instead of reporting not_found', () => {
