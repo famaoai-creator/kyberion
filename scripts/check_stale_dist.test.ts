@@ -117,10 +117,17 @@ describe('check_stale_dist', () => {
     expect(scan.checked).toBe(1);
   });
 
-  function writeBuildInfo(relativePath: string, entries: Record<string, string>): void {
+  function writeBuildInfo(
+    relativePath: string,
+    entries: Record<string, string>,
+    options: { lowercasePaths?: boolean } = {}
+  ): void {
     const buildInfoPath = pathResolver.sharedTmp(`check-stale-dist/${relativePath}`);
     const baseDir = path.dirname(buildInfoPath);
-    const fileNames = Object.keys(entries).map((abs) => path.relative(baseDir, abs));
+    const fileNames = Object.keys(entries).map((abs) => {
+      const relative = path.relative(baseDir, abs);
+      return options.lowercasePaths ? relative.toLowerCase() : relative;
+    });
     const fileInfos = Object.values(entries).map((version) => ({ version }));
     write(relativePath, JSON.stringify({ fileNames, fileInfos }));
   }
@@ -190,6 +197,22 @@ describe('check_stale_dist', () => {
     });
     setMtime('src/a.ts', T_NEW);
     setMtime('dist/a.js', T_OLD);
+    setMtime('.tsbuildinfo', T_OLD);
+
+    const scan = findStaleDistTargets({
+      targets: [spec({ buildInfo: [`${FIXTURE_ROOT}/.tsbuildinfo`] })],
+    });
+    expect(scan.stale).toEqual([]);
+  });
+
+  it('matches Windows-lowercased tsbuildinfo paths to on-disk source casing', () => {
+    if (process.platform !== 'win32') return;
+    const contents = 'export const chart = 1;\n';
+    const source = write('src/charts/ChartView.tsx', contents);
+    write('dist/charts/ChartView.js');
+    writeBuildInfo('.tsbuildinfo', { [source]: sha256(contents) }, { lowercasePaths: true });
+    setMtime('src/charts/ChartView.tsx', T_NEW);
+    setMtime('dist/charts/ChartView.js', T_OLD);
     setMtime('.tsbuildinfo', T_OLD);
 
     const scan = findStaleDistTargets({

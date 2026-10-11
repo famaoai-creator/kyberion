@@ -7,7 +7,18 @@
 # TCC-free location — BEFORE anything that can fail (external-volume access,
 # node resolution), so a silent early death is still visible.
 
-BREADCRUMB="${HOME:-/tmp}/Library/Logs/kyberion-browser-bridge.log"
+case "$(uname -s 2>/dev/null || true)" in
+  Darwin)
+    DEFAULT_LOG_DIR="${HOME:-/tmp}/Library/Logs"
+    ;;
+  Linux)
+    DEFAULT_LOG_DIR="${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/kyberion"
+    ;;
+  *)
+    DEFAULT_LOG_DIR="${TMPDIR:-/tmp}/kyberion"
+    ;;
+esac
+BREADCRUMB="${KYBERION_BROWSER_BRIDGE_LOG:-$DEFAULT_LOG_DIR/kyberion-browser-bridge.log}"
 mkdir -p "$(dirname "$BREADCRUMB")" 2>/dev/null || BREADCRUMB=/dev/null
 crumb() { echo "$(date '+%Y-%m-%dT%H:%M:%S%z') pid=$$ $*" >> "$BREADCRUMB" 2>/dev/null; }
 crumb "launch.sh started (cwd=$(pwd 2>/dev/null || echo '?'), arg0=$0)"

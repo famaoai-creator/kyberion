@@ -125,6 +125,9 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
   const binaryRequirements = [
     ...(capability.prerequisites?.binaries || []),
     ...(capability.requirements?.bin || []),
+    ...(capability.requirements?.bin_by_platform?.[
+      process.platform as 'darwin' | 'linux' | 'win32'
+    ] || []),
   ];
   const envRequirements = [
     ...(capability.prerequisites?.env || []),
