@@ -29,6 +29,9 @@ vi.mock('../secure-io.js', () => ({
   safeLstat: mocks.lstat,
   safeReaddir: mocks.readdir,
 }));
+vi.mock('../owner-scope.js', () => ({
+  boundTenant: vi.fn(() => undefined),
+}));
 
 import { resetAwaitResumeState, sweepAwaitStateRuns } from './pipeline-await-resume.js';
 

@@ -19,6 +19,7 @@ import { loadPipelineRunJournal } from './pipeline-run-journal.js';
 import { evaluateStateProbe, type StateProbeDeps, type StateProbeSpec } from '../state-probe.js';
 import { pathResolver, shared, rootDir } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
+import { boundTenant } from '../owner-scope.js';
 
 export interface AwaitResumeOutcome {
   runId: string;
@@ -56,9 +57,31 @@ function journalFiles(): string[] {
   collect(shared('runtime/pipeline-runs'));
   for (const tier of ['confidential', 'public'] as const) {
     const base = path.join(rootDir(), 'active', 'missions', tier);
-    if (!safeExistsSync(base)) continue;
-    for (const missionId of safeReaddir(base)) {
-      collect(path.join(base, missionId, 'coordination', 'pipeline-runs'));
+    const roots: string[] = [];
+    try {
+      if (safeExistsSync(base)) {
+        for (const entry of safeReaddir(base)) {
+          roots.push(path.join(base, entry));
+        }
+      }
+    } catch {
+      // Bound processes cannot enumerate a protected tier root — the tenant
+      // list is out of their io scope. Probe their own partition instead;
+      // other tenants are invisible by policy anyway.
+      const bound = boundTenant();
+      if (bound) roots.push(path.join(base, bound));
+    }
+    for (const root of roots) {
+      // Flat mission dir: <tier>/<id>/coordination/...
+      collect(path.join(root, 'coordination', 'pipeline-runs'));
+      try {
+        // Tenant partition: <tier>/<tenant|shared>/<id>/coordination/...
+        for (const nested of safeReaddir(root)) {
+          collect(path.join(root, nested, 'coordination', 'pipeline-runs'));
+        }
+      } catch {
+        continue;
+      }
     }
   }
   return files;
