@@ -153,6 +153,30 @@ describe('actuator-capability', () => {
       expect(status.capabilities[0]?.available).toBe(true);
     });
 
+    it('checks platform-scoped binary requirements on the current host', async () => {
+      const missingBinary = `kyberion-test-missing-${process.platform}-binary`;
+      const manifest = {
+        actuator_id: 'platform-bin-test-actuator',
+        version: '1.0.0',
+        capabilities: [
+          {
+            op: 'native_secret_operation',
+            platforms: ['darwin', 'linux', 'win32'],
+            requirements: {
+              bin_by_platform: {
+                [process.platform]: [missingBinary],
+              },
+            },
+          },
+        ],
+      };
+      fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
+
+      const status = await checkActuatorCapabilities('platform-bin-test-actuator', TMP_MANIFEST);
+      expect(status.capabilities[0]?.available).toBe(false);
+      expect(status.capabilities[0]?.reason).toContain(`missing binary: ${missingBinary}`);
+    });
+
     it('reports implemented:false capabilities as unavailable with not_implemented reason', async () => {
       const manifest = {
         actuator_id: 'stub-test-actuator',
