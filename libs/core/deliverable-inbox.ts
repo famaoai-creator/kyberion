@@ -282,14 +282,18 @@ export function addInboxEntry(input: {
   integratedSummary?: string;
 }): DeliverableInboxEntry {
   const now = nowIso();
+  // Persisted paths are repo-relative and portable: an absolute path embeds
+  // the operator's machine layout in the shared store and dies on any host
+  // whose checkout lives elsewhere. Non-path refs (trace:, receipt:, …) pass
+  // through unchanged.
+  const normalizeStoredRef = (ref: unknown): string =>
+    pathResolver.toRepoRelative(String(ref).trim()).split(path.sep).join('/');
   const entry: DeliverableInboxEntry = {
     entry_id: input.entryId || `INBOX-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId?.trim() || undefined,
     title: input.title.trim() || input.missionId?.trim() || 'Deliverable',
     artifact_paths: Array.from(
-      new Set(
-        (input.artifactPaths || []).map((artifact) => String(artifact).trim()).filter(Boolean)
-      )
+      new Set((input.artifactPaths || []).map(normalizeStoredRef).filter(Boolean))
     ),
     summary: input.summary?.trim() || '',
     created_at: input.createdAt || now,
@@ -301,7 +305,7 @@ export function addInboxEntry(input: {
       ? {
           role_sections: input.roleSections.map((section) => ({
             ...section,
-            evidence_refs: [...section.evidence_refs],
+            evidence_refs: section.evidence_refs.map(normalizeStoredRef),
           })),
         }
       : {}),

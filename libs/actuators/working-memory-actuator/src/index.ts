@@ -922,11 +922,20 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
 // initMissionMemory — called from mission-creation.ts on new mission creation
 // ---------------------------------------------------------------------------
 
-export function initMissionMemory(input: { missionId: string; tier?: VolatileTier }): {
+export function initMissionMemory(input: {
+  missionId: string;
+  tier?: VolatileTier;
+  /** Caller-resolved mission dir — tenant-bound missions MUST pass this: the
+   *  `volatile('mission')` fallback (`missions/<tier>/<id>`) is the unqualified
+   *  layout and would materialize a skeleton outside the tenant partition. */
+  dir?: string;
+}): {
   mdPath: string;
   nowPath: string;
 } {
-  const dir = pr.volatile('mission', input.missionId, { tier: input.tier ?? 'confidential' });
+  const dir = input.dir
+    ? assertSafeRepositoryPath(input.dir)
+    : pr.volatile('mission', input.missionId, { tier: input.tier ?? 'confidential' });
   const mdPath = assertSafeRepositoryPath(path.join(dir, 'MEMORY.md'), {
     allowMissingLeaf: true,
   });

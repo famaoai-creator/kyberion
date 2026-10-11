@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 
 import { guardRequest } from '../../../lib/api-guard';
-import { pathResolver } from '@agent/core/path-resolver';
+import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import {
   assertSafeRepositoryPath,
@@ -39,26 +40,22 @@ const ALLOWED_REPO_PREFIXES = [
   'active/projects/',
   'active/organizations/',
 ] as const;
+// Task/session-scoped artifacts live on the runtime-session floor; only their
+// `artifacts/` subtree is servable — session state stays unreachable.
+const SESSION_ARTIFACT_PREFIX = 'active/shared/runtime/session/';
 
 function resolveMissionRoot(missionId: string): string | null {
-  const roots = [
-    pathResolver.active('missions/public'),
-    pathResolver.active('missions/confidential'),
-  ];
-
-  for (const root of roots) {
-    try {
-      const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
-      const candidate = assertSafeRepositoryPath(path.join(safeRoot, missionId), {
-        allowMissingLeaf: true,
-      });
-      if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) return candidate;
-    } catch {
-      // A missing, symlinked, or malformed mission root is not a readable asset scope.
-    }
+  // Tenant-bound missions live at `missions/<tier>/<tenant>/<id>`; findMissionPath
+  // scans every tenant partition (and fails closed on ambiguous/unreadable state),
+  // while the old two-root scan could only see the unqualified layout.
+  const missionPath = missionPathOrNull(findMissionPath, missionId);
+  if (!missionPath) return null;
+  try {
+    const safeDir = assertSafeRepositoryPath(missionPath);
+    return safeExistsSync(safeDir) && safeLstat(safeDir).isDirectory() ? safeDir : null;
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
 function isAllowedMissionAssetPath(relativePath: string): boolean {
@@ -81,6 +78,12 @@ function toRepoRelative(rawPath: string): string | null {
 function isAllowedRepoAssetPath(relativePath: string): boolean {
   if (relativePath.startsWith('active/organizations/')) {
     return organizationArtifactOwner(relativePath) !== null;
+  }
+  if (relativePath.startsWith(SESSION_ARTIFACT_PREFIX)) {
+    // Only `session/<id>/artifacts/...` — never the session's own state files.
+    const rest = relativePath.slice(SESSION_ARTIFACT_PREFIX.length);
+    const segments = rest.split('/');
+    return segments.length >= 2 && segments[1] === 'artifacts';
   }
   return ALLOWED_REPO_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
 }
@@ -159,14 +162,20 @@ export async function GET(req: NextRequest) {
     if (artifactId) {
       artifact = withViewerContext(() => loadArtifactRecord(artifactId));
       if (!artifact) return NextResponse.json({ error: 'Artifact not found' }, { status: 404 });
-      if (
-        tenantSlugs !== 'all' &&
-        (!artifactTenant(artifact) || !tenantSlugs.includes(artifactTenant(artifact)!))
-      ) {
-        return NextResponse.json(
-          { error: 'Asset is outside the viewer tenant scope' },
-          { status: 403 }
-        );
+      // Untenanted records are org-shared: admitted at public tier only —
+      // confidential/personal without an owner stays fail-closed per scope.
+      if (tenantSlugs !== 'all') {
+        const recordTenant = artifactTenant(artifact);
+        if (
+          recordTenant
+            ? !tenantSlugs.includes(recordTenant)
+            : inferDeliverableTier(artifact, artifact.path, undefined) !== 'public'
+        ) {
+          return NextResponse.json(
+            { error: 'Asset is outside the viewer tenant scope' },
+            { status: 403 }
+          );
+        }
       }
     }
 
@@ -240,11 +249,15 @@ export async function GET(req: NextRequest) {
       }
     }
     const assetTenant = pathTenant || boundTenant;
-    if (assetTenant && tenantSlugs !== 'all' && !tenantSlugs.includes(assetTenant)) {
-      return NextResponse.json(
-        { error: 'Asset is outside the viewer tenant scope' },
-        { status: 403 }
-      );
+    if (tenantSlugs !== 'all') {
+      // No bound tenant = org-shared: public tier is servable to any scope;
+      // a confidential/personal path without an owner tenant stays denied.
+      if (assetTenant ? !tenantSlugs.includes(assetTenant) : assetTier !== 'public') {
+        return NextResponse.json(
+          { error: 'Asset is outside the viewer tenant scope' },
+          { status: 403 }
+        );
+      }
     }
     if (!assetTier) {
       return NextResponse.json({ error: 'Asset tier is unavailable' }, { status: 403 });

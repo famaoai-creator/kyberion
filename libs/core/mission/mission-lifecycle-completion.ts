@@ -134,7 +134,11 @@ export function buildMissionCompletionReconciliationInput(
   if (!state) return null;
 
   const evidence = collectMissionEvidence(missionDir);
-  const evidenceRefs = evidence.map((item) => item.ref);
+  // Repo-relative refs: absolute paths embed the operator's machine layout in
+  // the shared inbox store — a path must travel with the repo, not the host.
+  const evidenceRefs = evidence.map((item) =>
+    pathResolver.toRepoRelative(item.ref).split(path.sep).join('/')
+  );
   const completionGoal = {
     summary:
       state.intent?.goal_summary ||

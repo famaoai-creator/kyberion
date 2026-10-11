@@ -141,6 +141,7 @@ describe('deliverable inbox', () => {
     });
 
     expect(entry.status).toBe('unread');
+    expect(entry.tenant_slug).toBe('tenant-a');
 
     const unread = listInboxEntries({ status: 'unread' });
     expect(unread).toHaveLength(1);
@@ -185,6 +186,32 @@ describe('deliverable inbox', () => {
     const filtered = listInboxEntries({ status: ['rejected', 'changes_requested'] });
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.entry_id).toBe(entry.entry_id);
+  });
+
+  it('persists repo-relative artifact paths — never machine-absolute ones', async () => {
+    const { addInboxEntry } = await import('./deliverable-inbox.js');
+
+    fs.mkdirSync(path.join(tmpRoot, 'active/shared/inbox'), { recursive: true });
+    const absolute = path.join(tmpRoot, 'active/missions/public/MSN-P/evidence/a.md');
+    const entry = addInboxEntry({
+      missionId: 'MSN-P',
+      title: 'Portable paths',
+      artifactPaths: [absolute, 'trace:run-1', 'active/missions/public/MSN-P/evidence/b.md'],
+      roleSections: [
+        { role: 'implementer', summary: 'wrote it', evidence_refs: [absolute, 'trace:run-1'] },
+      ],
+    });
+
+    expect(entry.artifact_paths).toEqual([
+      'active/missions/public/MSN-P/evidence/a.md',
+      'trace:run-1',
+      'active/missions/public/MSN-P/evidence/b.md',
+    ]);
+    // Role-section refs normalize the same way so the artifact binding survives.
+    expect(entry.role_sections?.[0]?.evidence_refs).toEqual([
+      'active/missions/public/MSN-P/evidence/a.md',
+      'trace:run-1',
+    ]);
   });
 
   it('requires an authenticated human receipt for final acceptance', async () => {
