@@ -40,7 +40,15 @@ export type MissionTriageClassification =
   | 'not_started';
 
 export type MissionTriageAction =
-  'scope_rebaseline' | 'abandon' | 'finish' | 'verify' | 'continue' | 'archive' | 'start' | 'none';
+  | 'scope_rebaseline'
+  | 'abandon'
+  | 'finish'
+  | 'verify'
+  | 'continue'
+  | 'inspect'
+  | 'archive'
+  | 'start'
+  | 'none';
 
 export interface MissionTriageRecommendation {
   action: MissionTriageAction;
@@ -295,8 +303,28 @@ export function collectMissionTriageReport(missionId: string): MissionTriageRepo
     state,
     missionDir,
     recommendation,
-    driftBlocked: classification === 'intent_drift_blocked',
+    driftBlocked:
+      classification === 'intent_drift_blocked' ||
+      (state?.status === 'completed' && drift?.passed === false),
+    driftReason: drift?.passed === false ? drift.message : undefined,
   });
+  // Preserve the lifecycle category, but do not let legacy consumers bypass
+  // observed closure blockers with the former completed => archive advice.
+  const closureCandidate = state?.status === 'completed' ? flow.candidates[0] : undefined;
+  const effectiveRecommendation: MissionTriageRecommendation = closureCandidate
+    ? {
+        action:
+          closureCandidate.action === 'finish'
+            ? 'finish'
+            : closureCandidate.action === 'scope_rebaseline'
+              ? 'scope_rebaseline'
+              : closureCandidate.kind === 'continue_task'
+                ? 'continue'
+                : 'inspect',
+        reason: closureCandidate.reason,
+        commands: closureCandidate.action === 'finish' ? [`${MC} finish ${upperId}`] : [],
+      }
+    : recommendation;
   return {
     flow,
     mission_id: upperId,
@@ -317,7 +345,7 @@ export function collectMissionTriageReport(missionId: string): MissionTriageRepo
     ...(context.intent_drift_gate_failure_count
       ? { intent_drift_gate_failures: Number(context.intent_drift_gate_failure_count) }
       : {}),
-    recommendation,
+    recommendation: effectiveRecommendation,
   };
 }
 

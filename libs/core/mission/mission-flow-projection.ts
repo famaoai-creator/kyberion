@@ -18,6 +18,8 @@ import {
 import {
   buildMissionCompletionReconciliationInput,
   MISSION_TASK_COMPLETED_STATUSES,
+  isReviewKindTask,
+  isTaskDeliverableSatisfied,
 } from './mission-lifecycle-completion.js';
 import type { MissionState } from './mission-types.js';
 import { validatePlannedNextTasks } from './mission-next-task-validation.js';
@@ -32,6 +34,7 @@ export interface MissionFlowBlocker {
     | 'recorded_gate_failure'
     | 'verification_rejected'
     | 'evidence_gap'
+    | 'artifact_review'
     | 'intent_drift'
     | 'approval_pending'
     | 'approval_expired';
@@ -116,6 +119,7 @@ export function collectMissionFlowProjection(input: {
   missionDir: string | null;
   recommendation: { action: string; reason: string; commands?: string[] };
   driftBlocked: boolean;
+  driftReason?: string;
 }): MissionFlowProjection {
   const { state, missionDir, missionId, recommendation } = input;
   const flow: MissionFlowProjection = {
@@ -152,7 +156,7 @@ export function collectMissionFlowProjection(input: {
       reason: recommendation.reason,
       evidence_refs: stateRef ? [stateRef] : [],
     });
-  } else if (['completed', 'archived', 'failed'].includes(state.status)) {
+  } else if (['archived', 'failed'].includes(state.status)) {
     flow.disposition = 'terminal';
     flow.candidates.push({
       action: recommendation.action,
@@ -182,6 +186,8 @@ export function collectMissionFlowProjection(input: {
             (task) =>
               typeof task.task_id !== 'string' ||
               !task.task_id.trim() ||
+              (task.phase_kind !== undefined &&
+                !['implement', 'review'].includes(String(task.phase_kind))) ||
               (task.dependencies !== undefined &&
                 (!Array.isArray(task.dependencies) ||
                   task.dependencies.some((id) => typeof id !== 'string')))
@@ -189,7 +195,11 @@ export function collectMissionFlowProjection(input: {
         )
           throw new Error('Invalid task identity or dependencies');
         // Reuse the dispatcher's graph checks (missing/self/cyclic dependencies).
-        tasks = validatePlannedNextTasks(tasks, missionId).map((task) => ({ ...task }));
+        const observedTasks = tasks;
+        tasks = validatePlannedNextTasks(tasks, missionId).map((task, index) => ({
+          ...task,
+          phase_kind: observedTasks[index].phase_kind,
+        }));
         flow.task_board = 'available';
       }
     } catch {
@@ -234,6 +244,12 @@ export function collectMissionFlowProjection(input: {
       );
     } catch {
       flow.approval_observation.coverage = 'unavailable';
+      if (state.status === 'completed')
+        add({
+          code: 'observation_unreadable',
+          reason: 'Scoped approval observations are unavailable; closure must be inspected.',
+          evidence_refs: [stateRef],
+        });
     }
     if (state.verification?.status === 'rejected')
       add({
@@ -242,7 +258,11 @@ export function collectMissionFlowProjection(input: {
         evidence_refs: [stateRef],
       });
     if (input.driftBlocked)
-      add({ code: 'intent_drift', reason: recommendation.reason, evidence_refs: [stateRef] });
+      add({
+        code: 'intent_drift',
+        reason: input.driftReason || recommendation.reason,
+        evidence_refs: [stateRef],
+      });
     const gatesDir = path.join(missionDir, 'gates');
     try {
       const latest = new Map<string, { record: MissionGateRecord; ref: string }>();
@@ -312,14 +332,16 @@ export function collectMissionFlowProjection(input: {
         task_id: taskId,
         reason: unmet.length
           ? `Task ${taskId} has unfinished or missing dependencies: ${unmet.join(', ')}.`
-          : `Task ${taskId} is ${String(task.status || 'planned')}; inspect its deliverable and record evidence when its phase ends.`,
+          : state.status === 'completed'
+            ? `Mission lifecycle is completed, but closure task ${taskId} is ${String(task.status || 'planned')}; inspect its deliverable and ${isReviewKindTask(task) ? 'use review-task with an independent reviewer' : 'use record-evidence after its work is complete'}.`
+            : `Task ${taskId} is ${String(task.status || 'planned')}; inspect its deliverable and record evidence when its phase ends.`,
         evidence_refs: [`${boardRef}#${encodeURIComponent(taskId)}`],
       });
     }
     if (
       tasks &&
       pending?.length === 0 &&
-      ['active', 'validating', 'distilling'].includes(state.status)
+      ['active', 'validating', 'distilling', 'completed'].includes(state.status)
     ) {
       try {
         const context = buildMissionCompletionReconciliationInput(missionId, { state, missionDir });
@@ -340,6 +362,42 @@ export function collectMissionFlowProjection(input: {
           code: 'observation_unreadable',
           reason: 'Completion evidence could not be inspected.',
           evidence_refs: [reference(path.join(missionDir, 'evidence'))],
+        });
+      }
+    }
+    if (tasks && state.status === 'completed') {
+      // This validator only reads receipts. The finish exit evaluator may repair
+      // task state, so must never be called from this advisory observation.
+      try {
+        const statusByTaskId = new Map(
+          tasks.map((task) => [
+            String(task.task_id),
+            String(task.status || 'planned').toLowerCase(),
+          ])
+        );
+        for (const task of tasks) {
+          if (
+            !isReviewKindTask(task) ||
+            !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+          )
+            continue;
+          if (
+            !isTaskDeliverableSatisfied(missionDir, task, statusByTaskId, {
+              requireReviewIdentityBinding: true,
+            })
+          )
+            add({
+              code: 'artifact_review',
+              reason: `Closure review task ${String(task.task_id)} lacks current deliverable, dependency, or independent receipt proof; use the governed review-task flow before finish.`,
+              task_id: String(task.task_id),
+              evidence_refs: [`${boardRef}#${encodeURIComponent(String(task.task_id))}`],
+            });
+        }
+      } catch {
+        add({
+          code: 'observation_unreadable',
+          reason: 'Artifact review evidence could not be inspected.',
+          evidence_refs: [boardRef],
         });
       }
     }
@@ -377,9 +435,12 @@ export function collectMissionFlowProjection(input: {
   }));
   if (!flow.candidates.length)
     flow.candidates.push({
-      action: recommendation.action,
+      action: state?.status === 'completed' ? 'finish' : recommendation.action,
       kind: 'lifecycle',
-      reason: recommendation.reason,
+      reason:
+        state?.status === 'completed'
+          ? 'Observed closure tasks and structural evidence permit a finish candidate. The governed finish facade must revalidate all gates; this is not authority or proof of merge or deployment.'
+          : recommendation.reason,
       evidence_refs: [...(stateRef ? [stateRef] : []), ...flow.completion.evidence_refs],
     });
   flow.disposition = flow.blockers.some((item) =>
