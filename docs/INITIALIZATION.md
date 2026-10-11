@@ -100,7 +100,7 @@ How each stage maps to a step of the standard flow:
   - The `dist/` directory is created.
   - The Chronos (`presence/displays/chronos-mirror-v2/.next/`) and concierge UIs are built (`build:ui`).
   - Runtime contracts between workspaces are rebuilt.
-- **Build steps**: `build:packages` -> `build:actuators` -> terminal-hud -> `build:repo` -> `build:ui`. To rebuild only the UI, use `pnpm build:ui`.
+- **Build steps**: `build:packages` -> `build:actuators` -> terminal-hud -> `build:repo` -> `build:bundle` -> knowledge index manifest -> `build:ui`. To rebuild only the UI, use `pnpm build:ui`.
 
 ### Stage 3: Prerequisite toolchain check
 
@@ -162,12 +162,13 @@ generated registries, validation, and security boundaries), follow the
 
 - **Command**: `pnpm reasoning:setup`
 - **Purpose**: see which reasoning backends this host can use. The source of truth for candidates is `allowed_modes` in `knowledge/product/governance/reasoning-backend-policy.json`; the main ones are:
-  - Local CLIs: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli`
+  - Local CLIs: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli` / `devin-cli`
   - APIs: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`
   - Local models: `local` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai`
   - Offline / testing: `stub`
 - **Physical changes**:
   - `KYBERION_REASONING_BACKEND` is saved to `.env.local` only if you pick a backend in interactive mode.
+  - API keys for API-type providers are registered through the governed secret store with `pnpm kyberion secret introduce <service-id> API_KEY` (service IDs are declared per provider under `knowledge/product/governance/reasoning-providers/`); do not export raw keys into the environment or startup commands.
 - **Known pitfall (claude-cli shadowing)**: until its postinstall is approved, the repo dependency `@anthropic-ai/claude-code` places a placeholder shim at `node_modules/.bin/claude`, which under pnpm can hide the real `claude` (for example `~/.local/bin/claude`) on PATH. If running `claude` prints `claude native binary not installed`, this is the cause. Fix: approve `@anthropic-ai/claude-code` with `pnpm approve-builds`, or set `KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude` (the probe falls back to `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` and so on when it detects the placeholder, but an explicit setting is the most reliable).
 
 #### 4d. Per-feature dependencies and system tools
@@ -195,11 +196,12 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
 
 - **Command**: `pnpm onboarding` (needs `dist/`)
 - **Purpose**: make the system remember the sovereign's name, language, interaction style, specialty, and vision.
-- **To do it in the GUI**: open the concierge `/settings` (the old `/setup` and `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.
+- **To do it in the GUI**: open the concierge `/settings` (the old Concierge `/setup` and the Presence Studio `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.
 - **In a non-interactive environment**: without a TTY, `pnpm onboarding` stops with exit 2. Use one of these instead:
   - `pnpm onboarding apply --identity <path/to/identity.json>` — apply the identity from a JSON file (Path B)
     - Copy the template [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json). Validating with `--dry-run` first is safest.
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — proceed with default values on purpose (for evaluation environments)
+- **Before anyone can sign in from a browser**: on a host with no owner yet, `pnpm organization first-run code` prints a one-time setup URL (`/setup/first-run` on the concierge). It creates the tenant and owner member, then closes for good. Details: [SURFACE_OIDC_LOGIN_OPERATIONS](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md).
 - **Operator identity for approvals**: the terminal records approvals as the local owner member (`user:owner`, `knowledge/personal/members/owner.json`), with your onboarding name kept beside it for display. Opening the concierge or presence-studio creates this member; from a terminal only, run `pnpm organization member ensure-owner` (idempotent). It is needed when separation of duties is switched on (`approval-policy.json` `separation_of_duties.enabled`): without it, opening or approving a request from the terminal stops with a diagnostic.
 - **To start over**: `pnpm onboarding reset` removes the onboarding state and the generated identity / vision / agent artifacts.
 - **Physical changes**:
@@ -215,6 +217,7 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
 - **Purpose**: confirm that every judgment layer L0-L11 passes. The layers are listed in standard flow Step 0.
 - **Layers that often fail the first time**:
   - **L8 (storage janitor)**: baseline-check enqueues the janitor automatically. Re-run after it completes. To run it by hand: `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'`.
+  - **L2 (stale build)**: reports `needs_recovery` when `dist/` is older than its sources. Rebuild with `pnpm build`, then re-run (runbook: [stale-build-troubleshooting-runbook](../knowledge/product/orchestration/stale-build-troubleshooting-runbook.md)).
   - **L10 (scheduler)**: passes when no schedule is enabled. After registering schedules, keep the chronos daemon resident. `pnpm kyberion scheduler install` shows what it will do and `--apply` registers it with the host's user service manager (launchd on macOS, `systemd --user` on Linux — `libs/core/daemon/service-manager.ts`). To just run it in the foreground, use `pnpm scheduler`. The same ceremony registers the media generation scheduler and the daemon watchdog (a 5-minute one-shot) with `--daemon generation-schedule` / `--daemon daemon-watchdog`. On macOS the node binary resolves to `<prefix>/opt/node/bin/node` (a version-independent symlink), so `brew upgrade node` does not break it.
   - **L10 (stale heartbeat, daemon alive)**: if `pnpm kyberion scheduler status` shows the daemon running but the heartbeat file is stale and the error log repeats `EPERM` on repo paths, the daemon lost its OS file-access grants — restart it with `pnpm kyberion scheduler restart --apply` (launchd kickstart / `systemctl --user restart`, platform-abstracted) instead of reinstalling ([runbook](../knowledge/product/governance/operations-hygiene-runbook.md)).
   - **L11 (audit ledger)**: fails if there are no audit records, or they are stale. Governed operations such as Stage 7 record them.
@@ -257,4 +260,4 @@ You are done when the baseline-check `status` is `all_clear`.
 ---
 
 _Status: Mandated by AGENTS.md — day-2 command reference (ONB-02)_
-_Last Updated: 2026-10-01_
+_Last Updated: 2026-10-12_
