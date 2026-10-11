@@ -98,4 +98,15 @@ describe('secure-io canonicalization under a symlinked checkout prefix', () => {
     expect(guard.seen).toContain(path.join(aliasRoot, 'other', 'through.txt'));
     expect(fixturePaths().filter((p) => !insideAlias(p))).toEqual([]);
   });
+
+  it('lists and stats a symlinked checkout root without /proc/self/fd', async () => {
+    const pathGuard = await import('./secure-io-path-guard.js');
+    const previous = pathGuard.setProcFdLookupDisabledForTesting(true);
+    try {
+      expect(io.safeReaddir(aliasRoot).sort()).toEqual(expect.arrayContaining(['data', 'other']));
+      expect(io.safeStat(aliasRoot).isDirectory()).toBe(true);
+    } finally {
+      pathGuard.setProcFdLookupDisabledForTesting(previous);
+    }
+  });
 });
