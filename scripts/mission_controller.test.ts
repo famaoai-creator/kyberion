@@ -12,6 +12,7 @@ import {
   saveProjectTrackRecord,
 } from '@agent/core';
 import * as killSwitch from '@agent/core/governance/kill-switch';
+import * as providerDiscovery from '@agent/core/provider/provider-discovery';
 import * as orchestratorSession from '@agent/core/mission/orchestrator-session';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
@@ -105,6 +106,33 @@ describe('mission_controller argument parsing', () => {
     cleanupScopeTrackFixture();
     cleanupPublicTenantFixture();
     cleanupLinkTestProjects();
+  });
+
+  it('reads provider observations without probing or populating caches during status', async () => {
+    const monitor = vi
+      .spyOn(killSwitch.killSwitch, 'startMonitor')
+      .mockImplementation(() => undefined);
+    const discover = vi.spyOn(providerDiscovery, 'discoverProviders').mockImplementation(() => {
+      throw new Error('Read-only status must not probe providers');
+    });
+    const peek = vi
+      .spyOn(providerDiscovery, 'peekProviderDiscovery')
+      .mockReturnValue({ providers: [], source: 'unavailable' });
+    const previousRefresh = process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH;
+    process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH = '0';
+    const output: unknown[] = [];
+    try {
+      await main(['status', 'MSN-READ-ONLY-MISSING'], (value) => output.push(value));
+      expect(peek).toHaveBeenCalledOnce();
+      expect(discover).not.toHaveBeenCalled();
+      expect(output.map(String).join('\n')).toContain('current readiness was not probed');
+    } finally {
+      monitor.mockRestore();
+      discover.mockRestore();
+      peek.mockRestore();
+      if (previousRefresh === undefined) delete process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH;
+      else process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH = previousRefresh;
+    }
   });
 
   it('skips the reasoning bootstrap only for journal-only actions', () => {
