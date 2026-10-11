@@ -17,6 +17,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/governance/approval-store.ts', consumer: 'apply_claim' },
   { file: 'libs/core/project/project-trust.ts', consumer: 'project_trust' },
   { file: 'libs/core/dot/dot-executor-release.ts', consumer: 'dot_release' },
+  { file: 'libs/core/governance/work-effect-release.ts', consumer: 'dot_release' },
   { file: 'libs/core/dot/dot-dispatch.ts', consumer: 'dot_dispatch' },
   { file: 'libs/core/dot/dot-autonomy.ts', consumer: 'dot_autonomy_promotion' },
   { file: 'libs/core/surface/front-desk-execution.ts', consumer: 'front_desk_execution' },

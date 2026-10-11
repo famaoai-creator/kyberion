@@ -17,10 +17,18 @@ export async function runStepHooks(
   hooks: StepHook[],
   ctx: Record<string, unknown>,
   phase: 'before' | 'after',
-  loadActuatorDispatch: DispatchLoader
+  loadActuatorDispatch: DispatchLoader,
+  assertExecutionCurrent?: () => void
 ): Promise<HookDecision> {
   for (const hook of hooks) {
-    const rejected = await runOneHook(hook, ctx, phase, loadActuatorDispatch);
+    assertExecutionCurrent?.();
+    const rejected = await runOneHook(
+      hook,
+      ctx,
+      phase,
+      loadActuatorDispatch,
+      assertExecutionCurrent
+    );
     if (!rejected) continue;
 
     const decision = hook.on_reject ?? 'abort';
@@ -45,12 +53,13 @@ async function runOneHook(
   hook: StepHook,
   ctx: Record<string, unknown>,
   phase: 'before' | 'after',
-  loadActuatorDispatch: DispatchLoader
+  loadActuatorDispatch: DispatchLoader,
+  assertExecutionCurrent?: () => void
 ): Promise<boolean> {
   const label = hook.label ?? `${phase}:${hook.type}`;
   try {
     if (hook.type === 'actuator_op') {
-      return await runActuatorHook(hook, ctx, loadActuatorDispatch);
+      return await runActuatorHook(hook, ctx, loadActuatorDispatch, assertExecutionCurrent);
     }
     if (hook.type === 'http') {
       return await runHttpHook(hook, ctx);
@@ -60,6 +69,7 @@ async function runOneHook(
     }
     throw new Error(`unsupported hook type: ${(hook as any).type}`);
   } catch (err: any) {
+    if (err?.adfControlFlow === 'preflight') throw err;
     const hookTarget = (hook as any).url || (hook as any).cmd || (hook as any).op || '';
     const targetSuffix = hookTarget ? ` → ${hookTarget}` : '';
     logger.warn(
@@ -72,13 +82,15 @@ async function runOneHook(
 async function runActuatorHook(
   hook: StepHook,
   ctx: Record<string, unknown>,
-  loadActuatorDispatch: DispatchLoader
+  loadActuatorDispatch: DispatchLoader,
+  assertExecutionCurrent?: () => void
 ): Promise<boolean> {
   if (!hook.op) throw new Error('actuator hook requires op');
   const [domain, action] = hook.op.split(':', 2);
   if (!domain || !action) throw new Error(`invalid actuator hook op: ${hook.op}`);
 
   const dispatch = await loadActuatorDispatch(domain);
+  assertExecutionCurrent?.();
   const params = resolveParamsRecursive(hook.params ?? {}, ctx);
   const result = await dispatch(action, params, ctx);
   if (!result.handled) throw new Error(`actuator hook was not handled: ${hook.op}`);

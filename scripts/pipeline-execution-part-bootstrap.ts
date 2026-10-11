@@ -515,7 +515,24 @@ export type DispatchFunc = (
 export const dispatchCache: Record<string, DispatchFunc> = {};
 export const moduleCache: Record<string, any> = {};
 
+/** A trusted caller fence, never sourced from pipeline JSON or context. */
+export function assertPipelineExecutionCurrent(options: {
+  assertExecutionCurrent?: () => void;
+}): void {
+  try {
+    options.assertExecutionCurrent?.();
+  } catch (error) {
+    const stopped = new Error(
+      'Pipeline execution ownership/deadline refused: ' +
+        (error instanceof Error ? error.message : String(error))
+    );
+    (stopped as Error & { adfControlFlow: string }).adfControlFlow = 'preflight';
+    throw stopped;
+  }
+}
+
 export interface RunStepsOptions {
+  assertExecutionCurrent?: () => void;
   /** Trusted restrictive mode; never read from ADF/context. */
   executionMode?: PipelineExecutionMode;
   /** Current diagnostic approval/configuration check immediately before the write. */
