@@ -1,12 +1,7 @@
 /** Isolated executable evaluation. Each invocation is a fresh process; no provider/channel calls. */
-import { withExecutionContextAsync } from '../../libs/core/dist/authority.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-} from '../../libs/core/dist/secure-io.js';
-import { writeJson, readJsonIfPresent } from '../../libs/core/dist/foundation/json.js';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { writeJson, readJsonIfPresent } from '@agent/core/foundation/json';
 import {
   clearWorkCoordinationStore,
   createWorkItem,
@@ -14,9 +9,9 @@ import {
   listWorkItems,
   claimWorkItem,
   setWorkCoordinationNamespace,
-} from '../../libs/core/dist/workforce/work-coordination.js';
-import { runDotExecutorSweep } from '../../libs/core/dist/dot/dot-executor.js';
-import { stubReasoningBackend } from '../../libs/core/dist/reasoning/reasoning-backend.js';
+} from '@agent/core/work-coordination';
+import { runDotExecutorSweep } from '@agent/core/dot/dot-executor';
+import { stubReasoningBackend } from '@agent/core/reasoning-backend';
 import { buildDotExecutorPorts } from '../../dist/scripts/dot_executor_step.js';
 import { runValidatedSteps } from '../../dist/scripts/pipeline-execution-part-results.js';
 const mode = process.argv[2];
