@@ -77,6 +77,12 @@ jobs:
         with:
           name: build-outputs
 
+      # chronos-dom-contrast starts `next start` — the .next bundles are
+      # deliberately excluded from the shared artifact (multi-GB), so this
+      # job builds the UI locally (~1min vs ~4min for the full build).
+      - name: Build UI for surface-dependent gates
+        run: pnpm run build:ui
+
       # PI-12: prove the source distribution is self-contained in a clean
       # governed staging directory and publish a checksum downstream can pin.
       - name: Verify source archive and clean install
