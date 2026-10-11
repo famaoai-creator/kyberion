@@ -23,6 +23,10 @@ import {
 } from './mission-lifecycle-completion.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
+import {
+  collectMissionFlowProjection,
+  type MissionFlowProjection,
+} from './mission-flow-projection.js';
 
 export type MissionTriageClassification =
   | 'not_found'
@@ -46,10 +50,13 @@ export interface MissionTriageRecommendation {
 }
 
 export interface MissionTriageReport {
+  /** Shared advisory observation; lifecycle classification alone is not readiness. */
+  flow: MissionFlowProjection;
   mission_id: string;
   found: boolean;
   mission_dir?: string;
   status?: string;
+  /** Legacy lifecycle category, not evidence of readiness; consult flow first. */
   classification: MissionTriageClassification;
   drift?: {
     passed: boolean;
@@ -283,8 +290,15 @@ export function collectMissionTriageReport(missionId: string): MissionTriageRepo
   const drift = missionDir ? evaluateMissionIntentDrift(upperId) : null;
   const tasks = missionDir ? pendingTaskIds(missionDir) : { total: 0, completed: 0, pending: [] };
   const context = ((state?.context || {}) as Record<string, unknown>) || {};
-
+  const flow = collectMissionFlowProjection({
+    missionId: upperId,
+    state,
+    missionDir,
+    recommendation,
+    driftBlocked: classification === 'intent_drift_blocked',
+  });
   return {
+    flow,
     mission_id: upperId,
     found: Boolean(missionDir && state),
     ...(missionDir ? { mission_dir: missionDir } : {}),

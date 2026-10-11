@@ -114,7 +114,12 @@ export async function runMissionTriage(
     return report;
   }
   print(`Mission: ${report.mission_id}`);
-  print(`  status: ${report.status || '<none>'}  classification: ${report.classification}`);
+  print(`  observation: ${report.flow.disposition}; advisory only, revalidate before execution`);
+  for (const candidate of report.flow.candidates) {
+    print(`  candidate (${candidate.action}): ${candidate.reason}`);
+    for (const ref of candidate.evidence_refs) print(`    evidence: ${ref}`);
+  }
+  print(`  status: ${report.status || '<none>'}  lifecycle category: ${report.classification}`);
   if (report.current_goal) print(`  current goal: ${report.current_goal}`);
   if (report.drift) {
     print(
@@ -125,9 +130,14 @@ export async function runMissionTriage(
     `  tasks: ${report.tasks.completed}/${report.tasks.total} closed` +
       (report.tasks.pending.length ? `  pending: ${report.tasks.pending.join(', ')}` : '')
   );
-  print(`  recommendation (${report.recommendation.action}): ${report.recommendation.reason}`);
-  for (const command of report.recommendation.commands) {
-    print(`    $ ${command}`);
+  if (
+    report.flow.candidates[0]?.kind === 'lifecycle' ||
+    report.flow.candidates[0]?.action === 'scope_rebaseline'
+  ) {
+    print(
+      `  lifecycle guidance (${report.recommendation.action}): ${report.recommendation.reason}`
+    );
+    for (const command of report.recommendation.commands) print(`    $ ${command}`);
   }
   if (scopeApprovalRequest?.id) {
     print('');
