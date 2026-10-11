@@ -246,3 +246,131 @@ function promote(
   }
   return result;
 }
+
+/**
+ * Durable-scope fallback for missions without a project link. Their published
+ * `report`/`export` deliverables are copied to the owner's storage floor
+ * (`active/shared/artifacts/<tier>/<tenant>/` for tenant missions,
+ * `active/shared/artifacts/system/` for untenanted public ones) and the
+ * ArtifactRecord is re-pointed — without this the archive move orphans every
+ * published record (surfaces list them as `missing`, downloads 404).
+ *
+ * Personal-tier missions and non-public missions without a tenant have no
+ * governed floor to land on and stay archived with the mission.
+ */
+export function promoteMissionArtifactsToOwnerFloor(input: {
+  missionId: string;
+  missionDir: string;
+  state: MissionState;
+}): MissionArtifactPromotionResult {
+  const result: MissionArtifactPromotionResult = {
+    status: 'skipped',
+    promoted: [],
+    failed: [],
+  };
+  try {
+    return promoteToOwnerFloor(input, result);
+  } catch (error) {
+    result.status = result.promoted.length > 0 ? 'partial' : 'skipped';
+    result.reason = 'error';
+    result.failed.push({
+      path: path.join('artifacts', SCOPED_ARTIFACT_INDEX_FILENAME),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return result;
+  }
+}
+
+function promoteToOwnerFloor(
+  input: { missionId: string; missionDir: string; state: MissionState },
+  result: MissionArtifactPromotionResult
+): MissionArtifactPromotionResult {
+  const missionId = stringOrEmpty(input.missionId).toUpperCase();
+  if (!missionId) return { ...result, reason: 'no_mission' };
+  const stateTenant =
+    stringOrEmpty(input.state.tenant_slug).toLowerCase() ||
+    stringOrEmpty(input.state.tenant_id).toLowerCase();
+  const missionTier = input.state.tier;
+  const scope =
+    stateTenant && missionTier
+      ? ({ tenant: stateTenant } as const)
+      : missionTier === 'public'
+        ? ({ system: true } as const)
+        : undefined;
+  if (!scope || !missionTier) return { ...result, reason: 'no_durable_scope' };
+  const tenant = 'tenant' in scope ? stateTenant : undefined;
+  result.status = 'nothing_to_promote';
+
+  const deliverables = readMissionIndex(input.missionDir).filter(
+    (entry) =>
+      MISSION_PROMOTION_CLASSES.includes(entry.artifact_class) &&
+      (entry.scope_kind === 'mission' || entry.scope_kind === 'task')
+  );
+  if (deliverables.length === 0) return result;
+  const byPath = new Map(deliverables.map((entry) => [entry.path, entry]));
+  const recordsByPath = new Map<string, ReturnType<typeof listArtifactRecords>>();
+  for (const record of listArtifactRecords()) {
+    if (record.mission_id?.toUpperCase() !== missionId || !record.path) continue;
+    if (!byPath.has(record.path)) continue;
+    recordsByPath.set(record.path, [...(recordsByPath.get(record.path) || []), record]);
+  }
+  const archiveDir = pathResolver.toRepoRelative(pathResolver.archivedMissionDir(missionId));
+  for (const [entryPath, records] of recordsByPath) {
+    const entry = byPath.get(entryPath) as ScopedArtifactIndexEntry;
+    try {
+      const source = confinedSource(input.missionDir, entryPath);
+      const content = safeReadFile(source, { encoding: null }) as Buffer;
+      const written = writeScopedArtifact({
+        scope,
+        tier: missionTier,
+        artifact_class: entry.artifact_class,
+        name: promotedName(missionId, entry),
+        content,
+        format: 'buffer',
+      });
+      const archivedFrom = path.posix.join(
+        archiveDir.split(path.sep).join('/'),
+        path.relative(input.missionDir, source).split(path.sep).join('/')
+      );
+      const promotedAt = nowIso();
+      for (const record of records) {
+        // The new scope re-decides tenancy: a tenant-floor copy carries it,
+        // a system-floor copy carries none (like a shared project).
+        const { tenant_slug: _previousTenant, ...rest } = record;
+        saveArtifactRecord({
+          ...rest,
+          path: written.repo_relative_path,
+          ...(tenant ? { tenant_slug: tenant } : {}),
+          metadata: {
+            ...(record.metadata || {}),
+            tier: missionTier,
+            scope_kind: 'tenant' in scope ? 'tenant' : 'system',
+            promoted_from: archivedFrom,
+            promoted_from_mission: missionId,
+            promoted_at: promotedAt,
+          },
+        });
+        result.promoted.push({
+          artifact_id: record.artifact_id,
+          from: entryPath,
+          to: written.repo_relative_path,
+        });
+      }
+    } catch (error) {
+      result.failed.push({
+        path: entryPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (result.failed.length > 0) {
+    logger.warn(
+      `mission artifact promotion incomplete — ${result.failed.length} deliverable(s) not copied to the owner floor | originals stay in the mission archive | mission=${missionId}`
+    );
+    result.status = result.promoted.length > 0 ? 'partial' : 'skipped';
+    result.reason = 'copy_failed';
+  } else if (result.promoted.length > 0) {
+    result.status = 'promoted';
+  }
+  return result;
+}

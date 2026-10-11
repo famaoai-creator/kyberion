@@ -423,7 +423,7 @@ export async function createMission(args: {
         pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
       )
     );
-    initMissionMemory({ missionId: upperId, tier: finalTier });
+    initMissionMemory({ missionId: upperId, tier: finalTier, dir: missionDir });
     logger.info(`📝 [WorkingMemory] Volatile memory faces initialized for ${upperId}.`);
   } catch {
     // Best-effort: working-memory-actuator may not be compiled yet
