@@ -7,7 +7,11 @@ export function evaluateCapabilityContract(capability, platform, binaryAvailable
   const platforms = Array.isArray(capability.platforms) ? capability.platforms : [];
   const requirements = capability.requirements ?? {};
   const platformMatch = platforms.includes(platform);
-  const missingBins = (requirements.bin ?? []).filter((bin) => !binaryAvailable(bin));
+  const requiredBins = [
+    ...(requirements.bin ?? []),
+    ...(requirements.bin_by_platform?.[platform] ?? []),
+  ];
+  const missingBins = requiredBins.filter((bin) => !binaryAvailable(bin));
   const envPlatforms = requirements.env_platforms;
   const environmentApplies =
     !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(platform);

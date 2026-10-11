@@ -14,7 +14,11 @@
       "platforms": ["darwin", "win32", "linux"],
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
-        "env_platforms": ["linux"]
+        "env_platforms": ["linux"],
+        "bin_by_platform": {
+          "darwin": ["security"],
+          "win32": ["powershell.exe"]
+        }
       },
       "effect": "read"
     },
@@ -23,7 +27,11 @@
       "platforms": ["darwin", "win32", "linux"],
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
-        "env_platforms": ["linux"]
+        "env_platforms": ["linux"],
+        "bin_by_platform": {
+          "darwin": ["security", "swift"],
+          "win32": ["powershell.exe"]
+        }
       },
       "effect": "write"
     },
@@ -32,7 +40,11 @@
       "platforms": ["darwin", "win32", "linux"],
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
-        "env_platforms": ["linux"]
+        "env_platforms": ["linux"],
+        "bin_by_platform": {
+          "darwin": ["security", "swift"],
+          "win32": ["powershell.exe"]
+        }
       },
       "effect": "write"
     },

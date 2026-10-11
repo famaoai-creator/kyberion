@@ -60,7 +60,7 @@ describe('kyberion script-command dispatch', () => {
     expect(mocks.safeExecResultAsync).not.toHaveBeenCalled();
     expect(mocks.spawnManagedProcess).toHaveBeenCalledTimes(1);
     const spec = mocks.spawnManagedProcess.mock.calls[0]?.[0];
-    expect(spec.command).toBe(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm');
+    expect(spec.command).toBe(pnpmExecutable());
     expect(spec.args).toEqual(['run', 'tui']);
     expect(spec.spawnOptions.stdio).toBe('inherit');
     expect(spec).not.toHaveProperty('timeoutMs');
@@ -194,8 +194,8 @@ describe('kyberion script-command dispatch', () => {
     expect(env).toHaveProperty('PATH');
   });
 
-  it('uses pnpm.cmd on Windows in both the buffered and streamed paths', () => {
-    expect(pnpmExecutable('win32')).toBe('pnpm.cmd');
+  it('uses the native pnpm executable on Windows in both the buffered and streamed paths', () => {
+    expect(pnpmExecutable('win32')).toBe('pnpm.exe');
     expect(pnpmExecutable('linux')).toBe('pnpm');
     expect(pnpmExecutable('darwin')).toBe('pnpm');
   });

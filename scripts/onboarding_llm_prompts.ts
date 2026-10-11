@@ -35,7 +35,10 @@ export interface LlmPromptDeps extends OnboardingLlmOptions {
 }
 
 const MAX_ATTEMPTS = 3;
-const affirmative = (value: string): boolean => /^(y|yes|はい)$/i.test(value.trim()); // i18n-exempt: bilingual prompt pair (JA side intentional)
+const affirmative = (value: string): boolean => {
+  const answer = value.trim();
+  return /^(y|yes)$/i.test(answer) || answer === 'はい'; // i18n-exempt: bilingual prompt pair (JA side intentional)
+};
 
 function pick(deps: LlmPromptDeps): (en: string, ja: string) => string {
   return deps.t ?? ((en) => en);

@@ -38,6 +38,10 @@ const LEGACY_INDEX_PATH = pathResolver.knowledge(
   'product/orchestration/legacy_component_index.json'
 );
 const REPORT_PATH = pathResolver.knowledge('product/architecture/component-lifecycle-inventory.md');
+
+function relativeLink(sourceFile: string, targetPath: string): string {
+  return path.relative(path.dirname(sourceFile), targetPath).replace(/\\/g, '/');
+}
 const CAPABILITIES_GUIDE_PATH = pathResolver.rootResolve('CAPABILITIES_GUIDE.md');
 
 const LEGACY_RATIONALES: Record<string, string> = {
@@ -324,13 +328,13 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('');
   lines.push('- Source manifests: `libs/actuators/*/manifest.json`');
   lines.push(
-    `- Compatibility snapshot: [global_actuator_index.json](${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`
+    `- Compatibility snapshot: [global_actuator_index.json](${relativeLink(CAPABILITIES_GUIDE_PATH, CURRENT_INDEX_PATH)})`
   );
   lines.push(
-    `- [legacy_component_index.json](${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`
+    `- [legacy_component_index.json](${relativeLink(CAPABILITIES_GUIDE_PATH, LEGACY_INDEX_PATH)})`
   );
   lines.push(
-    `- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`
+    `- [component-lifecycle-inventory.md](${relativeLink(CAPABILITIES_GUIDE_PATH, REPORT_PATH)})`
   );
   lines.push('- Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)');
   lines.push('- Email inbox vs send: [docs/EMAIL_OPERATOR.ja.md](docs/EMAIL_OPERATOR.ja.md)');
@@ -394,7 +398,7 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push('## Legacy Review Queue');
   lines.push('');
   lines.push(
-    `- Source of truth: [legacy_component_index.json](${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`
+    `- Source of truth: [legacy_component_index.json](${relativeLink(REPORT_PATH, LEGACY_INDEX_PATH)})`
   );
   lines.push(`- Count: ${legacy.length}`);
   lines.push('');

@@ -6,10 +6,10 @@
   <key>Label</key>
   <string>com.kyberion.agent-runtime-supervisor</string>
   <key>WorkingDirectory</key>
-  <string>/Users/kyberion/kyberion</string>
+  <string>__KYBERION_REPOSITORY_ROOT__</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/pnpm</string>
+    <string>__PNPM_EXECUTABLE_PATH__</string>
     <string>kyberion</string>
     <string>agent-runtime</string>
     <string>daemon</string>
@@ -31,8 +31,8 @@
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/Users/kyberion/Library/Logs/kyberion-agent-runtime-supervisor.log</string>
+  <string>__OPERATOR_HOME__/Library/Logs/kyberion-agent-runtime-supervisor.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/kyberion/Library/Logs/kyberion-agent-runtime-supervisor.err.log</string>
+  <string>__OPERATOR_HOME__/Library/Logs/kyberion-agent-runtime-supervisor.err.log</string>
 </dict>
 </plist>
