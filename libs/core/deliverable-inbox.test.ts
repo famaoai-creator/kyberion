@@ -32,7 +32,7 @@ const secureIo = vi.hoisted(() => ({
   },
   safeCreateExclusiveFileSync: (filePath: string, data: string | Buffer = '') => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, data);
+    fs.writeFileSync(filePath, data, { flag: 'wx' });
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
@@ -359,5 +359,42 @@ describe('deliverable inbox', () => {
     fs.mkdirSync(path.join(inboxDir, 'entries.jsonl'), { recursive: true });
 
     expect(() => listInboxEntries()).toThrow(/entries must be a regular file/);
+  });
+  it('atomically preserves explicit notification identities beyond list retention windows', async () => {
+    const { addInboxEntry, listInboxEntries, markInboxEntry } =
+      await import('./deliverable-inbox.js');
+    const input = {
+      entryId: 'INBOX-N-OLD',
+      title: 'Old notification',
+      summary: 'same content',
+      kind: 'operator_notification',
+      ifAbsent: true,
+    };
+    const original = addInboxEntry(input);
+    const filePath = path.join(tmpRoot, 'active/shared/inbox/entries.jsonl');
+    const entries = [
+      original,
+      ...Array.from({ length: 501 }, (_, index) => ({
+        ...original,
+        entry_id: 'INBOX-N-' + index,
+        title: 'newer',
+        created_at: '2099-01-01T00:00:00.000Z',
+        updated_at: '2099-01-01T00:00:00.000Z',
+      })),
+    ];
+    fs.writeFileSync(filePath, entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+    expect(
+      listInboxEntries({ limit: 500 }).some((entry) => entry.entry_id === original.entry_id)
+    ).toBe(false);
+    markInboxEntry(original.entry_id, 'read');
+    expect(addInboxEntry(input).status).toBe('read');
+    expect(listInboxEntries({ entryId: original.entry_id, limit: 1 })[0]?.entry_id).toBe(
+      original.entry_id
+    );
+    expect(listInboxEntries({ limit: 1000 })).toHaveLength(502);
+    expect(() => addInboxEntry({ ...input, summary: 'different content' })).toThrow(
+      'identity conflicts'
+    );
+    expect(listInboxEntries({ limit: 1000 })).toHaveLength(502);
   });
 });

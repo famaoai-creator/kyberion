@@ -1,10 +1,23 @@
+import { dotDigestActionEvidence } from './dot-digest-evidence.js';
+import { reconcileAdmittedDotAction } from './dot-admission-reconciliation.js';
+import { composeDotDigestText, dotCharterTimezone } from './dot-digest-composition.js';
+import { dotWorkItemInput } from './dot-work-item.js';
+import { sendDueDotDigest } from './dot-digest-delivery.js';
+export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
+import type { DotWorkResultRow } from './dot-state-paths.js';
+import {
+  admissionForDotRecord,
+  dotAdmissionItemId,
+  dotAdmissionScopeHash,
+  genericDotActionIdentity,
+  withDotAdmissionLock,
+} from './dot-admission-identity.js';
 import {
   DOT_ACTION_LEDGER_PATH,
   appendActionRecord,
   currentDotActions,
   dotProposalHash,
   type DotActionRecord,
-  type DotActionStatus,
 } from './dot-action-ledger.js';
 export {
   DOT_ACTION_LEDGER_PATH,
@@ -28,20 +41,9 @@ import {
  * Dot dispatch — the single enforcement point between a dot's proposals and
  * the world.
  *
- * Every proposal goes through, in order:
- *   1. charter bounds — `authority.allowed_work_shapes`, handoff acceptance,
- *      `authority.max_concurrent_delegations` (open WorkItems + parked actions);
- *   2. decision — autonomous-ops-gate, raised (never lowered) to the strictest
- *      of the charter `decisions.default_decision`, the floor learned from
- *      operator rejections, and the dot's own requested decision. The single
- *      exception is {@link dotNotifyToAutoExceptionApplies} (L4 notify → auto
- *      for a policy `autonomy.relaxable_actions` action);
- *   2b. disposition — a {@link DotDispositionOverride} may turn the proposal
- *      into a record-only `shadow` row (L0: no card, no WorkItem);
- *   3. routing — `routeAutonomousDecision` (decision card, veto window,
- *      digest notice) delivered to the charter's route;
- *   4. outcome — proceed → WorkItem (or a handoff to another dot); parked →
- *      settled on a later sweep by {@link settleDotParkedActions}.
+ * Proposals pass charter bounds, strict decision floors and disposition overrides,
+ * then governed routing, durable admission and deterministic WorkItem creation.
+ * Parked approvals settle on later sweeps; admitted creations reconcile after crashes.
  *
  * Identity: every effect carries the dot actor id `dot:<dot_id>` — WorkItem
  * metadata, approval requester, audit-chain entries, and notification titles —
@@ -51,14 +53,9 @@ import {
  * latest row per `action_ref` is the action's state.
  */
 
-import * as path from 'node:path';
-import { pathResolver } from '../path-resolver.js';
-import { safeMkdir } from '../secure-io.js';
 import { withFrontDeskDispatchLock } from '../surface/front-desk-dispatch-lock.js';
 import { inspectFrontDeskPendingRequest as inspectPendingRequest } from '../surface/front-desk-conversation-persistence.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
-import { matchesCron, getZonedDateParts } from '../pipeline/cron-utils.js';
 import {
   evaluateAutonomousOpsAction,
   getAutonomousOpsPolicy,
@@ -79,11 +76,7 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
-import {
-  createWorkItem,
-  createWorkItemIfAbsent,
-  listWorkItems,
-} from '../workforce/work-coordination.js';
+import { createWorkItemIfAbsent, listWorkItems } from '../workforce/work-coordination.js';
 
 import {
   getFrontDeskExecutionMapping,
@@ -93,6 +86,8 @@ import type { EventScopeInput } from '../event-scope.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import {
   notifyOperatorSync,
+  notifyOperatorWithReceiptSync,
+  type OperatorNotificationReceipt,
   type NotificationChannelTarget,
   type NotificationQuietHours,
   type OperatorEvent,
@@ -103,7 +98,6 @@ import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import {
   isFrontDeskDiagnosticDot,
   requireCurrentFrontDeskDiagnosticDot,
-  dotGoalRefLabel,
   listDotCharters,
   type DotCharter,
 } from './dot-charter.js';
@@ -116,7 +110,6 @@ import {
   type DotWorkShape,
 } from './dot-proposals.js';
 import {
-  dotSignalStatusLines,
   hasDotFeedbackFor,
   learnedDotDecisionFloor,
   measureDotSuccessSignals,
@@ -160,6 +153,14 @@ const DECISION_RANK: Record<DotDecisionLevel, number> = { auto: 0, notify: 1, ap
 const OPEN_WORK_ITEM_STATUSES = ['backlog', 'ready', 'in_progress', 'blocked', 'review'] as const;
 
 export interface DotDispatchDeps {
+  /** Stable identity of the originating wake; reuse on retries, change for intentional new work. */
+  operationKey?: string;
+  readWorkResults?: (charter: DotCharter) => DotWorkResultRow[];
+  notifyReceipt?: (
+    event: OperatorEvent,
+    payload: OperatorNotificationPayload,
+    options: OperatorNotificationOptions
+  ) => OperatorNotificationReceipt;
   rootDir?: string;
   now?: () => Date;
   gate?: (input: AutonomousOpsGateInput) => AutonomousOpsGateResult;
@@ -253,7 +254,7 @@ function defaultCountOpenWorkItems(dotId: string, rootDir?: string): number {
 
 function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
   const parked = currentDotActions(charter.dot_id, deps).filter(
-    (row) => row.status === 'parked'
+    (row) => row.status === 'parked' || row.status === 'admitted'
   ).length;
   const count =
     deps.countOpenWorkItems ?? ((dotId: string) => defaultCountOpenWorkItems(dotId, deps.rootDir));
@@ -707,17 +708,6 @@ function notifyDot(
   );
 }
 
-function workItemDescription(charter: DotCharter, record: DotActionRecord): string {
-  return [
-    record.objective,
-    record.rationale ? `\nRationale: ${record.rationale}` : '',
-    `\nProposed by ${dotActorId(charter.dot_id)} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.work_shape}; decision: ${record.decision ?? 'n/a'}.`,
-    dotGoalRefLabel(charter) ? `Contributes to: ${dotGoalRefLabel(charter)}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
 /** Admission and the executor own request revisions. Dispatch retains only references,
  * and rechecks current mapping/charter scope before creating or settling an approval. */
 function frontDeskDispatchScope(
@@ -758,7 +748,26 @@ function executeDotAction(
   options: { reuseExisting?: boolean } = {}
 ): DotActionRecord {
   const binding = record.front_desk_execution;
-  if (!binding) return executeDotActionUnlocked(charter, record, deps, options);
+  if (!binding)
+    return withDotAdmissionLock(charter, deps.rootDir, () => {
+      const latest = currentDotActions(charter.dot_id, deps).find(
+        (row) => row.action_ref === record.action_ref
+      );
+      if (latest?.status === 'dispatched' || latest?.status === 'declined') return latest;
+      const admitted =
+        latest?.status === 'admitted'
+          ? latest
+          : appendActionRecord(
+              {
+                ...record,
+                status: 'admitted',
+                admission: admissionForDotRecord(charter, record),
+                work_item_id: dotAdmissionItemId(record.action_ref),
+              },
+              deps
+            );
+      return executeDotActionUnlocked(charter, admitted, deps, { reuseExisting: true });
+    });
   return withFrontDeskDispatchLock(binding, () => {
     const latest = currentDotActions(charter.dot_id, deps).find(
       (row) => row.action_ref === record.action_ref
@@ -810,51 +819,19 @@ function executeDotActionUnlocked(
         ? undefined
         : (ref: string) => defaultFindWorkItemByActionRef(ref, deps.rootDir));
     const existing = options.reuseExisting ? find?.(record.action_ref) : undefined;
+    // The real store verifies the original creation snapshot, including archived items.
+    // Injected ports may use a custom finder but must preserve the action identity.
+    if (
+      existing &&
+      existing.metadata?.action_ref &&
+      existing.metadata.action_ref !== record.action_ref
+    )
+      throw new Error('dot work item identity conflict');
     item =
-      existing ??
-      (
-        deps.createWorkItem ??
-        (record.front_desk_execution ? createWorkItemIfAbsent : createWorkItem)
-      )({
-        ...(record.front_desk_execution
-          ? {
-              itemId: record.front_desk_execution.work_item_id,
-              sourceRef: record.front_desk_execution.request_digest,
-            }
-          : {}),
-        title: record.title,
-        description: workItemDescription(charter, record),
-        status: 'ready',
-        priority: record.priority ?? 'normal',
-        ...(charter.scope.project_id ? { projectId: charter.scope.project_id } : {}),
-        context: {
-          ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
-          ...(charter.scope.organization_id
-            ? { organization_id: charter.scope.organization_id }
-            : {}),
-          ...(charter.scope.project_id ? { project_id: charter.scope.project_id } : {}),
-          work_shape: 'routine_operation',
-        },
-        metadata: {
-          ...(record.front_desk_execution
-            ? { front_desk_execution: record.front_desk_execution }
-            : {}),
-          dot_id: charter.dot_id,
-          actor_id: actor,
-          action_ref: record.action_ref,
-          action_id: record.action_id,
-          requested_work_shape: record.work_shape,
-          authority_role: charter.authority.authority_role,
-          ...(record.decision ? { decision: record.decision } : {}),
-          ...(record.request_id ? { approval_request_id: record.request_id } : {}),
-          ...(record.handoff_to ? { handoff_to: record.handoff_to } : {}),
-          ...(dotGoalRefLabel(charter) ? { goal_ref: dotGoalRefLabel(charter) } : {}),
-          ...(record.pipeline_ref ? { pipeline_ref: record.pipeline_ref } : {}),
-          ...(record.expected_effect ? { expected_effect: record.expected_effect } : {}),
-          ...(record.target ? { target: record.target } : {}),
-          ...(record.intent ? { intent: record.intent } : {}),
-        },
-      });
+      (deps.createWorkItem && existing) ||
+      (deps.createWorkItem ?? createWorkItemIfAbsent)(
+        dotWorkItemInput(charter, record, deps.rootDir, existing)
+      );
   } catch (error) {
     const reason = `WorkItem creation failed: ${error instanceof Error ? error.message : String(error)}`;
     recordAudit(
@@ -865,7 +842,12 @@ function executeDotActionUnlocked(
       deps
     );
     return appendActionRecord(
-      { ...record, status: 'refused', reason, at: nowOf(deps).toISOString() },
+      {
+        ...record,
+        status: record.status === 'admitted' ? 'admitted' : 'refused',
+        reason,
+        at: nowOf(deps).toISOString(),
+      },
       deps
     );
   }
@@ -882,6 +864,7 @@ function executeDotActionUnlocked(
             action_ref: record.action_ref,
           },
           source: 'dot-handoff',
+          idempotency_key: record.action_ref,
         }
       );
     } catch (error) {
@@ -909,6 +892,32 @@ function executeDotActionUnlocked(
   );
 }
 
+function reconcileDotAdmission(
+  charter: DotCharter,
+  record: DotActionRecord,
+  deps: DotDispatchDeps
+): DotActionRecord {
+  return reconcileAdmittedDotAction(charter, record, deps, {
+    find:
+      deps.findWorkItemByActionRef ?? ((ref) => defaultFindWorkItemByActionRef(ref, deps.rootDir)),
+    scope: (proposal) => checkDotProposalScope(charter, proposal, deps),
+    preGate: (proposal) => runDotPreGateChecks(charter, proposal, deps),
+    gate: (proposal) => evaluateDotProposalGate(charter, proposal, deps).gate,
+    shadow: (proposal, action_ref, gate) =>
+      Boolean(runDotDispositionOverrides(charter, proposal, { action_ref, gate }, deps)),
+    execute: (latest) => executeDotActionUnlocked(charter, latest, deps, { reuseExisting: true }),
+  });
+}
+
+export function reconcileDotAdmissions(
+  charter: DotCharter,
+  deps: DotDispatchDeps = {}
+): DotActionRecord[] {
+  return currentDotActions(charter.dot_id, deps)
+    .filter((row) => row.status === 'admitted' && !row.front_desk_execution)
+    .map((row) => reconcileDotAdmission(charter, row, deps));
+}
+
 export interface DotDispatchResult {
   records: DotActionRecord[];
   duplicates: string[];
@@ -920,37 +929,38 @@ export function dispatchDotProposals(
   proposals: readonly DotProposal[],
   deps: DotDispatchDeps = {}
 ): DotDispatchResult {
-  if (!proposals.some((proposal) => proposal.front_desk_execution))
-    return dispatchDotProposalsUnlocked(charter, proposals, deps);
-  const result: DotDispatchResult = { records: [], duplicates: [] };
-  for (const proposal of proposals) {
-    const dispatch = () => {
-      if (proposal.front_desk_execution) {
-        const admission = inspectPendingRequest(proposal.front_desk_execution, charter, deps);
-        if (!admission.ok) return;
-        const prior = currentDotActions(charter.dot_id, deps).find(
-          (row) => row.action_ref === 'frontdesk-' + proposal.front_desk_execution!.work_item_id
-        );
-        if (prior) {
-          result.duplicates.push(prior.action_ref);
-          return;
+  return withDotAdmissionLock(charter, deps.rootDir, () => {
+    const result: DotDispatchResult = { records: [], duplicates: [] };
+    for (const [ordinal, proposal] of proposals.entries()) {
+      const dispatch = () => {
+        if (proposal.front_desk_execution) {
+          const admission = inspectPendingRequest(proposal.front_desk_execution, charter, deps);
+          if (!admission.ok) return;
+          const prior = currentDotActions(charter.dot_id, deps).find(
+            (row) => row.action_ref === 'frontdesk-' + proposal.front_desk_execution!.work_item_id
+          );
+          if (prior) {
+            result.duplicates.push(prior.action_ref);
+            return;
+          }
         }
-      }
-      const next = dispatchDotProposalsUnlocked(charter, [proposal], deps);
-      result.records.push(...next.records);
-      result.duplicates.push(...next.duplicates);
-    };
-    if (proposal.front_desk_execution)
-      withFrontDeskDispatchLock(proposal.front_desk_execution, dispatch);
-    else dispatch();
-  }
-  return result;
+        const next = dispatchDotProposalsUnlocked(charter, [proposal], deps, ordinal);
+        result.records.push(...next.records);
+        result.duplicates.push(...next.duplicates);
+      };
+      if (proposal.front_desk_execution)
+        withFrontDeskDispatchLock(proposal.front_desk_execution, dispatch);
+      else dispatch();
+    }
+    return result;
+  });
 }
 
 function dispatchDotProposalsUnlocked(
   charter: DotCharter,
   proposals: readonly DotProposal[],
-  deps: DotDispatchDeps = {}
+  deps: DotDispatchDeps = {},
+  ordinalOffset = 0
 ): DotDispatchResult {
   const records: DotActionRecord[] = [];
   const duplicates: string[] = [];
@@ -958,25 +968,49 @@ function dispatchDotProposalsUnlocked(
   for (const [index, proposal] of proposals.entries()) {
     const now = nowOf(deps);
     const hash = dotProposalHash(charter.dot_id, proposal);
-    // A declined proposal is not re-asked inside the window (no card spam);
-    // an override-shadowed one is not re-recorded (no digest spam).
+    const identity = proposal.front_desk_execution
+      ? undefined
+      : genericDotActionIdentity(charter, proposal, ordinalOffset + index, deps.operationKey);
+    const priorOperation =
+      identity && deps.operationKey
+        ? currentDotActions(charter.dot_id, deps).find(
+            (row) => row.action_ref === identity.action_ref
+          )
+        : undefined;
+    if (priorOperation) {
+      if (priorOperation.admission?.semantic_hash !== identity?.admission?.semantic_hash) {
+        records.push({
+          ...priorOperation,
+          reason: 'operation identity conflict: proposal changed; original admission retained',
+        });
+      } else if (priorOperation.status === 'admitted') {
+        records.push(reconcileDotAdmission(charter, priorOperation, deps));
+      } else duplicates.push(priorOperation.action_ref);
+      continue;
+    }
     const recent = currentDotActions(charter.dot_id, deps).find(
       (row) =>
         row.proposal_hash === hash &&
-        (row.status === 'parked' ||
-          row.status === 'dispatched' ||
-          row.status === 'declined' ||
-          (row.status === 'shadow' && Boolean(row.disposition_by))) &&
-        now.getTime() - Date.parse(row.at) < DOT_PROPOSAL_DEDUPE_WINDOW_MS
+        (!row.admission || row.admission.scope_hash === dotAdmissionScopeHash(charter)) &&
+        (row.status === 'admitted' ||
+          (row.status === 'dispatched' &&
+            dotDigestActionEvidence(charter, row, deps).status !== 'done') ||
+          ((row.status === 'parked' ||
+            (!deps.operationKey && row.status === 'dispatched') ||
+            row.status === 'declined' ||
+            (row.status === 'shadow' && Boolean(row.disposition_by))) &&
+            now.getTime() - Date.parse(row.at) < DOT_PROPOSAL_DEDUPE_WINDOW_MS))
     );
     if (recent) {
-      duplicates.push(recent.action_ref);
+      if (recent.status === 'admitted') records.push(reconcileDotAdmission(charter, recent, deps));
+      else duplicates.push(recent.action_ref);
       continue;
     }
     const base: DotActionRecord = {
       action_ref: proposal.front_desk_execution
         ? `frontdesk-${proposal.front_desk_execution.work_item_id}`
-        : `dact-${charter.dot_id}-${hash}-${now.getTime().toString(36)}-${index}`,
+        : identity!.action_ref,
+      ...(identity?.admission ? { admission: identity.admission } : {}),
       ...(proposal.front_desk_execution
         ? { front_desk_execution: proposal.front_desk_execution }
         : {}),
@@ -1158,7 +1192,12 @@ function dispatchDotProposalsUnlocked(
       logger.warn(
         `[dot-dispatch] proposal failed for ${charter.dot_id} — ${reason} | next: the dot re-proposes on its next wake`
       );
-      records.push(appendActionRecord({ ...base, reason }, deps));
+      const admitted = currentDotActions(charter.dot_id, deps).find(
+        (row) =>
+          row.action_ref === base.action_ref &&
+          (row.status === 'admitted' || row.status === 'dispatched')
+      );
+      records.push(admitted ?? appendActionRecord({ ...base, reason }, deps));
     }
   }
   return { records, duplicates };
@@ -1453,7 +1492,10 @@ export async function runDotHousekeeping(
   const fail = (step: string, error: unknown) =>
     result.errors.push(`${step}: ${error instanceof Error ? error.message : String(error)}`);
   try {
-    result.settled = settleDotParkedActions(charter, deps);
+    result.settled = [
+      ...reconcileDotAdmissions(charter, deps),
+      ...settleDotParkedActions(charter, deps),
+    ];
   } catch (error) {
     fail('settle', error);
   }
@@ -1480,52 +1522,13 @@ export async function runDotHousekeeping(
 // digest
 // ---------------------------------------------------------------------------
 
-export const DOT_DIGEST_LEDGER_PATH = 'active/shared/runtime/dot-digest-ledger.jsonl';
-
-interface DotDigestRow {
-  dot_id: string;
-  key: string;
-  sent_at: string;
-  delivered: boolean;
-}
-
-/** Charter wall-clock zone: quiet hours first, then its first cron trigger. */
-export function dotCharterTimezone(charter: DotCharter): string | undefined {
-  if (charter.notification.quiet_hours?.timezone) return charter.notification.quiet_hours.timezone;
-  for (const trigger of charter.attention.triggers) {
-    if (trigger.kind === 'cron' && trigger.timezone) return trigger.timezone;
-  }
-  return undefined;
-}
-
-function digestMinuteKey(charter: DotCharter, now: Date): string {
-  const p = getZonedDateParts(now, dotCharterTimezone(charter));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${charter.notification.digest_cron}@${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
-}
-
-/** Compose the digest text: actions since the last digest, open decisions, signals. */
+export { dotCharterTimezone } from './dot-digest-composition.js';
 export function composeDotDigest(
   charter: DotCharter,
   since: Date | undefined,
   deps: DotDispatchDeps = {}
 ): string {
-  const actions = currentDotActions(charter.dot_id, deps);
-  const recent = actions.filter((row) => !since || Date.parse(row.at) >= since.getTime());
-  const count = (status: DotActionStatus) => recent.filter((row) => row.status === status).length;
-  const waiting = actions.filter((row) => row.status === 'parked');
-  const signals = dotSignalStatusLines(charter, { rootDir: deps.rootDir });
-  return [
-    `${charter.title}${dotGoalRefLabel(charter) ? ` — ${dotGoalRefLabel(charter)}` : ''}`,
-    `Since last digest: dispatched ${count('dispatched')}, waiting ${waiting.length}, declined ${count('declined')}, refused ${count('refused')}.`,
-    ...recent
-      .filter((row) => row.status === 'dispatched')
-      .slice(-5)
-      .map((row) => `- done: ${row.title}${row.work_item_id ? ` (${row.work_item_id})` : ''}`),
-    ...waiting.slice(0, 5).map((row) => `- waiting on you: ${row.title}`),
-    ...(signals.length ? ['Signals:', ...signals] : []),
-    ...dotDigestSectionLines(charter, since, deps),
-  ].join('\n');
+  return composeDotDigestText(charter, since, deps, dotDigestSectionLines(charter, since, deps));
 }
 
 function dotDigestSectionLines(
@@ -1545,32 +1548,30 @@ function dotDigestSectionLines(
   return lines;
 }
 
-/** Send the charter digest when `digest_cron` is due (once per cron minute). */
+/** Durable bounded catch-up and retries; accepted is enqueue evidence, not remote delivery. */
 export function maybeSendDotDigest(charter: DotCharter, deps: DotDispatchDeps = {}): boolean {
-  const cron = charter.notification.digest_cron;
-  if (!cron) return false;
-  const now = nowOf(deps);
-  if (!matchesCron(cron, now, dotCharterTimezone(charter))) return false;
-  const file = path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_DIGEST_LEDGER_PATH);
-  const rows = readJsonLines<DotDigestRow>(file, { onMalformed: 'skip' }).filter(
-    (row) => row?.dot_id === charter.dot_id
-  );
-  const key = digestMinuteKey(charter, now);
-  if (rows.some((row) => row.key === key)) return false;
-  const last = rows.filter((row) => row.delivered).at(-1);
-  const text = composeDotDigest(charter, last ? new Date(last.sent_at) : undefined, deps);
-  const delivered = notifyDot(
-    charter,
-    'decision_digest',
-    { title: 'digest', body: text, correlation_id: `dot-digest:${charter.dot_id}:${key}` },
-    deps
-  );
-  safeMkdir(path.dirname(file), { recursive: true });
-  appendJsonLine(file, {
-    dot_id: charter.dot_id,
-    key,
-    sent_at: now.toISOString(),
-    delivered,
-  } satisfies DotDigestRow);
-  return delivered;
+  return sendDueDotDigest(charter, dotCharterTimezone(charter), {
+    rootDir: deps.rootDir,
+    now: deps.now,
+    compose: (since) => composeDotDigest(charter, since, deps),
+    notify: (text, key) => {
+      const payload = {
+        title: '[' + dotActorId(charter.dot_id) + '] digest',
+        body: text,
+        correlation_id: key,
+      };
+      const options = {
+        route: dotNotificationRoute(charter),
+        quietHours: dotQuietHours(charter),
+        deduplicationKey: key,
+      };
+      if (deps.notifyReceipt) return deps.notifyReceipt('decision_digest', payload, options);
+      if (deps.notify)
+        return {
+          status: deps.notify('decision_digest', payload, options) ? 'accepted' : 'retryable',
+          reason: 'injected_notification_port',
+        };
+      return notifyOperatorWithReceiptSync('decision_digest', payload, options);
+    },
+  });
 }
