@@ -431,3 +431,5 @@ When a CI failure or review finding reveals a NEW repo-specific rule (not
 an instance of an existing one), add it here in the matching section. Keep
 entries as _rules with reasons_, not war stories — the history lives in
 git and the improvement-plan docs.
+
+Dot execution changes must preserve [timed-out effect ownership and executor continuation](./operations-hygiene-runbook.md#13-timed-out-effects-and-executor-continuation), including isolated delayed-write and process-restart evidence.

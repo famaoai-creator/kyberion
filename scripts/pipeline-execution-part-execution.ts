@@ -1,3 +1,4 @@
+import { assertPipelineExecutionCurrent } from './pipeline-execution-part-bootstrap.js';
 import { refineErrorClassification } from '@agent/core/error-classifier-judgment';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
@@ -127,6 +128,8 @@ export async function runWithRepair(
     try {
       return await attemptOnce();
     } catch (err: any) {
+      if (err?.adfControlFlow === 'preflight') throw err;
+      assertPipelineExecutionCurrent(opts);
       lastError = err;
       // classifyError(), refined only by a calibrated judgment (inert until a fit lands).
       const failure = await refineErrorClassification(err);
@@ -1177,6 +1180,7 @@ export async function runStepsInternal(
       seedCtx?: Record<string, unknown>
     ) => Promise<AdfRunResult<Record<string, unknown>>>
   ): Promise<Record<string, unknown> | AdfSkippedStep> => {
+    assertPipelineExecutionCurrent(opts);
     const step = stepRefStack[stepRefStack.length - 1];
     const stepPolicy = normalizeReasoningPolicy(step);
 
@@ -1201,19 +1205,28 @@ export async function runStepsInternal(
     }
 
     if (step.hooks?.before?.length) {
-      const decision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
+      const decision = await runStepHooks(
+        step.hooks.before,
+        ctx,
+        'before',
+        loadActuatorDispatch,
+        () => assertPipelineExecutionCurrent(opts)
+      );
       if (decision === 'abort') throw new Error('aborted by before hook');
       if (decision === 'skip') return skipAdfStep(ctx, 'skipped by before hook');
     }
 
-    const dispatch = (): Promise<Record<string, unknown> | AdfSkippedStep> =>
-      runNestedSteps
+    const dispatch = (): Promise<Record<string, unknown> | AdfSkippedStep> => {
+      assertPipelineExecutionCurrent(opts);
+      return runNestedSteps
         ? dispatchControlOp(step.op, step.params, ctx, runNestedSteps)
         : dispatchLeafOp(step, ctx, rootDir, shellBin, opts, stepPolicy);
+    };
 
     const outcome = step.on_error
       ? await dispatch()
       : await runWithRepair(step, opts, stepPolicy, dispatch);
+    assertPipelineExecutionCurrent(opts);
     if (isSkip(outcome)) return outcome;
 
     if (step.hooks?.after?.length) {
@@ -1221,7 +1234,8 @@ export async function runStepsInternal(
         step.hooks.after,
         outcome as Record<string, unknown>,
         'after',
-        loadActuatorDispatch
+        loadActuatorDispatch,
+        () => assertPipelineExecutionCurrent(opts)
       );
       if (afterDecision === 'abort') throw new Error('aborted by after hook');
     }
@@ -1239,6 +1253,7 @@ export async function runStepsInternal(
   const eventStream = getDefaultWorkerEventStream();
   const hooks: AdfStepHooks = {
     beforeStep: (rawStep, stepNumber) => {
+      assertPipelineExecutionCurrent(opts);
       const step = rawStep as unknown as PipelineAdfStep;
       stepRefStack.push(step);
       if (opts.executionMode) assertBuiltinOnlyWorkerEventStream(eventStream);
