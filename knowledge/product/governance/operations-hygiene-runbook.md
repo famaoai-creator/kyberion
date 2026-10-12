@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-11
+last_updated: 2026-10-12
 ---
 
 # Operations Hygiene Runbook
@@ -67,6 +67,18 @@ had regressed.
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
 4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
+
+**Build-artifact identity and diagnostics.** Freshness checks must compare directory
+components after artifact-only path normalization: a buildinfo entry under `src-other/`
+or named `src.ts` is never evidence that the compiler owns `src/`. Keep Windows
+case/slash identity normalization local to build artifacts; never reuse it for tenant
+or security paths. Source-specific failures name the actual scanned source and its
+expected emit, each with that file's own timestamp; absent emits have a null timestamp
+and orphan emits have no source provenance. Only mtime fallback uses target-wide newest
+files. Cover older changed inputs beside newer unchanged inputs and missing/orphan
+outputs in `scripts/check_stale_dist.test.ts`. Platform-specific fixtures must be
+explicit skips elsewhere and included in the native platform's CI command;
+`tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
 **Gate budgets (`pnpm check`).** `scripts/run_checks.ts` runs up to 6 gates at once with a 120s
 default per gate (`DEFAULT_GATE_TIMEOUT_MS`). A gate that times out on busy runs:

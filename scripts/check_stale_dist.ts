@@ -144,6 +144,14 @@ function pathKey(filePath: string): string {
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
+function fileMtime(filePath: string): number | null {
+  try {
+    return safeStat(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 function hashFile(filePath: string): string | null {
   try {
     return createHash('sha256').update(readTextFile(filePath), 'utf8').digest('hex');
@@ -191,6 +199,22 @@ function evaluateTarget(
     ? newestMtime(distRoot, (filePath) => path.extname(filePath) === '.js')
     : { file: null, mtimeMs: null };
 
+  const emitForSource = (filePath: string): string =>
+    path.join(
+      distRoot,
+      spec.emitPrefix || '',
+      path.relative(sourceRoot, filePath).replace(/\.[cm]?tsx?$/u, '.js')
+    );
+  const sourceEvidence = (filePath: string) => {
+    const emitted = emitForSource(filePath);
+    return {
+      source_file: toRepoRelative(filePath),
+      source_mtime_ms: fileMtime(filePath),
+      dist_file: toRepoRelative(emitted),
+      dist_mtime_ms: fileMtime(emitted),
+    };
+  };
+
   const base = {
     target: spec.id,
     source_file: source.newestFile ? toRepoRelative(source.newestFile) : null,
@@ -207,7 +231,10 @@ function evaluateTarget(
       if (!['.ts', '.tsx'].some((extension) => safeExistsSync(sourceStem + extension))) {
         return {
           ...base,
+          source_file: null,
+          source_mtime_ms: null,
           dist_file: toRepoRelative(file),
+          dist_mtime_ms: fileMtime(file),
           reason: 'orphaned_emit',
           detail:
             'compiler output has no source; run the owned-output clean build after a delete or rename',
@@ -235,9 +262,18 @@ function evaluateTarget(
     }
     const versions = buildInfoCache.get(buildInfoPath)!;
     if (!versions) continue;
-    const tracked = [...versions.keys()].filter((filePath) =>
-      filePath.startsWith(pathKey(sourceRoot + path.sep))
-    );
+    const sourceRootKey = pathKey(sourceRoot);
+    const tracked = [...versions.keys()].filter((filePath) => {
+      // Normalize identity before checking directory components. Resolving
+      // sourceRoot + path.sep removes the separator and admits prefix siblings.
+      const relative = path.relative(sourceRootKey, filePath);
+      return (
+        relative !== '' &&
+        relative !== '..' &&
+        !relative.startsWith('..' + path.sep) &&
+        !path.isAbsolute(relative)
+      );
+    });
     if (tracked.length === 0) continue;
     // Only a buildinfo that actually tracks this sourceRoot may join the
     // freshness marker — `dist/.tsbuildinfo` is shared by build:repo and
@@ -260,15 +296,18 @@ function evaluateTarget(
         if (fileMs <= thisBuildInfoMs && !spec.required) continue;
         return {
           ...base,
-          source_file: toRepoRelative(filePath),
+          ...sourceEvidence(filePath),
+          source_mtime_ms: fileMs,
           reason: 'unrecorded_source',
-          detail: 'source file has no tsbuildinfo entry — newer than the last build',
+          detail: spec.required
+            ? 'source file has no tsbuildinfo entry in the required compiler project'
+            : 'source file has no tsbuildinfo entry — newer than the last build',
         };
       }
       if (hashFile(filePath) !== versions.get(pathKey(filePath))) {
         return {
           ...base,
-          source_file: toRepoRelative(filePath),
+          ...sourceEvidence(filePath),
           reason: 'source_changed_since_build',
           detail: 'content hash differs from the last recorded build input',
         };
@@ -278,19 +317,18 @@ function evaluateTarget(
     // re-emitted (incremental emit after a partial dist wipe) leaves the
     // recorded output absent on disk — the freshness check above cannot see
     // that. Verify every tracked source's expected .js exists.
-    const onDisk = new Set(source.files.map(pathKey));
-    for (const filePath of tracked) {
-      if (!onDisk.has(pathKey(filePath))) continue;
-      const emitted = path.join(
-        distRoot,
-        spec.emitPrefix || '',
-        path.relative(sourceRoot, filePath).replace(/\.[cm]?tsx?$/u, '.js')
-      );
+    // Buildinfo keys may be lowercased on Windows. Keep their identity for
+    // lookup, but use the scanned path's real spelling for diagnostic provenance.
+    const onDisk = new Map(source.files.map((filePath) => [pathKey(filePath), filePath]));
+    for (const trackedPath of tracked) {
+      const filePath = onDisk.get(trackedPath);
+      if (!filePath) continue;
+      const emitted = emitForSource(filePath);
       if (!safeExistsSync(emitted)) {
         return {
           ...base,
-          source_file: toRepoRelative(filePath),
-          dist_file: toRepoRelative(emitted),
+          ...sourceEvidence(filePath),
+          dist_mtime_ms: null,
           reason: 'emit_missing' as const,
           detail:
             'buildinfo records the source but its emitted .js is absent — likely a stale incremental emit after a partial dist wipe',

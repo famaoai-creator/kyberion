@@ -120,13 +120,16 @@ describe('check_stale_dist', () => {
   function writeBuildInfo(
     relativePath: string,
     entries: Record<string, string>,
-    options: { lowercasePaths?: boolean } = {}
+    options: { lowercasePaths?: boolean; separator?: string; absolutePaths?: boolean } = {}
   ): void {
     const buildInfoPath = pathResolver.sharedTmp(`check-stale-dist/${relativePath}`);
     const baseDir = path.dirname(buildInfoPath);
     const fileNames = Object.keys(entries).map((abs) => {
-      const relative = path.relative(baseDir, abs);
-      return options.lowercasePaths ? relative.toLowerCase() : relative;
+      const relative = options.absolutePaths ? abs : path.relative(baseDir, abs);
+      const separated = options.separator
+        ? relative.split(path.sep).join(options.separator)
+        : relative;
+      return options.lowercasePaths ? separated.toLowerCase() : separated;
     });
     const fileInfos = Object.values(entries).map((version) => ({ version }));
     write(relativePath, JSON.stringify({ fileNames, fileInfos }));
@@ -205,20 +208,55 @@ describe('check_stale_dist', () => {
     expect(scan.stale).toEqual([]);
   });
 
-  it('matches Windows-lowercased tsbuildinfo paths to on-disk source casing', () => {
-    if (process.platform !== 'win32') return;
+  // This must run on a Windows filesystem, not merely pass by returning on Unix.
+  it.skipIf(process.platform !== 'win32').each([
+    { separator: '/', absolutePaths: false },
+    { separator: '\\', absolutePaths: false },
+    { separator: '/', absolutePaths: true },
+    { separator: '\\', absolutePaths: true },
+  ])('matches Windows case/slash buildinfo identities: %j', (options) => {
+    const contents = 'export const chart = 1;\n';
+    const source = write('src/charts/ChartView.tsx', contents);
+    write('dist/charts/ChartView.js');
+    write('dist/other.js');
+    writeBuildInfo(
+      '.tsbuildinfo',
+      { [source]: sha256(contents) },
+      {
+        ...options,
+        lowercasePaths: true,
+      }
+    );
+    setMtime('src/charts/ChartView.tsx', T_NEW);
+    setMtime('dist/charts/ChartView.js', T_OLD);
+    setMtime('dist/other.js', T_NEW);
+    setMtime('.tsbuildinfo', T_OLD);
+
+    const targets = [spec({ buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })];
+    expect(findStaleDistTargets({ targets }).stale).toEqual([]);
+    safeRmSync(pathResolver.sharedTmp('check-stale-dist/dist/charts/ChartView.js'));
+    expect(findStaleDistTargets({ targets }).stale[0]).toMatchObject({
+      reason: 'emit_missing',
+      source_file: FIXTURE_ROOT + '/src/charts/ChartView.tsx',
+      source_mtime_ms: T_NEW,
+      dist_file: FIXTURE_ROOT + '/dist/charts/ChartView.js',
+      dist_mtime_ms: null,
+    });
+  });
+
+  it.skipIf(process.platform === 'win32')('does not case-fold buildinfo identities on Unix', () => {
     const contents = 'export const chart = 1;\n';
     const source = write('src/charts/ChartView.tsx', contents);
     write('dist/charts/ChartView.js');
     writeBuildInfo('.tsbuildinfo', { [source]: sha256(contents) }, { lowercasePaths: true });
-    setMtime('src/charts/ChartView.tsx', T_NEW);
-    setMtime('dist/charts/ChartView.js', T_OLD);
-    setMtime('.tsbuildinfo', T_OLD);
+    setMtime('src/charts/ChartView.tsx', T_OLD);
+    setMtime('.tsbuildinfo', T_NEW);
 
-    const scan = findStaleDistTargets({
-      targets: [spec({ buildInfo: [`${FIXTURE_ROOT}/.tsbuildinfo`] })],
-    });
-    expect(scan.stale).toEqual([]);
+    expect(
+      findStaleDistTargets({
+        targets: [spec({ required: true, buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
+      }).stale[0]?.reason
+    ).toBe('unrecorded_source');
   });
 
   it('flags a content change even when mtimes still look fresh', () => {
@@ -254,6 +292,103 @@ describe('check_stale_dist', () => {
     expect(scan.stale).toHaveLength(1);
     expect(scan.stale[0].reason).toBe('unrecorded_source');
     expect(scan.stale[0].source_file).toBe(`${FIXTURE_ROOT}/src/new.ts`);
+  });
+
+  it('pairs an older changed source with its own mtime and emit, not newer unchanged files', () => {
+    const original = 'export const value = 1;\n';
+    const changed = write('src/changed.ts', 'export const value = 2;\n');
+    const unchanged = write('src/unchanged.ts', original);
+    write('dist/src/changed.js');
+    write('dist/src/unchanged.js');
+    writeBuildInfo('.tsbuildinfo', {
+      [changed]: sha256(original),
+      [unchanged]: sha256(original),
+    });
+    setMtime('src/changed.ts', T_OLD);
+    setMtime('src/unchanged.ts', T_NEW);
+    setMtime('dist/src/changed.js', T_OLD + 100_000);
+    setMtime('dist/src/unchanged.js', T_NEW + 100_000);
+
+    expect(
+      findStaleDistTargets({
+        targets: [spec({ buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'], emitPrefix: 'src' })],
+      }).stale[0]
+    ).toMatchObject({
+      reason: 'source_changed_since_build',
+      source_file: FIXTURE_ROOT + '/src/changed.ts',
+      source_mtime_ms: T_OLD,
+      dist_file: FIXTURE_ROOT + '/dist/src/changed.js',
+      dist_mtime_ms: T_OLD + 100_000,
+    });
+  });
+
+  it('pairs an old required unrecorded source with its own timestamp and absent emit', () => {
+    const original = 'export const current = 1;\n';
+    const current = write('src/current.ts', original);
+    write('src/unrecorded.ts');
+    write('dist/current.js');
+    writeBuildInfo('.tsbuildinfo', { [current]: sha256(original) });
+    setMtime('src/current.ts', T_NEW);
+    setMtime('src/unrecorded.ts', T_OLD);
+    setMtime('dist/current.js', T_NEW);
+    setMtime('.tsbuildinfo', T_NEW);
+
+    expect(
+      findStaleDistTargets({
+        targets: [spec({ required: true, buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
+      }).stale[0]
+    ).toMatchObject({
+      reason: 'unrecorded_source',
+      source_file: FIXTURE_ROOT + '/src/unrecorded.ts',
+      source_mtime_ms: T_OLD,
+      dist_file: FIXTURE_ROOT + '/dist/unrecorded.js',
+      dist_mtime_ms: null,
+    });
+  });
+
+  it('reports an orphan emit with its own timestamp and no source provenance', () => {
+    write('src/current.ts');
+    write('dist/current.js');
+    write('dist/orphan.js');
+    setMtime('src/current.ts', T_NEW);
+    setMtime('dist/current.js', T_NEW);
+    setMtime('dist/orphan.js', T_OLD);
+
+    expect(
+      findStaleDistTargets({ targets: [spec({ checkOrphans: true })] }).stale[0]
+    ).toMatchObject({
+      reason: 'orphaned_emit',
+      source_file: null,
+      source_mtime_ms: null,
+      dist_file: FIXTURE_ROOT + '/dist/orphan.js',
+      dist_mtime_ms: T_OLD,
+    });
+  });
+
+  it('reports a missing emit with its source timestamp and null output timestamp', () => {
+    const original = 'export const value = 1;\n';
+    const missing = write('src/old.ts', original);
+    const current = write('src/current.ts', original);
+    write('dist/current.js');
+    writeBuildInfo('.tsbuildinfo', {
+      [missing]: sha256(original),
+      [current]: sha256(original),
+    });
+    setMtime('src/old.ts', T_OLD);
+    setMtime('src/current.ts', T_NEW);
+    setMtime('dist/current.js', T_NEW);
+
+    expect(
+      findStaleDistTargets({
+        targets: [spec({ buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
+      }).stale[0]
+    ).toMatchObject({
+      reason: 'emit_missing',
+      source_file: FIXTURE_ROOT + '/src/old.ts',
+      source_mtime_ms: T_OLD,
+      dist_file: FIXTURE_ROOT + '/dist/old.js',
+      dist_mtime_ms: null,
+    });
   });
 
   it('ignores declaration variants and *.test.tsx under excludeTests', () => {
@@ -313,6 +448,28 @@ describe('check_stale_dist', () => {
     expect(scan.stale).toHaveLength(1);
     expect(scan.stale[0].reason).toBe('source_newer_than_dist');
   });
+
+  it.each(['src-other/a.ts', 'src.ts'])(
+    'does not credit a foreign buildinfo prefix sibling %s',
+    (foreignSource) => {
+      write('src/a.ts', 'const a = 2;\n');
+      write('dist/a.js');
+      writeBuildInfo('.tsbuildinfo', {
+        [pathResolver.sharedTmp('check-stale-dist/' + foreignSource)]: sha256('foreign'),
+      });
+      setMtime('src/a.ts', T_OLD + 500_000);
+      setMtime('dist/a.js', T_OLD);
+      setMtime('.tsbuildinfo', T_NEW);
+
+      for (const required of [false, true]) {
+        const scan = findStaleDistTargets({
+          targets: [spec({ required, buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
+        });
+        expect(scan.stale).toHaveLength(1);
+        expect(scan.stale[0].reason).toBe('source_newer_than_dist');
+      }
+    }
+  );
 
   it('falls back to mtime when buildinfo tracks no files under the source root', () => {
     write('src/a.ts');

@@ -145,6 +145,7 @@ jobs:
           libs/core/platform.test.ts
           libs/core/virtual/os-accessibility-detector.test.ts
           libs/core/windows-os-automation.test.ts
+          scripts/check_stale_dist.test.ts
 
       # Live UI Automation smoke: launches Notepad and a WPF window on the
       # runner's interactive desktop, focuses them and checks that
