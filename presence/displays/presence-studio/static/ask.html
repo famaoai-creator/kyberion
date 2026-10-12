@@ -65,6 +65,24 @@
               <p>{{t:front_desk:conversation_legacy_notice}}</p>
               <ol id="conversation-legacy-turns"></ol>
             </details>
+            <section
+              id="draft-choice"
+              class="kb-callout ask-draft-choice"
+              aria-labelledby="draft-choice-title"
+              hidden
+            >
+              <p id="draft-choice-title">{{t:front_desk:ask_draft_conflict}}</p>
+              <p id="draft-choice-preview" class="ask-draft-preview"></p>
+              <div class="ask-draft-actions">
+                <button type="button" id="draft-keep" class="kb-btn kb-btn--secondary">
+                  {{t:front_desk:ask_draft_keep}}
+                </button>
+                <button type="button" id="draft-replace" class="kb-btn kb-btn--primary">
+                  {{t:front_desk:ask_draft_replace}}
+                </button>
+              </div>
+            </section>
+            <p id="draft-storage-warning" class="kb-callout" role="status" hidden></p>
             <form id="ask-form" class="ask-input-row">
               <input
                 type="text"
@@ -89,16 +107,36 @@
               ></button>
             </form>
             <div class="ask-chips" id="ask-chips">
-              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="email">
+              <button
+                type="button"
+                class="kb-btn kb-btn--secondary ask-chip"
+                disabled
+                data-chip="email"
+              >
                 {{t:front_desk:chip_email}}
               </button>
-              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="minutes">
+              <button
+                type="button"
+                class="kb-btn kb-btn--secondary ask-chip"
+                disabled
+                data-chip="minutes"
+              >
                 {{t:front_desk:chip_minutes}}
               </button>
-              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="browser">
+              <button
+                type="button"
+                class="kb-btn kb-btn--secondary ask-chip"
+                disabled
+                data-chip="browser"
+              >
                 {{t:front_desk:chip_browser}}
               </button>
-              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="webapp">
+              <button
+                type="button"
+                class="kb-btn kb-btn--secondary ask-chip"
+                disabled
+                data-chip="webapp"
+              >
                 {{t:front_desk:chip_webapp}}
               </button>
             </div>

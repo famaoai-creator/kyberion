@@ -139,6 +139,10 @@
     conversationId: null,
     historyState: 'loading',
     storageVerified: false,
+    draftEdited: false,
+    draftRestored: false,
+    draftSaveFailed: false,
+    proposedDraft: null,
     pending: 0,
     errorKey: null,
     setupHref: '/onboarding',
@@ -237,6 +241,7 @@
     chipDefs.forEach(function (def) {
       var button = document.querySelector('.ask-chip[data-chip="' + def.key + '"]');
       if (!button) return;
+      button.disabled = state.historyState !== 'ready' || !state.storageVerified;
       button.innerHTML =
         svgIcon(def.icon) + '<span>' + escapeHtml(vt(state.vocab, def.textKey)) + '</span>';
     });
@@ -902,9 +907,95 @@
     if (!key || !input) return;
     try {
       window.sessionStorage.setItem(key, input.value);
+      state.draftSaveFailed = window.sessionStorage.getItem(key) !== input.value;
     } catch (err) {
-      /* Browser-only draft. */
+      state.draftSaveFailed = true;
     }
+    renderDraftChoice();
+  }
+
+  function renderDraftChoice() {
+    var host = document.getElementById('draft-choice');
+    if (host) host.hidden = !state.proposedDraft;
+    var warning = document.getElementById('draft-storage-warning');
+    if (warning) {
+      warning.hidden = !state.draftSaveFailed;
+      warning.textContent = vt(state.vocab, 'front_desk:ask_draft_not_saved');
+    }
+  }
+
+  function cancelDraftChoice(focus) {
+    var proposal = state.proposedDraft;
+    state.proposedDraft = null;
+    renderDraftChoice();
+    var input = document.getElementById('ask-input');
+    if (focus && input) {
+      input.focus();
+      if (proposal && input.setSelectionRange && proposal.start !== null)
+        input.setSelectionRange(proposal.start, proposal.end, proposal.direction);
+    }
+  }
+
+  function editDraft(text) {
+    var input = document.getElementById('ask-input');
+    if (!input) return;
+    state.draftEdited = true;
+    cancelDraftChoice(false);
+    input.value = text;
+    saveDraft();
+  }
+
+  function proposeDraft(text) {
+    var input = document.getElementById('ask-input');
+    if (!input || !text || state.historyState !== 'ready' || !state.storageVerified) return false;
+    if (input.value.trim() && input.value !== text) {
+      state.proposedDraft = {
+        text: text,
+        start: input.selectionStart,
+        end: input.selectionEnd,
+        direction: input.selectionDirection,
+      };
+      var preview = document.getElementById('draft-choice-preview');
+      if (preview) preview.textContent = text;
+      renderDraftChoice();
+      var keep = document.getElementById('draft-keep');
+      if (keep) keep.focus();
+    } else {
+      editDraft(text);
+      input.focus();
+    }
+    return true;
+  }
+
+  function wireDraft() {
+    var input = document.getElementById('ask-input');
+    if (input)
+      input.addEventListener('input', function () {
+        state.draftEdited = true;
+        cancelDraftChoice(false);
+        saveDraft();
+      });
+    var keep = document.getElementById('draft-keep');
+    if (keep)
+      keep.addEventListener('click', function () {
+        cancelDraftChoice(true);
+      });
+    var replace = document.getElementById('draft-replace');
+    if (replace)
+      replace.addEventListener('click', function () {
+        if (!state.proposedDraft) return;
+        editDraft(state.proposedDraft.text);
+        if (input) input.focus();
+      });
+    function cancelOnEscape(event) {
+      if (event.key === 'Escape' && state.proposedDraft) {
+        event.preventDefault();
+        cancelDraftChoice(true);
+      }
+    }
+    var choice = document.getElementById('draft-choice');
+    if (choice) choice.addEventListener('keydown', cancelOnEscape);
+    if (input) input.addEventListener('keydown', cancelOnEscape);
   }
 
   function renderConversationStatus() {
@@ -945,7 +1036,7 @@
       escapeHtml(vt(state.vocab, 'front_desk:nav_settings')) +
       '</a>';
     document.getElementById('conversation-reload').addEventListener('click', function () {
-      restoreConversation(false);
+      restoreConversation(false).then(applyUrlPrefill);
     });
   }
 
@@ -1005,7 +1096,12 @@
             throw new Error('invalid saved request');
           if (saved) state.pendingRequest = saved;
           state.storageVerified = true;
-          if (restoreDraft && input) input.value = savedDraft || input.value;
+          if ((restoreDraft || !state.draftRestored) && input && !state.draftEdited)
+            input.value = savedDraft || input.value;
+          state.draftRestored = true;
+          // Early edits, including deliberate clearing, outrank delayed restoration.
+          // Retry after an initial history failure also reaches this verified boundary.
+          if (state.draftEdited) saveDraft();
         } catch (err) {
           state.storageVerified = false;
           state.errorKey = 'front_desk:conversation_storage_required';
@@ -1203,7 +1299,10 @@
       }
       finalTranscript = (finalTranscript + ' ' + finals).trim();
       var input = document.getElementById('ask-input');
-      if (input) input.value = (finalTranscript + ' ' + interim).trim();
+      if (input) {
+        cancelDraftChoice(false);
+        input.value = (finalTranscript + ' ' + interim).trim();
+      }
     };
     instance.onerror = function () {
       recognition = null;
@@ -1282,6 +1381,7 @@
       event.preventDefault();
       unlockAvatarAudio();
       var input = document.getElementById('ask-input');
+      cancelDraftChoice(false);
       sendText(input ? input.value : '');
     });
   }
@@ -1312,11 +1412,7 @@
           webapp: 'chip_webapp',
         }[key];
         var template = textKey ? vt(state.vocab, 'front_desk:' + textKey) : '';
-        var input = document.getElementById('ask-input');
-        if (input) {
-          input.value = template;
-          input.focus();
-        }
+        proposeDraft(template);
       });
     });
   }
@@ -1333,9 +1429,14 @@
       var ask = params.get('ask');
       var mic = params.get('mic') === '1';
       if (ask) {
-        var input = document.getElementById('ask-input');
-        if (input) input.value = ask;
-        if (params.get('send') === '1') sendText(ask);
+        if (params.get('send') === '1') {
+          // Explicit home send keeps its existing contract.
+          editDraft(ask);
+          sendText(ask);
+        } else if (!proposeDraft(ask)) {
+          // Keep this hand-off in the URL until draft ownership can be checked.
+          return;
+        }
       }
       if (mic && SpeechRecognitionCtor) startRecognitionCycle(false);
       if (ask || mic) {
@@ -1366,6 +1467,7 @@
     } catch (err) {
       state.hearingMode = false;
     }
+    wireDraft();
     wireForm();
     wireMic();
     wireHandsFree();
@@ -1390,8 +1492,7 @@
         if (progressResult.ok && progressResult.body && progressResult.body.ok) {
           renderRecent(progressResult.body.active || []);
         }
-        var input = document.getElementById('ask-input');
-        if (input) input.addEventListener('input', saveDraft);
+
         var legacy = loadTurns();
         var archive = document.getElementById('conversation-legacy');
         var archiveTurns = document.getElementById('conversation-legacy-turns');
