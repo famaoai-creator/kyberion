@@ -17,6 +17,10 @@ const EXAMPLE_PIPELINE_OPS: Record<string, string> = {
   'agent:staff_mission': 'mission-team-staff',
   'agent:prewarm_mission': 'mission-team-prewarm',
   'modeling:terraform_to_topology_ir': 'terraform-topology-ir',
+  'modeling:terraform_asset_inventory': 'terraform-asset-inventory',
+  'modeling:asset_inventory_to_ledger': 'external-asset-ledger',
+  'modeling:security_ledger_check_plan': 'exposure-check',
+  'network:exposure_check': 'exposure-check',
   'modeling:test_inventory_to_device_pipeline': 'test-inventory-device-pipeline',
 };
 

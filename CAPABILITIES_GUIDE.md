@@ -280,6 +280,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `summarize_ui_tree`                          | android                                     |
 | `team_plan`                                  | agent                                       |
 | `team_role`                                  | agent                                       |
+| `terraform_asset_inventory`                  | modeling                                    |
 | `terraform_to_architecture_adf`              | modeling                                    |
 | `terraform_to_topology_ir`                   | modeling                                    |
 | `test_inventory_to_browser_pipeline`         | modeling                                    |
