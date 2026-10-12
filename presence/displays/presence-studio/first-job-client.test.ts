@@ -131,6 +131,7 @@ function harness(
       'scope',
       'advance',
       'setup',
+      'next',
       'start',
       'restart',
       'restart-note',
@@ -2021,6 +2022,46 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
     advancement: row('not_started'),
     ...overrides,
   });
+  it.each([
+    ['running', 'next_running'],
+    ['receipt_verified', 'next_result'],
+    ['review_or_tick', 'next_pending'],
+    ['not_started', 'next_ready'],
+  ])('prioritizes the %s execution state in the primary next step', async (status, key) => {
+    const h = harness({
+      get: () => reply(snapshot({ setup: setup({ advancement: row(status) }) })),
+    });
+    await flush();
+    expect(h.get('next').textContent).toContain(key);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('directs held work to recovery instead of offering a ready-to-start step', async () => {
+    const h = harness({
+      heldRequests: [
+        {
+          request_id: first,
+          status: 'approval_verification_failed',
+          recovery: 'operator_recovery',
+        },
+      ],
+      get: () => reply(snapshot({ setup: setup() })),
+    });
+    await flush();
+    expect(h.get('next').textContent).toContain('next_recovery');
+    expect(h.get('start').disabled).toBe(true);
+  });
+  it('shows a settled refresh failure rather than claiming that checking is still running', async () => {
+    const h = harness({ get: () => reply(null, 503) });
+    await flush();
+    expect(h.get('next').textContent).toContain('next_unavailable');
+    expect(h.get('next').textContent).not.toContain('next_loading');
+  });
+  it('does not offer a ready step when browser storage is unavailable', async () => {
+    const h = harness({ storageThrows: true, get: () => reply(snapshot({ setup: setup() })) });
+    await flush();
+    expect(h.get('next').textContent).toContain('storage_required');
+    expect(h.get('start').disabled).toBe(true);
+  });
   it('shows simultaneous missing profile, mapping and login configuration without posting', async () => {
     const h = harness({
       approvalReady: false,
@@ -2044,6 +2085,7 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
     expect(h.get('setup-profile').textContent).toContain('setup_profile_missing');
     expect(h.get('setup-profile').textContent).toContain('setup_owner_operator');
     expect(h.get('setup-oidc').textContent).toContain('configuration_required');
+    expect(h.get('next').textContent).toContain('next_signin_setup');
     expect(h.get('setup-browser_user').textContent).toContain('setup_owner_user');
     expect(h.get('setup-baseline').textContent).toContain('unchecked');
     expect(h.get('setup-reasoning').textContent).toContain('not_required');

@@ -475,3 +475,18 @@ describe('operator service registration rendered interactions', () => {
     expect(api.calls).toEqual([null]);
   });
 });
+
+it('explains known service scope in Japanese and keeps raw operations in closed technical details', async () => {
+  mockApi();
+  const japanese = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
+    conciergeText(key, 'ja', params);
+  const m = mount(createElement(OperatorServiceRegistrationPanel, { t: japanese }));
+  await flush();
+  expect(m.container.textContent).toContain('対象リポジトリの設定');
+  expect(m.container.textContent).toContain('チャンネルへの参加');
+  expect(m.container.textContent).not.toContain('Only grant needed');
+  const details = card(m).querySelector('details')!;
+  expect(details.querySelector('summary')!.textContent).toBe('技術的な確認内容');
+  expect(details.hasAttribute('open')).toBe(false);
+  expect(details.textContent).toContain('github.auth.test');
+});

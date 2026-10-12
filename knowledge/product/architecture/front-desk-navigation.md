@@ -1,7 +1,7 @@
 ---
 title: 'Existing front-desk navigation'
 tags: [surface, navigation, authorization, user-experience]
-last_updated: 2026-10-08
+last_updated: 2026-10-12
 role_affinity: [ecosystem_architect]
 ---
 
@@ -44,6 +44,10 @@ Menu visibility is only an aid to discovery. Every destination retains its exist
 
 ## Scope and interaction
 
-Links preserve the selected tenant, organization and project. Chronos uses organization_id/project_id; the primary front-desk routes use organizationId/projectId. The shared link metadata selects the correct names. Changing tenant clears both older scope aliases.
+Links preserve a concrete selected tenant, organization and project, including when its display profile is absent. Concierge's personal and system overviews are not tenant slugs. Opening a workspace-only destination from either overview first asks the user to choose from the server-listed workspaces and retains the intended destination. Cancel or Escape leaves the source scope and history unchanged. An explicit workspace transition drops the previous organization/project hierarchy, and the destination rechecks authorization. The rail and command search use this same transition. Surface identity comes from the navigation catalog as well as the URL origin, so a shared-origin reverse proxy does not silently change the contract.
+
+The chooser distinguishes pending workspace/catalog reads from settled failures, and keeps a command-search destination that arrives before the rail's reads finish. Navigation role labels describe access, not verified approver identity; the first-job guide explains its separate sign-in and diagnostic-setup requirements and derives its primary next step from current execution and failure state.
+
+Concrete links preserve the selected tenant, organization and project. Chronos uses organization_id/project_id; the primary front-desk routes use organizationId/projectId. The shared link metadata selects the correct names. Changing tenant clears both older scope aliases.
 
 Desktop navigation scrolls vertically and mobile navigation horizontally without hiding later groups. Current-page state covers workspace, import, first-job and training routes. Command search supports keyboard selection, dismissal and focus restoration, native settings hash history, and ignores responses superseded by closing, locale changes or tenant changes.
