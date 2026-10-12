@@ -7523,6 +7523,10 @@
     "./identity-context-bridge": {
       "types": "./dist/identity-context-bridge.d.ts",
       "default": "./dist/identity-context-bridge.js"
+    },
+    "./reasoning/reasoning-selection-settings": {
+      "types": "./dist/reasoning/reasoning-selection-settings.d.ts",
+      "default": "./dist/reasoning/reasoning-selection-settings.js"
     }
   },
   "dependencies": {

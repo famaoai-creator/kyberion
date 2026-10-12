@@ -1,14 +1,33 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '../secure-io.js';
 import { compileSchema } from '../foundation/ajv.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import {
+  loadReasoningBackendPolicy,
+  resolveScopedBackendPolicy,
+  type ReasoningBackendMode,
+  type ReasoningBackendPolicy,
+} from './reasoning-backend-policy.js';
+import {
+  peekReasoningSelectionReadiness,
+  type ReasoningSelectionReadiness,
+} from './reasoning-selection-readiness.js';
 import { currentScope, type ScopeContext } from '../scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
-import { reasoningProviderModelEnvKeys } from './reasoning-provider-registry.js';
+import {
+  getReasoningProviderDescriptor,
+  reasoningProviderModelEnvKeys,
+} from './reasoning-provider-registry.js';
+import { readPinFile } from '../provider/provider-pins-store.js';
 import { loadLlmSelectionPreferences } from '../llm-selection-state.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
@@ -129,15 +148,43 @@ export interface ResolvedStepReasoningRoute {
     | 'policy';
   provenance: string[];
 }
+export interface ReasoningRoleSelection {
+  mode: 'auto' | 'preferred' | 'fixed';
+  /** Non-auto selection names an exact runtime; its provider is registry-owned. */
+  runtime_mode?: string;
+  provider?: string;
+  /** Omitted model retains normal model resolution, even in fixed runtime mode. */
+  model?: string;
+  profile?: string;
+}
+export interface ReasoningSelectionDecision {
+  requested: ReasoningRoleSelection;
+  effective: { profile: string; runtime_mode: string; provider?: string; model?: string };
+  source: 'user' | 'request' | 'env' | 'policy';
+  reason: string;
+  reasonCode: 'selected' | 'fallback' | 'overridden' | 'automatic';
+  fallback: boolean;
+  /** Exact model constraint may come from the user or a stronger broker policy pin. */
+  modelPinned?: boolean;
+}
 export interface ReasoningRouteUserConfig {
   version?: string;
   revision?: number;
   updated_at?: string;
   last_change?: string;
-  roles?: Record<string, { profile?: string; candidates?: string[]; sampling?: SamplingParams }>;
+  roles?: Record<
+    string,
+    {
+      profile?: string;
+      candidates?: string[];
+      sampling?: SamplingParams;
+      selection?: ReasoningRoleSelection;
+    }
+  >;
   profiles?: Record<string, Partial<RuntimeProfileConfig>>;
 }
 export interface ResolvedReasoningRoute {
+  selection?: ReasoningSelectionDecision;
   role: ReasoningRole;
   profileRef: string;
   mode: ReasoningBackendMode | string;
@@ -210,7 +257,43 @@ export function reasoningRouteUserConfigPath(): string {
   return USER_CONFIG_PATH;
 }
 
-export function saveReasoningRouteUserConfig(config: ReasoningRouteUserConfig): void {
+let userConfigLockHeld = false;
+/** Synchronous nesting is safe: no await or other execution can enter the critical section. */
+export function withReasoningRouteConfigLock<T>(run: () => T): T {
+  if (userConfigLockHeld) return run();
+  return withLockSync('reasoning-route-user-config', () => {
+    userConfigLockHeld = true;
+    try {
+      return run();
+    } finally {
+      userConfigLockHeld = false;
+    }
+  });
+}
+
+/** Compatibility saver; supplied revisions remain next revisions, with additive CAS support. */
+export function saveReasoningRouteUserConfig(
+  config: ReasoningRouteUserConfig,
+  expectedRevision?: number
+): void {
+  withReasoningRouteConfigLock(() => {
+    const current = safeExistsSync(USER_CONFIG_PATH)
+      ? loadReasoningRouteUserConfigAtPath(USER_CONFIG_PATH)
+      : {};
+    const currentRevision = current.revision ?? 0;
+    if (expectedRevision !== undefined && expectedRevision !== currentRevision) {
+      throw new Error('[REASONING_SELECTION_REVISION_CONFLICT] Reasoning configuration changed');
+    }
+    // Old callers may omit a revision. Serialize them and advance the generation
+    // so they cannot invisibly invalidate the Operator's revision CAS.
+    const nextRevision = config.revision ?? currentRevision + 1;
+    if (nextRevision <= currentRevision) {
+      throw new Error('[REASONING_SELECTION_REVISION_CONFLICT] Revision must advance');
+    }
+    saveReasoningRouteUserConfigLocked({ ...config, revision: nextRevision });
+  });
+}
+function saveReasoningRouteUserConfigLocked(config: ReasoningRouteUserConfig): void {
   validateReasoningRouteUserConfig(config);
   const policy = loadReasoningRoutePolicy();
   for (const role of Object.keys(config.roles || {})) {
@@ -226,6 +309,7 @@ export function saveReasoningRouteUserConfig(config: ReasoningRouteUserConfig): 
     mkdir: true,
     encoding: 'utf8',
   });
+  reasoningRouteUserConfigCatalog.reset();
 }
 
 export function normalizeReasoningRole(
@@ -349,21 +433,27 @@ function resolveAndValidateModel(input: {
   throw new Error(`Model ${model} is not approved in model-registry.json for ${input.profile}`);
 }
 
-export function resolveReasoningRoute(
-  input: {
-    role?: string;
-    requestedProfile?: string;
-    requestedMode?: string;
-    requestedModel?: string;
-    requiredCapabilities?: ReasoningCapability[];
-    sampling?: SamplingParams;
-    thinkingLevel?: ThinkingLevel;
-    constrainedSampling?: ConstrainedSampling;
-    env?: NodeJS.ProcessEnv;
-    policy?: ReasoningRoutePolicy;
-    userConfig?: ReasoningRouteUserConfig;
-    scope?: ScopeContext;
-  } = {}
+export interface ResolveReasoningRouteInput {
+  role?: string;
+  requestedProfile?: string;
+  requestedMode?: string;
+  requestedModel?: string;
+  requiredCapabilities?: ReasoningCapability[];
+  sampling?: SamplingParams;
+  thinkingLevel?: ThinkingLevel;
+  constrainedSampling?: ConstrainedSampling;
+  env?: NodeJS.ProcessEnv;
+  policy?: ReasoningRoutePolicy;
+  userConfig?: ReasoningRouteUserConfig;
+  scope?: ScopeContext;
+  backendPolicy?: ReasoningBackendPolicy;
+  readiness?: Record<string, ReasoningSelectionReadiness>;
+  /** Read-only broker-pin seam; null explicitly means no pin in hermetic callers. */
+  brokerPin?: { provider: string; modelId?: string } | null;
+}
+
+function resolveLegacyReasoningRoute(
+  input: ResolveReasoningRouteInput = {}
 ): ResolvedReasoningRoute {
   const policy = resolveScopedReasoningRoutePolicy(
     input.policy ?? loadReasoningRoutePolicy(),
@@ -401,7 +491,9 @@ export function resolveReasoningRoute(
       : roleUser?.candidates || rolePolicy.candidates;
   const candidates = input.requestedMode
     ? configuredCandidates.filter(
-        (profileRef) => policy.profiles[profileRef]?.mode === input.requestedMode
+        (profileRef) =>
+          (user.profiles?.[profileRef]?.mode || policy.profiles[profileRef]?.mode) ===
+          input.requestedMode
       )
     : configuredCandidates;
   const required = Array.from(
@@ -618,6 +710,340 @@ export function resolveReasoningRoute(
   throw new Error(
     `No usable reasoning route for role ${role}. Rejected: ${rejectedCandidates.map((x) => `${x.profile} (${x.reason})`).join('; ')}`
   );
+}
+
+export class ReasoningSelectionError extends Error {
+  constructor(
+    public readonly reasonCode: 'conflict' | 'unavailable' | 'invalid',
+    message: string,
+    public readonly rejectedCandidates: Array<{ profile: string; reason: string }> = []
+  ) {
+    super('[REASONING_SELECTION_' + reasonCode.toUpperCase() + '] ' + message);
+    this.name = 'ReasoningSelectionError';
+  }
+}
+
+function selectionTargetProfile(
+  selection: ReasoningRoleSelection,
+  policy: ReasoningRoutePolicy,
+  user: ReasoningRouteUserConfig,
+  role: string
+): string {
+  if (selection.profile) return selection.profile;
+  const profiles = { ...policy.profiles, ...user.profiles };
+  return (
+    [...(policy.roles[role]?.candidates || []), ...Object.keys(profiles)].find(
+      (ref) => profiles[ref]?.mode === selection.runtime_mode
+    ) || 'selection-' + role
+  );
+}
+
+function sameSelectionModel(left: string, right: string, adapter: RuntimeAdapterConfig): boolean {
+  return (
+    resolveAndValidateModel({ model: left, adapter, profile: 'selection' }) ===
+    resolveAndValidateModel({ model: right, adapter, profile: 'selection' })
+  );
+}
+
+/** All eligible routes, in execution order. Fixed selection always yields exactly one. */
+export function resolveReasoningRouteCandidates(
+  input: ResolveReasoningRouteInput = {}
+): ResolvedReasoningRoute[] {
+  const policy = resolveScopedReasoningRoutePolicy(
+    input.policy ?? loadReasoningRoutePolicy(),
+    input.scope ?? currentScope()
+  );
+  const role = normalizeReasoningRole(input.role, policy);
+  const user = input.userConfig ?? loadReasoningRouteUserConfig();
+  const selection = user.roles?.[role]?.selection;
+  if (!selection) {
+    const initial = resolveLegacyReasoningRoute(input);
+    const routes = [initial];
+    for (const profile of initial.candidates) {
+      if (profile === initial.profileRef) continue;
+      try {
+        routes.push(resolveLegacyReasoningRoute({ ...input, requestedProfile: profile }));
+      } catch {
+        // An invalid legacy fallback must not discard a usable primary.
+      }
+    }
+    return routes;
+  }
+  validateReasoningRouteUserConfig(user);
+  const env = input.env ?? process.env;
+  const backendPolicy = resolveScopedBackendPolicy(
+    input.backendPolicy ?? loadReasoningBackendPolicy(),
+    input.scope ?? currentScope()
+  );
+  const readiness = input.readiness ?? peekReasoningSelectionReadiness(policy, env);
+  const fixed = selection.mode === 'fixed';
+  let fixedPinModel: string | undefined;
+  const targetMode = selection.runtime_mode;
+  const adapter = targetMode ? policy.runtime_adapters[targetMode] : undefined;
+  const targetProfile =
+    selection.mode === 'auto' ? undefined : selectionTargetProfile(selection, policy, user, role);
+  const rejected: Array<{ profile: string; reason: string }> = [];
+  const reject = (profile: string, reason: string) => rejected.push({ profile, reason });
+  const cleanUser: ReasoningRouteUserConfig = {
+    ...user,
+    roles: { ...user.roles, [role]: { ...user.roles?.[role], selection: undefined } },
+    profiles: { ...user.profiles },
+  };
+  const envBinding = requestedBinding(role, env);
+  const envMode = envText(env, 'KYBERION_REASONING_BACKEND');
+  const canonicalMode = (mode: string) => backendPolicy.mode_aliases[mode] || mode;
+  const hasRequest = Boolean(input.requestedProfile || input.requestedMode || input.requestedModel);
+  const hasEnvironment = Boolean(envBinding || envMode);
+  const source: ReasoningSelectionDecision['source'] = fixed
+    ? 'user'
+    : hasRequest
+      ? 'request'
+      : hasEnvironment
+        ? 'env'
+        : selection.mode === 'auto'
+          ? 'policy'
+          : 'user';
+
+  if (fixed) {
+    if (
+      envText(env, 'KYBERION_HARNESS_SUBAGENT') === '1' ||
+      envText(env, 'KYBERION_IN_SESSION_SUBAGENT') === '1'
+    ) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Fixed reasoning is unsupported while independent subagent dispatch is enabled'
+      );
+    }
+    if (selection.model && targetMode === 'agy-cli') {
+      throw new ReasoningSelectionError(
+        'invalid',
+        'Agy runtime does not support an exact model override'
+      );
+    }
+    if (!targetMode || !adapter) {
+      throw new ReasoningSelectionError('invalid', 'Fixed runtime is not registered');
+    }
+    const pin =
+      input.brokerPin === undefined ? readPinFile().pins['reasoning-backend'] : input.brokerPin;
+    const descriptor = getReasoningProviderDescriptor(targetMode as ReasoningBackendMode);
+    if (pin && pin.provider !== targetMode && pin.provider !== descriptor?.provider) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Capability broker provider pin conflicts with fixed runtime'
+      );
+    }
+    fixedPinModel = pin?.modelId;
+    if (
+      pin?.modelId &&
+      selection.model &&
+      !sameSelectionModel(selection.model, pin.modelId, adapter)
+    ) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Capability broker model pin conflicts with exact fixed model'
+      );
+    }
+    const constrainedModel = selection.model || fixedPinModel;
+    if (
+      (input.requestedMode && canonicalMode(input.requestedMode) !== targetMode) ||
+      (envMode && canonicalMode(envMode) !== targetMode)
+    ) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Fixed runtime conflicts with request or environment backend'
+      );
+    }
+    for (const binding of [input.requestedProfile, envBinding].filter(Boolean) as string[]) {
+      const parsed = parseBinding(binding);
+      const profile = parsed.profile
+        ? { ...policy.profiles[parsed.profile], ...user.profiles?.[parsed.profile] }
+        : undefined;
+      const mode = parsed.mode || profile?.mode;
+      const model = parsed.model;
+      if (
+        !mode ||
+        canonicalMode(mode) !== targetMode ||
+        (selection.profile && parsed.profile && parsed.profile !== selection.profile) ||
+        (constrainedModel && model && !sameSelectionModel(constrainedModel, model, adapter))
+      ) {
+        throw new ReasoningSelectionError(
+          'conflict',
+          'Fixed target conflicts with requested profile or environment binding'
+        );
+      }
+    }
+    if (constrainedModel) {
+      for (const model of [
+        input.requestedModel,
+        ...[...reasoningProviderModelEnvKeys(targetMode), 'KYBERION_REASONING_MODEL'].map((key) =>
+          envText(env, key)
+        ),
+      ].filter(Boolean) as string[]) {
+        if (!sameSelectionModel(constrainedModel, model, adapter)) {
+          throw new ReasoningSelectionError(
+            'conflict',
+            'Fixed or broker-pinned model conflicts with request or environment model'
+          );
+        }
+      }
+    }
+  }
+
+  const requests: Array<{ profile: string; model?: string; target: boolean }> = [];
+  const honorTarget = selection.mode !== 'auto' && (fixed || (!hasRequest && !hasEnvironment));
+  if (honorTarget && targetProfile) {
+    requests.push({
+      profile: targetProfile,
+      model: selection.model || fixedPinModel,
+      target: true,
+    });
+  }
+  if (!fixed) {
+    try {
+      const initial = resolveLegacyReasoningRoute({
+        ...input,
+        policy,
+        userConfig: cleanUser,
+        requestedMode: input.requestedMode || (envMode ? canonicalMode(envMode) : undefined),
+      });
+      for (const profile of initial.candidates) {
+        // Preserve the same profile with its normal model as a disclosed preferred fallback.
+        requests.push({ profile, model: input.requestedModel, target: false });
+      }
+    } catch (error) {
+      reject('automatic', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const routes: ResolvedReasoningRoute[] = [];
+  const seen = new Set<string>();
+  for (const request of requests) {
+    try {
+      let candidateUser = cleanUser;
+      if (request.target) {
+        const descriptor = getReasoningProviderDescriptor(targetMode as ReasoningBackendMode);
+        if (!adapter || !descriptor) throw new Error('Requested runtime has no governed provider');
+        if (selection.provider && descriptor.provider !== selection.provider) {
+          throw new Error('Requested provider does not match the runtime descriptor');
+        }
+        const profile = {
+          ...policy.profiles[request.profile],
+          ...user.profiles?.[request.profile],
+        };
+        if (selection.profile && !profile.mode) throw new Error('Requested profile does not exist');
+        if (profile.mode && profile.mode !== targetMode)
+          throw new Error('Requested profile uses another runtime');
+        candidateUser = {
+          ...cleanUser,
+          profiles: {
+            ...cleanUser.profiles,
+            [request.profile]: {
+              ...profile,
+              mode: targetMode,
+              ...(request.model ? { model: request.model } : {}),
+            },
+          },
+        };
+      }
+      const route = resolveLegacyReasoningRoute({
+        ...input,
+        role,
+        policy,
+        userConfig: candidateUser,
+        requestedProfile: request.target
+          ? request.profile
+          : input.requestedProfile || envBinding || request.profile,
+        requestedMode: request.target
+          ? targetMode
+          : input.requestedMode || (envMode ? canonicalMode(envMode) : undefined),
+        requestedModel: request.model,
+      });
+      if (!backendPolicy.allowed_modes.includes(route.mode as ReasoningBackendMode)) {
+        throw new Error('Runtime is denied by scoped backend policy');
+      }
+      const routeAdapter = policy.runtime_adapters[route.mode]!;
+      const registered = route.model
+        ? loadModelRegistry().models.find((entry) => entry.model_id === route.model)
+        : undefined;
+      if (
+        registered &&
+        routeAdapter.selection?.model_provider &&
+        registered.provider !== routeAdapter.selection.model_provider
+      ) {
+        throw new Error('Model provider is incompatible with the selected runtime');
+      }
+      if (route.model && route.mode === 'stub')
+        throw new Error('Stub runtime does not execute models');
+      if (!readiness[route.mode]?.available) {
+        throw new Error(readiness[route.mode]?.reason || 'No cached runtime readiness evidence');
+      }
+      const key = route.mode + ':' + (route.model || '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const fallback = selection.mode === 'preferred' && honorTarget && !request.target;
+      const reasonCode = fallback
+        ? 'fallback'
+        : source === 'request' || source === 'env'
+          ? 'overridden'
+          : selection.mode === 'auto'
+            ? 'automatic'
+            : 'selected';
+      const reason = fallback
+        ? 'Preferred target was unavailable or ineligible; an eligible fallback is selected'
+        : reasonCode === 'overridden'
+          ? 'Request and environment constraints take precedence over the preference'
+          : fixed
+            ? selection.model
+              ? 'Fixed runtime and exact model selected; fallback is disabled'
+              : fixedPinModel
+                ? 'Fixed runtime selected; the capability broker policy pins the exact model; fallback is disabled'
+                : 'Fixed runtime selected; model follows normal model resolution; runtime fallback is disabled'
+            : selection.mode === 'auto'
+              ? 'Automatic policy route selected using cached readiness'
+              : 'Preferred target is eligible and selected first';
+      route.selection = {
+        requested: selection,
+        effective: {
+          profile: route.profileRef,
+          runtime_mode: route.mode,
+          provider: getReasoningProviderDescriptor(route.mode as ReasoningBackendMode)?.provider,
+          ...(route.model ? { model: route.model } : {}),
+        },
+        source,
+        reason,
+        reasonCode,
+        fallback,
+        modelPinned: fixed && Boolean(selection.model || fixedPinModel),
+      };
+      routes.push(route);
+    } catch (error) {
+      reject(request.profile, error instanceof Error ? error.message : String(error));
+      if (fixed) break;
+    }
+  }
+  if (!routes.length) {
+    throw new ReasoningSelectionError(
+      'unavailable',
+      'No eligible runtime satisfies the selection',
+      rejected
+    );
+  }
+  for (const route of routes) {
+    route.candidates = routes.map((candidate) => candidate.profileRef);
+    route.rejectedCandidates = [...rejected, ...route.rejectedCandidates];
+    if (fixed) route.failover = { ...route.failover, max_attempts: 1, max_in_place_retries: 0 };
+  }
+  return routes;
+}
+
+export function resolveReasoningRoute(
+  input: ResolveReasoningRouteInput = {}
+): ResolvedReasoningRoute {
+  const user = input.userConfig ?? loadReasoningRouteUserConfig();
+  const role = normalizeReasoningRole(input.role, input.policy);
+  if (!user.roles?.[role]?.selection)
+    return resolveLegacyReasoningRoute({ ...input, userConfig: user });
+  return resolveReasoningRouteCandidates({ ...input, userConfig: user })[0]!;
 }
 
 /** Apply tenant -> organization -> project overlays; the later layer is more specific. */

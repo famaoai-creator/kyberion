@@ -19,7 +19,11 @@ import {
 import * as crypto from 'node:crypto';
 import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
-import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
+import {
+  parseAgentRequestedSelection,
+  resolveAgentProviderTarget,
+  type ResolvedAgentProviderTarget,
+} from './agent-provider-resolution.js';
 import { isObsoleteAgentRuntimeProvider } from '../provider/provider-config.js';
 import { loadProviderConfig } from '../provider/provider-config.js';
 import type { TaskModelHint } from '../reasoning/reasoning-model-routing.js';
@@ -214,6 +218,13 @@ function readTaskModelHint(runtimeMetadata?: Record<string, unknown>): TaskModel
   };
 }
 
+function readRequestedSelection(runtimeMetadata?: Record<string, unknown>) {
+  const value = runtimeMetadata?.requested_selection;
+  // Legacy callers do not enter the additive selection contract at all. Null is
+  // deliberately not treated as absence: an explicitly malformed policy fails closed.
+  return value === undefined ? undefined : parseAgentRequestedSelection(value);
+}
+
 export function resolveAgentLifecycleModelId(
   options: Pick<SpawnOptions, 'modelId' | 'runtimeMetadata'>,
   env: NodeJS.ProcessEnv = process.env
@@ -222,10 +233,79 @@ export function resolveAgentLifecycleModelId(
     getRegisteredEnvText('KYBERION_TASK_MODEL_ROUTING', { env }) || 'advisory'
   ).toLowerCase();
   const taskModelHint = readTaskModelHint(options.runtimeMetadata);
+  const selection = readRequestedSelection(options.runtimeMetadata);
+  const fixedModelId = selection?.mode === 'fixed' ? selection.model_id : undefined;
   if (taskRoutingMode === 'enforce' && taskModelHint?.model_id) {
+    if (fixedModelId && taskModelHint.model_id !== fixedModelId) {
+      throw new Error(
+        '[AGENT_SELECTION_ROUTING_CONFLICT] Enforced task model ' +
+          taskModelHint.model_id +
+          ' conflicts with fixed model ' +
+          fixedModelId
+      );
+    }
     return taskModelHint.model_id;
   }
-  return options.modelId;
+  return fixedModelId || options.modelId;
+}
+
+function lifecycleRequiredCapabilities(options: SpawnOptions): string[] | undefined {
+  const required = options.runtimeMetadata?.required_capabilities;
+  if (required === undefined) return options.capabilities;
+  if (
+    !Array.isArray(required) ||
+    required.some((entry) => typeof entry !== 'string' || !entry.trim())
+  ) {
+    throw new Error(
+      '[AGENT_SELECTION_INVALID] required_capabilities must contain non-empty strings'
+    );
+  }
+  return required as string[];
+}
+
+function matchesLifecycleSelection(
+  options: SpawnOptions,
+  metadata?: Record<string, unknown>
+): boolean {
+  const selection = readRequestedSelection(options.runtimeMetadata);
+  const existingSelection = readRequestedSelection(metadata);
+  return (
+    JSON.stringify(selection) === JSON.stringify(existingSelection) &&
+    (!selection ||
+      JSON.stringify(lifecycleRequiredCapabilities(options) || []) ===
+        JSON.stringify(metadata?.required_capabilities || []))
+  );
+}
+
+function resolveExplicitLifecycleTarget(
+  options: SpawnOptions
+): ResolvedAgentProviderTarget | undefined {
+  const selection = readRequestedSelection(options.runtimeMetadata);
+  if (!selection) return undefined;
+  const modelId = resolveAgentLifecycleModelId(options);
+  const target = resolveAgentProviderTarget({
+    preferredProvider: options.provider,
+    preferredModelId: modelId,
+    selectionMode: selection.mode,
+    fixedProvider: selection.mode === 'fixed' ? selection.provider : undefined,
+    fixedModelId: selection.mode === 'fixed' ? selection.model_id : undefined,
+    fallbackProviders: Array.isArray(options.runtimeMetadata?.fallback_providers)
+      ? (options.runtimeMetadata.fallback_providers as string[])
+      : undefined,
+    requiredCapabilities: lifecycleRequiredCapabilities(options),
+  });
+  const taskModelHint = readTaskModelHint(options.runtimeMetadata);
+  if (
+    selection.mode === 'fixed' &&
+    getRegisteredEnvText('KYBERION_TASK_MODEL_ROUTING')?.toLowerCase() === 'enforce' &&
+    taskModelHint?.model_id &&
+    target.modelId !== taskModelHint.model_id
+  ) {
+    throw new Error(
+      '[AGENT_SELECTION_ROUTING_CONFLICT] Enforced task model is incompatible with the fixed provider/model selection'
+    );
+  }
+  return target;
 }
 
 const loadProviderLifecycle = () => loadProviderConfig().lifecycle;
@@ -353,6 +433,21 @@ class AgentLifecycleManagerImpl {
   async spawn(options: SpawnOptions): Promise<AgentHandle> {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
     const manifestAgentId = resolveRuntimeManifestAgentId(agentId, options);
+    const selection = readRequestedSelection(options.runtimeMetadata);
+    if (
+      selection?.mode === 'fixed' &&
+      selection.agent_id &&
+      selection.agent_id !== manifestAgentId
+    ) {
+      throw new Error(
+        '[AGENT_SELECTION_IDENTITY_CONFLICT] Fixed agent identity does not match the requested runtime'
+      );
+    }
+    // Validate before reusing a handle: a cached runtime cannot bypass a new fixed constraint,
+    // provider health check, hard capability requirement, or enforced task-model conflict.
+    const explicitTarget = resolveExplicitLifecycleTarget(options);
+    const requestedProvider = explicitTarget?.provider || options.provider;
+    const requestedModelId = explicitTarget?.modelId || options.modelId;
     if (this.stoppingScopedRuntimes.has(agentId)) {
       throw new Error(
         '[AGENT_SURFACE_RUNTIME_STOPPING] Scoped runtime shutdown is pending or uncertain'
@@ -396,12 +491,45 @@ class AgentLifecycleManagerImpl {
       // Only reuse a live runtime when it matches the requested provider.
       // Dynamic provider failover (demoted backend → new provider) must not
       // be silently satisfied by a runtime still bound to the old backend.
+      const existingSelection = readRequestedSelection(existingRecord.metadata);
       if (
-        (!options.provider || existingRecord?.provider === options.provider) &&
-        (!options.modelId || existingRecord?.modelId === options.modelId) &&
+        (!requestedProvider || existingRecord.provider === requestedProvider) &&
+        (!requestedModelId || existingRecord.modelId === requestedModelId) &&
         existingRuntimeBackend === requestedRuntimeBackend
       ) {
+        const retained = this.spawnOptions.get(agentId);
+        if (
+          selection &&
+          (!retained ||
+            retained.missionId !== options.missionId ||
+            retained.runtimeOwnerId !== options.runtimeOwnerId ||
+            retained.runtimeOwnerType !== options.runtimeOwnerType ||
+            retained.runtimeMetadata?.team_role !== options.runtimeMetadata?.team_role)
+        ) {
+          throw new Error(
+            '[AGENT_SELECTION_RUNTIME_CONFLICT] A live runtime belongs to a different owner or team role'
+          );
+        }
+        if (matchesLifecycleSelection(options, existingRecord.metadata) || !selection)
+          return existingHandle;
+        // Tightening a same-owner, same-target contract needs no restart and must not
+        // interrupt a busy turn. Retain it for every subsequent restart/refresh.
+        this.spawnOptions.set(agentId, {
+          ...retained!,
+          runtimeMetadata: { ...retained!.runtimeMetadata, ...options.runtimeMetadata },
+        });
+        existingRecord.metadata = {
+          ...existingRecord.metadata,
+          requested_selection: selection,
+          required_capabilities: lifecycleRequiredCapabilities(options) || [],
+          selection_resolution: options.runtimeMetadata?.selection_resolution,
+        };
         return existingHandle;
+      }
+      if (selection || existingSelection) {
+        throw new Error(
+          '[AGENT_SELECTION_RUNTIME_CONFLICT] A live runtime has a different provider/model or launch backend; stop it explicitly before changing the target'
+        );
       }
       logger.info(
         `[AGENT_LIFECYCLE] Recreating ${agentId}: held runtime ` +
@@ -412,10 +540,22 @@ class AgentLifecycleManagerImpl {
     }
     const pending = this.pendingSpawns.get(agentId);
     if (pending) {
-      return pending;
+      const handle = await pending;
+      const record = handle.getRecord();
+      if (
+        explicitTarget &&
+        (record?.provider !== explicitTarget.provider ||
+          record?.modelId !== explicitTarget.modelId ||
+          !matchesLifecycleSelection(options, record?.metadata))
+      ) {
+        throw new Error(
+          '[AGENT_SELECTION_RUNTIME_CONFLICT] Concurrent spawn resolved to a different provider/model'
+        );
+      }
+      return handle;
     }
 
-    const pendingSpawn = this.spawnInternal(agentId, options);
+    const pendingSpawn = this.spawnInternal(agentId, options, explicitTarget);
     this.pendingSpawns.set(agentId, pendingSpawn);
     try {
       return await pendingSpawn;
@@ -424,7 +564,11 @@ class AgentLifecycleManagerImpl {
     }
   }
 
-  private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
+  private async spawnInternal(
+    agentId: string,
+    options: SpawnOptions,
+    explicitTarget?: ResolvedAgentProviderTarget
+  ): Promise<AgentHandle> {
     const manifestAgentId = resolveRuntimeManifestAgentId(agentId, options);
     const manifest = getAgentManifest(manifestAgentId);
     if (options.manifestAgentId) {
@@ -447,25 +591,27 @@ class AgentLifecycleManagerImpl {
       process.env
     );
     const shouldResolveProvider = !runtimeMetadata.skip_provider_resolution;
-    const resolvedTarget = shouldResolveProvider
-      ? resolveAgentProviderTarget({
-          preferredProvider: options.provider,
-          preferredModelId: resolvedModelId,
-          providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as
-            'strict' | 'preferred' | 'adaptive',
-          fallbackProviders: Array.isArray(runtimeMetadata.fallback_providers)
-            ? (runtimeMetadata.fallback_providers as string[])
-            : undefined,
-          requiredCapabilities: Array.isArray(options.capabilities)
-            ? options.capabilities
-            : undefined,
-        })
-      : {
-          provider: options.provider,
-          modelId: resolvedModelId || options.modelId || options.provider,
-          strategy: 'preferred' as const,
-          availableProviders: [options.provider],
-        };
+    const resolvedTarget =
+      explicitTarget ||
+      (shouldResolveProvider
+        ? resolveAgentProviderTarget({
+            preferredProvider: options.provider,
+            preferredModelId: resolvedModelId,
+            providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as
+              'strict' | 'preferred' | 'adaptive',
+            fallbackProviders: Array.isArray(runtimeMetadata.fallback_providers)
+              ? (runtimeMetadata.fallback_providers as string[])
+              : undefined,
+            requiredCapabilities: Array.isArray(options.capabilities)
+              ? options.capabilities
+              : undefined,
+          })
+        : {
+            provider: options.provider,
+            modelId: resolvedModelId || options.modelId || options.provider,
+            strategy: 'preferred' as const,
+            availableProviders: [options.provider],
+          });
     const resolvedOptions: SpawnOptions = {
       ...options,
       agentId,
@@ -546,8 +692,25 @@ class AgentLifecycleManagerImpl {
           preferredModelId: resolvedModelId || null,
           strategy: resolvedTarget.strategy,
           availableProviders: resolvedTarget.availableProviders,
-          requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
+          requiredCapabilities: explicitTarget
+            ? lifecycleRequiredCapabilities(options) || []
+            : Array.isArray(options.capabilities)
+              ? options.capabilities
+              : [],
+          ...(explicitTarget ? { selectionMode: explicitTarget.selectionMode } : {}),
         },
+        ...(runtimeMetadata.requested_selection
+          ? {
+              requested_selection: runtimeMetadata.requested_selection,
+              mission_id: resolvedOptions.missionId,
+              team_role: runtimeMetadata.team_role,
+              execution_mode: runtimeMetadata.execution_mode || 'default',
+              runtime_owner_id: resolvedOptions.runtimeOwnerId,
+              runtime_owner_type: resolvedOptions.runtimeOwnerType,
+              selection_resolution: runtimeMetadata.selection_resolution,
+              required_capabilities: lifecycleRequiredCapabilities(options) || [],
+            }
+          : {}),
         task_model_hint: runtimeMetadata.task_model_hint,
         scope: resolvedScope,
         ...(resolvedOptions.toolAccess === 'none' ? { tool_access: 'none' } : {}),

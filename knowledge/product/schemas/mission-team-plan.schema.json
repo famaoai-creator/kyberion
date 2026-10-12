@@ -3,15 +3,27 @@
   "type": "object",
   "required": ["mission_id", "mission_type", "tier", "template", "assignments"],
   "properties": {
-    "mission_id": { "type": "string" },
-    "mission_type": { "type": "string" },
-    "tier": { "type": "string" },
-    "template": { "type": "string" },
-    "assigned_persona": { "type": "string" },
+    "mission_id": {
+      "type": "string"
+    },
+    "mission_type": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "template": {
+      "type": "string"
+    },
+    "assigned_persona": {
+      "type": "string"
+    },
     "mission_classification": {
       "$ref": "./mission-classification.schema.json"
     },
-    "generated_at": { "type": "string" },
+    "generated_at": {
+      "type": "string"
+    },
     "team_governance": {
       "type": "object",
       "required": ["lifecycle", "composition"],
@@ -22,9 +34,21 @@
             "type": "object",
             "required": ["id", "reason", "require_roles"],
             "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "reason": { "type": "string", "minLength": 1 },
-              "require_roles": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "require_roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           }
         },
@@ -41,11 +65,26 @@
             "cooldown_minutes"
           ],
           "properties": {
-            "max_parallel_members": { "type": "integer", "minimum": 1 },
-            "max_members": { "type": "integer", "minimum": 1 },
-            "max_messages_per_run": { "type": "integer", "minimum": 1 },
-            "max_wall_clock_minutes": { "type": "integer", "minimum": 1 },
-            "max_member_turns": { "type": "integer", "minimum": 1 },
+            "max_parallel_members": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_members": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_messages_per_run": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_wall_clock_minutes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_member_turns": {
+              "type": "integer",
+              "minimum": 1
+            },
             "shutdown_policy": {
               "type": "string",
               "enum": ["graceful_handoff", "manual", "auto_shutdown"]
@@ -54,7 +93,10 @@
               "type": "string",
               "enum": ["checkpoint_resume", "manual_resume"]
             },
-            "cooldown_minutes": { "type": "integer", "minimum": 0 }
+            "cooldown_minutes": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "composition": {
@@ -66,11 +108,36 @@
             "unfilled_required_roles"
           ],
           "properties": {
-            "required_roles": { "type": "array", "items": { "type": "string" } },
-            "optional_roles": { "type": "array", "items": { "type": "string" } },
-            "assigned_roles": { "type": "array", "items": { "type": "string" } },
-            "standby_roles": { "type": "array", "items": { "type": "string" } },
-            "unfilled_required_roles": { "type": "array", "items": { "type": "string" } }
+            "required_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "optional_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "assigned_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "standby_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unfilled_required_roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       }
@@ -81,9 +148,15 @@
         "type": "object",
         "required": ["team_role", "required", "status"],
         "properties": {
-          "team_role": { "type": "string" },
-          "required": { "type": "boolean" },
-          "status": { "enum": ["assigned", "standby", "unfilled"] },
+          "team_role": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": ["assigned", "standby", "unfilled"]
+          },
           "role_sources": {
             "type": "array",
             "minItems": 1,
@@ -93,12 +166,25 @@
               "enum": ["structural", "obligation", "template", "restaff"]
             }
           },
-          "agent_id": { "type": ["string", "null"] },
-          "actor_type": { "type": "string", "enum": ["human", "agent", "service"] },
-          "resource": { "$ref": "#/definitions/workforce_resource_ref" },
-          "accountable_human_id": { "type": ["string", "null"] },
-          "runtime_identity": { "type": ["string", "null"] },
-          "authority_role": { "type": ["string", "null"] },
+          "agent_id": {
+            "type": ["string", "null"]
+          },
+          "actor_type": {
+            "type": "string",
+            "enum": ["human", "agent", "service"]
+          },
+          "resource": {
+            "$ref": "#/definitions/workforce_resource_ref"
+          },
+          "accountable_human_id": {
+            "type": ["string", "null"]
+          },
+          "runtime_identity": {
+            "type": ["string", "null"]
+          },
+          "authority_role": {
+            "type": ["string", "null"]
+          },
           "delegation_contract": {
             "type": ["object", "null"],
             "required": [
@@ -110,33 +196,103 @@
               "allowed_write_scopes"
             ],
             "properties": {
-              "ownership_scope": { "type": "string" },
-              "allowed_delegate_team_roles": { "type": "array", "items": { "type": "string" } },
-              "escalation_parent_team_role": { "type": ["string", "null"] },
-              "required_scope_classes": { "type": "array", "items": { "type": "string" } },
-              "resolved_scope_classes": { "type": "array", "items": { "type": "string" } },
-              "allowed_write_scopes": { "type": "array", "items": { "type": "string" } }
+              "ownership_scope": {
+                "type": "string"
+              },
+              "allowed_delegate_team_roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "escalation_parent_team_role": {
+                "type": ["string", "null"]
+              },
+              "required_scope_classes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resolved_scope_classes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowed_write_scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
-          "provider": { "type": ["string", "null"] },
-          "modelId": { "type": ["string", "null"] },
-          "required_capabilities": { "type": "array", "items": { "type": "string" } },
-          "notes": { "type": "string" },
-          "organization_role_id": { "type": "string", "minLength": 1 },
+          "provider": {
+            "type": ["string", "null"]
+          },
+          "modelId": {
+            "type": ["string", "null"]
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "organization_role_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "perspective_ids": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "reasoning_route_id": { "type": "string", "minLength": 1 },
-          "security_scope": { "$ref": "security-scope.schema.json" },
+          "reasoning_route_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "security_scope": {
+            "$ref": "security-scope.schema.json"
+          },
           "selection_reason_codes": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "requested_selection": {
+            "$ref": "#/definitions/mission_team_role_selection"
+          },
+          "selection_resolution": {
+            "type": "object",
+            "required": ["source", "reason"],
+            "properties": {
+              "source": {
+                "enum": ["legacy", "auto", "requested", "fallback", "blocked"]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
           }
         }
+      }
+    },
+    "selection_settings": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/mission_team_role_selection"
       }
     }
   },
@@ -155,39 +311,88 @@
         "accountable_human_id"
       ],
       "properties": {
-        "resource_id": { "type": "string", "minLength": 1 },
-        "resource_type": { "type": "string", "enum": ["human", "agent", "service"] },
-        "display_name": { "type": "string", "minLength": 1 },
-        "authority_roles": { "type": "array", "items": { "type": "string" } },
-        "capabilities": { "type": "array", "items": { "type": "string" } },
-        "availability": { "type": "object", "additionalProperties": true },
-        "cost_profile": { "type": "object", "additionalProperties": true },
-        "status": { "type": "string", "enum": ["active", "suspended", "revoked"] },
-        "accountable_human_id": { "type": ["string", "null"] },
-        "provider": { "type": ["string", "null"] },
-        "model_id": { "type": ["string", "null"] },
-        "runtime_identity": { "type": ["string", "null"] }
+        "resource_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_type": {
+          "type": "string",
+          "enum": ["human", "agent", "service"]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "availability": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "cost_profile": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended", "revoked"]
+        },
+        "accountable_human_id": {
+          "type": ["string", "null"]
+        },
+        "provider": {
+          "type": ["string", "null"]
+        },
+        "model_id": {
+          "type": ["string", "null"]
+        },
+        "runtime_identity": {
+          "type": ["string", "null"]
+        }
       },
       "allOf": [
         {
           "if": {
-            "properties": { "resource_type": { "enum": ["agent", "service"] } }
+            "properties": {
+              "resource_type": {
+                "enum": ["agent", "service"]
+              }
+            }
           },
           "then": {
             "properties": {
-              "accountable_human_id": { "type": "string", "minLength": 1 }
+              "accountable_human_id": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
         {
           "if": {
-            "properties": { "resource_type": { "const": "agent" } }
+            "properties": {
+              "resource_type": {
+                "const": "agent"
+              }
+            }
           },
           "then": {
             "properties": {
               "runtime_identity": {
                 "anyOf": [
-                  { "type": "null" },
+                  {
+                    "type": "null"
+                  },
                   {
                     "type": "string",
                     "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
@@ -199,6 +404,67 @@
         }
       ],
       "additionalProperties": false
+    },
+    "mission_team_role_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["auto", "preferred", "fixed"]
+        },
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "auto"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["agent_id"]
+                },
+                {
+                  "required": ["provider"]
+                },
+                {
+                  "required": ["model_id"]
+                }
+              ]
+            }
+          },
+          "else": {
+            "anyOf": [
+              {
+                "required": ["agent_id"]
+              },
+              {
+                "required": ["provider"]
+              },
+              {
+                "required": ["model_id"]
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

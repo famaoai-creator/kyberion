@@ -5,8 +5,8 @@ import { pathResolver, safeReadFile, safeReaddir, safeLstat, safeExistsSync } fr
 /**
  * Contract test (MOS acceptance criterion §9.1):
  *
- *   The MOS must not import any write APIs from @agent/core. Operators
- *   may only read filesystem state. This test scans every TS/TSX file
+ *   The MOS must not import filesystem write APIs. The explicit inbox and
+ *   selection endpoints call governed facades behind their documented guards. This test scans every TS/TSX file
  *   under `src/` for forbidden imports and forbidden literal references
  *   to write surfaces.
  *
@@ -30,7 +30,11 @@ const FORBIDDEN_IDENTIFIERS = [
 // chokepoint that emits mos.read events per operator-surface-strategy.md
 // §9.1) and forbidden everywhere else under src/.
 const AUDIT_CHAIN_ALLOWED_RELATIVE = 'src/lib/audit-mos.ts';
-const ALLOWED_WRITE_METHOD_FILES = new Set(['src/app/api/inbox/route.ts']);
+const ALLOWED_WRITE_METHOD_FILES = new Set([
+  'src/app/api/inbox/route.ts',
+  'src/app/api/missions/[id]/selection/route.ts',
+  'src/app/api/reasoning/selection/route.ts',
+]);
 
 const FORBIDDEN_HTTP_METHODS_RE =
   /\bexport\s+(async\s+)?(function|const)\s+(POST|PUT|PATCH|DELETE)\b/;
@@ -113,7 +117,7 @@ describe('MOS no-write-API contract', () => {
     ).toEqual([]);
   });
 
-  it('exports no HTTP write methods (POST/PUT/PATCH/DELETE)', () => {
+  it('exports HTTP writes only for the explicit governed inbox and selection routes', () => {
     const files = walk(SRC);
     const offenders: string[] = [];
     for (const file of files) {
@@ -150,5 +154,28 @@ describe('MOS no-write-API contract', () => {
     expect(text).toContain("t('os_observed_at', { at: item.observedAt })");
     expect(text).not.toContain('fetch(');
     expect(text).not.toContain('method:');
+  });
+  it('keeps selection writes behind one scoped authorization/facade adapter', () => {
+    const allowed = 'src/lib/selection-service.ts';
+    const offenders = walk(SRC).filter((file) => {
+      if (path.relative(ROOT, file) === allowed) return false;
+      return /\b(saveReasoningSelection|saveTeamSelection)\s*\(/.test(
+        String(safeReadFile(file, { encoding: 'utf8' }))
+      );
+    });
+    expect(offenders).toEqual([]);
+    const route = String(
+      safeReadFile(path.join(SRC, 'lib/selection-route.ts'), { encoding: 'utf8' })
+    );
+    expect(route).toContain('resolveSelectionRequestViewer(req)');
+    expect(route).toContain('parseSelectionCommand');
+    const service = String(
+      safeReadFile(path.join(SRC, 'lib/selection-service.ts'), { encoding: 'utf8' })
+    );
+    expect(service).toContain('isGlobalSelectionAdmin(viewer)');
+    expect(service).toContain("withExecutionContextAsync('reasoning_settings_writer'");
+    expect(service).not.toContain("withExecutionContextAsync('ecosystem_architect'");
+    expect(service).toContain('requireSelectionMission(viewer, id)');
+    expect(service).toContain('expected_scope: missionScope(state)');
   });
 });

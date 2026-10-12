@@ -76,3 +76,5 @@ export * from './surface/first-job-recovery.js';
 export * from './surface/first-job-approval-proof.js';
 
 export * from './workforce/work-effect-ownership.js';
+
+export * from './reasoning/reasoning-selection-settings.js';

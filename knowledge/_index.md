@@ -123,7 +123,7 @@
 - [OS Automation Bridge Model](./product/architecture/os-automation-bridge-model.md) (public | Unknown)
 - [OpenHarness調査に基づく改善ポイント（2026-04-29）](./product/architecture/openharness-integration-improvements-2026-04-29.md) (public | Unknown)
 - [Operator Intent Learning Simulation](./product/architecture/operator-intent-learning-simulation-2026-04-29.md) (public | Codex)
-- [Operator Surface Strategy (CLI + Read-only Web)](./product/architecture/operator-surface-strategy.md) (public | Unknown)
+- [Operator Surface Strategy (CLI + Governed Operator Web)](./product/architecture/operator-surface-strategy.md) (public | Unknown)
 - [Organization Profile Model](./product/architecture/organization-profile-model.md) (public | Ecosystem Architect)
 - [Organization Work Loop](./product/architecture/organization-work-loop.md) (public | Ecosystem Architect)
 - [Pane Agent Prompt Handling](./product/architecture/agent-prompt-handling.md) (public | Unknown)

@@ -13,7 +13,9 @@ describe('reasoning config entrypoint', () => {
     expect(source).toContain('new ScriptExitError');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('console.error(');
-    expect(source).toContain("nowIso, readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('commitReasoningRouteConfig');
+    expect(source).toContain('saveReasoningSelection');
   });
 
   it('rejects a directory before reading the previous route config', () => {
