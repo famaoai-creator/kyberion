@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import SelectionSettings from '../src/components/SelectionSettings';
+import SelectionSettings, { SelectionField } from '../src/components/SelectionSettings';
 import type { SelectionSnapshot } from '../src/lib/selection-contract';
 
 const snapshot: SelectionSnapshot = {
@@ -35,6 +35,29 @@ function render(canEdit = false, locale: 'en' | 'ja' = 'en') {
   );
 }
 describe('selection rendering contract', () => {
+  it.each(['Selection mode', 'Agent identity', 'Runtime', '選択方式'])(
+    'keeps exact native label text separate from select options: %s',
+    (label) => {
+      const html = renderToStaticMarkup(
+        createElement(SelectionField, {
+          id: 'selection-field',
+          label,
+          children: createElement(
+            'select',
+            { id: 'selection-field', defaultValue: 'auto' },
+            createElement('option', { value: 'auto' }, 'Automatic'),
+            createElement('option', { value: 'fixed' }, 'Fixed')
+          ),
+        })
+      );
+      expect(html).toContain(
+        '<label for="selection-field">' + label + '</label><select id="selection-field"'
+      );
+      expect(html).not.toContain('<label for="selection-field">' + label + '<select');
+      expect(html).toContain('Automatic');
+      expect(html).toContain('Fixed');
+    }
+  );
   it('shows requested/resolved/source/reason dimensions separately', () => {
     const html = render();
     for (const text of [

@@ -204,7 +204,7 @@ a.operator-cell__title:hover {
 .operator-selection__fields legend {
   padding: var(--kb-ui-space-2) 0;
 }
-.operator-selection__fields label {
+.operator-selection__field {
   display: flex;
   flex-direction: column;
   gap: var(--kb-ui-space-1);

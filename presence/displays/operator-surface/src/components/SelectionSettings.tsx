@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Section, StatusPill } from '@agent/shared-ui';
 import { operatorTranslator, type OperatorLocale } from '@/lib/i18n';
 import {
@@ -20,6 +20,24 @@ export interface SelectionSettingsProps {
   locale: OperatorLocale;
   /** Dependency injection for the isolated browser fixture; production uses the fixed local transport. */
   transport?: SelectionTransport;
+}
+
+/** Keep label text separate from select option text, while retaining native association. */
+export function SelectionField({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="operator-selection__field">
+      <label htmlFor={id}>{label}</label>
+      {children}
+    </div>
+  );
 }
 
 export default function SelectionSettings({
@@ -356,8 +374,7 @@ export default function SelectionSettings({
                     aria-errormessage={editorErrorIds.join(' ') || undefined}
                   >
                     <legend className="operator-muted">{t('selection_fixed_help')}</legend>
-                    <label htmlFor={fieldId + '-mode'}>
-                      {t('selection_mode')}
+                    <SelectionField id={fieldId + '-mode'} label={t('selection_mode')}>
                       <select
                         id={fieldId + '-mode'}
                         value={draft.mode}
@@ -369,11 +386,15 @@ export default function SelectionSettings({
                           </option>
                         ))}
                       </select>
-                    </label>
+                    </SelectionField>
                     {draft.mode !== 'auto' ? (
                       <>
-                        <label htmlFor={fieldId + '-identity'}>
-                          {t(target.kind === 'mission' ? 'selection_agent' : 'selection_runtime')}
+                        <SelectionField
+                          id={fieldId + '-identity'}
+                          label={t(
+                            target.kind === 'mission' ? 'selection_agent' : 'selection_runtime'
+                          )}
+                        >
                           <select
                             id={fieldId + '-identity'}
                             value={
@@ -410,7 +431,7 @@ export default function SelectionSettings({
                               </option>
                             ) : null}
                           </select>
-                        </label>
+                        </SelectionField>
                         <datalist id={fieldId + '-providers'}>
                           {[
                             ...new Set(
@@ -452,8 +473,7 @@ export default function SelectionSettings({
                             <option key={value} value={value} />
                           ))}
                         </datalist>
-                        <label htmlFor={fieldId + '-provider'}>
-                          {t('selection_provider')}
+                        <SelectionField id={fieldId + '-provider'} label={t('selection_provider')}>
                           <input
                             id={fieldId + '-provider'}
                             list={fieldId + '-providers'}
@@ -463,9 +483,8 @@ export default function SelectionSettings({
                             autoComplete="off"
                             placeholder={t('selection_none')}
                           />
-                        </label>
-                        <label htmlFor={fieldId + '-model'}>
-                          {t('selection_model')}
+                        </SelectionField>
+                        <SelectionField id={fieldId + '-model'} label={t('selection_model')}>
                           <input
                             id={fieldId + '-model'}
                             list={fieldId + '-models'}
@@ -475,10 +494,9 @@ export default function SelectionSettings({
                             autoComplete="off"
                             placeholder={t('selection_none')}
                           />
-                        </label>
+                        </SelectionField>
                         {target.kind === 'reasoning' ? (
-                          <label htmlFor={fieldId + '-profile'}>
-                            {t('selection_profile')}
+                          <SelectionField id={fieldId + '-profile'} label={t('selection_profile')}>
                             <input
                               id={fieldId + '-profile'}
                               list={fieldId + '-profiles'}
@@ -488,7 +506,7 @@ export default function SelectionSettings({
                               autoComplete="off"
                               placeholder={t('selection_none')}
                             />
-                          </label>
+                          </SelectionField>
                         ) : null}
                       </>
                     ) : null}

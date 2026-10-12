@@ -36,6 +36,37 @@ async function waitReady(page: Page) {
     );
   });
 }
+async function assertExactNativeLabel(page: Page, label: string) {
+  const control = page.getByLabel(label, { exact: true });
+  const nativeLabels = await control.evaluate((element) =>
+    Array.from((element as HTMLSelectElement).labels ?? []).map((entry) =>
+      entry.textContent?.trim()
+    )
+  );
+  assert.deepEqual(
+    nativeLabels,
+    [label],
+    'native label must contain only its name, not select option text'
+  );
+}
+async function openEditor(page: Page) {
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
+  await assertExactNativeLabel(page, 'Selection mode');
+}
+async function diagnosticDeadline<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Diagnostic capture deadline')), 2_000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 async function counters(page: Page) {
   const text = await page.getByLabel('Fixture request counters').innerText();
   return {
@@ -89,7 +120,23 @@ export async function runSelectionBrowserSmoke(
   page.setDefaultTimeout(10_000);
   page.setDefaultNavigationTimeout(20_000);
   const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  const consoleErrors: string[] = [];
+  const sanitizeDiagnostic = (message: string) =>
+    message
+      .split('\n')[0]
+      .replaceAll(baseUrl, '[fixture]')
+      .replaceAll(pathResolver.rootDir(), '[repository]')
+      .slice(0, 300);
+  page.on('pageerror', (error) => {
+    errors.push(sanitizeDiagnostic(error.message));
+    if (errors.length > 8) errors.shift();
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      consoleErrors.push(sanitizeDiagnostic(message.text()));
+      if (consoleErrors.length > 8) consoleErrors.shift();
+    }
+  });
   const output = pathResolver.rootResolve(
     'active/shared/tmp/operator-selection-browser-' + crypto.randomUUID()
   );
@@ -102,8 +149,9 @@ export async function runSelectionBrowserSmoke(
     );
     await waitReady(page);
     const initial = await counters(page);
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openEditor(page);
     await page.getByLabel('Selection mode', { exact: true }).selectOption('fixed');
+    await assertExactNativeLabel(page, 'Agent identity');
     await page.getByLabel('Agent identity', { exact: true }).selectOption('agent-lyra');
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.getByRole('heading', { name: 'Preview result' }).waitFor();
@@ -125,7 +173,7 @@ export async function runSelectionBrowserSmoke(
     assert.equal(saved.saves, initial.saves + 1);
     assert.match(await page.getByLabel('Current settings').innerText(), /agent-lyra/);
 
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openEditor(page);
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await page.waitForTimeout(850);
@@ -136,7 +184,7 @@ export async function runSelectionBrowserSmoke(
       'cancel during preview must not write'
     );
 
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openEditor(page);
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.getByRole('heading', { name: 'Preview result' }).waitFor();
     await page.getByRole('button', { name: 'Simulate concurrent change' }).click();
@@ -152,7 +200,7 @@ export async function runSelectionBrowserSmoke(
     await page.getByRole('button', { name: 'Reload settings' }).click();
     await waitReady(page);
 
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openEditor(page);
     await page.getByLabel('Selection mode', { exact: true }).selectOption('fixed');
     await page.getByLabel('Agent identity', { exact: true }).selectOption('agent-offline');
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
@@ -171,8 +219,9 @@ export async function runSelectionBrowserSmoke(
     await page.getByRole('button', { name: 'Reasoning fixture', exact: true }).click();
     await page.getByRole('heading', { name: 'Reasoning runtime selection' }).waitFor();
     await waitReady(page);
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openEditor(page);
     await page.getByLabel('Selection mode', { exact: true }).selectOption('preferred');
+    await assertExactNativeLabel(page, 'Runtime');
     await page.getByLabel('Runtime', { exact: true }).selectOption('fixture-offline');
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.getByRole('heading', { name: 'Preview result' }).waitFor();
@@ -205,6 +254,7 @@ export async function runSelectionBrowserSmoke(
     await page.getByRole('button', { name: '編集', exact: true }).waitFor();
     await page.getByRole('button', { name: '編集', exact: true }).click();
     await page.getByLabel('選択方式', { exact: true }).waitFor();
+    await assertExactNativeLabel(page, '選択方式');
     await page.setViewportSize({ width: 390, height: 844 });
     safeWriteFile(output + '/mobile-dark-ja.png', await page.screenshot({ fullPage: true }));
     await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -230,6 +280,64 @@ export async function runSelectionBrowserSmoke(
       themes: ['light', 'dark'],
       screenshotDirectory: output,
     };
+  } catch (error) {
+    // This app is synthetic. Capture only bounded visible labels/control metadata, never input
+    // values, HTML/scripts, cookies, storage, request headers or provider/configuration data.
+    let dom: unknown = { unavailable: true };
+    try {
+      dom = await diagnosticDeadline(
+        page.evaluate(() => ({
+          forms: document.forms.length,
+          labels: Array.from(document.querySelectorAll('label'))
+            .slice(0, 10)
+            .map((label) => ({
+              for: label.htmlFor.slice(0, 100),
+              text: label.textContent?.trim().slice(0, 160),
+            })),
+          controls: Array.from(document.querySelectorAll('form input, form select, form fieldset'))
+            .slice(0, 12)
+            .map((control) => ({
+              tag: control.tagName,
+              id: control.id.slice(0, 100),
+              disabled: control.hasAttribute('disabled'),
+            })),
+          buttons: Array.from(document.querySelectorAll('button'))
+            .slice(0, 12)
+            .map((button) => ({
+              text: button.textContent?.trim().slice(0, 80),
+              disabled: button.disabled,
+            })),
+          statuses: Array.from(document.querySelectorAll('[role="status"]'))
+            .slice(0, 4)
+            .map((node) => node.textContent?.trim().slice(0, 160)),
+          counters: document.querySelector('output')?.textContent?.trim().slice(0, 240),
+        }))
+      );
+    } catch {
+      /* A closed/crashed page must not replace the original failure. */
+    }
+    let screenshotCaptured = false;
+    try {
+      safeWriteFile(output + '/failure.png', await page.screenshot({ timeout: 1_000 }));
+      screenshotCaptured = true;
+    } catch {
+      /* Screenshot is best-effort; assertions still fail. */
+    }
+    const diagnostics = {
+      browserVersion,
+      error: sanitizeDiagnostic(error instanceof Error ? error.message : String(error)),
+      pageErrors: errors,
+      consoleErrors,
+      dom,
+      screenshotCaptured,
+    };
+    try {
+      safeWriteFile(output + '/failure.json', JSON.stringify(diagnostics, null, 2));
+    } catch {
+      /* Diagnostics must not replace the original assertion failure. */
+    }
+    process.stderr.write('[selection-browser-failure] ' + JSON.stringify(diagnostics) + '\n');
+    throw error;
   } finally {
     options.signal?.removeEventListener('abort', abort);
     await context.close();
