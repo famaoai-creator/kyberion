@@ -113,12 +113,13 @@ function child(code: string): Promise<{ code: number | null; output: string }> {
     p.once('close', (code) => resolve({ code, output }));
   });
 }
+// Match the built package imports: one authority/lock singleton graph in each child.
 const childImports =
-  "import {safeReadFile,safeAppendFileSync} from './libs/core/secure-io.ts';" +
-  "import {withExecutionContextAsync} from './libs/core/authority.ts';" +
-  "import {evaluateDotEventTriggers} from './libs/core/dot/dot-event-intake.ts';" +
-  "import {claimEventContinuation} from './libs/core/dot/dot-event-continuation.ts';" +
-  "import {recordDotWakeOutcome} from './libs/core/dot/dot-runtime.ts';";
+  "import {safeReadFile,safeAppendFileSync} from '@agent/core/secure-io';" +
+  "import {withExecutionContextAsync} from '@agent/core/authority';" +
+  "import {evaluateDotEventTriggers} from '@agent/core/dot/dot-event-intake';" +
+  "import {claimEventContinuation} from '@agent/core/dot/dot-event-intake';" +
+  "import {recordDotWakeOutcome} from '@agent/core/dot/dot-runtime';";
 afterEach(() => {
   if (safeExistsSync(ROOT)) safeRmSync(ROOT, { recursive: true, force: true });
 });

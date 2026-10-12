@@ -49,16 +49,16 @@ import {
   type DueDotTrigger,
 } from '@agent/core/dot/dot-runtime';
 import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
-import {
-  evaluateDotEventTriggers,
-  reconcileEventRunnerTerminal,
-  isDurableEventKey,
-} from '@agent/core/dot/dot-event-intake';
+import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
 } from '@agent/core/reasoning/reasoning-bootstrap';
-import { runDotSupervisorExtensions } from './dot_supervisor_extensions.js';
+import {
+  runDotSupervisorExtensions,
+  triggerRunnerSource,
+  reconcileDotEventRunnerDuplicate,
+} from './dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
@@ -330,13 +330,6 @@ export function resetDotSweepStateForTests(): void {
   dotSweepInFlight = false;
 }
 
-function triggerRunnerSource(trigger: DueDotTrigger): 'cron' | 'watch' | 'wake' {
-  // probe / event / followup are dot-level kinds; at the runner they are a
-  // wake (an observation or self-scheduled event), same as an inbox row.
-  const kind = trigger.trigger.kind;
-  return kind === 'cron' || kind === 'watch' ? kind : 'wake';
-}
-
 export async function runDotSweepOnce(
   now: Date = new Date(),
   deps: DotSweepDeps = {}
@@ -519,24 +512,9 @@ export async function runDotSweepOnce(
             undefined,
             loaded.charter.scope.tenant_slug
           );
-          // Duplicate is not an acknowledgement; only inspect the authoritative terminal record.
-          if (receipt.status === 'duplicate' && isDurableEventKey(trigger.key)) {
-            const terminal = dotTriggerRunner
-              .records()
-              .find(
-                (r) =>
-                  r.idempotencyKey === receipt.idempotencyKey &&
-                  (r.status === 'delivered' || r.status === 'rejected')
-              );
-            if (terminal)
-              withExecutionContext(
-                role,
-                () => reconcileEventRunnerTerminal(loaded.charter, trigger.key, terminal),
-                undefined,
-                loaded.charter.scope.tenant_slug,
-                loaded.charter.scope.organization_id
-              );
-          }
+          reconcileDotEventRunnerDuplicate(loaded.charter, trigger.key, receipt, () =>
+            dotTriggerRunner.records()
+          );
           if (receipt.status === 'delivered') {
             delivered += 1;
           } else if (receipt.status === 'rejected') {

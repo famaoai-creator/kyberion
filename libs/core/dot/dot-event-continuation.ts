@@ -429,3 +429,29 @@ export function reconcileEventRunnerTerminal(
     writeEventContinuation(c, state, deps);
   });
 }
+
+/** Refuse queued legacy or differently scoped offers after charter adoption/change. */
+export function eventContinuationCharterChanged(
+  original: DotCharter,
+  current: DotCharter,
+  trigger?: DueDotTrigger
+): boolean {
+  return (
+    trigger?.trigger.kind === 'event' &&
+    (eventContinuationIdentity(current) !== eventContinuationIdentity(original) ||
+      current.attention.event_delivery?.activation_id !==
+        original.attention.event_delivery?.activation_id ||
+      Boolean(current.attention.event_delivery) !== isDurableEventKey(trigger.key))
+  );
+}
+
+/** Partial output application is ambiguous after dispatch, never delivered. */
+export function assertEventContinuationOutput(
+  attemptId: string | undefined,
+  errorCount: number
+): void {
+  if (attemptId && errorCount > 0)
+    throw new Error(
+      'Durable event output is unresolved; dispatched attempt retained for operator recovery'
+    );
+}
