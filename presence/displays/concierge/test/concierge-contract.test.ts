@@ -446,7 +446,12 @@ describe('concierge surface contract', () => {
     expect(setupRoute).toContain("target: '#setup-");
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain("t('setup.readiness_title')");
-    expect(setupPage).toContain('scrollIntoView');
+    expect(setupPage).toContain('createSettingsNavigation');
+    const navigation = safeReadFile(
+      path.join(appDir, 'src/app/settings/settings-navigation.ts'),
+      { encoding: 'utf8' }
+    );
+    expect(navigation).toContain('scrollIntoView');
     // The 4 anchors now live in their own section files (FD-06 file split).
     const anchorFiles: Record<string, string> = {
       'setup-profile': 'ProfileSection.tsx',
