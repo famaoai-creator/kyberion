@@ -1,6 +1,6 @@
 /**
  * `pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr]
- *   [--no-audio] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]`
+ *   [--no-audio] [--ocr-provider <id>] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]`
  *
  * Perceives a video the way `read` perceives a document: ffprobe for the
  * metadata, a sampled frame timeline OCR'd locally (same path as `see`), and
@@ -34,13 +34,14 @@ import {
 
 const DEFAULT_MAX_FRAMES = 24;
 
-export const WATCH_USAGE = `Usage: pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr] [--no-audio] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]
+export const WATCH_USAGE = `Usage: pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr] [--no-audio] [--ocr-provider <id>] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]
 
 Perceives a ${VIDEO_EXTENSIONS.join(' / ')} video: metadata, audio transcript, and an OCR'd frame timeline (local only).
   --every <sec>     Sample one frame every <sec> seconds (default: spread --max-frames over the duration)
   --max-frames <n>  Upper bound on sampled frames (default ${DEFAULT_MAX_FRAMES})
   --no-ocr          Skip frame OCR (timeline lists timestamps only)
   --no-audio        Skip the audio transcript
+  --ocr-provider <id> Prefer an OCR provider (e.g. local_vlm); allows loopback OCR, never external OCR
   --frames <dir>    Keep the sampled frames as PNGs in <dir> (inside the repository)
   --lang <tag>      Language hint for OCR and speech, e.g. ja, en
   --json            Print {file, metadata, transcript, frames, warnings} as JSON
@@ -56,6 +57,7 @@ interface WatchArgs extends CommonArgs {
   ocr: boolean;
   audio: boolean;
   frames?: string;
+  ocrProvider?: string;
 }
 
 export interface VideoMetadata {
@@ -119,6 +121,10 @@ function parseWatchArgs(argv: string[]): WatchArgs {
       args.frames = argv[index + 1];
       index += 1;
       if (!args.frames) throw new ScriptExitError(1, '--frames requires a directory');
+    } else if (value === '--ocr-provider') {
+      args.ocrProvider = argv[index + 1];
+      index += 1;
+      if (!args.ocrProvider) throw new ScriptExitError(1, '--ocr-provider requires an id');
     } else if (value.startsWith('--')) throw new ScriptExitError(1, `Unknown option: ${value}`);
     else if (!args.file) args.file = value;
     else throw new ScriptExitError(1, `Unexpected argument: ${value}`);
@@ -329,7 +335,8 @@ export async function runWatchCommand(
         try {
           const ocr = await deps.ocr({
             path: path.relative(pathResolver.rootDir(), source),
-            mode: 'local_only',
+            mode: args.ocrProvider ? 'privacy_first' : 'local_only',
+            ...(args.ocrProvider ? { providerPreference: [args.ocrProvider] } : {}),
             ...(args.lang ? { language: args.lang } : {}),
           });
           frame.text = ocr.text;

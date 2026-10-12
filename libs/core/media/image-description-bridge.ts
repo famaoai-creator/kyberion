@@ -9,6 +9,14 @@ import {
   ImageDescriptionResult,
 } from './image-description-types.js';
 import { pathResolver } from '../path-resolver.js';
+import { secureFetch } from '../network.js';
+import { safeReadFile, assertSafeRepositoryPath } from '../secure-io.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  resolveRuntimeDefaultModelId,
+  resolveRuntimeEndpoint,
+} from '../provider/provider-config.js';
+import { isRecord } from '../foundation/text.js';
 import {
   withReasoningPayloadScope,
   type ReasoningPayloadScope,
@@ -35,6 +43,102 @@ export class WindowsNativeImageDescriptionProvider implements ImageDescriptionPr
           provider: this.id,
           description: '',
           error: 'windows_native_image_description_failed',
+          elapsedMs: Date.now() - startedAt,
+        };
+  }
+}
+
+/** Local Ollama vision provider for image captions; only loopback endpoints are eligible. */
+export class OllamaVisionImageDescriptionProvider implements ImageDescriptionProvider {
+  readonly id = 'ollama_vision';
+  private readonly endpoint: string;
+  private readonly model: string;
+  private readonly explicitlyConfigured: boolean;
+
+  constructor(
+    endpoint = getRegisteredEnvText('OLLAMA_HOST') || resolveRuntimeEndpoint('ollama'),
+    model = getRegisteredEnvText('OLLAMA_VLM_MODEL') ||
+      resolveRuntimeDefaultModelId('ollama-vision'),
+    private readonly visionOptions: ReasoningVisionOptions = {}
+  ) {
+    this.endpoint = endpoint.replace(/\/$/u, '');
+    const configured = getRegisteredEnvText('OLLAMA_VLM_MODEL');
+    this.explicitlyConfigured = Boolean(configured);
+    this.model = configured || model;
+  }
+
+  private isLoopback(): boolean {
+    try {
+      const host = new URL(this.endpoint).hostname.toLowerCase().replace(/^\[|\]$/gu, '');
+      return ['localhost', '127.0.0.1', '::1'].includes(host);
+    } catch {
+      return false;
+    }
+  }
+
+  async isAvailable(): Promise<boolean> {
+    if (!this.explicitlyConfigured || !this.isLoopback()) return false;
+    try {
+      const response = await secureFetch<unknown>({
+        method: 'GET',
+        url: `${this.endpoint}/api/tags`,
+        timeout: 1_500,
+        kyberion_allow_local_network: true,
+      });
+      const models = isRecord(response) && Array.isArray(response.models) ? response.models : [];
+      return models.some(
+        (entry) => isRecord(entry) && typeof entry.name === 'string' && entry.name === this.model
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async describe(request: ImageDescriptionRequest): Promise<ImageDescriptionResult> {
+    const startedAt = Date.now();
+    if (!this.isLoopback()) {
+      return {
+        status: 'failed',
+        provider: this.id,
+        description: '',
+        error: 'ollama_vision_requires_loopback_endpoint',
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    const absolutePath = assertSafeRepositoryPath(pathResolver.rootResolve(request.path));
+    const image = safeReadFile(absolutePath, { encoding: null }) as Buffer;
+    const response = await withReasoningPayloadScope(
+      {
+        tier: effectiveTier(absolutePath, this.visionOptions.tier),
+        ...(this.visionOptions.tenant_slug ? { tenant_slug: this.visionOptions.tenant_slug } : {}),
+        purpose: 'image description',
+      },
+      () =>
+        secureFetch<unknown>({
+          method: 'POST',
+          url: `${this.endpoint}/api/generate`,
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 300_000,
+          kyberion_allow_local_network: true,
+          data: {
+            model: this.model,
+            prompt: imageDescriptionPrompt(request.kind),
+            images: [image.toString('base64')],
+            think: false,
+            stream: false,
+            options: { temperature: 0, num_ctx: 8_192, num_predict: 512 },
+          },
+        })
+    );
+    const description =
+      isRecord(response) && typeof response.response === 'string' ? response.response.trim() : '';
+    return description
+      ? { status: 'succeeded', provider: this.id, description, elapsedMs: Date.now() - startedAt }
+      : {
+          status: 'failed',
+          provider: this.id,
+          description: '',
+          error: 'ollama_vision_empty_description',
           elapsedMs: Date.now() - startedAt,
         };
   }
@@ -227,7 +331,7 @@ export class ReasoningVisionImageDescriptionProvider implements ImageDescription
 }
 
 export interface DescribeImageOptions extends ReasoningVisionOptions {
-  /** Override the provider chain (tests). Defaults to windows_native, then reasoning_vision. */
+  /** Override the provider chain (tests). */
   providers?: ImageDescriptionProvider[];
 }
 
@@ -237,6 +341,7 @@ export async function describeImage(
 ): Promise<ImageDescriptionResult> {
   const providers = options.providers ?? [
     new WindowsNativeImageDescriptionProvider(),
+    new OllamaVisionImageDescriptionProvider(undefined, undefined, options),
     new ReasoningVisionImageDescriptionProvider(options),
   ];
   for (const provider of providers) {

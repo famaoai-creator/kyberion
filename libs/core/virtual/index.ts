@@ -12,6 +12,8 @@ export * from './os-app-adapters.js';
 export * from './os-automation-bridge.js';
 export * from './os-automation-platform.js';
 export {
+  performMouseOperation,
+  launchApplication,
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -28,6 +30,7 @@ export {
   getScreenSize,
   getWindowList,
   activateWindowByTitle,
+  setWindowState,
   quitApplication,
   systemNotify,
   clipboardRead,
@@ -37,6 +40,7 @@ export {
   terminalBridge,
   FocusedInputState,
 } from './os-automation.js';
+export type { MouseOperation } from './os-automation.js';
 export * from './screen-capture-bridge.js';
 export * from './screen-display-inventory-bridge.js';
 export * from './screen-frame-redaction.js';
