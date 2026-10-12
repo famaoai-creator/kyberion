@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { spawnManagedProcess } from '../managed-process.js';
+import {
+  spawnManagedProcess,
+  stopManagedProcess,
+  type ManagedProcessHandle,
+} from '../managed-process.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -82,9 +86,10 @@ function ingest(i: number, blob = '') {
   expect(result.status).toBe('accepted');
   return result.event;
 }
+const children = new Map<ManagedProcessHandle, Promise<void>>();
 function child(code: string): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
-    const { child: p } = spawnManagedProcess({
+    const handle = spawnManagedProcess({
       resourceId: 'event-continuation-test-' + randomUUID(),
       kind: 'service',
       ownerId: 'event-continuation-tests',
@@ -102,15 +107,35 @@ function child(code: string): Promise<{ code: number | null; output: string }> {
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     });
+    const p = handle.child;
+    children.set(
+      handle,
+      new Promise<void>((closed) =>
+        p.once('close', () => {
+          children.delete(handle);
+          closed();
+        })
+      )
+    );
     let output = '';
+    const timer = setTimeout(() => {
+      stopManagedProcess(handle.resourceId, p);
+      reject(new Error('Continuation test child timed out: ' + output));
+    }, 90_000);
     p.stdout!.on('data', (data) => {
       output += String(data);
     });
     p.stderr!.on('data', (data) => {
       output += String(data);
     });
-    p.once('error', reject);
-    p.once('close', (code) => resolve({ code, output }));
+    p.once('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    p.once('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code, output });
+    });
   });
 }
 // Match the built package imports: one authority/lock singleton graph in each child.
@@ -120,7 +145,13 @@ const childImports =
   "import {evaluateDotEventTriggers} from '@agent/core/dot/dot-event-intake';" +
   "import {claimEventContinuation} from '@agent/core/dot/dot-event-intake';" +
   "import {recordDotWakeOutcome} from '@agent/core/dot/dot-runtime';";
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(
+    [...children].map(async ([handle, closed]) => {
+      stopManagedProcess(handle.resourceId, handle.child);
+      await closed;
+    })
+  );
   if (safeExistsSync(ROOT)) safeRmSync(ROOT, { recursive: true, force: true });
 });
 
