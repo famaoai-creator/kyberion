@@ -28,6 +28,16 @@ vi.mock('@agent/core/dot/dot-charter', async (importOriginal) => {
       actual.findDotCharter(dotId, rootDir ?? mocks.rootDir),
   };
 });
+vi.mock('@agent/core/dot/dot-lifecycle', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/dot/dot-lifecycle')>();
+  return {
+    ...actual,
+    enableDotEventContinuation: (
+      dotId: string,
+      deps: Parameters<typeof actual.enableDotEventContinuation>[1]
+    ) => actual.enableDotEventContinuation(dotId, { ...deps, rootDir: mocks.rootDir }),
+  };
+});
 vi.mock('@agent/core/dot/dot-wake-orchestration', () => ({
   runDotWakeWithGoalDriver: mocks.wake,
 }));
@@ -276,5 +286,37 @@ describe('dot execution diagnostic CLI presentation', () => {
     expect(mocks.release).not.toHaveBeenCalled();
     expect(mocks.install).not.toHaveBeenCalled();
     expect(mocks.appendInbox).not.toHaveBeenCalled();
+  });
+});
+
+describe('forward event continuation CLI', () => {
+  it('requires explicit quiescence and adopts only the paused fixture', async () => {
+    writeCharter(
+      {
+        ...CHARTER,
+        status: 'paused',
+        attention: { triggers: [{ kind: 'event', sources: ['fixture'] }] },
+      },
+      'fixture'
+    );
+    expect(
+      await runDotCharters(['event', 'continue', 'collision', '--json', '--quiet'])
+    ).toBeUndefined();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = 0;
+    const result = await runDotCharters([
+      'event',
+      'continue',
+      'collision',
+      '--confirm-quiescent',
+      '--json',
+      '--quiet',
+    ]);
+    expect(result, JSON.stringify(vi.mocked(console.error).mock.calls)).toMatchObject({
+      ok: true,
+      status: 'paused',
+    });
+    expect(mocks.install).not.toHaveBeenCalled();
+    expect(mocks.wake).not.toHaveBeenCalled();
   });
 });

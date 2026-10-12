@@ -104,7 +104,10 @@ export interface DotCharter {
     /** Default minutes before a completed action's outcome is measured (default 60). */
     outcome_settle_minutes?: number;
   };
-  attention: { triggers: DotTrigger[] };
+  attention: {
+    triggers: DotTrigger[];
+    event_delivery?: { mode: 'durable'; activation_id: string };
+  };
   authority: {
     authority_role: string;
     accountability_charter_ref?: string;

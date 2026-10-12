@@ -1079,3 +1079,56 @@ Missing or malformed task boards must stay unknown rather than becoming zero pen
 Associate approvals only through matching explicit scope, never a mission-name-only legacy record. Pending and expired requests are observations; an approved record is not thereby usable, and a successfully applied request must not later demand another decision merely because its expiry passed. Report incomplete legacy coverage. A team roster or historical launch is not runtime readiness; leave unobserved readiness unknown.
 
 Regression gate: run `libs/core/mission/mission-flow-projection.test.ts` and `mission-triage.test.ts`, then execute the status read model and CLI on isolated synthetic stores. Compare recursive file hashes before and after reads, check repeated and transitioned observations, and distinguish real-store evaluations from in-memory approval fixtures. Verify the existing terminal-HUD consumer receives the same next-action projection.
+
+### Forward-only event continuation
+
+Legacy event intake inspects only the latest 2,000 accepted rows / 4 MiB and uses
+a 24-hour initial lookback. The dot status command now reports scan coverage;
+history outside that window is not an exact lost-event or pending count.
+
+To adopt durable forward continuation, an operator must first pause the charter,
+stop all supervisors and competing charter editors, and review existing effects.
+Then run: pnpm kyberion dot event continue <dot_id> --confirm-quiescent.
+The command preserves draft/paused status and captures the current complete-line
+EOF under the intake lock. It writes the continuation snapshot before declaring
+the activation ID in the charter. Review dot status and separately use the
+normal activation ceremony. This is not historical recovery: rows before the
+captured boundary remain untouched.
+
+Per-scope snapshots under the existing dot state floor retain at most 128 matching
+pending events; each scan reads a batch of at most 4 MiB, plus fixed-size
+256-byte checkpoint-anchor reads, and inspects at most 2,000 lines per sweep.
+Capacity stops scanning and never evicts pending work. Offsets advance only with
+atomically persisted pending entries; merely offering a wake never acknowledges
+it. Scope identity includes tier, tenant, organization, project and dot ID, while
+the authenticated event source remains tenant-wide.
+
+A claim is persisted before provider invocation. A crash, timeout, non-complete
+goal result, or unresolved output after dispatch retains an ambiguous attempt.
+There is no automatic lease expiry or re-dispatch. Known failures before dispatch
+retain normal backoff. Matching terminal wake evidence consumes the event; an
+authoritative terminal runner record can reconcile an offered event, but a generic
+duplicate receipt cannot. Already-held attempts require matching wake evidence or
+separately authorized operator investigation; no automatic reset command is provided.
+
+Kyberion's wrapper retries/failover and Anthropic request retries are disabled
+lexically for these attempts. This does not control the internal behavior of
+external CLI runtimes or promise exactly-once downstream business effects.
+Downstream operations still need their own idempotency. Existing wake-receipt
+replay remains unchanged and is not bounded by the event-reader limits. Atomic
+snapshot writes do not establish a tested sudden-power-loss durability guarantee.
+
+Missing/malformed checkpoints, orphan snapshots, changed triggers/scope,
+source rotation/truncation, changed anchors, malformed complete rows and oversized
+rows stop continuation. Do not delete or reset evidence to resume. Preserve the
+charter, source, checkpoint, wake/runner receipts and downstream effect evidence;
+a separately approved recovery must reconcile the exact activation/event/attempt
+before any replay decision. A trailing incomplete source line waits for completion.
+Status reads inspect recorded state/continuity without scanning every unread row
+or establishing process liveness.
+
+Regression gates: real distinct-payload acceptance above 2,000 rows, byte cutoff,
+bounded pending pressure, new-process restart and competing process claims,
+stale offers, pre/post-dispatch failure, partial wake-tool effects, terminal
+receipt correlation, tenant/full-scope isolation and fail-closed state/source loss.
+Never invoke real providers, notifications or resident daemons for these fixtures.
