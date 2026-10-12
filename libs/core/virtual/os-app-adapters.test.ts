@@ -37,11 +37,16 @@ function restorePlatform() {
 
 describe('os-app-adapters', () => {
   it('lists known app capabilities', async () => {
+    mockDarwinPlatform();
     const adapters = await import('./os-app-adapters.js');
-    expect(
-      adapters.listKnownAppCapabilities().find((entry) => entry.application === 'Google Chrome')
-        ?.capabilities
-    ).toContain('list_tabs');
+    try {
+      expect(
+        adapters.listKnownAppCapabilities().find((entry) => entry.application === 'Google Chrome')
+          ?.capabilities
+      ).toContain('list_tabs');
+    } finally {
+      restorePlatform();
+    }
   });
 
   it('parses Chrome tab listings into structured rows', async () => {
