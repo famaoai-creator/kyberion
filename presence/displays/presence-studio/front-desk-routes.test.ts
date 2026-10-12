@@ -45,6 +45,12 @@ import {
   toFrontDeskViewerScope,
 } from './security.js';
 
+// This exact JavaScript identifier contains "adf" across its camel-case boundary.
+// Exclude this exact token only; retain the original forbidden-copy checks.
+function stripProgressInternalIdentifiers(source: string): string {
+  return source.replace(/\breadFilter\b/g, '');
+}
+
 function readRepoFile(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
 }
@@ -550,6 +556,7 @@ describe('FD-05 progress page static contract', () => {
     const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
     const progressJs = readRepoFile('presence/displays/presence-studio/static/progress.js');
     const combined = `${progressHtml}\n${progressJs}`;
+    const withoutInternalIdentifiers = `${progressHtml}\n${stripProgressInternalIdentifiers(progressJs)}`;
 
     expect(combined).not.toContain('target=');
     expect(combined).not.toContain('127.0.0.1');
@@ -566,7 +573,7 @@ describe('FD-05 progress page static contract', () => {
       'ports',
     ];
     for (const word of forbiddenWords) {
-      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+      expect(withoutInternalIdentifiers.toLowerCase()).not.toContain(word.toLowerCase());
     }
   });
 });
@@ -1026,4 +1033,22 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     expect(helpJs).not.toContain('target=');
     expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(helpJs)).toBe(false);
   });
+});
+
+describe('progress raw-copy scanner identifier exception', () => {
+  it('strips only the exact case-sensitive readFilter identifier', () => {
+    expect(stripProgressInternalIdentifiers('readFilter()')).toBe('()');
+    expect(
+      stripProgressInternalIdentifiers('readfilter READFILTER xreadFilter readFilterSuffix')
+    ).toBe('readfilter READFILTER xreadFilter readFilterSuffix');
+  });
+
+  it.each(['ADF', '[ADF]', 'mission', '(mission)', 'pipeline', 'pipeline:'])(
+    'still detects forbidden copy %s after removing the known identifier',
+    (copy) => {
+      const source = stripProgressInternalIdentifiers('readFilter(); ' + copy).toLowerCase();
+      const forbiddenWords = ['ADF', 'mission', 'pipeline'];
+      expect(forbiddenWords.some((word) => source.includes(word.toLowerCase()))).toBe(true);
+    }
+  );
 });
