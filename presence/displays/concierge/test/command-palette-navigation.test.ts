@@ -335,3 +335,23 @@ describe('server-gated command palette', () => {
     }
   );
 });
+
+it.each(['personal', 'shared'])(
+  'retains the intended external destination for explicit %s workspace selection',
+  async (scope) => {
+    const m = mount(async () => json([item('home', true, 'http://studio.test/')]));
+    m.switchTenant(scope);
+    const before = (dom.window.location as URL).href;
+    m.toggle();
+    await flush();
+    m.click('front-desk-home');
+    expect((dom.window.location as URL).href).toBe(before);
+    expect(dom.window.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'front-desk:workspace-destination',
+        detail: { id: 'home' },
+      })
+    );
+    expect(dom.document.activeElement).toBe(m.opener);
+  }
+);

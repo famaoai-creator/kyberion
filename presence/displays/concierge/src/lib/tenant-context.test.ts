@@ -93,3 +93,45 @@ it('preserves the Management hierarchy when leaving and returning through the ra
     projectId: 'prj-a',
   });
 });
+
+describe('explicit aggregate to workspace navigation', () => {
+  it.each(['personal', 'shared', null])(
+    'asks for a workspace from %s without changing the current URL',
+    async (scope) => {
+      const { needsWorkspaceSelection, workspaceDestinationHref } =
+        await import('./tenant-context');
+      const h = browser(
+        'http://localhost:3050/settings?tenant=' +
+          (scope || 'personal') +
+          '&organizationId=old&project_id=old'
+      );
+      const before = h.window.location.href;
+      expect(needsWorkspaceSelection('http://localhost:3031/progress', scope)).toBe(true);
+      expect(needsWorkspaceSelection('/settings', scope)).toBe(false);
+      const target = new URL(
+        workspaceDestinationHref(
+          'http://localhost:3031/progress?organizationId=old&project_id=old#results',
+          'alpha'
+        )
+      );
+      expect(target.search).toBe('?tenant=alpha');
+      expect(target.pathname).toBe('/progress');
+      expect(target.hash).toBe('#results');
+      expect(h.window.location.href).toBe(before);
+      expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    }
+  );
+  it('keeps an explicit concrete workspace instead of offering an aggregate transition', async () => {
+    const { needsWorkspaceSelection } = await import('./tenant-context');
+    browser('http://localhost:3050/settings?tenant=alpha');
+    expect(needsWorkspaceSelection('http://localhost:3031/', 'alpha')).toBe(false);
+  });
+});
+
+it('uses catalog surface identity for same-origin reverse-proxy destinations', async () => {
+  const { needsWorkspaceSelection } = await import('./tenant-context');
+  browser('https://work.example/concierge/settings?tenant=personal');
+  expect(needsWorkspaceSelection('/presence/', null, true)).toBe(true);
+  expect(needsWorkspaceSelection('/concierge/settings', null, false)).toBe(false);
+  expect(needsWorkspaceSelection('/presence/', 'alpha', true)).toBe(false);
+});
