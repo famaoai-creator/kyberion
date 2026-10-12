@@ -38,7 +38,9 @@ vi.mock('../src/app/settings/sections/RecordingConsentSection', () => ({
   RecordingConsentSection: () => null,
 }));
 vi.mock('../src/app/settings/sections/PluginsSection', () => ({ PluginsSection: () => null }));
-vi.mock('../src/app/settings/sections/AdvancedSection', () => ({ AdvancedSection: () => null }));
+vi.mock('../src/app/settings/sections/AdvancedSection', () => ({
+  AdvancedSection: () => null,
+}));
 vi.mock('../src/app/settings/sections/DisplaySection', () => ({ DisplaySection: () => null }));
 vi.mock('../src/lib/use-concierge-i18n', () => ({
   useConciergeI18n: () => ({
@@ -47,6 +49,23 @@ vi.mock('../src/lib/use-concierge-i18n', () => ({
     t: (key: string, params?: Record<string, unknown>) =>
       key + (params ? JSON.stringify(params) : ''),
   }),
+}));
+type ExitRegistration = {
+  dirty: boolean;
+  saving: boolean;
+  isSaving: () => boolean;
+  valid: boolean;
+  discard: () => boolean;
+};
+const exit = vi.hoisted(() => ({
+  registration: null as ExitRegistration | null,
+  invalidate: vi.fn(),
+}));
+vi.mock('../src/lib/settings-exit-guard', () => ({
+  useSettingsExitRegistration: (registration: ExitRegistration) => {
+    exit.registration = registration;
+    return { invalidate: exit.invalidate };
+  },
 }));
 import SettingsPage from '../src/app/settings/page';
 
@@ -95,7 +114,10 @@ const preferences = (target = 'old-channel') => ({
   channels: [{ surface: 'slack', display_name: 'Slack', status: 'ready' }],
 });
 const json = (value: unknown, status = 200) =>
-  new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 type Respond = (url: string, init?: RequestInit) => Response | Promise<Response> | undefined;
 function serve(respond?: Respond) {
   const storedSetup = setup();
@@ -146,6 +168,8 @@ afterEach(() => {
   captured.profile = null;
   captured.notifications = null;
   captured.services = null;
+  exit.registration = null;
+  exit.invalidate.mockReset();
 });
 afterAll(() => dom.restore());
 async function mount() {
@@ -577,4 +601,150 @@ describe('initial notification baseline interleavings', () => {
     expect(captured.notifications!.notif.target).toBe('old-channel');
     expect(posts()).toHaveLength(0);
   });
+});
+
+describe('settings exit registration', () => {
+  it.each(['profile', 'services', 'notifications'] as const)(
+    'protects the %s draft and returns to clean after grouped discard',
+    async (section) => {
+      serve();
+      await mount();
+      expect(exit.registration).toMatchObject({ dirty: false, saving: false, valid: true });
+      expect(exit.registration!.isSaving()).toBe(false);
+      if (section === 'profile') await profileName('Unsaved');
+      else if (section === 'services')
+        await act(async () => captured.services!.setServices(['browser']));
+      else await notificationTarget('Unsaved');
+      expect(exit.registration!.dirty).toBe(true);
+      await act(async () => {
+        expect(exit.registration!.discard()).toBe(true);
+      });
+      expect(exit.registration).toMatchObject({ dirty: false, saving: false, valid: true });
+      expect(captured.profile!.profile.name).toBe('Saved name');
+      expect(captured.services!.services).toEqual(['browser', 'slack']);
+      expect(captured.notifications!.notif.target).toBe('old-channel');
+      expect(posts()).toHaveLength(0);
+    }
+  );
+
+  it('keeps a pending save protected even after the user reverts every edit to baseline', async () => {
+    const pending = deferred<Response>();
+    let saving = false;
+    serve((url, init) => {
+      if (url === '/api/setup' && init?.method === 'POST') {
+        saving = true;
+        return pending.promise;
+      }
+      if (url === '/api/setup' && saving) {
+        const data = setup();
+        data.setup.profile.name = 'Submitted';
+        return json(data);
+      }
+    });
+    await mount();
+    await profileName('Submitted');
+    const beforeSave = exit.registration!;
+    await act(async () => {
+      captured.profile!.onSaveProfile();
+      expect(beforeSave.isSaving()).toBe(true);
+      expect(beforeSave.discard()).toBe(false);
+    });
+    expect(exit.registration).toMatchObject({ dirty: true, saving: true, valid: true });
+    await profileName('Saved name');
+    expect(exit.registration).toMatchObject({ dirty: false, saving: true, valid: true });
+    expect(exit.registration!.isSaving()).toBe(true);
+    await act(async () => {
+      expect(exit.registration!.discard()).toBe(false);
+    });
+    expect(captured.profile!.profile.name).toBe('Saved name');
+    await act(async () => pending.resolve(receipt()));
+    expect(exit.registration).toMatchObject({ dirty: true, saving: false, valid: true });
+    expect(exit.registration!.isSaving()).toBe(false);
+  });
+
+  it.each(['profile', 'notifications'] as const)(
+    'keeps the %s draft registered after a failed save',
+    async (section) => {
+      serve((_url, init) => (init?.method === 'POST' ? json({ ok: false }, 500) : undefined));
+      await mount();
+      if (section === 'profile') {
+        await profileName('Unsaved');
+        await act(async () => captured.profile!.onSaveProfile());
+      } else {
+        await notificationTarget('Unsaved');
+        await act(async () => captured.notifications!.onSaveNotification());
+      }
+      expect(exit.registration).toMatchObject({ dirty: true, saving: false, valid: true });
+      expect(exit.registration!.isSaving()).toBe(false);
+      expect(exit.invalidate).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([false, true])(
+    'keeps the unsuccessful part of a grouped save protected (profile succeeds %s)',
+    async (profileSucceeds) => {
+      serve((url, init) => {
+        if (init?.method === 'POST' && (url === '/api/setup') !== profileSucceeds)
+          return json({ ok: false }, 500);
+      });
+      const view = await mount();
+      await profileName('Submitted');
+      await notificationTarget('new-channel');
+      await view.click('settings.save');
+      expect(exit.registration).toMatchObject({ dirty: true, saving: false, valid: true });
+      await act(async () => {
+        expect(exit.registration!.discard()).toBe(true);
+      });
+      expect(exit.registration!.dirty).toBe(false);
+      expect(captured.profile!.profile.name).toBe(profileSucceeds ? 'Submitted' : 'Saved name');
+      expect(captured.notifications!.notif.target).toBe(
+        profileSucceeds ? 'old-channel' : 'new-channel'
+      );
+    }
+  );
+
+  it('releases protection only after all grouped saves are acknowledged', async () => {
+    serve();
+    const view = await mount();
+    await profileName('Submitted');
+    await act(async () => captured.services!.setServices(['browser']));
+    await notificationTarget('new-channel');
+    await view.click('settings.save');
+    expect(posts()).toHaveLength(2);
+    expect(exit.registration).toMatchObject({ dirty: false, saving: false, valid: true });
+    expect(exit.registration!.isSaving()).toBe(false);
+  });
+
+  it.each(['principal', 'auth', 'bfcache'] as const)(
+    'invalidates pending exits before clearing drafts after %s invalidation',
+    async (reason) => {
+      let changed = false;
+      serve((url, init) => {
+        if (!changed) return undefined;
+        if (reason === 'principal' && url === '/api/me') {
+          const value = me();
+          value.member.member_id = 'bob';
+          return json(value);
+        }
+        if (reason === 'auth' && url === '/api/setup' && init?.method === 'POST')
+          return json({ ok: false }, 403);
+      });
+      const view = await mount();
+      await profileName('Private draft');
+      exit.invalidate.mockImplementation(() => {
+        expect(exit.registration!.dirty).toBe(true);
+        expect(captured.profile!.profile.name).toBe('Private draft');
+      });
+      changed = true;
+      if (reason === 'bfcache')
+        await act(async () => {
+          fireEvent(dom.windowEvents, 'pageshow', { persisted: true });
+        });
+      else await act(async () => captured.profile!.onSaveProfile());
+      expect(exit.invalidate).toHaveBeenCalledTimes(1);
+      expect(exit.registration).toMatchObject({ dirty: false, saving: false, valid: false });
+      expect(view.container.querySelector('.settings-page')).toBeNull();
+      expect(posts()).toHaveLength(reason === 'auth' ? 1 : 0);
+    }
+  );
 });

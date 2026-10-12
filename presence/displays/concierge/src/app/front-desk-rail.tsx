@@ -1,5 +1,6 @@
 'use client';
 
+import { useSettingsExitGuard } from '../lib/settings-exit-guard';
 import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
@@ -20,6 +21,7 @@ import {
   readTenantSelection,
   reflectResolvedSelection,
   switchTenantSelection,
+  selectionSwitchHref,
   withSelectedTenant,
 } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
@@ -112,6 +114,7 @@ export function FrontDeskRail() {
 }
 
 function FrontDeskRailContent() {
+  const { requestLeave } = useSettingsExitGuard();
   const { locale } = useConciergeI18n();
   const pathname = usePathname();
   // Management changes hierarchy with native replaceState on the same path.
@@ -122,6 +125,8 @@ function FrontDeskRailContent() {
   const selectionGeneration = React.useRef(0);
   const [navigationUnavailable, setNavigationUnavailable] = React.useState(false);
   const [destinationId, setDestinationId] = React.useState<string | null>(null);
+  const latestScope = React.useRef({ nav, me });
+  latestScope.current = { nav, me };
 
   const fetchMe = React.useCallback(() => {
     const generation = ++selectionGeneration.current;
@@ -256,15 +261,54 @@ function FrontDeskRailContent() {
           setDestinationId(null);
           return;
         }
-        window.location.assign(workspaceDestinationHref(item.href, company.tenant_slug));
+        const sourceSelection = readTenantSelection();
+        const intentGeneration = selectionGeneration.current;
+        const target = workspaceDestinationHref(item.href, company.tenant_slug);
+        setDestinationId(null);
+        requestLeave(target, () => {
+          const latest = latestScope.current;
+          const latestItem = latest.nav?.items.find(
+            (candidate) => candidate.id === item.id && candidate.allowed
+          );
+          if (
+            selectionGeneration.current !== intentGeneration ||
+            readTenantSelection() !== sourceSelection ||
+            !latest.me?.selection ||
+            railSelectionValue(latest.me.selection) !== sourceSelection ||
+            !latest.me.switcher?.companies.some(
+              (candidate) => candidate.tenant_slug === company.tenant_slug
+            ) ||
+            !latestItem
+          )
+            return;
+          window.location.assign(workspaceDestinationHref(latestItem.href, company.tenant_slug));
+        });
         return;
       }
       if (actionId === TENANT_SWITCH_ACTION && typeof payload?.value === 'string') {
         setDestinationId(null);
-        switchTenantSelection(payload.value);
+        const value = payload.value;
+        const sourceSelection = readTenantSelection();
+        const intentGeneration = selectionGeneration.current;
+        requestLeave(selectionSwitchHref(window.location.href, value), () => {
+          const latest = latestScope.current.me;
+          if (
+            selectionGeneration.current !== intentGeneration ||
+            readTenantSelection() !== sourceSelection ||
+            !latest?.selection ||
+            railSelectionValue(latest.selection) !== sourceSelection ||
+            !latest.switcher
+          )
+            return;
+          const currentOptions = railSwitcherOptions(latest.selection, latest.switcher, {
+            personal: '',
+            system: '',
+          });
+          if (currentOptions.some((option) => option.value === value)) switchTenantSelection(value);
+        });
       }
     },
-    [nav, me, destinationId]
+    [nav, me, destinationId, requestLeave]
   );
 
   const current = currentItemId(pathname);

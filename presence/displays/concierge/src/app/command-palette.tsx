@@ -1,5 +1,7 @@
 'use client';
 
+import { useSettingsExitGuard } from '../lib/settings-exit-guard';
+
 import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
@@ -59,6 +61,7 @@ function allowedItems(payload: unknown): NavItem[] {
 }
 
 export function CommandPalette() {
+  const { requestLeave } = useSettingsExitGuard();
   const { locale, t } = useConciergeI18n();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -193,6 +196,7 @@ export function CommandPalette() {
         }
         // Native navigation updates history and emits hashchange, allowing Settings
         // to reveal collapsed sections and supporting browser Back/Forward.
+        const sourceSelection = readTenantSelection();
         const target = withSelectedTenant(
           entry.href,
           tenant ?? readTenantSelection(),
@@ -203,10 +207,14 @@ export function CommandPalette() {
           window.location.hash
         ) {
           window.dispatchEvent(new Event('hashchange'));
-        } else window.location.href = target;
+        } else
+          requestLeave(target, () => {
+            if (tenant === readSelectedTenant() && sourceSelection === readTenantSelection())
+              window.location.href = target;
+          });
       }
     },
-    [close, tenant]
+    [close, tenant, requestLeave]
   );
 
   React.useEffect(() => {

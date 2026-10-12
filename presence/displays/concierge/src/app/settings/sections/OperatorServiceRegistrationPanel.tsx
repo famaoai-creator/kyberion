@@ -1,5 +1,7 @@
 'use client';
 
+import { GuardedAnchor } from '../../../lib/settings-exit-guard';
+
 import * as React from 'react';
 import { Badge, Button, Callout, SecretField, SettingsGroup } from '@agent/shared-ui';
 import {
@@ -250,14 +252,14 @@ function OperatorServiceCard({
         </p>
       </details>
       <p className="kb-text kb-text--body">
-        <a
+        <GuardedAnchor
           href={service.setupUrl}
           target="_blank"
           rel="noopener noreferrer"
           referrerPolicy="no-referrer"
         >
           {t('settings.operator_issue_token', { service: service.label })}
-        </a>
+        </GuardedAnchor>
       </p>
       <div className="settings-row-actions">
         <Button
@@ -351,7 +353,7 @@ function OperatorServiceCard({
             <p className="kb-text kb-text--muted">
               {t('settings.operator_next_step', { service: service.label })}
             </p>
-            <a href="/">{t('settings.operator_open_requests')}</a>
+            <GuardedAnchor href="/">{t('settings.operator_open_requests')}</GuardedAnchor>
           </div>
         ) : null}
       </div>

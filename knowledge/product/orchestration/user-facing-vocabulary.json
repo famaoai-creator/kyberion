@@ -14750,6 +14750,31 @@
         "en": "Technical check details",
         "ja": "技術的な確認内容",
         "qps-ploc": "⟦Ŧėƈħñïƈȧŀ ƈħėƈķ ḓėŧȧïŀş ŀőřėɱ ï⟧"
+      },
+      "setup.leave_title": {
+        "ja": "保存していない設定があります",
+        "en": "You have unsaved settings",
+        "qps-ploc": "⟦Ẏőů ħȧṽė ůñşȧṽėḓ şėŧŧïñɠş ŀőřėɱ ïṗ⟧"
+      },
+      "setup.leave_message": {
+        "ja": "この画面を離れると、保存していないプロフィール・サービス選択・通知の変更は失われます。",
+        "en": "Leaving this page will discard unsaved profile, service-selection and notification changes.",
+        "qps-ploc": "⟦Ŀėȧṽïñɠ ŧħïş ṗȧɠė ẇïŀŀ ḓïşƈȧřḓ ůñşȧṽėḓ ṗřőƒïŀė, şėřṽïƈė-şėŀėƈŧïőñ ȧñḓ ñőŧïƒïƈȧŧïőñ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "setup.leave_saving_message": {
+        "ja": "保存結果を確認しています。送信済みの保存は取り消せないため、結果が分かるまでこの画面でお待ちください。",
+        "en": "Waiting for the save result. A submitted save cannot be canceled; stay here until its result is known.",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ŧħė şȧṽė řėşůŀŧ. Ȧ şůƀɱïŧŧėḓ şȧṽė ƈȧññőŧ ƀė ƈȧñƈėŀėḓ; şŧȧẏ ħėřė ůñŧïŀ ïŧş řėşůŀŧ ïş ķñőẇñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "setup.leave_stay": {
+        "ja": "編集を続ける",
+        "en": "Keep editing",
+        "qps-ploc": "⟦Ķėėṗ ėḓïŧïñɠ ŀőř⟧"
+      },
+      "setup.leave_discard": {
+        "ja": "破棄して移動",
+        "en": "Discard and leave",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ȧñḓ ŀėȧṽė ŀőřėɱ⟧"
       }
     },
     "onboarding": {

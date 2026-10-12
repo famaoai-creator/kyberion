@@ -1,5 +1,7 @@
 'use client';
 
+import { GuardedAnchor } from '../../../lib/settings-exit-guard';
+
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 
 import * as React from 'react';
@@ -72,7 +74,9 @@ export function OrgReadinessPane({ t }: { t: SettingsTranslate }) {
                     status={step.done ? 'completed' : 'needs_setup'}
                     label={step.done ? t('setup.completed') : t('setup.incomplete')}
                   />
-                  {!step.done ? <a href={step.href}>{t('setup.org_ready_go')}</a> : null}
+                  {!step.done ? (
+                    <GuardedAnchor href={step.href}>{t('setup.org_ready_go')}</GuardedAnchor>
+                  ) : null}
                 </div>
               </SettingRow>
             );

@@ -7,6 +7,12 @@ import {
 import { CommandPalette } from '../src/app/command-palette';
 
 const i18n = vi.hoisted(() => ({ locale: 'en' }));
+const exit = vi.hoisted(() => ({
+  requestLeave: vi.fn((_target: string, navigate: () => void) => navigate()),
+}));
+vi.mock('../src/lib/settings-exit-guard', () => ({
+  useSettingsExitGuard: () => ({ requestLeave: exit.requestLeave }),
+}));
 vi.mock('../src/lib/use-concierge-i18n', () => ({
   useConciergeI18n: () => ({ locale: i18n.locale, t: (key: string) => key }),
 }));
@@ -73,6 +79,7 @@ afterEach(() => {
   unmount = undefined;
   vi.unstubAllGlobals();
   i18n.locale = 'en';
+  exit.requestLeave.mockReset().mockImplementation((_target, navigate) => navigate());
 });
 afterAll(() => dom.restore());
 
@@ -355,3 +362,120 @@ it.each(['personal', 'shared'])(
     expect(dom.document.activeElement).toBe(m.opener);
   }
 );
+
+describe('command palette controlled exits', () => {
+  it.each(['/ingest', 'http://studio.test/work-items'])(
+    'waits for confirmation before assigning %s',
+    async (href) => {
+      let proceed: (() => void) | undefined;
+      exit.requestLeave.mockImplementation((_target, navigate) => {
+        proceed = navigate;
+      });
+      const m = mount(async () => json([item('destination', true, href)]));
+      const before = (dom.window.location as URL).href;
+      m.toggle();
+      await flush();
+      m.click('front-desk-destination');
+      const target = href + '?tenant=alpha';
+      expect(exit.requestLeave).toHaveBeenCalledWith(target, expect.any(Function));
+      expect((dom.window.location as URL).href).toBe(before);
+      expect(m.container.querySelector('[role="dialog"]')).toBeNull();
+      expect(dom.document.activeElement).toBe(m.opener);
+      act(() => proceed!());
+      expect((dom.window.location as URL).href).toBe(new URL(target, before).href);
+    }
+  );
+
+  it('cancelling a queued exit leaves the current page and scope unchanged', async () => {
+    exit.requestLeave.mockImplementation(() => {});
+    const m = mount(async () => json([item('ingest')]));
+    const before = (dom.window.location as URL).href;
+    m.toggle();
+    await flush();
+    m.click('front-desk-ingest');
+    expect(exit.requestLeave).toHaveBeenCalledTimes(1);
+    expect((dom.window.location as URL).href).toBe(before);
+    m.toggle();
+    await flush();
+    expect(m.container.textContent).toContain('ingest');
+    m.key('Escape');
+    expect((dom.window.location as URL).href).toBe(before);
+  });
+
+  it('rechecks the selected tenant when a deferred confirmation is accepted', async () => {
+    let proceed: (() => void) | undefined;
+    exit.requestLeave.mockImplementation((_target, navigate) => {
+      proceed = navigate;
+    });
+    const m = mount(async () => json([item('ingest')]));
+    m.toggle();
+    await flush();
+    m.click('front-desk-ingest');
+    m.switchTenant('beta');
+    const changed = (dom.window.location as URL).href;
+    act(() => proceed!());
+    expect((dom.window.location as URL).href).toBe(changed);
+  });
+
+  it('rejects a stale catalog selection before it reaches the exit guard', async () => {
+    const m = mount(async () => json([item('ingest')]));
+    m.toggle();
+    await flush();
+    dom.window.location = locationAt('http://concierge.test/settings?tenant=beta');
+    m.click('front-desk-ingest');
+    expect(exit.requestLeave).not.toHaveBeenCalled();
+    expect((dom.window.location as URL).pathname).toBe('/settings');
+  });
+
+  it('reopens an unchanged settings anchor without queuing a page exit', async () => {
+    exit.requestLeave.mockImplementation(() => {});
+    const m = mount(async () => json([item('settings')]));
+    dom.window.location = locationAt(
+      'http://concierge.test/settings?tenant=alpha#settings-advanced'
+    );
+    m.toggle();
+    await flush();
+    m.click('settings-advanced');
+    expect(exit.requestLeave).not.toHaveBeenCalled();
+    expect(dom.window.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'hashchange' })
+    );
+  });
+
+  it('opens the dock without queuing a page exit', async () => {
+    exit.requestLeave.mockImplementation(() => {});
+    const m = mount(async () => json([]));
+    m.toggle();
+    await flush();
+    m.key('Enter');
+    expect(exit.requestLeave).not.toHaveBeenCalled();
+    expect(dom.window.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'concierge:open-dock' })
+    );
+  });
+});
+
+describe('command palette exact workspace scope fence', () => {
+  it.each(['personal', 'shared'] as const)(
+    'rejects a queued same-origin exit after changing from %s to the other aggregate scope',
+    async (selection) => {
+      let proceed: (() => void) | undefined;
+      exit.requestLeave.mockImplementation((_target, navigate) => {
+        proceed = navigate;
+      });
+      const m = mount(async () => json([item('ingest')]));
+      m.switchTenant(selection);
+      m.toggle();
+      await flush();
+      m.click('front-desk-ingest');
+      expect(exit.requestLeave).toHaveBeenCalledWith(
+        '/ingest?tenant=' + selection,
+        expect.any(Function)
+      );
+      m.switchTenant(selection === 'personal' ? 'shared' : 'personal');
+      const changed = (dom.window.location as URL).href;
+      act(() => proceed!());
+      expect((dom.window.location as URL).href).toBe(changed);
+    }
+  );
+});
