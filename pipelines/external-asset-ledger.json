@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "external-asset-ledger",
+  "version": "1.0.0",
+  "name": "Terraform To External Asset Ledger Draft",
+  "description": "Classify a Terraform directory into an asset inventory, then map it onto the canonical external-asset ledger schema (Phase 2 of the inventory procedure). Output is a review-pending draft — owner/contract/MFA/data classification require human or facade verification before registry promotion.",
+  "labels": ["modeling", "terraform", "security", "asset-inventory", "ledger"],
+  "context": {
+    "terraform_dir": ".",
+    "title": "external-asset-ledger",
+    "output_path": "active/shared/tmp/modeling/external-asset-ledger-draft.json"
+  },
+  "steps": [
+    {
+      "id": "build_asset_inventory",
+      "role": "transform",
+      "op": "modeling:terraform_asset_inventory",
+      "produces": { "channel": "asset_inventory", "type": "IaCAssetInventory" },
+      "params": { "dir": "{{terraform_dir}}", "title": "{{title}}", "export_as": "asset_inventory" }
+    },
+    {
+      "id": "map_ledger_draft",
+      "role": "transform",
+      "op": "modeling:asset_inventory_to_ledger",
+      "produces": { "channel": "ledger_draft", "type": "ExternalAssetLedgerDraft" },
+      "consumes": "asset_inventory",
+      "params": { "from": "asset_inventory", "export_as": "ledger_draft" }
+    },
+    {
+      "id": "write_ledger_draft",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "ledger_draft",
+      "params": { "path": "{{output_path}}", "content": "{{ledger_draft}}" }
+    }
+  ]
+}

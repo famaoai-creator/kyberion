@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "security-asset-record.schema.json",
+  "title": "External Asset Security Ledger Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": { "type": "string", "pattern": "^sec-[a-f0-9]{16}$" },
+    "service_id": { "type": "string", "pattern": "^(svc|asset):[a-z0-9][a-z0-9:_-]*$" },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service_id": { "type": "string", "pattern": "^(svc|asset):[a-z0-9][a-z0-9:_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "vendor": { "type": "string" },
+        "category": {
+          "enum": [
+            "saas",
+            "cloud",
+            "vpn",
+            "published-app",
+            "api-integration",
+            "data-store",
+            "network-control",
+            "identity"
+          ]
+        },
+        "endpoints": { "type": "array", "items": { "type": "string" } },
+        "exposure": { "enum": ["public", "partner-restricted", "internal-only", "unknown"] },
+        "data_classification": { "enum": ["personal", "confidential", "public", "unknown"] },
+        "auth_method": { "enum": ["sso", "local-password", "api-key", "federated", "unknown"] },
+        "mfa_status": { "enum": ["enforced", "optional", "unavailable", "unknown"] },
+        "log_access": { "type": "string" },
+        "account_admin": { "type": "string" },
+        "owner": { "type": "string" },
+        "department": { "type": "string" },
+        "contract_ref": { "type": "string" },
+        "discovery_sources": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "last_verified": { "type": "string" },
+        "shadow": { "type": "boolean" },
+        "review_status": { "enum": ["pending", "verified"] },
+        "check_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "check_id": { "type": "string", "minLength": 1 },
+              "result": { "type": "string", "minLength": 1 },
+              "evidence": { "type": "string" },
+              "checked_at": { "type": "string" },
+              "checker": { "type": "string" }
+            },
+            "required": ["check_id", "result"]
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "source_op": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } },
+            "signal_rules": { "type": "array", "items": { "type": "string" } },
+            "via": { "type": "array", "items": { "type": "string" } },
+            "unresolved_refs": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "required": [
+        "service_id",
+        "name",
+        "category",
+        "endpoints",
+        "exposure",
+        "data_classification",
+        "auth_method",
+        "mfa_status",
+        "discovery_sources",
+        "review_status"
+      ]
+    },
+    "promoted_at": { "type": "string", "format": "date-time" },
+    "promoted_by": { "type": "string", "minLength": 1 },
+    "approval_id": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "supersedes": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["active", "superseded", "retired"] },
+    "retired_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["asset_id", "service_id", "entry", "promoted_at", "promoted_by", "version", "status"]
+}

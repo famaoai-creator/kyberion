@@ -514,12 +514,15 @@
       "transform": [
         "ajv_validate",
         "analyze_source_tree",
+        "asset_inventory_to_ledger",
         "build_agentic_source_review_participants",
         "compile_agentic_source_review_plan",
         "compile_agentic_source_review_verification",
         "compile_engineering_artifacts",
         "json_query",
         "mermaid_gen",
+        "security_ledger_check_plan",
+        "terraform_asset_inventory",
         "terraform_to_architecture_adf",
         "terraform_to_topology_ir",
         "test_inventory_to_browser_pipeline",
@@ -546,7 +549,7 @@
       "control": ["if", "while"]
     },
     "network": {
-      "capture": ["a2a_poll", "fetch", "shell"],
+      "capture": ["a2a_poll", "exposure_check", "fetch", "shell"],
       "transform": ["distill_response", "json_query", "llm_decide", "regex_extract"],
       "apply": ["a2a_send", "log", "write_artifact", "write_file"],
       "control": ["if", "while"]

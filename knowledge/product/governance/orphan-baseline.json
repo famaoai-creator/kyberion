@@ -109,6 +109,10 @@
       "reason": "Validation bundle for the Cloudflare OS control plane (OS-01..15), run by hand per pipelines/README.md when that area changes; not a CI gate."
     },
     {
+      "id": "pipelines/external-asset-ledger.json",
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:asset_inventory_to_ledger (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
       "id": "pipelines/generate-design-system-demo.json",
       "reason": "Diagnostic deck exercising every slide-layout preset (pipelines/README.md); run by hand when the design system changes."
     },
@@ -191,6 +195,10 @@
     {
       "id": "pipelines/surface-capability-check.json",
       "reason": "Operator diagnostic for the governed surface capability layer (pipelines/README.md); run by hand."
+    },
+    {
+      "id": "pipelines/terraform-asset-inventory.json",
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_asset_inventory (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
     {
       "id": "pipelines/terraform-topology-ir.json",

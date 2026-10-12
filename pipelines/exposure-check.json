@@ -1,0 +1,48 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "exposure-check",
+  "version": "1.0.0",
+  "name": "External Asset Exposure Check",
+  "description": "Phase 3 of the inventory procedure: derive the check plan from the tenant-scoped external-assets ledger, probe each endpoint with network:exposure_check (per-item error capture — an unreachable endpoint is a finding, not a crash), then write the checks JSON for the `pnpm security:ledger --record-checks` ceremony (governed, human-run — never an automatic ledger write).",
+  "labels": ["security", "asset-inventory", "exposure-check", "ipa-checklist"],
+  "schedule": {
+    "id": "exposure-check-quarterly",
+    "cron": "0 6 1 */3 *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "context": {
+    "tenant": "default",
+    "check_id": "A-1-reachability",
+    "probe_timeout": 8000,
+    "output_path": "active/shared/tmp/security/exposure-checks.json"
+  },
+  "steps": [
+    {
+      "id": "check_plan",
+      "role": "transform",
+      "op": "modeling:security_ledger_check_plan",
+      "produces": { "channel": "check_plan", "type": "SecurityCheckPlan" },
+      "params": { "tenant": "{{tenant}}", "check_id": "{{check_id}}", "export_as": "check_plan" }
+    },
+    {
+      "id": "probe_endpoints",
+      "role": "source",
+      "op": "network:exposure_check",
+      "produces": { "channel": "exposure_checks", "type": "ExposureCheckResults" },
+      "consumes": "check_plan",
+      "params": {
+        "items": "{{check_plan.items}}",
+        "check_id": "{{check_plan.check_id}}",
+        "timeout": "{{probe_timeout}}"
+      }
+    },
+    {
+      "id": "write_checks",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "exposure_checks",
+      "params": { "path": "{{output_path}}", "content": "{{exposure_checks}}" }
+    }
+  ]
+}
