@@ -3,6 +3,7 @@ import * as windows from '../windows-os-automation.js';
 import type { FocusedInputState } from '../apple-event-bridge.js';
 
 export interface OsAutomationPlatformAdapter {
+  launchApplication(application: string): boolean;
   activateApplication(application: string): void;
   detectFocusedInput(): FocusedInputState;
   keystrokeText(text: string): void;
@@ -28,6 +29,12 @@ export interface OsAutomationPlatformAdapter {
     windowTitle: string,
     matchPolicy?: 'strict' | 'prefix' | 'contains'
   ): boolean;
+  setWindowState(
+    appName: string,
+    windowTitle: string,
+    state: 'maximize' | 'minimize' | 'restore',
+    matchPolicy?: 'strict' | 'prefix' | 'contains'
+  ): boolean;
   quitApplication(appName: string): void;
   systemNotify(title: string, message: string, subtitle?: string): void;
   clipboardRead(): string;
@@ -35,10 +42,86 @@ export interface OsAutomationPlatformAdapter {
   takeScreenshot(outputPath: string, options?: { silent?: boolean; displayIndex?: number }): string;
 }
 
+export type MouseOperation =
+  | { type: 'move'; x: number; y: number }
+  | { type: 'click'; x: number; y: number; button?: 'left' | 'right'; count?: number }
+  | {
+      type: 'scroll';
+      x: number;
+      y: number;
+      direction: 'up' | 'down' | 'left' | 'right';
+      amount?: number;
+    }
+  | { type: 'drag'; fromX: number; fromY: number; toX: number; toY: number };
+
+/** Build the stable pointer API over platform-native primitives. */
+export function createMouseOperationExecutor(
+  adapter: Pick<
+    OsAutomationPlatformAdapter,
+    'moveMouse' | 'clickAt' | 'rightClickAt' | 'scrollAt' | 'dragFrom'
+  >
+): (operation: MouseOperation) => void {
+  return (operation) => {
+    switch (operation.type) {
+      case 'move':
+        adapter.moveMouse(operation.x, operation.y);
+        return;
+      case 'click':
+        (operation.button === 'right' ? adapter.rightClickAt : adapter.clickAt)(
+          operation.x,
+          operation.y,
+          operation.count ?? 1
+        );
+        return;
+      case 'scroll':
+        adapter.scrollAt(operation.x, operation.y, operation.direction, operation.amount);
+        return;
+      case 'drag':
+        adapter.dragFrom(operation.fromX, operation.fromY, operation.toX, operation.toY);
+        return;
+    }
+  };
+}
+
 const macAdapter: OsAutomationPlatformAdapter = mac;
 const windowsAdapter: OsAutomationPlatformAdapter = windows;
+const unsupportedAdapter: OsAutomationPlatformAdapter = {
+  launchApplication: () => false,
+  activateApplication: () => undefined,
+  detectFocusedInput: () => ({
+    application: '',
+    windowTitle: '',
+    role: '',
+    description: '',
+    editable: false,
+  }),
+  keystrokeText: () => undefined,
+  pasteText: () => undefined,
+  pressKey: () => undefined,
+  pressKeyCode: () => undefined,
+  toggleDictation: () => undefined,
+  clickAt: () => undefined,
+  rightClickAt: () => undefined,
+  moveMouse: () => undefined,
+  scrollAt: () => undefined,
+  dragFrom: () => undefined,
+  runAppleScript: () => '',
+  getScreenSize: () => ({ width: 0, height: 0 }),
+  getWindowList: () => [],
+  activateWindowByTitle: () => false,
+  setWindowState: () => false,
+  quitApplication: () => undefined,
+  systemNotify: () => undefined,
+  clipboardRead: () => '',
+  clipboardWrite: () => undefined,
+  takeScreenshot: () => '',
+};
 
 /** Select once at the boundary; platform-specific code stays inside adapters. */
-export function resolveOsAutomationPlatform(): OsAutomationPlatformAdapter {
-  return process.platform === 'win32' ? windowsAdapter : macAdapter;
+export function resolveOsAutomationPlatform(
+  platform: NodeJS.Platform = process.platform
+): OsAutomationPlatformAdapter {
+  if (platform === 'win32') return windowsAdapter;
+  if (platform === 'darwin') return macAdapter;
+  return unsupportedAdapter;
 }

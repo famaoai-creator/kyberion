@@ -20,6 +20,8 @@ describe('pnpm kyberion record', () => {
           params: {
             capture_mode: 'screen',
             duration: 7,
+            fps: 1,
+            frame_interval_ms: 1000,
             output: '/tmp/a.mp4',
             export_as: 'screen_recording',
           },
