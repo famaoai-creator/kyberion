@@ -51,3 +51,11 @@ The chooser distinguishes pending workspace/catalog reads from settled failures,
 Concrete links preserve the selected tenant, organization and project. Chronos uses organization_id/project_id; the primary front-desk routes use organizationId/projectId. The shared link metadata selects the correct names. Changing tenant clears both older scope aliases.
 
 Desktop navigation scrolls vertically and mobile navigation horizontally without hiding later groups. Current-page state covers workspace, import, first-job and training routes. Command search supports keyboard selection, dismissal and focus restoration, native settings hash history, and ignores responses superseded by closing, locale changes or tenant changes.
+
+## Leaving edited settings
+
+The existing grouped profile, service-preparation and notification drafts remain owned by the Settings page. App-controlled same-tab links, command-search destinations and workspace switches ask whether to keep editing or discard before leaving when those drafts are dirty. A workspace switch waits for that choice before changing the selection cookie. Cancel and Escape retain the edits, URL and scope; an accepted exit runs once. No draft content is copied to persistent storage.
+
+A save in progress keeps the page protected even if fields were edited back to their previous values. The leave dialog waits for its result and never claims to cancel a submitted request or leaves automatically when a save settles. Known context invalidation and page unmount cancel queued navigation.
+
+Same-page section links and hash Back/Forward retain native behavior. Modifier clicks, new tabs and downloads do not discard the current page and remain unchanged. Reload, closing the tab and full-document departure use the browser-controlled beforeunload warning where supported. Same-document browser Back/Forward to another client-rendered route cannot reliably be canceled across supported browsers and is not intercepted: no sentinel history entries or reverse-traversal loops are added. Authentication redirects and the OAuth flow retain their existing behavior.
