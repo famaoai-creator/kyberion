@@ -24,6 +24,7 @@ import {
   retireSecurityAsset,
   serviceLineage,
   type PromoteOptions,
+  type SecurityAssetEntry,
   type SecurityCheckResult,
 } from '@agent/core/security-asset-ledger';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
@@ -31,7 +32,8 @@ import { createApprovalRequest, listApprovalRequests } from '@agent/core/governa
 import { pathResolver } from '@agent/core/path-resolver';
 import { tenantProfilePath } from '@agent/core/organization/tenant-registry';
 import { validateReadPermission } from '@agent/core/tier-guard';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -408,7 +410,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
       ? args.recordChecks
       : path.resolve(rootDir, args.recordChecks);
     if (!safeExistsSync(absFile)) throw new Error(`--record-checks not found: ${absFile}`);
-    const parsed = JSON.parse(String(safeReadFile(absFile, { encoding: 'utf8' })));
+    const parsed = readJson<{ checks?: unknown[] } | unknown[]>(absFile);
     const rawChecks = Array.isArray(parsed)
       ? parsed
       : Array.isArray(parsed?.checks)
@@ -479,10 +481,12 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   }
 
   if (!args.draft)
-    throw new Error('one action is required: --draft, --retire, --list, or --lineage');
+    throw new Error(
+      'one action is required: --draft, --record-checks, --retire, --list, --report, --request-approvals, or --lineage'
+    );
   const absDraft = path.isAbsolute(args.draft) ? args.draft : path.resolve(rootDir, args.draft);
   if (!safeExistsSync(absDraft)) throw new Error(`--draft not found: ${absDraft}`);
-  const draft = JSON.parse(String(safeReadFile(absDraft, { encoding: 'utf8' })));
+  const draft = readJson<{ entries?: SecurityAssetEntry[] }>(absDraft);
   if (!draft || !Array.isArray(draft.entries)) {
     throw new Error('--draft must be a ledger draft object with an entries array');
   }
@@ -498,7 +502,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     })
   ) as NonNullable<PromoteOptions['overrides']>;
 
-  const result = promoteSecurityLedger(args.tenant, draft, {
+  const result = promoteSecurityLedger(args.tenant, draft as { entries: SecurityAssetEntry[] }, {
     ...pathOptions,
     promotedBy,
     asOf: args.asOf,
