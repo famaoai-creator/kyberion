@@ -239,6 +239,7 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       'ingest',
       'first-job',
       'help',
+      'organization',
       'settings',
     ]);
     expect(items.map((item) => item.label)).toEqual([
@@ -250,6 +251,7 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       '資料の取込',
       'はじめての仕事',
       '使い方を見る',
+      '組織',
       '設定',
     ]);
     // decide/settings live on concierge — the port must come from the
