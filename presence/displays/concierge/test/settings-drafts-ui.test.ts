@@ -135,6 +135,8 @@ let client: typeof import('react-dom/client');
 let unmount: (() => void) | undefined;
 beforeAll(async () => {
   dom = installFakeDom({ sessionStorage: { getItem: () => null } });
+  // Section components are intentionally mocked out in this draft-only harness.
+  Object.assign(dom.document, { getElementById: () => null });
   client = await import('react-dom/client');
 });
 afterEach(() => {
