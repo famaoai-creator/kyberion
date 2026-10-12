@@ -66,6 +66,12 @@ afterAll(() => {
 });
 import type { PresenceStudioViewerContext } from './security.js';
 
+// This exact JavaScript identifier contains "adf" across its camel-case boundary.
+// Exclude this exact token only; retain the original forbidden-copy checks.
+function stripProgressInternalIdentifiers(source: string): string {
+  return source.replace(/\breadFilter\b/g, '');
+}
+
 function readRepoFile(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
 }
@@ -489,6 +495,7 @@ describe('static/progress.html + progress.js render the work-inventory panel key
     const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
     const progressJs = readRepoFile('presence/displays/presence-studio/static/progress.js');
     const combined = `${progressHtml}\n${progressJs}`;
+    const withoutInternalIdentifiers = `${progressHtml}\n${stripProgressInternalIdentifiers(progressJs)}`;
 
     expect(combined).not.toContain('target=');
     expect(combined).not.toContain('127.0.0.1');
@@ -505,7 +512,25 @@ describe('static/progress.html + progress.js render the work-inventory panel key
       'ports',
     ];
     for (const word of forbiddenWords) {
-      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+      expect(withoutInternalIdentifiers.toLowerCase()).not.toContain(word.toLowerCase());
     }
   });
+});
+
+describe('progress raw-copy scanner identifier exception', () => {
+  it('strips only the exact case-sensitive readFilter identifier', () => {
+    expect(stripProgressInternalIdentifiers('readFilter()')).toBe('()');
+    expect(
+      stripProgressInternalIdentifiers('readfilter READFILTER xreadFilter readFilterSuffix')
+    ).toBe('readfilter READFILTER xreadFilter readFilterSuffix');
+  });
+
+  it.each(['ADF', '[ADF]', 'mission', '(mission)', 'pipeline', 'pipeline:'])(
+    'still detects forbidden copy %s after removing the known identifier',
+    (copy) => {
+      const source = stripProgressInternalIdentifiers('readFilter(); ' + copy).toLowerCase();
+      const forbiddenWords = ['ADF', 'mission', 'pipeline'];
+      expect(forbiddenWords.some((word) => source.includes(word.toLowerCase()))).toBe(true);
+    }
+  );
 });
