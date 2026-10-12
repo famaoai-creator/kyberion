@@ -89,3 +89,32 @@ export function isDotToolBackendUnavailableError(message: string): boolean {
     message
   );
 }
+
+export async function runDelegatedWake(
+  charter: DotCharter,
+  backend: DotWakeBackend,
+  prompt: string,
+  timeoutMs: number
+): Promise<string> {
+  if (backend.delegateTaskHandle) {
+    const handle = backend.delegateTaskHandle(prompt, undefined);
+    return await Promise.race([
+      handle.join(),
+      new Promise<string>((_resolve, reject) =>
+        setTimeout(() => {
+          void handle.cancel(`wall_clock budget ${timeoutMs}ms exceeded`).catch(() => {});
+          reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`));
+        }, timeoutMs).unref?.()
+      ),
+    ]);
+  }
+  return await Promise.race([
+    backend.delegateTask(prompt, undefined),
+    new Promise<string>((_resolve, reject) =>
+      setTimeout(
+        () => reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`)),
+        timeoutMs
+      ).unref?.()
+    ),
+  ]);
+}

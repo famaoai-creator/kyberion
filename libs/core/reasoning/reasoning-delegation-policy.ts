@@ -36,3 +36,16 @@ export function buildDelegationSummaryContinuationPrompt(
     briefResult,
   ].join('\n');
 }
+
+export function shouldRetryShortDelegationSummary(input: {
+  instruction: string;
+  result: string;
+  servedBackendName: string;
+}): boolean {
+  if (!delegationSummaryRetryEnabled()) return false;
+  // The stub backend returns short deterministic placeholders by design —
+  // retrying would only duplicate them and destabilize hermetic tests.
+  if (input.servedBackendName === 'stub') return false;
+  if (input.instruction.startsWith(STRUCTURED_DELEGATION_PROMPT_HEADER)) return false;
+  return input.result.trim().length < DELEGATION_SUMMARY_MIN_CHARS;
+}

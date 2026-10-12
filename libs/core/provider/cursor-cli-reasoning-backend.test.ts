@@ -1,3 +1,4 @@
+import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -378,6 +379,24 @@ describe('cursor-cli-reasoning-backend', () => {
     const [, retryArgs] = spawnMock.mock.calls[1];
     expect(retryArgs).toContain('--model');
     expect(retryArgs).toContain('auto');
+  });
+
+  it('does not redispatch a named model error inside a durable attempt scope', async () => {
+    spawnMock.mockReturnValueOnce(
+      createChild(
+        JSON.stringify({
+          type: 'result',
+          subtype: 'error',
+          is_error: true,
+          result: 'Named models unavailable Free plans can only use Auto.',
+        })
+      )
+    );
+    const backend = new CursorCliReasoningBackend({ bin: 'cursor-agent', model: 'composer-2.5' });
+    await expect(
+      withoutAutomaticReasoningRedispatch(() => backend.prompt('synthetic'))
+    ).rejects.toThrow('Named models unavailable');
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
   it('maps model tiers to Cursor model ids', () => {

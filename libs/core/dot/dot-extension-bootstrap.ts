@@ -46,6 +46,7 @@ import {
   dotOutcomesPromptSection,
   dotOutcomesStatusSection,
 } from './dot-outcomes.js';
+import { dotEventIntakeStatusSection } from './dot-event-intake-diagnostics.js';
 import { dotArbitrationPreGateCheck } from './dot-arbitration.js';
 
 let registered = false;
@@ -87,6 +88,7 @@ export function ensureDotExtensionsRegistered(): void {
 
   // DL-01 executor status (results + escalations)
   DOT_STATUS_SECTIONS.push(dotExecutorStatusSection());
+  DOT_STATUS_SECTIONS.push(dotEventIntakeStatusSection());
 }
 
 ensureDotExtensionsRegistered();

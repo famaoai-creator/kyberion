@@ -360,16 +360,19 @@ describe('evaluateDotEventTriggers', () => {
     at: Date,
     source = 'github',
     type = 'workflow_run'
-  ) =>
-    ingestLocalEvent({
+  ) => {
+    const result = ingestLocalEvent({
       source,
       type,
       deliveryId: delivery,
-      body: { workflow_run: { conclusion } },
+      body: { delivery, workflow_run: { conclusion } },
       policy: POLICY,
       rootDir: TEST_ROOT,
       now: at,
-    }).event;
+    });
+    expect(result.status).toBe('accepted');
+    return result.event;
+  };
 
   it('wakes once per matching event and consumes delivered keys', () => {
     const hit = ingest('a', 'failure', new Date(now.getTime() - 60_000));

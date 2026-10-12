@@ -54,7 +54,11 @@ import {
   installReasoningBackends,
   reselectReasoningBackends,
 } from '@agent/core/reasoning/reasoning-bootstrap';
-import { runDotSupervisorExtensions } from './dot_supervisor_extensions.js';
+import {
+  runDotSupervisorExtensions,
+  triggerRunnerSource,
+  reconcileDotEventRunnerDuplicate,
+} from './dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
@@ -326,13 +330,6 @@ export function resetDotSweepStateForTests(): void {
   dotSweepInFlight = false;
 }
 
-function triggerRunnerSource(trigger: DueDotTrigger): 'cron' | 'watch' | 'wake' {
-  // probe / event / followup are dot-level kinds; at the runner they are a
-  // wake (an observation or self-scheduled event), same as an inbox row.
-  const kind = trigger.trigger.kind;
-  return kind === 'cron' || kind === 'watch' ? kind : 'wake';
-}
-
 export async function runDotSweepOnce(
   now: Date = new Date(),
   deps: DotSweepDeps = {}
@@ -514,6 +511,9 @@ export async function runDotSweepOnce(
             },
             undefined,
             loaded.charter.scope.tenant_slug
+          );
+          reconcileDotEventRunnerDuplicate(loaded.charter, trigger.key, receipt, () =>
+            dotTriggerRunner.records()
           );
           if (receipt.status === 'delivered') {
             delivered += 1;
