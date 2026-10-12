@@ -6,6 +6,7 @@
 import * as nodePath from 'node:path';
 import type { AgentContextMode } from '../context-boundary.js';
 import { readCanonicalWorkGraph } from '../workforce/work-graph-projection.js';
+import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   listWorkItems,
@@ -206,7 +207,19 @@ export function resolveAssigneePeerId(input: {
   teamRole?: string;
 }): string | undefined {
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
+  const configured = input.teamRole
+    ? readMissionTeamSelectionDispatch({ missionId: input.missionId, teamRole: input.teamRole })
+    : null;
   const resolved = metadata.resolved_agent_id;
+  if (configured?.requested_selection?.mode === 'fixed') {
+    const prior = typeof resolved === 'string' && resolved ? resolved : input.item.assignee_peer_id;
+    if (prior && prior !== configured.agent_id) {
+      throw new Error(
+        '[MISSION_TEAM_SELECTION_INVALID] Existing work-item owner conflicts with fixed role selection.'
+      );
+    }
+    return configured.agent_id || undefined;
+  }
   if (typeof resolved === 'string' && resolved) return resolved;
   if (input.item.assignee_peer_id) return input.item.assignee_peer_id;
   if (input.teamRole) {

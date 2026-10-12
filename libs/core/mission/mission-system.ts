@@ -39,6 +39,10 @@ import {
   showMissionTeam as _showMissionTeam,
   staffMissionTeam as _staffMissionTeam,
 } from './mission-runtime.js';
+import {
+  previewMissionTeamSelection as _previewMissionTeamSelection,
+  saveMissionTeamSelection as _saveMissionTeamSelection,
+} from './mission-team-selection.js';
 import { distillMission as _distillMission } from './mission-distill.js';
 import type { MissionExecutionSurface } from './mission-execution-surface.js';
 import { reconcileMissionExistingWork as _reconcileMissionExistingWork } from './mission-work-reconciliation.js';
@@ -310,6 +314,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     purgeMissions(dryRun = false, options?: Parameters<typeof _purgeMissions>[2]) {
       return _purgeMissions(rootDir, dryRun, options);
     },
+    previewTeamSelection: _previewMissionTeamSelection,
+    saveTeamSelection: _saveMissionTeamSelection,
     showMissionTeam(id: string, refresh = false, providerPreference?: TeamProviderPreference) {
       return _showMissionTeam(id, refresh, rootDir, providerPreference);
     },

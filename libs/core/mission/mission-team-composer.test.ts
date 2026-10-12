@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
@@ -32,7 +32,12 @@ function seedPublicMissionState(missionPath: string, missionId: string): void {
     priority: 1,
     assigned_persona: 'worker',
     confidence_score: 1,
-    git: { branch: `mission/${missionId}`, start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+    git: {
+      branch: `mission/${missionId}`,
+      start_commit: 'a',
+      latest_commit: 'a',
+      checkpoints: [],
+    },
     history: [],
   } as never);
 }
@@ -310,11 +315,21 @@ describe('mission-team-composer classification integration', () => {
         missionType: 'development',
         tier: 'public',
       });
-      writeMissionTeamPlan(missionPath, { ...plan, mission_id: 'MSN-OTHER-001' });
+      // Seed deliberately corrupt persisted fixtures outside the governed writer.
+      safeWriteFile(
+        `${missionPath}/team-composition.json`,
+        JSON.stringify({ ...plan, mission_id: 'MSN-OTHER-001' })
+      );
 
       expect(() => loadMissionTeamPlan(missionId)).toThrow('[MISSION_TEAM_PLAN_SCOPE_MISMATCH]');
+      expect(() => writeMissionTeamPlan(missionPath, plan)).toThrow(
+        '[MISSION_TEAM_PLAN_SCOPE_MISMATCH]'
+      );
 
-      writeMissionTeamPlan(missionPath, { ...plan, assignments: null as never });
+      safeWriteFile(
+        `${missionPath}/team-composition.json`,
+        JSON.stringify({ ...plan, assignments: null })
+      );
       expect(() => loadMissionTeamPlan(missionId)).toThrow(/Invalid catalog mission-team-plan/);
     } finally {
       safeRmSync(missionPath, { recursive: true, force: true });

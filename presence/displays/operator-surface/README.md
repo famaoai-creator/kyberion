@@ -1,140 +1,112 @@
-# Minimum Operator Surface (MOS)
+# Operator Web Surface
 
-Read-only Web operator surface for Kyberion. CLI is the primary interface;
-this app exists to give operators and non-operator stakeholders (CEO,
-compliance) a visual view of mission state, audit chain, and health
-**without** introducing a mutation surface.
+The Operator Web surface shows mission state, audit history, health, surface guidance,
+knowledge, inbox entries, and reasoning settings. CLI remains available for broader
+mission operations. This app now has narrowly scoped, governed selection mutations;
+it is no longer an entirely read-only application.
 
-Strategy: [`knowledge/product/architecture/operator-surface-strategy.md`](../../../knowledge/product/architecture/operator-surface-strategy.md)
+## Selection pages and exact write boundary
 
-## What this MVP includes
+- /missions/:id: inspect each team role's requested and effective agent identity,
+  provider, model, source and reason, with a separate current-eligibility warning if the
+  stored target becomes unavailable. Authenticated administrators can preview and save
+  auto/preferred/fixed selections. Agent identity is separate from provider and model.
+- /reasoning: inspect and edit each role's runtime selection, independent of mission
+  actors. An omitted model remains automatic; fixed applies only to requested dimensions.
+- Existing inbox acceptance/read-status mutations retain their existing guard.
 
-| Page                | Purpose                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| `/`                 | Mission list, scoped by `KYBERION_TENANT`                                             |
-| `/missions/:id`     | Mission detail: history, checkpoints, evidence, copy-able commands                    |
-| `/audit`            | Audit-chain timeline (filtered by tenant)                                             |
-| `/health`           | Mission counts, recent audit volume, override events                                  |
-| `/surfaces`         | Read-only surface concierge: auth boundary, runtime state, scenario fit, next command |
-| `/intent-snapshots` | Read-only intent history with consecutive-snapshot drift summaries                    |
-| `/knowledge`        | Public-tier knowledge browser                                                         |
+GET /api/missions/:id/selection and GET /api/reasoning/selection return secret-free
+cached projections. POST to these exact paths accepts only action, role, selection and
+expectedRevision, plus expectedPreviewToken for mission saves. Preview is read-only: no settings writes, provider discovery, model
+calls or runtime launches. Save delegates to the core mission-lifecycle or reasoning
+selection facade, which owns validation, locking, revision checks, persistence and audit.
+Only authorized reasoning saves enter the dedicated reasoning_settings_writer context,
+bounded to the selection file, previous backup and history. Preview never enters that role.
+No browser request can choose a filesystem path, destination URL or authorization scope.
+Mission saves also require the explicit preview decision token; the facade recomputes the
+choice under its lock and rejects a changed target. This token is not authorization.
 
-The data layer (`src/lib/data.ts`) imports **only** read APIs from
-`@agent/core/secure-io`:
+Selection POST requests require all of:
 
-```ts
-import {
-  safeReadFile,
-  safeReaddir,
-  safeExistsSync,
-  safeLstat,
-  pathResolver,
-} from '@agent/core/secure-io';
-```
+1. A server-resolved authenticated localadmin principal. Anonymous/loopback viewers
+   remain read-only, even on localhost. The app does not manufacture credentials.
+2. Same-origin Origin on every request, including bearer-authenticated calls; cross-site
+   requests are rejected. Authentication comes from the existing session/credential seam.
+3. Server-derived target scope. Mission tier, tenant, organization and project are checked
+   against the real mission before mission_controller is entered; the facade rechecks the
+   expected mission scope and content revision under its mutation fence. Explicit and
+   persisted server scope further narrow access; no Git or working-directory inference
+   is used by this guard. Missing scoped
+   dimensions and conflicting mission bindings fail closed.
+4. Global scope in all dimensions for the global reasoning store. Tenant-, organization-,
+   project- or tier-scoped administrators cannot write global runtime settings. Any explicit
+   or persisted server tenant/organization/project/mission/task/tier binding also denies
+   global settings writes; invalid scope fails closed.
+5. A matching revision. Stale updates return HTTP 409; the UI requires reload and a new
+   preview. Active mission ownership and unavailable fixed targets remain governed errors.
 
-A contract test (`test/no-write-api.test.ts`) scans every TS / TSX file
-under `src/` and fails if any of `safeWriteFile`, `safeMkdir`,
-`safeAppendFileSync`, etc. appear. This guard is acceptance-gating per
-[`operator-surface-strategy.md` §9.1](../../../knowledge/product/architecture/operator-surface-strategy.md#91-security-baseline-mandatory-before-any-external-exposure).
+The browser requires preview before save, blocks repeated in-flight writes, clears stale
+previews after edits, and ignores late responses after cancel/navigation. Cancel aborts a
+preview; it is disabled while a save may already have committed. Back/Forward and restored
+pages refresh their snapshot. Read-only viewers receive no editing controls.
 
-## Acceptance criteria status
+## Local development and browser QA
 
-From [`operator-surface-strategy.md` §9](../../../knowledge/product/architecture/operator-surface-strategy.md#9-acceptance-criteria-for-mos-shipped):
+Run from this directory with existing workspace dependencies:
 
-- [x] No write API in the app's network surface
-- [x] Renders mission list, mission detail, audit timeline, health,
-      knowledge index
-- [x] Multi-tenant: `KYBERION_TENANT` filters all data sources
-- [x] Actions surfaced via copy-able `suggested_command`
-- [x] CI runs MOS-side tests as part of `pnpm run validate`
-      (`check:mos-no-write-api` step in root validate)
+    pnpm next dev -H 127.0.0.1 -p 3331
 
-§9.1 Security baseline (mandatory before external exposure):
+Use the existing sign-in workflow for a real authorized administrator. Do not add fake
+credentials or edit live settings to test the UI. Loopback alone grants only read access.
 
-- [x] Filesystem read sandbox: write APIs are statically forbidden
-      (no-write-api.test.ts)
-- [x] SSRF guard: outbound network primitives statically forbidden
-      (ssrf-guard.test.ts — fetch / node:http / axios / node-fetch /
-      undici imports all rejected)
-- [x] `mos.read` audit events — every Server Component page emits a
-      `mos.read` audit-chain event via the single `src/lib/audit-mos.ts`
-      chokepoint; the contract test enforces that no other source file
-      touches `auditChain.record`. The OS projection is recorded separately
-      as `resource_kind=os_control_plane`.
-- [ ] WAF placement — deployment-time concern, see §Deployment below
-- [ ] Client cert / OIDC + tenant scope — deployment-time, see §Auth
-- [ ] Independent auth review — deployment-time
+A separate, synthetic browser app lives under test/browser. It renders the real selection
+component with in-memory fixtures and never imports production auth, API or settings stores:
 
-The remaining items are deployment posture, not code; document them in
-the operator's runbook before exposing the MOS beyond loopback.
+    pnpm exec next dev test/browser --hostname 127.0.0.1 --port 3342 --webpack
 
-## Local development
+Open http://127.0.0.1:3342. The fixture supplies agent/runtime pages, readonly mode, delayed
+responses, request/write counters and a simulated concurrent revision change. Check keyboard
+labels, preview zero writes, rapid repeated save, cancel during preview, stale-revision reload,
+Back/Forward and light/dark layouts. These are synthetic UI tests, not production access tests.
+The independent API unit tests verify real guard composition using isolated mocks.
 
-```bash
-cd presence/displays/operator-surface
-pnpm install        # if not already
-pnpm dev            # http://localhost:3331
-```
+## Tests and deployment limits
 
-By default the dev server binds to all interfaces. To restrict to
-loopback (recommended for any deployment touching real tenant data):
+    pnpm test
+    pnpm test:no-write-api
 
-```bash
-pnpm next dev -H 127.0.0.1 -p 3331
-```
+The historical no-write-api command now enforces no direct filesystem writes and exactly
+three governed POST route files (inbox plus the two selection endpoints). The SSRF guard
+continues to forbid server outbound network primitives. Its sole fetch exception is the
+client-only transport using fixed same-origin selection paths, with redirects refused.
 
-## Tenant scoping
+All other operational pages stay read-only apart from the existing read-audit chokepoint.
+Mission lifecycle transitions, pipeline execution, security settings, credentials, registry
+editing and deployment remain outside these selection APIs. No arbitrary file-write or
+provider-execution endpoint is introduced.
 
-Set `KYBERION_TENANT` in the environment before starting the server:
+Bind to loopback for development. External exposure still requires the deployment's trusted
+authentication/perimeter configuration and independent security review. The UI does not
+configure a WAF, install identity providers or expand existing role-assumption permissions.
+Existing non-selection data loaders continue to use their documented server tenant filters;
+this change does not claim to redesign every legacy page's authorization model.
 
-```bash
-KYBERION_TENANT=acme-corp pnpm dev
-```
+Opt-in deeper verification from the repository root (after core build):
 
-For a tenant-scoped OS projection, also set a trusted human principal and,
-optionally, the guarded decision surface URL:
+    node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-runtime-smoke.ts
+    node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-browser-smoke.ts
 
-```bash
-KYBERION_TENANT=acme-corp \
-KYBERION_MOS_PRINCIPAL=human:acme-operator \
-KYBERION_OS_GUARDED_SURFACE_URL=https://chronos.example.test \
-pnpm dev
-```
+The runtime smoke copies only public product policy/schema catalogs and synthetic data into
+an isolated root, then checks actual facade persistence and role assumptions under
+SYSTEM_ROLE=operator_surface. The browser smoke needs the separate fixture server and an
+already installed stable Google Chrome. It uses Playwright channel chrome with
+chromiumSandbox:true, logs the actual browser version, and fails rather than falling back
+to a custom executable or launch flags. It never downloads a browser or disables its sandbox.
 
-When set, every loader filters mission state and audit events to that
-tenant only. Public-tier missions remain visible (cross-tenant tooling).
-There is **no UI control** to switch tenants — that boundary is
-intentional.
-
-When unset, the server runs in tenant-agnostic mode and shows all
-non-personal missions. Acceptable for development; not acceptable for
-multi-tenant production. In this mode the OS panel deliberately shows only
-public observations and hides held actions.
-
-## Deployment notes
-
-- **Networking**: bind to loopback or place behind a WAF. The MOS does
-  not implement its own auth — relying on the perimeter (corporate VPN,
-  reverse proxy with OIDC, mTLS) is the documented path.
-- **Per-tenant deployment**: run one MOS process per tenant, each with
-  its own `KYBERION_TENANT`. The server reads `KYBERION_TENANT` once and
-  filters everything; do not expose a multi-tenant aggregate.
-- **No mutating endpoints**: `pnpm test:no-write-api` enforces this.
-  Run it in CI to keep the property over time.
-
-## Tests
-
-```bash
-pnpm test                    # vitest (no-write-api contract)
-pnpm test:no-write-api       # alias
-```
-
-## What is intentionally out of scope
-
-- Editing mission state. Use `mission_controller` CLI.
-- Approving / rejecting memory candidates. Use `memory-approve` CLI.
-- Triggering pipelines. Use `pnpm pipeline ...`.
-- Cross-tenant aggregation views.
-- Public exposure without a WAF / auth perimeter.
-
-These omissions are not gaps — they are the design.
+The package includes one explicitly GitHub-hosted browser test. Local runs (including
+CI=true) list it as skipped and do not establish browser validation. The existing hosted
+full-check lane requires both CI=true and GITHUB_ACTIONS=true and uses stable Chrome
+already supplied by the Ubuntu runner image. The test starts its isolated fixture,
+exercises real browser flows, and fails on missing/failed browser launch. A hosted browser pass
+is required before claiming these flows verified. Its 120-second budget covers bounded
+startup 45s, scenarios 65s and cleanup 5s; no exception converts a browser failure to success.

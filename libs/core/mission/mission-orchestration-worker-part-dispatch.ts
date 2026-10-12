@@ -1,3 +1,4 @@
+import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import { sanitizeIdSegment } from '../foundation/text.js';
 import { agentRegistry } from '../agent/agent-registry.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';
@@ -849,6 +850,9 @@ export interface DispatchPlannedMissionTaskInput {
     selection_reason_codes?: string[];
     provider?: string | null;
     modelId?: string | null;
+    requested_selection?: MissionTeamAssignment['requested_selection'];
+    selection_resolution?: MissionTeamAssignment['selection_resolution'];
+    required_capabilities?: MissionTeamAssignment['required_capabilities'];
   };
   allTasks: PlannedNextTask[];
   upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>;

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 
 // Capture the metrics logger only; tier-guard and secure-io stay REAL here.
 const warnings = vi.hoisted(() => [] as string[]);
@@ -17,7 +18,11 @@ vi.mock('./logger.js', async (importOriginal) => {
   };
 });
 
-import { MetricsCollector, RESOURCE_USAGE_LEDGER_ROOT } from './metrics.js';
+import {
+  MetricsCollector,
+  METRICS_CAP_READER_ROLE,
+  RESOURCE_USAGE_LEDGER_ROOT,
+} from './metrics.js';
 
 const base = path.join(process.cwd(), 'active/shared/tmp/resource-usage-tenant-binding-test');
 const metricsDir = path.join(base, 'metrics');
@@ -70,20 +75,28 @@ describe('resource-usage ledger under a real tenant binding', () => {
       persist: false,
     });
 
-    // Unbound operator: every legacy row is visible (unchanged behavior).
+    // The existing narrow ledger reader supplies read authority, not tenant bypass.
     delete process.env.KYBERION_TENANT;
-    expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual(['legacy-b']);
+    withExecutionContext(METRICS_CAP_READER_ROLE, () => {
+      expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual(['legacy-b']);
+    });
 
     // Bound to tenant-a: tenant-b's legacy rows are withheld in every mode.
     process.env.KYBERION_TENANT = 'tenant-a';
-    expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual([]);
-    expect(
-      ids(mc.loadResourceUsageHistory({ scope: { tier: 'confidential', tenant_slug: 'tenant-b' } }))
-    ).toEqual([]);
-    expect(
-      ids(mc.loadResourceUsageHistory({ scope: { tier: 'confidential', tenant_slug: 'tenant-a' } }))
-    ).toEqual(['legacy-a']);
-    expect(ids(mc.loadResourceUsageHistory({ all: true }))).toEqual(['legacy-a', 'sys']);
+    withExecutionContext(METRICS_CAP_READER_ROLE, () => {
+      expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual([]);
+      expect(
+        ids(
+          mc.loadResourceUsageHistory({ scope: { tier: 'confidential', tenant_slug: 'tenant-b' } })
+        )
+      ).toEqual([]);
+      expect(
+        ids(
+          mc.loadResourceUsageHistory({ scope: { tier: 'confidential', tenant_slug: 'tenant-a' } })
+        )
+      ).toEqual(['legacy-a']);
+      expect(ids(mc.loadResourceUsageHistory({ all: true }))).toEqual(['legacy-a', 'sys']);
+    });
   });
 
   it('stamps the bound tenant onto a tenant-less personal/confidential row', () => {

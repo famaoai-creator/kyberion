@@ -7,6 +7,9 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
 import { getAgentIdentity, resetAgentIdentityServiceForTests } from './agent-identity.js';
 import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
+import * as providerDiscovery from '../provider/provider-discovery.js';
+import * as providerResolution from './agent-provider-resolution.js';
+import * as execAdapterBridge from './agent-exec-adapter-bridge.js';
 
 describe('agent-lifecycle model routing', () => {
   it('routes task model routing environment reads through the governed accessor', () => {
@@ -18,6 +21,38 @@ describe('agent-lifecycle model routing', () => {
     expect(source).not.toMatch(/env\.KYBERION_/u);
     expect(source).toContain('getRegisteredEnvText');
   });
+
+  it('does not enter explicit selection parsing for absent legacy metadata', () => {
+    const parse = vi
+      .spyOn(providerResolution, 'parseAgentRequestedSelection')
+      .mockImplementation(() => {
+        throw new Error('Legacy requests must not invoke the explicit selection parser');
+      });
+    try {
+      expect(resolveAgentLifecycleModelId({ modelId: 'legacy-model' }, {})).toBe('legacy-model');
+      expect(
+        resolveAgentLifecycleModelId({ modelId: 'legacy-model', runtimeMetadata: {} }, {})
+      ).toBe('legacy-model');
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
+  it.each([null, 'fixed', {}, { mode: 'invalid' }])(
+    'rejects explicitly malformed selection metadata %j',
+    (requested_selection) => {
+      expect(() =>
+        resolveAgentLifecycleModelId(
+          {
+            modelId: 'legacy-model',
+            runtimeMetadata: { requested_selection },
+          },
+          {}
+        )
+      ).toThrow(/AGENT_SELECTION_INVALID/);
+    }
+  );
 
   it('keeps the manifest model in advisory mode', () => {
     expect(
@@ -59,6 +94,42 @@ describe('agent-lifecycle model routing', () => {
         }
       )
     ).toBe('openai:gpt-5.5');
+  });
+
+  it('rejects enforced task model replacement of an explicit fixed model', () => {
+    expect(() =>
+      resolveAgentLifecycleModelId(
+        {
+          modelId: 'exact',
+          runtimeMetadata: {
+            requested_selection: { mode: 'fixed', model_id: 'exact' },
+            task_model_hint: {
+              tier: 'large',
+              effort: 'high',
+              model_id: 'other',
+              route_reason: 'test',
+            },
+          },
+        },
+        { KYBERION_TASK_MODEL_ROUTING: 'enforce' }
+      )
+    ).toThrow(/AGENT_SELECTION_ROUTING_CONFLICT/);
+  });
+
+  it('preserves fixed models in advisory mode and accepts matching enforced hints', () => {
+    const options = {
+      modelId: 'other',
+      runtimeMetadata: {
+        requested_selection: { mode: 'fixed', model_id: 'exact' },
+        task_model_hint: { tier: 'large', effort: 'high', model_id: 'exact', route_reason: 'test' },
+      },
+    };
+    expect(resolveAgentLifecycleModelId(options, { KYBERION_TASK_MODEL_ROUTING: 'advisory' })).toBe(
+      'exact'
+    );
+    expect(resolveAgentLifecycleModelId(options, { KYBERION_TASK_MODEL_ROUTING: 'enforce' })).toBe(
+      'exact'
+    );
   });
 
   it('uses the trust engine score instead of a fixed bootstrap value', () => {
@@ -168,6 +239,129 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     });
     await agentLifecycle.shutdown(agentId);
   });
+  it('launches, asks and restarts a fake adapter with the exact fixed model', async () => {
+    const agentId = 'fixed-exact-adapter-agent';
+    vi.spyOn(providerDiscovery, 'discoverProviders').mockReturnValue([
+      {
+        provider: 'codex',
+        installed: true,
+        healthy: true,
+        version: 'test',
+        protocol: 'exec',
+        models: ['exact', 'alternative'],
+        capabilities: ['terminal'],
+        modelCapabilities: { exact: ['code'], alternative: ['code'] },
+      },
+    ]);
+    const boot = vi.fn(async () => undefined);
+    const ask = vi.fn(async () => ({ text: 'exact response', stopReason: 'completed' }));
+    const shutdown = vi.fn(async () => undefined);
+    vi.spyOn(execAdapterBridge, 'hasAgentExecAdapter').mockResolvedValue(true);
+    const create = vi
+      .spyOn(execAdapterBridge, 'createAgentExecAdapter')
+      .mockResolvedValue({ boot, ask, shutdown });
+    vi.stubEnv('KYBERION_TASK_MODEL_ROUTING', 'advisory');
+    try {
+      const firstHandle = await agentLifecycle.spawn({
+        agentId,
+        provider: 'codex',
+        modelId: 'exact',
+        runtimeMetadata: {
+          requested_selection: { mode: 'preferred', provider: 'codex', model_id: 'exact' },
+          required_capabilities: ['code', 'terminal'],
+        },
+      });
+      agentRegistry.updateStatus(agentId, 'busy');
+      const handle = await agentLifecycle.spawn({
+        agentId,
+        provider: 'codex',
+        modelId: 'alternative',
+        runtimeMetadata: {
+          requested_selection: {
+            mode: 'fixed',
+            agent_id: agentId,
+            provider: 'codex',
+            model_id: 'exact',
+          },
+          required_capabilities: ['code', 'terminal'],
+          skip_provider_resolution: true,
+          task_model_hint: {
+            tier: 'large',
+            effort: 'high',
+            model_id: 'alternative',
+            route_reason: 'test',
+          },
+        },
+      });
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'codex', modelId: 'exact' })
+      );
+      expect(boot).toHaveBeenCalledOnce();
+      expect(handle).toBe(firstHandle);
+      expect(shutdown).not.toHaveBeenCalled();
+      expect(handle.getRecord()?.metadata?.requested_selection).toMatchObject({
+        mode: 'fixed',
+        model_id: 'exact',
+      });
+      await expect(
+        agentLifecycle.spawn({
+          agentId,
+          provider: 'codex',
+          modelId: 'alternative',
+          runtimeMetadata: {
+            requested_selection: { mode: 'fixed', provider: 'codex', model_id: 'alternative' },
+            required_capabilities: ['code'],
+          },
+        })
+      ).rejects.toThrow(/AGENT_SELECTION_RUNTIME_CONFLICT/);
+      expect(shutdown).not.toHaveBeenCalled();
+      expect(create).toHaveBeenCalledOnce();
+      expect(await handle.ask('use the selected model')).toBe('exact response');
+      expect(ask).toHaveBeenCalledWith('use the selected model');
+      expect(handle.getRecord()).toMatchObject({ provider: 'codex', modelId: 'exact' });
+      await agentLifecycle.restart(agentId);
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(
+        create.mock.calls.every(
+          ([request]) => request.provider === 'codex' && request.modelId === 'exact'
+        )
+      ).toBe(true);
+    } finally {
+      await agentLifecycle.shutdown(agentId);
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('cannot bypass explicit fixed availability using skip_provider_resolution', async () => {
+    vi.spyOn(providerDiscovery, 'discoverProviders').mockReturnValue([]);
+    await expect(
+      agentLifecycle.spawn({
+        agentId: 'fixed-unavailable-agent',
+        provider: 'claude',
+        modelId: 'exact',
+        runtimeMetadata: {
+          skip_provider_resolution: true,
+          requested_selection: { mode: 'fixed', provider: 'claude', model_id: 'exact' },
+          required_capabilities: [],
+        },
+      })
+    ).rejects.toThrow(/AGENT_SELECTION_PROVIDER_UNAVAILABLE/);
+    expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
+    expect(agentRegistry.get('fixed-unavailable-agent')).toBeUndefined();
+  });
+
+  it('keeps fixed agent identity distinct from a provider target', async () => {
+    await expect(
+      agentLifecycle.spawn({
+        agentId: 'actual-agent',
+        provider: 'codex',
+        modelId: 'exact',
+        runtimeMetadata: { requested_selection: { mode: 'fixed', agent_id: 'different-agent' } },
+      })
+    ).rejects.toThrow(/AGENT_SELECTION_IDENTITY_CONFLICT/);
+    expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
+  });
+
   it('fails closed when a tool-less runtime is requested from a provider that cannot disable tools', async () => {
     await expect(
       agentLifecycle.spawn({

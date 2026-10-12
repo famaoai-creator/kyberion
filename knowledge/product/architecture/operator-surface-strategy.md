@@ -1,9 +1,9 @@
 ---
-title: Operator Surface Strategy (CLI + Read-only Web)
+title: Operator Surface Strategy (CLI + Governed Operator Web)
 category: Architecture
 tags: [ui, surface, operator, cli, web, strategy]
 importance: 8
-last_updated: 2026-04-27
+last_updated: 2026-10-12
 ---
 
 # Operator Surface Strategy
@@ -18,21 +18,24 @@ _surfaces_ that boundary lives on.
 
 ## 1. Stance
 
-**CLI / pipeline first. Read-only web second. No mutating GUI.**
+**CLI / pipeline first. Observation-first web with narrowly governed settings.**
 
-In one sentence: **commands enter through CLI; state is observed through
-read-only web; mutations to mission state never originate from a Web UI**.
+Most commands enter through CLI and state is observed through the Operator Web.
+The explicit exceptions are inbox acknowledgement and authenticated administrator
+selection settings: per-mission actor choices and per-reasoning-role runtime
+choices. These delegate to existing governed core facades; they do not start
+missions, spawn agents, execute reasoning, change credentials or grant authority.
 
 ## 2. Surface Tiers
 
-| Tier      | Surface                                             | Who                   | Mutates state?                      |
-| --------- | --------------------------------------------------- | --------------------- | ----------------------------------- |
-| Primary   | `claude` / `codex` / `gemini` CLI + `pnpm pipeline` | Operators, agents     | Yes — primary entry                 |
-| Primary   | `mission_controller` CLI                            | Operators             | Yes — mission lifecycle             |
-| Secondary | Read-only mission status viewer (web)               | Operators, leadership | No — view only                      |
-| Secondary | `chronos-mirror-v2` (presence display)              | Stakeholders          | No — passive feed                   |
-| Tertiary  | Mobile / WebView surfaces (handoff target)          | Operators in motion   | Limited — handoff-imported sessions |
-| Forbidden | Public-facing web admin UI                          | —                     | Never                               |
+| Tier      | Surface                                             | Who                   | Mutates state?                                            |
+| --------- | --------------------------------------------------- | --------------------- | --------------------------------------------------------- |
+| Primary   | `claude` / `codex` / `gemini` CLI + `pnpm pipeline` | Operators, agents     | Yes — primary entry                                       |
+| Primary   | `mission_controller` CLI                            | Operators             | Yes — mission lifecycle                                   |
+| Secondary | Operator Web                                        | Operators, leadership | Observation; scoped administrator selection settings only |
+| Secondary | `chronos-mirror-v2` (presence display)              | Stakeholders          | No — passive feed                                         |
+| Tertiary  | Mobile / WebView surfaces (handoff target)          | Operators in motion   | Limited — handoff-imported sessions                       |
+| Forbidden | Public-facing web admin UI                          | —                     | Never                                                     |
 
 ## 3. Why CLI-first
 
@@ -61,7 +64,7 @@ auditability invariant.
 
 A single Next.js app under `presence/displays/operator-surface/` (planned —
 not yet implemented) renders the following from filesystem + audit-chain
-**without ever issuing a write**:
+with observation-first pages and the bounded settings exceptions above:
 
 ### 5.1 Pages
 
@@ -85,7 +88,10 @@ filesystem (via secure-io read APIs)
   - knowledge/product/evolution/*.md
 ```
 
-No write APIs. Everything mutating routes through CLI.
+Only the enumerated inbox and selection-settings endpoints may mutate. Mission
+selection writes enter the mission lifecycle facade; reasoning writes enter the
+shared revisioned configuration service. The Web must never write their stores
+directly. Preview is read-only and must not launch discovery probes or providers.
 
 ### 5.3 Auth model
 
@@ -93,13 +99,21 @@ No write APIs. Everything mutating routes through CLI.
 - Multi-tenant deployment: reverse-proxy with auth, scope each session to
   one `KYBERION_TENANT`. The app reads `KYBERION_TENANT` from env and
   filters all data sources accordingly.
-- No write endpoints means no CSRF surface and no privilege boundary
-  beyond filesystem permissions.
+- Settings mutations require an authenticated administrator, same-origin/CSRF
+  validation and server-derived tenant, organization and project scope.
+- Credential-free loopback access remains read-only. Client scope parameters
+  can narrow authorization, never create it.
+- The shared global reasoning configuration is writable only by an unscoped
+  administrator; scoped administrators must not acquire global write access.
 
-### 5.4 Action affordances (without mutation)
+### 5.4 Action affordances
 
 Where the user might want to act, the page renders a **`suggested_command`**
-they can copy into their CLI — never a button that calls an API.
+they can copy into their CLI. The bounded selection editors additionally provide
+edit, read-only preview, save and cancel. They show the requested and effective
+choice, its source and any rejection or fallback reason. Saves reject stale
+revisions and retain an audit trail; changing settings never replaces an active
+task owner.
 
 This matches the `Next Action Contract` from
 [`USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md):
@@ -118,9 +132,9 @@ job is to make filesystem + audit-chain readable.
 
 ## 7. Anti-patterns (do not build)
 
-1. **Web-issued mission mutations** — e.g. "approve" button that calls a
-   server endpoint that runs `mission_controller verify`. Always route
-   such a request through the operator's local CLI.
+1. **Unbounded Web-issued mission mutations** — e.g. a button running
+   `mission_controller verify`, dispatch or arbitrary CLI commands. Selection
+   settings use their dedicated facade only; lifecycle actions stay in the CLI.
 2. **Server-side reasoning backend** — e.g. a web form that triggers
    `pnpm pipeline ...` on a shared host. Pipelines run under a specific
    persona context; centralizing them muddies authority.
@@ -150,12 +164,14 @@ When the MOS is finally built:
 
 The MOS is considered shipped when **all** hold:
 
-- [ ] No write API in the app's network surface (`grep -r 'app/api' app | grep -i 'POST\|PUT\|DELETE'` returns 0).
+- [ ] Mutation routes match the explicit inbox/settings allowlist; all other
+      write APIs are rejected by the boundary test.
 - [ ] Renders mission list, mission detail, audit timeline, intent
       snapshots, health, knowledge index.
 - [ ] Multi-tenant: an operator with `KYBERION_TENANT=acme` cannot see
       another tenant's mission state.
-- [ ] All actions surfaced via copy-able `suggested_command`.
+- [ ] Lifecycle actions use copy-able `suggested_command`; settings use
+      authenticated, scoped, revision-checked editors.
 - [ ] CI runs MOS-side tests as part of `pnpm run validate`.
 
 ### 9.1 Security baseline (mandatory before any external exposure)

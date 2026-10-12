@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -10,6 +12,7 @@ import {
   type MissionTeamAssignment,
   type RoleSeparationConstraints,
   type TeamProviderPreference,
+  type MissionTeamRoleSelection,
 } from '../organization/team-role-assignment-selection.js';
 import { resolveTaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { collectWorkforceLoad } from '../workforce/workforce-load.js';
@@ -43,11 +46,12 @@ import {
   resolveParticipantContext,
   type ParticipantRisk,
 } from '../participant-context-resolver.js';
-import { discoverProviders } from '../provider/provider-discovery.js';
+import { discoverProviders, type ProviderInfo } from '../provider/provider-discovery.js';
 import { isObsoleteAgentRuntimeProvider } from '../provider/provider-config.js';
 import type { ScopeContext } from '../scope-context.js';
 
 export interface MissionTeamPlan {
+  selection_settings?: Record<string, MissionTeamRoleSelection>;
   mission_id: string;
   mission_type: string;
   tier: string;
@@ -161,6 +165,8 @@ export interface ResolveMissionTeamOptions {
   scope?: ScopeContext;
   forceRefresh?: boolean;
   providerPreference?: TeamProviderPreference;
+  selectionSettings?: Record<string, MissionTeamRoleSelection>;
+  discoveredProviders?: ProviderInfo[];
 }
 
 function loadMissionTenantSlug(missionId: string): string | undefined {
@@ -256,7 +262,7 @@ function buildTeamGovernance(
   };
 }
 
-function enrichAssignmentContext(input: {
+export function enrichAssignmentContext(input: {
   assignment: MissionTeamAssignment;
   missionId: string;
   tier: 'personal' | 'confidential' | 'public';
@@ -346,7 +352,7 @@ export const SEPARATION_ROLE_PAIRS: ReadonlyArray<{
  * added mid-mission is held to the same independence rules as one selected at
  * creation.
  */
-function resolveRoleSeparation(
+export function resolveRoleSeparation(
   role: string,
   holders: Map<string, RoleHolder>
 ): RoleSeparationConstraints | undefined {
@@ -397,6 +403,8 @@ export function composeMissionTeamPlan(input: {
   organizationProfile?: OrganizationProfile | null;
   scope?: ScopeContext;
   providerPreference?: TeamProviderPreference;
+  selectionSettings?: Record<string, MissionTeamRoleSelection>;
+  discoveredProviders?: ProviderInfo[];
 }): MissionTeamPlan {
   const organizationProfile = input.organizationProfile ?? loadOrganizationProfile();
   const tenantSlug = input.tenantSlug?.trim() || 'default';
@@ -572,7 +580,10 @@ export function composeMissionTeamPlan(input: {
       routingHint: missionTaskModelHint,
       separation: separationForRole(role),
       organizationId: organizationProfile?.organization_id,
+      tier: input.tier,
       providerPreference,
+      requestedSelection: input.selectionSettings?.[role],
+      discoveredProviders: input.discoveredProviders,
       loadIndex,
     });
     recordAssignment(role, selected);
@@ -594,6 +605,7 @@ export function composeMissionTeamPlan(input: {
 
   return {
     mission_id: input.missionId,
+    ...(input.selectionSettings ? { selection_settings: input.selectionSettings } : {}),
     mission_type: missionType,
     tier: input.tier,
     tenant_slug: tenantSlug,
@@ -660,11 +672,60 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
   };
 }
 
-export function writeMissionTeamPlan(missionDir: string, plan: MissionTeamPlan): string {
+export function missionTeamPlanRevision(plan: MissionTeamPlan): string {
+  return createHash('sha256').update(JSON.stringify(plan)).digest('hex');
+}
+
+const heldTeamPlanMutations = new Set<string>();
+
+/** Every plan writer shares the fence used by revision-checked operator saves. */
+export function withMissionTeamPlanMutation<T>(missionDir: string, fn: () => T): T {
+  const key = assertSafeRepositoryPath(path.join(missionDir, 'team-composition.json'), {
+    allowMissingLeaf: true,
+  });
+  if (heldTeamPlanMutations.has(key)) return fn();
+  return withLockSync('mission-team-plan:' + createHash('sha256').update(key).digest('hex'), () => {
+    heldTeamPlanMutations.add(key);
+    try {
+      return fn();
+    } finally {
+      heldTeamPlanMutations.delete(key);
+    }
+  });
+}
+
+export function writeMissionTeamPlan(
+  missionDir: string,
+  plan: MissionTeamPlan,
+  options?: { expectedRevision?: string }
+): string {
+  return withMissionTeamPlanMutation(missionDir, () =>
+    writeMissionTeamPlanLocked(missionDir, plan, options)
+  );
+}
+
+function writeMissionTeamPlanLocked(
+  missionDir: string,
+  plan: MissionTeamPlan,
+  options?: { expectedRevision?: string }
+): string {
   const targetPath = assertSafeRepositoryPath(path.join(missionDir, 'team-composition.json'), {
     allowMissingLeaf: true,
   });
   const safeMissionPath = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+  if (safeExistsSync(targetPath)) {
+    const current = loadMissionTeamPlanAtPath(targetPath, plan.mission_id);
+    if (
+      options?.expectedRevision
+        ? missionTeamPlanRevision(current) !== options.expectedRevision
+        : JSON.stringify(current.selection_settings || {}) !==
+          JSON.stringify(plan.selection_settings || {})
+    ) {
+      throw new Error(
+        '[MISSION_TEAM_SELECTION_STALE] Team selection changed before plan write; refresh the plan.'
+      );
+    }
+  }
   writeProvisionedJson({
     missionId: plan.mission_id,
     filePath: targetPath,
@@ -698,6 +759,7 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
     return null;
   }
   if (
+    !plan.selection_settings &&
     plan.assignments.some(
       (assignment) =>
         assignment.status !== 'unfilled' &&
@@ -712,7 +774,8 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
 export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): MissionTeamPlan {
   const missionId = input.missionId.toUpperCase();
   const tenantSlug = input.tenantSlug?.trim() || loadMissionTenantSlug(missionId);
-  const existing = input.forceRefresh ? null : loadMissionTeamPlan(missionId);
+  const previousPlan = loadMissionTeamPlan(missionId);
+  const existing = input.forceRefresh ? null : previousPlan;
   if (existing && (!tenantSlug || existing.tenant_slug === tenantSlug)) return existing;
 
   const recomposed = composeMissionTeamPlan({
@@ -729,13 +792,32 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
     ...(tenantSlug ? { tenantSlug } : {}),
     organizationProfile: input.organizationProfile,
     providerPreference: input.providerPreference,
+    selectionSettings: input.selectionSettings ?? previousPlan?.selection_settings,
+    discoveredProviders: input.discoveredProviders,
+    scope: input.scope,
   });
 
   // TC-01: recomposition must not un-staff members who are already working.
   // A refresh re-derives the roster and may re-select actors, but a role the
   // mission had already staffed stays staffed.
-  const previousPlan = existing ?? loadMissionTeamPlan(missionId);
   if (!previousPlan) return recomposed;
+  if (previousPlan.selection_settings) {
+    // Refresh may update diagnostics, but only an idle, revision-checked operator
+    // save may replace an already staffed actor or its execution target.
+    recomposed.assignments = recomposed.assignments.map((assignment) => {
+      const prior = previousPlan.assignments.find(
+        (entry) => entry.team_role === assignment.team_role
+      );
+      return prior?.status === 'assigned'
+        ? {
+            ...prior,
+            requested_selection:
+              previousPlan.selection_settings?.[assignment.team_role] || prior.requested_selection,
+            selection_resolution: assignment.selection_resolution || prior.selection_resolution,
+          }
+        : assignment;
+    });
+  }
 
   // TC-06: a restaffed member is a recorded governance decision with a ledger
   // entry behind it, not an artifact of the template. Recomposition derives
@@ -948,7 +1030,9 @@ export function extendMissionTeamPlanRoster(
     routingHint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
     separation: { ...(separation || {}), excludeAgents },
     organizationId: plan.organization_profile?.organization_id,
+    tier: plan.tier,
     loadIndex: collectWorkforceLoad(),
+    requestedSelection: plan.selection_settings?.[teamRole],
   });
   if (selected.status !== 'assigned' || !selected.agent_id) {
     return { plan, added: null, refusal: 'no_compatible_actor' };
@@ -1103,7 +1187,10 @@ export function resolveMissionTeamReceiver(input: {
       (input.requiredCapabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
     )
   );
-  if (excludedAgentIds.size === 0 && requiredCapabilities.length === 0) return assignment;
+  const requestedSelection =
+    plan.selection_settings?.[input.teamRole] || assignment.requested_selection;
+  if (!requestedSelection && excludedAgentIds.size === 0 && requiredCapabilities.length === 0)
+    return assignment;
 
   const agents = loadAgentProfileIndex();
   const currentProfile = agents[assignment.agent_id];
@@ -1111,6 +1198,7 @@ export function resolveMissionTeamReceiver(input: {
     (currentProfile?.capabilities || []).map((entry) => entry.trim().toLowerCase())
   );
   if (
+    !requestedSelection &&
     !excludedAgentIds.has(assignment.agent_id.toLowerCase()) &&
     requiredCapabilities.every((capability) => currentCapabilities.has(capability))
   ) {
@@ -1134,6 +1222,10 @@ export function resolveMissionTeamReceiver(input: {
     agents: eligibleAgents,
     routingHint: assignment.model_hint,
     loadIndex: collectWorkforceLoad(),
+    requestedSelection,
+    tier: plan.tier,
+    organizationId: plan.organization_profile?.organization_id,
+    separation: { excludeAgents: input.excludedAgentIds },
   });
   if (selected.status !== 'assigned' || !selected.agent_id) return null;
   const selectedCapabilities = new Set(

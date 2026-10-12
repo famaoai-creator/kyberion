@@ -1,4 +1,8 @@
 import { notFound } from 'next/navigation';
+import SelectionSettings from '@/components/SelectionSettings';
+import { requireOperatorViewer } from '@/lib/viewer-context';
+import { getMissionSelectionSnapshot } from '@/lib/selection-service';
+import { requireSelectionMission, SelectionAccessError } from '@/lib/selection-access';
 import {
   Badge,
   EmptyState,
@@ -29,6 +33,19 @@ const INTENTS = ['verify', 'distill', 'finish', 'export-bundle', 'view-evidence'
 
 export default async function MissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const viewer = await requireOperatorViewer();
+  try {
+    requireSelectionMission(viewer, id);
+  } catch (error) {
+    if (error instanceof SelectionAccessError) notFound();
+    throw error;
+  }
+  let selection = null;
+  try {
+    selection = getMissionSelectionSnapshot(viewer, id);
+  } catch {
+    /* A missing legacy team plan must not hide the mission detail. */
+  }
   const detail = getMissionDetail(id);
   if (!detail) notFound();
   emitMosRead({
@@ -61,6 +78,18 @@ export default async function MissionDetailPage({ params }: { params: Promise<{ 
         <Badge label={tierLabel(detail.tier, t)} tone={tierTone(detail.tier)} />
         {detail.tenant_slug ? <Badge label={detail.tenant_slug} tone="neutral" /> : null}
       </div>
+
+      {selection ? (
+        <SelectionSettings
+          target={{ kind: 'mission', missionId: id }}
+          initial={selection}
+          locale={locale}
+        />
+      ) : (
+        <Section title={t('selection_actor_title')}>
+          <p role="status">{t('selection_error')}</p>
+        </Section>
+      )}
 
       <Grid min_column_width="lg" gap="md">
         <Section title={t('detail_overview_title')}>

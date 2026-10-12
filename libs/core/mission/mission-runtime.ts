@@ -446,3 +446,10 @@ export async function adviseMission(
   );
   return consultation;
 }
+
+export type {
+  MissionTeamRoleSelection,
+  MissionTeamSelectionView,
+  PreviewMissionTeamSelectionInput,
+  SaveMissionTeamSelectionInput,
+} from './mission-team-selection.js';

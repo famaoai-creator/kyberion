@@ -511,6 +511,9 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_completed',
     agent_id: resolvedAgentId,
+    ...(snapshot?.agent.spawnedAt !== undefined
+      ? { runtime_generation: snapshot.agent.spawnedAt }
+      : {}),
     mission_id: options.missionId,
     scope: runtimeScope,
     requested_by: options.requestedBy,
@@ -525,12 +528,16 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
 registerAgentRuntimeEnsurer(ensureAgentRuntime);
 
 export async function stopAgentRuntime(agentId: string, requestedBy: string): Promise<void> {
-  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
+  const record = getAgentRuntimeHandle(agentId)?.getRecord();
+  const scope = record?.scope;
+  // Capture instance identity before shutdown unregisters the live record.
+  const runtimeGeneration = record?.spawnedAt;
   appendSupervisorEvent({
     decision: 'agent_runtime_stop_requested',
     agent_id: agentId,
     requested_by: requestedBy,
     scope,
+    ...(runtimeGeneration !== undefined ? { runtime_generation: runtimeGeneration } : {}),
   });
   await agentLifecycle.shutdown(agentId);
   appendSupervisorEvent({
@@ -538,6 +545,7 @@ export async function stopAgentRuntime(agentId: string, requestedBy: string): Pr
     agent_id: agentId,
     requested_by: requestedBy,
     scope,
+    ...(runtimeGeneration !== undefined ? { runtime_generation: runtimeGeneration } : {}),
   });
 }
 

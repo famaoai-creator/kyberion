@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
   const ensureAgentRuntime = vi.fn();
   const ensureAgentRuntimeViaDaemon = vi.fn();
   const staffMissionTeamRoles = vi.fn();
+  const reserveMissionTeamSelectionDispatch = vi.fn();
 
   return {
     loadMissionTeamPlan,
@@ -15,31 +16,38 @@ const mocks = vi.hoisted(() => {
     ensureAgentRuntime,
     ensureAgentRuntimeViaDaemon,
     staffMissionTeamRoles,
+    reserveMissionTeamSelectionDispatch,
   };
 });
 
-vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
+vi.mock('./mission-team-plan-composer.js', () => ({
   loadMissionTeamPlan: mocks.loadMissionTeamPlan,
   loadAgentProfileIndex: mocks.loadAgentProfileIndex,
 }));
 
 // TC-02: staffing standby roles is the binding layer's job; the orchestrator
 // only asks for it and then materializes what came back staffed.
-vi.mock('../libs/core/mission/mission-team-binding.js', () => ({
+vi.mock('./mission-team-binding.js', () => ({
   staffMissionTeamRoles: mocks.staffMissionTeamRoles,
 }));
 
-vi.mock('../libs/core/agent/agent-registry.js', () => ({
+// Keep this orchestration unit focused on staffing, reservation, and runtime wiring.
+// The selection suite exercises the real strict lookup and durable reservation fence.
+vi.mock('./mission-team-selection.js', () => ({
+  reserveMissionTeamSelectionDispatch: mocks.reserveMissionTeamSelectionDispatch,
+}));
+
+vi.mock('../agent/agent-registry.js', () => ({
   agentRegistry: {
     get: mocks.get,
   },
 }));
 
-vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
+vi.mock('../agent/agent-runtime-supervisor.js', () => ({
   ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
-vi.mock('../libs/core/agent/agent-runtime-supervisor-client.js', () => ({
+vi.mock('../agent/agent-runtime-supervisor-client.js', () => ({
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
 }));
 
@@ -47,6 +55,7 @@ describe('mission-team-orchestrator', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.reserveMissionTeamSelectionDispatch.mockReturnValue(null);
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.staffMissionTeamRoles.mockImplementation(() => ({
       plan: mocks.loadMissionTeamPlan(),
@@ -90,6 +99,17 @@ describe('mission-team-orchestrator', () => {
       await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
+    expect(mocks.reserveMissionTeamSelectionDispatch).toHaveBeenCalledWith({
+      missionId: 'MSN-TEAM',
+      teamRole: 'owner',
+      agentId: 'nerve-agent',
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      expectedRequestedSelection: null,
+    });
+    expect(mocks.reserveMissionTeamSelectionDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.ensureAgentRuntimeViaDaemon.mock.invocationCallOrder[0]
+    );
     expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledWith(
       expect.objectContaining({
         agentId: 'nerve-agent',
@@ -177,6 +197,7 @@ describe('mission-team-orchestrator', () => {
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
     expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+    expect(mocks.reserveMissionTeamSelectionDispatch).toHaveBeenCalledTimes(1);
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments.map((entry: any) => entry.runtime_status)).toEqual([
       'spawned',
@@ -249,6 +270,14 @@ describe('mission-team-orchestrator', () => {
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments).toHaveLength(1);
     expect(result.assignments[0].team_role).toBe('planner');
+    expect(mocks.reserveMissionTeamSelectionDispatch).toHaveBeenCalledWith({
+      missionId: 'MSN-TEAM',
+      teamRole: 'planner',
+      agentId: 'nerve-agent',
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      expectedRequestedSelection: null,
+    });
     // TC-02: a role-scoped ensure is a staffing demand for exactly those roles.
     expect(mocks.staffMissionTeamRoles).toHaveBeenCalledWith(
       expect.objectContaining({ missionId: 'MSN-TEAM', teamRoles: ['planner'] })

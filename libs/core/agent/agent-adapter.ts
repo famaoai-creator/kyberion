@@ -962,7 +962,7 @@ export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok
 export class CodexAdapter implements AgentAdapter {
   protected enhancers: AgentEnhancer[] = [];
 
-  constructor() {
+  constructor(private readonly options: { model?: string } = {}) {
     this.addEnhancer(new CodexExecutionEnhancer());
   }
 
@@ -985,7 +985,14 @@ export class CodexAdapter implements AgentAdapter {
       const activePermissionArgs = resolveActiveProviderPermissionArgs('codex') ?? [];
       const res = await runCliProcess(
         'npx',
-        ['codex', 'exec', ...activePermissionArgs, '--json', enhanced.prompt],
+        [
+          'codex',
+          'exec',
+          ...activePermissionArgs,
+          ...(this.options.model ? ['--model', this.options.model] : []),
+          '--json',
+          enhanced.prompt,
+        ],
         {
           env: safeChildEnv() as NodeJS.ProcessEnv,
           cwd: PROJECT_ROOT,
