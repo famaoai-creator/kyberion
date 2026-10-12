@@ -222,6 +222,15 @@
       "additionalProperties": false,
       "required": ["triggers"],
       "properties": {
+        "event_delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "activation_id"],
+          "properties": {
+            "mode": { "const": "durable" },
+            "activation_id": { "type": "string", "pattern": "^[a-f0-9-]{36}$" }
+          }
+        },
         "triggers": {
           "type": "array",
           "items": {
