@@ -1,0 +1,45 @@
+---
+record_id: mem-MSN-MEDIA-PIPELINE-20261013-2026_10_12
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-MEDIA-PIPELINE-20261013-2026_10_12
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-12T19:35:13.806Z
+source_branch: feat/media-ja-tts-video-20261013
+source_commit: 0362079caa56f5a04b089083dc612f0400a6f046
+---
+
+# Kokoro mlx_audio Japanese TTS + HyperFrames narrated-video pipeline guidance
+
+Codified reading rules for misaki cutlet G2P (write kana/katakana, never pyopenjtalk on 82M-4bit), the whisper round-trip verification gate, and registered the narrated-explainer-video template + voice.mlx_audio_kokoro backend.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Japanese Kokoro synthesis via mlx_audio uses misaki cutlet G2P: Latin alphabet passes through unphonemized (AI→あい) and no pitch-accent marks are emitted (flat intonation). Write readings in kana/katakana (エーアイ, だいさんい, みっつ) and lint predicted phonemes before synthesis. JAG2P version=pyopenjtalk verified worse on Kokoro-82M-4bit — do not use. The governed route is voice:generate_voice with engine_id kokoro + params.voice passthrough; ad-hoc mlx_audio CLI is scratch-only. Pipeline: knowledge/product/pipeline-templates/narrated-explainer-video.json; playbook: knowledge/product/orchestration/japanese-voiceover-production-playbook.md; backend record: knowledge/product/governance/media-backends/voice.mlx_audio_kokoro.json.
+
+## Recommended References
+
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/implementation-report.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/test-report.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/distillation.md
+
+## Evidence
+
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/implementation-report.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/test-report.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-MEDIA-PIPELINE-20261013/evidence/distillation.md
+
+## Artifacts
