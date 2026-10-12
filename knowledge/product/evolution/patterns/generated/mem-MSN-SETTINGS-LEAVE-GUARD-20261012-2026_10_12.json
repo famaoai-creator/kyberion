@@ -1,0 +1,25 @@
+{
+  "record_id": "mem-MSN-SETTINGS-LEAVE-GUARD-20261012-2026_10_12",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Deferred navigation must revalidate live draft and scope state",
+  "summary": "Treat a confirmed exit as a revocable intent: keep draft ownership local, check live save/context state before side effects, and separate app-navigation guarantees from browser-controlled unload warnings.",
+  "candidate_id": "mem-MSN-SETTINGS-LEAVE-GUARD-20261012-2026_10_12",
+  "evidence_refs": [
+    "active/missions/public/MSN-SETTINGS-LEAVE-GUARD-20261012/evidence/implementation-report.md",
+    "active/missions/public/MSN-SETTINGS-LEAVE-GUARD-20261012/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-SETTINGS-LEAVE-GUARD-20261012/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-12T19:13:20.701Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-SETTINGS-LEAVE-GUARD-20261012"
+  ],
+  "reusable_steps": [
+    "Treat a confirmed exit as a revocable intent: keep draft ownership local, check live save/context state before side effects, and separate app-navigation guarantees from browser-controlled unload warnings"
+  ],
+  "expected_outcome": "# Deferred navigation must revalidate live draft and scope state\n\nUse this pattern when a confirmation dialog delays navigation while a page owns unsaved edits.\n\n## Invariants\n\n- Keep the draft and its discard operation in the owning page. A shell-level guard stores callbacks and destination intent, not a second draft or persistent copy.\n- Intercept navigation before changing a tenant/workspace cookie or any other scope side effect. Cancel must preserve URL, selection and draft.\n- Confirmation is not authority to replay stale work. Immediately before continuing, recheck the live save-pending flag, draft/context validity, exact raw scope identity and selection generation. Normalized scope aliases can hide a personal/shared transition.\n- A submitted save is not canceled by a leave dialog. Disable discard while it is pending. A clean save cancels pending navigation rather than silently leaving afterward.\n- Consume an accepted intent once. Newer destinations supersede older ones; invalidation and unmount revoke pending callbacks.\n\n## Preserve native navigation semantics\n\nAllow same-document section hashes, modified/new-tab links and downloads without discarding the original page. Do not manufacture history sentinels or reverse-traversal loops to claim universal Back protection. Browser-controlled beforeunload warnings are a separate, best-effort layer and cannot guarantee app-controlled confirmation behavior.\n\n## Verify distinct claims independently\n\nUse source/integration tests for save races, exact-scope changes, once-only replay, clean transitions and unmount. Use actual browser checks for Keep/Discard/Escape, restored focus, superseded destinations, grouped drafts, section history and modified links.\n\nIf trusted input followed by native reload loses a draft without warning, record a failed native-warning check. Compare a minimal standard-handler fixture in the same browser with visible trusted-input and activation evidence. Matching failure supports an environment-specific observation, not an unproven browser-policy explanation. Do not label fake-event coverage as native dialog success.",
+  "source_branch": "fix/settings-leave-guard-20261012",
+  "source_commit": "f9f5657427d81ecbba0e5df61d6bb121f2eb7f71"
+}
