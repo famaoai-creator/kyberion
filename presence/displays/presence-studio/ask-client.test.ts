@@ -3,15 +3,26 @@ import { runInNewContext } from 'node:vm';
 import { randomUUID } from 'node:crypto';
 import { safeReadFile } from '@agent/core/secure-io';
 
+type TestEvent = { preventDefault: () => void; key?: string };
+
 class Element {
   value = '';
   innerHTML = '';
   textContent = '';
   disabled = false;
+  hidden = true;
+  selectionStart = 0;
+  selectionEnd = 0;
+  selectionDirection = 'none';
+  setSelectionRange = vi.fn((start: number, end: number, direction: string) => {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+    this.selectionDirection = direction;
+  });
   focus = vi.fn();
   scrollIntoView = vi.fn();
   attributes: Record<string, string> = {};
-  listeners: Record<string, (event: { preventDefault: () => void }) => void> = {};
+  listeners: Record<string, (event: TestEvent) => void> = {};
   classList = { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() };
   setAttribute(name: string, value: string) {
     this.attributes[name] = value;
@@ -19,11 +30,13 @@ class Element {
   getAttribute(name: string) {
     return this.attributes[name] ?? null;
   }
-  addEventListener(name: string, handler: (event: { preventDefault: () => void }) => void) {
+  addEventListener(name: string, handler: (event: TestEvent) => void) {
     this.listeners[name] = handler;
   }
-  fire(name: string) {
-    this.listeners[name]?.({ preventDefault() {} });
+  fire(name: string, detail: Partial<TestEvent> = {}) {
+    const event = { preventDefault: vi.fn(), ...detail };
+    this.listeners[name]?.(event);
+    return event;
   }
 }
 function deferred<T>() {
@@ -49,7 +62,11 @@ function harness(
     post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof response>>;
     history?: Record<string, unknown>;
     historyStatus?: number;
+    conversation?: () => Promise<ReturnType<typeof response>>;
+    vocabulary?: Promise<ReturnType<typeof response>>;
+    texts?: Record<string, string>;
     query?: string;
+    hash?: string;
   } = {}
 ) {
   const elements = new Map(
@@ -64,15 +81,27 @@ function harness(
       'conversation-reload',
       'conversation-legacy',
       'conversation-legacy-turns',
+      'draft-choice',
+      'draft-choice-preview',
+      'draft-keep',
+      'draft-replace',
+      'draft-storage-warning',
     ].map((id) => [id, new Element()])
+  );
+  const chips = new Map(
+    ['email', 'minutes', 'browser', 'webapp', 'unknown'].map((key) => {
+      const chip = new Element();
+      chip.setAttribute('data-chip', key);
+      return [key, chip] as const;
+    })
   );
   const storage = options.storage ?? new Map<string, string>();
   const location = {
-    href: 'http://localhost/ask?tenant=alpha',
+    href: 'http://localhost/ask' + (options.query ?? '?tenant=alpha') + (options.hash ?? ''),
     origin: 'http://localhost',
     pathname: '/ask',
     search: options.query ?? '?tenant=alpha',
-    hash: '',
+    hash: options.hash ?? '',
   };
   const scopedUrl = (path: string) => {
     const url = new URL(path, location.href);
@@ -92,26 +121,34 @@ function harness(
     FrontDeskRail: { ready: options.ready ?? Promise.resolve() },
     KyberionAsk: undefined as undefined | { mount: () => void },
   };
-  const texts = new Proxy({} as Record<string, string>, { get: (_target, key) => String(key) });
+  const texts =
+    options.texts ??
+    new Proxy({} as Record<string, string>, { get: (_target, key) => String(key) });
   const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     if (init?.method === 'POST')
       return options.post
         ? options.post(JSON.parse(init.body!))
         : response({ ok: true, reply: 'Done', mode: 'orchestrator' });
-    if (url.startsWith('/api/ask-vocabulary')) return response({ ok: true, texts });
+    if (url.startsWith('/api/ask-vocabulary'))
+      return options.vocabulary ?? response({ ok: true, texts });
     if (url.startsWith('/api/progress')) return response({ ok: true, active: [] });
     if (url.startsWith('/api/conversation'))
-      return response(
-        { ok: true, sessionId: session, messages: [], pending: 0, ...options.history },
-        options.historyStatus ?? 200
-      );
+      return options.conversation
+        ? options.conversation()
+        : response(
+            { ok: true, sessionId: session, messages: [], pending: 0, ...options.history },
+            options.historyStatus ?? 200
+          );
     throw new Error('unexpected ' + url);
   });
   const document = {
     documentElement: { getAttribute: () => 'en' },
     getElementById: (id: string) => elements.get(id) ?? null,
-    querySelector: () => null,
-    querySelectorAll: () => [],
+    querySelector: (selector: string) => {
+      const key = /^\.ask-chip\[data-chip="([^"]+)"\]$/.exec(selector)?.[1];
+      return key ? (chips.get(key) ?? null) : null;
+    },
+    querySelectorAll: (selector: string) => (selector === '.ask-chip' ? [...chips.values()] : []),
   };
   runInNewContext(
     String(safeReadFile('presence/displays/presence-studio/static/ask.js', { encoding: 'utf8' })),
@@ -120,6 +157,7 @@ function harness(
   window.KyberionAsk!.mount();
   return {
     elements,
+    chips,
     storage,
     fetch,
     window,
@@ -357,4 +395,403 @@ it('focuses a resumed request once after hydration, then leaves new messages vis
   expect(target.focus).toHaveBeenCalledTimes(1);
   expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
   expect(h.elements.get('turns')!.innerHTML).toContain('A new message');
+});
+
+describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
+  const draftKey = 'kyberion.ask.draft.' + session;
+  const requestKey = draftKey + '.request';
+  const chipText = 'front_desk:chip_email';
+  const historyResponse = () =>
+    response({ ok: true, sessionId: session, messages: [], pending: 0 });
+  const posts = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+  const edit = (h: ReturnType<typeof harness>, text: string) => {
+    h.input.value = text;
+    h.input.fire('input');
+  };
+
+  it.each(['empty', 'replace'])(
+    'persists a chip from %s input across reload without sending',
+    async (mode) => {
+      const storage = new Map<string, string>();
+      const h = harness({ storage });
+      await flush();
+      if (mode === 'replace') edit(h, 'Original draft');
+      h.chips.get('email')!.fire('click');
+      if (mode === 'replace') {
+        expect(h.input.value).toBe('Original draft');
+        expect(storage.get(draftKey)).toBe('Original draft');
+        expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+        expect(h.elements.get('draft-choice-preview')!.textContent).toBe(chipText);
+        h.elements.get('draft-replace')!.fire('click');
+      }
+      expect(h.input.value).toBe(chipText);
+      expect(storage.get(draftKey)).toBe(chipText);
+      expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+      expect(h.input.focus).toHaveBeenCalled();
+      const reloaded = harness({ storage });
+      await flush();
+      expect(reloaded.input.value).toBe(chipText);
+      expect(posts(h)).toHaveLength(0);
+      expect(posts(reloaded)).toHaveLength(0);
+    }
+  );
+
+  it.each(['keep', 'Escape', 'editor Escape'])(
+    'preserves text, selection, and focus on %s',
+    async (action) => {
+      const h = harness();
+      await flush();
+      edit(h, 'Original draft');
+      h.input.setSelectionRange(2, 8, 'backward');
+      h.chips.get('email')!.fire('click');
+      expect(h.elements.get('draft-keep')!.focus).toHaveBeenCalledTimes(1);
+      h.input.setSelectionRange(0, 0, 'none');
+      if (action === 'keep') h.elements.get('draft-keep')!.fire('click');
+      else {
+        const target = action === 'editor Escape' ? h.input : h.elements.get('draft-choice')!;
+        if (action === 'editor Escape') h.input.focus();
+        const event = target.fire('keydown', { key: 'Escape' });
+        expect(event.preventDefault).toHaveBeenCalledTimes(1);
+      }
+      expect(h.input.value).toBe('Original draft');
+      expect(h.storage.get(draftKey)).toBe('Original draft');
+      expect(h.input.setSelectionRange).toHaveBeenLastCalledWith(2, 8, 'backward');
+      expect(h.input.focus).toHaveBeenCalled();
+      expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+      h.elements.get('draft-replace')!.fire('click');
+      expect(h.input.value).toBe('Original draft');
+      expect(posts(h)).toHaveLength(0);
+    }
+  );
+
+  it('requires a choice for conflicting URL prefill and cleans only handoff parameters', async () => {
+    const storage = new Map([[draftKey, 'Saved draft']]);
+    const h = harness({
+      storage,
+      query:
+        '?tenant=alpha&organizationId=org-a&projectId=project-a&other=retained&ask=From+home&send=0&mic=0',
+      hash: '#details',
+    });
+    await flush();
+    expect(h.input.value).toBe('Saved draft');
+    expect(storage.get(draftKey)).toBe('Saved draft');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe('From home');
+    expect(h.window.history.replaceState).toHaveBeenCalledExactlyOnceWith(
+      null,
+      '',
+      '/ask?tenant=alpha&organizationId=org-a&projectId=project-a&other=retained#details'
+    );
+    h.elements.get('draft-replace')!.fire('click');
+    expect(storage.get(draftKey)).toBe('From home');
+    const reloaded = harness({ storage });
+    await flush();
+    expect(reloaded.input.value).toBe('From home');
+    expect(posts(h)).toHaveLength(0);
+    expect(posts(reloaded)).toHaveLength(0);
+  });
+
+  it('persists a nonconflicting URL prefill without submitting it', async () => {
+    const h = harness({ query: '?tenant=alpha&ask=From+home' });
+    await flush();
+    expect(h.input.value).toBe('From home');
+    expect(h.storage.get(draftKey)).toBe('From home');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it.each(['before readiness', 'during vocabulary', 'during history'])(
+    'preserves typing and deliberate clearing %s',
+    async (stage) => {
+      for (const text of ['Early edit', '']) {
+        const ready = deferred<void>();
+        const vocabulary = deferred<ReturnType<typeof response>>();
+        const conversation = deferred<ReturnType<typeof response>>();
+        const storage = new Map([[draftKey, 'Stale saved draft']]);
+        const h = harness({
+          storage,
+          ready: ready.promise,
+          vocabulary: vocabulary.promise,
+          conversation: () => conversation.promise,
+        });
+        if (stage !== 'before readiness') ready.resolve();
+        if (stage === 'during history') vocabulary.resolve(response({ ok: true, texts: {} }));
+        await flush();
+        edit(h, 'Typed then changed');
+        edit(h, text);
+        expect(storage.get(draftKey)).toBe('Stale saved draft');
+        expect(posts(h)).toHaveLength(0);
+        ready.resolve();
+        vocabulary.resolve(response({ ok: true, texts: {} }));
+        conversation.resolve(historyResponse());
+        await flush();
+        expect(h.input.value).toBe(text);
+        expect(storage.get(draftKey)).toBe(text);
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        const reloaded = harness({ storage });
+        await flush();
+        expect(reloaded.input.value).toBe(text);
+        expect(posts(h)).toHaveLength(0);
+      }
+    }
+  );
+
+  it('ignores early chip activation until stored history and draft are verified', async () => {
+    const conversation = deferred<ReturnType<typeof response>>();
+    const request = JSON.stringify({
+      id: '44444444-4444-4444-8444-444444444444',
+      text: 'Saved draft',
+      createdAt: 1,
+    });
+    const storage = new Map([
+      [draftKey, 'Saved draft'],
+      [requestKey, request],
+    ]);
+    const h = harness({ storage, conversation: () => conversation.promise });
+    await flush();
+    expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', { cache: 'no-store' });
+    expect(h.chips.get('email')!.disabled).toBe(true);
+    // Deliberately invoke the handler even while disabled to exercise its own guard.
+    h.chips.get('email')!.fire('click');
+    expect(h.input.value).toBe('');
+    expect(storage.get(draftKey)).toBe('Saved draft');
+    expect(storage.get(requestKey)).toBe(request);
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    conversation.resolve(historyResponse());
+    await flush();
+    expect(h.input.value).toBe('Saved draft');
+    expect(h.chips.get('email')!.disabled).toBe(false);
+    h.chips.get('email')!.fire('click');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe(chipText);
+    expect(h.input.value).toBe('Saved draft');
+    expect(storage.get(draftKey)).toBe('Saved draft');
+    expect(storage.get(requestKey)).toBe(request);
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it('offers a URL choice against an early edit rather than restoring the old draft', async () => {
+    const ready = deferred<void>();
+    const h = harness({
+      ready: ready.promise,
+      storage: new Map([[draftKey, 'Stale saved draft']]),
+      query: '?tenant=alpha&ask=Home+proposal',
+    });
+    edit(h, 'Early edit');
+    ready.resolve();
+    await flush();
+    expect(h.input.value).toBe('Early edit');
+    expect(h.storage.get(draftKey)).toBe('Early edit');
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe('Home proposal');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it.each(['Typed after failure', ''])(
+    'flushes edits after history failure and retry (%s)',
+    async (text) => {
+      let attempts = 0;
+      const retry = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        storage: new Map([[draftKey, 'Stale saved draft']]),
+        conversation: async () => (++attempts === 1 ? response({ ok: false }, 503) : retry.promise),
+      });
+      await flush();
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+      edit(h, 'Changed before retry');
+      edit(h, text);
+      expect(h.storage.get(draftKey)).toBe('Stale saved draft');
+      h.elements.get('conversation-reload')!.fire('click');
+      await flush();
+      retry.resolve(historyResponse());
+      await flush();
+      expect(attempts).toBe(2);
+      expect(h.input.value).toBe(text);
+      expect(h.storage.get(draftKey)).toBe(text);
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(posts(h)).toHaveLength(0);
+    }
+  );
+
+  it('retains a URL candidate through failed history and offers a choice after retry', async () => {
+    let attempts = 0;
+    const retry = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      storage: new Map([[draftKey, 'Unknown saved draft']]),
+      query: '?tenant=alpha&ask=Candidate',
+      conversation: async () => (++attempts === 1 ? response({ ok: false }, 503) : retry.promise),
+    });
+    await flush();
+    expect(h.input.value).toBe('');
+    expect(h.storage.get(draftKey)).toBe('Unknown saved draft');
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(posts(h)).toHaveLength(0);
+    h.elements.get('conversation-reload')!.fire('click');
+    await flush();
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    retry.resolve(historyResponse());
+    await flush();
+    expect(h.input.value).toBe('Unknown saved draft');
+    expect(h.storage.get(draftKey)).toBe('Unknown saved draft');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe('Candidate');
+    expect(h.window.history.replaceState).toHaveBeenCalledExactlyOnceWith(
+      null,
+      '',
+      '/ask?tenant=alpha'
+    );
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it('retains URL prefill and saved draft when request metadata is corrupt', async () => {
+    const h = harness({
+      storage: new Map([
+        [draftKey, 'Unknown saved draft'],
+        [requestKey, '{corrupt'],
+      ]),
+      query: '?tenant=alpha&ask=Candidate',
+    });
+    await flush();
+    expect(h.input.value).toBe('');
+    expect(h.storage.get(draftKey)).toBe('Unknown saved draft');
+    expect(h.storage.get(requestKey)).toBe('{corrupt');
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it('retains pending request metadata across keep, replace, and reload, then reuses its retry ID', async () => {
+    const request = {
+      id: '33333333-3333-4333-8333-333333333333',
+      text: 'Uncertain request',
+      createdAt: 1,
+    };
+    const raw = JSON.stringify(request);
+    const storage = new Map([
+      [draftKey, request.text],
+      [requestKey, raw],
+    ]);
+    const h = harness({ storage });
+    await flush();
+    h.chips.get('email')!.fire('click');
+    expect(storage.get(requestKey)).toBe(raw);
+    h.elements.get('draft-keep')!.fire('click');
+    expect(storage.get(requestKey)).toBe(raw);
+    h.chips.get('email')!.fire('click');
+    h.elements.get('draft-replace')!.fire('click');
+    expect(storage.get(requestKey)).toBe(raw);
+    const reloaded = harness({ storage });
+    await flush();
+    expect(storage.get(requestKey)).toBe(raw);
+    expect(posts(h)).toHaveLength(0);
+    expect(posts(reloaded)).toHaveLength(0);
+    edit(reloaded, request.text);
+    reloaded.form.fire('submit');
+    await flush();
+    expect(posts(reloaded)).toHaveLength(1);
+    expect(JSON.parse(posts(reloaded)[0][1]!.body!).request_id).toBe(request.id);
+  });
+
+  it('does not erase the current draft for an unavailable or unknown chip', async () => {
+    const h = harness({ texts: {} });
+    await flush();
+    edit(h, 'Keep me');
+    h.chips.get('email')!.fire('click');
+    h.chips.get('unknown')!.fire('click');
+    expect(h.input.value).toBe('Keep me');
+    expect(h.storage.get(draftKey)).toBe('Keep me');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it.each(['throws', 'silently drops'])(
+    'keeps accepted text and warns when draft storage %s',
+    async (failure) => {
+      const h = harness();
+      await flush();
+      edit(h, 'Saved draft');
+      const setItem = h.window.sessionStorage.setItem;
+      h.window.sessionStorage.setItem = (key, value) => {
+        if (key !== draftKey) return setItem(key, value);
+        if (failure === 'throws') throw new Error('write blocked');
+        return h.storage;
+      };
+      h.chips.get('email')!.fire('click');
+      h.elements.get('draft-replace')!.fire('click');
+      expect(h.input.value).toBe(chipText);
+      expect(h.storage.get(draftKey)).toBe('Saved draft');
+      expect(h.elements.get('draft-storage-warning')!.hidden).toBe(false);
+      expect(h.elements.get('draft-storage-warning')!.textContent).toBe(
+        'front_desk:ask_draft_not_saved'
+      );
+      expect(posts(h)).toHaveLength(0);
+      h.window.sessionStorage.setItem = setItem;
+      edit(h, 'Now saved');
+      expect(h.storage.get(draftKey)).toBe('Now saved');
+      expect(h.elements.get('draft-storage-warning')!.hidden).toBe(true);
+    }
+  );
+
+  it('treats equal text as an idempotent acceptance without a replacement choice', async () => {
+    const h = harness({ storage: new Map([[draftKey, chipText]]) });
+    await flush();
+    h.chips.get('email')!.fire('click');
+    h.chips.get('email')!.fire('click');
+    expect(h.input.value).toBe(chipText);
+    expect(h.storage.get(draftKey)).toBe(chipText);
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(h.elements.get('draft-keep')!.focus).not.toHaveBeenCalled();
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it('replaces only with the latest proposal and cancels stale choices on new input', async () => {
+    const h = harness();
+    await flush();
+    edit(h, 'Original');
+    h.chips.get('email')!.fire('click');
+    h.chips.get('minutes')!.fire('click');
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe('front_desk:chip_minutes');
+    expect(h.input.value).toBe('Original');
+    h.elements.get('draft-replace')!.fire('click');
+    expect(h.storage.get(draftKey)).toBe('front_desk:chip_minutes');
+    h.chips.get('email')!.fire('click');
+    edit(h, 'New typing');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    h.elements.get('draft-replace')!.fire('click');
+    expect(h.input.value).toBe('New typing');
+    expect(h.storage.get(draftKey)).toBe('New typing');
+    expect(posts(h)).toHaveLength(0);
+  });
+
+  it('preserves explicit send=1 behavior without a replacement choice', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      storage: new Map([[draftKey, 'Older draft']]),
+      query: '?tenant=alpha&ask=Explicit+submission&send=1',
+      post: () => pending.promise,
+    });
+    await flush();
+    expect(posts(h)).toHaveLength(1);
+    expect(JSON.parse(posts(h)[0][1]!.body!)).toMatchObject({ text: 'Explicit submission' });
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    pending.resolve(response({ ok: true, reply: 'Done', mode: 'orchestrator' }));
+    await flush();
+  });
+
+  it('leaves saved draft and URL untouched for read-only request selection', async () => {
+    const h = harness({
+      storage: new Map([[draftKey, 'Saved draft']]),
+      query: '?tenant=alpha&request=missing&ask=Do+not+prefill&send=1&mic=1',
+      hash: '#details',
+    });
+    await flush();
+    expect(h.input.value).toBe('Saved draft');
+    expect(h.storage.get(draftKey)).toBe('Saved draft');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    expect(posts(h)).toHaveLength(0);
+  });
 });

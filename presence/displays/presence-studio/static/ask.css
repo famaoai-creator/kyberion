@@ -230,3 +230,22 @@
     min-height: 0;
   }
 }
+
+.ask-draft-choice {
+  display: block;
+}
+
+.ask-draft-choice[hidden] {
+  display: none;
+}
+
+.ask-draft-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ask-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2);
+}
