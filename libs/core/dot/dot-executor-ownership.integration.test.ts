@@ -1,9 +1,14 @@
+import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { approvalStoreRoots, decideApprovalRequest } from '../governance/approval-store.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-store-paths.js';
 import { requestDotWorkItemRelease, applyApprovedDotReleases } from './dot-executor-release.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as json from '../foundation/json.js';
+import * as io from '../secure-io.js';
+import { DOT_STATE_ROOT } from './dot-state-paths.js';
+import { inspectExecutorSchedulingCursor } from './dot-executor-scheduling.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   clearWorkCoordinationNamespace,
@@ -71,6 +76,7 @@ beforeEach(() => {
   safeMkdir(ROOT, { recursive: true });
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   clearWorkCoordinationStore();
   clearWorkCoordinationNamespace();
   withExecutionContext('infrastructure_sentinel', () => {
@@ -252,5 +258,106 @@ describe('real isolated dot behavior', () => {
     expect(new Set(order.slice(0, 3)).size).toBe(3);
     expect(new Set(order.slice(3, 6)).size).toBe(3);
     expect(listWorkItems().every((x) => (x.attempts?.length ?? 0) <= 1)).toBe(true);
+  });
+});
+
+describe('strict persisted executor cursor', () => {
+  const cursor = path.join(ROOT, DOT_STATE_ROOT, 'executor-schedule.json');
+  function writeCursor(content: string) {
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeMkdir(ROOT + '/' + DOT_STATE_ROOT, { recursive: true });
+      safeWriteFile(cursor, content);
+    });
+  }
+  async function assertBlocked(overrides: Partial<ReturnType<typeof deps>> = {}) {
+    const c = charter('eval-a');
+    item('cursor-waiting', c.dot_id, 'service:cursor-isolation');
+    const before = getWorkItem('cursor-waiting');
+    const effects: string[] = [];
+    const port = async () => {
+      effects.push('unexpected');
+      safeWriteFile(ROOT + '/unexpected-effect.txt', 'unexpected');
+      return { status: 'succeeded' as const, summary: 'Unexpected isolated effect' };
+    };
+    expect(
+      await runDotExecutorSweep(
+        [loaded(c)],
+        {
+          runGoalTurn: async () => {
+            effects.push('goal');
+            return unused();
+          },
+          delegateText: async () => {
+            effects.push('delegate');
+            return unused();
+          },
+          runPipeline: port,
+        },
+        { ...deps(), ...overrides }
+      )
+    ).toEqual([]);
+    expect(effects).toEqual([]);
+    expect(io.safeExistsSync(ROOT + '/unexpected-effect.txt')).toBe(false);
+    expect(getWorkItem('cursor-waiting')).toEqual(before);
+    expect(inspectExecutorSchedulingCursor(ROOT).state).toBe('blocked');
+  }
+  it.each(['{', 'null', 'false', '0', '""', '{}', '[]', '{"after":42}', '{"after":""}'])(
+    'preserves invalid bytes %s and makes no new claim or execution effect',
+    async (content) => {
+      writeCursor(content);
+      await assertBlocked();
+      expect(safeReadFile(cursor)).toBe(content);
+    }
+  );
+  it.each(['EACCES', 'EIO', 'ENOENT'])(
+    'fails closed on %s while reading a cursor known to exist',
+    async (code) => {
+      const content = '{"after":"eval-a:retained-evidence"}';
+      writeCursor(content);
+      const original = json.readJson;
+      vi.spyOn(json, 'readJson').mockImplementation((file, options) => {
+        if (file === cursor) throw Object.assign(new Error('PRIVATE reader detail'), { code });
+        return original(file, options);
+      });
+      await assertBlocked();
+      expect(safeReadFile(cursor)).toBe(content);
+      expect(JSON.stringify(inspectExecutorSchedulingCursor(ROOT))).not.toContain('PRIVATE');
+    }
+  );
+  it.each(['EACCES', 'EIO', 'ENOTDIR', undefined])(
+    'does not treat cursor metadata error %s as absent',
+    async (code) => {
+      writeCursor('{"after":"eval-a:retained-evidence"}');
+      const original = io.safeLstat;
+      vi.spyOn(io, 'safeLstat').mockImplementation((file) => {
+        if (file === cursor) throw Object.assign(new Error('PRIVATE metadata detail'), { code });
+        return original(file);
+      });
+      await assertBlocked();
+      expect(safeReadFile(cursor)).toBe('{"after":"eval-a:retained-evidence"}');
+    }
+  );
+  it('preserves corruption introduced after ordering but before the next turn', async () => {
+    writeCursor('{"after":"eval-a:accepted"}');
+    await assertBlocked({
+      throttle: () => {
+        writeCursor('{');
+        return 'normal';
+      },
+    });
+    expect(safeReadFile(cursor)).toBe('{');
+  });
+  it('refuses a direct turn record over corrupt evidence', () => {
+    writeCursor('null');
+    expect(() => recordExecutorTurn(charter('eval-a'), ROOT)).toThrow('operator recovery required');
+    expect(safeReadFile(cursor)).toBe('null');
+  });
+  it('rejects a directory cursor without overwriting its contents', async () => {
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeMkdir(cursor, { recursive: true });
+      safeWriteFile(cursor + '/retained.txt', 'evidence');
+    });
+    await assertBlocked();
+    expect(safeReadFile(cursor + '/retained.txt')).toBe('evidence');
   });
 });

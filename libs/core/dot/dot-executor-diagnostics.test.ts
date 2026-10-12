@@ -184,12 +184,13 @@ describe('read-only executor scheduling evidence', () => {
     expect(safeExistsSync(cursorFile())).toBe(false);
   });
 
-  it('reports malformed JSON syntax as unknown without claiming sweeps stop', async () => {
+  it('reports malformed JSON syntax as blocking normal sweeps without exposing parser details', async () => {
     await write(cursorFile(), '{ "after":');
     const result = inspect().scheduling;
-    expect(result.state).toBe('unknown');
-    expect(result.reason).toContain('may fall back');
-    expect(result.next).toContain('no cursor was cleared or repaired');
+    expect(result.state).toBe('blocked');
+    expect(result.reason).toContain('normal executor sweeps stop before claiming work');
+    expect(result.next).toContain('do not delete or reset');
+    expect(JSON.stringify(result)).not.toMatch(/SyntaxError|Unexpected|after/);
   });
 
   it.each([{}, [], { after: '' }, { after: 42 }, 'invalid'])(
@@ -203,15 +204,12 @@ describe('read-only executor scheduling evidence', () => {
     }
   );
 
-  it.each([null, false, 0, ''])(
-    'reports falsy persisted cursor %j as unknown fallback evidence',
-    async (value) => {
-      await write(cursorFile(), JSON.stringify(value));
-      const result = inspect().scheduling;
-      expect(result.state).toBe('unknown');
-      expect(result.reason).toContain('falls back to initial ordering');
-    }
-  );
+  it.each([null, false, 0, ''])('reports falsy persisted cursor %j as blocked', async (value) => {
+    await write(cursorFile(), JSON.stringify(value));
+    const result = inspect().scheduling;
+    expect(result.state).toBe('blocked');
+    expect(result.reason).toContain('normal executor sweeps stop before claiming work');
+  });
 
   it('accepts a valid recorded cursor without promising liveness', async () => {
     await write(cursorFile(), JSON.stringify({ after: 'ops:synthetic-scope-hash' }));

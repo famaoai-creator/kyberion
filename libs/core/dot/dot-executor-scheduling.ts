@@ -2,10 +2,10 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { readJson, readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { readJson, writeJson } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir } from '../secure-io.js';
+import { safeLstat, safeMkdir } from '../secure-io.js';
 import { DOT_STATE_ROOT } from './dot-state-paths.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 
@@ -30,6 +30,29 @@ export function isExecutorSchedulingCursor(value: unknown): value is { after: st
   );
 }
 
+/** Only a genuinely absent file starts a new order; corrupt evidence is never reset. */
+function readExecutorSchedulingCursor(p: string): { after: string } | null {
+  const invalid = () =>
+    new Error('executor scheduling cursor is invalid or unreadable; operator recovery required');
+  let stat: ReturnType<typeof safeLstat>;
+  try {
+    stat = safeLstat(p);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw invalid();
+  }
+  // A dangling link or non-regular object is existing evidence, not missing state.
+  if (!stat.isFile()) throw invalid();
+  try {
+    const value: unknown = readJson(p);
+    if (isExecutorSchedulingCursor(value)) return value;
+  } catch {
+    // Even ENOENT after the metadata read is uncertainty, not initialization.
+    // Do not expose parser/path details through the executor's warning or status.
+  }
+  throw invalid();
+}
+
 /** No lock or writes: inspect persisted evidence, never reset or advance the cursor. */
 export function inspectExecutorSchedulingCursor(rootDir?: string): {
   state: 'recorded' | 'unrecorded' | 'blocked' | 'unknown';
@@ -37,39 +60,24 @@ export function inspectExecutorSchedulingCursor(rootDir?: string): {
   next: string;
 } {
   try {
-    const p = file(rootDir);
-    if (!safeExistsSync(p))
+    const value = readExecutorSchedulingCursor(file(rootDir));
+    if (!value)
       return {
         state: 'unrecorded',
         reason: 'No persisted continuation; the executor uses its initial order.',
         next: 'Observe the next authorized sweep; absence alone does not prove a stalled executor.',
       };
-    const value: unknown = readJson(p);
-    if (isExecutorSchedulingCursor(value))
-      return {
-        state: 'recorded',
-        reason: 'Persisted cursor format is accepted; executor liveness is not established.',
-        next: 'Use current work evidence below; this read does not advance the cursor.',
-      };
-    if (value)
-      return {
-        state: 'blocked',
-        reason:
-          'Persisted cursor shape is rejected; normal executor sweeps stop before claiming work.',
-        next: 'An operator must inspect and recover executor-schedule.json before another normal sweep; do not delete or reset it automatically.',
-      };
     return {
-      state: 'unknown',
-      reason:
-        'Persisted cursor contains no usable continuation; the current executor falls back to initial ordering.',
-      next: 'Ask an operator to inspect scheduling evidence; this is not proof the executor stopped.',
+      state: 'recorded',
+      reason: 'Persisted cursor format is accepted; executor liveness is not established.',
+      next: 'Use current work evidence below; this read does not advance the cursor.',
     };
   } catch {
     return {
-      state: 'unknown',
+      state: 'blocked',
       reason:
-        'Scheduling evidence is malformed or unreadable; continuation is unknown. The current optional reader may fall back to initial ordering.',
-      next: 'Ask an operator to inspect executor-schedule.json; no cursor was cleared or repaired.',
+        'Scheduling cursor is invalid or unreadable; normal executor sweeps stop before claiming work. Scoped diagnostic passes do not use this cursor.',
+      next: 'An operator must inspect and recover executor-schedule.json before another normal sweep; do not delete or reset it automatically.',
     };
   }
 }
@@ -94,15 +102,15 @@ export function orderExecutorCharters(
         ? 1
         : 0
   );
-  const state = guarded(rootDir, (p) => readJsonIfPresent<{ after: string }>(p));
+  const state = guarded(rootDir, readExecutorSchedulingCursor);
   if (!state) return ordered;
-  if (!isExecutorSchedulingCursor(state))
-    throw new Error('executor scheduling cursor is invalid; operator recovery required');
   const next = ordered.findIndex((row) => identity(row.charter) > state.after);
   return next < 0 ? ordered : [...ordered.slice(next), ...ordered.slice(0, next)];
 }
 export function recordExecutorTurn(c: DotCharter, rootDir?: string): void {
   guarded(rootDir, (p) => {
+    // Ordering and recording hold separate locks; preserve corruption seen between turns.
+    readExecutorSchedulingCursor(p);
     safeMkdir(path.dirname(p), { recursive: true });
     // Dot ids already occur in the shared WorkItem store. Scope remains hashed.
     writeJson(p, { after: identity(c) });
