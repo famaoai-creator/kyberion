@@ -28492,6 +28492,21 @@
           ]
         },
         {
+          "op": "app_launch",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "application": {
+                "type": "string"
+              }
+            },
+            "required": ["application"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
           "op": "app_quit",
           "kind": "apply",
           "input_schema": {
@@ -28696,6 +28711,50 @@
               }
             },
             "required": ["application"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "window_focus",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "application": {
+                "type": "string"
+              },
+              "window_title": {
+                "type": "string"
+              },
+              "match_policy": {
+                "enum": ["strict", "prefix", "contains"],
+                "type": "string"
+              }
+            },
+            "required": ["application", "window_title"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "window_maximize",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "application": {
+                "type": "string"
+              },
+              "window_title": {
+                "type": "string"
+              },
+              "match_policy": {
+                "enum": ["strict", "prefix", "contains"],
+                "type": "string"
+              }
+            },
+            "required": ["application", "window_title"],
             "additionalProperties": false
           },
           "examples": [{}]

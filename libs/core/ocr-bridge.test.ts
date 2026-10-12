@@ -436,7 +436,12 @@ describe('LocalVlmOcrProvider', () => {
       expect.objectContaining({
         url: 'http://localhost:11434/api/generate',
         method: 'POST',
-        data: expect.objectContaining({ model: 'llama3-vision' }),
+        timeout: 120_000,
+        data: expect.objectContaining({
+          model: 'llama3-vision',
+          think: false,
+          options: { temperature: 0, num_ctx: 8_192, num_predict: 1_024 },
+        }),
         kyberion_allow_local_network: true,
       })
     );

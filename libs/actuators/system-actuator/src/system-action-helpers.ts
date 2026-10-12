@@ -586,13 +586,14 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       throw new Error('Path is required for reveal_path');
     }
     revealFinderPath(targetPath);
-    emitPatch('succeeded', interaction.type, targetPath, 'Finder', { path: targetPath });
+    const fileManager = process.platform === 'win32' ? 'File Explorer' : 'Finder';
+    emitPatch('succeeded', interaction.type, targetPath, fileManager, { path: targetPath });
     return {
       status: 'succeeded',
       results: [{ op: 'reveal_path', status: 'success' }],
       context: {
         file_manager_action: {
-          application: 'Finder',
+          application: fileManager,
           action: 'reveal_path',
           path: targetPath,
         },
@@ -607,13 +608,14 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       throw new Error('Path is required for open_path');
     }
     openFinderPath(targetPath);
-    emitPatch('succeeded', interaction.type, targetPath, 'Finder', { path: targetPath });
+    const fileManager = process.platform === 'win32' ? 'File Explorer' : 'Finder';
+    emitPatch('succeeded', interaction.type, targetPath, fileManager, { path: targetPath });
     return {
       status: 'succeeded',
       results: [{ op: 'open_path', status: 'success' }],
       context: {
         file_manager_action: {
-          application: 'Finder',
+          application: fileManager,
           action: 'open_path',
           path: targetPath,
         },
@@ -633,8 +635,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         requestedBy: 'system-actuator',
         kind: 'channel-approval',
         draft: {
-          title: 'Approval required: empty Finder trash',
-          summary: 'A computer interaction requested a destructive Finder operation.',
+          title: 'Approval required: empty recycle bin',
+          summary: 'A computer interaction requested a destructive file manager operation.',
           details: 'Approve this request before running empty_trash.',
           severity: 'high',
         },
@@ -646,8 +648,9 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         },
         justification: {
           reason: 'Destructive desktop operation requested through computer_interaction.',
-          impactSummary: 'All items currently in Finder trash will be permanently removed.',
-          requestedEffects: ['empty_finder_trash'],
+          impactSummary:
+            'All items currently in the recycle bin or trash will be permanently removed.',
+          requestedEffects: ['empty_file_manager_trash'],
         },
         risk: {
           level: 'high',
