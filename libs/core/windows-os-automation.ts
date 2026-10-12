@@ -6,9 +6,103 @@ import { escapeXml } from './text-escaping.js';
 import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
 
 const PS = 'powershell.exe';
+export const WINDOWS_APP_LAUNCH_ENV = 'KYBERION_WINDOWS_APP_LAUNCH';
+export const WINDOWS_WINDOW_ACTION_ENV = 'KYBERION_WINDOWS_WINDOW_ACTION';
+
+export const WINDOWS_APP_LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
+$raw = [string]$env:${WINDOWS_APP_LAUNCH_ENV}
+if (-not $raw) { throw 'Application launch options are missing' }
+$options = ConvertFrom-Json -InputObject $raw
+Start-Process -FilePath ([string]$options.application) | Out-Null
+[Console]::Out.WriteLine('true')`;
+
+export const WINDOWS_WINDOW_ACTION_SCRIPT = `$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$raw = [string]$env:${WINDOWS_WINDOW_ACTION_ENV}
+if (-not $raw) { throw 'Window action options are missing' }
+$options = ConvertFrom-Json -InputObject $raw
+$app = ([string]$options.application -replace '[.]exe$', '' -replace '[^a-zA-Z0-9]', '').ToLowerInvariant()
+$aliases = @{ googlechrome = 'chrome'; fileexplorer = 'explorer'; microsoftedge = 'msedge'; mozillafirefox = 'firefox'; microsoftword = 'winword'; microsoftexcel = 'excel'; microsoftpowerpoint = 'powerpnt' }
+if ($aliases.ContainsKey($app)) { $app = $aliases[$app] }
+$title = [string]$options.title
+$policy = [string]$options.matchPolicy
+$state = [string]$options.state
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)
+$windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)
+$matches = @()
+for ($i = 0; $i -lt $windows.Count; $i++) {
+  $window = $windows.Item($i)
+  $name = [string]$window.Current.Name
+  $titleMatch = switch ($policy) {
+    'strict' { [string]::Equals($name, $title, [StringComparison]::OrdinalIgnoreCase) }
+    'prefix' { $name.StartsWith($title, [StringComparison]::OrdinalIgnoreCase) }
+    default { $name.IndexOf($title, [StringComparison]::OrdinalIgnoreCase) -ge 0 }
+  }
+  if (-not $titleMatch) { continue }
+  if ($app) {
+    $process = Get-Process -Id $window.Current.ProcessId -ErrorAction SilentlyContinue
+    $processName = if ($process) { ($process.ProcessName -replace '[^a-zA-Z0-9]', '').ToLowerInvariant() } else { '' }
+    if ($processName -and -not ($processName.Contains($app) -or $app.Contains($processName))) { continue }
+  }
+  $matches += $window
+}
+if ($matches.Count -ne 1) { [Console]::Out.WriteLine('false'); exit 0 }
+$window = $matches[0]
+try {
+  $pattern = $null
+  if (-not $window.TryGetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern, [ref]$pattern)) { throw 'WindowPattern unavailable' }
+  switch ($state) {
+    'focus' {
+      $processId = [int]$window.Current.ProcessId
+      $shell = New-Object -ComObject WScript.Shell
+      if (-not $shell.AppActivate($processId)) { throw 'Window activation failed' }
+      $window.SetFocus()
+    }
+    'maximize' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Maximized) }
+    'minimize' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Minimized) }
+    'restore' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Normal) }
+    default { throw 'Unsupported window state' }
+  }
+  [Console]::Out.WriteLine('true')
+} catch { [Console]::Out.WriteLine('false') }`;
+
+function runWindowsAppScript(
+  script: string,
+  envName: string,
+  value: Record<string, unknown>
+): boolean {
+  const result = safeExecResult(PS, powerShellStdinArgs(), {
+    timeoutMs: 10_000,
+    maxOutputMB: 1,
+    env: { ...windowsPowerShellEnv(), [envName]: JSON.stringify(value) },
+    input: script,
+  });
+  return result.status === 0 && result.stdout.trim().toLowerCase() === 'true';
+}
 
 function quote(value: string): string {
   return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+const WINDOWS_APPLICATION_PROCESS_ALIASES: Record<string, string> = {
+  googlechrome: 'chrome',
+  fileexplorer: 'explorer',
+  microsoftedge: 'msedge',
+  mozillafirefox: 'firefox',
+  microsoftword: 'winword',
+  microsoftexcel: 'excel',
+  microsoftpowerpoint: 'powerpnt',
+};
+
+function windowsApplicationProcessName(application: string): string {
+  const normalized = application
+    .trim()
+    .replace(/\.exe$/i, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+  return WINDOWS_APPLICATION_PROCESS_ALIASES[normalized] || normalized;
 }
 
 function run(script: string): string {
@@ -25,14 +119,73 @@ function runResult(script: string): string {
 }
 
 export function activateApplication(application: string): void {
-  run(`$ws = New-Object -ComObject WScript.Shell; [void]$ws.AppActivate(${quote(application)})`);
+  const target = application.trim();
+  if (!target) return;
+  const processName = windowsApplicationProcessName(target);
+  run(
+    `$processName = ${quote(processName)}; ` +
+      '$process = Get-Process | Where-Object { ($_.ProcessName -replace "[^a-zA-Z0-9]", "").ToLowerInvariant() -eq $processName } | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; ' +
+      '$ws = New-Object -ComObject WScript.Shell; ' +
+      `if ($process) { [void]$ws.AppActivate([int]$process.Id) } else { [void]$ws.AppActivate(${quote(target)}) }`
+  );
+}
+
+export function launchApplication(application: string): boolean {
+  const target = application.trim();
+  if (!target) return false;
+  return runWindowsAppScript(WINDOWS_APP_LAUNCH_SCRIPT, WINDOWS_APP_LAUNCH_ENV, {
+    application: target,
+  });
 }
 
 export function detectFocusedInput(): FocusedInputState {
-  const title = runResult(
-    '(Get-Process | Where-Object {$_.MainWindowHandle -eq (Get-Process -Id $PID).MainWindowHandle} | Select-Object -First 1 -ExpandProperty MainWindowTitle)'
+  const output = runResult(
+    [
+      'Add-Type -AssemblyName UIAutomationClient',
+      '$focused = [System.Windows.Automation.AutomationElement]::FocusedElement',
+      '$application = ""; $windowTitle = ""; $role = ""; $description = ""; $editable = $false',
+      'if ($null -ne $focused) {',
+      '  $current = $focused.Current',
+      '  $role = $current.ControlType.ProgrammaticName',
+      '  $description = $current.Name',
+      '  try {',
+      '    $process = Get-Process -Id $current.ProcessId -ErrorAction Stop',
+      '    $application = $process.ProcessName',
+      '    $windowTitle = $process.MainWindowTitle',
+      '  } catch {}',
+      '  $isEdit = $current.ControlType -eq [System.Windows.Automation.ControlType]::Edit',
+      '  $isComboBox = $current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox',
+      '  if ($isEdit -or $isComboBox) {',
+      '    $valuePattern = $null',
+      '    $hasValue = $focused.TryGetCurrentPattern(',
+      '      [System.Windows.Automation.ValuePattern]::Pattern, [ref]$valuePattern)',
+      '    if ($hasValue) {',
+      '      $editable = -not $valuePattern.Current.IsReadOnly',
+      '    }',
+      '  }',
+      '}',
+      '$result = [pscustomobject]@{',
+      '  application = $application; windowTitle = $windowTitle; role = $role',
+      '  description = $description; editable = $editable',
+      '}',
+      '$result | ConvertTo-Json -Compress',
+    ].join('\n')
   );
-  return { application: '', windowTitle: title, role: '', description: '', editable: false };
+  try {
+    const focused = parseSafeJsonInput(
+      output,
+      'Windows focused input state'
+    ) as Partial<FocusedInputState>;
+    return {
+      application: typeof focused.application === 'string' ? focused.application : '',
+      windowTitle: typeof focused.windowTitle === 'string' ? focused.windowTitle : '',
+      role: typeof focused.role === 'string' ? focused.role : '',
+      description: typeof focused.description === 'string' ? focused.description : '',
+      editable: focused.editable === true,
+    };
+  } catch {
+    return { application: '', windowTitle: '', role: '', description: '', editable: false };
+  }
 }
 
 export function keystrokeText(text: string): void {
@@ -299,7 +452,7 @@ export function getScreenSize(): { width: number; height: number } {
     return { width: 0, height: 0 };
   }
 }
-export function getWindowList(_appName: string): string[] {
+export function getWindowList(appName: string): string[] {
   // Prefer the Windows UI Automation tree.  Unlike MainWindowTitle, UIA also
   // sees modern WinUI/WPF controls and filters out background processes at the
   // accessibility boundary.  Keep the process query as a compatibility
@@ -310,9 +463,11 @@ export function getWindowList(_appName: string): string[] {
     '$condition = New-Object System.Windows.Automation.PropertyCondition(',
     '  [System.Windows.Automation.AutomationElement]::ControlTypeProperty,',
     '  [System.Windows.Automation.ControlType]::Window)',
+    `$requestedApp = ${quote(windowsApplicationProcessName(appName))}`,
     '$windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)',
     'for ($i = 0; $i -lt $windows.Count; $i++) {',
-    '  $name = $windows.Item($i).Current.Name',
+    '  $window = $windows.Item($i); $name = $window.Current.Name',
+    '  if ($requestedApp) { $p = Get-Process -Id $window.Current.ProcessId -ErrorAction SilentlyContinue; $pn = if ($p) { ($p.ProcessName -replace "[^a-zA-Z0-9]", "").ToLowerInvariant() } else { "" }; if ($pn -and -not ($pn.Contains($requestedApp) -or $requestedApp.Contains($pn))) { continue } }',
     '  if ($name) { $name }',
     '}',
   ].join('\n');
@@ -327,12 +482,38 @@ export function getWindowList(_appName: string): string[] {
     .split(/\r?\n/)
     .filter(Boolean);
 }
-export function activateWindowByTitle(_appName: string, windowTitle: string): boolean {
-  activateApplication(windowTitle);
-  return true;
+export function activateWindowByTitle(
+  appName: string,
+  windowTitle: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
+): boolean {
+  return runWindowsAppScript(WINDOWS_WINDOW_ACTION_SCRIPT, WINDOWS_WINDOW_ACTION_ENV, {
+    application: appName,
+    title: windowTitle,
+    matchPolicy,
+    state: 'focus',
+  });
+}
+export function setWindowState(
+  appName: string,
+  windowTitle: string,
+  state: 'maximize' | 'minimize' | 'restore',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
+): boolean {
+  return runWindowsAppScript(WINDOWS_WINDOW_ACTION_SCRIPT, WINDOWS_WINDOW_ACTION_ENV, {
+    application: appName,
+    title: windowTitle,
+    matchPolicy,
+    state,
+  });
 }
 export function quitApplication(application: string): void {
-  run(`Get-Process -Name ${quote(application)} -ErrorAction SilentlyContinue | Stop-Process`);
+  const name = windowsApplicationProcessName(application);
+  if (!name) return;
+  run(
+    `$processes = @(Get-Process -Name ${quote(name)} -ErrorAction SilentlyContinue); ` +
+      'foreach ($process in $processes) { if ($process.MainWindowHandle -ne 0) { [void]$process.CloseMainWindow() } }'
+  );
 }
 export function systemNotify(title: string, message: string): void {
   try {

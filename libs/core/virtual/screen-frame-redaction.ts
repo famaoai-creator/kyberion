@@ -23,7 +23,14 @@ function defaultWorkDir(): string {
 /** OCR `ocrPath` (holding `payload`) and return the redacted PNG frame. */
 async function redactPayload(payload: Buffer, ocrPath: string, tsMs: number): Promise<VideoFrame> {
   const image = await Jimp.read(payload);
-  const ocr = await ocrImage({ path: ocrPath, mode: 'privacy_first' });
+  // Screen masking needs word locations as well as text. Prefer the exact,
+  // on-device OCR engines before a local VLM, which can caption text but does
+  // not return trustworthy pixel boxes for redaction.
+  const ocr = await ocrImage({
+    path: ocrPath,
+    mode: 'privacy_first',
+    providerPreference: ['windows_native', 'apple_vision', 'tesseract'],
+  });
   const redaction = redactFrame({
     frame: {
       width: image.bitmap.width,

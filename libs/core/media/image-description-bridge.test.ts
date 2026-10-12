@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { probe } = vi.hoisted(() => ({ probe: vi.fn() }));
+const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 
 vi.mock('../windows-native-image-recognition-bridge.js', () => ({
   probeWindowsNativeImageRecognition: probe,
   describeImageWithWindowsNativeApi: vi.fn(() => ''),
 }));
+vi.mock('../network.js', () => ({ secureFetch: fetchMock }));
 
 import {
   ImageDescriptionUnavailableError,
+  OllamaVisionImageDescriptionProvider,
   ReasoningVisionImageDescriptionProvider,
   createReasoningVisionDescribeFn,
   describeImage,
@@ -54,6 +57,7 @@ function visionBackend(
 
 beforeEach(() => {
   probe.mockReturnValue({ ocr: false, description: false, reason: 'requires Windows' });
+  fetchMock.mockReset();
 });
 
 describe('describeImage with the reasoning_vision provider', () => {
@@ -136,6 +140,14 @@ describe('describeImage with the reasoning_vision provider', () => {
     expect(result.status).toBe('failed');
     expect(result.error).toMatch(/VISION_UNSUPPORTED_MEDIA_TYPE/);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('OllamaVisionImageDescriptionProvider', () => {
+  it('refuses non-loopback endpoints', async () => {
+    const provider = new OllamaVisionImageDescriptionProvider('https://example.invalid', 'vision');
+    await expect(provider.isAvailable()).resolves.toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

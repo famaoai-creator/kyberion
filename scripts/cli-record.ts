@@ -15,13 +15,14 @@ import { safeStat } from '@agent/core/secure-io';
 import { ScriptExitError } from './lib/harness.js';
 import { isInsideRepository, parseCommonOption } from './lib/perception.js';
 
-export const RECORD_USAGE = `Usage: pnpm kyberion record screen|audio|camera [--duration <seconds>] [--out <file>] [--device <name>] [--json]
+export const RECORD_USAGE = `Usage: pnpm kyberion record screen|audio|camera [--duration <seconds>] [--fps <n>] [--out <file>] [--device <name>] [--json]
 
 Records a time-series capture through the governed recording bridges.
   record screen      Record the screen as video via system:record_screen (frames redacted, max 300s)
   record audio       Record microphone audio via system:record_audio (meetings: pnpm minutes:record)
   record camera      Record camera video via system:record_camera (photo-per-frame, low fps, max 60s)
   --duration <s>     Seconds to record (default 5; screen/audio max 300, camera max 60)
+  --fps <n>          Screen sampling rate (default 1, max 30; each frame is redacted)
   --out <file>       Where to write inside the repository.
                      screen/camera: mp4 / mov (defaults under active/shared/runtime/computer/)
                      audio: a single wav / mp3 / m4a / ... file (needs exactly one input),
@@ -53,6 +54,7 @@ export interface RecordArgs {
   device?: string;
   source: 'screen' | 'audio' | 'camera';
   durationS: number;
+  fps: number;
 }
 
 export interface RecordResult {
@@ -71,7 +73,8 @@ export interface RecordDeps {
 
 export function buildRecordScreenPipelineInput(
   target: string,
-  durationS: number
+  durationS: number,
+  fps = 1
 ): Record<string, unknown> {
   return {
     action: 'pipeline',
@@ -82,6 +85,8 @@ export function buildRecordScreenPipelineInput(
         params: {
           capture_mode: 'screen',
           duration: durationS,
+          fps,
+          frame_interval_ms: Math.round(1_000 / fps),
           output: target,
           export_as: 'screen_recording',
         },
@@ -141,6 +146,7 @@ function parseRecordArgs(argv: string[]): RecordArgs {
     help: false,
     source: 'screen',
     durationS: RECORD_DEFAULT_DURATION_S,
+    fps: 1,
   };
   const common: { json: boolean; help: boolean; out?: string } = { json: false, help: false };
   const takeValue = (index: number, flag: string, label: string): string => {
@@ -180,6 +186,14 @@ function parseRecordArgs(argv: string[]): RecordArgs {
         throw new ScriptExitError(1, `--duration must be 1-${maxS} seconds, got "${raw}"`);
       }
       args.durationS = parsed;
+      index += 1;
+    } else if (value === '--fps') {
+      const raw = takeValue(index, '--fps', 'a frame rate');
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 30) {
+        throw new ScriptExitError(1, `--fps must be 1-30, got "${raw}"`);
+      }
+      args.fps = parsed;
       index += 1;
     } else if (value.startsWith('--')) throw new ScriptExitError(1, `Unknown option: ${value}`);
     else throw new ScriptExitError(1, `Unexpected argument: ${value}`);
@@ -245,7 +259,7 @@ interface AudioRecordingEntry {
 }
 
 function toRelative(repoPath: string): string {
-  return path.relative(pathResolver.rootDir(), repoPath);
+  return path.relative(pathResolver.rootDir(), repoPath).replace(/\\/gu, '/');
 }
 
 function statSizeOrThrow(saved: string, opName: string): number {
@@ -272,6 +286,9 @@ export async function runRecordCommand(
   if (args.device && args.source !== 'audio') {
     throw new ScriptExitError(1, '[record] --device only applies to `record audio`');
   }
+  if (args.fps !== 1 && args.source !== 'screen') {
+    throw new ScriptExitError(1, '[record] --fps only applies to `record screen`');
+  }
   if (args.source === 'camera' && args.durationS > RECORD_CAMERA_MAX_DURATION_S) {
     throw new ScriptExitError(
       1,
@@ -284,7 +301,7 @@ export async function runRecordCommand(
     const input =
       args.source === 'camera'
         ? buildRecordCameraPipelineInput(target, args.durationS)
-        : buildRecordScreenPipelineInput(target, args.durationS);
+        : buildRecordScreenPipelineInput(target, args.durationS, args.fps);
     let raw: Record<string, unknown>;
     try {
       raw = await deps.record(input);

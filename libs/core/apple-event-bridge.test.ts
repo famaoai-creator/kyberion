@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./secure-io.js', () => ({
   safeExec: vi.fn(() => ''),
+  safeExecResult: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
 }));
 
 const originalPlatform = process.platform;
@@ -52,6 +53,31 @@ describe('apple-event-bridge', () => {
       'tell application "Safari" to activate',
     ]);
 
+    restorePlatform();
+  });
+
+  it('launches an application through the native launch boundary', async () => {
+    mockDarwinPlatform();
+    const secureIo = await import('./secure-io.js');
+    const bridge = await import('./apple-event-bridge.js');
+
+    expect(bridge.launchApplication('Safari')).toBe(true);
+    expect(secureIo.safeExecResult).toHaveBeenCalledWith('open', ['-a', 'Safari'], {
+      timeoutMs: 10_000,
+    });
+    restorePlatform();
+  });
+
+  it('sets window state through Accessibility actions with explicit matching', async () => {
+    mockDarwinPlatform();
+    const secureIo = await import('./secure-io.js');
+    vi.mocked(secureIo.safeExec).mockReturnValueOnce('true');
+    const bridge = await import('./apple-event-bridge.js');
+
+    expect(bridge.setWindowState('Safari', 'Settings', 'maximize', 'strict')).toBe(true);
+    const script = vi.mocked(secureIo.safeExec).mock.calls.at(-1)?.[1]?.[1];
+    expect(script).toContain('name of w is "Settings"');
+    expect(script).toContain('perform action "AXZoom" of w');
     restorePlatform();
   });
 

@@ -4,20 +4,30 @@ import { clearMarks, resolveMarkTarget, saveMarks } from './mark-target-resolver
 import { fuseSetOfMarks } from './set-of-marks.js';
 import { POWERSHELL_STDIN_BOOTSTRAP, powerShellStdinArgs } from './windows-powershell.js';
 
-const mocks = vi.hoisted(() => ({ safeExecResult: vi.fn() }));
+const mocks = vi.hoisted(() => ({ safeExec: vi.fn(() => ''), safeExecResult: vi.fn() }));
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
-  return { ...actual, safeExecResult: mocks.safeExecResult };
+  return { ...actual, safeExec: mocks.safeExec, safeExecResult: mocks.safeExecResult };
 });
 
 const {
   MOUSEEVENTF,
   WINDOWS_POINTER_OPTIONS_ENV,
   WINDOWS_POINTER_SCRIPT,
+  WINDOWS_APP_LAUNCH_ENV,
+  WINDOWS_APP_LAUNCH_SCRIPT,
+  WINDOWS_WINDOW_ACTION_ENV,
+  WINDOWS_WINDOW_ACTION_SCRIPT,
   clickAt,
+  detectFocusedInput,
   dragFrom,
   getScreenSize,
+  launchApplication,
+  activateWindowByTitle,
+  activateApplication,
+  quitApplication,
+  setWindowState,
   moveMouse,
   rightClickAt,
   runWindowsPointerActions,
@@ -161,6 +171,104 @@ describe('Windows pointer actions', () => {
     expect(actionsOf(calls()[0])).toEqual([]);
     reply(REPORT, 1);
     expect(getScreenSize()).toEqual({ width: 0, height: 0 });
+  });
+});
+
+describe('Windows application and window operations', () => {
+  it('launches an application through a fixed script with separate request data', () => {
+    mocks.safeExecResult.mockReturnValue({ stdout: 'true', stderr: '', status: 0 });
+    expect(launchApplication('notepad.exe')).toBe(true);
+    const call = calls().at(-1)!;
+    expect(call.options.input).toBe(WINDOWS_APP_LAUNCH_SCRIPT);
+    expect(call.options.env?.[WINDOWS_APP_LAUNCH_ENV]).toBe(
+      JSON.stringify({ application: 'notepad.exe' })
+    );
+    expect(WINDOWS_APP_LAUNCH_SCRIPT).not.toContain('notepad.exe');
+  });
+
+  it('focuses and maximizes only a unique UI Automation window match', () => {
+    mocks.safeExecResult.mockReturnValue({ stdout: 'true', stderr: '', status: 0 });
+    expect(activateWindowByTitle('chrome', 'Docs', 'strict')).toBe(true);
+    const focusCall = calls().at(-1)!;
+    expect(focusCall.options.input).toBe(WINDOWS_WINDOW_ACTION_SCRIPT);
+    expect(focusCall.options.env?.[WINDOWS_WINDOW_ACTION_ENV]).toBe(
+      JSON.stringify({
+        application: 'chrome',
+        title: 'Docs',
+        matchPolicy: 'strict',
+        state: 'focus',
+      })
+    );
+
+    expect(setWindowState('chrome', 'Docs', 'maximize')).toBe(true);
+    expect(calls().at(-1)?.options.env?.[WINDOWS_WINDOW_ACTION_ENV]).toContain(
+      '"state":"maximize"'
+    );
+    expect(WINDOWS_WINDOW_ACTION_SCRIPT).toContain('WindowVisualState]::Maximized');
+    expect(WINDOWS_WINDOW_ACTION_SCRIPT).toContain('$matches.Count -ne 1');
+  });
+
+  it('resolves common display names to process names and requests a graceful quit', () => {
+    activateApplication('Google Chrome');
+    expect(mocks.safeExec).toHaveBeenLastCalledWith('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      expect.stringContaining("$processName = 'chrome'"),
+    ]);
+
+    quitApplication('Google Chrome');
+    const [, quitArgs] = mocks.safeExec.mock.calls.at(-1)!;
+    const quitScript = quitArgs[3];
+    expect(quitScript).toContain("Get-Process -Name 'chrome'");
+    expect(quitScript).toContain('CloseMainWindow()');
+    expect(quitScript).not.toContain('Stop-Process');
+  });
+});
+
+describe('Windows focused input detection', () => {
+  it('reads focused UI Automation metadata and reports editable value controls', () => {
+    mocks.safeExecResult.mockReturnValueOnce({
+      stdout: JSON.stringify({
+        application: 'chrome',
+        windowTitle: 'Kyberion',
+        role: 'ControlType.Edit',
+        description: 'Search',
+        editable: true,
+      }),
+      stderr: '',
+      status: 0,
+      signal: null,
+      error: null,
+    });
+
+    expect(detectFocusedInput()).toEqual({
+      application: 'chrome',
+      windowTitle: 'Kyberion',
+      role: 'ControlType.Edit',
+      description: 'Search',
+      editable: true,
+    });
+    expect(calls()[0].args).toContain('-Command');
+    expect(calls()[0].args.at(-1)).toContain('AutomationElement]::FocusedElement');
+  });
+
+  it('fails closed when UI Automation has no focused element', () => {
+    mocks.safeExecResult.mockReturnValueOnce({
+      stdout: '',
+      stderr: 'UI Automation unavailable',
+      status: 1,
+      signal: null,
+      error: null,
+    });
+
+    expect(detectFocusedInput()).toEqual({
+      application: '',
+      windowTitle: '',
+      role: '',
+      description: '',
+      editable: false,
+    });
   });
 });
 

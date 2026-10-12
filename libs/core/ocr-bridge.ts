@@ -253,14 +253,22 @@ export class TesseractOcrProvider implements OcrProvider {
         throw new Error('OCR cancelled before recognition');
       }
       request.signal?.addEventListener('abort', abortWorker, { once: true });
-      const result = await worker.recognize(resolvedPath);
+      // `lines` are derived from Tesseract's block output. The default output
+      // only returns plain text, which is fine for `see` but cannot safely
+      // redact a screen frame because it has no pixel coordinates.
+      const result = await worker.recognize(resolvedPath, {}, { blocks: true });
+      const recognizedLines = Array.isArray(result.data.blocks)
+        ? result.data.blocks.flatMap((block: any) =>
+            (block.paragraphs || []).flatMap((paragraph: any) => paragraph.lines || [])
+          )
+        : undefined;
 
       return {
         status: 'succeeded',
         provider: this.id,
         text: result.data.text,
         confidence: result.data.confidence,
-        lines: result.data.lines?.map((line) => ({
+        lines: recognizedLines?.map((line: any) => ({
           text: line.text,
           confidence: line.confidence,
           boundingBox: line.bbox
@@ -658,13 +666,18 @@ export class LocalVlmOcrProvider implements OcrProvider {
       prompt:
         'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks or explanations.',
       images: [base64Data],
+      // Qwen's reasoning mode is unnecessary for literal OCR. Bound the
+      // working context and make token output deterministic for local media.
+      think: false,
       stream: false,
+      options: { temperature: 0, num_ctx: 8_192, num_predict: 1_024 },
     };
 
     const data = await secureFetch<unknown>({
       method: 'POST',
       url: this.endpoint,
       headers: { 'Content-Type': 'application/json' },
+      timeout: request.timeout_ms ?? 120_000,
       data: payload,
       kyberion_allow_local_network: true,
     });
