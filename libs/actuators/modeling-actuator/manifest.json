@@ -1,6 +1,6 @@
 {
   "actuator_id": "modeling-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Architectural Analysis and ADF Transformation Engine",
   "contract_schema": "knowledge/product/schemas/modeling-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",

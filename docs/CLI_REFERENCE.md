@@ -278,6 +278,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion secret apply`                  |                                     | Apply an introduced secret                                                                                            |
 | `pnpm kyberion secret introduce`              |                                     | Introduce a secret through a hidden prompt                                                                            |
 | `pnpm kyberion secrets encrypt`               | `pnpm secrets:encrypt`              | Encrypt (or --decrypt) connection documents                                                                           |
+| `pnpm kyberion security ledger`               | `pnpm security:ledger`              | Promote or verify entries in the tenant external-asset security registry                                              |
 | `pnpm kyberion service harness`               |                                     | Run the service harness                                                                                               |
 | `pnpm kyberion service recording`             |                                     | Run the service recording flow                                                                                        |
 | `pnpm kyberion sketch-input server`           |                                     | Start the sketch input pad                                                                                            |
