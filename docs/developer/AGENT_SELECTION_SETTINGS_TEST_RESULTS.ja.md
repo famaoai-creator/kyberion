@@ -74,3 +74,5 @@ PR #1070 の最初の head 1ef8ea0 では、PR readiness、actuator/boundary/sec
 - 対象ランナーの [公式ソフトウェア一覧](https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md) は Google Chrome 154.0.8037.97 を掲載する。[Chromium の公式説明](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md) に従い、既存 Ubuntu ポリシーの対象となるインストール済み stable Chrome を [Playwright の標準 channel](https://playwright.dev/docs/browsers#google-chrome--microsoft-edge) で選ぶ。chromiumSandbox:true を維持し、起動失敗は失敗のままとする。OS・AppArmor 設定、インストール、sandbox 無効化、別ブラウザーへの自動代替は追加しない。実際の browser version と assertion 結果は修正後 CI のログで確認する。
 
 修正後のローカル Operator 試験は 80 件成功、実ブラウザー 1 件は明示的な skip。型検査と production build も成功した。独立したソースレビューで線形分類・sandbox 維持・代替経路なしを確認した。修正後の CodeQL と実ブラウザー assertion は次の CI で確認する。
+
+次の head 3d09c888 で CodeQL は成功し、sandbox を有効にした stable Chrome は実際の画面操作へ進んだ。しかし、select を囲む label に option 全文が含まれ、正確な Selection mode ラベルが一致せず失敗した。ラベルと control を兄弟要素にして htmlFor/id を維持し、英語・日本語の SSR 回帰と実ブラウザーの native label 検証を追加した。セレクターやタイムアウトは緩和していない。修正後のローカル試験 84 件、型検査、production build、対象 lint は成功した。失敗時には人工画面の限定的な状態だけを診断へ出力し、元の失敗を再送出する。最終 hosted assertion は引き続き未確定。
