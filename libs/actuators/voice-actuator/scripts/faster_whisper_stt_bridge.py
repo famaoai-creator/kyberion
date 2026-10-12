@@ -31,12 +31,22 @@ def transcribe(params: dict) -> dict:
     language = str(params.get("language") or os.environ.get("KYBERION_STT_LANGUAGE") or "")
     try:
         model = WhisperModel(model_ref, device=device, compute_type=compute_type)
-        segments, info = model.transcribe(audio_path, language=language or None, vad_filter=True)
+        word_timestamps = bool(params.get("word_timestamps"))
+        segments, info = model.transcribe(
+            audio_path, language=language or None, vad_filter=True, word_timestamps=word_timestamps
+        )
         segment_list = []
         for segment in segments:
             text = str(segment.text or "").strip()
-            if text:
-                segment_list.append({"start_sec": float(segment.start), "end_sec": float(segment.end), "text": text})
+            if not text:
+                continue
+            entry = {"start_sec": float(segment.start), "end_sec": float(segment.end), "text": text}
+            if word_timestamps and segment.words:
+                entry["words"] = [
+                    {"start_sec": float(w.start), "end_sec": float(w.end), "word": str(w.word)}
+                    for w in segment.words
+                ]
+            segment_list.append(entry)
         return {
             "status": "success",
             "text": " ".join(item["text"] for item in segment_list).strip(),

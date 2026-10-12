@@ -476,6 +476,10 @@
         "generate_image",
         "generate_music",
         "generate_video",
+
+        "lyric_normalize",
+        "mv_compose",
+        "mv_storyboard",
         "get_generation_job",
         "run_workflow",
         "submit_generation",

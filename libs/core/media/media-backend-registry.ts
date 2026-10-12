@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { clamp } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
@@ -58,6 +59,8 @@ export interface MediaBackendRecord {
    */
   probe?: MediaBackendProbeDescriptor;
   fallback_backend_id?: string;
+  /** Minimum host RAM (GB) this backend requires; backends above the host's total memory are skipped during resolution. */
+  min_memory_gb?: number;
   cost_tier?: 'free' | 'paid' | 'self_hosted' | 'environment';
   data_policy?: 'training_eligible' | 'zero_retention' | 'local_only';
   execution_locality?: 'local' | 'remote' | 'hybrid';
@@ -422,7 +425,8 @@ export async function probeMediaBackendAvailability(
 export async function resolveMediaBackendWithAvailability(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3)
 ): Promise<{
   backend: MediaBackendRecord;
   availability: MediaBackendAvailability;
@@ -438,8 +442,13 @@ export async function resolveMediaBackendWithAvailability(
       modality,
       platform
     );
-    if (availability.available) {
-      return { backend: current, availability, fallback_used: fallbackUsed };
+    if (current.min_memory_gb === undefined || hostMemoryGb >= current.min_memory_gb) {
+      if (availability.available) {
+        return { backend: current, availability, fallback_used: fallbackUsed };
+      }
+      if (!current.fallback_backend_id) {
+        return { backend: current, availability, fallback_used: fallbackUsed };
+      }
     }
     if (!current.fallback_backend_id) {
       return { backend: current, availability, fallback_used: fallbackUsed };
@@ -455,7 +464,8 @@ export async function resolveMediaBackendWithAvailability(
 export function resolveMediaBackendForPlatform(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3)
 ): MediaBackendRecord {
   const registry = getRegistry();
   const configuredDefault =
@@ -467,7 +477,11 @@ export function resolveMediaBackendForPlatform(
   while (current) {
     if (visited.has(current.backend_id)) break;
     visited.add(current.backend_id);
-    if (current.status === 'active' && isSupportedPlatform(current, platform)) {
+    if (
+      current.status === 'active' &&
+      isSupportedPlatform(current, platform) &&
+      (current.min_memory_gb === undefined || hostMemoryGb >= current.min_memory_gb)
+    ) {
       return current;
     }
     if (current.fallback_backend_id) {
@@ -478,7 +492,11 @@ export function resolveMediaBackendForPlatform(
   }
 
   const defaultBackend = getMediaBackendRecord(defaultBackendId, modality);
-  if (defaultBackend.status === 'active' && isSupportedPlatform(defaultBackend, platform)) {
+  if (
+    defaultBackend.status === 'active' &&
+    isSupportedPlatform(defaultBackend, platform) &&
+    (defaultBackend.min_memory_gb === undefined || hostMemoryGb >= defaultBackend.min_memory_gb)
+  ) {
     return defaultBackend;
   }
 

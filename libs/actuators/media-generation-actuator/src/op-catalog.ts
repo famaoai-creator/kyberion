@@ -57,6 +57,57 @@ const MEDIA_GENERATION_CONTRACTS: Record<string, InputSchema> = {
     properties: { output: { type: 'string' } },
     additionalProperties: false,
   },
+  lyric_normalize: {
+    type: 'object',
+    properties: {
+      lyrics: { type: 'string' },
+      lyrics_path: { type: 'string' },
+      display_lyrics: { type: 'string' },
+      reading_overrides: { type: 'object' },
+    },
+    additionalProperties: false,
+  },
+  vocal_align: {
+    type: 'object',
+    properties: {
+      audio_path: { type: 'string' },
+      language: { type: 'string' },
+      lyrics: {},
+      srt_path: { type: 'string' },
+    },
+    required: ['audio_path'],
+    additionalProperties: false,
+  },
+  mv_storyboard: {
+    type: 'object',
+    properties: {
+      srt_path: { type: 'string' },
+      srt: { type: 'string' },
+      duration_sec: { type: 'number' },
+      lead_in_sec: { type: 'number' },
+      outro_sec: { type: 'number' },
+      min_scene_sec: { type: 'number' },
+      style: { type: 'string' },
+      output_path: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  mv_compose: {
+    type: 'object',
+    properties: {
+      storyboard_path: { type: 'string' },
+      scenes_path: { type: 'string' },
+      audio_path: { type: 'string' },
+      srt_path: { type: 'string' },
+      output_path: { type: 'string' },
+      fps: { type: 'number' },
+      width: { type: 'number' },
+      height: { type: 'number' },
+      timeout_ms: { type: 'number' },
+    },
+    required: ['output_path'],
+    additionalProperties: false,
+  },
   generate_image: {
     type: 'object',
     properties: {
@@ -188,10 +239,30 @@ const MEDIA_GENERATION_EXAMPLES: Record<string, Array<Record<string, unknown>>> 
   generate_image: [{ prompt: 'A calm landscape', output_path: 'active/shared/tmp/image.png' }],
   generate_video: [{ prompt: 'A calm landscape', output_path: 'active/shared/tmp/video.mp4' }],
   generate_music: [{ prompt: 'A calm ambient theme', output_path: 'active/shared/tmp/music.wav' }],
+  lyric_normalize: [{ lyrics: 'AI test lyrics' }],
+  vocal_align: [{ audio_path: 'active/shared/tmp/mv/song.mp3', language: 'ja' }],
+  mv_storyboard: [
+    {
+      srt_path: 'active/shared/tmp/mv/lyrics.srt',
+      output_path: 'active/shared/tmp/mv/scenes.json',
+    },
+  ],
+  mv_compose: [
+    {
+      storyboard_path: 'active/shared/tmp/mv/scenes.json',
+      audio_path: 'active/shared/tmp/mv/song.mp3',
+      srt_path: 'active/shared/tmp/mv/lyrics.srt',
+      output_path: 'active/shared/tmp/mv/mv.mp4',
+    },
+  ],
   run_workflow: [{ workflow: 'creative-default' }],
 };
 
 export const MEDIA_GENERATION_ACTIONS = [
+  'lyric_normalize',
+  'vocal_align',
+  'mv_storyboard',
+  'mv_compose',
   'generate_image',
   'generate_video',
   'generate_music',
@@ -215,6 +286,10 @@ export const MEDIA_GENERATION_ACTUATOR_CAPTURE_OPS = [
 export const MEDIA_GENERATION_ACTUATOR_TRANSFORM_OPS = [] as const;
 
 export const MEDIA_GENERATION_ACTUATOR_APPLY_OPS = [
+  'lyric_normalize',
+  'vocal_align',
+  'mv_storyboard',
+  'mv_compose',
   'collect_generation_artifact',
   'generate_image',
   'generate_music',

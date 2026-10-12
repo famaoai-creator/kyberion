@@ -3,6 +3,7 @@ import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
   resolveImageBackend,
+  resolveMediaBackendForPlatform,
   resolveMusicBackend,
   resolveVideoBackend,
   resolveVoiceBackend,
@@ -126,6 +127,23 @@ describe('media backend registry', () => {
     expect(resolveMusicBackend('stable_audio_3_small_music', 'darwin').backend_id).toBe(
       'media-generation.stable_audio_3_small_music'
     );
+  });
+
+  it('skips backends above the host memory budget via min_memory_gb', () => {
+    // fp8 i2v fits a 16GB host; fp16 needs 24GB
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v', 'darwin', 16)
+        .backend_id
+    ).toBe('media-generation.comfyui.ltx-i2v-fp8');
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v-fp8', 'darwin', 16)
+        .backend_id
+    ).toBe('media-generation.comfyui.ltx-i2v-fp8');
+    // low-memory host with no fitting backend falls through to the default
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v', 'darwin', 8)
+        .backend_id
+    ).toBe('video.hyperframes_cli');
   });
 
   it('does not return an exact backend record from a different modality', () => {
