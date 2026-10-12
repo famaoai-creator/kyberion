@@ -13,6 +13,7 @@ import type { GenerationJob } from '@agent/core/contracts/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
+import { handleMvOp } from './mv-production-ops.js';
 import * as path from 'node:path';
 
 type MediaActionResult = Record<string, unknown> & Partial<GenerationJob>;
@@ -733,6 +734,14 @@ async function executeSingleAction(input: MediaActionInput) {
   if (action === 'get_generation_job') return getGenerationJob(params);
   if (action === 'wait_generation_job') return waitGenerationJob(params);
   if (action === 'collect_generation_artifact') return collectGenerationArtifact(params);
+  if (
+    action === 'lyric_normalize' ||
+    action === 'vocal_align' ||
+    action === 'mv_storyboard' ||
+    action === 'mv_compose'
+  ) {
+    return handleMvOp(action, params);
+  }
 
   if (
     action === 'capture_screen' ||

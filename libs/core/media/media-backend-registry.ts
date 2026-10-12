@@ -1,6 +1,8 @@
+import os from 'node:os';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { clamp } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync } from '../secure-io.js';
 import {
   loadRegistryDirectory,
   resolveRegistryDirectory,
@@ -20,6 +22,47 @@ export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
 export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
 export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local' | 'agent_tool';
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
+
+/** Execution accelerators a media backend may run on (any-of). */
+export type MediaBackendAccelerator = 'cpu' | 'mps' | 'mlx' | 'cuda' | 'rocm' | 'directml';
+
+let detectedHostAccelerators: MediaBackendAccelerator[] | undefined;
+
+/**
+ * Accelerators present on this host. Apple Silicon exposes torch MPS and the
+ * MLX runtime; CUDA is probed via `nvidia-smi`. Windows always has DirectML.
+ * Result is cached per process; tests inject `hostAccelerators` instead.
+ */
+export function detectHostAccelerators(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): MediaBackendAccelerator[] {
+  if (detectedHostAccelerators) return detectedHostAccelerators;
+  const accels = new Set<MediaBackendAccelerator>(['cpu']);
+  if (platform === 'darwin' && arch === 'arm64') {
+    accels.add('mps');
+    accels.add('mlx');
+  }
+  if (platform === 'win32') accels.add('directml');
+  if (
+    platform === 'linux' &&
+    (safeExistsSync('/usr/bin/nvidia-smi') || safeExistsSync('/proc/driver/nvidia/version'))
+  ) {
+    accels.add('cuda');
+  }
+  detectedHostAccelerators = [...accels];
+  return detectedHostAccelerators;
+}
+
+function supportsHostAccelerator(
+  backend: MediaBackendRecord,
+  hostAccelerators: readonly MediaBackendAccelerator[]
+): boolean {
+  return (
+    backend.accelerators === undefined ||
+    backend.accelerators.some((a) => hostAccelerators.includes(a))
+  );
+}
 export type MediaBackendProbeKind =
   'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
 
@@ -58,6 +101,15 @@ export interface MediaBackendRecord {
    */
   probe?: MediaBackendProbeDescriptor;
   fallback_backend_id?: string;
+  /** Minimum host RAM (GB) this backend requires; backends above the host's total memory are skipped during resolution. */
+  min_memory_gb?: number;
+  /**
+   * Accelerators this backend can run on (any-of). A backend declaring no
+   * entry is accelerator-agnostic. Examples: a ComfyUI/LTX workflow declares
+   * ["mps","cuda"] (CPU runs are impractically slow), an MLX-native CLI
+   * declares ["mlx"].
+   */
+  accelerators?: MediaBackendAccelerator[];
   cost_tier?: 'free' | 'paid' | 'self_hosted' | 'environment';
   data_policy?: 'training_eligible' | 'zero_retention' | 'local_only';
   execution_locality?: 'local' | 'remote' | 'hybrid';
@@ -422,7 +474,9 @@ export async function probeMediaBackendAvailability(
 export async function resolveMediaBackendWithAvailability(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3),
+  hostAccelerators: readonly MediaBackendAccelerator[] = detectHostAccelerators()
 ): Promise<{
   backend: MediaBackendRecord;
   availability: MediaBackendAvailability;
@@ -438,8 +492,16 @@ export async function resolveMediaBackendWithAvailability(
       modality,
       platform
     );
-    if (availability.available) {
-      return { backend: current, availability, fallback_used: fallbackUsed };
+    if (
+      (current.min_memory_gb === undefined || hostMemoryGb >= current.min_memory_gb) &&
+      supportsHostAccelerator(current, hostAccelerators)
+    ) {
+      if (availability.available) {
+        return { backend: current, availability, fallback_used: fallbackUsed };
+      }
+      if (!current.fallback_backend_id) {
+        return { backend: current, availability, fallback_used: fallbackUsed };
+      }
     }
     if (!current.fallback_backend_id) {
       return { backend: current, availability, fallback_used: fallbackUsed };
@@ -455,7 +517,9 @@ export async function resolveMediaBackendWithAvailability(
 export function resolveMediaBackendForPlatform(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3),
+  hostAccelerators: readonly MediaBackendAccelerator[] = detectHostAccelerators()
 ): MediaBackendRecord {
   const registry = getRegistry();
   const configuredDefault =
@@ -467,7 +531,12 @@ export function resolveMediaBackendForPlatform(
   while (current) {
     if (visited.has(current.backend_id)) break;
     visited.add(current.backend_id);
-    if (current.status === 'active' && isSupportedPlatform(current, platform)) {
+    if (
+      current.status === 'active' &&
+      isSupportedPlatform(current, platform) &&
+      (current.min_memory_gb === undefined || hostMemoryGb >= current.min_memory_gb) &&
+      supportsHostAccelerator(current, hostAccelerators)
+    ) {
       return current;
     }
     if (current.fallback_backend_id) {
@@ -478,7 +547,12 @@ export function resolveMediaBackendForPlatform(
   }
 
   const defaultBackend = getMediaBackendRecord(defaultBackendId, modality);
-  if (defaultBackend.status === 'active' && isSupportedPlatform(defaultBackend, platform)) {
+  if (
+    defaultBackend.status === 'active' &&
+    isSupportedPlatform(defaultBackend, platform) &&
+    (defaultBackend.min_memory_gb === undefined || hostMemoryGb >= defaultBackend.min_memory_gb) &&
+    supportsHostAccelerator(defaultBackend, hostAccelerators)
+  ) {
     return defaultBackend;
   }
 

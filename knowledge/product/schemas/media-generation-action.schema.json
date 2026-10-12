@@ -305,6 +305,18 @@
         "params": { "type": "object" }
       },
       "additionalProperties": false
+    },
+    {
+      "title": "MV production op",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": {
+          "enum": ["lyric_normalize", "vocal_align", "mv_storyboard", "mv_compose"]
+        },
+        "params": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
     }
   ]
 }

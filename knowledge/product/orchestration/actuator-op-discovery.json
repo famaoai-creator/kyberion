@@ -22039,6 +22039,146 @@
           ]
         },
         {
+          "op": "lyric_normalize",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "lyrics": {
+                "type": "string"
+              },
+              "lyrics_path": {
+                "type": "string"
+              },
+              "display_lyrics": {
+                "type": "string"
+              },
+              "reading_overrides": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "lyrics": "AI test lyrics"
+            }
+          ]
+        },
+        {
+          "op": "vocal_align",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "audio_path": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "lyrics": {},
+              "srt_path": {
+                "type": "string"
+              }
+            },
+            "required": ["audio_path"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "audio_path": "active/shared/tmp/mv/song.mp3",
+              "language": "ja"
+            }
+          ]
+        },
+        {
+          "op": "mv_storyboard",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "srt_path": {
+                "type": "string"
+              },
+              "srt": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "lead_in_sec": {
+                "type": "number"
+              },
+              "outro_sec": {
+                "type": "number"
+              },
+              "min_scene_sec": {
+                "type": "number"
+              },
+              "style": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "srt_path": "active/shared/tmp/mv/lyrics.srt",
+              "output_path": "active/shared/tmp/mv/scenes.json"
+            }
+          ]
+        },
+        {
+          "op": "mv_compose",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "storyboard_path": {
+                "type": "string"
+              },
+              "scenes_path": {
+                "type": "string"
+              },
+              "audio_path": {
+                "type": "string"
+              },
+              "srt_path": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "fps": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              },
+              "timeout_ms": {
+                "type": "number"
+              }
+            },
+            "required": ["output_path"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "storyboard_path": "active/shared/tmp/mv/scenes.json",
+              "audio_path": "active/shared/tmp/mv/song.mp3",
+              "srt_path": "active/shared/tmp/mv/lyrics.srt",
+              "output_path": "active/shared/tmp/mv/mv.mp4"
+            }
+          ]
+        },
+        {
           "op": "collect_generation_artifact",
           "kind": "apply",
           "input_schema": {
