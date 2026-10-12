@@ -168,3 +168,150 @@ describe('agent-provider-resolution', () => {
     });
   });
 });
+
+describe('explicit agent provider selection', () => {
+  const catalog: ProviderInfo[] = [
+    {
+      ...provider('claude', ['small', 'large'], true, {
+        small: ['conversation'],
+        large: ['reasoning'],
+      }),
+      capabilities: ['terminal'],
+    },
+    {
+      ...provider('codex', ['exact'], true, { exact: ['reasoning', 'code'] }),
+      capabilities: ['terminal'],
+    },
+  ];
+
+  it('holds the exact fixed provider/model and records its explicit mode', () => {
+    expect(
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          preferredModelId: 'large',
+          selectionMode: 'fixed',
+          fixedProvider: 'codex',
+          fixedModelId: 'exact',
+          requiredCapabilities: ['code', 'terminal'],
+        },
+        catalog
+      )
+    ).toMatchObject({ provider: 'codex', modelId: 'exact', selectionMode: 'fixed' });
+  });
+
+  it('fails closed for an unavailable fixed provider instead of falling back', () => {
+    expect(() =>
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          selectionMode: 'fixed',
+          fixedProvider: 'missing',
+        },
+        catalog
+      )
+    ).toThrow(/AGENT_SELECTION_PROVIDER_UNAVAILABLE/);
+    expect(() =>
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          selectionMode: 'fixed',
+          fixedProvider: 'claude',
+        },
+        catalog.map((entry) => ({ ...entry, healthy: false }))
+      )
+    ).toThrow(/AGENT_SELECTION_PROVIDER_UNAVAILABLE/);
+  });
+
+  it('rejects unknown exact model IDs without substituting a default or alias', () => {
+    expect(() =>
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          preferredModelId: 'large',
+          selectionMode: 'fixed',
+          fixedProvider: 'claude',
+          fixedModelId: 'unknown-exact',
+        },
+        catalog
+      )
+    ).toThrow(/AGENT_SELECTION_MODEL_UNAVAILABLE/);
+  });
+
+  it('does not borrow another model capability to make a fixed model eligible', () => {
+    expect(() =>
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          selectionMode: 'fixed',
+          fixedProvider: 'claude',
+          fixedModelId: 'small',
+          requiredCapabilities: ['reasoning'],
+        },
+        catalog
+      )
+    ).toThrow(/required capabilities/);
+  });
+
+  it('fixes only the supplied provider dimension and chooses an eligible model', () => {
+    expect(
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          preferredModelId: 'small',
+          selectionMode: 'fixed',
+          fixedProvider: 'claude',
+          requiredCapabilities: ['reasoning'],
+        },
+        catalog
+      )
+    ).toMatchObject({ provider: 'claude', modelId: 'large' });
+  });
+
+  it('fixes only the supplied model dimension and can select another provider', () => {
+    expect(
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          selectionMode: 'fixed',
+          fixedModelId: 'exact',
+          requiredCapabilities: ['code'],
+        },
+        catalog
+      )
+    ).toMatchObject({ provider: 'codex', modelId: 'exact' });
+  });
+
+  it('prefers an eligible preferred provider and model before alternatives', () => {
+    expect(
+      resolveAgentProviderTarget(
+        {
+          preferredProvider: 'claude',
+          preferredModelId: 'large',
+          selectionMode: 'preferred',
+          requiredCapabilities: ['reasoning'],
+        },
+        catalog
+      )
+    ).toMatchObject({ provider: 'claude', modelId: 'large' });
+  });
+
+  it.each(['auto', 'preferred', 'fixed'] as const)(
+    'enforces hard requirements in explicit %s mode',
+    (selectionMode) => {
+      expect(() =>
+        resolveAgentProviderTarget(
+          {
+            preferredProvider: 'claude',
+            selectionMode,
+            requiredCapabilities: ['unavailable-capability'],
+          },
+          catalog
+        )
+      ).toThrow(/required capabilities/);
+      expect(() =>
+        resolveAgentProviderTarget({ preferredProvider: 'claude', selectionMode }, [])
+      ).toThrow(/AGENT_SELECTION_UNAVAILABLE/);
+    }
+  );
+});

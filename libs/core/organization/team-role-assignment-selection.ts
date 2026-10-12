@@ -1,3 +1,4 @@
+import type { ProviderInfo } from '../provider/provider-discovery.js';
 import { performanceScoreAdjustment } from '../agent/agent-performance-index.js';
 import { modelPerformanceScoreAdjustment } from '../reasoning/model-performance-index.js';
 import { modelRoleFitnessScoreAdjustment } from '../reasoning/model-role-fitness.js';
@@ -76,7 +77,66 @@ export interface AgentProfileRecord {
  */
 export type MissionTeamAssignmentStatus = 'assigned' | 'standby' | 'unfilled';
 
+/** Operator intent is independent from the resolved, refreshable assignment. */
+export interface MissionTeamRoleSelection {
+  mode: 'auto' | 'preferred' | 'fixed';
+  agent_id?: string;
+  provider?: string;
+  model_id?: string;
+}
+
+export interface MissionTeamSelectionResolution {
+  source: 'legacy' | 'auto' | 'requested' | 'fallback' | 'blocked';
+  reason: string;
+}
+
+export function normalizeMissionTeamRoleSelection(
+  value: MissionTeamRoleSelection
+): MissionTeamRoleSelection {
+  if (!value || !['auto', 'preferred', 'fixed'].includes(value.mode)) {
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] Selection mode must be auto, preferred or fixed.'
+    );
+  }
+  for (const key of Object.keys(value)) {
+    if (!['mode', 'agent_id', 'provider', 'model_id'].includes(key)) {
+      throw new Error('[MISSION_TEAM_SELECTION_INVALID] Unsupported selection field: ' + key);
+    }
+  }
+  const normalized: MissionTeamRoleSelection = { mode: value.mode };
+  for (const key of ['agent_id', 'provider', 'model_id'] as const) {
+    if (value[key] === undefined) continue;
+    if (typeof value[key] !== 'string' || !value[key]!.trim()) {
+      throw new Error(
+        '[MISSION_TEAM_SELECTION_INVALID] Selection dimensions must be nonempty strings.'
+      );
+    }
+    normalized[key] = value[key]!.trim();
+  }
+  if (
+    value.mode === 'auto' &&
+    (normalized.agent_id || normalized.provider || normalized.model_id)
+  ) {
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] Auto mode does not accept target dimensions.'
+    );
+  }
+  if (
+    value.mode !== 'auto' &&
+    !normalized.agent_id &&
+    !normalized.provider &&
+    !normalized.model_id
+  ) {
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] Preferred and fixed modes require a target dimension.'
+    );
+  }
+  return normalized;
+}
+
 export interface MissionTeamAssignment {
+  requested_selection?: MissionTeamRoleSelection;
+  selection_resolution?: MissionTeamSelectionResolution;
   team_role: string;
   required: boolean;
   status: MissionTeamAssignmentStatus;
@@ -172,7 +232,11 @@ export interface SelectAgentForTeamRoleInput {
   separation?: RoleSeparationConstraints;
   /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
   organizationId?: string;
+  tier?: string;
   providerPreference?: TeamProviderPreference;
+  requestedSelection?: MissionTeamRoleSelection;
+  /** Passing an empty cache must never trigger discovery or provider probes. */
+  discoveredProviders?: ProviderInfo[];
   /**
    * TC-09: observed workforce load, built once per composition pass. Selection
    * prefers an actor that is not already carrying work; the penalty is capped
@@ -192,7 +256,14 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
     organizationId,
     providerPreference,
     loadIndex,
+    discoveredProviders,
   } = input;
+  const requestedSelection = input.requestedSelection
+    ? normalizeMissionTeamRoleSelection(input.requestedSelection)
+    : undefined;
+  const explicitSelection = Boolean(requestedSelection);
+  const fixedSelection = requestedSelection?.mode === 'fixed';
+  const blockedReasons = new Set<string>();
   const hardExcludedAgents = new Set(
     (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
   );
@@ -213,10 +284,23 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
   const candidates = Object.entries(agents)
     .flatMap(([agentId, profile]) => {
       if (!profile.team_roles.includes(teamRole)) return [];
+      if (fixedSelection && requestedSelection?.agent_id && requestedSelection.agent_id !== agentId)
+        return [];
+      if (explicitSelection && hardExcludedAgents.has(agentId)) {
+        blockedReasons.add('Requested actor is excluded by review independence.');
+        return [];
+      }
 
       const profileCapabilities = new Set(
         (profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
       );
+      if (
+        explicitSelection &&
+        !Array.from(requiredCapabilities).every((capability) => profileCapabilities.has(capability))
+      ) {
+        blockedReasons.add('Actor does not hold every required capability.');
+        return [];
+      }
       const routedModelId = routingHint?.model_id;
       const routedProvider = routedModelId ? resolveModelProvider(routedModelId) : undefined;
       const agentSelectionHints = providerPreference?.provider
@@ -247,13 +331,41 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         fallbackModel,
         agentId
       );
-      const resolvedTarget = resolveAgentProviderTarget({
-        preferredProvider: selectionProvider,
-        preferredModelId: selectionModel,
-        providerStrategy: providerPreference?.strategy || profile.provider_strategy || 'adaptive',
-        fallbackProviders: profile.fallback_providers || [],
-        requiredCapabilities: profile.capabilities,
-      });
+      let resolvedTarget: ResolvedAgentProviderTarget;
+      try {
+        resolvedTarget = resolveAgentProviderTarget(
+          {
+            preferredProvider: requestedSelection?.provider || selectionProvider,
+            preferredModelId: requestedSelection?.model_id || selectionModel,
+            providerStrategy:
+              providerPreference?.strategy || profile.provider_strategy || 'adaptive',
+            fallbackProviders: profile.fallback_providers || [],
+            requiredCapabilities: explicitSelection
+              ? Array.from(requiredCapabilities)
+              : profile.capabilities,
+            ...(requestedSelection
+              ? {
+                  selectionMode: requestedSelection.mode,
+                  ...(fixedSelection
+                    ? {
+                        fixedProvider: requestedSelection.provider,
+                        fixedModelId: requestedSelection.model_id,
+                      }
+                    : {}),
+                }
+              : {}),
+          },
+          discoveredProviders
+        );
+      } catch (error) {
+        if (!explicitSelection) throw error;
+        blockedReasons.add(error instanceof Error ? error.message : String(error));
+        return [];
+      }
+      if (explicitSelection && resolvedTarget.strategy === 'unresolved') {
+        blockedReasons.add('No available provider/model satisfies the requested selection.');
+        return [];
+      }
       const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
         profileCapabilities.has(capability)
       ).length;
@@ -281,7 +393,13 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       const loadPenalty = loadIndex
         ? workerLoadPenalty(resolveWorkforceLoad(agentId, loadIndex))
         : 0;
+      const requestedMatch =
+        requestedSelection?.mode === 'preferred' &&
+        (!requestedSelection.agent_id || requestedSelection.agent_id === agentId) &&
+        (!requestedSelection.provider || requestedSelection.provider === resolvedTarget.provider) &&
+        (!requestedSelection.model_id || requestedSelection.model_id === resolvedTarget.modelId);
       const score =
+        (requestedMatch ? 1000000 : 0) +
         capabilityHits * 10 -
         capabilityPenalty +
         preferredAgentBonus +
@@ -300,6 +418,8 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       return compatibleAuthorityRoles.flatMap((authorityRole) => {
         const authorityRecord = authorityRoles[authorityRole];
         if (!authorityRecord) return [];
+        if (explicitSelection && input.tier && !authorityRecord.tier_access.includes(input.tier))
+          return [];
         const resolvedScopes = new Set(authorityRecord.scope_classes || []);
         const missingScope = Array.from(requiredScopes).find(
           (scopeClass) => !resolvedScopes.has(scopeClass)
@@ -326,10 +446,36 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
   const independentWinner = candidates.find(
     (candidate) => !hardExcludedAgents.has(candidate.agentId)
   );
-  const winner = independentWinner || candidates[0];
+  const winner = independentWinner || (explicitSelection ? undefined : candidates[0]);
   const separationFallback = Boolean(winner && !independentWinner && hardExcludedAgents.size > 0);
   if (winner) {
+    const matchesRequested =
+      !requestedSelection ||
+      ((!requestedSelection.agent_id || requestedSelection.agent_id === winner.agentId) &&
+        (!requestedSelection.provider ||
+          requestedSelection.provider === winner.resolvedTarget.provider) &&
+        (!requestedSelection.model_id ||
+          requestedSelection.model_id === winner.resolvedTarget.modelId));
     return {
+      ...(requestedSelection
+        ? {
+            requested_selection: requestedSelection,
+            selection_resolution: {
+              source:
+                requestedSelection.mode === 'auto'
+                  ? ('auto' as const)
+                  : matchesRequested
+                    ? ('requested' as const)
+                    : ('fallback' as const),
+              reason:
+                requestedSelection.mode === 'auto'
+                  ? 'Automatically selected an eligible actor and execution target.'
+                  : matchesRequested
+                    ? 'Requested dimensions selected after capability, authority, scope and independence checks.'
+                    : 'Preferred dimensions unavailable or ineligible; selected an eligible fallback.',
+            },
+          }
+        : {}),
       team_role: teamRole,
       required: true,
       status: 'assigned',
@@ -365,6 +511,17 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
   }
 
   return {
+    ...(requestedSelection
+      ? {
+          requested_selection: requestedSelection,
+          selection_resolution: {
+            source: 'blocked' as const,
+            reason:
+              Array.from(blockedReasons).join(' ') ||
+              'No actor satisfies the requested identity, capabilities, compatible authority, scope and independence constraints.',
+          },
+        }
+      : {}),
     team_role: teamRole,
     required: true,
     status: 'unfilled',

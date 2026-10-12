@@ -1,5 +1,7 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveRole, withExecutionContext } from '../authority.js';
+import { getFoundationIo } from '../foundation/io.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
@@ -27,6 +29,7 @@ import {
   setWorkCoordinationNamespace,
   updateWorkItem,
   recordMissionHandoff,
+  withWorkItemInventorySnapshot,
 } from './work-coordination.js';
 import { buildHandoffPacket } from '../mesh/handoff-packet.js';
 
@@ -41,6 +44,44 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('keeps immutable snapshot reads and callback under caller authority, not the lock sentinel', () => {
+    createWorkItem({
+      itemId: 'snapshot-authority',
+      title: 'Snapshot',
+      description: 'Authority-scoped immutable snapshot fixture',
+      metadata: { nested: { value: 1 } },
+    });
+    const observed: string[] = [];
+    // Foundation JSON readers capture the governed secure-io bridge at registration.
+    // Spy the actual read entrypoint, not the original module's exported binding.
+    const io = getFoundationIo();
+    const originalRead = io.readFile;
+    const spy = vi.spyOn(io, 'readFile').mockImplementation((filePath, options) => {
+      if (String(filePath).endsWith('/items.jsonl')) {
+        observed.push(resolveRole() || 'unknown');
+        if (resolveRole() === 'operator_surface') throw new Error('caller_inventory_read_denied');
+      }
+      return originalRead(filePath, options);
+    });
+    try {
+      withExecutionContext('ecosystem_architect', () =>
+        withWorkItemInventorySnapshot((items) => {
+          expect(resolveRole()).toBe('ecosystem_architect');
+          expect(items.map((item) => item.item_id)).toContain('snapshot-authority');
+          expect(Object.isFrozen(items)).toBe(true);
+          expect(Object.isFrozen(items[0]?.metadata)).toBe(true);
+        })
+      );
+      expect(observed).toContain('ecosystem_architect');
+      expect(() =>
+        withExecutionContext('operator_surface', () => withWorkItemInventorySnapshot(() => true))
+      ).toThrow('caller_inventory_read_denied');
+      expect(observed).not.toContain('infrastructure_sentinel');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('validates governed display namespaces while preserving arbitrary display labels', () => {
     for (const label of ['mission:', 'team_role:bad role', 'governance:']) {
       expect(() => createWorkItem({ title: 'task', description: 'task', labels: [label] })).toThrow(

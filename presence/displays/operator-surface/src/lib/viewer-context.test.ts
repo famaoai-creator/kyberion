@@ -35,6 +35,30 @@ describe('operator-surface viewer context', () => {
     expect(viewer.credentialSource).toBe('session-cookie');
   });
 
+  it('preserves verified tenant, organization, project and tier claims', () => {
+    mocks.resolve.mockReturnValue({
+      scope: {
+        role: 'localadmin',
+        source: 'token',
+        principalId: 'verified',
+        tenantSlugs: ['tenant-a'],
+        organizationIds: ['org-a'],
+        projectIds: ['project-a'],
+        tierAccess: ['confidential'],
+        memberId: 'member-a',
+      },
+    });
+    expect(
+      resolveOperatorViewer({ authorization: 'Bearer verified-fixture', loopback: false })
+    ).toMatchObject({
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+      tierAccess: ['confidential'],
+      memberId: 'member-a',
+    });
+  });
+
   it('prefers an Authorization bearer over the cookie', () => {
     const viewer = resolveOperatorViewer({
       authorization: 'Bearer abc',

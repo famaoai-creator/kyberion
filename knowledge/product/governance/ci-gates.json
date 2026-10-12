@@ -660,7 +660,8 @@
         "vitest.config.mjs"
       ],
       "owner": "security",
-      "rationale": "Checks read-only operator-surface API boundaries."
+      "rationale": "Checks enumerated operator mutation boundaries, scoped administrator selection settings, and mandatory hosted Chromium selection flows in CI (explicit local browser skip is not validation).",
+      "timeout_ms": 180000
     },
     {
       "id": "audit-continuity",

@@ -1,20 +1,23 @@
 import {
   loadReasoningRoutePolicy,
-  loadReasoningRouteUserConfigAtPath,
   loadReasoningRouteUserConfig,
   normalizeReasoningRole,
   reasoningRouteUserConfigPath,
   resolveReasoningRoute,
-  saveReasoningRouteUserConfig,
-  validateReasoningRouteUserConfig,
   type ReasoningRouteUserConfig,
 } from '@agent/core/reasoning/reasoning-route-resolver';
 import { inspectReasoningRoutes } from '@agent/core/reasoning/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { nowIso, readTextFile } from '@agent/core/foundation';
-import { getRegisteredEnv } from '@agent/core/foundation/env';
-import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
-import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import {
+  commitReasoningRouteConfig,
+  getReasoningSelectionSettings,
+  previewReasoningSelection,
+  saveReasoningSelection,
+  rollbackReasoningSelection,
+} from '@agent/core/reasoning/reasoning-selection-settings';
+import type { ReasoningRoleSelection } from '@agent/core/reasoning/reasoning-route-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 const HELP = `Usage:
   pnpm reasoning:config list [--json]
@@ -25,7 +28,10 @@ const HELP = `Usage:
        probes such as Anthropic GET /v1/models)
   pnpm reasoning:config bind-role <role> <profile|mode:model> [--dry-run]
   pnpm reasoning:config set-fallback --role <role> <profile1,profile2,...> [--dry-run]
-  pnpm reasoning:config rollback [--dry-run]
+  pnpm reasoning:config selection [--json]
+  pnpm reasoning:config preview --role <role> --mode <auto|preferred|fixed> [--runtime <mode>] [--model <model>]
+  pnpm reasoning:config select-role --role <role> --mode <auto|preferred|fixed> [--runtime <mode>] [--model <model>] [--expected-revision <n>] [--dry-run]
+  pnpm reasoning:config rollback [--expected-revision <n>] [--dry-run]
 `;
 
 function hasFlag(argv: string[], name: string): boolean {
@@ -43,45 +49,56 @@ function option(argv: string[], name: string): string | undefined {
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
-function validateConfigResolves(config: ReasoningRouteUserConfig): void {
-  const policy = loadReasoningRoutePolicy();
-  for (const role of Object.keys(policy.roles)) resolveReasoningRoute({ role, userConfig: config });
-}
-
 function saveWithBackup(
   config: ReasoningRouteUserConfig,
   dryRun: boolean,
   change: string,
   print: (value: unknown) => void
 ): void {
-  const path = reasoningRouteUserConfigPath();
-  const backup = `${path}.previous`;
-  const historyPath = `${path}.history/reasoning-route-user-config-${Date.now()}.json`;
-  const nextConfig: ReasoningRouteUserConfig = {
-    ...config,
-    version: config.version || '1.0.0',
-    revision: (config.revision || 0) + 1,
-    updated_at: nowIso(),
-    last_change: change,
+  const next = commitReasoningRouteConfig(config, {
+    expectedRevision: config.revision ?? 0,
+    change,
+    dryRun,
+  });
+  print(
+    dryRun
+      ? { dry_run: true, path: reasoningRouteUserConfigPath(), config: next }
+      : 'Updated ' + reasoningRouteUserConfigPath()
+  );
+}
+
+function expectedRevision(argv: string[]): number {
+  const raw = option(argv, '--expected-revision');
+  if (raw === undefined) return getReasoningSelectionSettings().revision;
+  if (!/^(0|[1-9][0-9]*)$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+    throw new Error('--expected-revision must be a nonnegative safe integer');
+  }
+  return Number(raw);
+}
+
+function selectRole(
+  argv: string[],
+  dryRun: boolean,
+  preview: boolean,
+  print: (value: unknown) => void
+): void {
+  const role = normalizeReasoningRole(option(argv, '--role'));
+  const mode = option(argv, '--mode');
+  if (!mode || !['auto', 'preferred', 'fixed'].includes(mode)) {
+    throw new Error('--mode must be auto, preferred, or fixed');
+  }
+  const selection: ReasoningRoleSelection = {
+    mode: mode as ReasoningRoleSelection['mode'],
+    ...(option(argv, '--runtime') ? { runtime_mode: option(argv, '--runtime') } : {}),
+    ...(option(argv, '--provider') ? { provider: option(argv, '--provider') } : {}),
+    ...(option(argv, '--model') ? { model: option(argv, '--model') } : {}),
+    ...(option(argv, '--profile') ? { profile: option(argv, '--profile') } : {}),
   };
-  validateReasoningRouteUserConfig(nextConfig);
-  validateConfigResolves(nextConfig);
-  if (dryRun) {
-    print({ dry_run: true, path, config: nextConfig });
+  if (preview || dryRun) {
+    print(previewReasoningSelection({ role, selection }));
     return;
   }
-  if (safeExistsSync(path)) {
-    const previous = readReasoningConfigTextFile(path);
-    safeWriteFile(backup, previous, { mkdir: true, encoding: 'utf8' });
-    safeWriteFile(historyPath, previous, { mkdir: true, encoding: 'utf8' });
-  }
-  saveReasoningRouteUserConfig(nextConfig);
-  recordGovernanceAction(
-    (getRegisteredEnv<string>('KYBERION_PERSONA') as string | undefined) || 'operator',
-    'reasoning_route_config_update',
-    change
-  );
-  print(`Updated ${path}`);
+  print(saveReasoningSelection({ role, selection, expectedRevision: expectedRevision(argv) }));
 }
 
 function listRoutes(asJson: boolean, print: (value: unknown) => void): void {
@@ -151,7 +168,7 @@ function bindRole(argv: string[], dryRun: boolean, print: (value: unknown) => vo
   const role = normalizeReasoningRole(argv[1]);
   const binding = argv[2]?.trim();
   if (!binding) throw new Error('bind-role requires <profile|mode:model>');
-  const config = loadReasoningRouteUserConfig();
+  const config = structuredClone(loadReasoningRouteUserConfig());
   const profile =
     binding.includes(':') && !binding.startsWith('profile:')
       ? `user-${role}`
@@ -187,15 +204,7 @@ function setFallback(argv: string[], dryRun: boolean, print: (value: unknown) =>
 }
 
 function rollback(argv: string[], dryRun: boolean, print: (value: unknown) => void): void {
-  const path = reasoningRouteUserConfigPath();
-  const backup = `${path}.previous`;
-  if (!safeExistsSync(backup)) throw new Error(`No rollback snapshot at ${backup}`);
-  const restored = loadReasoningRouteUserConfigAtPath(backup);
-  validateReasoningRouteUserConfig(restored, backup);
-  validateConfigResolves(restored);
-  if (dryRun) return print({ dry_run: true, restore: backup, target: path, config: restored });
-  saveWithBackup(restored, false, 'rollback', print);
-  print(`Restored ${path}`);
+  print(rollbackReasoningSelection({ expectedRevision: expectedRevision(argv), dryRun }));
 }
 
 async function doctor(
@@ -227,6 +236,9 @@ export async function main(
   if (command === 'list') return listRoutes(asJson, print);
   if (command === 'explain') return explainRoute(argv, asJson, print);
   if (command === 'validate') return validateRoutes(asJson, print);
+  if (command === 'selection') return print(getReasoningSelectionSettings());
+  if (command === 'preview') return selectRole(argv, true, true, print);
+  if (command === 'select-role') return selectRole(argv, dryRun, false, print);
   if (command === 'doctor') return doctor(asJson, hasFlag(argv, '--live'), print);
   if (command === 'bind-role') return bindRole(argv, dryRun, print);
   if (command === 'set-fallback') return setFallback(argv, dryRun, print);

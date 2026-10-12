@@ -310,8 +310,11 @@ export async function dispatchMissionTickets(
       qa: ['reviewer', 'implementer'],
       reviewer: ['implementer'],
     };
+    const roleSelection = teamRole
+      ? loadMissionTeamPlan(missionId)?.selection_settings?.[teamRole]
+      : undefined;
     let resolvedAssignment = teamRole ? resolveMissionTeamReceiver({ missionId, teamRole }) : null;
-    if (!resolvedAssignment && teamRole) {
+    if (!resolvedAssignment && teamRole && roleSelection?.mode !== 'fixed') {
       for (const fallbackRole of roleStaffingFallbacks[teamRole] || []) {
         resolvedAssignment = resolveMissionTeamReceiver({ missionId, teamRole: fallbackRole });
         if (resolvedAssignment) {
@@ -324,6 +327,16 @@ export async function dispatchMissionTickets(
     }
     const resolvedAgentId = task.assigned_to?.agent_id || resolvedAssignment?.agent_id || undefined;
     const validation = validateMissionTicketTask(task, resolvedAgentId);
+    if (
+      roleSelection?.mode === 'fixed' &&
+      (!resolvedAssignment?.agent_id ||
+        (task.assigned_to?.agent_id && task.assigned_to.agent_id !== resolvedAssignment.agent_id))
+    ) {
+      validation.ok = false;
+      validation.notes.push(
+        'Fixed role selection is unavailable or conflicts with the assigned task actor.'
+      );
+    }
     if (!validation.ok) {
       status = 'failed';
       notes.push(...validation.notes);
