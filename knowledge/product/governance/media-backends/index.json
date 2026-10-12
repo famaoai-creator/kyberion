@@ -19,6 +19,9 @@
     "media-generation.local_flux",
     "media-generation.apple_playground",
     "voice.local_say",
-    "video.hyperframes_cli"
+    "video.hyperframes_cli",
+    "media-generation.comfyui.ace-step-music",
+    "media-generation.comfyui.ltx-i2v",
+    "media-generation.comfyui.ltx-i2v-fp8"
   ]
 }

@@ -12515,6 +12515,398 @@
         "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
       },
       "phases": ["intake", "planning", "execution", "verification", "delivery"]
+    },
+    {
+      "id": "music-video-production",
+      "pattern": "creative_assembly_loop",
+      "playbook_ref": "knowledge/product/orchestration/narrated-video-production-playbook.md",
+      "description": "オリジナル曲 MV の制作プロセス: 歌詞正規化(media-generation:lyric_normalize で発音可能形へ) → 楽曲生成(generate_music / music_adf) → vocal_align で実測タイミング取得 → 歌詞同期シーン設計(mv_storyboard) → シーン別静止画+i2v生成 → mv_compose で字幕付き合成 → 完成動画のAI評価→シーン修復ループ → 公開パッケージ→承認ゲート。pipelines/mv-generate.json が deterministic 実行体。人物一貫性には reference 画像/IPAdapter 系 backend を使う。",
+      "match": {
+        "mission_classes": ["content_and_media"],
+        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "intent_ids": [
+          "music-video",
+          "mv-production",
+          "produce-music-video",
+          "music-video-production"
+        ]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "goal_brief",
+          "title": "目的定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "goal-brief",
+              "team_role": "planner",
+              "description": "動画の目的を evidence/goal-brief.json に定義する: 誰に(audience)・何を伝え(message)・何を感じてもらい(emotion)・何をしてもらうか(desired_action)",
+              "deliverable": "evidence/goal-brief.json",
+              "acceptance_criteria": ["audience / message / emotion / desired_action が揃っている"],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low"
+            }
+          ],
+          "exit_gate": {
+            "id": "GOAL_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/goal-brief.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "production_spec",
+          "title": "動画仕様",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "production-spec",
+              "team_role": "experience_designer",
+              "description": "goal-brief を踏まえ動画全体の仕様を evidence/production-spec.json に定義する: テーマ・尺・構成・トーン・媒体・KPI・禁止事項",
+              "deliverable": "evidence/production-spec.json",
+              "acceptance_criteria": [
+                "theme / duration / structure / tone / medium が揃っている",
+                "禁止事項が明記されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "SPEC_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/production-spec.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "song_production",
+          "title": "楽曲制作",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "produce-song",
+              "team_role": "implementer",
+              "description": "歌詞を lyric_normalize で発音可能形(sing_lyrics)に変換し、generate_music(music_adf, vocals)で楽曲生成、vocal_align で実測タイミング SRT を得る。成果物: evidence/song.mp3, evidence/lyrics.srt, evidence/normalized-lyrics.json",
+              "deliverable": "evidence/song.mp3",
+              "acceptance_criteria": [
+                "song.mp3 が存在し目標尺 ±10%",
+                "lyrics.srt が実測タイミング",
+                "normalized-lyrics.json に display/sing 両形がある"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "SONG_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/song.mp3"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/lyrics.srt"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "scene_plan",
+          "title": "シーン設計",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "scene-plan",
+              "team_role": "experience_designer",
+              "description": "lyrics.srt の実測タイミングを mv_storyboard でシーン分割し、各シーンに visual/motion/lyric を持つ scenes.json を evidence/scene-plan.json に設計する。人物一貫性のため共通スタイル記述とキャラ参照を揃える",
+              "deliverable": "evidence/scene-plan.json",
+              "acceptance_criteria": [
+                "全シーンに 内容/ナレーション/映像/テロップ/音/尺 がある",
+                "シーン尺の合計が production-spec の尺と整合する"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "SCENES_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/scene-plan.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "asset_generation",
+          "title": "素材生成",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "generate-assets",
+              "team_role": "implementer",
+              "description": "scene-plan の各シーンについて必要素材を並列生成する(音声は voice:generate_voice、映像・静止画は media:generate_video / generate_image、BGM は generate_music、図解・テロップは artifact ops)。成果物は evidence/assets/ に置き、scene_id → asset パスの対応表を evidence/asset-manifest.json に記録する",
+              "deliverable": "evidence/asset-manifest.json",
+              "acceptance_criteria": [
+                "全シーンの必須素材が manifest に記録されている",
+                "生成失敗素材は manifest に理由つきで記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "ASSETS_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/asset-manifest.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "assembly",
+          "title": "タイムライン合成",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "assemble-video",
+              "team_role": "implementer",
+              "description": "asset-manifest の素材をタイムラインに合成し evidence/draft-video.mp4 を生成する(video-composition: prepare_video_composition / create_narrated_video_from_content_brief + verify_rendered_video_artifact で検証)",
+              "deliverable": "evidence/draft-video.mp4",
+              "acceptance_criteria": [
+                "合成動画が生成され verify_rendered_video_artifact を通過する",
+                "全シーンが scene-plan 通りの順序・尺で配置されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "DRAFT_ASSEMBLED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/draft-video.mp4"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "artifact_evaluation",
+          "title": "完成物評価",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "evaluate-video",
+              "team_role": "reviewer",
+              "review_target_suffix": "assemble-video",
+              "description": "完成動画そのものをAIが視聴して独立評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 に加え、読みやすさ(字幕の有無と文字量・ナレーション速度・用語統一)を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする",
+              "acceptance_criteria": [
+                "全シーンが評価済み",
+                "verdict と per-scene flags が記録されている",
+                "読みやすさの観点が採点に含まれている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_EVALUATED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/video-eval-report.json"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/REVIEW-assembly-assemble-video.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "title": "シーン修復",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "repair-scenes",
+              "team_role": "implementer",
+              "description": "video-eval-report.json の verdict=pass かつ flags 空なら pass-through を記録する。flags がある場合は該当シーンの素材だけを再生成して再合成し evidence/final-video.mp4 を更新、eval-report を再評価つきで更新する(verdict=pass まで繰り返し、上限3回。超過時は残 flags と理由を報告)",
+              "deliverable": "evidence/final-video.mp4",
+              "acceptance_criteria": [
+                "eval-report が再評価つきで更新されている",
+                "verdict=pass または残 flags の理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_EVALUATION_PASSED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/final-video.mp4"
+                }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/video-eval-report.json",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "verdict が pass で未解決の flag が残っていない",
+                    "評価が台本ではなく完成動画そのものを対象にしている"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "promotion",
+          "title": "レシピ昇格",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "promote-video-recipe",
+              "team_role": "implementer",
+              "description": "評価を通過した scene-plan / production-spec / asset-manifest を governed な narrated-video-brief に凍結して evidence/promoted-video-brief.json に記録する(scratch-to-pipeline-video-promotion 準拠: シーン別 VO・テロップ・尺・配色/タイプを storyboard 項目へ移す)。同じ動画を再実行する見込みがある場合のみ pipelines/<slug>.json を登録し、一過性なら brief は mission evidence に留める",
+              "deliverable": "evidence/promoted-video-brief.json",
+              "acceptance_criteria": [
+                "採用レシピが promoted-video-brief.json に凍結されている",
+                "再利用要否の判断と根拠が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_PROMOTED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/promoted-video-brief.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "publish",
+          "title": "公開準備",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "publish-package",
+              "team_role": "implementer",
+              "description": "タイトル・サムネイル・説明文を生成し evidence/publish-package.json にまとめる(公開自体は別ゲート。publish-youtube-video 手順は人承認後)",
+              "deliverable": "evidence/publish-package.json",
+              "acceptance_criteria": [
+                "タイトル・サムネイル・説明文が揃っている",
+                "公開先と公開範囲(public/unlisted/draft)が明記されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "PUBLISH_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/publish-package.json"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "learn",
+          "title": "学習フィードバック",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "learn-report",
+              "team_role": "planner",
+              "description": "視聴データ・フィードバック・制作中の学びを evidence/learn-report.json にまとめ、narrated-video-preference-profile や knowledge への反映提案を記録する(反映自体は承認後)",
+              "deliverable": "evidence/learn-report.json",
+              "acceptance_criteria": ["学びと反映提案が記録されている"],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low"
+            }
+          ],
+          "exit_gate": {
+            "id": "LEARN_RECORDED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/learn-report.json"
+                }
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
