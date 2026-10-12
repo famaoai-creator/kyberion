@@ -669,6 +669,7 @@
       ],
       "apply": [
         "activate_application",
+        "app_launch",
         "app_quit",
         "check_native_tts",
         "clipboard_write",
@@ -693,6 +694,8 @@
         "voice",
         "voice_input_toggle",
         "wait",
+        "window_focus",
+        "window_maximize",
         "write_artifact",
         "write_file",
         "write_json"

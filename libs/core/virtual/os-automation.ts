@@ -1,8 +1,12 @@
-import { resolveOsAutomationPlatform } from './os-automation-platform.js';
+import {
+  createMouseOperationExecutor,
+  resolveOsAutomationPlatform,
+} from './os-automation-platform.js';
 import type { FocusedInputState } from '../apple-event-bridge.js';
 
 const platform = resolveOsAutomationPlatform();
 
+export const launchApplication = platform.launchApplication;
 export const activateApplication = platform.activateApplication;
 export const detectFocusedInput = platform.detectFocusedInput;
 export const keystrokeText = platform.keystrokeText;
@@ -19,11 +23,16 @@ export const runAppleScript = platform.runAppleScript;
 export const getScreenSize = platform.getScreenSize;
 export const getWindowList = platform.getWindowList;
 export const activateWindowByTitle = platform.activateWindowByTitle;
+export const setWindowState = platform.setWindowState;
 export const quitApplication = platform.quitApplication;
 export const systemNotify = platform.systemNotify;
 export const clipboardRead = platform.clipboardRead;
 export const clipboardWrite = platform.clipboardWrite;
 export const takeScreenshot = platform.takeScreenshot;
+
+/** Platform-neutral pointer operation facade over the native mouse primitives. */
+export const performMouseOperation = createMouseOperationExecutor(platform);
+export type { MouseOperation } from './os-automation-platform.js';
 
 export const toAppleScriptString = (value: string): string =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');

@@ -1,4 +1,6 @@
 import {
+  performMouseOperation,
+  launchApplication,
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -15,6 +17,7 @@ import {
   getScreenSize,
   getWindowList,
   activateWindowByTitle,
+  setWindowState,
   quitApplication,
   systemNotify,
   clipboardRead,
@@ -36,6 +39,8 @@ import {
 } from './os-automation.js';
 
 export const osAutomationBridge = {
+  performMouseOperation,
+  launchApplication,
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -52,6 +57,7 @@ export const osAutomationBridge = {
   getScreenSize,
   getWindowList,
   activateWindowByTitle,
+  setWindowState,
   quitApplication,
   systemNotify,
   clipboardRead,

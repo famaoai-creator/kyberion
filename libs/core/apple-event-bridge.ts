@@ -1,4 +1,4 @@
-import { safeExec } from './secure-io.js';
+import { safeExec, safeExecResult } from './secure-io.js';
 
 export interface FocusedInputState {
   application: string;
@@ -14,6 +14,11 @@ function isDarwin() {
 
 export function toAppleScriptString(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+export function launchApplication(application: string): boolean {
+  if (!isDarwin() || !application.trim()) return false;
+  return safeExecResult('open', ['-a', application.trim()], { timeoutMs: 10_000 }).status === 0;
 }
 
 export function activateApplication(application: string) {
@@ -280,6 +285,46 @@ export function activateWindowByTitle(
     'on error',
     'return "false"',
     'end try',
+    'end tell',
+    'end tell',
+  ].join('\n');
+  try {
+    return runAppleScript(script).trim().toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setWindowState(
+  appName: string,
+  windowTitle: string,
+  state: 'maximize' | 'minimize' | 'restore',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
+): boolean {
+  if (!isDarwin() || !appName.trim() || !windowTitle.trim()) return false;
+  const condition =
+    matchPolicy === 'strict'
+      ? `name of w is "${toAppleScriptString(windowTitle)}"`
+      : matchPolicy === 'prefix'
+        ? `(name of w as string) starts with "${toAppleScriptString(windowTitle)}"`
+        : `(name of w as string) contains "${toAppleScriptString(windowTitle)}"`;
+  const action =
+    state === 'maximize'
+      ? 'perform action "AXZoom" of w'
+      : state === 'minimize'
+        ? 'perform action "AXMinimize" of w'
+        : 'set value of attribute "AXMinimized" of w to false';
+  const script = [
+    'tell application "System Events"',
+    `tell process "${toAppleScriptString(appName)}"`,
+    'set frontmost to true',
+    'repeat with w in windows',
+    `if ${condition} then`,
+    `try ${action} on error return "false" end try`,
+    'return "true"',
+    'end if',
+    'end repeat',
+    'return "false"',
     'end tell',
     'end tell',
   ].join('\n');

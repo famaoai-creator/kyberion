@@ -198,6 +198,9 @@ const buildUnknownActuatorOpError = vi.fn(
 const activateApplication = vi.fn((application: string) =>
   safeExec('osascript', ['-e', `tell application "${application}" to activate`])
 );
+const launchApplication = vi.fn(() => true);
+const setWindowState = vi.fn(() => true);
+const performMouseOperation = vi.fn();
 const detectFocusedInput = vi.fn(() => {
   const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
   const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] =
@@ -1049,6 +1052,9 @@ vi.mock('@agent/core', async () => ({
   resolveDesktopLaunchAdapter,
   emitComputerSurfacePatch,
   activateApplication,
+  launchApplication,
+  setWindowState,
+  performMouseOperation,
   detectFocusedInput,
   keystrokeText,
   pasteText,
@@ -1102,7 +1108,10 @@ vi.mock('@agent/core/foundation', async (importOriginal) => {
 });
 
 vi.mock('@agent/core/virtual/os-automation', () => ({
+  launchApplication,
   activateApplication,
+  setWindowState,
+  performMouseOperation,
   detectFocusedInput,
   keystrokeText,
   pasteText,
@@ -1436,7 +1445,7 @@ describe('system-actuator reconcile admission', () => {
         action: { type: 'left_click', coordinate: { x: 10, y: 20 } },
       })
     ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test computer interaction denial');
-    expect(core.clickAt).not.toHaveBeenCalled();
+    expect(performMouseOperation).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
@@ -1501,7 +1510,9 @@ describe('system-actuator computer_interaction adapter', () => {
 
     expect(result.context.focus_target_id).toBe('chat-main');
     expect(core.safeWriteFile).toHaveBeenCalledWith(
-      '/tmp/kyberion/active/shared/runtime/computer/focused-targets.json',
+      expect.stringMatching(
+        /[/\\]active[/\\]shared[/\\]runtime[/\\]computer[/\\]focused-targets\.json$/
+      ),
       expect.stringContaining('"chat-main"')
     );
   });
@@ -1531,7 +1542,9 @@ describe('system-actuator computer_interaction adapter', () => {
     vi.mocked(core.safeExistsSync).mockReturnValue(true);
     vi.spyOn(core, 'safeLstat').mockReturnValue({ isFile: () => true } as never);
     vi.mocked(core.safeReadFile).mockImplementation((filePath: string) =>
-      String(filePath).includes('active/shared/tmp/input.json') ? '{"a":1}' : '{}'
+      String(filePath).replaceAll('\\', '/').includes('active/shared/tmp/input.json')
+        ? '{"a":1}'
+        : '{}'
     );
 
     const result = await handleAction({
@@ -1554,7 +1567,7 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.parsed.a).toBe(1);
     expect(core.safeWriteFile).toHaveBeenCalledWith(
-      `${process.cwd()}/active/shared/tmp/system-context.json`,
+      expect.stringMatching(/[/\\]active[/\\]shared[/\\]tmp[/\\]system-context\.json$/),
       expect.stringContaining('"parsed"')
     );
   });
@@ -1811,6 +1824,13 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
+    expect(performMouseOperation).toHaveBeenCalledWith({
+      type: 'click',
+      x: 120,
+      y: 240,
+      button: 'left',
+      count: 1,
+    });
   });
 
   it('returns known app capabilities', async () => {
@@ -2183,7 +2203,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
         kind: 'dir',
       });
       expect(assertSafeRepositoryPath).toHaveBeenCalledWith(
-        expect.stringContaining(`${path.sep}node_modules`),
+        expect.stringMatching(/[/\\]node_modules/),
         { allowMissingLeaf: true, allowSymlinkLeaf: true }
       );
     });
@@ -2207,7 +2227,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(secureIo.safeExistsSync).toHaveBeenCalledWith('/tmp/customer/acme/my-identity.json');
+      expect(secureIo.safeExistsSync).toHaveBeenCalledWith(
+        expect.stringMatching(/[/\\]tmp[/\\]customer[/\\]acme[/\\]my-identity\.json$/)
+      );
       expect(result.context.identity).toEqual({
         path: 'my-identity.json',
         exists: true,
@@ -2974,8 +2996,8 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       );
       expect((result.context.camera_injection_test as any).status).toBe('succeeded');
       expect((result.context.camera_injection_test as any).mode).toBe('replay');
-      expect((result.context.camera_injection_test as any).source_path).toContain(
-        'active/shared/tmp/in.mp4'
+      expect((result.context.camera_injection_test as any).source_path).toMatch(
+        /active[/\\]shared[/\\]tmp[/\\]in\.mp4/
       );
       expect(createVirtualCameraInjectionBridge).toHaveBeenCalled();
     });
@@ -3062,7 +3084,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
   });
 
   describe('apply ops', () => {
-    it('scroll: calls scrollAt with correct coordinates and direction', async () => {
+    it('scroll: routes through the platform-neutral pointer contract', async () => {
       const { handleAction } = await import('./index');
 
       const result = await handleAction({
@@ -3073,10 +3095,16 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(scrollAt).toHaveBeenCalledWith(100, 200, 'down', 5);
+      expect(performMouseOperation).toHaveBeenCalledWith({
+        type: 'scroll',
+        x: 100,
+        y: 200,
+        direction: 'down',
+        amount: 5,
+      });
     });
 
-    it('drag: calls dragFrom with from and to coordinates', async () => {
+    it('drag: routes through the platform-neutral pointer contract', async () => {
       const { handleAction } = await import('./index');
 
       const result = await handleAction({
@@ -3087,7 +3115,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(dragFrom).toHaveBeenCalledWith(10, 20, 300, 400);
+      expect(performMouseOperation).toHaveBeenCalledWith({
+        type: 'drag',
+        fromX: 10,
+        fromY: 20,
+        toX: 300,
+        toY: 400,
+      });
     });
 
     it('notify: calls systemNotify with title, message and subtitle', async () => {
@@ -3215,6 +3249,55 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('succeeded');
       expect(quitApplication).toHaveBeenCalledWith('Finder');
+    });
+
+    it('app_launch: starts an application through the platform adapter', async () => {
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'app_launch', params: { application: 'notepad.exe' } }],
+      } as Parameters<typeof handleAction>[0]);
+
+      expect(result.status).toBe('succeeded');
+      expect(launchApplication).toHaveBeenCalledWith('notepad.exe');
+    });
+
+    it('window_maximize: targets a window by application and title', async () => {
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'window_maximize',
+            params: {
+              application: 'chrome',
+              window_title: 'Docs',
+              match_policy: 'strict',
+            },
+          },
+        ],
+      } as Parameters<typeof handleAction>[0]);
+
+      expect(result.status).toBe('succeeded');
+      expect(setWindowState).toHaveBeenCalledWith('chrome', 'Docs', 'maximize', 'strict');
+    });
+
+    it('window_focus: targets a window by application and title', async () => {
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'window_focus',
+            params: { application: 'chrome', window_title: 'Docs', match_policy: 'strict' },
+          },
+        ],
+      } as Parameters<typeof handleAction>[0]);
+
+      expect(result.status).toBe('succeeded');
+      expect(activateWindowByTitle).toHaveBeenCalledWith('chrome', 'Docs', 'strict');
     });
 
     it('app_quit: rejects missing application input with contract validation', async () => {
