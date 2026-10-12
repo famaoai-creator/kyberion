@@ -738,8 +738,15 @@
       });
   }
 
+  function readFilter() {
+    var filter = new URLSearchParams(window.location.search).get('filter');
+    return FILTERS.indexOf(filter) >= 0 ? filter : null;
+  }
+
   function applyHashOrDefault() {
     if (!state.loaded) return;
+    var filter = readFilter();
+    state.filter = filter || 'active';
     var hashId = readHashId();
     var hasHash = Boolean(String(window.location.hash || '').replace(/^#/, ''));
     var found = findSection(hashId);
@@ -755,7 +762,7 @@
         return Boolean(match);
       });
     }
-    if (!found && !hasHash && !request) {
+    if (!found && !hasHash && !request && !filter) {
       var defaultActive = (state.payload.active || []).find(function (item) {
         return item.selected_default;
       });
@@ -777,9 +784,27 @@
       var button = document.getElementById('filter-' + name);
       if (!button) return;
       button.addEventListener('click', function () {
+        if (!state.loaded || state.navigationPending) return;
+        // An explicit tab choice starts an untargeted list view. Back retains
+        // the previous item/request URL; reload must not reselect that old work.
+        var url = new URL(window.location.href);
+        url.searchParams.set('filter', name);
+        url.searchParams.delete('request');
+        url.hash = '';
+        var destination = url.pathname + url.search;
+        if (
+          destination !==
+          window.location.pathname + window.location.search + window.location.hash
+        )
+          window.history.pushState(window.history.state, '', destination);
         state.filter = name;
+        state.selectedId = null;
+        state.selectedTitle = '';
+        if (isSelectionNotice()) showNotice(null);
         renderFilters();
         renderList();
+        // Also fences any detail response started before the tab changed.
+        loadDetail();
       });
     });
   }

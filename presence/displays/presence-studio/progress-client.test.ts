@@ -220,6 +220,10 @@ function harness(
       },
     },
     history: {
+      state: null,
+      pushState: vi.fn((_state: unknown, _title: string, href: string) => {
+        location = new URL(href, location);
+      }),
       replaceState(_state: unknown, _title: string, href: string) {
         location = new URL(href, location);
       },
@@ -302,6 +306,110 @@ function dataFetcher(
 }
 
 describe('progress browser-script contracts', () => {
+  it.each(['active', 'delivered', 'done'])(
+    'restores explicit %s filter without selecting unrelated default work',
+    async (filter) => {
+      const payload = emptyPayload();
+      payload.active = [{ id: 'unrelated', title: 'Other work', selected_default: true }];
+      const h = harness({ search: '?filter=' + filter, fetcher: dataFetcher(payload) });
+      await h.window.KyberionProgress.mount();
+      expect(h.elements['filter-' + filter].attributes['aria-selected']).toBe('true');
+      expect(h.window.location.hash).toBe('');
+      expect(h.fetch.mock.calls.some(([url]) => url.startsWith('/api/progress/'))).toBe(false);
+    }
+  );
+  it('pushes distinct filter choices, preserves scope, and replays query-only Back Forward', async () => {
+    const h = harness({
+      search: '?tenant=alpha&organizationId=org&projectId=project&extra=kept',
+      fetcher: dataFetcher(emptyPayload()),
+    });
+    await h.window.KyberionProgress.mount();
+    const initial = h.window.location.href;
+    h.elements['filter-delivered'].fire();
+    const delivered = h.window.location.href;
+    h.elements['filter-done'].fire();
+    const done = h.window.location.href;
+    h.elements['filter-done'].fire();
+    expect(h.window.history.pushState).toHaveBeenCalledTimes(2);
+    for (const href of [delivered, done]) {
+      const query = new URL(href).searchParams;
+      expect(query.get('tenant')).toBe('alpha');
+      expect(query.get('organizationId')).toBe('org');
+      expect(query.get('projectId')).toBe('project');
+      expect(query.get('extra')).toBe('kept');
+    }
+    for (const [href, filter] of [
+      [delivered, 'delivered'],
+      [initial, 'active'],
+      [done, 'done'],
+    ]) {
+      h.window.location.href = href;
+      h.listeners.popstate();
+      await flush();
+      expect(h.elements['filter-' + filter].attributes['aria-selected']).toBe('true');
+    }
+    expect(h.window.location.reload).not.toHaveBeenCalled();
+    expect(h.window.history.pushState).toHaveBeenCalledTimes(2);
+  });
+  it('clears old request and item targeting on explicit tab choice and fences a late detail', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'requested', title: 'Requested work', correlation_id: 'r1' }];
+    const pending = deferred<MockResponse>();
+    const h = harness({
+      search: '?tenant=alpha&request=r1',
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/requested' ? pending.promise : undefined
+      ),
+    });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    const original = h.window.location.href;
+    expect(original).toContain('request=r1');
+    expect(original).toContain('#requested');
+    h.elements['filter-delivered'].fire();
+    expect(h.window.location.search).toBe('?tenant=alpha&filter=delivered');
+    expect(h.window.location.hash).toBe('');
+    pending.resolve(response(detail('stale request detail')));
+    await mounted;
+    await flush();
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('stale request detail');
+    const reloaded = harness({ search: h.window.location.search, fetcher: dataFetcher(payload) });
+    await reloaded.window.KyberionProgress.mount();
+    expect(reloaded.elements['filter-delivered'].attributes['aria-selected']).toBe('true');
+    expect(reloaded.window.location.hash).toBe('');
+    h.window.location.href = original;
+    h.listeners.popstate();
+    await flush();
+    expect(h.elements['filter-active'].attributes['aria-selected']).toBe('true');
+    expect(h.window.location.hash).toBe('#requested');
+  });
+  it('keeps explicit item and request precedence above conflicting filters without substituting missing items', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'default', title: 'Default', selected_default: true }];
+    payload.done = [{ id: 'target', title: 'Target', correlation_id: 'r1' }];
+    for (const options of [
+      { search: '?filter=delivered', hash: '#target' },
+      { search: '?filter=delivered&request=r1', hash: '#%E0%A4%A' },
+    ]) {
+      const h = harness({ ...options, fetcher: dataFetcher(payload) });
+      await h.window.KyberionProgress.mount();
+      expect(h.elements['filter-done'].attributes['aria-selected']).toBe('true');
+      expect(h.window.location.hash).toBe('#target');
+    }
+    const missing = harness({
+      search: '?filter=delivered&request=r1',
+      hash: '#missing',
+      fetcher: dataFetcher(payload),
+    });
+    await missing.window.KyberionProgress.mount();
+    expect(missing.window.location.hash).toBe('#missing');
+    expect(missing.noticeText.textContent).toContain('work item is unavailable');
+    expect(missing.fetch.mock.calls.some(([url]) => url.startsWith('/api/progress/'))).toBe(false);
+    const invalid = harness({ search: '?filter=unrecognized', fetcher: dataFetcher(payload) });
+    await invalid.window.KyberionProgress.mount();
+    expect(invalid.window.location.hash).toBe('#default');
+  });
+
   it('waits for the validated scope before every initial read', async () => {
     const ready = deferred<void>();
     const h = harness({ ready: ready.promise, fetcher: dataFetcher(emptyPayload()) });
