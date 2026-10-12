@@ -281,7 +281,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-lifecycle.ts#enableDotEventContinuation",
+      "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
+      "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatusUnlocked",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
     },
@@ -2198,6 +2208,13 @@
       ]
     },
     {
+      "site": "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
+      "roles": [],
+      "unresolved": [
+        "role argument `charter.authority.authority_role` could not be resolved at scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate"
+      ]
+    },
+    {
       "site": "scripts/encrypt_connection_documents.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2801,6 +2818,9 @@
     "scripts/check_doc_examples.ts#runBashSyntax": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate": [
+      "role argument `charter.authority.authority_role` could not be resolved at scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate"
+    ],
     "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch": [
       "dynamic import with a computed specifier at scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch"
     ],
@@ -3311,6 +3331,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -3648,6 +3669,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -4145,6 +4167,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -4435,6 +4458,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -4777,6 +4801,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -5065,6 +5090,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -5503,6 +5529,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -5894,6 +5921,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -6235,6 +6263,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -6493,6 +6522,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -6796,6 +6826,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -7104,6 +7135,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -7394,6 +7426,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -7687,6 +7720,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
@@ -7951,6 +7985,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",

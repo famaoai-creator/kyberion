@@ -347,7 +347,8 @@ normal activation ceremony. This is not historical recovery: rows before the
 captured boundary remain untouched.
 
 Per-scope snapshots under the existing dot state floor retain at most 128 matching
-pending events; scans read at most 4 MiB and inspect at most 2,000 lines per sweep.
+pending events; each scan reads a batch of at most 4 MiB, plus fixed-size
+256-byte checkpoint-anchor reads, and inspects at most 2,000 lines per sweep.
 Capacity stops scanning and never evicts pending work. Offsets advance only with
 atomically persisted pending entries; merely offering a wake never acknowledges
 it. Scope identity includes tier, tenant, organization, project and dot ID, while

@@ -63,7 +63,7 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   DELEGATION_SUMMARY_MIN_CHARS,
-  delegationSummaryRetryEnabled,
+  shouldRetryShortDelegationSummary,
   buildDelegationSummaryContinuationPrompt,
   STRUCTURED_DELEGATION_PROMPT_HEADER,
 } from './reasoning-delegation-policy.js';
@@ -121,19 +121,6 @@ import {
   type ReasoningLiveCapabilities,
 } from './reasoning-live-capabilities.js';
 export * from './reasoning-live-capabilities.js';
-
-function shouldRetryShortDelegationSummary(input: {
-  instruction: string;
-  result: string;
-  servedBackendName: string;
-}): boolean {
-  if (!delegationSummaryRetryEnabled()) return false;
-  // The stub backend returns short deterministic placeholders by design —
-  // retrying would only duplicate them and destabilize hermetic tests.
-  if (input.servedBackendName === 'stub') return false;
-  if (input.instruction.startsWith(STRUCTURED_DELEGATION_PROMPT_HEADER)) return false;
-  return input.result.trim().length < DELEGATION_SUMMARY_MIN_CHARS;
-}
 
 function normalizeProviderName(value?: string): string | null {
   const provider = String(value || '')

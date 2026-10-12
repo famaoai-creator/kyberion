@@ -8,7 +8,11 @@
  * logged in diagnostic format and the rest still run.
  */
 
-import type { LoadedDotCharter } from '@agent/core/dot/dot-charter';
+import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
+import { withExecutionContext } from '@agent/core/authority';
+import type { DueDotTrigger } from '@agent/core/dot/dot-runtime';
+import type { TriggerReceipt } from '@agent/core/trigger-runner';
+import { isDurableEventKey, reconcileEventRunnerTerminal } from '@agent/core/dot/dot-event-intake';
 import { createLogger } from '@agent/core/logger';
 import { distillDotMemory } from '@agent/core/dot/dot-memory';
 import { measureActiveDotKeyResults, runAsDotCharter } from '@agent/core/dot/dot-key-results';
@@ -142,3 +146,33 @@ DOT_SUPERVISOR_STEPS.push({
 // that opt in with operations_cadence — scoped to the charter's own organization
 // and run as its authority role, so no sovereign chronos daemon is required
 DOT_SUPERVISOR_STEPS.push(DOT_ORG_CADENCE_SUPERVISOR_STEP);
+
+/** Duplicate is not an acknowledgement: require an exact authoritative terminal record. */
+export function reconcileDotEventRunnerDuplicate(
+  charter: DotCharter,
+  key: string,
+  receipt: TriggerReceipt,
+  records: () => readonly TriggerReceipt[]
+): void {
+  if (receipt.status !== 'duplicate' || !isDurableEventKey(key)) return;
+  const terminal = records().find(
+    (r) =>
+      r.idempotencyKey === receipt.idempotencyKey &&
+      (r.status === 'delivered' || r.status === 'rejected')
+  );
+  if (terminal)
+    withExecutionContext(
+      charter.authority.authority_role,
+      () => reconcileEventRunnerTerminal(charter, key, terminal),
+      undefined,
+      charter.scope.tenant_slug,
+      charter.scope.organization_id
+    );
+}
+
+export function triggerRunnerSource(trigger: DueDotTrigger): 'cron' | 'watch' | 'wake' {
+  // probe / event / followup are dot-level kinds; at the runner they are a
+  // wake (an observation or self-scheduled event), same as an inbox row.
+  const kind = trigger.trigger.kind;
+  return kind === 'cron' || kind === 'watch' ? kind : 'wake';
+}

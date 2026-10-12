@@ -11,6 +11,7 @@
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
 import type { DotCharter } from './dot-charter.js';
+import type { DotRuntimeDeps, DueDotTrigger } from './dot-runtime.js';
 import type { DotDecisionLevel, DotProposal } from './dot-proposals.js';
 
 export interface DotExtCtx {
@@ -130,4 +131,14 @@ export interface DotStatusSection {
 export interface DotDigestSection {
   id: string;
   lines(c: DotCharter, since: Date | undefined, ctx: DotExtCtx): string[];
+}
+
+export function dotExtCtx(deps: DotRuntimeDeps, completingTrigger?: DueDotTrigger): DotExtCtx {
+  return {
+    rootDir: deps.rootDir,
+    now: deps.now ?? (() => new Date()),
+    ...(completingTrigger?.trigger.kind === 'followup'
+      ? { completingFollowupKey: completingTrigger.key }
+      : {}),
+  };
 }
