@@ -3,7 +3,7 @@ import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeli
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
-import { secureFetch } from '@agent/core/network';
+import { secureFetch, SecureFetchError } from '@agent/core/network';
 import {
   assertSafeRepositoryPath,
   safeWriteFile,
@@ -249,6 +249,64 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
         });
       }, buildRetryOptions(params));
       return { ...ctx, [exportKey(params, 'last_capture')]: response };
+
+    case 'exposure_check': {
+      // Batch reachability probe (external-asset inventory Phase 3): each item
+      // is {service_id, endpoint}; per-item try/catch keeps one dead endpoint
+      // from aborting the run — the failure IS the check result.
+      const rawItems = params.items;
+      if (!Array.isArray(rawItems)) throw new Error('network:exposure_check requires items: array');
+      const maxItems = readNumberParam(params, 'max_items', 100);
+      const timeout = readNumberParam(params, 'timeout', 8000);
+      const method = readStringParam(params, 'method', 'GET');
+      const checkId = readStringParam(params, 'check_id', 'A-1-reachability');
+      const checks: Array<Record<string, unknown>> = [];
+      let malformed = 0;
+      for (const raw of rawItems.slice(0, maxItems)) {
+        if (!isRecord(raw) || typeof raw.endpoint !== 'string' || !raw.endpoint.trim()) {
+          malformed += 1;
+          continue;
+        }
+        const serviceId = String(raw.service_id || 'unknown');
+        const endpoint = /^https?:\/\//i.test(raw.endpoint)
+          ? raw.endpoint
+          : `https://${raw.endpoint}`;
+        let result: string;
+        let evidence: string;
+        try {
+          await secureFetch({ url: endpoint, method, timeout });
+          result = 'reachable';
+          evidence = `${method} ok`;
+        } catch (err) {
+          const status = err instanceof SecureFetchError ? err.httpStatus : undefined;
+          if (typeof status === 'number') {
+            // Any HTTP response proves the endpoint is exposed.
+            result = 'reachable';
+            evidence = `HTTP ${status}`;
+          } else {
+            result = 'unreachable';
+            evidence = (err instanceof Error ? err.message : String(err)).slice(0, 160);
+          }
+        }
+        checks.push({
+          service_id: serviceId,
+          check_id: checkId,
+          result,
+          evidence,
+          endpoint,
+          checked_at: nowIso(),
+        });
+      }
+      return {
+        ...ctx,
+        [exportKey(params, 'exposure_checks')]: {
+          checks,
+          truncated: rawItems.length > maxItems,
+          attempted: checks.length,
+          skipped_malformed: malformed,
+        },
+      };
+    }
 
     case 'shell':
       assertUnsafeShellAllowed();

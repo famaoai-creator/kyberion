@@ -646,6 +646,14 @@
       "count": 4
     },
     {
+      "file": "pipelines/exposure-check.json",
+      "count": 1
+    },
+    {
+      "file": "pipelines/external-asset-ledger.json",
+      "count": 1
+    },
+    {
       "file": "pipelines/fragments/artifact-packaging.json",
       "count": 2
     },
@@ -795,6 +803,10 @@
     },
     {
       "file": "pipelines/storage-janitor.json",
+      "count": 1
+    },
+    {
+      "file": "pipelines/terraform-asset-inventory.json",
       "count": 1
     },
     {
