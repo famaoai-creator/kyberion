@@ -1,5 +1,5 @@
 ---
-category: fixed
+category: Fixed
 ---
 
 - Keep personal and system overview navigation explicit: choose an authorized workspace before opening a workspace-only destination, with the same behavior in navigation and command search.
