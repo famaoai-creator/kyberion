@@ -988,6 +988,14 @@ describe('media-generation-actuator', () => {
       capture_focused_window: { output: 'active/shared/tmp/capture.jpg' },
       record_screen: { output: 'active/shared/tmp/capture.mp4' },
       pipeline: { steps: [] },
+      lyric_normalize: { lyrics: 'AI にまかせろ' },
+      vocal_align: { audio_path: 'active/shared/tmp/mv/song.mp3' },
+      mv_storyboard: { srt_path: 'active/shared/tmp/mv/lyrics.srt' },
+      mv_compose: {
+        storyboard_path: 'active/shared/tmp/mv/scenes.json',
+        audio_path: 'active/shared/tmp/mv/song.mp3',
+        output_path: 'active/shared/tmp/mv/mv.mp4',
+      },
     };
     // Compile the action schema once: compiling it per action (12x) made this
     // test ~0.75s idle and >10s under parallel load (operations-hygiene-runbook §5).

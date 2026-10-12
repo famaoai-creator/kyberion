@@ -1,6 +1,6 @@
 {
   "actuator_id": "media-generation-actuator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Generative image, video, music, and screen capture actuator",
   "contract_schema": "knowledge/product/schemas/media-generation-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -9,6 +9,26 @@
     "retry_profile": "media-generation-actuator"
   },
   "capabilities": [
+    {
+      "op": "lyric_normalize",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "vocal_align",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "mv_storyboard",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "mv_compose",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
     {
       "op": "generate_image",
       "platforms": ["darwin", "linux", "win32"],
