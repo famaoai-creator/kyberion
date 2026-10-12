@@ -24,7 +24,8 @@
       "action": "generate_video",
       "fallback_backend_id": "video.hyperframes_cli",
       "min_memory_gb": 16,
-      "notes": "GGUF q8 LTX-Video + t5xxl_fp8 text encoder. ~12GB peak on unified-memory hosts."
+      "notes": "GGUF q8 LTX-Video + t5xxl_fp8 text encoder. ~12GB peak on unified-memory hosts.",
+      "accelerators": ["mps", "cuda"]
     }
   ],
   "default_backend_ids": {
