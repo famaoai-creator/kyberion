@@ -12,6 +12,7 @@ import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import { z } from 'zod';
 import { logger } from '../core.js';
+import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { memoizedCliSpawnSync } from './provider-discovery.js';
 import { resolveProviderCliCommand } from './provider-managed-env.js';
@@ -569,7 +570,11 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       return await this.spawnAndParse(args, options?.signal, options?.profile);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      if (model !== 'auto' && isNamedModelUnavailableError(message)) {
+      if (
+        automaticReasoningRedispatchAllowed() &&
+        model !== 'auto' &&
+        isNamedModelUnavailableError(message)
+      ) {
         logger.warn(
           `[cursor-cli] model "${model}" unavailable on current plan; retrying once with auto`
         );
