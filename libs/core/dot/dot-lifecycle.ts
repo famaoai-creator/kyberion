@@ -19,10 +19,19 @@
  */
 
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import {
+  eventContinuationExists,
+  eventContinuationLedger,
+  eventIntakeLockId,
+  initialEventContinuation,
+  withEventContinuationLock,
+  writeEventContinuation,
+} from './dot-event-continuation.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeLstat, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { withExecutionContext } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
@@ -151,7 +160,7 @@ export function createDraftDotCharter(input: unknown, deps: DotLifecycleDeps = {
  * charter. Throws on an unknown dot, an illegal transition, or a failed
  * activation gate.
  */
-export function transitionDotCharterStatus(
+function transitionDotCharterStatusUnlocked(
   dotId: string,
   target: DotCharterStatus,
   deps: DotLifecycleDeps = {}
@@ -245,4 +254,96 @@ export function checkDotActivationReadiness(
 
 export function isDotStatusTerminal(status: DotCharterStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
+}
+
+export function transitionDotCharterStatus(
+  dotId: string,
+  target: DotCharterStatus,
+  deps: DotLifecycleDeps = {}
+): DotCharter {
+  const source = findDotCharter(dotId, deps.rootDir);
+  if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
+  return withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () =>
+      withLockSync('dot-charter-edit:' + path.resolve(source.path), () =>
+        transitionDotCharterStatusUnlocked(dotId, target, deps)
+      ),
+    undefined,
+    source.tenant_slug,
+    source.charter.scope.organization_id
+  );
+}
+
+/**
+ * Explicit forward-only adoption. Supervisors and all charter editors must be
+ * quiescent; this command never starts a dot or replays pre-adoption history.
+ */
+export function enableDotEventContinuation(
+  dotId: string,
+  deps: DotLifecycleDeps & { confirmQuiescent: boolean }
+): DotCharter {
+  if (deps.confirmQuiescent !== true)
+    throw new Error('Stop supervisors and charter editors; then confirm quiescence explicitly.');
+  const source = findDotCharter(dotId, deps.rootDir);
+  if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
+  return withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () =>
+      withLockSync('dot-charter-edit:' + path.resolve(source.path), () => {
+        const raw = String(safeReadFile(source.path, { encoding: 'utf8' }));
+        const parsed = parseSafeJsonObjectInput(raw, 'event continuation charter');
+        const current = validateDotCharter(parsed, source.path);
+        if (current.status !== 'draft' && current.status !== 'paused')
+          throw new Error('Event continuation adoption requires a draft or paused charter.');
+        if (current.attention.event_delivery || eventContinuationExists(current, deps))
+          throw new Error(
+            'Continuation evidence already exists; inspect it, never initialize again.'
+          );
+        if (!current.attention.triggers.some((t) => t.kind === 'event'))
+          throw new Error('Event continuation requires an event trigger.');
+        return withEventContinuationLock(current, deps, () =>
+          withLockSync(eventIntakeLockId(eventContinuationLedger(current, deps.rootDir)), () => {
+            const file = eventContinuationLedger(current, deps.rootDir);
+            try {
+              safeLstat(file);
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
+              safeWriteFile(file, '', { createOnly: true });
+            }
+            const activation_id = randomUUID();
+            const next = {
+              ...parsed,
+              attention: {
+                ...current.attention,
+                event_delivery: { mode: 'durable' as const, activation_id },
+              },
+            };
+            const validated = validateDotCharter(next, source.path);
+            const state = initialEventContinuation(current, activation_id, deps);
+            if (safeReadFile(source.path, { encoding: 'utf8' }) !== raw)
+              throw new Error('Charter changed during adoption; stop all editors before retrying.');
+            // Snapshot first: a crash before the declaration creates a visible hold.
+            writeEventContinuation(current, state, deps, true);
+            if (safeReadFile(source.path, { encoding: 'utf8' }) !== raw)
+              throw new Error('Charter changed after snapshot; operator recovery required.');
+            safeWriteFile(source.path, JSON.stringify(next, null, 2) + '\n');
+            auditTransition(
+              {
+                event: 'dot_event_continuation_adopted',
+                dot_id: dotId,
+                path: source.path,
+                activation_id,
+                floor: state.source.floor,
+              },
+              deps
+            );
+            return validated;
+          })
+        );
+      }),
+    undefined,
+    source.tenant_slug,
+    source.charter.scope.organization_id
+  );
 }

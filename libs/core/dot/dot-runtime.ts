@@ -1,3 +1,10 @@
+import {
+  assertEventContinuationOutput,
+  claimEventContinuation,
+  eventContinuationCharterChanged,
+  isDurableEventKey,
+} from './dot-event-continuation.js';
+import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 /**
  * Dot runtime: due-ness and one bounded goal turn per wake, called by the supervisor.
@@ -45,7 +52,6 @@ import type {
   ToolCall,
   ToolDefinition,
 } from '../reasoning/reasoning-backend-contracts.js';
-import type { DelegationHandle } from '../delegated-task-observability.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { estimateTokens } from '../workforce/worker-context-compaction.js';
 import {
@@ -78,9 +84,10 @@ import {
 import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js';
 import { dotStatePath } from './dot-state-paths.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
-import type { DotExtCtx } from './dot-extensions.js';
+import { dotExtCtx, type DotExtCtx } from './dot-extensions.js';
 import { DOT_FOLLOWUP_TOOL_NAME } from './dot-followups.js';
 import {
+  runDelegatedWake,
   dotBackendIsUnconfiguredStub,
   isDotToolBackendUnavailableError,
   DOT_WAKE_BACKEND_UNAVAILABLE,
@@ -168,6 +175,8 @@ export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 export type DotWakeTrigger = DotTrigger | { kind: 'followup' };
 
 export interface DotWakeLedgerEntry {
+  /** Durable event attempt correlation; absence never proves a dispatch did not occur. */
+  event_attempt_id?: string;
   dot_id: string;
   trigger_key: string;
   kind: DotWakeTrigger['kind'] | 'manual';
@@ -230,6 +239,8 @@ export interface DueDotTrigger {
 }
 
 export interface DotRuntimeDeps {
+  /** Internal durable event claim, minted immediately before provider invocation. */
+  eventAttemptId?: string;
   /** Resolve provider wiring only after current charter validation. */
   resolveWakeExecution?: (
     charter: DotCharter
@@ -314,6 +325,7 @@ export function recordDotWakeOutcome(
     DOT_WAKE_LEDGER_PATH,
     {
       dot_id: charter.dot_id,
+      ...(deps.eventAttemptId ? { event_attempt_id: deps.eventAttemptId } : {}),
       trigger_key: key,
       kind: trigger?.trigger.kind ?? 'manual',
       fired_at: now.toISOString(),
@@ -1015,16 +1027,6 @@ export interface DotWakeReceipt {
   tool_errors?: string[];
 }
 
-function dotExtCtx(deps: DotRuntimeDeps, completingTrigger?: DueDotTrigger): DotExtCtx {
-  return {
-    rootDir: deps.rootDir,
-    now: deps.now ?? (() => new Date()),
-    ...(completingTrigger?.trigger.kind === 'followup'
-      ? { completingFollowupKey: completingTrigger.key }
-      : {}),
-  };
-}
-
 function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
   logger.warn(
     `${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: the wake continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
@@ -1216,35 +1218,6 @@ function followupSuccessorLost(
 /** One dot must never run two wakes concurrently, whatever the trigger mix. */
 const wakingDots = new Set<string>();
 
-async function runDelegatedWake(
-  charter: DotCharter,
-  backend: NonNullable<DotRuntimeDeps['backend']>,
-  prompt: string,
-  timeoutMs: number
-): Promise<string> {
-  if (backend.delegateTaskHandle) {
-    const handle: DelegationHandle = backend.delegateTaskHandle(prompt, undefined);
-    return await Promise.race([
-      handle.join(),
-      new Promise<string>((_resolve, reject) =>
-        setTimeout(() => {
-          void handle.cancel(`wall_clock budget ${timeoutMs}ms exceeded`).catch(() => {});
-          reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`));
-        }, timeoutMs).unref?.()
-      ),
-    ]);
-  }
-  return await Promise.race([
-    backend.delegateTask(prompt, undefined),
-    new Promise<string>((_resolve, reject) =>
-      setTimeout(
-        () => reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`)),
-        timeoutMs
-      ).unref?.()
-    ),
-  ]);
-}
-
 /**
  * One delegated turn: the child gets the fenced-proposal prompt; its fenced
  * proposals and wake-tool blocks are governed here, in this process, under
@@ -1274,6 +1247,7 @@ async function runFencedWake(
     ...wakeTools.errors,
     ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger), failedTools),
   ];
+  assertEventContinuationOutput(deps.eventAttemptId, toolErrors.length + parsed.errors.length);
   if (deps.trigger?.trigger.kind === 'watch') {
     recordWatchSnapshotFromKey(current, deps.trigger, deps);
   }
@@ -1331,7 +1305,10 @@ export async function runDotWake(
     try {
       current = rereadOwnCharter(loaded);
       isFrontDeskDiagnosticDot(charter);
-      if (current.dot_id !== charter.dot_id) {
+      if (
+        current.dot_id !== charter.dot_id ||
+        eventContinuationCharterChanged(charter, current, deps.trigger)
+      ) {
         throw new Error(`file now declares dot_id '${current.dot_id}'`);
       }
     } catch (error) {
@@ -1402,12 +1379,19 @@ export async function runDotWake(
       const withWakeUsage = <T>(fn: () => T): T =>
         withUsageAttribution(
           { actor_id: `dot:${current.dot_id}`, accounting_id, scope: current.scope },
-          fn
+          () => (deps.eventAttemptId ? withoutAutomaticReasoningRedispatch(fn) : fn())
         );
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would
       // record fabricated `[STUB]` text as a delivered wake.
       const realBackend = execution.backend !== undefined || !dotBackendIsUnconfiguredStub(backend);
+      if (isDurableEventKey(deps.trigger?.key) && !realBackend)
+        throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
+      // The claim precedes every possible provider call. A failure after it is ambiguous.
+      if (realBackend) {
+        const attemptId = claimEventContinuation(current, deps.trigger, deps);
+        if (attemptId) deps = { ...deps, eventAttemptId: attemptId };
+      }
       if (!execution.runLoop) {
         if (!realBackend) throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
         return await withWakeUsage(() =>
@@ -1509,6 +1493,7 @@ export async function runDotWake(
           proposalInputs.length === 0 && Object.keys(toolOutputs).length === 0;
         if (
           realBackend &&
+          !deps.eventAttemptId &&
           turnsCompleted === 0 &&
           nothingCollected &&
           isDotToolBackendUnavailableError(message)
@@ -1529,11 +1514,20 @@ export async function runDotWake(
       }
       const tokens = result.goal.budgetStats?.tokensUsed ?? 0;
       recordDotTokenUsage(current.dot_id, tokens, { ...deps, accounting_id });
+      if (deps.eventAttemptId && result.finalState !== 'complete') {
+        throw new Error(
+          'Durable event goal did not complete; dispatched attempt retained for operator recovery'
+        );
+      }
       const collected = collectDotProposals(proposalInputs);
       const actions = governProposals(current, collected.proposals, deps);
       const failedTools = new Set<string>();
       toolErrors.push(
         ...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger), failedTools)
+      );
+      assertEventContinuationOutput(
+        deps.eventAttemptId,
+        toolErrors.length + collected.errors.length
       );
       if (deps.trigger?.trigger.kind === 'watch') {
         recordWatchSnapshotFromKey(current, deps.trigger, deps);

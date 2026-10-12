@@ -26,6 +26,12 @@
  */
 
 import * as path from 'node:path';
+import { evaluateEventContinuation } from './dot-event-continuation.js';
+export {
+  claimEventContinuation,
+  reconcileEventRunnerTerminal,
+  isDurableEventKey,
+} from './dot-event-continuation.js';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
@@ -380,9 +386,16 @@ function absolute(rel: string, deps: DotEventDeps): string {
  * the ledger. When the window was cut, its first line is a fragment and is
  * dropped; malformed lines are skipped.
  */
-function readLedgerTail(filePath: string): unknown[] {
+function readLedgerTail(
+  filePath: string,
+  observation?: { truncated: boolean; size: number; malformed: number }
+): unknown[] {
   if (!safeExistsSync(filePath)) return [];
-  const { buffer, truncated } = safeReadFileTail(filePath, DOT_EVENT_SCAN_TAIL_BYTES);
+  const { buffer, truncated, size } = safeReadFileTail(filePath, DOT_EVENT_SCAN_TAIL_BYTES);
+  if (observation) {
+    observation.truncated = truncated;
+    observation.size = size;
+  }
   const lines = buffer.toString('utf8').split(/\r?\n/);
   if (truncated) lines.shift();
   const rows: unknown[] = [];
@@ -391,6 +404,7 @@ function readLedgerTail(filePath: string): unknown[] {
     try {
       rows.push(parseSafeJsonInput(line, 'dot events ledger tail entry'));
     } catch {
+      if (observation) observation.malformed++;
       /* a torn or malformed line must not hide the rest of the tail */
     }
   }
@@ -594,7 +608,15 @@ export function evaluateDotEventTriggers(
   const triggers = charter.attention.triggers.filter(
     (trigger): trigger is EventTrigger => trigger.kind === 'event'
   );
-  if (triggers.length === 0) return [];
+  if (triggers.length === 0 && !charter.attention.event_delivery) return [];
+  const dueChecker = () => buildDotDueChecker(charter, deps.now?.() ?? new Date(), deps);
+  let check: ((key: string) => boolean) | undefined;
+  const continuation = evaluateEventContinuation(charter, deps, {
+    matches: dotEventMatchesTrigger,
+    receipts: () => readDotWakeLedger(deps),
+    isDue: (key) => (check ??= dueChecker())(key),
+  });
+  if (continuation !== null) return continuation;
   const tenantSlug = charter.scope.tenant_slug || undefined;
   const events = readDotInboundEvents(tenantSlug, deps).filter(
     (event) => (event.tenant_slug || undefined) === tenantSlug
@@ -641,4 +663,35 @@ export function evaluateDotEventTriggers(
     });
   }
   return due;
+}
+
+/** A bounded observation, not an exact backlog or delivery count. */
+export function inspectDotInboundEventWindow(
+  tenantSlug: string | undefined,
+  deps: DotEventDeps = {}
+) {
+  const observation = { truncated: false, size: 0, malformed: 0 };
+  const rows = readLedgerTail(
+    absolute(dotEventsLedgerPath(tenantSlug), deps),
+    observation
+  ) as DotInboundEvent[];
+  const valid = rows.filter(
+    (row) =>
+      typeof row?.event_id === 'string' &&
+      typeof row?.source === 'string' &&
+      typeof row?.received_at === 'string'
+  );
+  return {
+    source_bytes: observation.size,
+    visible_rows: valid
+      .slice(-DOT_EVENT_SCAN_TAIL)
+      .filter((row) => (row.tenant_slug || undefined) === tenantSlug).length,
+    malformed_visible_rows: observation.malformed,
+    invalid_visible_rows: rows.length - valid.length,
+    byte_limit: DOT_EVENT_SCAN_TAIL_BYTES,
+    row_limit: DOT_EVENT_SCAN_TAIL,
+    byte_cutoff: observation.truncated,
+    row_cutoff: valid.length > DOT_EVENT_SCAN_TAIL,
+    history_outside_window: observation.truncated || valid.length > DOT_EVENT_SCAN_TAIL,
+  };
 }
