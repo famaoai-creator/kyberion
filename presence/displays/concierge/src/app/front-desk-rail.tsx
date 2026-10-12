@@ -5,7 +5,7 @@ import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
-import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
+import { A2UIActionProvider, Dialog, NavRail, useA2UIActions } from '@agent/shared-ui';
 import {
   railSelectionValue,
   railSwitcherOptions,
@@ -13,6 +13,11 @@ import {
   type RailSwitcherPayload,
 } from '../lib/rail-switcher';
 import {
+  WORKSPACE_DESTINATION_EVENT,
+  TENANT_CHANGED_EVENT,
+  needsWorkspaceSelection,
+  workspaceDestinationHref,
+  readTenantSelection,
   reflectResolvedSelection,
   switchTenantSelection,
   withSelectedTenant,
@@ -115,9 +120,13 @@ function FrontDeskRailContent() {
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
   const selectionGeneration = React.useRef(0);
+  const [navigationUnavailable, setNavigationUnavailable] = React.useState(false);
+  const [destinationId, setDestinationId] = React.useState<string | null>(null);
 
   const fetchMe = React.useCallback(() => {
     const generation = ++selectionGeneration.current;
+    setDestinationId(null);
+    setNavigationUnavailable(false);
     setNav(null);
     setMe(null);
     return fetch('/api/me', { cache: 'no-store' })
@@ -147,11 +156,10 @@ function FrontDeskRailContent() {
           setMe(data);
           // Show what the server actually resolved; a refused hint is replaced.
           if (data.selection) reflectResolvedSelection(railSelectionValue(data.selection));
-        }
+        } else setNavigationUnavailable(true);
       })
       .catch(() => {
-        // The rail degrades to "no tenant block" — it must never block the
-        // navigation from rendering.
+        if (generation === selectionGeneration.current) setNavigationUnavailable(true);
       });
   }, []);
 
@@ -162,27 +170,102 @@ function FrontDeskRailContent() {
     const generation = selectionGeneration.current;
     setNav(null);
     if (!me) return;
+    setNavigationUnavailable(false);
     fetch(withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, me.viewing?.tenant_slug), {})
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
-        if (current && generation === selectionGeneration.current && data?.ok) setNav(data);
+        if (current && generation === selectionGeneration.current) {
+          if (data?.ok) setNav(data);
+          else setNavigationUnavailable(true);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (current && generation === selectionGeneration.current) setNavigationUnavailable(true);
+      });
     return () => {
       current = false;
     };
   }, [locale, me]);
 
   React.useEffect(() => {
-    fetchMe();
+    void fetchMe();
+    const refresh = () => {
+      void fetchMe();
+    };
+    window.addEventListener('popstate', refresh);
+    window.addEventListener(TENANT_CHANGED_EVENT, refresh);
+    return () => {
+      window.removeEventListener('popstate', refresh);
+      window.removeEventListener(TENANT_CHANGED_EVENT, refresh);
+    };
   }, [fetchMe]);
+
+  React.useEffect(() => {
+    const request = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: unknown }>).detail?.id;
+      // A palette request can arrive while /api/me is still loading. Keep only
+      // its bounded catalog id; resolve the allowed destination before navigation.
+      if (typeof id === 'string' && /^[a-z][a-z-]{0,63}$/.test(id)) setDestinationId(id);
+    };
+    window.addEventListener(WORKSPACE_DESTINATION_EVENT, request);
+    return () => window.removeEventListener(WORKSPACE_DESTINATION_EVENT, request);
+  }, []);
 
   // The shell's provider supplies `next/link`; keep it for the rail items.
   const outerActions = useA2UIActions();
-  const onAction = React.useCallback((actionId: string, payload?: Record<string, unknown>) => {
-    if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
-    switchTenantSelection(payload.value);
-  }, []);
+  const onAction = React.useCallback(
+    (actionId: string, payload?: Record<string, unknown>) => {
+      if (actionId === 'workspace.cancel') {
+        setDestinationId(null);
+        return;
+      }
+      if (actionId === 'workspace.open' && typeof payload?.id === 'string') {
+        const item = nav?.items.find(
+          (candidate) => candidate.id === payload.id && candidate.allowed
+        );
+        if (
+          item &&
+          needsWorkspaceSelection(
+            item.href,
+            me?.selection ? railSelectionValue(me.selection) : (me?.viewing?.tenant_slug ?? null),
+            item.external
+          )
+        )
+          setDestinationId(item.id);
+        return;
+      }
+      if (actionId === 'workspace.choose') {
+        const choice = payload?.choice;
+        if (choice === 'cancel') {
+          setDestinationId(null);
+          return;
+        }
+        const company = me?.switcher?.companies.find(
+          (item) => 'tenant:' + item.tenant_slug === choice
+        );
+        const item = nav?.items.find(
+          (candidate) => candidate.id === destinationId && candidate.allowed
+        );
+        // The choice is navigation, never authorization. The destination validates its viewer again.
+        if (
+          !company ||
+          !item ||
+          !me?.selection ||
+          readTenantSelection() !== railSelectionValue(me.selection)
+        ) {
+          setDestinationId(null);
+          return;
+        }
+        window.location.assign(workspaceDestinationHref(item.href, company.tenant_slug));
+        return;
+      }
+      if (actionId === TENANT_SWITCH_ACTION && typeof payload?.value === 'string') {
+        setDestinationId(null);
+        switchTenantSelection(payload.value);
+      }
+    },
+    [nav, me, destinationId]
+  );
 
   const current = currentItemId(pathname);
   const roleLabel = (role: FrontDeskTenantView['role'] | undefined) =>
@@ -203,8 +286,26 @@ function FrontDeskRailContent() {
     .map((item) => ({
       id: item.id,
       label: item.label,
-      hint: item.sublabel,
-      href: withSelectedTenant(item.href, me?.viewing?.tenant_slug, item.scope_query_style),
+      hint: needsWorkspaceSelection(
+        item.href,
+        me?.selection ? railSelectionValue(me.selection) : (me?.viewing?.tenant_slug ?? null),
+        item.external
+      )
+        ? frontDeskText('workspace_destination_hint', locale)
+        : item.sublabel,
+      ...(needsWorkspaceSelection(
+        item.href,
+        me?.selection ? railSelectionValue(me.selection) : (me?.viewing?.tenant_slug ?? null),
+        item.external
+      )
+        ? { action: { id: 'workspace.open', payload: { id: item.id } } }
+        : {
+            href: withSelectedTenant(
+              item.href,
+              me?.selection ? railSelectionValue(me.selection) : (me?.viewing?.tenant_slug ?? null),
+              item.scope_query_style
+            ),
+          }),
       icon: item.icon,
       group_label: item.group_label,
       active: item.id === current,
@@ -267,6 +368,40 @@ function FrontDeskRailContent() {
         brand={{ name: 'Kyberion', subtitle: brandTagline }}
         context={context}
         items={items}
+      />
+      <Dialog
+        id="workspace-destination"
+        open={destinationId !== null}
+        title={frontDeskText('workspace_destination_title', locale)}
+        message={frontDeskText(
+          navigationUnavailable
+            ? 'workspace_destination_unavailable'
+            : !nav || !me
+              ? 'workspace_destination_loading'
+              : !nav.items.some((item) => item.id === destinationId && item.allowed)
+                ? 'workspace_destination_unavailable'
+                : me.switcher?.companies.length
+                  ? 'workspace_destination_message'
+                  : 'workspace_destination_empty',
+          locale,
+          {
+            destination: nav?.items.find((item) => item.id === destinationId)?.label || '',
+          }
+        )}
+        choices={[
+          ...(nav?.items.some((item) => item.id === destinationId && item.allowed)
+            ? (me?.switcher?.companies ?? [])
+            : []
+          ).map((company) => ({
+            id: 'tenant:' + company.tenant_slug,
+            label: frontDeskText('workspace_destination_continue', locale, {
+              workspace: company.display_name || company.tenant_slug,
+            }),
+          })),
+          { id: 'cancel', label: frontDeskText('workspace_destination_cancel', locale) },
+        ]}
+        action={{ id: 'workspace.choose' }}
+        cancel_action={{ id: 'workspace.cancel' }}
       />
     </A2UIActionProvider>
   );
