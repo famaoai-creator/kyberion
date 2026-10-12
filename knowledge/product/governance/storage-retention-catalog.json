@@ -251,7 +251,7 @@
       "path": "active/shared/runtime/dot",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Resident-dot state (dot-state-paths.ts DOT_STATE_ROOT): events.jsonl inbound-event ledger, work-results / kr-ledger / outcomes / autonomy / arbitration ledgers and working memory, per scope (system floor or tenants/<slug>/). Load-bearing append-only state — event dedup and trigger replay read the ledger tail (bounded at 4 MiB), outcome checks and autonomy read the result ledgers. No automatic deletion; a tenant subtree is purged by the audited tenant offboarding ceremony."
+      "note": "Resident-dot state (dot-state-paths.ts DOT_STATE_ROOT): events.jsonl inbound-event ledger, work-results / kr-ledger / outcomes / autonomy / arbitration ledgers and working memory, per scope (system floor or tenants/<slug>/). Load-bearing append-only state — event dedup and trigger replay read the ledger tail (bounded at 4 MiB), outcome checks and autonomy read the result ledgers. Per-scope event-continuations snapshots retain immutable adoption offsets, bounded pending entries and unresolved dispatch attempts; never TTL-delete or capacity-evict them. No automatic deletion; a tenant subtree is purged by the audited tenant offboarding ceremony."
     },
     {
       "path": "active/shared/runtime/ingest",

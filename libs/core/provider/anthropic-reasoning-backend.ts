@@ -8,6 +8,7 @@
  * model: Kyberion owns the contract, the reasoning itself runs on Claude.
  */
 
+import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
@@ -505,10 +506,14 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(this.applyEffort(params, options?.effort));
     const started = Date.now();
+    const noAutomaticRetry = !automaticReasoningRedispatchAllowed();
     try {
       const result = await llmSemaphore.run(() =>
-        options?.signal
-          ? this.client.messages.parse(budgeted, { signal: options.signal })
+        options?.signal || noAutomaticRetry
+          ? this.client.messages.parse(budgeted, {
+              ...(options?.signal ? { signal: options.signal } : {}),
+              ...(noAutomaticRetry ? { maxRetries: 0 } : {}),
+            })
           : this.client.messages.parse(budgeted)
       );
       this.recordSdkUsage(started, 'success', budgeted.model, result);
@@ -535,11 +540,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
         : new Error('[DELEGATION_CANCELLED] anthropic reasoning operation aborted');
     }
     const started = Date.now();
+    const noAutomaticRetry = !automaticReasoningRedispatchAllowed();
     try {
       const result = await llmSemaphore.run(
         () =>
-          (options?.signal
-            ? this.client.messages.create(budgeted, { signal: options.signal })
+          (options?.signal || noAutomaticRetry
+            ? this.client.messages.create(budgeted, {
+                ...(options?.signal ? { signal: options.signal } : {}),
+                ...(noAutomaticRetry ? { maxRetries: 0 } : {}),
+              })
             : this.client.messages.create(budgeted)) as Promise<Anthropic.Message>
       );
       this.recordSdkUsage(started, 'success', budgeted.model, result);

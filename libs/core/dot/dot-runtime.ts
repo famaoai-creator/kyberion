@@ -1,3 +1,9 @@
+import {
+  claimEventContinuation,
+  eventContinuationIdentity,
+  isDurableEventKey,
+} from './dot-event-continuation.js';
+import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 /**
  * Dot runtime: due-ness and one bounded goal turn per wake, called by the supervisor.
@@ -168,6 +174,8 @@ export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 export type DotWakeTrigger = DotTrigger | { kind: 'followup' };
 
 export interface DotWakeLedgerEntry {
+  /** Durable event attempt correlation; absence never proves a dispatch did not occur. */
+  event_attempt_id?: string;
   dot_id: string;
   trigger_key: string;
   kind: DotWakeTrigger['kind'] | 'manual';
@@ -230,6 +238,8 @@ export interface DueDotTrigger {
 }
 
 export interface DotRuntimeDeps {
+  /** Internal durable event claim, minted immediately before provider invocation. */
+  eventAttemptId?: string;
   /** Resolve provider wiring only after current charter validation. */
   resolveWakeExecution?: (
     charter: DotCharter
@@ -314,6 +324,7 @@ export function recordDotWakeOutcome(
     DOT_WAKE_LEDGER_PATH,
     {
       dot_id: charter.dot_id,
+      ...(deps.eventAttemptId ? { event_attempt_id: deps.eventAttemptId } : {}),
       trigger_key: key,
       kind: trigger?.trigger.kind ?? 'manual',
       fired_at: now.toISOString(),
@@ -1274,6 +1285,11 @@ async function runFencedWake(
     ...wakeTools.errors,
     ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger), failedTools),
   ];
+  if (deps.eventAttemptId && (toolErrors.length || parsed.errors.length)) {
+    throw new Error(
+      'Durable event output is unresolved; dispatched attempt retained for operator recovery'
+    );
+  }
   if (deps.trigger?.trigger.kind === 'watch') {
     recordWatchSnapshotFromKey(current, deps.trigger, deps);
   }
@@ -1331,7 +1347,14 @@ export async function runDotWake(
     try {
       current = rereadOwnCharter(loaded);
       isFrontDeskDiagnosticDot(charter);
-      if (current.dot_id !== charter.dot_id) {
+      if (
+        current.dot_id !== charter.dot_id ||
+        (deps.trigger?.trigger.kind === 'event' &&
+          (eventContinuationIdentity(current) !== eventContinuationIdentity(charter) ||
+            current.attention.event_delivery?.activation_id !==
+              charter.attention.event_delivery?.activation_id ||
+            Boolean(current.attention.event_delivery) !== isDurableEventKey(deps.trigger.key)))
+      ) {
         throw new Error(`file now declares dot_id '${current.dot_id}'`);
       }
     } catch (error) {
@@ -1402,12 +1425,19 @@ export async function runDotWake(
       const withWakeUsage = <T>(fn: () => T): T =>
         withUsageAttribution(
           { actor_id: `dot:${current.dot_id}`, accounting_id, scope: current.scope },
-          fn
+          () => (deps.eventAttemptId ? withoutAutomaticReasoningRedispatch(fn) : fn())
         );
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would
       // record fabricated `[STUB]` text as a delivered wake.
       const realBackend = execution.backend !== undefined || !dotBackendIsUnconfiguredStub(backend);
+      if (isDurableEventKey(deps.trigger?.key) && !realBackend)
+        throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
+      // The claim precedes every possible provider call. A failure after it is ambiguous.
+      if (realBackend) {
+        const attemptId = claimEventContinuation(current, deps.trigger, deps);
+        if (attemptId) deps = { ...deps, eventAttemptId: attemptId };
+      }
       if (!execution.runLoop) {
         if (!realBackend) throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
         return await withWakeUsage(() =>
@@ -1509,6 +1539,7 @@ export async function runDotWake(
           proposalInputs.length === 0 && Object.keys(toolOutputs).length === 0;
         if (
           realBackend &&
+          !deps.eventAttemptId &&
           turnsCompleted === 0 &&
           nothingCollected &&
           isDotToolBackendUnavailableError(message)
@@ -1529,12 +1560,22 @@ export async function runDotWake(
       }
       const tokens = result.goal.budgetStats?.tokensUsed ?? 0;
       recordDotTokenUsage(current.dot_id, tokens, { ...deps, accounting_id });
+      if (deps.eventAttemptId && result.finalState !== 'complete') {
+        throw new Error(
+          'Durable event goal did not complete; dispatched attempt retained for operator recovery'
+        );
+      }
       const collected = collectDotProposals(proposalInputs);
       const actions = governProposals(current, collected.proposals, deps);
       const failedTools = new Set<string>();
       toolErrors.push(
         ...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger), failedTools)
       );
+      if (deps.eventAttemptId && (toolErrors.length || collected.errors.length)) {
+        throw new Error(
+          'Durable event output is unresolved; dispatched attempt retained for operator recovery'
+        );
+      }
       if (deps.trigger?.trigger.kind === 'watch') {
         recordWatchSnapshotFromKey(current, deps.trigger, deps);
       }

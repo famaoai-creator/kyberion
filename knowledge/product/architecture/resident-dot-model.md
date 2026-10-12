@@ -330,3 +330,55 @@ chronos and every resident loop. `decisions.quiet_hours` and
 `autonomous-ops-policy.active_hours` are the sanctioned way to bound that;
 true 24/7 operation needs a non-sleeping host (customer VM per
 docs/operator/DEPLOYMENT.md "persistent always-on" section).
+
+## Forward-only event continuation
+
+Legacy event intake inspects only the latest 2,000 accepted rows / 4 MiB and uses
+a 24-hour initial lookback. The dot status command now reports scan coverage;
+history outside that window is not an exact lost-event or pending count.
+
+To adopt durable forward continuation, an operator must first pause the charter,
+stop all supervisors and competing charter editors, and review existing effects.
+Then run: pnpm kyberion dot event continue <dot_id> --confirm-quiescent.
+The command preserves draft/paused status and captures the current complete-line
+EOF under the intake lock. It writes the continuation snapshot before declaring
+the activation ID in the charter. Review dot status and separately use the
+normal activation ceremony. This is not historical recovery: rows before the
+captured boundary remain untouched.
+
+Per-scope snapshots under the existing dot state floor retain at most 128 matching
+pending events; scans read at most 4 MiB and inspect at most 2,000 lines per sweep.
+Capacity stops scanning and never evicts pending work. Offsets advance only with
+atomically persisted pending entries; merely offering a wake never acknowledges
+it. Scope identity includes tier, tenant, organization, project and dot ID, while
+the authenticated event source remains tenant-wide.
+
+A claim is persisted before provider invocation. A crash, timeout, non-complete
+goal result, or unresolved output after dispatch retains an ambiguous attempt.
+There is no automatic lease expiry or re-dispatch. Known failures before dispatch
+retain normal backoff. Matching terminal wake evidence consumes the event; an
+authoritative terminal runner record can reconcile an offered event, but a generic
+duplicate receipt cannot. Already-held attempts require matching wake evidence or
+separately authorized operator investigation; no automatic reset command is provided.
+
+Kyberion's wrapper retries/failover and Anthropic request retries are disabled
+lexically for these attempts. This does not control the internal behavior of
+external CLI runtimes or promise exactly-once downstream business effects.
+Downstream operations still need their own idempotency. Existing wake-receipt
+replay remains unchanged and is not bounded by the event-reader limits. Atomic
+snapshot writes do not establish a tested sudden-power-loss durability guarantee.
+
+Missing/malformed checkpoints, orphan snapshots, changed triggers/scope,
+source rotation/truncation, changed anchors, malformed complete rows and oversized
+rows stop continuation. Do not delete or reset evidence to resume. Preserve the
+charter, source, checkpoint, wake/runner receipts and downstream effect evidence;
+a separately approved recovery must reconcile the exact activation/event/attempt
+before any replay decision. A trailing incomplete source line waits for completion.
+Status reads inspect recorded state/continuity without scanning every unread row
+or establishing process liveness.
+
+Regression gates: real distinct-payload acceptance above 2,000 rows, byte cutoff,
+bounded pending pressure, new-process restart and competing process claims,
+stale offers, pre/post-dispatch failure, partial wake-tool effects, terminal
+receipt correlation, tenant/full-scope isolation and fail-closed state/source loss.
+Never invoke real providers, notifications or resident daemons for these fixtures.

@@ -13,6 +13,7 @@
  * adapter) are registered via `registerReasoningBackend`.
  */
 
+import { automaticReasoningRedispatchAllowed } from './reasoning-dispatch-scope.js';
 import { logger } from '../core.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import { assertOperationPolicy, currentDelegationDepth } from '../operation-policy-gate.js';
@@ -499,7 +500,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         }
         return { ok: true, result };
       } catch (error) {
-        if (signal?.aborted) throw error;
+        if (!automaticReasoningRedispatchAllowed() || signal?.aborted) throw error;
         const message = reasoningFailureMessage(error);
         const classification = classifyReasoningFailure(error);
         if (classification.retryable && retryAttempt < maxInPlaceRetries) {
@@ -652,7 +653,10 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       },
       options?.signal
     );
-    if (!shouldRetryShortDelegationSummary({ instruction, result: first, servedBackendName })) {
+    if (
+      !automaticReasoningRedispatchAllowed() ||
+      !shouldRetryShortDelegationSummary({ instruction, result: first, servedBackendName })
+    ) {
       return first;
     }
     logger.warn(
@@ -750,10 +754,15 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           yield delta;
         }
         if (yielded) return;
+        if (!automaticReasoningRedispatchAllowed()) {
+          throw new Error(
+            'Reasoning stream ended empty after dispatch; automatic redispatch is disabled'
+          );
+        }
       } catch (error) {
         // Once output has reached the caller, replaying on another provider
         // would duplicate speech. Before the first delta, try the next route.
-        if (yielded) throw error;
+        if (yielded || !automaticReasoningRedispatchAllowed()) throw error;
         if (options?.signal?.aborted) throw error;
         const message = reasoningFailureMessage(error);
         const classification = classifyReasoningFailure(error);
@@ -1122,7 +1131,9 @@ export async function delegateStructured<T>(
   schema: StructuredOutputSchemaRef<T>,
   options: StructuredDelegationOptions = {}
 ): Promise<T> {
-  const maxRetries = Math.max(0, options.maxRetries ?? 2);
+  const maxRetries = automaticReasoningRedispatchAllowed()
+    ? Math.max(0, options.maxRetries ?? 2)
+    : 0;
   const constrainedSampling = resolveConstrainedSampling(
     options.constrainedSampling,
     options.capabilityProfile ?? { supportsStrictTools: false, supportsGrammarTools: false }

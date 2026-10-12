@@ -49,7 +49,11 @@ import {
   type DueDotTrigger,
 } from '@agent/core/dot/dot-runtime';
 import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
-import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
+import {
+  evaluateDotEventTriggers,
+  reconcileEventRunnerTerminal,
+  isDurableEventKey,
+} from '@agent/core/dot/dot-event-intake';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
@@ -515,6 +519,24 @@ export async function runDotSweepOnce(
             undefined,
             loaded.charter.scope.tenant_slug
           );
+          // Duplicate is not an acknowledgement; only inspect the authoritative terminal record.
+          if (receipt.status === 'duplicate' && isDurableEventKey(trigger.key)) {
+            const terminal = dotTriggerRunner
+              .records()
+              .find(
+                (r) =>
+                  r.idempotencyKey === receipt.idempotencyKey &&
+                  (r.status === 'delivered' || r.status === 'rejected')
+              );
+            if (terminal)
+              withExecutionContext(
+                role,
+                () => reconcileEventRunnerTerminal(loaded.charter, trigger.key, terminal),
+                undefined,
+                loaded.charter.scope.tenant_slug,
+                loaded.charter.scope.organization_id
+              );
+          }
           if (receipt.status === 'delivered') {
             delivered += 1;
           } else if (receipt.status === 'rejected') {

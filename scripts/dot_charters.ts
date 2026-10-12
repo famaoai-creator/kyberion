@@ -46,6 +46,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import {
   checkDotActivationReadiness,
+  enableDotEventContinuation,
   transitionDotCharterStatus,
 } from '@agent/core/dot/dot-lifecycle';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
@@ -374,6 +375,21 @@ function reportRelease(argv: string[]) {
 /** `dot event ingest` — local test event through the governed policy (no HMAC, source must exist). */
 function reportEvent(argv: string[]) {
   const [action, ...rest] = argv;
+  if (action === 'continue') {
+    const dotId = rest.find((arg) => !arg.startsWith('--'));
+    if (!dotId)
+      throw new Error('usage: pnpm kyberion dot event continue <dot_id> --confirm-quiescent');
+    const charter = enableDotEventContinuation(dotId, {
+      confirmQuiescent: rest.includes('--confirm-quiescent'),
+    });
+    return {
+      ok: true,
+      dot_id: dotId,
+      status: charter.status,
+      event_delivery: charter.attention.event_delivery,
+      next: 'Review dot status before separately activating the paused/draft charter. Historical events remain untouched.',
+    };
+  }
   const usage = 'usage: pnpm kyberion dot event ingest --source <s> --file <json> [--type <t>]';
   if (action !== 'ingest') throw new Error(usage);
   const flag = (name: string): string | undefined => {
