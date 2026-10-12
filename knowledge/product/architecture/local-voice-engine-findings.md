@@ -64,3 +64,33 @@ by mlx-audio's `stt_model` default for clone-quality checks.
 Registry defaults stay `local_say`/`faster_whisper` for portability; the
 quality upgrade path is resolved per-host via `resolveVoiceEngineForPlatform`
 and `resolveMediaBackendForPlatform` (accelerators/memory-aware).
+
+## Realtime conversation measurements (5 s utterance unless noted)
+
+`realtime-voice-loop.ts` needs sub-second-ish STT and fast first-audio TTS to
+keep the LISTENING→SPEAKING round-trip snappy on this host.
+
+### STT per-turn latency (MLX, 5 s ja utterance)
+
+| model                        | cold                       | notes                                                                          |
+| ---------------------------- | -------------------------- | ------------------------------------------------------------------------------ |
+| whisper-tiny (mlx)           | **0.92 s**                 | lowest latency; rough ja output — usable as the loop's fast transcription tier |
+| whisper-base (mlx)           | ~9 s (incl. download)      | mid tier                                                                       |
+| whisper-small (mlx)          | ~21 s (incl. download)     | accurate but too heavy per-turn                                                |
+| whisper-large-v3-turbo (mlx) | ~5.4 s (warm)              | best quality; fits eotHold + confirm passes, not every-chunk                   |
+| parakeet-tdt-0.6b-v3 (mlx)   | 0.9 s but **empty output** | v3 covers European languages only — no ja. Not usable for this locale          |
+
+Guideline: streaming/fast tier = whisper-tiny (barge-in confirmation, partial
+gates), high-quality final pass = large-v3-turbo or faster-whisper small.
+
+### TTS time-to-first-audio (MLX)
+
+| engine                       | first audio                | full utterance       | peak    | realtime fit                                                                   |
+| ---------------------------- | -------------------------- | -------------------- | ------- | ------------------------------------------------------------------------------ |
+| kokoro-82M-4bit (`jf_alpha`) | **0.58 s**                 | 0.59 s               | 1.41 GB | strong — sentence-level TTFA well under 1 s                                    |
+| qwen3-tts 0.6B stream bridge | —                          | streaming PCM chunks | low     | designed for this seam (`qwen3_tts_stream_bridge.py`, stdin text → stdout PCM) |
+| qwen3-tts 1.7B ICL           | ~9 s total for 6.2 s audio | —                    | 6.58 GB | not a live engine; narration/clone jobs only                                   |
+
+Recommended live stack on this host:
+`ten_vad`/`silero_vad` (barge-in) → `whisper-tiny` fast turn + `large-v3-turbo`
+final → `kokoro` (TTFA ~0.6 s) or `qwen3-0.6B` stream bridge for PCM piping.
