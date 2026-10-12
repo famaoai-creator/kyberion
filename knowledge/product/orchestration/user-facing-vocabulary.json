@@ -26043,6 +26043,26 @@
         "en": "This destination is no longer available in the current navigation. Return to this page and refresh to check access.",
         "ja": "この移動先は現在のメニューで利用できません。この画面に戻り、再読み込みしてアクセス範囲を確認してください。",
         "qps-ploc": "⟦Ŧħïş ḓėşŧïñȧŧïőñ ïş ñő ŀőñɠėř ȧṽȧïŀȧƀŀė ïñ ŧħė ƈůřřėñŧ ñȧṽïɠȧŧïőñ. Řėŧůřñ ŧő ŧħïş ṗȧɠė ȧñḓ řėƒřėşħ ŧő ƈħėƈķ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "ask_draft_conflict": {
+        "en": "You have an unsent draft. Keep it or use this shortcut?",
+        "ja": "入力途中の下書きがあります。今の文章を残すか、この例文に置き換えるか選んでください。",
+        "qps-ploc": "⟦Ẏőů ħȧṽė ȧñ ůñşėñŧ ḓřȧƒŧ. Ķėėṗ ïŧ őř ůşė ŧħïş şħőřŧƈůŧ? ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ask_draft_keep": {
+        "en": "Keep current draft",
+        "ja": "今の下書きを残す",
+        "qps-ploc": "⟦Ķėėṗ ƈůřřėñŧ ḓřȧƒŧ ŀőřėɱ⟧"
+      },
+      "ask_draft_replace": {
+        "en": "Use this text",
+        "ja": "この文章に置き換える",
+        "qps-ploc": "⟦Ůşė ŧħïş ŧėẋŧ ŀőřė⟧"
+      },
+      "ask_draft_not_saved": {
+        "en": "This draft could not be kept in this tab. Copy it before leaving or reloading.",
+        "ja": "このタブに下書きを保存できませんでした。画面を離れる前や再読み込みの前に、文章をコピーしてください。",
+        "qps-ploc": "⟦Ŧħïş ḓřȧƒŧ ƈőůŀḓ ñőŧ ƀė ķėṗŧ ïñ ŧħïş ŧȧƀ. Ƈőṗẏ ïŧ ƀėƒőřė ŀėȧṽïñɠ őř řėŀőȧḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       }
     },
     "operator": {
