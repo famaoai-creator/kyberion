@@ -183,10 +183,10 @@ describe('speech-to-text-bridge', () => {
           'class WhisperModel:',
           '    def __init__(self, model, device, compute_type):',
           '        self.config = dict(model=model, device=device, compute_type=compute_type)',
-          '    def transcribe(self, audio_path, language=None, vad_filter=True):',
+          '    def transcribe(self, audio_path, language=None, vad_filter=True, word_timestamps=False):',
           "        self.config.update(language=language, secret=os.environ.get('OPENAI_API_KEY'))",
           '        text = json.dumps(self.config, ensure_ascii=False)',
-          '        return [SimpleNamespace(text=text, start=0, end=1)], SimpleNamespace(language=language or "auto")',
+          '        return [SimpleNamespace(text=text, start=0, end=1, words=[])], SimpleNamespace(language=language or "auto")',
           '',
         ].join('\n')
       );
