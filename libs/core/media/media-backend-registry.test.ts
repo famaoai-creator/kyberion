@@ -121,9 +121,15 @@ describe('media backend registry', () => {
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
     expect(resolveMusicBackend().backend_id).toBe('media-generation.comfyui.music');
-    expect(resolveMusicBackend('musicgen_mlx', 'darwin').backend_id).toBe(
-      'media-generation.musicgen_mlx'
-    );
+    // musicgen_mlx is MLX-gated: inject Apple Silicon accelerators so the
+    // assertion is hermetic on non-Mac hosts (linux CI has no mlx).
+    expect(
+      resolveMediaBackendForPlatform('music', 'media-generation.musicgen_mlx', 'darwin', 32, [
+        'cpu',
+        'mps',
+        'mlx',
+      ]).backend_id
+    ).toBe('media-generation.musicgen_mlx');
     expect(resolveMusicBackend('stable_audio_3_small_music', 'darwin').backend_id).toBe(
       'media-generation.stable_audio_3_small_music'
     );

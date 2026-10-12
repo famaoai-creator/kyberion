@@ -215,16 +215,19 @@ export type MvScene = {
 
 function parseSrt(text: string): Array<{ start: number; end: number; text: string }> {
   const cues: Array<{ start: number; end: number; text: string }> = [];
-  const re =
-    /\d+\s*\n(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*\n([^\n]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
+  // Parse block-by-block with an anchored pattern (no /g scan over the whole
+  // document) so pathological inputs cannot cause polynomial backtracking.
+  const cueRe =
+    /^(\d+)[ \t]*\r?\n(\d{2}):(\d{2}):(\d{2})[,.](\d{3})[ \t]*-->[ \t]*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})[ \t]*\r?\n([^\n]+)/;
+  for (const block of text.split(/\r?\n[ \t]*\r?\n/)) {
+    const m = cueRe.exec(block.trim());
+    if (!m) continue;
     const t = (h: string, mm: string, ss: string, ms: string) =>
       Number(h) * 3600 + Number(mm) * 60 + Number(ss) + Number(ms) / 1000;
     cues.push({
-      start: t(m[1], m[2], m[3], m[4]),
-      end: t(m[5], m[6], m[7], m[8]),
-      text: m[9].trim(),
+      start: t(m[2], m[3], m[4], m[5]),
+      end: t(m[6], m[7], m[8], m[9]),
+      text: m[10].trim(),
     });
   }
   return cues;
@@ -373,7 +376,10 @@ export async function mvCompose(params: Params): Promise<Record<string, unknown>
   const vlabels = storyboard.scenes.map((_, i) => `[v${i}]`).join('');
   let videoChain = `${vlabels}concat=n=${storyboard.scenes.length}:v=1:a=0[vbase]`;
   if (hasSubtitles && srtPath && safeExistsSync(srtPath)) {
-    const esc = srtPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\\\'");
+    // Escape ffmpeg subtitles-filter metacharacters. Windows separators are
+    // normalized to '/' first; backslashes are then backslash-escaped along
+    // with the other filter special chars (single-pass, no bypass).
+    const esc = srtPath.replace(/\\/g, '/').replace(/([':;,\[\]\\])/g, '\\$1');
     videoChain += `;[vbase]subtitles='${esc}'[vout]`;
   }
   const filterComplex = chains.join(';') + ';' + videoChain;
