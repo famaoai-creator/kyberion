@@ -111,10 +111,17 @@ describe('media backend registry', () => {
   });
 
   it('resolves image, voice, and video backends through the same abstraction', () => {
-    expect(resolveImageBackend(undefined, 'darwin').backend_id).toBe('media-generation.local_flux');
-    expect(resolveImageBackend('local_flux', 'darwin').backend_id).toBe(
-      'media-generation.local_flux'
-    );
+    // local_flux is MLX-gated (min_memory_gb 14, accelerators ["mlx"]): inject
+    // Apple Silicon accelerators + memory so the assertion is hermetic on
+    // non-Mac hosts (linux CI has no mlx), same as musicgen_mlx below.
+    expect(
+      resolveMediaBackendForPlatform('image', undefined, 'darwin', 32, ['cpu', 'mps', 'mlx'])
+        .backend_id
+    ).toBe('media-generation.local_flux');
+    expect(
+      resolveMediaBackendForPlatform('image', 'local_flux', 'darwin', 32, ['cpu', 'mps', 'mlx'])
+        .backend_id
+    ).toBe('media-generation.local_flux');
     expect(resolveImageBackend('apple_playground', 'darwin').backend_id).toBe(
       'media-generation.apple_playground'
     );
