@@ -80,7 +80,10 @@ describe('os-app-adapters', () => {
       { index: 1, title: 'Inbox', url: 'https://mail.example' },
       { index: 2, title: 'Docs', url: '' },
     ]);
-    expect(vi.mocked(secureIo.safeExecResult).mock.calls[0]?.[0]).toBe('powershell.exe');
+    const [command, args] = vi.mocked(secureIo.safeExecResult).mock.calls[0] ?? [];
+    expect(command).toBe('powershell.exe');
+    expect(args?.join(' ')).toContain('foreach ($p in (Get-Process chrome');
+    expect(args?.join(' ')).toContain('$candidateTabs.Count -gt $tabs.Count');
     restorePlatform();
   });
 
