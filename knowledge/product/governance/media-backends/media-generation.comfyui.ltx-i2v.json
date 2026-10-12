@@ -24,7 +24,8 @@
       "action": "generate_video",
       "fallback_backend_id": "media-generation.comfyui.ltx-i2v-fp8",
       "min_memory_gb": 24,
-      "notes": "LTX-Video 2B fp16 + t5xxl_fp16 (~18GB peak). Use first_frame_image + motion prompt; low-memory hosts use ltx-i2v-fp8."
+      "notes": "LTX-Video 2B fp16 + t5xxl_fp16 (~18GB peak). Use first_frame_image + motion prompt; low-memory hosts use ltx-i2v-fp8.",
+      "accelerators": ["mps", "cuda"]
     }
   ],
   "default_backend_ids": {

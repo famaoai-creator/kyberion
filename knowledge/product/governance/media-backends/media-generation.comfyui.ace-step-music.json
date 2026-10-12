@@ -24,7 +24,8 @@
       "action": "generate_music",
       "fallback_backend_id": "media-generation.comfyui.music",
       "min_memory_gb": 12,
-      "notes": "ACE-Step 1.5 turbo vocal music (UNETLoader+DualCLIP qwen). Supports tags/lyrics/bpm/duration/language/keyscale."
+      "notes": "ACE-Step 1.5 turbo vocal music (UNETLoader+DualCLIP qwen). Supports tags/lyrics/bpm/duration/language/keyscale.",
+      "accelerators": ["mps", "cuda", "cpu"]
     }
   ],
   "default_backend_ids": {
