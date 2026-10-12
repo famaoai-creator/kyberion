@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
   "default_backend_ids": {
-    "image": "media-generation.comfyui",
+    "image": "media-generation.local_flux",
     "voice": "voice.local_say",
     "video": "video.hyperframes_cli",
-    "music": "media-generation.comfyui.music"
+    "music": "media-generation.acestep-cpp"
   },
   "backends": [
     {
@@ -27,7 +27,9 @@
       "data_policy": "local_only",
       "execution_locality": "local",
       "fallback_backend_id": "media-generation.comfyui",
-      "notes": "Apple Silicon local FLUX generation via the governed tool runtime registry. Tuned via KYBERION_MFLUX_* env policy."
+      "min_memory_gb": 14,
+      "accelerators": ["mlx"],
+      "notes": "Apple Silicon local FLUX generation via mflux (4-bit MLX). ~95s/image, peak ~14GB; verified local-media-generation-hardware-findings. Tuned via KYBERION_MFLUX_* env policy."
     }
   ]
 }
