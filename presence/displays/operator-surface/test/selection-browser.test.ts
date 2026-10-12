@@ -5,16 +5,26 @@ import { expect, it } from 'vitest';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { safeSpawn, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { runSelectionBrowserSmoke } from './selection-browser-smoke';
+import { runSelectionBrowserSmoke, selectionBrowserLaunchOptions } from './selection-browser-smoke';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// GitHub Actions' existing Operator full-check lane installs Chromium. Missing/failed
+it('uses only supported stable Chrome with its sandbox and bounded startup', () => {
+  expect(selectionBrowserLaunchOptions).toEqual({
+    channel: 'chrome',
+    headless: true,
+    chromiumSandbox: true,
+    timeout: 20_000,
+  });
+  expect(Object.isFrozen(selectionBrowserLaunchOptions)).toBe(true);
+});
+
+// GitHub Actions' existing Ubuntu image provides stable Chrome. Missing/failed
 // hosted launches FAIL. Local skips, including CI=true runs, are not browser validation.
 it.skipIf(process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true')(
-  'GitHub-hosted Chromium selection flows (local skip is NOT browser validation)',
+  'GitHub-hosted stable Chrome selection flows (local skip is NOT browser validation)',
   { timeout: 120_000 },
   async () =>
     withExecutionContextAsync('ecosystem_architect', async () => {
@@ -91,6 +101,8 @@ it.skipIf(process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true')(
         const report = await runSelectionBrowserSmoke({ baseUrl, signal: controller.signal });
         expect(report).toMatchObject({
           ok: true,
+          browserChannel: 'chrome',
+          browserVersion: expect.any(String),
           previewWrites: 0,
           repeatedSaveWrites: 1,
           pendingCancel: true,

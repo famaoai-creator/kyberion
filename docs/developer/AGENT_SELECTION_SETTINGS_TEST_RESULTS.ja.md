@@ -64,3 +64,13 @@
 ローカル Chromium は IPC 制約により起動できず、手動の画面確認・スクリーンショット確認は未実施。既存 GitHub Actions の full gate 内で新しい browser integration が必須実行される。CI=true と GITHUB_ACTIONS=true の両方を要求し、ホストされた実行で browser の起動失敗を skip にしない。既存 chronos-dom-contrast も変更していない。
 
 ホストされた browser、socket、全体 suite の結果は実際の PR チェックで確定する。pending は成功と数えない。この文書のローカル結果だけではマージ可能と判断しない。
+
+## 最初のホスト CI と修正
+
+PR #1070 の最初の head 1ef8ea0 では、PR readiness、actuator/boundary/security、core 6 shard が成功した。一方、CodeQL はエラー分類の非固定正規表現に多項式時間の後戻りを検出し、full gate は 81 件中 mos-no-write-api が失敗した。これらを成功として扱っていない。
+
+- エラー分類を、行ごとに順序を保つ線形の文字列検索へ変更し、長い反復入力・大文字小文字・逆順・改行・情報非開示を回帰対象とした。
+- ホスト browser assertion は skip されず起動を試みたが、Ubuntu 24.04 の AppArmor によりダウンロード版 Chromium の sandbox を利用できなかった。既存 chronos-dom-contrast は成功した。
+- 対象ランナーの [公式ソフトウェア一覧](https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md) は Google Chrome 154.0.8037.97 を掲載する。[Chromium の公式説明](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md) に従い、既存 Ubuntu ポリシーの対象となるインストール済み stable Chrome を [Playwright の標準 channel](https://playwright.dev/docs/browsers#google-chrome--microsoft-edge) で選ぶ。chromiumSandbox:true を維持し、起動失敗は失敗のままとする。OS・AppArmor 設定、インストール、sandbox 無効化、別ブラウザーへの自動代替は追加しない。実際の browser version と assertion 結果は修正後 CI のログで確認する。
+
+修正後のローカル Operator 試験は 80 件成功、実ブラウザー 1 件は明示的な skip。型検査と production build も成功した。独立したソースレビューで線形分類・sandbox 維持・代替経路なしを確認した。修正後の CodeQL と実ブラウザー assertion は次の CI で確認する。
