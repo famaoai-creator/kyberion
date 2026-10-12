@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.local_flux",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.acestep-cpp"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.acestep-cpp",
+      "modality": "music",
+      "display_name": "ACE-Step 1.5 via acestep.cpp (GGML Metal)",
+      "kind": "cli",
+      "provider": "acestep_cpp",
+      "status": "active",
+      "platforms": ["darwin", "linux"],
+      "supports": {
+        "artifact_formats": ["mp3", "wav"],
+        "async": false
+      },
+      "command": "ace-server",
+      "args": ["--models", "{model_dir}", "--host", "127.0.0.1"],
+      "aliases": ["acestep_cpp", "ace-server"],
+      "probe": { "kind": "registry" },
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.comfyui.music",
+      "min_memory_gb": 4,
+      "accelerators": ["mps", "cpu"],
+      "notes": "GGML C++ ACE-Step runner (Metal/CPU). Q4_K_M turbo DiT + Q8_0 0.6B LM ≈3.1GB total; ~37s for a 30s vocal track on Apple Silicon. Verified local-media-generation-hardware-findings."
+    }
+  ]
+}
