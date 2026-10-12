@@ -1,5 +1,7 @@
 'use client';
 
+import { GuardedAnchor } from '../../../lib/settings-exit-guard';
+
 import * as React from 'react';
 import {
   Button,
@@ -279,7 +281,7 @@ export function MembersSection({
           description={frontDeskText('settings_member_sso_help', locale)}
         >
           <p className="kb-text kb-text--muted">
-            <a href="/setup/sso">{frontDeskText('sso_title', locale)}</a>
+            <GuardedAnchor href="/setup/sso">{frontDeskText('sso_title', locale)}</GuardedAnchor>
           </p>
           {members.map((member) => {
             const form = ssoForm(member.member_id);
