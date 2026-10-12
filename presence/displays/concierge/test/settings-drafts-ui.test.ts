@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { act, createElement } from 'react';
 import type { ProfileSectionProps } from '../src/app/settings/sections/ProfileSection';
 import type { NotificationsSectionProps } from '../src/app/settings/sections/NotificationsSection';
+import type { MembersSectionProps } from '../src/app/settings/sections/MembersSection';
 import type { ServicesSectionProps } from '../src/app/settings/sections/ServicesSection';
 import {
   installFakeDom,
@@ -11,6 +12,7 @@ import {
 
 const captured = vi.hoisted(() => ({
   profile: null as ProfileSectionProps | null,
+  members: null as MembersSectionProps | null,
   notifications: null as NotificationsSectionProps | null,
   services: null as ServicesSectionProps | null,
 }));
@@ -32,7 +34,12 @@ vi.mock('../src/app/settings/sections/ServicesSection', () => ({
     return null;
   },
 }));
-vi.mock('../src/app/settings/sections/MembersSection', () => ({ MembersSection: () => null }));
+vi.mock('../src/app/settings/sections/MembersSection', () => ({
+  MembersSection: (props: MembersSectionProps) => {
+    captured.members = props;
+    return null;
+  },
+}));
 vi.mock('../src/app/settings/sections/VoiceSection', () => ({ VoiceSection: () => null }));
 vi.mock('../src/app/settings/sections/RecordingConsentSection', () => ({
   RecordingConsentSection: () => null,
@@ -166,19 +173,20 @@ afterEach(() => {
   unmount = undefined;
   vi.unstubAllGlobals();
   captured.profile = null;
+  captured.members = null;
   captured.notifications = null;
   captured.services = null;
   exit.registration = null;
   exit.invalidate.mockReset();
 });
 afterAll(() => dom.restore());
-async function mount() {
+async function mount(ready = true) {
   const container = dom.document.createElement('div');
   dom.document.body.appendChild(container);
   const root = client.createRoot(container as unknown as Element);
   unmount = () => act(() => root.unmount());
   await act(async () => root.render(createElement(SettingsPage)));
-  expect(captured.profile).not.toBeNull();
+  if (ready) expect(captured.profile).not.toBeNull();
   return {
     container,
     text: () => serializeFake(container),
@@ -747,4 +755,173 @@ describe('settings exit registration', () => {
       expect(posts()).toHaveLength(reason === 'auth' ? 1 : 0);
     }
   );
+});
+
+describe('settings initial-load recovery', () => {
+  it.each(['/api/setup', '/api/me'])(
+    'retries transient %s failure without saving',
+    async (endpoint) => {
+      let failed = true;
+      serve((url) =>
+        url === endpoint && failed
+          ? json({ ok: false, error: 'private-server-detail' }, 503)
+          : undefined
+      );
+      const view = await mount(false);
+      expect(view.text()).toContain('setup.load_retry_help');
+      expect(view.text()).not.toContain('private-server-detail');
+      expect(captured.profile).toBeNull();
+      failed = false;
+      await view.click('settings.retry-load');
+      expect(captured.profile!.profile.name).toBe('Saved name');
+      expect(view.text()).not.toContain('setup.load_retry_help');
+      expect(view.text()).not.toContain('setup.draft_refresh_failed');
+      expect(posts()).toHaveLength(0);
+    }
+  );
+
+  it.each(['network', 'malformed'])('offers safe recovery for %s failure', async (failure) => {
+    let failed = true;
+    serve((url) => {
+      if (url !== '/api/setup' || !failed) return undefined;
+      if (failure === 'network') return Promise.reject(new Error('private-transport-detail'));
+      return json({ ok: true, setup: { private: 'private-server-detail' } });
+    });
+    const view = await mount(false);
+    expect(view.text()).toContain('setup.load_retry_help');
+    expect(view.text()).not.toContain('private-');
+    failed = false;
+    await view.click('settings.retry-load');
+    expect(captured.profile).not.toBeNull();
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('keeps a failed retry actionable and reports a pending retry once', async () => {
+    let mode: 'failed' | 'pending' = 'failed';
+    const pending = deferred<Response>();
+    let retryRequests = 0;
+    serve((url) => {
+      if (url !== '/api/setup') return undefined;
+      if (mode === 'failed') return json({ ok: false }, 503);
+      retryRequests++;
+      return pending.promise;
+    });
+    const view = await mount(false);
+    await view.click('settings.retry-load');
+    expect(view.text()).toContain('setup.load_retry_help');
+    mode = 'pending';
+    const retry = view.container.querySelector('[data-action-id="settings.retry-load"]')!;
+    await act(async () => {
+      fireEvent(retry, 'click');
+      fireEvent(retry, 'click');
+    });
+    expect(retryRequests).toBe(1);
+    expect(view.text()).toContain('setup.load_retry_pending');
+    expect(
+      view.container
+        .querySelector('[data-action-id="settings.retry-load"]')!
+        .getAttribute('disabled')
+    ).not.toBeNull();
+    await act(async () => pending.resolve(json(setup())));
+    expect(captured.profile).not.toBeNull();
+    expect(posts()).toHaveLength(0);
+  });
+
+  it.each([401, 403])('keeps initial %s invalidation terminal', async (status) => {
+    serve((url) => (url === '/api/me' ? json({ ok: false }, status) : undefined));
+    const view = await mount(false);
+    expect(view.text()).toContain('setup.draft_context_changed');
+    expect(view.container.querySelector('[data-action-id="settings.retry-load"]')).toBeNull();
+    expect(captured.profile).toBeNull();
+  });
+
+  it.each(['principal', '401', '403'])(
+    'does not revive a retry invalidated by %s',
+    async (reason) => {
+      const pending = deferred<Response>();
+      let retrying = false;
+      let changed = false;
+      serve((url) => {
+        if (url === '/api/setup') return retrying ? pending.promise : json({ ok: false }, 503);
+        if (url === '/api/me' && changed) {
+          if (reason !== 'principal') return json({ ok: false }, Number(reason));
+          const next = me();
+          next.member.member_id = 'bob';
+          return json(next);
+        }
+      });
+      const view = await mount(false);
+      retrying = true;
+      await view.click('settings.retry-load');
+      changed = true;
+      await act(async () => pending.resolve(json(setup())));
+      expect(view.text()).toContain('setup.draft_context_changed');
+      expect(view.container.querySelector('[data-action-id="settings.retry-load"]')).toBeNull();
+      expect(captured.profile).toBeNull();
+      expect(posts()).toHaveLength(0);
+    }
+  );
+
+  it('ignores a pending retry after unmount', async () => {
+    const pending = deferred<Response>();
+    let retrying = false;
+    serve((url) =>
+      url === '/api/setup' ? (retrying ? pending.promise : json({ ok: false }, 503)) : undefined
+    );
+    const view = await mount(false);
+    retrying = true;
+    await view.click('settings.retry-load');
+    unmount!();
+    unmount = undefined;
+    await act(async () => pending.resolve(json(setup())));
+    expect(captured.profile).toBeNull();
+    expect(serializeFake(view.container)).not.toContain('settings-page');
+    expect(posts()).toHaveLength(0);
+  });
+});
+
+it('refreshes the identity display when initial identity loading recovers', async () => {
+  let failed = true;
+  const tenant = { tenant_slug: 'alpha', display_name: 'Alpha', role: 'owner', status: 'active' };
+  serve((url) =>
+    url === '/api/me'
+      ? failed
+        ? json({ ok: false }, 503)
+        : json({ ...me(), tenants: [tenant], viewing: tenant })
+      : undefined
+  );
+  const view = await mount(false);
+  expect(captured.members).toBeNull();
+  failed = false;
+  await view.click('settings.retry-load');
+  expect(captured.members!.meTenants).toEqual([tenant]);
+  expect(captured.members!.meViewing).toEqual(tenant);
+  expect(captured.members!.memberForm.tenant_slug).toBe('alpha');
+  expect(posts()).toHaveLength(0);
+});
+
+it('ignores an old identity display response after the retry has loaded a newer one', async () => {
+  const pending = deferred<Response>();
+  let setupFailed = true;
+  let meReads = 0;
+  const tenant = { tenant_slug: 'alpha', display_name: 'Alpha', role: 'owner', status: 'active' };
+  serve((url) => {
+    if (url === '/api/setup' && setupFailed) return json({ ok: false }, 503);
+    if (url !== '/api/me') return undefined;
+    meReads++;
+    // The mount starts setup and notification identity checks, then display identity.
+    if (meReads === 3) return pending.promise;
+    return json({ ...me(), tenants: [tenant], viewing: tenant });
+  });
+  const view = await mount(false);
+  setupFailed = false;
+  await view.click('settings.retry-load');
+  expect(captured.members!.meTenants).toEqual([tenant]);
+  const oldTenant = { ...tenant, display_name: 'Stale display' };
+  await act(async () =>
+    pending.resolve(json({ ...me(), tenants: [oldTenant], viewing: oldTenant }))
+  );
+  expect(captured.members!.meTenants).toEqual([tenant]);
+  expect(captured.members!.meViewing).toEqual(tenant);
+  expect(posts()).toHaveLength(0);
 });
