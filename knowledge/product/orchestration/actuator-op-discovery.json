@@ -24478,6 +24478,100 @@
           ]
         },
         {
+          "op": "terraform_asset_inventory",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "dir": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "from": "terraform"
+            }
+          ]
+        },
+        {
+          "op": "asset_inventory_to_ledger",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "as_of": {
+                "type": "string"
+              },
+              "contract_ref": {
+                "type": "string"
+              },
+              "department": {
+                "type": "string"
+              },
+              "discovery_sources": {
+                "type": "array"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "from": "asset_inventory"
+            }
+          ]
+        },
+        {
+          "op": "security_ledger_check_plan",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "categories": {
+                "type": "array"
+              },
+              "check_id": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "tenant": {
+                "type": "string"
+              }
+            },
+            "required": ["tenant"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "tenant": "default"
+            }
+          ]
+        },
+        {
           "op": "analyze_source_tree",
           "kind": "transform",
           "input_schema": {
@@ -25234,6 +25328,48 @@
             "x-kyberion-contract": "inferred-legacy"
           },
           "examples": [{}]
+        },
+        {
+          "op": "exposure_check",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["GET", "HEAD"]
+              },
+              "timeout": {
+                "type": "number"
+              },
+              "max_items": {
+                "type": "number"
+              },
+              "check_id": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "items": [
+                {
+                  "service_id": "svc:example",
+                  "endpoint": "https://example.invalid/"
+                }
+              ],
+              "method": "HEAD",
+              "timeout": 5000
+            }
+          ]
         },
         {
           "op": "shell",

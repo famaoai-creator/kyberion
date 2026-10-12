@@ -53,6 +53,10 @@ import * as path from 'node:path';
 import type { TestCaseADF } from '@agent/core/contracts/test-case-adf';
 import type { UIFlowADF } from '@agent/core/contracts/ui-flow-adf';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
+import { terraformToAssetInventory } from './terraform-asset-inventory.js';
+import { iacInventoryToLedgerDraft } from './asset-ledger.js';
+import { securityLedgerCheckPlan } from './security-check-plan.js';
+import type { IaCAssetInventory } from './terraform-asset-inventory.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
 import {
   deriveTestInventory,
@@ -849,6 +853,65 @@ export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTra
       return {
         ...ctx,
         [params.export_as || 'topology_ir']: terraformToTopologyIr(terraformRoot, { title }),
+      };
+    },
+    terraform_asset_inventory: async ({ params, ctx, resolve }) => {
+      const rootDir = pathResolver.rootDir();
+      const terraformRoot = resolveModelingRepositoryPath(
+        rootDir,
+        resolve(params.dir || params.path || ctx[params.from || 'terraform_root']),
+        'terraform_asset_inventory'
+      );
+      const title = resolve(params.title) || path.basename(terraformRoot);
+      return {
+        ...ctx,
+        [params.export_as || 'asset_inventory']: terraformToAssetInventory(terraformRoot, {
+          title,
+        }),
+      };
+    },
+    asset_inventory_to_ledger: async ({ params, ctx, resolve }) => {
+      const inventory = ctx[params.from || 'asset_inventory'];
+      if (
+        !inventory ||
+        typeof inventory !== 'object' ||
+        !Array.isArray((inventory as any).external_services)
+      ) {
+        throw new Error(
+          '[ASSET_LEDGER_INPUT] asset_inventory_to_ledger requires an IaCAssetInventory object'
+        );
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'ledger_draft']: iacInventoryToLedgerDraft(
+          inventory as IaCAssetInventory,
+          {
+            asOf: resolve(params.as_of),
+            owner: resolve(params.owner),
+            department: resolve(params.department),
+            contractRef: resolve(params.contract_ref),
+            discoverySources: resolve(params.discovery_sources),
+          }
+        ),
+      };
+    },
+
+    security_ledger_check_plan: async ({ params, ctx, resolve }) => {
+      const tenant = resolve(params.tenant);
+      if (!tenant || typeof tenant !== 'string') {
+        throw new Error(
+          '[CHECK_PLAN_INPUT] security_ledger_check_plan requires params.tenant (tenant slug)'
+        );
+      }
+      const includeCategories = Array.isArray(resolve(params.categories))
+        ? (resolve(params.categories) as string[])
+        : undefined;
+      return {
+        ...ctx,
+        [params.export_as || 'check_plan']: securityLedgerCheckPlan(tenant, {
+          ...(includeCategories ? { includeCategories } : {}),
+          ...(resolve(params.check_id) ? { checkId: resolve(params.check_id) } : {}),
+        }),
       };
     },
   };
