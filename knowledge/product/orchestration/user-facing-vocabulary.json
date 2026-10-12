@@ -8992,6 +8992,11 @@
         "en": "Validate or explicitly start the default-off HTTP MCP resource server",
         "ja": "初期無効の HTTP MCP リソースサーバーを検証または明示的に起動",
         "qps-ploc": "⟦Ṽȧŀïḓȧŧė őř ėẋṗŀïƈïŧŀẏ şŧȧřŧ ŧħė ḓėƒȧůŀŧ-őƒƒ ĦŦŦṖ ⱮƇṖ řėşőůřƈė şėřṽėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_security_ledger": {
+        "en": "Promote or verify entries in the tenant external-asset security registry",
+        "ja": "テナント外部資産セキュリティ台帳のエントリを昇格・検証する",
+        "qps-ploc": "⟦Ṗřőɱőŧė őř ṽėřïƒẏ ėñŧřïėş ïñ ŧħė ŧėñȧñŧ ėẋŧėřñȧŀ-ȧşşėŧ şėƈůřïŧẏ řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       }
     },
     "recorder": {

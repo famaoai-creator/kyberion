@@ -160,6 +160,41 @@ const MODELING_CONTRACTS: Record<string, InputSchema> = {
     },
     additionalProperties: false,
   },
+  terraform_asset_inventory: {
+    type: 'object',
+    properties: {
+      dir: { type: 'string' },
+      export_as: { type: 'string' },
+      from: { type: 'string' },
+      path: { type: 'string' },
+      title: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  asset_inventory_to_ledger: {
+    type: 'object',
+    properties: {
+      as_of: { type: 'string' },
+      contract_ref: { type: 'string' },
+      department: { type: 'string' },
+      discovery_sources: { type: 'array' },
+      export_as: { type: 'string' },
+      from: { type: 'string' },
+      owner: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  security_ledger_check_plan: {
+    type: 'object',
+    properties: {
+      categories: { type: 'array' },
+      check_id: { type: 'string' },
+      export_as: { type: 'string' },
+      tenant: { type: 'string' },
+    },
+    required: ['tenant'],
+    additionalProperties: false,
+  },
   build_agentic_source_review_participants: {
     type: 'object',
     properties: {
@@ -374,6 +409,9 @@ const MODELING_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   while: [{ condition: 'pending', max_iterations: 3, pipeline: [] }],
   terraform_to_architecture_adf: [{ from: 'terraform' }],
   terraform_to_topology_ir: [{ from: 'terraform' }],
+  terraform_asset_inventory: [{ from: 'terraform' }],
+  asset_inventory_to_ledger: [{ from: 'asset_inventory' }],
+  security_ledger_check_plan: [{ tenant: 'default' }],
   build_agentic_source_review_participants: [
     { mission_id: 'MSN-20260826-001', tenant_slug: 'example-tenant' },
   ],
@@ -414,6 +452,9 @@ export const MODELING_ACTUATOR_TRANSFORM_OPS = [
   'mermaid_gen',
   'terraform_to_architecture_adf',
   'terraform_to_topology_ir',
+  'terraform_asset_inventory',
+  'asset_inventory_to_ledger',
+  'security_ledger_check_plan',
   'analyze_source_tree',
   'build_agentic_source_review_participants',
   'compile_agentic_source_review_plan',
