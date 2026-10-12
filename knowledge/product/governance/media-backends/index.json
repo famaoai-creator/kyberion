@@ -22,6 +22,9 @@
     "video.hyperframes_cli",
     "media-generation.comfyui.ace-step-music",
     "media-generation.comfyui.ltx-i2v",
-    "media-generation.comfyui.ltx-i2v-fp8"
+    "media-generation.comfyui.ltx-i2v-fp8",
+    "media-generation.acestep-cpp",
+    "media-generation.comfyui.flux-gguf",
+    "media-generation.comfyui.wan-i2v-gguf"
   ]
 }
