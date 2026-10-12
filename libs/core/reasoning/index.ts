@@ -90,3 +90,5 @@ export * from './reasoning-route-doctor.js';
 export * from './reasoning-route-resolver.js';
 export * from './reasoning-runtime-instructions.js';
 export * from './reasoning-tier-declaration.js';
+
+export * from './reasoning-selection-settings.js';

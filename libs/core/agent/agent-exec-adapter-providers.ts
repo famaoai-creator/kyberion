@@ -23,7 +23,7 @@ let registered = false;
 
 function createCodexAdapter(request: AgentExecAdapterRequest): AgentAdapter {
   const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
-  if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
+  if (mode === 'exec' || mode === 'legacy') return new CodexAdapter({ model: request.modelId });
   return new CodexAppServerAdapter({
     model: request.modelId,
     modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),

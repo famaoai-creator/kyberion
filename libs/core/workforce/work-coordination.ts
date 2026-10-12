@@ -8,6 +8,10 @@ import { slugify } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
+import {
+  selectCurrentWorkItems,
+  withImmutableWorkItemInventorySnapshot,
+} from './work-coordination-snapshot.js';
 import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
 import {
   assertSafeRepositoryPath,
@@ -244,13 +248,7 @@ function writeJson(logicalPath: string, value: unknown): void {
 }
 
 function currentWorkItems(): WorkItem[] {
-  const records = readJsonl<WorkItem>(itemsPath());
-  return latestById(records, 'item_id')
-    .map((item) => ({
-      ...item,
-      ...(item.attempts ? { attempts: item.attempts.map((attempt) => ({ ...attempt })) } : {}),
-    }))
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  return selectCurrentWorkItems(readJsonl<WorkItem>(itemsPath()));
 }
 
 function currentWorkItem(itemId: string): WorkItem | null {
@@ -523,6 +521,10 @@ export function listWorkItems(
     const items = applyWorkItemFilters(currentWorkItems(), filter);
     return sortItems(items, 'updated_at');
   });
+}
+
+export function withWorkItemInventorySnapshot<T>(callback: (items: readonly WorkItem[]) => T): T {
+  return withImmutableWorkItemInventorySnapshot(callback, withCoordinationMutation, listWorkItems);
 }
 
 /** Read-only base-schema inventory; diagnostic consumers validate execution evidence. */

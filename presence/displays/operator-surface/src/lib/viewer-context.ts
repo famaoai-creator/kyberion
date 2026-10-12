@@ -2,7 +2,10 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextResponse } from 'next/server';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { SurfaceViewerScopeError } from '@agent/core/surface/surface-mutation-guard';
+import {
+  SurfaceViewerScopeError,
+  type SurfaceViewerScope,
+} from '@agent/core/surface/surface-mutation-guard';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import {
   SURFACE_SESSION_COOKIE,
@@ -12,10 +15,7 @@ import {
 } from '@agent/core/surface/surface-session-cookie';
 import { LOOPBACK_HEADER } from './peer';
 
-export interface OperatorViewer {
-  role: string;
-  principalId?: string;
-  source: string;
+export interface OperatorViewer extends SurfaceViewerScope {
   loopback: boolean;
   credentialSource: SurfaceCredentialSource;
 }
@@ -49,9 +49,7 @@ export function resolveOperatorViewer(input: {
     surface: 'operator-surface',
   });
   return {
-    role: scope.role,
-    principalId: scope.principalId,
-    source: scope.source,
+    ...scope,
     loopback: input.loopback,
     credentialSource: source,
   };
