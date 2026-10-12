@@ -3,6 +3,7 @@ import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
   resolveImageBackend,
+  resolveMediaBackendForPlatform,
   resolveMusicBackend,
   resolveVideoBackend,
   resolveVoiceBackend,
@@ -120,12 +121,72 @@ describe('media backend registry', () => {
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
     expect(resolveMusicBackend().backend_id).toBe('media-generation.comfyui.music');
-    expect(resolveMusicBackend('musicgen_mlx', 'darwin').backend_id).toBe(
-      'media-generation.musicgen_mlx'
-    );
+    // musicgen_mlx is MLX-gated: inject Apple Silicon accelerators so the
+    // assertion is hermetic on non-Mac hosts (linux CI has no mlx).
+    expect(
+      resolveMediaBackendForPlatform('music', 'media-generation.musicgen_mlx', 'darwin', 32, [
+        'cpu',
+        'mps',
+        'mlx',
+      ]).backend_id
+    ).toBe('media-generation.musicgen_mlx');
     expect(resolveMusicBackend('stable_audio_3_small_music', 'darwin').backend_id).toBe(
       'media-generation.stable_audio_3_small_music'
     );
+  });
+
+  it('skips backends above the host memory budget via min_memory_gb', () => {
+    // fp8 i2v fits a 16GB host; fp16 needs 24GB
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v', 'darwin', 16, [
+        'mps',
+      ]).backend_id
+    ).toBe('media-generation.comfyui.ltx-i2v-fp8');
+    expect(
+      resolveMediaBackendForPlatform(
+        'video',
+        'media-generation.comfyui.ltx-i2v-fp8',
+        'darwin',
+        16,
+        ['mps']
+      ).backend_id
+    ).toBe('media-generation.comfyui.ltx-i2v-fp8');
+    // low-memory host with no fitting backend falls through to the default
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v', 'darwin', 8, [
+        'mps',
+      ]).backend_id
+    ).toBe('video.hyperframes_cli');
+  });
+
+  it('skips backends the host accelerator cannot run via accelerators', () => {
+    // CPU-only host cannot run the torch i2v backends -> default fallback
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v-fp8', 'linux', 32, [
+        'cpu',
+      ]).backend_id
+    ).toBe('video.hyperframes_cli');
+    // CUDA host can run fp8 i2v
+    expect(
+      resolveMediaBackendForPlatform('video', 'media-generation.comfyui.ltx-i2v-fp8', 'linux', 32, [
+        'cpu',
+        'cuda',
+      ]).backend_id
+    ).toBe('media-generation.comfyui.ltx-i2v-fp8');
+    // MLX-only music backend resolves on Apple Silicon, falls back elsewhere
+    expect(
+      resolveMediaBackendForPlatform('music', 'media-generation.musicgen_mlx', 'darwin', 32, [
+        'cpu',
+        'mps',
+        'mlx',
+      ]).backend_id
+    ).toBe('media-generation.musicgen_mlx');
+    expect(
+      resolveMediaBackendForPlatform('music', 'media-generation.musicgen_mlx', 'linux', 32, [
+        'cpu',
+        'cuda',
+      ]).backend_id
+    ).toBe('media-generation.comfyui.music');
   });
 
   it('does not return an exact backend record from a different modality', () => {

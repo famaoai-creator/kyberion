@@ -1,0 +1,175 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "mv-generate",
+  "version": "1.0.0",
+  "name": "Original Song MV Generation",
+  "description": "Lyric-driven music video pipeline: normalize lyrics for vocal synthesis, generate the song, align vocal timings, plan lyric-synced scenes, generate per-scene stills (and optional i2v motion clips), then compose with subtitles and audio. Scenes.json is a human/LLM-editable contract — refine visual/motion prompts before the scene generation steps when quality matters.",
+  "labels": ["media", "music-video", "content-generation"],
+  "context": {
+    "tenant": "default",
+    "work_dir": "active/shared/tmp/mv",
+    "lyrics_path": "active/shared/tmp/mv/lyrics.txt",
+    "style": "cinematic photograph, warm color grade",
+    "music_tags": "country, female vocal, japanese lyrics",
+    "duration_sec": 175,
+    "bpm": 90,
+    "language": "ja",
+    "music_backend": "media-generation.comfyui.ace-step-music",
+    "video_backend": "media-generation.comfyui.ltx-i2v-fp8",
+    "enable_i2v": false,
+    "min_scene_sec": 5
+  },
+  "steps": [
+    {
+      "id": "normalize_lyrics",
+      "role": "transform",
+      "op": "media-generation:lyric_normalize",
+      "produces": {
+        "channel": "lyrics",
+        "type": "NormalizedLyrics"
+      },
+      "params": {
+        "lyrics_path": "{{lyrics_path}}"
+      }
+    },
+    {
+      "id": "generate_song",
+      "role": "source",
+      "op": "media-generation:generate_music",
+      "produces": {
+        "channel": "song",
+        "type": "GeneratedArtifact"
+      },
+      "consumes": "lyrics",
+      "params": {
+        "backend_id": "{{music_backend}}",
+        "music_adf": {
+          "kind": "music-generation-adf",
+          "version": "1.0.0",
+          "intent": "lyric-driven original song MV",
+          "style": {
+            "genre": "{{music_tags}}",
+            "vocal": {
+              "language": "{{language}}"
+            }
+          },
+          "composition": {
+            "duration_sec": "{{duration_sec}}",
+            "bpm": "{{bpm}}"
+          },
+          "lyrics": {
+            "mode": "provided",
+            "text": "{{lyrics.sing_lyrics}}"
+          },
+          "output": {
+            "format": "mp3",
+            "filename_prefix": "mv_song",
+            "target_path": "{{work_dir}}/song.mp3",
+            "await_completion": true
+          }
+        }
+      }
+    },
+    {
+      "id": "align_vocals",
+      "role": "transform",
+      "op": "media-generation:vocal_align",
+      "produces": {
+        "channel": "alignment",
+        "type": "VocalAlignment"
+      },
+      "consumes": "song",
+      "params": {
+        "audio_path": "{{song.output_path}}",
+        "language": "{{language}}",
+        "lyrics": "{{lyrics.display_lyrics}}",
+        "srt_path": "{{work_dir}}/lyrics.srt"
+      }
+    },
+    {
+      "id": "storyboard",
+      "role": "transform",
+      "op": "media-generation:mv_storyboard",
+      "produces": {
+        "channel": "storyboard",
+        "type": "MvStoryboard"
+      },
+      "consumes": "alignment",
+      "params": {
+        "srt_path": "{{alignment.srt_path}}",
+        "duration_sec": "{{duration_sec}}",
+        "min_scene_sec": "{{min_scene_sec}}",
+        "style": "{{style}}",
+        "output_path": "{{work_dir}}/scenes.json"
+      }
+    },
+    {
+      "id": "scene_stills",
+      "role": "source",
+      "op": "core:foreach",
+      "consumes": "storyboard",
+      "params": {
+        "items": "{{storyboard.scenes}}",
+        "as": "scene",
+        "do": [
+          {
+            "role": "source",
+            "op": "media-generation:generate_image",
+            "params": {
+              "prompt": "{{style}}, {{scene.visual}}",
+              "output_path": "{{work_dir}}/scene_{{scene.id}}.png",
+              "aspect_ratio": "16:9",
+              "await_completion": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene_motion",
+      "role": "source",
+      "op": "core:if",
+      "consumes": "storyboard",
+      "params": {
+        "condition": "enable_i2v",
+        "then": [
+          {
+            "id": "scene_i2v_clips",
+            "role": "source",
+            "op": "core:foreach",
+            "params": {
+              "items": "{{storyboard.scenes}}",
+              "as": "scene",
+              "do": [
+                {
+                  "role": "source",
+                  "op": "media-generation:generate_video",
+                  "params": {
+                    "backend_id": "{{video_backend}}",
+                    "first_frame_image": "{{work_dir}}/scene_{{scene.id}}.png",
+                    "prompt": "{{scene.motion}}",
+                    "output_path": "{{work_dir}}/scene_{{scene.id}}.mp4",
+                    "await_completion": true
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "compose",
+      "role": "sink",
+      "op": "media-generation:mv_compose",
+      "consumes": "storyboard",
+      "params": {
+        "storyboard_path": "{{work_dir}}/scenes.json",
+        "audio_path": "{{song.output_path}}",
+        "srt_path": "{{alignment.srt_path}}",
+        "output_path": "{{work_dir}}/mv.mp4",
+        "fps": 30
+      }
+    }
+  ]
+}
