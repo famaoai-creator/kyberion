@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.local_flux",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.acestep-cpp"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.comfyui.wan-i2v-gguf",
+      "modality": "video",
+      "display_name": "ComfyUI Wan2.2 TI2V-5B (GGUF) image-to-video",
+      "kind": "service_preset",
+      "provider": "comfyui",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "service_id": "media-generation",
+      "action": "generate_video",
+      "probe": {
+        "kind": "service_runtime",
+        "ref": "comfyui"
+      },
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.comfyui.ltx-i2v",
+      "min_memory_gb": 10,
+      "accelerators": ["mps", "cuda"],
+      "notes": "Wan2.2-TI2V-5B Q4_K_M GGUF + umt5-xxl Q4_K_M via ComfyUI-GGUF; ~6.7min/clip at 640x360x49f on Apple Silicon. Higher quality/slower than LTX; fp8 Wan weights do NOT run on MPS. Verified local-media-generation-hardware-findings."
+    }
+  ]
+}
