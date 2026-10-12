@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "terraform-asset-inventory",
+  "version": "1.0.0",
+  "name": "Terraform To External Asset Inventory",
+  "description": "Classify a Terraform directory into an external asset inventory IR (provider-derived external services, public exposure candidates, open-ingress findings, DNS service hints, data stores) for the security asset-inventory procedure.",
+  "labels": ["modeling", "terraform", "security", "asset-inventory"],
+  "context": {
+    "terraform_dir": ".",
+    "title": "terraform-asset-inventory",
+    "output_path": "active/shared/tmp/modeling/asset-inventory.json"
+  },
+  "steps": [
+    {
+      "id": "build_asset_inventory",
+      "role": "transform",
+      "op": "modeling:terraform_asset_inventory",
+      "produces": { "channel": "asset_inventory", "type": "TerraformAssetInventory" },
+      "params": { "dir": "{{terraform_dir}}", "title": "{{title}}", "export_as": "asset_inventory" }
+    },
+    {
+      "id": "write_asset_inventory",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "asset_inventory",
+      "params": { "path": "{{output_path}}", "content": "{{asset_inventory}}" }
+    }
+  ]
+}

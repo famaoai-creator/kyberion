@@ -34,6 +34,19 @@ const NETWORK_CONTRACTS: Record<string, InputSchema> = {
     required: ['url'],
     additionalProperties: false,
   },
+  exposure_check: {
+    type: 'object',
+    properties: {
+      items: { type: 'array' },
+      method: { type: 'string', enum: ['GET', 'HEAD'] },
+      timeout: { type: 'number' },
+      max_items: { type: 'number' },
+      check_id: { type: 'string' },
+      export_as: { type: 'string' },
+    },
+    required: ['items'],
+    additionalProperties: false,
+  },
   shell: {
     type: 'object',
     properties: { cmd: { type: 'string' }, export_as: { type: 'string' } },
@@ -132,6 +145,13 @@ const NETWORK_CONTRACTS: Record<string, InputSchema> = {
 const NETWORK_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   a2a_poll: [{}],
   fetch: [{ url: 'https://example.invalid/api', method: 'GET' }],
+  exposure_check: [
+    {
+      items: [{ service_id: 'svc:example', endpoint: 'https://example.invalid/' }],
+      method: 'HEAD',
+      timeout: 5000,
+    },
+  ],
   shell: [{ cmd: 'curl --version' }],
   json_query: [{ from: 'response', path: '.items' }],
   regex_extract: [{ from: 'response', pattern: 'id=(?<id>\\w+)' }],
@@ -145,7 +165,12 @@ const NETWORK_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   write_file: [{ path: 'active/shared/tmp/note.txt', content: 'completed' }],
 };
 
-export const NETWORK_ACTUATOR_CAPTURE_OPS = ['a2a_poll', 'fetch', 'shell'] as const;
+export const NETWORK_ACTUATOR_CAPTURE_OPS = [
+  'a2a_poll',
+  'fetch',
+  'exposure_check',
+  'shell',
+] as const;
 
 export const NETWORK_ACTUATOR_TRANSFORM_OPS = [
   'json_query',
