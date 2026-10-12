@@ -2816,9 +2816,6 @@
     "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/windows-os-automation.ts#runWindowsAppScript": [
-      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
-    ],
     "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot": [
       "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot"
     ],
@@ -3362,7 +3359,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -3707,7 +3703,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -4212,7 +4207,6 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/surface/surface-management-mutations.ts#audit",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -4510,7 +4504,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -4860,7 +4853,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -5156,7 +5148,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -5602,7 +5593,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -5969,7 +5959,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "presence/displays/operator-surface/src/lib/view.ts#<module>",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
@@ -6319,7 +6308,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -6585,7 +6573,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -6896,7 +6883,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -6971,8 +6957,13 @@
           ]
         }
       },
-      "unresolved_sites": ["libs/core/windows-os-automation.ts#runWindowsAppScript"],
-      "policy_roles_not_reachable": []
+      "unresolved_sites": [],
+      "policy_roles_not_reachable": [
+        "chronos_tenant_runner",
+        "knowledge_steward",
+        "metrics_cap_reader",
+        "organization_operator"
+      ]
     },
     "system_configurator": {
       "entries": ["scripts/config_mission.ts", "scripts/run_pipeline.ts"],
@@ -7207,7 +7198,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -7505,7 +7495,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -7804,7 +7793,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
         "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow",
@@ -8077,7 +8065,6 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsAppScript",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "satellites/shared/supervise-child.ts#spawnSupervisedChild",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   clickAt: vi.fn(),
   rightClickAt: vi.fn(),
   moveMouse: vi.fn(),
+  performMouseOperation: vi.fn(),
 }));
 
 vi.mock('@agent/core/mark-target-resolver', async (importOriginal) => ({
@@ -36,6 +37,7 @@ vi.mock('@agent/core/virtual/os-automation', async (importOriginal) => ({
   clickAt: mocks.clickAt,
   rightClickAt: mocks.rightClickAt,
   moveMouse: mocks.moveMouse,
+  performMouseOperation: mocks.performMouseOperation,
 }));
 vi.mock('@agent/core/virtual/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
 
@@ -181,7 +183,13 @@ describe('system-actuator target_mark wiring', () => {
       session_id: 'vision-session',
       current_dhash: SCREEN,
     });
-    expect(mocks.clickAt).toHaveBeenCalledWith(225, 110, 1);
+    expect(mocks.performMouseOperation).toHaveBeenCalledWith({
+      type: 'click',
+      x: 225,
+      y: 110,
+      button: 'left',
+      count: 1,
+    });
   });
 
   it('computer_interaction refuses a stale mark without clicking', async () => {
@@ -193,6 +201,7 @@ describe('system-actuator target_mark wiring', () => {
         action: { type: 'double_click', target_mark: 'mark:1', mark_session_id: 'vision-s' },
       })
     ).rejects.toThrow('[MARK_STALE]');
+    expect(mocks.performMouseOperation).not.toHaveBeenCalled();
     expect(mocks.clickAt).not.toHaveBeenCalled();
   });
 
@@ -213,6 +222,12 @@ describe('system-actuator target_mark wiring', () => {
       session_id: 'vision-s',
       current_dhash: SCREEN,
     });
-    expect(mocks.rightClickAt).toHaveBeenCalledWith(40, 80, 1);
+    expect(mocks.performMouseOperation).toHaveBeenCalledWith({
+      type: 'click',
+      x: 40,
+      y: 80,
+      button: 'right',
+      count: 1,
+    });
   });
 });
