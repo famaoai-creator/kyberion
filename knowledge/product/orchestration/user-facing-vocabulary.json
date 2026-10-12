@@ -8996,7 +8996,7 @@
       "cli_cmd_script_security_ledger": {
         "en": "Promote or verify entries in the tenant external-asset security registry",
         "ja": "テナント外部資産セキュリティ台帳のエントリを昇格・検証する",
-        "qps-ploc": "⟦Ṕřőḿőŧė őř ṽėřïƒẏ ėñŧřïėş ïñ ŧħė ŧėñȧñŧ ėxŧėřñȧŀ-ȧşşėŧ şėćůřïŧẏ řėɠïşŧřẏ ļőřėɱ ïṗşůɱ⟧"
+        "qps-ploc": "⟦Ṗřőɱőŧė őř ṽėřïƒẏ ėñŧřïėş ïñ ŧħė ŧėñȧñŧ ėẋŧėřñȧŀ-ȧşşėŧ şėƈůřïŧẏ řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       }
     },
     "recorder": {
