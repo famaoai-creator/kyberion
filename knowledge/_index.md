@@ -103,6 +103,8 @@
 - [Kyberion 性能・リソース効率レビューと Luna 向け改善計画](./product/architecture/performance-resource-review-luna-plan-20261007.md) (public | Unknown)
 - [LLM Execution Boundary](./product/architecture/llm-execution-boundary.md) (public | Unknown)
 - [Lightpanda as a Browser Automation Runtime Provider — Evaluation](./product/architecture/lightpanda-browser-runtime-evaluation.md) (public | ecosystem_architect)
+- [Local Media Generation Hardware Findings (Apple Silicon, 16 GB)](./product/architecture/local-media-generation-hardware-findings.md) (public | Devin)
+- [Local Voice Engine Findings (Apple Silicon, 16 GB)](./product/architecture/local-voice-engine-findings.md) (public | Devin)
 - [Loop Closure Machinery — 4つの自己改善ループの実装地図](./product/architecture/loop-closure-machinery.md) (public | Unknown)
 - [MCP Facade Model (Inbound Tools, Skills, Actuators)](./product/architecture/mcp-facade-model.md) (public | Ecosystem Architect)
 - [Management Control Plane](./product/architecture/management-control-plane.md) (public | Ecosystem Architect)
