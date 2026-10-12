@@ -14735,6 +14735,21 @@
         "en": "Retry recording the saved change",
         "ja": "保存済みの変更の操作記録を再試行",
         "qps-ploc": "⟦Řėŧřẏ řėƈőřḓïñɠ ŧħė şȧṽėḓ ƈħȧñɠė ŀőřėɱ ïṗşů⟧"
+      },
+      "settings.operator_scope_github": {
+        "en": "The check verifies the token only. Repository access and write permissions depend on the token’s permissions and selected repositories.",
+        "ja": "確認できるのはトークンが有効かどうかです。リポジトリへのアクセスや書き込みは、トークンの権限と対象リポジトリの設定によって決まります。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ṽėřïƒïėş ŧħė ŧőķėñ őñŀẏ. Řėṗőşïŧőřẏ ȧƈƈėşş ȧñḓ ẇřïŧė ṗėřɱïşşïőñş ḓėṗėñḓ őñ ŧħė ŧőķėñ’ş ṗėřɱïşşïőñş ȧñḓ şėŀėƈŧėḓ řėṗőşïŧőřïėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "settings.operator_scope_slack": {
+        "en": "The check verifies the token only. App installation, channel membership, messaging permissions and Socket Mode each need separate setup.",
+        "ja": "確認できるのはトークンが有効かどうかです。アプリのインストール、チャンネルへの参加、メッセージの権限、Socket Mode はそれぞれ別途設定が必要です。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ṽėřïƒïėş ŧħė ŧőķėñ őñŀẏ. Ȧṗṗ ïñşŧȧŀŀȧŧïőñ, ƈħȧññėŀ ɱėɱƀėřşħïṗ, ɱėşşȧɠïñɠ ṗėřɱïşşïőñş ȧñḓ Şőƈķėŧ Ɱőḓė ėȧƈħ ñėėḓ şėṗȧřȧŧė şėŧůṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "settings.operator_technical_details": {
+        "en": "Technical check details",
+        "ja": "技術的な確認内容",
+        "qps-ploc": "⟦Ŧėƈħñïƈȧŀ ƈħėƈķ ḓėŧȧïŀş ŀőřėɱ ï⟧"
       }
     },
     "onboarding": {
@@ -24870,19 +24885,19 @@
         "qps-ploc": "⟦Ƈħőőşė ȧ ṽȧŀïḓ řėƈėïṗŧ ƒőřɱȧŧ ȧñḓ ṽėřşïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "first_job_title": {
-        "en": "Try your first safe job",
-        "ja": "安全な最初の仕事を試す",
-        "qps-ploc": "⟦Ŧřẏ ẏőůř ƒïřşŧ şȧƒė ĵőƀ ŀőřėɱ ï⟧"
+        "en": "First job: local diagnostic",
+        "ja": "最初の仕事：ローカル診断",
+        "qps-ploc": "⟦Ƒïřşŧ ĵőƀ: ŀőƈȧŀ ḓïȧɠñőşŧïƈ ŀőřėɱ ïṗ⟧"
       },
       "first_job_summary": {
-        "en": "Create a local diagnostic receipt using synthetic public data. No external AI service is called.",
-        "ja": "公開用の合成データで、ローカルの診断記録を作ります。外部のAIサービスは呼び出しません。",
-        "qps-ploc": "⟦Ƈřėȧŧė ȧ ŀőƈȧŀ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ůşïñɠ şẏñŧħėŧïƈ ṗůƀŀïƈ ḓȧŧȧ. Ñő ėẋŧėřñȧŀ ȦÏ şėřṽïƈė ïş ƈȧŀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+        "en": "See the request → review → result flow with synthetic public data. A diagnostic record is created only after the required setup and approval. No external AI service is called.",
+        "ja": "人工データを使い、依頼 → 内容の確認 → 結果の受け取りを試します。必要な準備と承認がそろってから診断記録を作ります。外部のAIサービスは呼び出しません。",
+        "qps-ploc": "⟦Şėė ŧħė řėɋůėşŧ → řėṽïėẇ → řėşůŀŧ ƒŀőẇ ẇïŧħ şẏñŧħėŧïƈ ṗůƀŀïƈ ḓȧŧȧ. Ȧ ḓïȧɠñőşŧïƈ řėƈőřḓ ïş ƈřėȧŧėḓ őñŀẏ ȧƒŧėř ŧħė řėɋůïřėḓ şėŧůṗ ȧñḓ ȧṗṗřőṽȧŀ. Ñő ėẋŧėřñȧŀ ȦÏ şėřṽïƈė ïş ƈȧŀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
       },
       "first_job_home_link": {
-        "en": "Open the first-job guide",
-        "ja": "最初の仕事のガイドを開く",
-        "qps-ploc": "⟦Őṗėñ ŧħė ƒïřşŧ-ĵőƀ ɠůïḓė ŀőřėɱ ï⟧"
+        "en": "Check preparation and next steps",
+        "ja": "準備状況と次の操作を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ṗřėṗȧřȧŧïőñ ȧñḓ ñėẋŧ şŧėṗş ŀőřėɱ ïṗşů⟧"
       },
       "first_job_readiness": {
         "en": "What is ready?",
@@ -25908,6 +25923,126 @@
         "en": "This tab could not safely update its saved access token. Close this tab and try again in a new tab.",
         "ja": "このタブに保存されたアクセス用トークンを安全に更新できませんでした。このタブを閉じ、新しいタブでやり直してください。",
         "qps-ploc": "⟦Ŧħïş ŧȧƀ ƈőůŀḓ ñőŧ şȧƒėŀẏ ůṗḓȧŧė ïŧş şȧṽėḓ ȧƈƈėşş ŧőķėñ. Ƈŀőşė ŧħïş ŧȧƀ ȧñḓ ŧřẏ ȧɠȧïñ ïñ ȧ ñėẇ ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "workspace_destination_hint": {
+        "en": "Choose a workspace to continue",
+        "ja": "作業先を選んで開く",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ẇőřķşṗȧƈė ŧő ƈőñŧïñůė ŀőřėɱ ïṗşů⟧"
+      },
+      "workspace_destination_title": {
+        "en": "Choose where to work",
+        "ja": "作業先を選んでください",
+        "qps-ploc": "⟦Ƈħőőşė ẇħėřė ŧő ẇőřķ ŀőřėɱ ⟧"
+      },
+      "workspace_destination_message": {
+        "en": "{destination} works in one workspace. Your current overview stays unchanged until you choose a destination. Access is checked again when it opens.",
+        "ja": "「{destination}」は1つの作業先を対象にします。下から選ぶまでは現在の表示範囲は変わりません。移動先でもアクセス権を確認します。",
+        "qps-ploc": "⟦{destination} ẇőřķş ïñ őñė ẇőřķşṗȧƈė. Ẏőůř ƈůřřėñŧ őṽėřṽïėẇ şŧȧẏş ůñƈħȧñɠėḓ ůñŧïŀ ẏőů ƈħőőşė ȧ ḓėşŧïñȧŧïőñ. Ȧƈƈėşş ïş ƈħėƈķėḓ ȧɠȧïñ ẇħėñ ïŧ őṗėñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "workspace_destination_empty": {
+        "en": "{destination} needs a workspace, but none is available for this account. Ask your administrator to check workspace membership, or return to this overview.",
+        "ja": "「{destination}」には作業先が必要ですが、このアカウントで選べる作業先がありません。管理者に所属を確認するか、この画面に戻ってください。",
+        "qps-ploc": "⟦{destination} ñėėḓş ȧ ẇőřķşṗȧƈė, ƀůŧ ñőñė ïş ȧṽȧïŀȧƀŀė ƒőř ŧħïş ȧƈƈőůñŧ. Ȧşķ ẏőůř ȧḓɱïñïşŧřȧŧőř ŧő ƈħėƈķ ẇőřķşṗȧƈė ɱėɱƀėřşħïṗ, őř řėŧůřñ ŧő ŧħïş őṽėřṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "workspace_destination_continue": {
+        "en": "Open in {workspace}",
+        "ja": "{workspace} で開く",
+        "qps-ploc": "⟦Őṗėñ ïñ {workspace} ŀőřėɱ ⟧"
+      },
+      "workspace_destination_cancel": {
+        "en": "Stay here",
+        "ja": "この画面に戻る",
+        "qps-ploc": "⟦Şŧȧẏ ħėřė ŀőř⟧"
+      },
+      "first_job_prerequisites": {
+        "en": "Before you start: an administrator sets up organization sign-in and the diagnostic workspace. You then sign in with an account authorized to approve this diagnostic.",
+        "ja": "開始前に、管理者が組織アカウントのログインと診断用の作業先を設定します。その後、この診断を承認できるアカウントでログインしてください。",
+        "qps-ploc": "⟦Ƀėƒőřė ẏőů şŧȧřŧ: ȧñ ȧḓɱïñïşŧřȧŧőř şėŧş ůṗ őřɠȧñïẑȧŧïőñ şïɠñ-ïñ ȧñḓ ŧħė ḓïȧɠñőşŧïƈ ẇőřķşṗȧƈė. Ẏőů ŧħėñ şïɠñ ïñ ẇïŧħ ȧñ ȧƈƈőůñŧ ȧůŧħőřïẑėḓ ŧő ȧṗṗřőṽė ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "first_job_identity_explanation": {
+        "en": "The sidebar role describes access to the workspace. Local administrator access or an access token alone does not verify the person who approves this job.",
+        "ja": "サイドバーの役割は、作業先でのアクセス範囲を表します。ローカル管理者としてのアクセスやアクセストークンだけでは、この仕事を承認する人の本人確認にはなりません。",
+        "qps-ploc": "⟦Ŧħė şïḓėƀȧř řőŀė ḓėşƈřïƀėş ȧƈƈėşş ŧő ŧħė ẇőřķşṗȧƈė. Ŀőƈȧŀ ȧḓɱïñïşŧřȧŧőř ȧƈƈėşş őř ȧñ ȧƈƈėşş ŧőķėñ ȧŀőñė ḓőėş ñőŧ ṽėřïƒẏ ŧħė ṗėřşőñ ẇħő ȧṗṗřőṽėş ŧħïş ĵőƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "first_job_next_title": {
+        "en": "Your next step",
+        "ja": "次にすること",
+        "qps-ploc": "⟦Ẏőůř ñėẋŧ şŧėṗ ŀőřė⟧"
+      },
+      "first_job_next_loading": {
+        "en": "Checking preparation. This check does not start work.",
+        "ja": "準備状況を確認しています。この確認で仕事が開始されることはありません。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ṗřėṗȧřȧŧïőñ. Ŧħïş ƈħėƈķ ḓőėş ñőŧ şŧȧřŧ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "first_job_next_signin_setup": {
+        "en": "Ask your administrator to configure organization sign-in first. The diagnostic cannot start yet; the setup details below show what is missing.",
+        "ja": "まず管理者に組織アカウントでのログイン設定を依頼してください。診断はまだ開始できません。下の詳細で不足している準備を確認できます。",
+        "qps-ploc": "⟦Ȧşķ ẏőůř ȧḓɱïñïşŧřȧŧőř ŧő ƈőñƒïɠůřė őřɠȧñïẑȧŧïőñ şïɠñ-ïñ ƒïřşŧ. Ŧħė ḓïȧɠñőşŧïƈ ƈȧññőŧ şŧȧřŧ ẏėŧ; ŧħė şėŧůṗ ḓėŧȧïŀş ƀėŀőẇ şħőẇ ẇħȧŧ ïş ɱïşşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "first_job_next_signin": {
+        "en": "Sign in with your organization account using the link below. Then refresh preparation to check this account’s approval access.",
+        "ja": "下のリンクから組織アカウントでログインしてください。その後、準備状況を再確認し、このアカウントで承認できるか確認します。",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ůşïñɠ ŧħė ŀïñķ ƀėŀőẇ. Ŧħėñ řėƒřėşħ ṗřėṗȧřȧŧïőñ ŧő ƈħėƈķ ŧħïş ȧƈƈőůñŧ’ş ȧṗṗřőṽȧŀ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "first_job_next_account": {
+        "en": "Ask your administrator to check this signed-in account’s membership and diagnostic approval access, then refresh preparation.",
+        "ja": "管理者にログイン中のアカウントの所属と診断の承認権限を確認してもらい、準備状況を再確認してください。",
+        "qps-ploc": "⟦Ȧşķ ẏőůř ȧḓɱïñïşŧřȧŧőř ŧő ƈħėƈķ ŧħïş şïɠñėḓ-ïñ ȧƈƈőůñŧ’ş ɱėɱƀėřşħïṗ ȧñḓ ḓïȧɠñőşŧïƈ ȧṗṗřőṽȧŀ ȧƈƈėşş, ŧħėñ řėƒřėşħ ṗřėṗȧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "first_job_next_mapping": {
+        "en": "Ask the local operator to preview the diagnostic setup below. Reviewing that plan does not create a job or approve anything.",
+        "ja": "環境を管理する人に、下の手順で診断用設定の案を確認してもらってください。案の確認だけでは仕事の作成や承認は行われません。",
+        "qps-ploc": "⟦Ȧşķ ŧħė ŀőƈȧŀ őṗėřȧŧőř ŧő ṗřėṽïėẇ ŧħė ḓïȧɠñőşŧïƈ şėŧůṗ ƀėŀőẇ. Řėṽïėẇïñɠ ŧħȧŧ ṗŀȧñ ḓőėş ñőŧ ƈřėȧŧė ȧ ĵőƀ őř ȧṗṗřőṽė ȧñẏŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "first_job_next_review": {
+        "en": "Review the preparation details below and refresh after the missing conditions are resolved. Opening or reloading this page never starts work.",
+        "ja": "下の準備状況を確認し、不足が解消したら再確認してください。この画面を開いたり再読み込みしたりしても仕事は開始しません。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ṗřėṗȧřȧŧïőñ ḓėŧȧïŀş ƀėŀőẇ ȧñḓ řėƒřėşħ ȧƒŧėř ŧħė ɱïşşïñɠ ƈőñḓïŧïőñş ȧřė řėşőŀṽėḓ. Őṗėñïñɠ őř řėŀőȧḓïñɠ ŧħïş ṗȧɠė ñėṽėř şŧȧřŧş ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "first_job_next_ready": {
+        "en": "Use the request controls below, then review the proposed action before approving it. Follow progress and the resulting record on this page.",
+        "ja": "下の操作から診断を依頼し、提案された内容を確認してから承認してください。この画面で進捗と診断結果を確認できます。",
+        "qps-ploc": "⟦Ůşė ŧħė řėɋůėşŧ ƈőñŧřőŀş ƀėŀőẇ, ŧħėñ řėṽïėẇ ŧħė ṗřőṗőşėḓ ȧƈŧïőñ ƀėƒőřė ȧṗṗřőṽïñɠ ïŧ. Ƒőŀŀőẇ ṗřőɠřėşş ȧñḓ ŧħė řėşůŀŧïñɠ řėƈőřḓ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "first_job_setup_details": {
+        "en": "Preparation details for the operator",
+        "ja": "管理者向けの準備状況",
+        "qps-ploc": "⟦Ṗřėṗȧřȧŧïőñ ḓėŧȧïŀş ƒőř ŧħė őṗėřȧŧőř ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "first_job_next_recovery": {
+        "en": "This request needs attention. Read the recovery or hold notice below before starting another request.",
+        "ja": "この依頼には確認が必要です。別の依頼を始める前に、下の復旧・保留の案内を確認してください。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ñėėḓş ȧŧŧėñŧïőñ. Řėȧḓ ŧħė řėƈőṽėřẏ őř ħőŀḓ ñőŧïƈė ƀėŀőẇ ƀėƒőřė şŧȧřŧïñɠ ȧñőŧħėř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "first_job_next_pending": {
+        "en": "A request is already being handled. Review its current status and any approval below; do not send a duplicate request.",
+        "ja": "依頼を処理中です。下の現在の状態と承認待ちの内容を確認してください。同じ依頼を重ねて送らないでください。",
+        "qps-ploc": "⟦Ȧ řėɋůėşŧ ïş ȧŀřėȧḓẏ ƀėïñɠ ħȧñḓŀėḓ. Řėṽïėẇ ïŧş ƈůřřėñŧ şŧȧŧůş ȧñḓ ȧñẏ ȧṗṗřőṽȧŀ ƀėŀőẇ; ḓő ñőŧ şėñḓ ȧ ḓůṗŀïƈȧŧė řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "first_job_next_running": {
+        "en": "The diagnostic is running. Wait for the result and use Refresh to check its progress.",
+        "ja": "診断を実行中です。結果を待ち、「再確認」で進捗を確認してください。",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ ïş řůññïñɠ. Ẇȧïŧ ƒőř ŧħė řėşůŀŧ ȧñḓ ůşė Řėƒřėşħ ŧő ƈħėƈķ ïŧş ṗřőɠřėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_next_result": {
+        "en": "A verified diagnostic record is available below. Review it before deciding whether to revise its format or start another job.",
+        "ja": "確認済みの診断記録を下に表示しています。結果を確認してから、表示形式の変更や次の依頼を選んでください。",
+        "qps-ploc": "⟦Ȧ ṽėřïƒïėḓ ḓïȧɠñőşŧïƈ řėƈőřḓ ïş ȧṽȧïŀȧƀŀė ƀėŀőẇ. Řėṽïėẇ ïŧ ƀėƒőřė ḓėƈïḓïñɠ ẇħėŧħėř ŧő řėṽïşė ïŧş ƒőřɱȧŧ őř şŧȧřŧ ȧñőŧħėř ĵőƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "first_job_next_unavailable": {
+        "en": "Preparation could not be checked. Read the error below and try Refresh; do not assume a previous request failed or send it again.",
+        "ja": "準備状況を確認できませんでした。下のエラーを確認し、「再確認」を試してください。前の依頼が失敗したと決めつけたり、再送したりしないでください。",
+        "qps-ploc": "⟦Ṗřėṗȧřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Řėȧḓ ŧħė ėřřőř ƀėŀőẇ ȧñḓ ŧřẏ Řėƒřėşħ; ḓő ñőŧ ȧşşůɱė ȧ ṗřėṽïőůş řėɋůėşŧ ƒȧïŀėḓ őř şėñḓ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "workspace_destination_loading": {
+        "en": "Checking available workspaces for this destination. Stay here to cancel without changing your current scope.",
+        "ja": "この移動先で選べる作業先を確認しています。「この画面に戻る」で表示範囲を変えずに取り消せます。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ȧṽȧïŀȧƀŀė ẇőřķşṗȧƈėş ƒőř ŧħïş ḓėşŧïñȧŧïőñ. Şŧȧẏ ħėřė ŧő ƈȧñƈėŀ ẇïŧħőůŧ ƈħȧñɠïñɠ ẏőůř ƈůřřėñŧ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "workspace_destination_unavailable": {
+        "en": "This destination is no longer available in the current navigation. Return to this page and refresh to check access.",
+        "ja": "この移動先は現在のメニューで利用できません。この画面に戻り、再読み込みしてアクセス範囲を確認してください。",
+        "qps-ploc": "⟦Ŧħïş ḓėşŧïñȧŧïőñ ïş ñő ŀőñɠėř ȧṽȧïŀȧƀŀė ïñ ŧħė ƈůřřėñŧ ñȧṽïɠȧŧïőñ. Řėŧůřñ ŧő ŧħïş ṗȧɠė ȧñḓ řėƒřėşħ ŧő ƈħėƈķ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       }
     },
     "operator": {
@@ -29077,9 +29212,9 @@
         "qps-ploc": "⟦Ŧħïş şůřƒȧƈė ƈȧññőŧ ṽėřïƒẏ ẇħő ẏőů ȧřė ẏėŧ. Ȧñ ȧḓɱïñïşŧřȧŧőř ɱůşŧ ƒïñïşħ ŧħė şïɠñ-ïñ şėŧůṗ: ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       },
       "unconfigured_hint": {
-        "en": "Until then, use an access token (KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN). Loopback auto-admin only applies where the surface can see a real local peer; on Next.js surfaces it needs KYBERION_TRUST_PROXY=1 behind a trusted proxy.",
-        "ja": "それまでは、アクセストークン(KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN)を使ってください。loopback の自動 admin は、サーフェスが実際のローカル接続元を判別できる場合だけ有効です(Next.js 系は、信頼できるプロキシの背後で KYBERION_TRUST_PROXY=1 が必要)。",
-        "qps-ploc": "⟦Ůñŧïŀ ŧħėñ, ůşė ȧñ ȧƈƈėşş ŧőķėñ (ĶẎɃĖŘÏŐÑ_ȦṖÏ_ŦŐĶĖÑ / ĶẎɃĖŘÏŐÑ_ĿŐƇȦĿȦḒⱮÏÑ_ŦŐĶĖÑ). Ŀőőṗƀȧƈķ ȧůŧő-ȧḓɱïñ őñŀẏ ȧṗṗŀïėş ẇħėřė ŧħė şůřƒȧƈė ƈȧñ şėė ȧ řėȧŀ ŀőƈȧŀ ṗėėř; őñ Ñėẋŧ.ĵş şůřƒȧƈėş ïŧ ñėėḓş ĶẎɃĖŘÏŐÑ_ŦŘŮŞŦ_ṖŘŐẊẎ=1 ƀėħïñḓ ȧ ŧřůşŧėḓ ṗřőẋẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+        "en": "An access token may allow access to supported screens, but it does not replace verified organization sign-in for approvals. The supported local server can recognize a direct local connection. Proxy deployments require their own trusted-proxy setup; ask your administrator which access method applies.",
+        "ja": "アクセストークンで利用できる画面もありますが、承認に必要な組織アカウントでの本人確認の代わりにはなりません。標準のローカルサーバーは直接のローカル接続を判別できます。プロキシ経由の構成には別途、信頼できるプロキシの設定が必要です。利用方法は管理者に確認してください。",
+        "qps-ploc": "⟦Ȧñ ȧƈƈėşş ŧőķėñ ɱȧẏ ȧŀŀőẇ ȧƈƈėşş ŧő şůṗṗőřŧėḓ şƈřėėñş, ƀůŧ ïŧ ḓőėş ñőŧ řėṗŀȧƈė ṽėřïƒïėḓ őřɠȧñïẑȧŧïőñ şïɠñ-ïñ ƒőř ȧṗṗřőṽȧŀş. Ŧħė şůṗṗőřŧėḓ ŀőƈȧŀ şėřṽėř ƈȧñ řėƈőɠñïẑė ȧ ḓïřėƈŧ ŀőƈȧŀ ƈőññėƈŧïőñ. Ṗřőẋẏ ḓėṗŀőẏɱėñŧş řėɋůïřė ŧħėïř őẇñ ŧřůşŧėḓ-ṗřőẋẏ şėŧůṗ; ȧşķ ẏőůř ȧḓɱïñïşŧřȧŧőř ẇħïƈħ ȧƈƈėşş ɱėŧħőḓ ȧṗṗŀïėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
       },
       "unbound_title": {
         "en": "Your account is not registered",

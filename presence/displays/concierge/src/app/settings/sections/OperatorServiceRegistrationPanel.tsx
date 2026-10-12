@@ -235,11 +235,20 @@ function OperatorServiceCard({
     <div ref={cardRef} className="settings-row-block" data-operator-service={service.serviceId}>
       <h3 className="kb-text kb-text--body">{service.label}</h3>
       <Badge label={t(statusKey)} tone={authenticated ? 'success' : 'neutral'} />
-      <p className="kb-text kb-text--muted">{service.scopeNotice}</p>
-      <p className="kb-text kb-text--caption">{t('settings.operator_scope_limit')}</p>
-      <p className="kb-text kb-text--caption">
-        {t('settings.operator_auth_operation', { operation: service.authOperation })}
+      <p className="kb-text kb-text--muted">
+        {service.serviceId === 'github'
+          ? t('settings.operator_scope_github')
+          : service.serviceId === 'slack'
+            ? t('settings.operator_scope_slack')
+            : service.scopeNotice}
       </p>
+      <p className="kb-text kb-text--caption">{t('settings.operator_scope_limit')}</p>
+      <details>
+        <summary>{t('settings.operator_technical_details')}</summary>
+        <p className="kb-text kb-text--caption">
+          {t('settings.operator_auth_operation', { operation: service.authOperation })}
+        </p>
+      </details>
       <p className="kb-text kb-text--body">
         <a
           href={service.setupUrl}
