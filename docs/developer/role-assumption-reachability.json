@@ -3835,6 +3835,7 @@
         "presence/displays/concierge/src/app/settings/sections/VoiceSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/form-scope.tsx",
         "presence/displays/concierge/src/app/settings/settings-api.ts",
+        "presence/displays/concierge/src/app/settings/settings-navigation.ts",
         "presence/displays/concierge/src/app/setup/first-run/page.tsx",
         "presence/displays/concierge/src/app/setup/page.tsx",
         "presence/displays/concierge/src/app/setup/sso-settings-form.tsx",

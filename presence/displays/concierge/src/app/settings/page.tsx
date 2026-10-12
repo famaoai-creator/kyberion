@@ -69,6 +69,7 @@ import {
   readSelectedTenant,
   readTenantSelection,
 } from '../../lib/tenant-context';
+import { createSettingsNavigation, SETTINGS_SECTION_ELEMENT_ID } from './settings-navigation';
 import './settings.css';
 
 /**
@@ -126,21 +127,6 @@ const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = 
   recording: 'settings_nav_recording',
   plugins: 'settings_nav_plugins',
   advanced: 'settings_nav_advanced',
-};
-
-/** The DOM id each section scrolls to — the 6 that carry a legacy `#setup-…`
- * anchor keep it; `members` and `advanced` are new wrapper ids (their 3
- * sub-panes under 詳細設定 keep their own legacy ids inside). */
-const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
-  profile: 'setup-profile',
-  display: 'settings-display',
-  members: 'settings-members',
-  services: 'setup-services',
-  voice: 'setup-media',
-  notifications: 'setup-notifications',
-  recording: 'settings-recording',
-  plugins: 'setup-plugins',
-  advanced: 'settings-advanced',
 };
 
 export default function SettingsPage() {
@@ -252,6 +238,7 @@ export default function SettingsPage() {
   const voiceRecorderRef = React.useRef<MediaRecorder | null>(null);
   const voiceChunksRef = React.useRef<Blob[]>([]);
   const sectionRefs = React.useRef<Partial<Record<SettingsSectionId, HTMLElement | null>>>({});
+  const settingsNavigation = React.useRef<ReturnType<typeof createSettingsNavigation> | null>(null);
 
   const setupRef = React.useRef(setup);
   setupRef.current = setup;
@@ -586,47 +573,27 @@ export default function SettingsPage() {
   }, [meTenants, memberForm.tenant_slug]);
 
   const jumpToSection = React.useCallback((target: string) => {
-    if (!target.startsWith('#')) return;
-    const element = document.getElementById(target.slice(1));
-    if (!element) return;
-    // 詳細設定 keeps its 3 sub-panes collapsed by default; a deep link (the
-    // readiness checklist's "ここで直す" button, or the command palette)
-    // must still reveal them rather than scrolling to hidden content.
-    let details = element.closest('details');
-    while (details) {
-      details.open = true;
-      details = details.parentElement?.closest('details') ?? null;
-    }
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    settingsNavigation.current?.navigate(target);
   }, []);
-
   const jumpToNavSection = React.useCallback(
     (id: SettingsSectionId) => jumpToSection(`#${SETTINGS_SECTION_ELEMENT_ID[id]}`),
     [jumpToSection]
   );
-
-  // FD-06: the left sub-nav highlights whichever card is currently in view.
+  const settingsReady = setup !== null;
   React.useEffect(() => {
-    if (!setup) return;
-    const observed = (
-      Object.entries(sectionRefs.current) as Array<[SettingsSectionId, HTMLElement | null]>
-    ).filter((entry): entry is [SettingsSectionId, HTMLElement] => entry[1] !== null);
-    if (!observed.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const mostVisible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!mostVisible) return;
-        const match = observed.find(([, element]) => element === mostVisible.target);
-        if (match) setActiveSection(match[0]);
-      },
-      { rootMargin: '-15% 0px -70% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] }
+    if (!settingsReady) return;
+    const navigation = createSettingsNavigation(
+      window,
+      document,
+      sectionRefs.current,
+      setActiveSection
     );
-    observed.forEach(([, element]) => observer.observe(element));
-    return () => observer.disconnect();
-  }, [setup]);
+    settingsNavigation.current = navigation;
+    return () => {
+      navigation.dispose();
+      settingsNavigation.current = null;
+    };
+  }, [settingsReady]);
 
   const saveNotification = React.useCallback(
     async (grouped = false): Promise<boolean> => {
