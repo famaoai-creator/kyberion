@@ -476,13 +476,13 @@
         "generate_image",
         "generate_music",
         "generate_video",
-
+        "get_generation_job",
         "lyric_normalize",
         "mv_compose",
         "mv_storyboard",
-        "get_generation_job",
         "run_workflow",
         "submit_generation",
+        "vocal_align",
         "wait_generation_job"
       ],
       "control": ["pipeline"]
