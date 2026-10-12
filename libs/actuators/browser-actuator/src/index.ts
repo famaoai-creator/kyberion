@@ -23,6 +23,11 @@ import {
 } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
+import {
+  completeBrowserPipelineReplay,
+  prepareBrowserPipelineReplay,
+  runBrowserAssist,
+} from './browser-assist.js';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -41,6 +46,7 @@ interface BrowserAction {
   action: 'pipeline';
   steps: PipelineStep[];
   session_id?: string;
+  task_session_id?: string;
   options?: {
     headless?: boolean;
     viewport?: { width: number; height: number };
@@ -115,6 +121,22 @@ async function handleAction(input: unknown) {
       },
       kind: 'computer_interaction',
     };
+    if (admitted.action.type === 'llm_assist') {
+      return runBrowserAssist(
+        {
+          session_id: admitted.session_id,
+          task_session_id: admitted.action.task_session_id,
+          goal: admitted.action.goal || '',
+          max_actions: admitted.action.max_actions,
+          allowed_origins: admitted.action.allowed_origins,
+          browser_options: admitted.action.browser_options,
+        },
+        {
+          executePipeline: (...args) => executeBrowserPipeline(...args),
+          emitProgress: emitComputerSurfacePatch,
+        }
+      );
+    }
     return await browserInteractionHelpers.handleComputerInteraction(admitted);
   }
   if (!isPipelineAction(input)) {
@@ -131,12 +153,15 @@ async function handleAction(input: unknown) {
     }
     return handleExtensionSessionPreflight(input.steps[0].params || {}, input.context || {});
   }
-  return await executeBrowserPipeline(
+  const linkedTaskSession = prepareBrowserPipelineReplay(input);
+  const result = await executeBrowserPipeline(
     input.steps || [],
     input.session_id || 'default',
     input.options || {},
     input.context || {}
   );
+  completeBrowserPipelineReplay(linkedTaskSession, result, input.session_id || 'default');
+  return result;
 }
 
 export const actuator = defineCatalogBackedActuator({
