@@ -21,16 +21,15 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import {
+  performMouseOperation,
+  launchApplication,
   activateApplication,
+  activateWindowByTitle,
+  setWindowState,
   keystrokeText,
   pasteText,
   pressKey,
   toggleDictation,
-  clickAt,
-  rightClickAt,
-  moveMouse,
-  scrollAt,
-  dragFrom,
   quitApplication,
   systemNotify,
   clipboardWrite,
@@ -178,22 +177,51 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       if (!application) {
         throw new Error('Application name is required for activate_application');
       }
-      if (isMacOS()) {
-        activateApplication(application);
+      activateApplication(application);
+      break;
+    }
+    case 'app_launch': {
+      const application = String(resolve(params.application || '')).trim();
+      if (!application) throw new Error('app_launch requires "application" param');
+      if (!launchApplication(application))
+        throw new Error(`Could not launch application: ${application}`);
+      break;
+    }
+    case 'window_focus': {
+      const application = String(resolve(params.application || '')).trim();
+      const title = String(resolve(params.window_title || '')).trim();
+      if (!application || !title)
+        throw new Error('window_focus requires application and window_title');
+      const policy = String(params.match_policy || 'contains') as 'strict' | 'prefix' | 'contains';
+      if (!activateWindowByTitle(application, title, policy)) {
+        throw new Error(`Could not focus window "${title}" for ${application}`);
+      }
+      break;
+    }
+    case 'window_maximize': {
+      const application = String(resolve(params.application || '')).trim();
+      const title = String(resolve(params.window_title || '')).trim();
+      if (!application || !title)
+        throw new Error('window_maximize requires application and window_title');
+      const policy = String(params.match_policy || 'contains') as 'strict' | 'prefix' | 'contains';
+      if (!setWindowState(application, title, 'maximize', policy)) {
+        throw new Error(`Could not maximize window "${title}" for ${application}`);
       }
       break;
     }
     case 'mouse_click': {
       const point = (await resolveSystemClickCoordinate(params, ctx.session_id)) ?? { x: 0, y: 0 };
-      if (params.button === 'right') {
-        rightClickAt(point.x, point.y, Number(params.click_count || 1));
-      } else {
-        clickAt(point.x, point.y, Number(params.click_count || 1));
-      }
+      performMouseOperation({
+        type: 'click',
+        x: point.x,
+        y: point.y,
+        button: params.button === 'right' ? 'right' : 'left',
+        count: Number(params.click_count || 1),
+      });
       break;
     }
     case 'mouse_move':
-      moveMouse(Number(params.x || 0), Number(params.y || 0));
+      performMouseOperation({ type: 'move', x: Number(params.x || 0), y: Number(params.y || 0) });
       break;
     case 'wait':
       await new Promise((resolveDelay) =>
@@ -297,21 +325,23 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'scroll': {
       const direction = String(resolve(params.direction || 'down')) as
         'up' | 'down' | 'left' | 'right';
-      scrollAt(
-        Number(resolve(params.x || 0)),
-        Number(resolve(params.y || 0)),
+      performMouseOperation({
+        type: 'scroll',
+        x: Number(resolve(params.x || 0)),
+        y: Number(resolve(params.y || 0)),
         direction,
-        Number(resolve(params.amount || 3))
-      );
+        amount: Number(resolve(params.amount || 3)),
+      });
       break;
     }
     case 'drag':
-      dragFrom(
-        Number(resolve(params.from_x || 0)),
-        Number(resolve(params.from_y || 0)),
-        Number(resolve(params.to_x || 0)),
-        Number(resolve(params.to_y || 0))
-      );
+      performMouseOperation({
+        type: 'drag',
+        fromX: Number(resolve(params.from_x || 0)),
+        fromY: Number(resolve(params.from_y || 0)),
+        toX: Number(resolve(params.to_x || 0)),
+        toY: Number(resolve(params.to_y || 0)),
+      });
       break;
     case 'run_applescript': {
       assertUnsafeShellAllowed();
