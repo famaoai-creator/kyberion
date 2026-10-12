@@ -944,6 +944,7 @@
 ## 📁 public/procedures/system
 - [Cross-Device Handoff Operations](./public/procedures/system/cross-device-handoff-operations.md) (public | Unknown)
 - [Developer Onboarding Runbook](./public/procedures/system/developer-onboarding.md) (public | Unknown)
+- [Procedure: External Asset Inventory (外部公開資産・外部サービス棚卸し)](./public/procedures/system/external-asset-inventory.md) (public | Ecosystem Architect)
 - [Procedure: GitHub PR & Issue Management](./public/procedures/system/github-pr-management.md) (public | Ecosystem Architect)
 - [Procedure: OS Peripheral Control](./public/procedures/system/control-peripherals.md) (public | Unknown)
 - [Procedure: Security Incident Response](./public/procedures/system/security-incident-response.md) (public | Ecosystem Architect)
@@ -1017,6 +1018,7 @@
 - [FISC-Aligned Security Standard (Cloud Infrastructure)](./public/standards/fisc/security-controls.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/ipa
+- [IPA 不正アクセス漏えい事案 緊急点検チェックリスト (2026-10-09 アラート)](./public/standards/ipa/unauthorized-access-checklist.md) (public | Ecosystem Architect)
 - [IPA-Aligned Requirements Engineering Standard](./public/standards/ipa/requirements-checklist.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/media
@@ -1031,7 +1033,9 @@
 - [Software Development Life Cycle (SDLC) Methodologies](./public/standards/sdlc/methodologies.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/security
+- [OWASP ASVS 5.0 (Application Security Verification Standard)](./public/standards/security/owasp_asvs.md) (public | Ecosystem Architect)
 - [OWASP Top 10 for LLM Applications](./public/standards/security/owasp_llm_top10.md) (public | Ecosystem Architect)
+- [OWASP Top 10:2025 (Web Application)](./public/standards/security/owasp_web_top10.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/testing
 - [Maestro Syntax Standard (v1.35.0)](./public/standards/testing/maestro-spec.md) (public | Ecosystem Architect)
