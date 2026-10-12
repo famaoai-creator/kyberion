@@ -1,5 +1,7 @@
 'use client';
 
+import { GuardedAnchor } from '../lib/settings-exit-guard';
+
 import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
@@ -738,14 +740,14 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
                       : 'dock.history.failed'
             )}{' '}
             {historyFailure === 'signin' ? (
-              <a
+              <GuardedAnchor
                 href={
                   '/login?next=' +
                   encodeURIComponent(window.location.pathname + window.location.search)
                 }
               >
                 {t('dock.history.signin_action')}
-              </a>
+              </GuardedAnchor>
             ) : null}
           </>
         ) : null}
@@ -762,9 +764,9 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
               {t('dock.history.retry')}
             </button>{' '}
             {historyState === 'ready' && pendingTurns > 0 ? (
-              <a href={withSelectedTenant(progressHref, tenant)}>
+              <GuardedAnchor href={withSelectedTenant(progressHref, tenant)}>
                 {frontDeskText('nav_progress', locale)}
-              </a>
+              </GuardedAnchor>
             ) : null}
           </>
         ) : null}
@@ -795,14 +797,14 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
               {shapeKey ? <span className="dock-shape-chip">{t(shapeKey)}</span> : null}
               <p className="dock-text">{message.text}</p>
               {message.role === 'user' && /^[a-f0-9-]{36}-user$/.test(message.id) ? (
-                <a
+                <GuardedAnchor
                   href={withSelectedTenant(
                     progressHref + '?request=' + encodeURIComponent(message.id.slice(0, -5)),
                     tenant
                   )}
                 >
                   {frontDeskText('nav_progress', locale)}
-                </a>
+                </GuardedAnchor>
               ) : null}
               {message.promoted ? (
                 <p className="dock-promoted">
