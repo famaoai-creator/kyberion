@@ -10,6 +10,18 @@ import {
 } from './selection-service';
 import type { SelectionTarget } from './selection-contract';
 
+/** Scan disjoint lines and fixed literals once; never retry a greedy suffix per occurrence. */
+function hasInvalidSelectionMessage(message: string): boolean {
+  // Preserve the old non-dotAll behavior for all JavaScript line terminators.
+  return message
+    .toLowerCase()
+    .split(/[\r\n\u2028\u2029]/)
+    .some((line) => {
+      const selectionAt = line.indexOf('selection');
+      return selectionAt >= 0 && line.indexOf('invalid', selectionAt + 'selection'.length) >= 0;
+    });
+}
+
 /** Errors expose stable classifications only, never raw provider/configuration details. */
 function selectionFailure(error: unknown): NextResponse {
   const message = error instanceof Error ? error.message : '';
@@ -25,7 +37,7 @@ function selectionFailure(error: unknown): NextResponse {
     return NextResponse.json({ error: error.code }, { status: error.status });
   if (/NOT_FOUND/.test(code))
     return NextResponse.json({ error: 'SELECTION_NOT_FOUND' }, { status: 404 });
-  if (/INVALID|ACTIVE|BLOCKED|UNAVAILABLE/.test(code) || /selection.*invalid/i.test(message))
+  if (/INVALID|ACTIVE|BLOCKED|UNAVAILABLE/.test(code) || hasInvalidSelectionMessage(message))
     return NextResponse.json({ error: 'SELECTION_REJECTED' }, { status: 422 });
   return NextResponse.json({ error: 'SELECTION_UNAVAILABLE' }, { status: 503 });
 }

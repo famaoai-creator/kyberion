@@ -94,17 +94,19 @@ this change does not claim to redesign every legacy page's authorization model.
 Opt-in deeper verification from the repository root (after core build):
 
     node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-runtime-smoke.ts
-    node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-browser-smoke.ts [chromium-executable]
+    node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-browser-smoke.ts
 
 The runtime smoke copies only public product policy/schema catalogs and synthetic data into
 an isolated root, then checks actual facade persistence and role assumptions under
 SYSTEM_ROLE=operator_surface. The browser smoke needs the separate fixture server and an
-already installed Chromium. It never downloads a browser or disables its sandbox.
+already installed stable Google Chrome. It uses Playwright channel chrome with
+chromiumSandbox:true, logs the actual browser version, and fails rather than falling back
+to a custom executable or launch flags. It never downloads a browser or disables its sandbox.
 
 The package includes one explicitly GitHub-hosted browser test. Local runs (including
 CI=true) list it as skipped and do not establish browser validation. The existing hosted
-full-check lane requires both CI=true and GITHUB_ACTIONS=true, and Chromium is provisioned
-already: the test starts its isolated fixture, exercises
-real Chromium flows, and fails on missing/failed browser launch. A hosted browser pass
+full-check lane requires both CI=true and GITHUB_ACTIONS=true and uses stable Chrome
+already supplied by the Ubuntu runner image. The test starts its isolated fixture,
+exercises real browser flows, and fails on missing/failed browser launch. A hosted browser pass
 is required before claiming these flows verified. Its 120-second budget covers bounded
 startup 45s, scenarios 65s and cleanup 5s; no exception converts a browser failure to success.

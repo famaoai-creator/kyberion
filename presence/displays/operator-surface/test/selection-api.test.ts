@@ -503,6 +503,51 @@ describe('selection preview and revision safety', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: 'STALE_SELECTION' });
   });
+  it.each([
+    {
+      name: 'long repeated selection without invalid suffix',
+      message: 'selection '.repeat(20_000) + 'private diagnostic',
+      status: 503,
+      error: 'SELECTION_UNAVAILABLE',
+    },
+    {
+      name: 'ordered mixed-case literals',
+      message: 'private path: SeLeCtIoN is InVaLiD; private diagnostic',
+      status: 422,
+      error: 'SELECTION_REJECTED',
+    },
+    {
+      name: 'reverse-order literals',
+      message: 'INVALID private diagnostic before SELECTION',
+      status: 503,
+      error: 'SELECTION_UNAVAILABLE',
+    },
+    {
+      name: 'adjacent literals',
+      message: 'selectioninvalid private diagnostic',
+      status: 422,
+      error: 'SELECTION_REJECTED',
+    },
+    {
+      name: 'line-separated literals',
+      message: 'selection\ninvalid private diagnostic',
+      status: 503,
+      error: 'SELECTION_UNAVAILABLE',
+    },
+    {
+      name: 'later line with an ordered pair',
+      message: 'selection\nSELECTION private diagnostic INVALID',
+      status: 422,
+      error: 'SELECTION_REJECTED',
+    },
+  ])('classifies $name with a stable sanitized response', async ({ message, status, error }) => {
+    mocks.reasoningSave.mockImplementation(() => {
+      throw new Error(message);
+    });
+    const response = await handleSelectionRequest(request(), { kind: 'reasoning' });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+  });
   it('maps mission stale scope and active ownership refusal from the governed facade', async () => {
     mocks.missionSave.mockRejectedValue(new Error('[MISSION_TEAM_SELECTION_STALE] private path'));
     expect(

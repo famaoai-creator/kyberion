@@ -1,15 +1,23 @@
 /**
  * Opt-in browser regression script. Start the isolated test/browser Next app first.
- * node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-browser-smoke.ts [chromium-executable]
- * Uses existing Playwright and an installed browser; never downloads or disables its sandbox.
+ * node --import ./scripts/ts-loader.mjs presence/displays/operator-surface/test/selection-browser-smoke.ts
+ * Uses existing Playwright and installed stable Chrome; never downloads or disables its sandbox.
  */
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Page } from 'playwright';
+import { chromium, type LaunchOptions, type Page } from 'playwright';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+
+/** Stable Chrome is covered by the hosted Ubuntu AppArmor profile; keep its sandbox enabled. */
+export const selectionBrowserLaunchOptions = Object.freeze({
+  channel: 'chrome',
+  headless: true,
+  chromiumSandbox: true,
+  timeout: 20_000,
+}) satisfies LaunchOptions;
 
 async function waitReady(page: Page) {
   await page.getByRole('button', { name: 'Edit', exact: true }).waitFor({ state: 'visible' });
@@ -57,16 +65,21 @@ async function assertEditorErrorAssociation(page: Page, expected: RegExp) {
   assert.match(association.text, expected);
 }
 export async function runSelectionBrowserSmoke(
-  options: { baseUrl?: string; executablePath?: string; signal?: AbortSignal } = {}
+  options: { baseUrl?: string; signal?: AbortSignal } = {}
 ) {
   const baseUrl = options.baseUrl ?? 'http://127.0.0.1:3342';
   assert.match(baseUrl, /^http:\/\/127\.0\.0\.1:\d+$/, 'synthetic fixture must be loopback-only');
-  const browser = await chromium.launch({
-    headless: true,
-    chromiumSandbox: true,
-    timeout: 20_000,
-    ...(options.executablePath ? { executablePath: options.executablePath } : {}),
-  });
+  const browser = await chromium.launch(selectionBrowserLaunchOptions);
+  const browserVersion = browser.version();
+  process.stdout.write(
+    '[selection-browser-engine] ' +
+      JSON.stringify({
+        channel: selectionBrowserLaunchOptions.channel,
+        version: browserVersion,
+        chromiumSandbox: true,
+      }) +
+      '\n'
+  );
   const abort = () => {
     void browser.close();
   };
@@ -205,6 +218,8 @@ export async function runSelectionBrowserSmoke(
     assert.deepEqual(errors, [], 'browser page errors');
     return {
       ok: true,
+      browserChannel: selectionBrowserLaunchOptions.channel,
+      browserVersion,
       previewWrites: 0,
       repeatedSaveWrites: 1,
       pendingCancel: true,
@@ -223,7 +238,7 @@ export async function runSelectionBrowserSmoke(
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const report = await withExecutionContextAsync('ecosystem_architect', () =>
-    runSelectionBrowserSmoke({ executablePath: process.argv[2] })
+    runSelectionBrowserSmoke()
   );
   process.stdout.write(JSON.stringify(report) + '\n');
 }
