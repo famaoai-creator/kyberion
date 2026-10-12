@@ -22,12 +22,16 @@
       "command": "uvx",
       "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
       "aliases": ["musicgen_mlx", "media-generation.musicgen_mlx"],
-      "probe": { "kind": "tool_runtime", "ref": "musicgen_mlx" },
+      "probe": {
+        "kind": "tool_runtime",
+        "ref": "musicgen_mlx"
+      },
       "cost_tier": "self_hosted",
       "data_policy": "local_only",
       "execution_locality": "local",
       "fallback_backend_id": "media-generation.comfyui.music",
-      "notes": "Apple Silicon local MusicGen via mlx-audiocraft tool runtime. Prefer facebook/musicgen-small; weights are CC BY-NC. Tuned via KYBERION_MUSICGEN_*. Install: uv tool install mlx-audiocraft (or trial via uvx)."
+      "notes": "Apple Silicon local MusicGen via mlx-audiocraft tool runtime. Prefer facebook/musicgen-small; weights are CC BY-NC. Tuned via KYBERION_MUSICGEN_*. Install: uv tool install mlx-audiocraft (or trial via uvx).",
+      "accelerators": ["mlx"]
     }
   ]
 }
