@@ -16,7 +16,7 @@ import {
   validateChainAttenuation,
   type DelegationChain,
 } from '../mission/delegation-chain.js';
-import { type AgentHandle } from '../agent/agent-lifecycle.js';
+import { resolveAgentLifecycleModelId, type AgentHandle } from '../agent/agent-lifecycle.js';
 import {
   parseAgentRuntimeLaunchMode,
   resolveAgentRuntimeLaunchMode,
@@ -24,7 +24,10 @@ import {
 } from '../agent/agent-pane-runtime-bridge.js';
 import '../agent/agent-pane-runtime-herdr.js';
 import { getAgentManifest, resolveAgentSelectionHints } from '../agent/agent-manifest.js';
-import { resolveAgentProviderTarget } from '../agent/agent-provider-resolution.js';
+import {
+  parseAgentRequestedSelection,
+  resolveAgentProviderTarget,
+} from '../agent/agent-provider-resolution.js';
 import { listDemotedProviders } from '../provider/provider-health-registry.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
@@ -60,6 +63,10 @@ import {
 import { normalizeAgentContextMode, type AgentContextMode } from '../context-boundary.js';
 import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { isRecord } from '../foundation/primitives.js';
+import {
+  readMissionTeamSelectionDispatch,
+  reserveMissionTeamSelectionDispatch,
+} from '../mission/mission-team-selection.js';
 import {
   validateContextSecurityScope,
   validateReasoningEgress,
@@ -688,8 +695,37 @@ class A2ABridgeImpl {
     this.syncCachedHandle(agentId);
 
     const securityScope = this.extractSecurityScope(payload);
-    const payloadRecord = isRecord(payload) ? payload : undefined;
-    const payloadContext = isRecord(payloadRecord?.context) ? payloadRecord.context : undefined;
+    let payloadRecord = isRecord(payload) ? payload : undefined;
+    let payloadContext = isRecord(payloadRecord?.context) ? payloadRecord.context : undefined;
+    const missionId =
+      typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : undefined;
+    const teamRole =
+      typeof payloadContext?.team_role === 'string' ? payloadContext.team_role : undefined;
+    const canonicalAssignment =
+      missionId && teamRole ? readMissionTeamSelectionDispatch({ missionId, teamRole }) : null;
+    if (canonicalAssignment) {
+      const transportProvider = this.extractProvider(payload) || provider;
+      const transportModelId = this.extractProviderModelId(payload);
+      if (
+        canonicalAssignment.agent_id !== agentId ||
+        (transportProvider && transportProvider !== canonicalAssignment.provider) ||
+        (transportModelId && transportModelId !== canonicalAssignment.modelId)
+      ) {
+        throw new Error(
+          '[AGENT_SELECTION_STALE] A2A target does not match the canonical mission role assignment'
+        );
+      }
+      payloadContext = {
+        ...payloadContext,
+        provider: canonicalAssignment.provider,
+        provider_model_id: canonicalAssignment.modelId,
+        requested_selection: canonicalAssignment.requested_selection,
+        required_capabilities: canonicalAssignment.required_capabilities,
+        selection_resolution: canonicalAssignment.selection_resolution,
+      };
+      payloadRecord = { ...payloadRecord, context: payloadContext };
+      payload = payloadRecord;
+    }
     const runtimeMissionId =
       securityScope?.mission_id ||
       (typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : undefined);
@@ -712,6 +748,73 @@ class A2ABridgeImpl {
     const existing = supervisorHandle || this.handles.get(agentId);
     const requestedProvider = this.extractProvider(payload) || provider;
     const requestedModelId = this.extractProviderModelId(payload);
+    const requestedSelectionInput =
+      payloadContext?.requested_selection !== undefined
+        ? payloadContext.requested_selection
+        : payloadRecord?.requested_selection;
+    const requestedSelection =
+      requestedSelectionInput === undefined
+        ? undefined
+        : parseAgentRequestedSelection(requestedSelectionInput);
+    if (
+      requestedSelection?.mode === 'fixed' &&
+      requestedSelection.agent_id &&
+      requestedSelection.agent_id !== agentId
+    ) {
+      throw new Error(
+        '[AGENT_SELECTION_IDENTITY_CONFLICT] Fixed agent identity does not match the A2A receiver'
+      );
+    }
+    const requiredCapabilities = requestedSelection
+      ? this.extractRequiredCapabilities(payload)
+      : undefined;
+    // Explicit contracts are checked even when a cached runtime could otherwise be reused.
+    const explicitManifest = requestedSelection ? getAgentManifest(agentId) : undefined;
+    if (requestedSelection && !explicitManifest) {
+      throw new Error(
+        '[AGENT_SELECTION_IDENTITY_UNAVAILABLE] Selected agent has no manifest: ' + agentId
+      );
+    }
+    const explicitHint = explicitManifest
+      ? resolveAgentSelectionHints(explicitManifest, provider)
+      : undefined;
+    const taskModelHint = this.extractTaskModelHint(payload);
+    const routedModelId = requestedSelection
+      ? resolveAgentLifecycleModelId({
+          modelId: requestedModelId || requestedSelection.model_id || explicitHint?.modelId,
+          runtimeMetadata: {
+            requested_selection: requestedSelection,
+            task_model_hint: taskModelHint,
+          },
+        })
+      : requestedModelId;
+    const explicitTarget =
+      requestedSelection && explicitHint
+        ? resolveAgentProviderTarget({
+            preferredProvider:
+              requestedProvider || requestedSelection.provider || explicitHint.provider,
+            preferredModelId: routedModelId,
+            selectionMode: requestedSelection.mode,
+            fixedProvider:
+              requestedSelection.mode === 'fixed' ? requestedSelection.provider : undefined,
+            fixedModelId:
+              requestedSelection.mode === 'fixed' ? requestedSelection.model_id : undefined,
+            fallbackProviders: explicitManifest?.selection_hints?.fallback_providers,
+            requiredCapabilities,
+          })
+        : undefined;
+    if (
+      requestedSelection?.mode === 'fixed' &&
+      getRegisteredEnvText('KYBERION_TASK_MODEL_ROUTING')?.toLowerCase() === 'enforce' &&
+      taskModelHint?.model_id &&
+      explicitTarget?.modelId !== taskModelHint.model_id
+    ) {
+      throw new Error(
+        '[AGENT_SELECTION_ROUTING_CONFLICT] Enforced task model is incompatible with the fixed provider/model selection'
+      );
+    }
+    const expectedProvider = explicitTarget?.provider || requestedProvider;
+    const expectedModelId = explicitTarget?.modelId || requestedModelId;
     const requestedBackend = resolveAgentRuntimeLaunchMode({
       runtimeBackend: this.extractRuntimeBackend(payload),
     });
@@ -720,10 +823,62 @@ class A2ABridgeImpl {
     const existingRecord = existingHandleRecord || agentRegistry.get(agentId);
     const existingBackend =
       parseAgentRuntimeLaunchMode(existingRecord?.metadata?.runtime_backend) || 'pipe';
+    const existingSelectionInput = existingRecord?.metadata?.requested_selection;
+    const existingSelection =
+      existingSelectionInput === undefined
+        ? undefined
+        : parseAgentRequestedSelection(existingSelectionInput);
+    const selectionContractMatches =
+      JSON.stringify(existingSelection) === JSON.stringify(requestedSelection) &&
+      (!requestedSelection ||
+        JSON.stringify(existingRecord?.metadata?.required_capabilities || []) ===
+          JSON.stringify(requiredCapabilities || []));
     const runtimeMatches =
-      (!requestedProvider || existingRecord?.provider === requestedProvider) &&
-      (!requestedModelId || existingRecord?.modelId === requestedModelId) &&
+      (!expectedProvider || existingRecord?.provider === expectedProvider) &&
+      (!expectedModelId || existingRecord?.modelId === expectedModelId) &&
       existingBackend === requestedBackend;
+    const localRuntimeContext = this.runtimeContexts.get(agentId);
+    const untrackedSelectedRuntime = Boolean(
+      existing && localRuntimeContext === undefined && (requestedSelection || existingSelection)
+    );
+    const canAdoptPrewarmedRuntime = Boolean(
+      untrackedSelectedRuntime &&
+      requestedSelection &&
+      runtimeMissionId &&
+      teamRole &&
+      runtimeMatches &&
+      selectionContractMatches &&
+      ['ready', 'busy', 'booting'].includes(existingRecord?.status || '') &&
+      parseAgentRuntimeLaunchMode(existingRecord?.metadata?.runtime_backend) === requestedBackend &&
+      existingRecord?.metadata?.execution_mode ===
+        (this.extractExecutionMode(payload) || 'default') &&
+      (existingRecord?.missionId || existingRecord?.metadata?.mission_id) === runtimeMissionId &&
+      existingRecord?.metadata?.team_role === teamRole &&
+      existingRecord?.metadata?.runtime_owner_id === runtimeMissionId &&
+      existingRecord?.metadata?.runtime_owner_type === 'mission'
+    );
+    if (untrackedSelectedRuntime && !canAdoptPrewarmedRuntime) {
+      throw new Error(
+        '[AGENT_SELECTION_RUNTIME_CONFLICT] An untracked runtime cannot be adopted without matching persisted mission, role, owner, execution and selection contracts'
+      );
+    }
+    // A verified prewarm still enters lifecycle ensure below. It is never adopted
+    // solely from this process's empty context cache, and is never shut down here.
+    const reserveSelection = (
+      targetProvider = expectedProvider,
+      targetModelId = expectedModelId
+    ): void => {
+      if (missionId && teamRole) {
+        reserveMissionTeamSelectionDispatch({
+          missionId,
+          teamRole,
+          agentId,
+          provider: targetProvider,
+          modelId: targetModelId,
+          expectedRequestedSelection: canonicalAssignment?.requested_selection || null,
+        });
+      }
+    };
     if (existing && this.runtimeContexts.get(agentId) === runtimeContextKey) {
       const record = agentRegistry.get(agentId);
       if (record && ['ready', 'busy', 'booting'].includes(record.status)) {
@@ -731,30 +886,67 @@ class A2ABridgeImpl {
         // must not be reused — fall through to the recreate path so the spawn
         // below re-resolves the provider dynamically.
         const providerDemoted = listDemotedProviders().includes(record.provider);
-        if (!providerDemoted && runtimeMatches) {
+        if (
+          requestedSelection &&
+          ((runtimeMissionId &&
+            (existingRecord?.missionId || existingRecord?.metadata?.mission_id) !==
+              runtimeMissionId) ||
+            (teamRole && existingRecord?.metadata?.team_role !== teamRole))
+        ) {
+          throw new Error(
+            '[AGENT_SELECTION_RUNTIME_CONFLICT] A live selected runtime belongs to a different mission or team role'
+          );
+        }
+        if (
+          !providerDemoted &&
+          runtimeMatches &&
+          (selectionContractMatches || !requestedSelection)
+        ) {
+          reserveSelection();
           this.handles.set(agentId, existing);
           return existing;
         }
-        logger.info(
-          `[A2A_BRIDGE] Recreating ${agentId}: ${
-            providerDemoted
-              ? `provider ${record.provider} is demoted`
-              : existingBackend !== requestedBackend
-                ? `runtime backend changed (${existingBackend} → ${requestedBackend})`
-                : 'runtime target changed'
-          }.`
-        );
-        try {
-          await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
-        } catch (_) {
-          await stopAgentRuntime(agentId, 'a2a_bridge');
+        if (requestedSelection || existingSelection) {
+          if (providerDemoted || !runtimeMatches) {
+            throw new Error(
+              '[AGENT_SELECTION_RUNTIME_CONFLICT] A live runtime has a different or unavailable target; stop it explicitly before changing selection'
+            );
+          }
+          // Same target with a changed contract: let lifecycle retain the new
+          // metadata without shutting down an active turn.
+        } else {
+          reserveSelection();
+          logger.info(
+            `[A2A_BRIDGE] Recreating ${agentId}: ${
+              providerDemoted
+                ? `provider ${record.provider} is demoted`
+                : existingBackend !== requestedBackend
+                  ? `runtime backend changed (${existingBackend} → ${requestedBackend})`
+                  : 'runtime target changed'
+            }.`
+          );
+          try {
+            await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
+          } catch (_) {
+            await stopAgentRuntime(agentId, 'a2a_bridge');
+          }
+          this.handles.delete(agentId);
+          this.runtimeContexts.delete(agentId);
         }
-        this.handles.delete(agentId);
-        this.runtimeContexts.delete(agentId);
       }
     }
 
-    if (existing && this.runtimeContexts.get(agentId) !== runtimeContextKey) {
+    if (
+      existing &&
+      this.runtimeContexts.get(agentId) !== runtimeContextKey &&
+      !canAdoptPrewarmedRuntime
+    ) {
+      if (requestedSelection || existingSelection) {
+        throw new Error(
+          '[AGENT_SELECTION_RUNTIME_CONFLICT] A live selected runtime has a different execution context; stop it explicitly before changing context'
+        );
+      }
+      reserveSelection();
       logger.info(`[A2A_BRIDGE] Recreating ${agentId} for runtime context ${runtimeContextKey}`);
       try {
         await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
@@ -786,22 +978,27 @@ class A2ABridgeImpl {
     // resolver so a demoted backend (rate limit reported into the shared
     // provider-health registry) fails over per the profile's strategy instead
     // of being spawned verbatim.
-    const dynamicTarget = resolveAgentProviderTarget({
-      preferredProvider: hinted.provider,
-      preferredModelId: hinted.modelId,
-      providerStrategy: hasExplicitRuntimeTarget
-        ? 'strict'
-        : manifest.selection_hints?.provider_strategy,
-      fallbackProviders: manifest.selection_hints?.fallback_providers,
-      requiredCapabilities: manifest.capabilities,
-    });
+    const dynamicTarget =
+      explicitTarget ||
+      resolveAgentProviderTarget({
+        preferredProvider: hinted.provider,
+        preferredModelId: hinted.modelId,
+        providerStrategy: hasExplicitRuntimeTarget
+          ? 'strict'
+          : manifest.selection_hints?.provider_strategy,
+        fallbackProviders: manifest.selection_hints?.fallback_providers,
+        requiredCapabilities: manifest.capabilities,
+      });
     const resolvedProvider = dynamicTarget.provider as AgentProvider;
     // A mission assignment is a concrete provider/model target, not merely a
     // preference hint. Keep the requested model when the provider remains the
     // requested provider; the resolver may still fail over the provider when
     // health policy requires it.
     const resolvedModelId =
-      requestedProvider && requestedModelId && resolvedProvider === requestedProvider
+      !requestedSelection &&
+      requestedProvider &&
+      requestedModelId &&
+      resolvedProvider === requestedProvider
         ? requestedModelId
         : dynamicTarget.modelId;
     if (resolvedProvider !== hinted.provider) {
@@ -809,6 +1006,8 @@ class A2ABridgeImpl {
         `[A2A_BRIDGE] Provider failover for ${agentId}: ${hinted.provider} → ${resolvedProvider} (${dynamicTarget.strategy})`
       );
     }
+    // Reserve only after pure preflight; a rejected selection must not mark a launch.
+    reserveSelection(resolvedProvider, resolvedModelId);
     const cwd = this.resolveSpawnCwd(
       agentId,
       resolvedProvider,
@@ -848,10 +1047,19 @@ class A2ABridgeImpl {
         // Mission assignments are concrete runtime targets. Do not run the
         // lifecycle's capability-based provider resolver a second time and
         // silently replace an explicitly assigned provider/model.
-        ...(hasExplicitRuntimeTarget
+        ...(hasExplicitRuntimeTarget && !requestedSelection
           ? { provider_strategy: 'strict', skip_provider_resolution: true }
           : {}),
-        task_model_hint: this.extractTaskModelHint(payload),
+        ...(requestedSelection
+          ? {
+              requested_selection: requestedSelection,
+              required_capabilities: requiredCapabilities || [],
+              selection_resolution:
+                payloadContext?.selection_resolution ?? payloadRecord?.selection_resolution,
+              fallback_providers: manifest.selection_hints?.fallback_providers,
+            }
+          : {}),
+        task_model_hint: taskModelHint,
         intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
       },
     } as const;
@@ -1027,6 +1235,25 @@ class A2ABridgeImpl {
     const context = isRecord(payload.context) ? payload.context : undefined;
     const modelId = context?.provider_model_id;
     return typeof modelId === 'string' && modelId.trim() ? modelId.trim() : undefined;
+  }
+
+  private extractRequiredCapabilities(payload: unknown): string[] {
+    if (!isRecord(payload)) return [];
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const required =
+      context?.required_capabilities !== undefined
+        ? context.required_capabilities
+        : payload.required_capabilities;
+    if (required === undefined) return [];
+    if (
+      !Array.isArray(required) ||
+      required.some((entry) => typeof entry !== 'string' || !entry.trim())
+    ) {
+      throw new Error(
+        '[AGENT_SELECTION_INVALID] required_capabilities must contain non-empty strings'
+      );
+    }
+    return required as string[];
   }
 
   private extractDispatchTimeoutMs(payload: unknown): number | undefined {
