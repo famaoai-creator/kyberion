@@ -163,6 +163,19 @@ function parseProposal(value: unknown): ProposedAction {
   return proposal;
 }
 
+function executionFailed(result: unknown): boolean {
+  if (!result || typeof result !== 'object') return false;
+  const record = result as Record<string, unknown>;
+  if (record.status === 'failed' || record.status === 'blocked') return true;
+  return (
+    Array.isArray(record.results) &&
+    record.results.some(
+      (step: unknown) =>
+        Boolean(step) && typeof step === 'object' && 'status' in step && step.status === 'failed'
+    )
+  );
+}
+
 export async function executeComputerAssist(
   input: ComputerAssistInput,
   execute: (action: ComputerInteractionAction | SystemAction) => Promise<unknown>
@@ -216,7 +229,7 @@ export async function executeComputerAssist(
       options: { max_steps: 1, timeout_ms: 15_000 },
     });
     return {
-      status: 'succeeded',
+      status: executionFailed(result) ? 'failed' : 'succeeded',
       proposed_action: { type: op, ...params },
       result,
       next_observation_required: true,
@@ -226,6 +239,7 @@ export async function executeComputerAssist(
   const action: ComputerInteractionAction['action'] = (() => {
     switch (proposal.type) {
       case 'activate_application':
+        return { type: 'activate_application', application: proposal.application };
       case 'left_click':
       case 'double_click':
       case 'mouse_move':
@@ -248,7 +262,7 @@ export async function executeComputerAssist(
     action,
   });
   return {
-    status: 'succeeded',
+    status: executionFailed(result) ? 'failed' : 'succeeded',
     proposed_action: action,
     result,
     next_observation_required: true,

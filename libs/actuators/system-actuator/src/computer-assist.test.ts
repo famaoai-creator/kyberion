@@ -74,4 +74,20 @@ describe('computer assist', () => {
     });
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('propagates actuator failures instead of reporting the assist as successful', async () => {
+    generateWithTools.mockResolvedValue({
+      toolCalls: [
+        { name: 'computer_action', input: { type: 'app_launch', application: 'Chrome' } },
+      ],
+    });
+    const execute = vi.fn().mockResolvedValue({
+      status: 'failed',
+      results: [{ op: 'app_launch', status: 'failed', error: 'not found' }],
+    });
+
+    await expect(executeComputerAssist(input, execute)).resolves.toMatchObject({
+      status: 'failed',
+    });
+  });
 });
