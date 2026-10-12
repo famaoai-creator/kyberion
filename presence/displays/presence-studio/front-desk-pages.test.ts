@@ -245,8 +245,8 @@ describe('First-job setup vocabulary delivery', () => {
   it('delivers every dynamically selected setup message through the browser vocabulary endpoint', () => {
     const catalog = loadVocabularyCatalog();
     expect(catalog).not.toBeNull();
-    const keys = Object.keys(catalog!.domains.front_desk).filter((key) =>
-      key.startsWith('first_job_setup_')
+    const keys = Object.keys(catalog!.domains.front_desk).filter(
+      (key) => key.startsWith('first_job_setup_') || key.startsWith('first_job_next_')
     );
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {

@@ -825,6 +825,44 @@
       }
       if (row.textContent !== content) row.textContent = content;
     });
+    var next = el('next');
+    var nextKey =
+      state.networkError || state.readBlocked
+        ? 'next_unavailable'
+        : !state.loaded || state.refreshing
+          ? 'next_loading'
+          : 'next_review';
+    if (setup && !state.readBlocked) {
+      var oidc = setup.oidc && setup.oidc.status;
+      var user = setup.browser_user && setup.browser_user.status;
+      var approval = setup.approval_scope && setup.approval_scope.status;
+      var mapping = setup.mapping && setup.mapping.status;
+      var advancement = setup.advancement && setup.advancement.status;
+      nextKey = !state.storageReady
+        ? 'storage_required'
+        : setupRecoveryBlocked()
+          ? 'next_recovery'
+          : state.pending || state.sending || state.approvalBusy
+            ? 'next_pending'
+            : advancement === 'running'
+              ? 'next_running'
+              : advancement === 'receipt_verified'
+                ? 'next_result'
+                : advancement === 'review_or_tick' || otherUnfinishedWork()
+                  ? 'next_pending'
+                  : oidc === 'configuration_required'
+                    ? 'next_signin_setup'
+                    : oidc === 'configured' && user === 'sign_in_required'
+                      ? 'next_signin'
+                      : user === 'binding_required'
+                        ? 'next_account'
+                        : mapping && mapping !== 'diagnostic_mapping_ready'
+                          ? 'next_mapping'
+                          : approval === 'ready' && canAct()
+                            ? 'next_ready'
+                            : 'next_review';
+    }
+    if (next) next.textContent = text(nextKey);
     var signin = el('setup-signin');
     if (signin)
       signin.hidden = !(

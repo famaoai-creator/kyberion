@@ -6,6 +6,30 @@
  * widens what the viewer is allowed to see.
  */
 export const TENANT_CHANGED_EVENT = 'front-desk:tenant-changed';
+/** Carries a catalog item id only; the rail resolves its own current allowed destination. */
+export const WORKSPACE_DESTINATION_EVENT = 'front-desk:workspace-destination';
+
+export function needsWorkspaceSelection(
+  href: string,
+  tenant: string | null,
+  external?: boolean
+): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    (external === true || new URL(href, window.location.href).origin !== window.location.origin) &&
+    (!tenant || tenant === PERSONAL_SELECTION || tenant === SYSTEM_SELECTION)
+  );
+}
+
+/** Explicit workspace transitions drop hierarchy belonging to the previous selection. */
+export function workspaceDestinationHref(href: string, tenant: string): string {
+  const url = new URL(href, window.location.href);
+  for (const key of ['organizationId', 'projectId', 'organization_id', 'project_id']) {
+    url.searchParams.delete(key);
+  }
+  url.searchParams.set(SELECTED_TENANT_PARAM, tenant);
+  return url.origin === window.location.origin ? url.pathname + url.search + url.hash : url.href;
+}
 
 /** Query parameter carrying the selection (also each route's narrowing hint). */
 export const SELECTED_TENANT_PARAM = 'tenant';

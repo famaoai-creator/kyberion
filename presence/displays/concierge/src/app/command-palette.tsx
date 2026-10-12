@@ -7,6 +7,9 @@ import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText, type FrontDeskMessageKey } from '../lib/i18n';
 import {
   TENANT_CHANGED_EVENT,
+  WORKSPACE_DESTINATION_EVENT,
+  needsWorkspaceSelection,
+  readTenantSelection,
   readSelectedTenant,
   withSelectedTenant,
 } from '../lib/tenant-context';
@@ -18,6 +21,7 @@ type PaletteEntry = {
   sublabel?: string;
   group_label?: string;
   icon?: string;
+  external?: boolean;
   scope_query_style?: 'snake' | 'camel';
   href?: string;
   event?: string;
@@ -179,9 +183,21 @@ export function CommandPalette() {
       close();
       if (entry.event) window.dispatchEvent(new CustomEvent(entry.event));
       else if (entry.href) {
+        if (needsWorkspaceSelection(entry.href, tenant, entry.external)) {
+          window.dispatchEvent(
+            new CustomEvent(WORKSPACE_DESTINATION_EVENT, {
+              detail: { id: entry.id.replace(/^front-desk-/, '') },
+            })
+          );
+          return;
+        }
         // Native navigation updates history and emits hashchange, allowing Settings
         // to reveal collapsed sections and supporting browser Back/Forward.
-        const target = withSelectedTenant(entry.href, tenant, entry.scope_query_style);
+        const target = withSelectedTenant(
+          entry.href,
+          tenant ?? readTenantSelection(),
+          entry.scope_query_style
+        );
         if (
           new URL(target, window.location.href).href === window.location.href &&
           window.location.hash
