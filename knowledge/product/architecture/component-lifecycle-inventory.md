@@ -36,7 +36,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.3.0, schema knowledge/product/schemas/media-generation-action.schema.json)
 - `meeting-actuator`: Layered online-meeting bridge: session transport (Zoom/Teams/Meet join-leave-speak-listen-chat-status) plus intelligence (action items, facilitation, reminders), target resolution, and guided dialogue. Single-op `{ op, params }`, legacy `{ action, params }`, and pipeline envelopes are all accepted. (19 ops, v1.3.0, schema knowledge/product/schemas/meeting-action.schema.json)
 - `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
-- `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema knowledge/product/schemas/modeling-pipeline.schema.json)
+- `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.1.0, schema knowledge/product/schemas/modeling-pipeline.schema.json)
 - `network-actuator`: ADF-driven secure fetch and A2A transport pipeline engine (1 ops, v2.2.0, schema knowledge/product/schemas/network-pipeline.schema.json)
 - `orchestrator-actuator`: Mission/control-plane transformation and execution-plan orchestration actuator (2 ops, v1.0.0, schema knowledge/product/schemas/orchestrator-pipeline.schema.json)
 - `presence-actuator`: Human Presence and Messaging Bridge (3 ops, v1.0.0, schema knowledge/product/schemas/presence-action.schema.json)
