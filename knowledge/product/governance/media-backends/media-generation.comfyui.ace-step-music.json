@@ -29,9 +29,9 @@
     }
   ],
   "default_backend_ids": {
-    "image": "media-generation.comfyui",
+    "image": "media-generation.local_flux",
     "voice": "voice.local_say",
     "video": "video.hyperframes_cli",
-    "music": "media-generation.comfyui.music"
+    "music": "media-generation.acestep-cpp"
   }
 }

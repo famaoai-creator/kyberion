@@ -48,7 +48,7 @@ describe('media backend registry', () => {
     expect(resetMediaBackendRegistryCache).toEqual(expect.any(Function));
     resetMediaBackendAvailabilityCache();
     resetMediaBackendRegistryCache();
-    expect(getMediaBackendRegistry().default_backend_ids.image).toBe('media-generation.comfyui');
+    expect(getMediaBackendRegistry().default_backend_ids.image).toBe('media-generation.local_flux');
   });
 
   it('force bypasses the availability probe cache', async () => {
@@ -81,7 +81,7 @@ describe('media backend registry', () => {
 
   it('loads the governed registry and resolves defaults', () => {
     const registry = getMediaBackendRegistry();
-    expect(registry.default_backend_ids.image).toBe('media-generation.comfyui');
+    expect(registry.default_backend_ids.image).toBe('media-generation.local_flux');
     expect(registry.default_backend_ids.voice).toBe('voice.local_say');
     expect(registry.default_backend_ids.video).toBe('video.hyperframes_cli');
     expect(
@@ -111,7 +111,7 @@ describe('media backend registry', () => {
   });
 
   it('resolves image, voice, and video backends through the same abstraction', () => {
-    expect(resolveImageBackend().backend_id).toBe('media-generation.comfyui');
+    expect(resolveImageBackend(undefined, 'darwin').backend_id).toBe('media-generation.local_flux');
     expect(resolveImageBackend('local_flux', 'darwin').backend_id).toBe(
       'media-generation.local_flux'
     );
@@ -120,7 +120,7 @@ describe('media backend registry', () => {
     );
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
-    expect(resolveMusicBackend().backend_id).toBe('media-generation.comfyui.music');
+    expect(resolveMusicBackend().backend_id).toBe('media-generation.acestep-cpp');
     // musicgen_mlx is MLX-gated: inject Apple Silicon accelerators so the
     // assertion is hermetic on non-Mac hosts (linux CI has no mlx).
     expect(
