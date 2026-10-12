@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { SettingsExitGuardProvider, useSettingsExitGuard } from '../lib/settings-exit-guard';
 import { A2UIActionProvider, AppShell, KbI18nProvider, type A2UILinkProps } from '@agent/shared-ui';
 import { buildUiMessageBundle } from '@agent/core/locale-normalize';
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
@@ -26,9 +28,39 @@ import {
  * surface) and follows the viewer's 設定 › 表示 choice.
  */
 
-function NextKbLink({ href, children, ...rest }: A2UILinkProps) {
+function NextKbLink({ href, children, onClick, ...rest }: A2UILinkProps) {
+  const router = useRouter();
+  const { requestLeave } = useSettingsExitGuard();
   return (
-    <Link href={href} {...rest}>
+    <Link
+      href={href}
+      {...rest}
+      onClick={(event) => {
+        onClick?.(event);
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey ||
+          rest.target === '_blank'
+        )
+          return;
+        const target = new URL(href, window.location.href);
+        if (
+          ['http:', 'https:'].includes(target.protocol) &&
+          target.origin !== window.location.origin
+        ) {
+          event.preventDefault();
+          requestLeave(target.href, () => window.location.assign(target.href));
+        }
+      }}
+      onNavigate={(event) => {
+        event.preventDefault();
+        requestLeave(href, () => router.push(href));
+      }}
+    >
       {children}
     </Link>
   );
@@ -39,7 +71,9 @@ function ConciergeUiProviders({ children }: { children?: React.ReactNode }) {
   const bundle = React.useMemo(() => buildUiMessageBundle(vocabularyCatalog, locale), [locale]);
   return (
     <KbI18nProvider locale={bundle.locale} messages={bundle.messages}>
-      <A2UIActionProvider linkComponent={NextKbLink}>{children}</A2UIActionProvider>
+      <SettingsExitGuardProvider>
+        <A2UIActionProvider linkComponent={NextKbLink}>{children}</A2UIActionProvider>
+      </SettingsExitGuardProvider>
     </KbI18nProvider>
   );
 }

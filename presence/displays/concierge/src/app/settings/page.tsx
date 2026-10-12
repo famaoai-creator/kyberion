@@ -48,6 +48,7 @@ import {
   isOnboardingSaveReceipt,
   notificationSaveReceipt,
 } from '../../lib/use-settings-draft';
+import { useSettingsExitRegistration } from '../../lib/settings-exit-guard';
 import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { useRecordingConsent } from '../../lib/use-recording-consent';
@@ -245,7 +246,9 @@ export default function SettingsPage() {
   const textRef = React.useRef(t);
   textRef.current = t;
   const savePending = React.useRef(false);
+  const invalidateExit = React.useRef<() => void>(() => {});
   const draftSession = useSettingsDraftSession(() => {
+    invalidateExit.current();
     profileDraft.clear();
     servicesDraft.clear();
     notifDraft.clear();
@@ -942,10 +945,6 @@ export default function SettingsPage() {
     voiceRecorderRef.current?.stop();
   }, []);
 
-  // The concierge shell supplies the shared-ui locale bundle (KbI18nProvider).
-  if (error) return <Callout tone="danger" title={t('setup.load_error', { error })} />;
-  if (!setup) return <Skeleton shape="card" lines={4} label={t('setup.loading')} />;
-
   const profileDirty = savedProfile !== null && !sameProfile(profile, savedProfile);
   const servicesDirty = savedServices !== null && !sameServices(services, savedServices);
   const notifDirty =
@@ -953,6 +952,27 @@ export default function SettingsPage() {
       ? notifDraft.edited
       : notif.surface !== savedNotif.surface || notif.target.trim() !== savedNotif.target;
   const anyDirty = profileDirty || servicesDirty || notifDirty;
+  const discardAll = () => {
+    if (savePending.current) return false;
+    profileDraft.discard();
+    servicesDraft.discard();
+    notifDraft.discard();
+    setSaveBarPhase('idle');
+    return true;
+  };
+  const exitRegistration = useSettingsExitRegistration({
+    dirty: anyDirty,
+    saving: savePending.current,
+    isSaving: () => savePending.current,
+    valid: setup !== null && draftSession.current(draftSession.epoch()),
+    discard: discardAll,
+  });
+  invalidateExit.current = exitRegistration.invalidate;
+
+  // The concierge shell supplies the shared-ui locale bundle (KbI18nProvider).
+  if (error) return <Callout tone="danger" title={t('setup.load_error', { error })} />;
+  if (!setup) return <Skeleton shape="card" lines={4} label={t('setup.loading')} />;
+
   const saveBarState: SaveBarState =
     savePending.current || saveBarPhase === 'saving'
       ? 'saving'
@@ -989,13 +1009,6 @@ export default function SettingsPage() {
       savePending.current = false;
       setBusy(false);
     }
-  };
-  const discardAll = () => {
-    if (savePending.current) return;
-    profileDraft.discard();
-    servicesDraft.discard();
-    notifDraft.discard();
-    setSaveBarPhase('idle');
   };
 
   const channelDisplayName = (surface: string) =>
