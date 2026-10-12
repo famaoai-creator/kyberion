@@ -2597,6 +2597,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/security-ledger.ts#main (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/service_recording.ts#candidate",
       "roles": ["surface_runtime"],
       "unresolved": []

@@ -289,7 +289,7 @@
       "path": "libs/actuators/modeling-actuator",
       "d": "Architectural Analysis and ADF Transformation Engine",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 2,
       "ops": ["pipeline", "reconcile"],
       "contract_schema": "knowledge/product/schemas/modeling-pipeline.schema.json",

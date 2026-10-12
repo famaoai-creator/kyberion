@@ -20,34 +20,34 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
+vi.mock('./mission-team-plan-composer.js', () => ({
   loadMissionTeamPlan: mocks.loadMissionTeamPlan,
   loadAgentProfileIndex: mocks.loadAgentProfileIndex,
 }));
 
 // TC-02: staffing standby roles is the binding layer's job; the orchestrator
 // only asks for it and then materializes what came back staffed.
-vi.mock('../libs/core/mission/mission-team-binding.js', () => ({
+vi.mock('./mission-team-binding.js', () => ({
   staffMissionTeamRoles: mocks.staffMissionTeamRoles,
 }));
 
 // Keep this orchestration unit focused on staffing, reservation, and runtime wiring.
 // The selection suite exercises the real strict lookup and durable reservation fence.
-vi.mock('../libs/core/mission/mission-team-selection.js', () => ({
+vi.mock('./mission-team-selection.js', () => ({
   reserveMissionTeamSelectionDispatch: mocks.reserveMissionTeamSelectionDispatch,
 }));
 
-vi.mock('../libs/core/agent/agent-registry.js', () => ({
+vi.mock('../agent/agent-registry.js', () => ({
   agentRegistry: {
     get: mocks.get,
   },
 }));
 
-vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
+vi.mock('../agent/agent-runtime-supervisor.js', () => ({
   ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
-vi.mock('../libs/core/agent/agent-runtime-supervisor-client.js', () => ({
+vi.mock('../agent/agent-runtime-supervisor-client.js', () => ({
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
 }));
 

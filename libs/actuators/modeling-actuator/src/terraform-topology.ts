@@ -25,7 +25,7 @@ function listTfFiles(dir: string): string[] {
   return out.sort();
 }
 
-function findMatchingBrace(text: string, openIndex: number): number {
+export function findMatchingBrace(text: string, openIndex: number): number {
   let depth = 0;
   for (let i = openIndex; i < text.length; i += 1) {
     if (text[i] === '{') depth += 1;
@@ -37,9 +37,30 @@ function findMatchingBrace(text: string, openIndex: number): number {
   return text.length - 1;
 }
 
-function parseBlocks(filePath: string, exampleRoot: string): TerraformBlock[] {
+export function parseBlocks(filePath: string, exampleRoot: string): TerraformBlock[] {
   const content = String(safeReadFile(filePath, { encoding: 'utf8' }));
   const blocks: TerraformBlock[] = [];
+  // Label-less `terraform { ... }` blocks carry backend + required_providers
+  // and have no quoted label, so the labeled-block regex cannot see them.
+  const bareTerraformRegex = /\bterraform\s*\{/g;
+  for (const match of content.matchAll(bareTerraformRegex)) {
+    // Skip commented-out `terraform {` lines (`# terraform {` / `// terraform {`).
+    const lineStart = content.lastIndexOf('\n', match.index ?? 0) + 1;
+    if (/^\s*(#|\/\/)/.test(content.slice(lineStart, match.index ?? 0))) continue;
+    const openIndex = (match.index || 0) + match[0].length - 1;
+    const closeIndex = findMatchingBrace(content, openIndex);
+    const relDir =
+      path.relative(exampleRoot, path.dirname(filePath)).replaceAll(path.sep, '/') || '.';
+    blocks.push({
+      kind: 'terraform',
+      type: 'terraform',
+      name: '',
+      id: `${relDir}::terraform.root`,
+      dir: relDir,
+      body: content.slice(openIndex + 1, closeIndex),
+      filePath,
+    });
+  }
   const blockRegex =
     /(provider|resource|data|module|output|variable|terraform)\s+"([^"]+)"(?:\s+"([^"]+)")?\s*\{/g;
   for (const match of content.matchAll(blockRegex)) {

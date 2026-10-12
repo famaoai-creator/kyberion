@@ -7527,6 +7527,10 @@
     "./reasoning/reasoning-selection-settings": {
       "types": "./dist/reasoning/reasoning-selection-settings.d.ts",
       "default": "./dist/reasoning/reasoning-selection-settings.js"
+    },
+    "./security-asset-ledger": {
+      "types": "./dist/security-asset-ledger.d.ts",
+      "default": "./dist/security-asset-ledger.js"
     }
   },
   "dependencies": {

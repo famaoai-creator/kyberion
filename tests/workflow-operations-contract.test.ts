@@ -108,6 +108,16 @@ describe('Workflow operations contract', () => {
     expect(crossOs).not.toContain('|| true');
   });
 
+  it('executes build-artifact casing regressions in the native Windows suite', () => {
+    const crossOs = read('.github/workflows/cross-os.yml');
+    const windowsStep = crossOs
+      .split('      - name: Unit tests (Windows native)')[1]
+      ?.split('\n      - name:')[0];
+    expect(windowsStep).toContain("if: runner.os == 'Windows'");
+    expect(windowsStep).toContain('pnpm exec vitest run');
+    expect(windowsStep).toContain('scripts/check_stale_dist.test.ts');
+  });
+
   it('keeps the CI failure investigation template wired to GitHub Actions run listing', () => {
     const template = read('knowledge/product/pipeline-templates/cicd-failure-investigation.json');
     expect(template).toContain('CI Failure Investigation');
