@@ -66,7 +66,7 @@ These measurements back the `accelerators` and `min_memory_gb` fields on
 
 ## Backend priority (this hardware profile)
 
-- **image**: `local_flux` (mflux, mlx) → `comfyui` (sdxl-turbo) → cloud fallbacks
+- **image**: `z-image-turbo` via mflux (peak 4.4 GB) or `local_flux` (mflux FLUX) → `comfyui` (sdxl-turbo) → cloud fallbacks
 - **video**: `hyperframes_cli` for composition/slideshow; `comfyui.ltx-i2v(-fp8)` for i2v; `comfyui.wan-i2v-gguf` as quality upgrade path
 - **music**: `acestep-cpp` → `comfyui.music` → `musicgen_mlx` (instrumental)
 
