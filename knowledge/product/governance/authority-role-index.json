@@ -302,6 +302,18 @@
       "allowed_actuators": ["code-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "reasoning_settings_writer": {
+      "description": "Writes only reasoning-route user settings, their previous backup, and revision history as additional role grants. Retains the unchanged worker and default workspace permissions; no actuation or security authority is added.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/state/reasoning-route-user-config.json",
+        "active/shared/state/reasoning-route-user-config.json.previous",
+        "active/shared/state/reasoning-route-user-config.json.history/"
+      ],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
+    },
     "ruthless_auditor": {
       "description": "Independent audit authority for evidence inspection, verdict issuance, and mission-halt power.",
       "default_persona": "ruthless_auditor",

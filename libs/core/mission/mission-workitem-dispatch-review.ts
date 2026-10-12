@@ -1,3 +1,4 @@
+import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 /**
  * scripts/refactor/mission-workitem-dispatch.ts
  * Mission work item execution dispatch for registered tickets.
@@ -1235,6 +1236,21 @@ export async function routeToAgentOrSubagent(input: {
       notes: string[];
     }
 > {
+  const roleAssignment = input.teamRole
+    ? readMissionTeamSelectionDispatch({ missionId: input.missionId, teamRole: input.teamRole })
+    : null;
+  const fixedSelection = roleAssignment?.requested_selection?.mode === 'fixed';
+  if (fixedSelection && input.assigneePeerId !== roleAssignment?.agent_id) {
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] Dispatch actor conflicts with fixed mission role selection.'
+    );
+  }
+  if (roleAssignment)
+    input = {
+      ...input,
+      provider: roleAssignment.provider || undefined,
+      providerModelId: roleAssignment.modelId || undefined,
+    };
   const prompt = input.prompt;
   const itemDetails = input.item as WorkItem & Record<string, unknown>;
   const deliverable =
@@ -1284,6 +1300,11 @@ export async function routeToAgentOrSubagent(input: {
   if (Object.keys(routingOptions).length > 0) {
     notes.push(
       `model routing: tier=${input.taskModelHint?.execution_tier ?? 'default'} effort=${input.taskModelHint?.effort ?? 'default'}`
+    );
+  }
+  if (fixedSelection && !useRuntime) {
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] Fixed mission actor selection requires the agent-runtime execution surface.'
     );
   }
   if (!useRuntime) {
@@ -1388,6 +1409,13 @@ export async function routeToAgentOrSubagent(input: {
                 team_role: input.teamRole,
                 ...(input.provider ? { provider: input.provider } : {}),
                 ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
+                ...(roleAssignment
+                  ? {
+                      requested_selection: roleAssignment.requested_selection,
+                      selection_resolution: roleAssignment.selection_resolution,
+                      required_capabilities: roleAssignment.required_capabilities,
+                    }
+                  : {}),
                 execution_mode: 'workitem',
                 dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
                 task_model_hint: input.taskModelHint,
@@ -1494,6 +1522,13 @@ export async function routeToAgentOrSubagent(input: {
           team_role: input.teamRole,
           ...(input.provider ? { provider: input.provider } : {}),
           ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
+          ...(roleAssignment
+            ? {
+                requested_selection: roleAssignment.requested_selection,
+                selection_resolution: roleAssignment.selection_resolution,
+                required_capabilities: roleAssignment.required_capabilities,
+              }
+            : {}),
           execution_mode: 'workitem',
           dispatch_timeout_ms: resolveWorkItemResponseTimeoutMs(),
           task_model_hint: input.taskModelHint,
@@ -1509,7 +1544,7 @@ export async function routeToAgentOrSubagent(input: {
       notes,
     };
   } catch (error: any) {
-    if (!hasSurfaceConfiguration && input.mode === 'agent') {
+    if (fixedSelection || (!hasSurfaceConfiguration && input.mode === 'agent')) {
       throw new Error(
         `[EXECUTION_SURFACE_FAILED] ${surfaceDecision.surface} dispatch failed: ${error?.message || error}`
       );

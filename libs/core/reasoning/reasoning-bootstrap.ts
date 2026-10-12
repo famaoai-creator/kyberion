@@ -101,7 +101,10 @@ function kyberionEnv(name: string): string | undefined {
 }
 import {
   loadReasoningRoutePolicy,
+  loadReasoningRouteUserConfig,
   resolveReasoningRoute,
+  resolveReasoningRouteCandidates,
+  ReasoningSelectionError,
   resolveSamplingParams,
   type SamplingParams,
 } from './reasoning-route-resolver.js';
@@ -111,6 +114,11 @@ import {
   listReasoningProviderModes,
   type ReasoningProviderRuntimeBundle,
 } from './reasoning-provider-registry.js';
+
+import {
+  bindFixedReasoningBackend,
+  reasoningSelectionWireModel,
+} from './reasoning-fixed-binding.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -184,6 +192,10 @@ function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallRea
     mode: selection.provider as ReasoningBackendMode,
     model: options.model || selection.model_id,
   };
+}
+
+function brokerModeMatches(provider: string, mode: ReasoningBackendMode): boolean {
+  return provider === mode || provider === getReasoningProviderDescriptor(mode)?.provider;
 }
 
 function providerForReasoningMode(mode: ReasoningBackendMode): string | undefined {
@@ -349,32 +361,34 @@ function buildReasoningRuntimeChain(
   selectedMode: ReasoningBackendMode,
   options: InstallReasoningOptions
 ): ReasoningRuntimeBundle[] {
-  if (options.role || options.profile) {
-    const initial = resolveReasoningRoute({
+  if (options.role || options.profile || loadReasoningRouteUserConfig().roles?.default?.selection) {
+    const routes = resolveReasoningRouteCandidates({
       role: options.role,
       requestedProfile: options.profile,
+      requestedMode: loadReasoningRouteUserConfig().roles?.[options.role || 'default']?.selection
+        ? options.mode
+        : undefined,
       sampling: options.samplingParams,
       requestedModel: options.model,
     });
+    const fixed = routes[0]?.selection?.requested.mode === 'fixed';
+    if (
+      fixed &&
+      lastBrokerSelection?.pinned &&
+      !brokerModeMatches(lastBrokerSelection.provider, routes[0]!.mode as ReasoningBackendMode)
+    ) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Capability broker pin conflicts with fixed reasoning runtime'
+      );
+    }
     const candidates: ReasoningRuntimeBundle[] = [];
-    const seen = new Set<string>();
-    for (const profileRef of initial.candidates) {
-      const route = resolveReasoningRoute({
-        role: initial.role,
-        requestedProfile: profileRef,
-        sampling: options.samplingParams,
-        requestedModel: options.model,
-      });
-      const candidateKey = `${route.profileRef}:${route.model || ''}`;
-      if (seen.has(candidateKey)) continue;
-      seen.add(candidateKey);
+    for (const route of routes) {
       const candidate = buildReasoningRuntimeBundle(
         normalizeReasoningBackendMode(route.mode as ReasoningBackendMode),
         {
           ...options,
-          model: route.model?.includes(':')
-            ? route.model.slice(route.model.indexOf(':') + 1)
-            : route.model,
+          model: reasoningSelectionWireModel(route.model),
           samplingParams: route.parameters,
           toolsEnabled: route.toolsEnabled,
           allowedTools: route.allowedTools,
@@ -384,8 +398,17 @@ function buildReasoningRuntimeChain(
         }
       );
       if (candidate) candidates.push(candidate);
+      else if (fixed)
+        throw new ReasoningSelectionError('unavailable', 'Fixed backend could not be constructed');
     }
-    return filterChainByProviderCapability(candidates);
+    const filtered = filterChainByProviderCapability(candidates);
+    if (fixed && filtered.length !== 1) {
+      throw new ReasoningSelectionError(
+        'unavailable',
+        'Fixed backend failed capability readiness; fallback is disabled'
+      );
+    }
+    return filtered;
   }
   const policy = loadReasoningBackendPolicy();
   const orderedModes = [selectedMode, ...policy.provider_fallback_order.map((entry) => entry.mode)];
@@ -416,7 +439,9 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set(
  * Skipped in stub/offline mode and never fatal.
  */
 export function consultCapabilityBrokerForMode(
-  resolvedMode: ReasoningBackendMode
+  resolvedMode: ReasoningBackendMode,
+  fixed = false,
+  fixedModel?: string
 ): ReasoningBackendMode {
   if (resolvedMode === 'stub') return resolvedMode;
   lastBrokerSelection = null;
@@ -426,6 +451,24 @@ export function consultCapabilityBrokerForMode(
       requiredCapabilities: ['reasoning'],
       record: true,
     });
+    if (fixed && decision.pinned && !brokerModeMatches(decision.provider, resolvedMode)) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Capability broker pin conflicts with fixed reasoning runtime'
+      );
+    }
+    if (
+      fixed &&
+      decision.pinned &&
+      fixedModel &&
+      decision.modelId &&
+      reasoningSelectionWireModel(decision.modelId) !== reasoningSelectionWireModel(fixedModel)
+    ) {
+      throw new ReasoningSelectionError(
+        'conflict',
+        'Capability broker model pin conflicts with exact fixed model'
+      );
+    }
     if (decision.pinned && REASONING_BACKEND_MODES.has(decision.provider as ReasoningBackendMode)) {
       if (decision.provider !== resolvedMode) {
         logger.debug(
@@ -445,6 +488,7 @@ export function consultCapabilityBrokerForMode(
       pinned: false,
     };
   } catch (err) {
+    if (err instanceof ReasoningSelectionError) throw err;
     logger.warn(
       `[reasoning-bootstrap] capability-broker consult skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`
     );
@@ -512,10 +556,20 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 }
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
+  for (const [role, config] of Object.entries(loadReasoningRouteUserConfig().roles || {})) {
+    if (config.selection?.mode === 'fixed') {
+      resolveReasoningRoute({ role, requestedMode: options.mode, requestedModel: options.model });
+    }
+  }
   initializeAdapterDefaultPreferences();
   // Copy before applying route-derived defaults — applyOperatorLlmSelection
   // may return the caller's object, and these fields must not leak back.
-  const effectiveOptions: InstallReasoningOptions = { ...applyOperatorLlmSelection(options) };
+  const selectedRole = options.role || 'default';
+  const requestedSelection = loadReasoningRouteUserConfig().roles?.[selectedRole]?.selection;
+  const effectiveOptions: InstallReasoningOptions = {
+    ...(requestedSelection ? options : applyOperatorLlmSelection(options)),
+  };
+  if (requestedSelection && !effectiveOptions.role) effectiveOptions.role = selectedRole;
   // The default (unscoped) chain serves every dispatch whose role is not in
   // the governed role map. Give it the `default` role's resolved route so the
   // profile's timeout_ms / tools_enabled / allowed_tools actually reach the
@@ -535,7 +589,19 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   } catch {
     // No default route — the backend keeps its own built-in defaults.
   }
-  const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
+  const selectedRoute = requestedSelection
+    ? resolveReasoningRoute({
+        role: selectedRole,
+        requestedProfile: options.profile,
+        requestedMode: options.mode,
+        requestedModel: options.model,
+      })
+    : undefined;
+  const mode = consultCapabilityBrokerForMode(
+    selectedRoute ? (selectedRoute.mode as ReasoningBackendMode) : resolveMode(effectiveOptions),
+    requestedSelection?.mode === 'fixed',
+    requestedSelection?.model
+  );
   refreshCapabilityRegistryIfRequested(effectiveOptions);
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
@@ -612,26 +678,43 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     // Selection telemetry must never prevent backend installation.
   }
   const governedFailoverPolicy = loadReasoningRoutePolicy().fallback;
-  const defaultBackend = buildFailoverReasoningBackend(
+  const builtDefaultBackend = buildFailoverReasoningBackend(
     chain.map((candidate) => candidate.backend),
-    governedFailoverPolicy
+    selectedRoute?.selection?.requested.mode === 'fixed'
+      ? selectedRoute.failover
+      : governedFailoverPolicy
   );
+  const defaultBackend = selectedRoute
+    ? bindFixedReasoningBackend(builtDefaultBackend, selectedRoute)
+    : builtDefaultBackend;
   let activeBackend = defaultBackend;
   if (!options.role && !options.profile) {
     const roleBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     const profileBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     for (const role of Object.keys(loadReasoningRoutePolicy().roles)) {
       try {
-        const roleChain = buildReasoningRuntimeChain(mode, { ...effectiveOptions, role });
-        if (roleChain.length > 0)
+        const roleChain = buildReasoningRuntimeChain(mode, {
+          ...effectiveOptions,
+          role,
+          mode: options.mode,
+          model: options.model,
+        });
+        if (roleChain.length > 0) {
+          const fixedRoute =
+            loadReasoningRouteUserConfig().roles?.[role]?.selection?.mode === 'fixed'
+              ? resolveReasoningRoute({ role })
+              : undefined;
+          const backend = buildFailoverReasoningBackend(
+            roleChain.map((candidate) => candidate.backend),
+            fixedRoute?.failover || governedFailoverPolicy
+          );
           roleBackends.set(
             role,
-            buildFailoverReasoningBackend(
-              roleChain.map((candidate) => candidate.backend),
-              governedFailoverPolicy
-            )
+            fixedRoute ? bindFixedReasoningBackend(backend, fixedRoute) : backend
           );
+        }
       } catch (error) {
+        if (loadReasoningRouteUserConfig().roles?.[role]?.selection?.mode === 'fixed') throw error;
         logger.warn(
           `[reasoning-bootstrap] role=${role} route unavailable; using default chain: ${error instanceof Error ? error.message : String(error)}`
         );

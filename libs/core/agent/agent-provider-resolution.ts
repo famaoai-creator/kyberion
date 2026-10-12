@@ -4,8 +4,48 @@ import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from '../provider/
 import { listDemotedProviders } from '../provider/provider-health-view.js';
 import { loadOperatorProviderPreferences } from '../surface/operator-provider-preferences.js';
 
+export type AgentSelectionMode = 'auto' | 'preferred' | 'fixed';
+
+/** Identity and runtime target are independent selection dimensions. */
+export interface AgentRequestedSelection {
+  mode: AgentSelectionMode;
+  agent_id?: string;
+  provider?: string;
+  model_id?: string;
+}
+
+export function parseAgentRequestedSelection(value: unknown): AgentRequestedSelection | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('[AGENT_SELECTION_INVALID] requested_selection must be an object');
+  }
+  const record = value as Record<string, unknown>;
+  if (record.mode !== 'auto' && record.mode !== 'preferred' && record.mode !== 'fixed') {
+    throw new Error(
+      '[AGENT_SELECTION_INVALID] requested_selection.mode must be auto, preferred or fixed'
+    );
+  }
+  const selection: AgentRequestedSelection = { mode: record.mode };
+  for (const key of ['agent_id', 'provider', 'model_id'] as const) {
+    const field = record[key];
+    if (field === undefined) continue;
+    if (typeof field !== 'string' || !field.trim()) {
+      throw new Error(
+        '[AGENT_SELECTION_INVALID] requested_selection.' + key + ' must be a non-empty string'
+      );
+    }
+    selection[key] = field.trim();
+  }
+  return selection;
+}
+
 export interface ResolveAgentProviderOptions {
   preferredProvider: string;
+  /** Explicit modes enforce hard eligibility; absent retains legacy strategy semantics. */
+  selectionMode?: AgentSelectionMode;
+  /** Only these dimensions are immutable in fixed mode, not the preferred hints. */
+  fixedProvider?: string;
+  fixedModelId?: string;
   preferredModelId?: string;
   providerStrategy?: 'strict' | 'preferred' | 'adaptive';
   fallbackProviders?: string[];
@@ -16,6 +56,7 @@ export interface ResolvedAgentProviderTarget {
   provider: string;
   modelId: string;
   strategy: 'preferred' | 'fallback' | 'unresolved';
+  selectionMode?: AgentSelectionMode;
   availableProviders: string[];
 }
 
@@ -119,6 +160,105 @@ function resolvePriority(preferredProvider: string): string[] {
   );
 }
 
+/** Capability evidence belongs to this provider and this exact model only. */
+function selectedTargetCapabilities(provider: ProviderInfo, modelId: string): string[] {
+  return [
+    ...normalizeSet([...(provider.capabilities || []), ...modelCapabilities(provider, modelId)]),
+  ];
+}
+
+function resolveExplicitProviderTarget(
+  options: ResolveAgentProviderOptions,
+  installedProviders: ProviderInfo[],
+  availableProviders: string[]
+): ResolvedAgentProviderTarget {
+  const selectionMode = options.selectionMode!;
+  if (selectionMode !== 'auto' && selectionMode !== 'preferred' && selectionMode !== 'fixed') {
+    throw new Error('[AGENT_SELECTION_INVALID] selectionMode must be auto, preferred or fixed');
+  }
+  for (const [key, value] of [
+    ['fixedProvider', options.fixedProvider],
+    ['fixedModelId', options.fixedModelId],
+  ] as const) {
+    if (value !== undefined && (typeof value !== 'string' || !value.trim())) {
+      throw new Error('[AGENT_SELECTION_INVALID] ' + key + ' must be a non-empty string');
+    }
+  }
+  const fixedProvider = selectionMode === 'fixed' ? options.fixedProvider?.trim() : undefined;
+  const fixedModelId = selectionMode === 'fixed' ? options.fixedModelId?.trim() : undefined;
+  const preferredProvider = options.preferredProvider.trim();
+  const preferredModelId = options.preferredModelId?.trim();
+  const required = [...normalizeSet(options.requiredCapabilities)];
+  const allowlist = normalizeSet(options.fallbackProviders);
+  if (fixedProvider && !installedProviders.some((entry) => entry.provider === fixedProvider)) {
+    throw new Error(
+      '[AGENT_SELECTION_PROVIDER_UNAVAILABLE] Fixed provider ' +
+        fixedProvider +
+        ' is not installed, healthy and available'
+    );
+  }
+  const providers = installedProviders.filter((entry) =>
+    fixedProvider
+      ? entry.provider === fixedProvider
+      : allowlist.size === 0 ||
+        entry.provider === preferredProvider ||
+        allowlist.has(entry.provider)
+  );
+  const knownTargets = providers.flatMap((provider) =>
+    provider.models
+      .filter((modelId) => !fixedModelId || modelId === fixedModelId)
+      .map((modelId) => ({ provider, modelId }))
+  );
+  if (fixedModelId && knownTargets.length === 0) {
+    throw new Error(
+      '[AGENT_SELECTION_MODEL_UNAVAILABLE] Fixed model ' +
+        fixedModelId +
+        ' is not advertised by an available eligible provider' +
+        (fixedProvider ? ' (' + fixedProvider + ')' : '')
+    );
+  }
+  const eligible = knownTargets.filter(({ provider, modelId }) =>
+    capabilityCoverage(selectedTargetCapabilities(provider, modelId), required)
+  );
+  if (eligible.length === 0) {
+    const reason =
+      knownTargets.length > 0
+        ? 'No eligible provider/model covers required capabilities [' + required.join(', ') + ']'
+        : 'No available eligible provider advertises a model';
+    throw new Error('[AGENT_SELECTION_UNAVAILABLE] ' + reason);
+  }
+  const priority = resolvePriority(preferredProvider);
+  const rank = (provider: string): number => {
+    const index = priority.indexOf(provider);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  const selected = eligible.sort((left, right) => {
+    const leftPreferred = left.provider.provider === preferredProvider;
+    const rightPreferred = right.provider.provider === preferredProvider;
+    const byProvider = Number(rightPreferred) - Number(leftPreferred);
+    const byModel =
+      Number(right.modelId === preferredModelId) - Number(left.modelId === preferredModelId);
+    return (
+      byProvider ||
+      byModel ||
+      rank(left.provider.provider) - rank(right.provider.provider) ||
+      (left.provider.provider < right.provider.provider
+        ? -1
+        : left.provider.provider > right.provider.provider
+          ? 1
+          : 0) ||
+      (left.modelId < right.modelId ? -1 : left.modelId > right.modelId ? 1 : 0)
+    );
+  })[0]!;
+  return {
+    provider: selected.provider.provider,
+    modelId: selected.modelId,
+    strategy: selected.provider.provider === preferredProvider ? 'preferred' : 'fallback',
+    selectionMode,
+    availableProviders,
+  };
+}
+
 export function resolveAgentProviderTarget(
   options: ResolveAgentProviderOptions,
   discoveredProviders = discoverProviders()
@@ -129,7 +269,7 @@ export function resolveAgentProviderTarget(
   // fail over instead of re-staffing onto a degraded backend. Demotion must
   // degrade, not disable — with everything demoted, ignore it.
   const demotedProviders = new Set(listDemotedProviders(discoveredProviders));
-  let installedProviders = discoveredProviders.filter(
+  const installedProviders = discoveredProviders.filter(
     (entry) =>
       entry.installed &&
       entry.healthy &&
@@ -137,6 +277,9 @@ export function resolveAgentProviderTarget(
       !isObsoleteAgentRuntimeProvider(entry.provider)
   );
   const availableProviders = installedProviders.map((entry) => entry.provider);
+  if (options.selectionMode !== undefined) {
+    return resolveExplicitProviderTarget(options, installedProviders, availableProviders);
+  }
   const preferredProvider = options.preferredProvider;
   const requiredCapabilities = (options.requiredCapabilities || [])
     .map((entry) => entry.trim().toLowerCase())

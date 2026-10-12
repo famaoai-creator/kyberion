@@ -4,19 +4,44 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "version": { "type": "string" },
-    "revision": { "type": "integer", "minimum": 0 },
-    "updated_at": { "type": "string", "minLength": 1 },
-    "last_change": { "type": "string", "maxLength": 200 },
+    "version": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "last_change": {
+      "type": "string",
+      "maxLength": 200
+    },
     "roles": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "profile": { "type": "string", "minLength": 1 },
-          "candidates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "sampling": { "$ref": "#/definitions/sampling" }
+          "profile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "sampling": {
+            "$ref": "#/definitions/sampling"
+          },
+          "selection": {
+            "$ref": "#/definitions/selection"
+          }
         }
       }
     },
@@ -26,11 +51,28 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "mode": { "type": "string", "minLength": 1 },
-          "model": { "type": "string", "minLength": 1 },
-          "model_ref": { "type": "string", "minLength": 1 },
-          "capabilities": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "tools_enabled": { "type": "boolean" },
+          "mode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "tools_enabled": {
+            "type": "boolean"
+          },
           "allowed_tools": {
             "type": "array",
             "items": {
@@ -38,10 +80,21 @@
               "enum": ["read_file", "write_file", "list_directory", "shell_exec"]
             }
           },
-          "context_window_tokens": { "type": "integer", "minimum": 1 },
-          "max_completion_tokens": { "type": "integer", "minimum": 1 },
-          "timeout_ms": { "type": "integer", "minimum": 1 },
-          "sampling": { "$ref": "#/definitions/sampling" }
+          "context_window_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sampling": {
+            "$ref": "#/definitions/sampling"
+          }
         }
       }
     }
@@ -51,19 +104,121 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
-        "top_p": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "top_k": { "type": "integer", "minimum": 0 },
-        "min_p": { "type": "number", "minimum": 0, "maximum": 1 },
-        "presence_penalty": { "type": "number", "minimum": -2, "maximum": 2 },
-        "frequency_penalty": { "type": "number", "minimum": -2, "maximum": 2 },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "top_p": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "presence_penalty": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "frequency_penalty": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        },
         "stop": {
           "oneOf": [
-            { "type": "string" },
-            { "type": "array", "items": { "type": "string" }, "maxItems": 4 }
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4
+            }
           ]
         }
       }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["auto", "preferred", "fixed"]
+        },
+        "runtime_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": ["preferred", "fixed"]
+              }
+            }
+          },
+          "then": {
+            "required": ["runtime_mode"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "auto"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["runtime_mode"]
+                },
+                {
+                  "required": ["provider"]
+                },
+                {
+                  "required": ["model"]
+                },
+                {
+                  "required": ["profile"]
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }

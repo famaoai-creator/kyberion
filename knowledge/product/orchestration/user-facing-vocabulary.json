@@ -26940,6 +26940,201 @@
         "en": "Accepted",
         "ja": "受け取り済み",
         "qps-ploc": "⟦Ȧƈƈėṗŧėḓ ŀőř⟧"
+      },
+      "selection_actor_title": {
+        "en": "Mission agent selection",
+        "ja": "ミッションのエージェント選択",
+        "qps-ploc": "⟦Ɱïşşïőñ ȧɠėñŧ şėŀėƈŧïőñ ŀőřėɱ ï⟧"
+      },
+      "selection_actor_description": {
+        "en": "Choose the agent identity separately from its provider and model.",
+        "ja": "エージェントの識別子とプロバイダー・モデルを分けて選択します。",
+        "qps-ploc": "⟦Ƈħőőşė ŧħė ȧɠėñŧ ïḓėñŧïŧẏ şėṗȧřȧŧėŀẏ ƒřőɱ ïŧş ṗřőṽïḓėř ȧñḓ ɱőḓėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "selection_reasoning_title": {
+        "en": "Reasoning runtime selection",
+        "ja": "推論ランタイムの選択",
+        "qps-ploc": "⟦Řėȧşőñïñɠ řůñŧïɱė şėŀėƈŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "selection_reasoning_description": {
+        "en": "Choose the runtime for each role. Preview uses cached readiness only.",
+        "ja": "ロールごとにランタイムを選択します。プレビューはキャッシュ済みの準備状況のみを使用します。",
+        "qps-ploc": "⟦Ƈħőőşė ŧħė řůñŧïɱė ƒőř ėȧƈħ řőŀė. Ṗřėṽïėẇ ůşėş ƈȧƈħėḓ řėȧḓïñėşş őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "selection_auto": {
+        "en": "Automatic",
+        "ja": "自動",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ ŀőř⟧"
+      },
+      "selection_preferred": {
+        "en": "Preferred",
+        "ja": "優先",
+        "qps-ploc": "⟦Ṗřėƒėřřėḓ ŀőř⟧"
+      },
+      "selection_fixed": {
+        "en": "Fixed",
+        "ja": "固定",
+        "qps-ploc": "⟦Ƒïẋėḓ ŀőř⟧"
+      },
+      "selection_mode": {
+        "en": "Selection mode",
+        "ja": "選択方式",
+        "qps-ploc": "⟦Şėŀėƈŧïőñ ɱőḓė ŀőřė⟧"
+      },
+      "selection_agent": {
+        "en": "Agent identity",
+        "ja": "エージェント識別子",
+        "qps-ploc": "⟦Ȧɠėñŧ ïḓėñŧïŧẏ ŀőřė⟧"
+      },
+      "selection_runtime": {
+        "en": "Runtime",
+        "ja": "ランタイム",
+        "qps-ploc": "⟦Řůñŧïɱė ŀőř⟧"
+      },
+      "selection_provider": {
+        "en": "Provider",
+        "ja": "プロバイダー",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
+      },
+      "selection_model": {
+        "en": "Model",
+        "ja": "モデル",
+        "qps-ploc": "⟦Ɱőḓėŀ ŀőř⟧"
+      },
+      "selection_profile": {
+        "en": "Profile",
+        "ja": "プロファイル",
+        "qps-ploc": "⟦Ṗřőƒïŀė ŀőř⟧"
+      },
+      "selection_requested": {
+        "en": "Requested",
+        "ja": "要求された設定",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ŀőř⟧"
+      },
+      "selection_effective": {
+        "en": "Resolved choice",
+        "ja": "解決された選択",
+        "qps-ploc": "⟦Řėşőŀṽėḓ ƈħőïƈė ŀőřė⟧"
+      },
+      "selection_source": {
+        "en": "Source",
+        "ja": "選択元",
+        "qps-ploc": "⟦Şőůřƈė ŀőř⟧"
+      },
+      "selection_reason": {
+        "en": "Reason",
+        "ja": "理由",
+        "qps-ploc": "⟦Řėȧşőñ ŀőř⟧"
+      },
+      "selection_edit": {
+        "en": "Edit",
+        "ja": "編集",
+        "qps-ploc": "⟦Ėḓïŧ ŀőř⟧"
+      },
+      "selection_preview": {
+        "en": "Preview",
+        "ja": "プレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőř⟧"
+      },
+      "selection_save": {
+        "en": "Save",
+        "ja": "保存",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "selection_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "selection_busy": {
+        "en": "Working…",
+        "ja": "処理中…",
+        "qps-ploc": "⟦Ẇőřķïñɠ… ŀőř⟧"
+      },
+      "selection_saved": {
+        "en": "Saved.",
+        "ja": "保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ. ŀőř⟧"
+      },
+      "selection_readonly": {
+        "en": "Read-only. An authenticated administrator with the required scope can edit.",
+        "ja": "閲覧専用です。必要なスコープを持つ認証済み管理者が編集できます。",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ. Ȧñ ȧůŧħėñŧïƈȧŧėḓ ȧḓɱïñïşŧřȧŧőř ẇïŧħ ŧħė řėɋůïřėḓ şƈőṗė ƈȧñ ėḓïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "selection_conflict": {
+        "en": "Settings changed elsewhere. Reload before editing again.",
+        "ja": "設定が別の場所で変更されました。再読み込みしてから編集してください。",
+        "qps-ploc": "⟦Şėŧŧïñɠş ƈħȧñɠėḓ ėŀşėẇħėřė. Řėŀőȧḓ ƀėƒőřė ėḓïŧïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "selection_reload": {
+        "en": "Reload settings",
+        "ja": "設定を再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ şėŧŧïñɠş ŀőřė⟧"
+      },
+      "selection_error": {
+        "en": "Could not load or save settings.",
+        "ja": "設定を読み込みまたは保存できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ őř şȧṽė şėŧŧïñɠş. ŀőřėɱ ïṗşů⟧"
+      },
+      "selection_preview_required": {
+        "en": "Preview this change before saving.",
+        "ja": "保存前に変更をプレビューしてください。",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŧħïş ƈħȧñɠė ƀėƒőřė şȧṽïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "selection_fallback": {
+        "en": "Fallback",
+        "ja": "代替選択",
+        "qps-ploc": "⟦Ƒȧŀŀƀȧƈķ ŀőř⟧"
+      },
+      "selection_blocked": {
+        "en": "Blocked",
+        "ja": "選択不可",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "selection_none": {
+        "en": "Automatic / not specified",
+        "ja": "自動・指定なし",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ / ñőŧ şṗėƈïƒïėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "selection_preview_notice": {
+        "en": "Preview only. No settings are saved and no provider is contacted.",
+        "ja": "プレビューのみです。設定の保存やプロバイダーへの接続は行いません。",
+        "qps-ploc": "⟦Ṗřėṽïėẇ őñŀẏ. Ñő şėŧŧïñɠş ȧřė şȧṽėḓ ȧñḓ ñő ṗřőṽïḓėř ïş ƈőñŧȧƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "selection_empty": {
+        "en": "No configurable roles are available.",
+        "ja": "設定可能なロールがありません。",
+        "qps-ploc": "⟦Ñő ƈőñƒïɠůřȧƀŀė řőŀėş ȧřė ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "selection_current": {
+        "en": "Current settings",
+        "ja": "現在の設定",
+        "qps-ploc": "⟦Ƈůřřėñŧ şėŧŧïñɠş ŀőřėɱ⟧"
+      },
+      "selection_proposed": {
+        "en": "Preview result",
+        "ja": "プレビュー結果",
+        "qps-ploc": "⟦Ṗřėṽïėẇ řėşůŀŧ ŀőřė⟧"
+      },
+      "selection_fixed_help": {
+        "en": "Fixed selections stop when unavailable. Preferred selections may fall back.",
+        "ja": "固定選択は利用できない場合に停止します。優先選択は代替を使用できます。",
+        "qps-ploc": "⟦Ƒïẋėḓ şėŀėƈŧïőñş şŧőṗ ẇħėñ ůñȧṽȧïŀȧƀŀė. Ṗřėƒėřřėḓ şėŀėƈŧïőñş ɱȧẏ ƒȧŀŀ ƀȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "selection_admin_badge": {
+        "en": "Authenticated administrator",
+        "ja": "認証済み管理者",
+        "qps-ploc": "⟦Ȧůŧħėñŧïƈȧŧėḓ ȧḓɱïñïşŧřȧŧőř ŀőřėɱ ïṗ⟧"
+      },
+      "selection_policy_conflict": {
+        "en": "Configuration conflict",
+        "ja": "設定の競合",
+        "qps-ploc": "⟦Ƈőñƒïɠůřȧŧïőñ ƈőñƒŀïƈŧ ŀőřėɱ ï⟧"
+      },
+      "selection_reasoning_runtime_notice": {
+        "en": "Saving does not restart running backends. A changed fixed target requires backend reselection before further calls.",
+        "ja": "保存しても実行中のバックエンドは再起動しません。固定対象を変更した場合は、次の呼び出しの前にバックエンドの再選択が必要です。",
+        "qps-ploc": "⟦Şȧṽïñɠ ḓőėş ñőŧ řėşŧȧřŧ řůññïñɠ ƀȧƈķėñḓş. Ȧ ƈħȧñɠėḓ ƒïẋėḓ ŧȧřɠėŧ řėɋůïřėş ƀȧƈķėñḓ řėşėŀėƈŧïőñ ƀėƒőřė ƒůřŧħėř ƈȧŀŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       }
     },
     "ui": {

@@ -1,15 +1,11 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  safeReadFile,
-  safeReaddir,
-  safeLstat,
-} from '@agent/core';
+import { safeReadFile, safeReaddir, safeLstat } from '@agent/core';
 
 /**
  * SSRF guard contract test (operator-surface-strategy.md §9.1).
  *
- * The MOS is read-only and observation-only. It must not perform any
+ * The MOS server is observation-only outside governed mutations. It must not perform any
  * outbound network fetch from Server Components or Server Actions.
  * Any future regression that introduces remote `fetch()`, `axios`,
  * `node-fetch`, etc. will trip these checks.
@@ -66,7 +62,10 @@ describe('MOS SSRF / outbound-network guard', () => {
         // does not trigger the matcher.
         if (line.trim().startsWith('//') || line.trim().startsWith('*')) return;
         for (const pattern of OUTBOUND_NETWORK_PATTERNS) {
-          if (pattern.re.test(line)) {
+          const browserSelectionFetch =
+            path.relative(ROOT, file) === 'src/lib/selection-client.ts' &&
+            pattern.name === 'global fetch()';
+          if (pattern.re.test(line) && !browserSelectionFetch) {
             offenders.push({
               file: path.relative(ROOT, file),
               pattern: pattern.name,
@@ -82,8 +81,24 @@ describe('MOS SSRF / outbound-network guard', () => {
       offenders,
       `Outbound network usage detected (would expose SSRF surface):\n${offenders
         .map((o) => `  ${o.file}:${o.line} [${o.pattern}] ${o.text}`)
-        .join('\n')}`,
+        .join('\n')}`
     ).toEqual([]);
+  });
+
+  it('allows only the browser selection transport with fixed same-origin URLs', () => {
+    const client = String(
+      safeReadFile(path.join(SRC, 'lib/selection-client.ts'), { encoding: 'utf8' })
+    );
+    expect(client).toMatch(/^'use client';/);
+    expect(client).toContain('fetch(selectionEndpoint(target)');
+    expect(client).toContain("mode: 'same-origin'");
+    expect(client).toContain("credentials: 'same-origin'");
+    expect(client).toContain("redirect: 'error'");
+    expect(client.match(/\bfetch\s*\(/g)).toHaveLength(1);
+    const page = String(
+      safeReadFile(path.join(SRC, 'app/reasoning/page.tsx'), { encoding: 'utf8' })
+    );
+    expect(page).not.toContain('inspectReasoningRoutes');
   });
 
   it('next.config.mjs does not enable image optimization remote patterns', () => {

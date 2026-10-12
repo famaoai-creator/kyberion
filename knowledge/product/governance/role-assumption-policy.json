@@ -86,9 +86,10 @@
         "chronos_token_registry_reader",
         "sovereign_concierge",
         "mission_controller",
-        "ecosystem_architect"
+        "ecosystem_architect",
+        "reasoning_settings_writer"
       ],
-      "rationale": "Read-only audit monitor (presence/displays/operator-surface), operator-launched through surface_runtime with SYSTEM_ROLE=operator_surface. sovereign_concierge and chronos_token_registry_reader: reachable per docs/developer/role-assumption-reachability.json via libs/core surface-authn -> authn-providers (module providers and loadRegistrations). mission_controller is reachable via data.ts#getCloudflareOsSnapshot -> CloudflareOsSurface -> CloudflareOsControlPlane -> decideApprovalRequest (held_effect settlement is always filed under mission_controller). ecosystem_architect is reachable via a spawned orchestration worker's deployment-adapter config load. The surface also has unresolved sites (provider-discovery memoized CLI spawn, a computed import in src/lib/view.ts), so the analysis treats every role as reachable and nothing here is removable."
+      "rationale": "Read-only audit monitor (presence/displays/operator-surface), operator-launched through surface_runtime with SYSTEM_ROLE=operator_surface. sovereign_concierge and chronos_token_registry_reader: reachable per docs/developer/role-assumption-reachability.json via libs/core surface-authn -> authn-providers (module providers and loadRegistrations). mission_controller is reachable via data.ts#getCloudflareOsSnapshot -> CloudflareOsSurface -> CloudflareOsControlPlane -> decideApprovalRequest (held_effect settlement is always filed under mission_controller). ecosystem_architect is reachable via a spawned orchestration worker's deployment-adapter config load. The surface also has unresolved sites (provider-discovery memoized CLI spawn, a computed import in src/lib/view.ts), so the analysis treats every role as reachable and nothing here is removable. Authenticated global-administrator reasoning settings saves may assume reasoning_settings_writer after scope, CSRF, and revision checks; this role grants writes only to the settings file, previous backup, and revision history beyond unchanged worker/default permissions."
     },
     "personal_pads": {
       "may_assume": [

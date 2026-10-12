@@ -69,6 +69,7 @@ describe('resolveProviderBackend', () => {
 
   it('never touches real construction when a construct seam is supplied (no config/binary access)', async () => {
     const handle = resolveProviderBackend('claude', {
+      registrySnapshot: () => null, // isolate construction from any persisted availability cache
       construct: { claude: () => fakeHandle('claude') },
     });
     expect(handle).not.toBeNull();

@@ -171,3 +171,61 @@ a.operator-cell__title:hover {
   white-space: nowrap;
   overflow-wrap: normal;
 }
+
+/* Agent/runtime selection uses the same surface tokens in both color schemes. */
+.operator-selection {
+  display: grid;
+  gap: var(--kb-ui-space-3);
+}
+.operator-selection__resolution dl {
+  display: grid;
+  gap: var(--kb-ui-space-2);
+  margin: var(--kb-ui-space-2) 0;
+}
+.operator-selection__resolution dl > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr);
+  gap: var(--kb-ui-space-2);
+}
+.operator-selection__resolution dt {
+  color: var(--kb-ui-text-muted);
+}
+.operator-selection__resolution dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.operator-selection__fields {
+  border: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--kb-ui-space-3);
+}
+.operator-selection__fields legend {
+  padding: var(--kb-ui-space-2) 0;
+}
+.operator-selection__fields label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+}
+.operator-selection__fields input,
+.operator-selection__fields select {
+  font: inherit;
+  color: var(--kb-ui-text);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  padding: var(--kb-ui-space-2);
+  min-width: 0;
+}
+.operator-selection__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2);
+  margin-top: var(--kb-ui-space-3);
+}
+.operator-selection button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

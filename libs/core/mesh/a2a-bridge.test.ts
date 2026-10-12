@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => {
   const readConversationHistory = vi.fn();
   const rehydrateConversation = vi.fn();
   const appendSupervisorEvent = vi.fn();
+  const readMissionTeamSelectionDispatch = vi.fn();
+  const reserveMissionTeamSelectionDispatch = vi.fn();
   return {
     warn,
     info,
@@ -50,6 +52,8 @@ const mocks = vi.hoisted(() => {
     readConversationHistory,
     rehydrateConversation,
     appendSupervisorEvent,
+    readMissionTeamSelectionDispatch,
+    reserveMissionTeamSelectionDispatch,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -68,6 +72,11 @@ vi.mock('../agent/agent-registry', () => ({
     get: mocks.get,
     getRuntimeIdentity: mocks.getRuntimeIdentity,
   },
+}));
+
+vi.mock('../mission/mission-team-selection.js', () => ({
+  readMissionTeamSelectionDispatch: mocks.readMissionTeamSelectionDispatch,
+  reserveMissionTeamSelectionDispatch: mocks.reserveMissionTeamSelectionDispatch,
 }));
 
 vi.mock('../agent/agent-runtime-supervisor.js', () => ({
@@ -125,12 +134,424 @@ describe('a2a-bridge', () => {
     // test set must not leak into whichever test runs next.
     vi.resetAllMocks();
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
+    mocks.readMissionTeamSelectionDispatch.mockReturnValue(null);
+    mocks.reserveMissionTeamSelectionDispatch.mockReturnValue(null);
     mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
     mocks.resolveAgentSelectionHints.mockImplementation((manifest: any) => ({
       provider: manifest.selection_hints?.preferred_provider || manifest.provider || 'gemini',
       modelId:
         manifest.selection_hints?.preferred_modelId || manifest.modelId || 'gemini-2.5-flash',
     }));
+  });
+
+  describe('explicit requested selection', () => {
+    beforeEach(async () => {
+      const discovery = await import('../provider/provider-discovery.js');
+      vi.spyOn(discovery, 'discoverProviders').mockReturnValue([
+        {
+          provider: 'claude',
+          installed: true,
+          healthy: true,
+          version: 'test',
+          protocol: 'print-json',
+          models: ['small', 'large'],
+          capabilities: [],
+          modelCapabilities: { small: ['conversation'], large: ['code'] },
+        },
+        {
+          provider: 'codex',
+          installed: true,
+          healthy: true,
+          version: 'test',
+          protocol: 'exec',
+          models: ['exact'],
+          capabilities: [],
+          modelCapabilities: { exact: ['code'] },
+        },
+      ]);
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'claude',
+        modelId: 'small',
+        systemPrompt: 'agent',
+        capabilities: ['agent-tag-only'],
+      });
+      mocks.get.mockReturnValue(undefined);
+      mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.ensureAgentRuntime.mockResolvedValue({ ask: vi.fn(async () => 'ok') });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllEnvs();
+    });
+
+    function payload(
+      requestedSelection: Record<string, unknown>,
+      context: Record<string, unknown> = {}
+    ) {
+      return {
+        context: {
+          provider: 'codex',
+          provider_model_id: 'exact',
+          required_capabilities: ['code'],
+          requested_selection: requestedSelection,
+          selection_resolution: { status: 'resolved' },
+          ...context,
+        },
+      };
+    }
+
+    it('carries independent fixed provider/model constraints and hard requirements into lifecycle metadata', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const selection = {
+        mode: 'fixed',
+        agent_id: 'planner-agent',
+        provider: 'codex',
+        model_id: 'exact',
+      };
+      await a2aBridge.ensureAgent('planner-agent', undefined, payload(selection));
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'planner-agent',
+          provider: 'codex',
+          modelId: 'exact',
+          runtimeMetadata: expect.objectContaining({
+            requested_selection: selection,
+            required_capabilities: ['code'],
+            selection_resolution: { status: 'resolved' },
+          }),
+        })
+      );
+      expect(
+        mocks.ensureAgentRuntime.mock.calls[0][0].runtimeMetadata.skip_provider_resolution
+      ).toBeUndefined();
+    });
+
+    it('does not turn a provider-only fixed constraint into a fixed model or agent identity', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await a2aBridge.ensureAgent(
+        'planner-agent',
+        undefined,
+        payload({ mode: 'fixed', provider: 'claude' })
+      );
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'planner-agent',
+          provider: 'claude',
+          modelId: 'large',
+          runtimeMetadata: expect.objectContaining({
+            requested_selection: { mode: 'fixed', provider: 'claude' },
+          }),
+        })
+      );
+    });
+
+    it('loads canonical fixed policy when a legacy producer omits selection metadata', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const selection = {
+        mode: 'fixed',
+        agent_id: 'planner-agent',
+        provider: 'codex',
+        model_id: 'exact',
+      };
+      mocks.readMissionTeamSelectionDispatch.mockReturnValue({
+        team_role: 'planner',
+        agent_id: 'planner-agent',
+        status: 'assigned',
+        provider: 'codex',
+        modelId: 'exact',
+        requested_selection: selection,
+        required_capabilities: ['code'],
+        selection_resolution: { source: 'requested', reason: 'fixed request' },
+      });
+      await a2aBridge.ensureAgent('planner-agent', undefined, {
+        context: { mission_id: 'MSN-SELECTION-TEST', team_role: 'planner' },
+      });
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'codex',
+          modelId: 'exact',
+          runtimeMetadata: expect.objectContaining({ requested_selection: selection }),
+        })
+      );
+      expect(mocks.reserveMissionTeamSelectionDispatch).toHaveBeenCalledWith({
+        missionId: 'MSN-SELECTION-TEST',
+        teamRole: 'planner',
+        agentId: 'planner-agent',
+        provider: 'codex',
+        modelId: 'exact',
+        expectedRequestedSelection: selection,
+      });
+      expect(mocks.reserveMissionTeamSelectionDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.ensureAgentRuntimeViaDaemon.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('rejects canonical fixed reviewer-to-planner fallback before provider preflight when legacy transport omits selection metadata', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const discovery = await import('../provider/provider-discovery.js');
+      const resolution = await import('../agent/agent-provider-resolution.js');
+      const resolveProvider = vi.spyOn(resolution, 'resolveAgentProviderTarget');
+      mocks.readMissionTeamSelectionDispatch.mockReturnValue({
+        team_role: 'reviewer',
+        agent_id: 'reviewer-agent',
+        status: 'assigned',
+        provider: 'codex',
+        modelId: 'exact',
+        requested_selection: {
+          mode: 'fixed',
+          agent_id: 'reviewer-agent',
+          provider: 'codex',
+          model_id: 'exact',
+        },
+        required_capabilities: ['code'],
+        selection_resolution: { source: 'requested', reason: 'Fixed independent reviewer.' },
+      });
+
+      await expect(
+        a2aBridge.ensureAgent('planner-agent', undefined, {
+          context: { mission_id: 'MSN-SELECTION-TEST', team_role: 'reviewer' },
+        })
+      ).rejects.toThrow(/AGENT_SELECTION_STALE/);
+
+      expect(mocks.readMissionTeamSelectionDispatch).toHaveBeenCalledWith({
+        missionId: 'MSN-SELECTION-TEST',
+        teamRole: 'reviewer',
+      });
+      expect(resolveProvider).not.toHaveBeenCalled();
+      expect(discovery.discoverProviders).not.toHaveBeenCalled();
+      expect(mocks.getAgentManifest).not.toHaveBeenCalled();
+      expect(mocks.reserveMissionTeamSelectionDispatch).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    });
+
+    it('does not reserve a canonical launch when fixed model preflight fails', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      mocks.readMissionTeamSelectionDispatch.mockReturnValue({
+        team_role: 'planner',
+        agent_id: 'planner-agent',
+        status: 'assigned',
+        provider: 'codex',
+        modelId: 'missing',
+        requested_selection: { mode: 'fixed', provider: 'codex', model_id: 'missing' },
+        required_capabilities: ['code'],
+      });
+      await expect(
+        a2aBridge.ensureAgent('planner-agent', undefined, {
+          context: { mission_id: 'MSN-SELECTION-TEST', team_role: 'planner' },
+        })
+      ).rejects.toThrow(/AGENT_SELECTION_MODEL_UNAVAILABLE/);
+      expect(mocks.reserveMissionTeamSelectionDispatch).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+    });
+
+    it('does not dispatch when canonical reservation detects a changed selection', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      mocks.reserveMissionTeamSelectionDispatch.mockImplementation(() => {
+        throw new Error('[MISSION_TEAM_SELECTION_STALE] changed');
+      });
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload(
+            { mode: 'fixed', provider: 'codex', model_id: 'exact' },
+            {
+              mission_id: 'MSN-SELECTION-TEST',
+              team_role: 'planner',
+            }
+          )
+        )
+      ).rejects.toThrow(/MISSION_TEAM_SELECTION_STALE/);
+      expect(mocks.ensureAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    });
+
+    it('retains an otherwise matching runtime while lifecycle adopts a fixed contract', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const preferred = { mode: 'preferred', provider: 'codex', model_id: 'exact' };
+      const record = {
+        status: 'ready',
+        provider: 'codex',
+        modelId: 'exact',
+        metadata: {
+          requested_selection: preferred,
+          required_capabilities: ['code'],
+        },
+      };
+      const handle = { ask: vi.fn(), getRecord: () => record };
+      mocks.ensureAgentRuntime.mockResolvedValue(handle);
+      await a2aBridge.ensureAgent('planner-agent', undefined, payload(preferred));
+      mocks.getAgentRuntimeHandle.mockReturnValue(handle);
+      mocks.get.mockReturnValue(record);
+      await a2aBridge.ensureAgent(
+        'planner-agent',
+        undefined,
+        payload({ ...preferred, mode: 'fixed' })
+      );
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(2);
+      expect(mocks.shutdownAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+    });
+
+    it('rejects a changed fixed target without stopping an active runtime or reserving a launch', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const original = { mode: 'fixed', provider: 'codex', model_id: 'exact' };
+      const record = {
+        status: 'busy',
+        provider: 'codex',
+        modelId: 'exact',
+        metadata: {
+          requested_selection: original,
+          required_capabilities: ['code'],
+        },
+      };
+      const handle = { ask: vi.fn(), getRecord: () => record };
+      mocks.ensureAgentRuntime.mockResolvedValue(handle);
+      await a2aBridge.ensureAgent('planner-agent', undefined, payload(original));
+      mocks.getAgentRuntimeHandle.mockReturnValue(handle);
+      mocks.get.mockReturnValue(record);
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload(
+            { mode: 'fixed', provider: 'claude', model_id: 'large' },
+            {
+              mission_id: 'MSN-SELECTION-TEST',
+              team_role: 'planner',
+            }
+          )
+        )
+      ).rejects.toThrow(/AGENT_SELECTION_RUNTIME_CONFLICT/);
+      expect(mocks.shutdownAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      expect(mocks.stopAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.reserveMissionTeamSelectionDispatch).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call the explicit selection parser for a legacy payload without selection metadata', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const resolution = await import('../agent/agent-provider-resolution.js');
+      const parse = vi.spyOn(resolution, 'parseAgentRequestedSelection').mockImplementation(() => {
+        throw new Error('Legacy requests must not invoke the explicit selection parser');
+      });
+      await a2aBridge.ensureAgent('planner-agent', undefined, { text: 'legacy request' });
+      expect(parse).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledOnce();
+    });
+
+    it('rejects malformed null selection instead of silently using legacy defaults', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await expect(
+        a2aBridge.ensureAgent('planner-agent', undefined, {
+          context: { requested_selection: null },
+        })
+      ).rejects.toThrow(/AGENT_SELECTION_INVALID/);
+    });
+
+    it('rejects unknown fixed models before creating a runtime', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload({
+            mode: 'fixed',
+            provider: 'codex',
+            model_id: 'unknown',
+          })
+        )
+      ).rejects.toThrow(/AGENT_SELECTION_MODEL_UNAVAILABLE/);
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+    });
+
+    it('rejects fixed agent identity mismatches rather than deriving identity from provider', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload({
+            mode: 'fixed',
+            agent_id: 'codex',
+            provider: 'codex',
+          })
+        )
+      ).rejects.toThrow(/AGENT_SELECTION_IDENTITY_CONFLICT/);
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    });
+
+    it('rechecks fixed availability before reusing a cached runtime', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const selection = { mode: 'fixed', provider: 'codex', model_id: 'exact' };
+      const record = { status: 'ready', provider: 'codex', modelId: 'exact' };
+      const handle = { ask: vi.fn(), getRecord: () => record };
+      mocks.ensureAgentRuntime.mockResolvedValue(handle);
+      await a2aBridge.ensureAgent('planner-agent', undefined, payload(selection));
+      mocks.getAgentRuntimeHandle.mockReturnValue(handle);
+      mocks.get.mockReturnValue(record);
+      const discovery = await import('../provider/provider-discovery.js');
+      vi.mocked(discovery.discoverProviders).mockReturnValue([]);
+      await expect(
+        a2aBridge.ensureAgent('planner-agent', undefined, payload(selection))
+      ).rejects.toThrow(/AGENT_SELECTION_PROVIDER_UNAVAILABLE/);
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails before dispatch when enforced task routing conflicts with a fixed model', async () => {
+      vi.stubEnv('KYBERION_TASK_MODEL_ROUTING', 'enforce');
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload(
+            {
+              mode: 'fixed',
+              provider: 'codex',
+              model_id: 'exact',
+            },
+            {
+              task_model_hint: {
+                tier: 'large',
+                effort: 'high',
+                model_id: 'large',
+                route_reason: 'test',
+              },
+            }
+          )
+        )
+      ).rejects.toThrow(/AGENT_SELECTION_ROUTING_CONFLICT/);
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    });
+
+    it('fails enforced task routing that cannot be satisfied by a fixed provider', async () => {
+      vi.stubEnv('KYBERION_TASK_MODEL_ROUTING', 'enforce');
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      await expect(
+        a2aBridge.ensureAgent(
+          'planner-agent',
+          undefined,
+          payload(
+            {
+              mode: 'fixed',
+              provider: 'codex',
+            },
+            {
+              task_model_hint: {
+                tier: 'large',
+                effort: 'high',
+                model_id: 'large',
+                route_reason: 'test',
+              },
+            }
+          )
+        )
+      ).rejects.toThrow(/AGENT_SELECTION_ROUTING_CONFLICT/);
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    });
   });
 
   it('signs and verifies messages', async () => {

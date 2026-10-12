@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "paths": { "@/*": ["../../src/*"] } },
+  "include": ["app/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

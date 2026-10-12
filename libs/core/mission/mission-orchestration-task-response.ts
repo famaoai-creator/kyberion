@@ -1,3 +1,7 @@
+import type {
+  MissionTeamRoleSelection,
+  MissionTeamSelectionResolution,
+} from '../organization/team-role-assignment-selection.js';
 import { recordKnowledgeVerifiedRun } from '../knowledge/knowledge-verification.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { nowIso } from '../foundation/time.js';
@@ -57,6 +61,9 @@ export async function obtainTaskResultResponse(
     taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
     provider?: string;
     providerModelId?: string;
+    requestedSelection?: MissionTeamRoleSelection;
+    selectionResolution?: MissionTeamSelectionResolution;
+    requiredCapabilities?: string[];
     prompt: string;
     contextPackId?: string;
     securityScope?: import('../context-security-scope.js').ContextSecurityScope;
@@ -134,6 +141,13 @@ export async function obtainTaskResultResponse(
         dispatch_timeout_ms: deps.resolveTaskDispatchTimeoutMs(input.task),
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
+        ...(input.requestedSelection
+          ? {
+              requested_selection: input.requestedSelection,
+              selection_resolution: input.selectionResolution,
+              required_capabilities: input.requiredCapabilities,
+            }
+          : {}),
         security_scope: input.securityScope,
         ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
       },
@@ -222,6 +236,13 @@ export async function obtainTaskResultResponse(
           dispatch_timeout_ms: deps.resolveTaskDispatchTimeoutMs(input.task),
           ...(input.provider ? { provider: input.provider } : {}),
           ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
+          ...(input.requestedSelection
+            ? {
+                requested_selection: input.requestedSelection,
+                selection_resolution: input.selectionResolution,
+                required_capabilities: input.requiredCapabilities,
+              }
+            : {}),
           security_scope: input.securityScope,
           ...(input.delegationChain ? { delegation_chain: input.delegationChain } : {}),
         },

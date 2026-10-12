@@ -1,3 +1,4 @@
+import { needsFixedReasoningGuard, pickRoleBackend } from './reasoning-fixed-binding.js';
 /**
  * Reasoning Backend Contract — where LLM reasoning actually runs.
  *
@@ -950,13 +951,7 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
   }
 
   private pick(options?: ReasoningCallOptions): ReasoningBackend {
-    const profile = options?.route_profile?.trim();
-    if (profile) return this.profileBackends.get(profile) || this.defaultBackend;
-    const role = options?.role
-      ?.trim()
-      .toLowerCase()
-      .replace(/[-\s]+/g, '_');
-    return (role && this.roleBackends.get(role)) || this.defaultBackend;
+    return pickRoleBackend(this.defaultBackend, this.roleBackends, this.profileBackends, options);
   }
 
   /** Live capabilities of the chain `role` routes to (default chain without a role). */
@@ -1347,7 +1342,10 @@ export function registerReasoningBackend(
 
 /** Get the active backend, falling back to the deterministic stub. */
 export function getReasoningBackend(): ReasoningBackend {
-  return reasoningBackendSeam.getOptional() ?? stubReasoningBackend;
+  const backend = reasoningBackendSeam.getOptional() ?? stubReasoningBackend;
+  return backend instanceof RoleAwareReasoningBackend || !needsFixedReasoningGuard(backend)
+    ? backend
+    : buildRoleAwareReasoningBackend(backend, new Map());
 }
 
 /** True when any backend (real or test-injected) holds the 'active' provider slot. */

@@ -306,6 +306,80 @@ describe('agent-runtime-supervisor', () => {
     );
   });
 
+  it('retains the stopped runtime generation and mission after shutdown removes the record', async () => {
+    const { stopAgentRuntime } = await import('./agent-runtime-supervisor.js');
+    const { agentLifecycle } = await import('./agent-lifecycle.js');
+    const events = await import('./agent-runtime-events.js');
+    const record: import('./agent-registry.js').AgentRecord = {
+      agentId: 'selection-stop-fixture',
+      provider: 'stub',
+      modelId: 'fixture-model',
+      status: 'ready',
+      capabilities: [],
+      trustScore: 1,
+      sessionId: null,
+      threadId: 'fixture',
+      spawnedAt: 1760000000001,
+      lastActivity: 1760000000001,
+      missionId: 'MSN-SELECTION-STOP',
+      scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-SELECTION-STOP' },
+    };
+    let current: typeof record | undefined = record;
+    const handle = {
+      agentId: record.agentId,
+      ask: vi.fn(),
+      shutdown: vi.fn(),
+      getRecord: () => current,
+    };
+    const getHandle = vi.spyOn(agentLifecycle, 'getHandle').mockReturnValue(handle);
+    const shutdown = vi.spyOn(agentLifecycle, 'shutdown').mockImplementation(async () => {
+      current = undefined;
+    });
+    const append = vi.spyOn(events, 'appendSupervisorEvent').mockImplementation(() => {});
+    try {
+      await stopAgentRuntime(record.agentId, 'fixture');
+      expect(current).toBeUndefined();
+      expect(append).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          decision: 'agent_runtime_stop_requested',
+          runtime_generation: record.spawnedAt,
+          scope: record.scope,
+        })
+      );
+      expect(append).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          decision: 'agent_runtime_stopped',
+          runtime_generation: record.spawnedAt,
+          scope: record.scope,
+        })
+      );
+    } finally {
+      getHandle.mockRestore();
+      shutdown.mockRestore();
+      append.mockRestore();
+    }
+  });
+
+  it('never invents stop-generation proof for an unknown runtime', async () => {
+    const { stopAgentRuntime } = await import('./agent-runtime-supervisor.js');
+    const { agentLifecycle } = await import('./agent-lifecycle.js');
+    const events = await import('./agent-runtime-events.js');
+    const getHandle = vi.spyOn(agentLifecycle, 'getHandle').mockReturnValue(undefined);
+    const shutdown = vi.spyOn(agentLifecycle, 'shutdown').mockResolvedValue(undefined);
+    const append = vi.spyOn(events, 'appendSupervisorEvent').mockImplementation(() => {});
+    try {
+      await stopAgentRuntime('unknown-selection-fixture', 'fixture');
+      expect(append).toHaveBeenCalledTimes(2);
+      expect(append.mock.calls[1][0]).not.toHaveProperty('runtime_generation');
+    } finally {
+      getHandle.mockRestore();
+      shutdown.mockRestore();
+      append.mockRestore();
+    }
+  });
+
   it('estimates usage when a provider exposes an empty placeholder usage object', async () => {
     const { resolveRuntimeTokenUsage } = await import('./agent-runtime-supervisor.js');
     expect(

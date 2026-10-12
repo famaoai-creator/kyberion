@@ -796,6 +796,18 @@
     "first_job_tenant_status_reader": {
       "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
       "allow_write": []
+    },
+    "reasoning_settings_writer": {
+      "allow_read": [
+        "active/shared/state/reasoning-route-user-config.json",
+        "active/shared/state/reasoning-route-user-config.json.previous",
+        "active/shared/state/reasoning-route-user-config.json.history/"
+      ],
+      "allow_write": [
+        "active/shared/state/reasoning-route-user-config.json",
+        "active/shared/state/reasoning-route-user-config.json.previous",
+        "active/shared/state/reasoning-route-user-config.json.history/"
+      ]
     }
   },
   "authority_permissions": {
@@ -861,8 +873,8 @@
     "min_coverage_pct": 0
   },
   "a2a_policy": {
-    "min_trust_score_personal": 8.0,
-    "min_trust_score_confidential": 5.0,
+    "min_trust_score_personal": 8,
+    "min_trust_score_confidential": 5,
     "mandatory_external_audit": true
   },
   "network_guardrails": {

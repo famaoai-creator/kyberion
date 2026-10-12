@@ -19,6 +19,7 @@ import {
   loadMissionTeamPlan,
   promoteMissionTeamPlanRoles,
   writeMissionTeamPlan,
+  withMissionTeamPlanMutation,
   type ExtendMissionTeamRosterRefusal,
 } from './mission-team-plan-composer.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
@@ -451,7 +452,16 @@ export interface StaffMissionTeamRolesResult {
  * appends one `team_role_staffed` entry per promotion to the mission
  * execution ledger so an audit can see when each member joined and why.
  */
-export function staffMissionTeamRoles(input: {
+export function staffMissionTeamRoles(
+  input: Parameters<typeof staffMissionTeamRolesLocked>[0]
+): StaffMissionTeamRolesResult {
+  const planPath = getMissionTeamPlanPath(normalizeMissionId(input.missionId));
+  return planPath
+    ? withMissionTeamPlanMutation(path.dirname(planPath), () => staffMissionTeamRolesLocked(input))
+    : staffMissionTeamRolesLocked(input);
+}
+
+function staffMissionTeamRolesLocked(input: {
   missionId: string;
   teamRoles: string[];
   missionPathHint?: string;
@@ -524,7 +534,16 @@ export interface RestaffMissionTeamRoleResult {
  * and one execution-ledger entry move together, so the roster change is
  * auditable rather than implicit.
  */
-export function restaffMissionTeamRole(input: {
+export function restaffMissionTeamRole(
+  input: Parameters<typeof restaffMissionTeamRoleLocked>[0]
+): RestaffMissionTeamRoleResult {
+  const planPath = getMissionTeamPlanPath(normalizeMissionId(input.missionId));
+  return planPath
+    ? withMissionTeamPlanMutation(path.dirname(planPath), () => restaffMissionTeamRoleLocked(input))
+    : restaffMissionTeamRoleLocked(input);
+}
+
+function restaffMissionTeamRoleLocked(input: {
   missionId: string;
   teamRole: string;
   requiredCapabilities?: string[];

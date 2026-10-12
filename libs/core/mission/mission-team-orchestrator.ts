@@ -1,3 +1,5 @@
+import { reserveMissionTeamSelectionDispatch } from './mission-team-selection.js';
+import { resolveAgentLifecycleModelId } from '../agent/agent-lifecycle.js';
 import { ensureAgentRuntime } from '../agent/agent-runtime-port.js';
 import { ensureAgentRuntimeViaDaemon } from '../agent/agent-runtime-supervisor-client.js';
 import { agentRegistry } from '../agent/agent-registry.js';
@@ -96,7 +98,15 @@ export async function ensureMissionTeamRuntime(
       continue;
     }
 
-    const cached = resolvedRuntimeStatus.get(assignment.agent_id);
+    const runtimeKey = JSON.stringify([
+      assignment.agent_id,
+      assignment.provider,
+      assignment.modelId,
+      assignment.requested_selection,
+      // Explicit contracts are role-owned even when two roles share the same actor.
+      assignment.requested_selection ? assignment.team_role : undefined,
+    ]);
+    const cached = resolvedRuntimeStatus.get(runtimeKey);
     if (cached) {
       assignments.push({
         ...assignment,
@@ -106,12 +116,33 @@ export async function ensureMissionTeamRuntime(
       continue;
     }
 
-    if (isReady(assignment.agent_id, assignment)) {
+    if (assignment.requested_selection) {
+      // Pure preflight precedes the durable reservation; failed routing never claims a launch.
+      resolveAgentLifecycleModelId({
+        modelId: assignment.modelId || undefined,
+        runtimeMetadata: {
+          requested_selection: assignment.requested_selection,
+          task_model_hint: assignment.model_hint,
+        },
+      });
+    }
+    reserveMissionTeamSelectionDispatch({
+      missionId,
+      teamRole: assignment.team_role,
+      agentId: assignment.agent_id,
+      provider: assignment.provider || undefined,
+      modelId: assignment.modelId || undefined,
+      expectedRequestedSelection: assignment.requested_selection || null,
+    });
+    const wasReady = isReady(assignment.agent_id, assignment);
+    // A ready record alone cannot prove explicit ownership/selection constraints.
+    // Let lifecycle validate or safely adopt the contract even when no boot is needed.
+    if (!assignment.requested_selection && wasReady) {
       const resolved = {
         ...assignment,
         runtime_status: 'already_ready',
       } satisfies MissionTeamRuntimeAssignment;
-      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      resolvedRuntimeStatus.set(runtimeKey, resolved);
       assignments.push(resolved);
       continue;
     }
@@ -128,6 +159,20 @@ export async function ensureMissionTeamRuntime(
         runtimeMetadata: {
           skip_provider_resolution: true,
           task_model_hint: assignment.model_hint,
+          requested_selection: assignment.requested_selection,
+          selection_resolution: assignment.selection_resolution,
+          required_capabilities: assignment.required_capabilities,
+          ...(assignment.requested_selection
+            ? {
+                mission_id: missionId.toUpperCase(),
+                team_role: assignment.team_role,
+                execution_mode: 'task',
+                // The prewarm supervisor requested this launch; the mission remains the
+                // stable owner when a later A2A task acquires the same runtime.
+                requested_runtime_owner_id: runtimeOwnerId,
+                requested_runtime_owner_type: runtimeOwnerType,
+              }
+            : {}),
         },
         missionId: missionId.toUpperCase(),
         scope: requestedScope || {
@@ -140,8 +185,12 @@ export async function ensureMissionTeamRuntime(
             : {}),
         },
         requestedBy: 'mission_team_orchestrator',
-        ...(runtimeOwnerId ? { runtimeOwnerId } : {}),
-        ...(runtimeOwnerType ? { runtimeOwnerType } : {}),
+        ...(assignment.requested_selection
+          ? { runtimeOwnerId: missionId.toUpperCase(), runtimeOwnerType: 'mission' }
+          : {
+              ...(runtimeOwnerId ? { runtimeOwnerId } : {}),
+              ...(runtimeOwnerType ? { runtimeOwnerType } : {}),
+            }),
       };
       try {
         await ensureAgentRuntimeViaDaemon(spawnPayload);
@@ -150,9 +199,9 @@ export async function ensureMissionTeamRuntime(
       }
       const resolved = {
         ...assignment,
-        runtime_status: 'spawned',
+        runtime_status: wasReady ? 'already_ready' : 'spawned',
       } satisfies MissionTeamRuntimeAssignment;
-      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      resolvedRuntimeStatus.set(runtimeKey, resolved);
       assignments.push(resolved);
     } catch (error) {
       const resolved = {
@@ -160,7 +209,7 @@ export async function ensureMissionTeamRuntime(
         runtime_status: 'failed',
         error: error instanceof Error ? error.message : String(error),
       } satisfies MissionTeamRuntimeAssignment;
-      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      resolvedRuntimeStatus.set(runtimeKey, resolved);
       assignments.push(resolved);
     }
   }

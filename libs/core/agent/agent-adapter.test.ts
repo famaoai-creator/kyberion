@@ -281,6 +281,42 @@ describe('CodexAdapter', () => {
     );
   });
 
+  it.each(['exec', 'legacy'])(
+    'preserves an exact runtime model through the %s adapter factory into CLI argv',
+    async (mode) => {
+      vi.stubEnv('KYBERION_CODEX_MODE', mode);
+      vi.stubEnv('KYBERION_CODEX_MODEL', 'ambient-model-must-not-win');
+      try {
+        await import('./agent-exec-adapter-providers.js');
+        const { createAgentExecAdapter } = await import('./agent-exec-adapter-bridge.js');
+        mockSpawnedCli(JSON.stringify({ message: 'selected exact model' }));
+        const adapter = await createAgentExecAdapter({
+          provider: 'codex',
+          modelId: 'requested-exact-model',
+        });
+        await adapter.boot();
+        const response = await adapter.ask('Run the exact target');
+        expect(response.text).toBe('selected exact model');
+        expect(spawn).toHaveBeenCalledWith(
+          'npx',
+          [
+            'codex',
+            'exec',
+            '--model',
+            'requested-exact-model',
+            '--json',
+            expect.stringContaining('Run the exact target'),
+          ],
+          expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+        );
+        expect(vi.mocked(spawn).mock.calls[0]?.[1]).not.toContain('ambient-model-must-not-win');
+        await adapter.shutdown();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
+
   it('fails closed when the Codex JSON response root is not an object', async () => {
     mockSpawnedCli('[]');
 

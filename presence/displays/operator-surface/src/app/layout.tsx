@@ -3,6 +3,7 @@ import { getTenantScope } from '@/lib/data';
 import { operatorTranslator, operatorUiMessages } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { requireOperatorViewer } from '@/lib/viewer-context';
+import { isSelectionAdmin } from '@/lib/selection-access';
 import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/display-preferences';
 import { OperatorShell, type OperatorNavItem } from './operator-shell';
 // Shared UI layer (UI-02): globals.css carries the generated --kb-* / --kb-ui-*
@@ -17,15 +18,16 @@ import './operator.css';
 
 export const metadata = {
   title: 'Kyberion Operator Surface',
-  description: 'Read-only operator view: missions, audit chain, health',
+  description: 'Operator views with scoped, authenticated selection settings',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Server-verified page gate: loopback passes, remote needs a valid session.
-  await requireOperatorViewer();
+  const viewer = await requireOperatorViewer();
   const scope = getTenantScope();
   const locale = await getRequestLocale();
   const t = operatorTranslator(locale);
+  const roleBadge = isSelectionAdmin(viewer) ? t('selection_admin_badge') : t('role_badge');
   const items: OperatorNavItem[] = [
     { id: 'missions', label: t('nav_missions'), href: '/', icon: 'mission' },
     { id: 'audit', label: t('nav_audit'), href: '/audit', icon: 'shield' },
@@ -55,13 +57,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           locale={locale}
           messages={operatorUiMessages(locale)}
           navLabel={t('nav_label')}
-          brand={{ name: t('brand_name'), subtitle: t('brand_role') }}
+          brand={{
+            name: t('brand_name'),
+            subtitle: isSelectionAdmin(viewer) ? roleBadge : t('brand_role'),
+          }}
           context={{
             label: scope ?? t('tenant_agnostic'),
             detail: t('tenant_context_detail'),
           }}
           items={items}
-          roleBadge={t('role_badge')}
+          roleBadge={roleBadge}
         >
           {children}
         </OperatorShell>

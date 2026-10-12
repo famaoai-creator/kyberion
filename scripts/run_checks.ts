@@ -162,6 +162,27 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
   return scoped;
 }
 
+/**
+ * Execute one declared gate through secure-io. Hosted browser coverage needs
+ * this non-secret CI marker, which is intentionally absent from the global
+ * inherited-environment allowlist. Forward only its canonical true value and
+ * only to the existing Operator boundary gate.
+ */
+export async function executeCheckGate(gate: Gate) {
+  const env =
+    gate.id === 'mos-no-write-api' && process.env.GITHUB_ACTIONS === 'true'
+      ? { GITHUB_ACTIONS: 'true' }
+      : undefined;
+  const options = {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: gate.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS,
+    ...(env ? { env } : {}),
+  };
+  return gate.script
+    ? safeExecResultAsync('pnpm', ['run', gate.script], options)
+    : safeExecResultAsync(gate.executable!, gate.args || [], options);
+}
+
 export async function main(
   argv: string[] = [],
   print: (value: unknown) => void = () => undefined
@@ -223,16 +244,7 @@ export async function main(
   }> = new Array(gates.length);
   let nextGateIndex = 0;
   const runGate = async (gate: Gate): Promise<(typeof results)[number]> => {
-    const execute = async () =>
-      gate.script
-        ? await safeExecResultAsync('pnpm', ['run', gate.script], {
-            cwd: pathResolver.rootDir(),
-            timeoutMs: gate.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS,
-          })
-        : await safeExecResultAsync(gate.executable!, gate.args || [], {
-            cwd: pathResolver.rootDir(),
-            timeoutMs: gate.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS,
-          });
+    const execute = () => executeCheckGate(gate);
     const result = usesPackageManager(gate)
       ? await withPackageManagerGateLock(execute)
       : await execute();

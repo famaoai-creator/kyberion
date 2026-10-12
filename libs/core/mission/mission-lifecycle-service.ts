@@ -1,3 +1,4 @@
+export { resolveMissionTeamSelectionScope } from './mission-team-selection.js';
 /**
  * SO-01: in-process governed facade over the mission lifecycle verbs.
  *
@@ -36,6 +37,20 @@ import type { ArchiveMissionByIdResult, PurgeMissionsResult } from './mission-ma
 import type { MissionExecutionSurface } from './mission-execution-surface.js';
 import type { TeamProviderPreference } from '../organization/team-role-assignment-selection.js';
 import type { HumanDecidedBy } from './mission-types.js';
+import {
+  previewMissionTeamSelection,
+  saveMissionTeamSelection,
+  type PreviewMissionTeamSelectionInput,
+  type SaveMissionTeamSelectionInput,
+} from './mission-team-selection.js';
+export type {
+  MissionTeamRoleSelection,
+  MissionTeamSelectionView,
+  MissionTeamSelectionRoleView,
+  MissionTeamSelectionScope,
+  PreviewMissionTeamSelectionInput,
+  SaveMissionTeamSelectionInput,
+} from './mission-team-selection.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -134,6 +149,11 @@ function missionLifecycleStatus(id?: string): MissionStatusView | MissionSummary
   return buildMissionStatusView(id);
 }
 
+export interface MissionTeamSelectionSaveOptions extends MissionLifecycleVerbOptions {
+  /** Trusted server-resolved viewer principal; never take this from a client body. */
+  actorId?: string;
+}
+
 export interface MissionLifecycleCreateOptions extends MissionLifecycleVerbOptions {
   ephemeral?: boolean;
   intentGoal?: string;
@@ -224,9 +244,37 @@ export function buildMissionLifecycleService(
   overrides?: {
     /** Test seam for the targeted single-mission archive implementation. */
     archiveMissionById?: typeof archiveMissionById;
+    previewTeamSelection?: typeof previewMissionTeamSelection;
+    saveTeamSelection?: typeof saveMissionTeamSelection;
   }
 ) {
   return {
+    previewTeamSelection(id: string, input: PreviewMissionTeamSelectionInput = {}) {
+      return (overrides?.previewTeamSelection || previewMissionTeamSelection)(id, input);
+    },
+    async saveTeamSelection(
+      id: string,
+      input: SaveMissionTeamSelectionInput,
+      options?: MissionTeamSelectionSaveOptions
+    ) {
+      assertMissionControllerContext('saveTeamSelection');
+      const result = (overrides?.saveTeamSelection || saveMissionTeamSelection)(id, input);
+      const actor = options?.actorId || resolveActor();
+      auditChain.record({
+        agentId: actor,
+        action: 'mission.lifecycle_verb',
+        operation: 'saveTeamSelection:' + normalizeMissionId(id),
+        result: 'completed',
+        metadata: {
+          actor,
+          surface: options?.surface || 'cli',
+          verb: 'saveTeamSelection',
+          mission: normalizeMissionId(id),
+        },
+        ...(options?.decidedBy ? { actor: options.decidedBy } : {}),
+      });
+      return result;
+    },
     async create(
       id: string,
       tier: 'personal' | 'confidential' | 'public' = 'confidential',
