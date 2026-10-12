@@ -27,7 +27,11 @@
 
 import * as path from 'node:path';
 import { evaluateEventContinuation } from './dot-event-continuation.js';
-export { reconcileEventRunnerTerminal, isDurableEventKey } from './dot-event-continuation.js';
+export {
+  claimEventContinuation,
+  reconcileEventRunnerTerminal,
+  isDurableEventKey,
+} from './dot-event-continuation.js';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
