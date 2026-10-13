@@ -19,6 +19,7 @@ import {
   GIT_REF_NAME_PATTERN,
 } from '@agent/core/knowledge/pr-knowledge-readiness';
 import { checkTitle } from './check_pr_title.js';
+import { parseCheckJobs } from './run_checks.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 
@@ -40,6 +41,7 @@ interface PublishOptions {
   fill: boolean;
   skipReadiness: boolean;
   missionRoot?: string;
+  checkJobs?: number;
 }
 
 function readHeadSubject(): string {
@@ -92,6 +94,7 @@ export const PUBLISH_PR_CLI: CliGuardSpec = {
     { flag: '--body-file', value: '<path>' },
     { flag: '--base', value: '<branch>' },
     { flag: '--mission-root', value: '<path>' },
+    { flag: '--check-jobs', value: '<1..6>' },
     { flag: '--draft' },
     { flag: '--no-draft' },
     { flag: '--fill' },
@@ -113,6 +116,13 @@ export function parsePublishArgs(argv: string[]): PublishOptions {
     else if (arg === '--fill') options.fill = true;
     else if (arg === '--skip-readiness') options.skipReadiness = true;
     else if (arg === '--mission-root') options.missionRoot = argv[++i];
+    else if (arg === '--check-jobs') {
+      if (options.checkJobs !== undefined)
+        throw new Error('--check-jobs may only be specified once');
+      const value = argv[++i];
+      if (value === undefined) throw new Error('--check-jobs requires a value');
+      options.checkJobs = parseCheckJobs(value, '--check-jobs');
+    }
   }
   return options;
 }
@@ -153,16 +163,19 @@ export function buildGhArgs(
   return args;
 }
 
-export function runPrePrReadiness(print: Print = () => undefined): void {
+export function runPrePrReadiness(print: Print = () => undefined, checkJobs?: number): void {
+  const args = ['check', '--', '--scope', 'pr'];
+  if (checkJobs !== undefined)
+    args.push('--jobs', String(parseCheckJobs(String(checkJobs), '--check-jobs')));
   print(
     [
-      '[pr:publish] Running PR readiness gate (pnpm check -- --scope pr).',
+      `[pr:publish] Running PR readiness gate (pnpm ${args.join(' ')}).`,
       `[pr:publish] Canonical checklist: ${PRE_PR_READINESS_CHECKLIST}`,
       '[pr:publish] Apply exception-table rows for actuator/env/core boundaries before create.',
       '[pr:publish] Pass --skip-readiness only for an explicit emergency bypass.',
     ].join('\n')
   );
-  safeExec('pnpm', ['check', '--', '--scope', 'pr'], {
+  safeExec('pnpm', args, {
     cwd: pathResolver.rootDir(),
     timeoutMs: 1_800_000,
   });
@@ -249,7 +262,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
       `[pr:publish] Skipping readiness gate (--skip-readiness). Still follow ${PRE_PR_READINESS_CHECKLIST}.`
     );
   } else {
-    runPrePrReadiness(print);
+    runPrePrReadiness(print, options.checkJobs);
   }
 
   runKnowledgeReadinessGate(options);

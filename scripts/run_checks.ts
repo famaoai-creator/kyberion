@@ -30,7 +30,16 @@ const gateManifestCatalog = defineCatalog<GateManifest>({
 
 const VALID_SCOPES = new Set<Gate['scope']>(['pr', 'full', 'release']);
 export const DEFAULT_GATE_TIMEOUT_MS = 120_000;
-const MAX_CONCURRENT_GATES = 6;
+export const DEFAULT_CONCURRENT_GATES = 6;
+
+/** A scheduling bound only: never changes gate selection or pass/fail semantics. */
+export function parseCheckJobs(value: string | undefined, flag = '--jobs'): number {
+  if (value === undefined) return DEFAULT_CONCURRENT_GATES;
+  if (!/^[1-6]$/.test(value)) {
+    throw new Error(`${flag} must be an integer from 1 to 6`);
+  }
+  return Number(value);
+}
 
 // `pnpm run` and `pnpm exec` may reconcile the workspace node_modules tree
 // before starting a command. Keep package-manager-backed gates on one lane so
@@ -188,7 +197,7 @@ export async function main(
   print: (value: unknown) => void = () => undefined
 ): Promise<number> {
   const args = argv[0] === '--' ? argv.slice(1) : argv;
-  const supportedFlags = new Set(['--scope', '--only', '--json']);
+  const supportedFlags = new Set(['--scope', '--only', '--json', '--jobs']);
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     if (!flag?.startsWith('--')) continue;
@@ -200,7 +209,7 @@ export async function main(
       return 1;
     }
     if (
-      (flag === '--scope' || flag === '--only') &&
+      (flag === '--scope' || flag === '--only' || flag === '--jobs') &&
       (!args[index + 1] || args[index + 1]!.startsWith('--'))
     ) {
       const json = args.includes('--json');
@@ -225,6 +234,15 @@ export async function main(
   if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
   if (scopeIndex >= 0 && !scopeValue) return error('--scope requires a value');
   if (onlyIndex >= 0 && !only) return error('--only requires a gate id');
+  if (args.filter((arg) => arg === '--jobs').length > 1)
+    return error('--jobs may only be specified once');
+  const jobsIndex = args.indexOf('--jobs');
+  let jobs: number;
+  try {
+    jobs = parseCheckJobs(jobsIndex >= 0 ? args[jobsIndex + 1] : undefined);
+  } catch (cause) {
+    return error(cause instanceof Error ? cause.message : String(cause));
+  }
   const scope = scopeValue;
   let gates: Gate[];
   try {
@@ -269,9 +287,7 @@ export async function main(
       results[index] = await runGate(gates[index]!);
     }
   };
-  await Promise.all(
-    Array.from({ length: Math.min(MAX_CONCURRENT_GATES, gates.length) }, () => worker())
-  );
+  await Promise.all(Array.from({ length: Math.min(jobs, gates.length) }, () => worker()));
   const failed = results.filter((result) => result.status === 'failed');
   if (json) print({ scope, results, failed: failed.length });
   else {

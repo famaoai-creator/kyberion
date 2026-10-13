@@ -94,6 +94,14 @@ gh pr checks <number> --watch
   追跡しやすくする。
 - **レビュー修正は同じ worktree・同じ branch で行う**。マージ後は `git worktree remove` で片付ける。
 
+### メモリ制約のある環境での同時実行数
+
+`pnpm check -- --scope pr --jobs 1` で検査を直列に実行できる。`--jobs` は整数 1〜6、
+省略時は従来どおり 6。同じ全検査を実行し、判定基準・制限時間・結果順序・失敗時の終了コードは変えない。
+PR 作成時も `pnpm kyberion pr create --check-jobs 1 --title "<conventional title>" --body-file <body-file>`
+として、公開ヘルパーが実行する readiness 検査に同じ値を渡す。
+リソース不足による終了も失敗として扱い、単独検査の成功や `--skip-readiness` で代用しない。
+
 ## エージェント必須手順
 
 実装と差分確認のあと、PR 作成より先に次を完了する。

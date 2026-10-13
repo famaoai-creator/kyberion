@@ -80,8 +80,16 @@ outputs in `scripts/check_stale_dist.test.ts`. Platform-specific fixtures must b
 explicit skips elsewhere and included in the native platform's CI command;
 `tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
-**Gate budgets (`pnpm check`).** `scripts/run_checks.ts` runs up to 6 gates at once with a 120s
-default per gate (`DEFAULT_GATE_TIMEOUT_MS`). A gate that times out on busy runs:
+**Gate budgets (`pnpm check`).** `scripts/run_checks.ts` defaults to at most 6 concurrent gates
+with a 120s default per gate (`DEFAULT_GATE_TIMEOUT_MS`). On a resource-constrained host,
+use `pnpm check -- --scope pr --jobs 1` (integer range 1–6). This changes scheduling only:
+all selected gates, per-gate budgets, manifest-order reports and failure exit codes stay the same.
+Pass `--check-jobs 1` to `pnpm kyberion pr create` so its real readiness rerun uses the same bound.
+A failed or resource-terminated gate remains a failure; never substitute an isolated pass or
+`--skip-readiness` for the complete run. Compare default and serial scheduling with
+`scripts/run_checks.concurrency.test.ts`, and verify the complete selected set on the host.
+
+A gate that times out on busy runs:
 
 1. Time it alone and under the concurrent run, and profile it (`node --cpu-prof`). Make it faster
    first, and measure each optimisation separately, comparing CPU time across alternating runs in
