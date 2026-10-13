@@ -839,6 +839,65 @@ describe('media-generation-actuator', () => {
     );
   });
 
+  it('maps music_adf vocal lyrics mode to vocals for the music bridge', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'failed',
+      provider: 'musicgen_mlx',
+      elapsedMs: 1,
+      error: 'No vocal-capable provider is registered',
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+
+    const { handleAction } = await import('./index.js');
+    await handleAction({
+      action: 'generate_music',
+      params: {
+        music_adf: {
+          kind: 'music-generation-adf',
+          version: '1.0.0',
+          intent: 'a lullaby',
+          style: { genre: 'folk', mood: ['soft'] },
+          composition: { duration_sec: 12 },
+          lyrics: { mode: 'vocal', text: 'hush now, sleep soft' },
+          output: { format: 'wav', target_path: 'active/shared/tmp/adf-vocal.wav' },
+          engine: { backend_id: 'media-generation.musicgen_mlx' },
+        },
+      },
+    });
+
+    expect(mocks.generateMusic).toHaveBeenCalledWith(
+      expect.objectContaining({ vocals: true, lyrics: 'hush now, sleep soft' })
+    );
+  });
+
+  it('forwards vocals/lyrics from generate_music params to the music bridge', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'failed',
+      provider: 'musicgen_mlx',
+      elapsedMs: 1,
+      error: 'No vocal-capable provider is registered',
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_music',
+      params: {
+        backend_id: 'media-generation.musicgen_mlx',
+        prompt: 'a lullaby melody',
+        vocals: true,
+        lyrics: 'hush now, sleep soft',
+        target_path: 'active/shared/tmp/vocal-demo.wav',
+      },
+    });
+
+    expect(mocks.generateMusic).toHaveBeenCalledWith(
+      expect.objectContaining({ vocals: true, lyrics: 'hush now, sleep soft' })
+    );
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('No vocal-capable provider');
+  });
+
   it('routes Stable Audio 3 small-music through the music bridge', async () => {
     mocks.generateMusic.mockResolvedValue({
       status: 'succeeded',

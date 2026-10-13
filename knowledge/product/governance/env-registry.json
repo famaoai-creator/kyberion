@@ -670,6 +670,86 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CHATMUSICIAN_HF_REPO",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "m-a-p/ChatMusician",
+      "description": "HuggingFace repo for ChatMusician composition.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_MAX_TOKENS",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "1024",
+      "description": "Max tokens for ChatMusician ABC composition.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_MODEL",
+      "category": "provider",
+      "type": "path",
+      "required": false,
+      "default": "",
+      "description": "Converted MLX ChatMusician model dir; unset falls back to KYBERION_CHATMUSICIAN_HF_REPO for mlx-lm auto-convert.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_PACKAGE",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "mlx-lm",
+      "description": "Package specification supplied to the ChatMusician runner via uvx --from.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_SEED",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Optional deterministic seed for ChatMusician composition.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_SOUNDFONT",
+      "category": "provider",
+      "type": "path",
+      "required": false,
+      "default": "",
+      "description": "SoundFont (.sf2) path for rendering ChatMusician MIDI to WAV via fluidsynth; required.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_TEMPERATURE",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "0.7",
+      "description": "Sampling temperature for ChatMusician ABC composition.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_CHATMUSICIAN_TIMEOUT_MS",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "1800000",
+      "description": "Maximum ChatMusician composition+render time in milliseconds.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
       "name": "KYBERION_CHRONOS_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -2400,6 +2480,96 @@
       "required": false,
       "description": "Optional runtime setting for mos principal; leave unset to use the built-in configuration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_DURATION_SEC",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "10",
+      "description": "Default clip length in seconds for local mlx-audiogen generation; clamped by KYBERION_MUSAUDIOGEN_MAX_DURATION_SEC.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_GUIDANCE",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "3",
+      "description": "Classifier-free guidance scale for local mlx-audiogen generation.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_MAX_DURATION_SEC",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "30",
+      "description": "Upper bound in seconds for local mlx-audiogen clip length.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "facebook/musicgen-small",
+      "description": "Model selector for local mlx-audiogen generation; maps to a registry variant short name passed as --weights-dir (auto-downloaded). Defaults to facebook/musicgen-small.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_PACKAGE",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "mlx-audiogen",
+      "description": "Package specification supplied to the local mlx-audiogen runner via uvx --from.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_SEED",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Optional deterministic seed passed to the local mlx-audiogen runner.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_TIMEOUT_MS",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "1800000",
+      "description": "Maximum local mlx-audiogen generation time in milliseconds.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_TOP_K",
+      "category": "provider",
+      "type": "number",
+      "required": false,
+      "default": "250",
+      "description": "Top-k sampling candidates for local mlx-audiogen generation.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSAUDIOGEN_WEIGHTS_DIR",
+      "category": "provider",
+      "type": "path",
+      "required": false,
+      "default": "",
+      "description": "Explicit mlx-audiogen weights dir or registry variant name selecting mono/stereo/melody variant; overrides KYBERION_MUSAUDIOGEN_MODEL. Unset means musicgen-small auto-download.",
+      "documented": true,
+      "subsystem": "media"
     },
     {
       "name": "KYBERION_MUSICGEN_DURATION_SEC",

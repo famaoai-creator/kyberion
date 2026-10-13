@@ -15,7 +15,10 @@ Generate a governed music artifact from a human-readable `music-generation-adf` 
 - **Default runtime**: local ComfyUI with ACE-Step models available
 - **Lightweight local alternatives** (no ComfyUI):
   - `media-generation.musicgen_mlx` — Apple Silicon MusicGen via `mlx-audiocraft` (`KYBERION_MUSICGEN_*`)
+  - `media-generation.musicgen_audiogen` — Apple Silicon MusicGen mono/stereo/melody variants via `mlx-audiocraft` successor `mlx-audiogen` (`KYBERION_MUSAUDIOGEN_*`; `KYBERION_MUSAUDIOGEN_MODEL` maps to a registry variant auto-downloaded as `--weights-dir`, explicit `KYBERION_MUSAUDIOGEN_WEIGHTS_DIR` wins)
+  - `media-generation.chatmusician_mlx` — ChatMusician ABC composition via `mlx-lm`, rendered with `abcmidi` + `fluid-synth` and a `.sf2` SoundFont (`KYBERION_CHATMUSICIAN_*`; select with `purpose: compose` or a named `backend_id`)
   - `media-generation.stable_audio_3_small_music` — Stable Audio 3 small-music via git/`uv` (`KYBERION_STABLE_AUDIO_*`; gated HF weights need `HF_TOKEN`)
+- **Vocals**: all local CLI backends above are instrumental-only. `params.vocals: true` (with optional `params.lyrics`) is accepted by the actuator but currently always fails closed with an actionable error naming the SongGeneration-MLX future path — both on auto-selection and on explicit `backend_id` naming — because no vocal-capable provider is registered yet.
 - **Preflight**: `pnpm service:preflight -- --service media-generation` for ComfyUI; local CLI backends use tool-runtime trial/install
 - **Schema**: [`music-generation-adf.schema.json`](../../../product/schemas/music-generation-adf.schema.json)
 
@@ -39,6 +42,18 @@ For ComfyUI, the actuator compiles this contract into an ACE-Step workflow. For 
 uv tool install mlx-audiocraft
 # or trial: uvx --from mlx-audiocraft musicgen-mlx "calm piano, no vocals" -d 10 -o /tmp/out.wav
 
+# MusicGen variants: mono/stereo/melody (darwin arm64)
+uv tool install mlx-audiogen
+# or trial: uvx --from mlx-audiogen mlx-audiogen --model musicgen \
+#   --prompt "wide stereo pad, no vocals" --seconds 10 --output /tmp/out.wav
+# variant follows converted weights: mlx-audiogen-convert --model facebook/musicgen-stereo-medium \
+#   --output ./converted/stereo-medium  (+ KYBERION_MUSAUDIOGEN_WEIGHTS_DIR)
+
+# ChatMusician ABC composition (darwin arm64; needs abcmidi + fluid-synth + a .sf2)
+uv tool install mlx-lm && brew install abcmidi fluid-synth
+# KYBERION_CHATMUSICIAN_SOUNDFONT=/path/to/FluidR3_GM.sf2
+# or trial: uvx --from mlx-lm mlx_lm.generate --model m-a-p/ChatMusician --prompt "..." --max-tokens 1024
+
 # Stable Audio 3 small-music (CPU/MPS; accept HF license + set HF_TOKEN)
 uv tool install git+https://github.com/Stability-AI/stable-audio-3.git
 # or trial: uvx --from git+https://github.com/Stability-AI/stable-audio-3.git \
@@ -48,6 +63,8 @@ uv tool install git+https://github.com/Stability-AI/stable-audio-3.git
 Direct actuator examples:
 
 - [`direct-musicgen-mlx.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-musicgen-mlx.json)
+- [`direct-musicgen-audiogen.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-musicgen-audiogen.json)
+- [`direct-chatmusician-mlx.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-chatmusician-mlx.json)
 - [`direct-stable-audio-3-small-music.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-stable-audio-3-small-music.json)
 
 ## 4. Execution

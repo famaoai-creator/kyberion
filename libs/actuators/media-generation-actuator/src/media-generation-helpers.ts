@@ -468,7 +468,7 @@ function describeGeneratedBackend(
   };
 }
 
-/** Registry id of a music bridge provider (musicgen_mlx / stable_audio_3), if any. */
+/** Registry id of a music bridge provider (musicgen_mlx / musicgen_audiogen / chatmusician_mlx / stable_audio_3), if any. */
 function musicBackendIdForProvider(providerId: string): string | undefined {
   const record = getMediaBackendRecord(providerId, 'music');
   return record.provider === providerId ? record.backend_id : undefined;
@@ -535,6 +535,8 @@ function resolveMusicBridgeRequest(params: Record<string, unknown>): {
   prompt: string;
   durationSec?: number;
   targetPath?: string;
+  vocals?: boolean;
+  lyrics?: string;
 } {
   if (isPlainObject(params?.music_adf)) {
     const brief = buildMusicPromptFromAdf(
@@ -547,6 +549,7 @@ function resolveMusicBridgeRequest(params: Record<string, unknown>): {
         (typeof params.target_path === 'string' && params.target_path) ||
         (typeof params.output_path === 'string' && params.output_path) ||
         brief.targetPath,
+      ...resolveMusicVocalRequest(params),
     };
   }
   const prompt = typeof params?.prompt === 'string' ? params.prompt.trim() : '';
@@ -561,6 +564,36 @@ function resolveMusicBridgeRequest(params: Record<string, unknown>): {
       (typeof params.target_path === 'string' && params.target_path) ||
       (typeof params.output_path === 'string' && params.output_path) ||
       undefined,
+    ...resolveMusicVocalRequest(params),
+  };
+}
+
+/**
+ * Vocal split for generate_music: params.vocals (or music_adf lyrics mode)
+ * routes to vocal-capable providers; without a vocal provider the bridge
+ * fails with an actionable error naming the SongGeneration future path.
+ */
+function resolveMusicVocalRequest(params: Record<string, unknown>): {
+  vocals?: boolean;
+  lyrics?: string;
+} {
+  const adf = isPlainObject(params?.music_adf) ? params.music_adf : undefined;
+  const adfLyrics = adf && isPlainObject(adf.lyrics) ? adf.lyrics : undefined;
+  const adfMode = typeof adfLyrics?.mode === 'string' ? adfLyrics.mode.trim().toLowerCase() : '';
+  const adfText = typeof adfLyrics?.text === 'string' ? adfLyrics.text.trim() : '';
+  const vocals =
+    typeof params?.vocals === 'boolean'
+      ? params.vocals
+      : adfMode === 'vocal'
+        ? true
+        : adfMode === 'instrumental'
+          ? false
+          : undefined;
+  const lyrics =
+    (typeof params?.lyrics === 'string' && params.lyrics.trim()) || adfText || undefined;
+  return {
+    ...(vocals !== undefined ? { vocals } : {}),
+    ...(lyrics ? { lyrics } : {}),
   };
 }
 

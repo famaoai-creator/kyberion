@@ -57,18 +57,20 @@ These measurements back the `accelerators` and `min_memory_gb` fields on
 
 ### Music (`generate_music`)
 
-| backend                               | model                                       | resident         | time/30 s song                   | notes                        |
-| ------------------------------------- | ------------------------------------------- | ---------------- | -------------------------------- | ---------------------------- |
-| `comfyui.music` (ACE-Step turbo fp16) | 4.8 GB DiT + ~5 GB qwen TE + VAE            | ~11 GB           | ~2-3 min                         | proven (song.mp3)            |
-| `acestep-cpp`                         | turbo Q4_K_M + LM 0.6B Q8 + Qwen3-Emb + VAE | **3.1 GB total** | **~37 s** (LM 12 s + synth 25 s) | Metal build verified         |
-| `musicgen_mlx`                        | musicgen-mlx                                | ~4 GB            | ~30 s/30 s                       | instrumental only, no vocals |
-| acestep GGUF via ComfyUI-GGUF         | acestep-dit arch                            | —                | fails                            | unsupported arch             |
+| backend                               | model                                       | resident            | time/30 s song                   | notes                                                                                  |
+| ------------------------------------- | ------------------------------------------- | ------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| `comfyui.music` (ACE-Step turbo fp16) | 4.8 GB DiT + ~5 GB qwen TE + VAE            | ~11 GB              | ~2-3 min                         | proven (song.mp3)                                                                      |
+| `acestep-cpp`                         | turbo Q4_K_M + LM 0.6B Q8 + Qwen3-Emb + VAE | **3.1 GB total**    | **~37 s** (LM 12 s + synth 25 s) | Metal build verified                                                                   |
+| `musicgen_mlx`                        | musicgen-mlx                                | ~4 GB               | ~30 s/30 s                       | instrumental only, no vocals                                                           |
+| `musicgen_audiogen`                   | mlx-audiogen musicgen-small (pre-converted) | ~2.1 GB weights     | ~86 s/12 s (DL別)                | instrumental only, no vocals. M4実機E2E済 (12s mono 32kHz WAV)                         |
+| `chatmusician_mlx`                    | ChatMusician 7B (mlx-lm, LLM段未E2E)        | ~5–6 GB (4-bit想定) | render chain実証済み             | ABC→MIDI→WAV実機検証済 (abc2midi -o + fluidsynth flags順序)。作曲段は7B DLのため未実施 |
+| acestep GGUF via ComfyUI-GGUF         | acestep-dit arch                            | —                   | fails                            | unsupported arch                                                                       |
 
 ## Backend priority (this hardware profile)
 
 - **image**: `z-image-turbo` via mflux (peak 4.4 GB) or `local_flux` (mflux FLUX) → `comfyui` (sdxl-turbo) → cloud fallbacks
 - **video**: `hyperframes_cli` for composition/slideshow; `comfyui.ltx-i2v(-fp8)` for i2v; `comfyui.wan-i2v-gguf` as quality upgrade path
-- **music**: `acestep-cpp` → `comfyui.music` → `musicgen_mlx` (instrumental)
+- **music**: `acestep-cpp` → `comfyui.music` → `musicgen_mlx` (instrumental) → `musicgen_audiogen` (variants) → `chatmusician_mlx` (prefer `purpose: compose` or named backend; last-resort fallback otherwise)
 
 ## Operational notes
 

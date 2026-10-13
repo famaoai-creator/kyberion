@@ -8,23 +8,40 @@
       "fallback_purpose": "quality",
       "traits": {
         "quality": "Musical fidelity and prompt adherence of the generated clip.",
-        "speed": "Wall-clock from request to a saved clip, including model start-up."
+        "speed": "Wall-clock from request to a saved clip, including model start-up.",
+        "composition": "Full-length structured composition ability (motifs, forms, development)."
       },
       "providers": {
         "musicgen_mlx": {
-          "traits": { "quality": 0.5, "speed": 0.5 },
-          "trait_basis": { "quality": "declared", "speed": "declared" },
+          "traits": { "quality": 0.5, "speed": 0.5, "composition": 0.2 },
+          "trait_basis": { "quality": "declared", "speed": "declared", "composition": "declared" },
           "evidence": [
             "libs/core/media/music-generation-bridge.ts (LocalMusicGenMlxGenerationProvider: local_only, self_hosted, Apple Silicon only, wav, max duration from KYBERION_MUSICGEN_MAX_DURATION_SEC, default 30s)",
             "Neutral declared values: no comparison with stable_audio_3 exists yet. Differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
           ]
         },
+        "musicgen_audiogen": {
+          "traits": { "quality": 0.5, "speed": 0.5, "composition": 0.2 },
+          "trait_basis": { "quality": "declared", "speed": "declared", "composition": "declared" },
+          "evidence": [
+            "libs/core/media/music-generation-bridge.ts (MlAudioGenGenerationProvider: local_only, self_hosted, Apple Silicon only, wav, mono/stereo/melody variants via weights dir, max duration from KYBERION_MUSAUDIOGEN_MAX_DURATION_SEC, default 30s)",
+            "Neutral declared values: differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
+          ]
+        },
         "stable_audio_3": {
-          "traits": { "quality": 0.5, "speed": 0.5 },
-          "trait_basis": { "quality": "declared", "speed": "declared" },
+          "traits": { "quality": 0.5, "speed": 0.5, "composition": 0.2 },
+          "trait_basis": { "quality": "declared", "speed": "declared", "composition": "declared" },
           "evidence": [
             "libs/core/media/music-generation-bridge.ts (LocalStableAudioGenerationProvider: local_only, self_hosted, any platform, wav, max duration from KYBERION_STABLE_AUDIO_MAX_DURATION_SEC, default 120s)",
             "Neutral declared values: no comparison with musicgen_mlx exists yet. Differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
+          ]
+        },
+        "chatmusician_mlx": {
+          "traits": { "quality": 0.5, "speed": 0.3, "composition": 0.9 },
+          "trait_basis": { "quality": "declared", "speed": "declared", "composition": "declared" },
+          "evidence": [
+            "libs/core/media/music-generation-bridge.ts (ChatMusicianGenerationProvider: local_only, self_hosted, Apple Silicon only, ABC composition via mlx-lm rendered through abc2midi+fluidsynth to wav)",
+            "Neutral declared values: differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
           ]
         }
       },
@@ -36,6 +53,10 @@
         "speed": {
           "description": "Drafts and previews where time to a saved clip matters most.",
           "weights": { "speed": 0.8, "quality": 0.2 }
+        },
+        "compose": {
+          "description": "Full-length structured composition (motifs, forms) matters most.",
+          "weights": { "composition": 1 }
         }
       }
     }

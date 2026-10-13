@@ -1,0 +1,10 @@
+{
+  "action": "generate_music",
+  "params": {
+    "await_completion": true,
+    "backend_id": "media-generation.musicgen_audiogen",
+    "duration_sec": 12,
+    "prompt": "wide stereo ambient pad, soft piano, 75 BPM, no vocals",
+    "target_path": "active/shared/tmp/musicgen-audiogen-demo.wav"
+  }
+}
