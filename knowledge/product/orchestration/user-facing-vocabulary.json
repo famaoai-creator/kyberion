@@ -23479,6 +23479,36 @@
         "ja": "最近の依頼",
         "qps-ploc": "⟦Řėƈėñŧ řėɋůėşŧş ŀőřė⟧"
       },
+      "ask_recent_loading": {
+        "en": "Loading recent requests…",
+        "ja": "最近の依頼を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ řėƈėñŧ řėɋůėşŧş… ŀőřėɱ ï⟧"
+      },
+      "ask_recent_failed": {
+        "en": "Recent requests could not be loaded. Try loading the list again.",
+        "ja": "最近の依頼を読み込めませんでした。一覧をもう一度読み込んでください。",
+        "qps-ploc": "⟦Řėƈėñŧ řėɋůėşŧş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ŧřẏ ŀőȧḓïñɠ ŧħė ŀïşŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ask_recent_retry": {
+        "en": "Reload recent requests",
+        "ja": "最近の依頼を再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ řėƈėñŧ řėɋůėşŧş ŀőřėɱ ï⟧"
+      },
+      "ask_startup_loading": {
+        "en": "Preparing the conversation…",
+        "ja": "会話を準備しています…",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ ŧħė ƈőñṽėřşȧŧïőñ… ŀőřėɱ ïṗ⟧"
+      },
+      "ask_startup_failed": {
+        "en": "This page could not be prepared. Try loading it again.",
+        "ja": "この画面を準備できませんでした。もう一度読み込んでください。",
+        "qps-ploc": "⟦Ŧħïş ṗȧɠė ƈőůŀḓ ñőŧ ƀė ṗřėṗȧřėḓ. Ŧřẏ ŀőȧḓïñɠ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ask_startup_retry": {
+        "en": "Try loading again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ ŀőřėɱ⟧"
+      },
       "ask_handsfree_on": {
         "en": "Hands-free: on",
         "ja": "ハンズフリー：オン",
