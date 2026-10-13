@@ -4,6 +4,8 @@ const f = vi.hoisted(() => ({
   accept: vi.fn(),
   mark: vi.fn(),
   entryTenant: 'alpha-team',
+  taskStatus: 'executing',
+  awaitingInput: false,
   artifactTenant: 'alpha-team',
   artifactTask: undefined as string | undefined,
   findTask: vi.fn(),
@@ -30,7 +32,8 @@ vi.mock('@agent/core/task/task-session', () => ({
     {
       session_id: 'task-1',
       goal: { summary: 'Work' },
-      status: 'running',
+      status: f.taskStatus,
+      control: { awaiting_user_input: f.awaitingInput },
       correlation_id: 'real-request-1',
       project_context: { tenant_slug: 'alpha-team' },
     },
@@ -110,6 +113,8 @@ function call(
 beforeEach(() => {
   vi.stubEnv('KYBERION_TENANT', 'alpha-team');
   f.entryTenant = 'alpha-team';
+  f.taskStatus = 'executing';
+  f.awaitingInput = false;
   f.artifactTenant = 'alpha-team';
   f.artifactTask = undefined;
   f.findTask.mockReset().mockReturnValue(null);
@@ -263,4 +268,46 @@ describe('explicit progress target HTTP boundaries', () => {
       expect(f.mark).not.toHaveBeenCalled();
     }
   );
+});
+
+it('propagates explicit task input wait to list and fresh direct detail', () => {
+  f.awaitingInput = true;
+  expect(call().body.active).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'task-1', task_state: 'awaiting_input' }),
+    ])
+  );
+  f.findTask.mockImplementation((id) =>
+    id === 'task-1'
+      ? {
+          session_id: 'task-1',
+          goal: { summary: 'Task' },
+          status: 'paused',
+          control: { awaiting_user_input: false },
+          project_context: { tenant_slug: 'alpha-team' },
+        }
+      : null
+  );
+  const res = call('GET', {}, 'alpha-team', {}, true, 'task-1');
+  expect(res.body.item).toEqual(
+    expect.objectContaining({ kind: 'task_session', status: 'paused', task_state: 'paused' })
+  );
+});
+it('keeps linked-artifact details out of task-state presentation', () => {
+  f.artifactTask = 'source-task';
+  f.findTask.mockImplementation((id) =>
+    id === 'source-task'
+      ? {
+          session_id: 'source-task',
+          goal: { summary: 'Source task' },
+          status: 'executing',
+          control: { awaiting_user_input: true },
+          project_context: { tenant_slug: 'alpha-team' },
+        }
+      : null
+  );
+  const res = call('GET', {}, 'alpha-team', {}, true);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.item).toEqual(expect.objectContaining({ kind: 'artifact' }));
+  expect(res.body.item).not.toHaveProperty('task_state');
 });
