@@ -29,6 +29,7 @@ export {
   runAppleScript,
   getScreenSize,
   getWindowList,
+  isUIAutomationAvailable,
   activateWindowByTitle,
   setWindowState,
   quitApplication,

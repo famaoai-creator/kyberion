@@ -24,6 +24,7 @@ export interface OsAutomationPlatformAdapter {
   runAppleScript(script: string): string;
   getScreenSize(): { width: number; height: number };
   getWindowList(appName: string): string[];
+  isUIAutomationAvailable?(): boolean;
   activateWindowByTitle(
     appName: string,
     windowTitle: string,
@@ -108,6 +109,7 @@ const unsupportedAdapter: OsAutomationPlatformAdapter = {
   runAppleScript: () => '',
   getScreenSize: () => ({ width: 0, height: 0 }),
   getWindowList: () => [],
+  isUIAutomationAvailable: () => false,
   activateWindowByTitle: () => false,
   setWindowState: () => false,
   quitApplication: () => undefined,

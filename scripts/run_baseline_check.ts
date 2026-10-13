@@ -69,7 +69,7 @@ import {
   listDesktopObservationSources,
 } from '@agent/core/virtual/desktop-recording';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
-import { getWindowList } from '@agent/core/virtual/os-automation';
+import { isUIAutomationAvailable } from '@agent/core/virtual/os-automation';
 import { listKnownAppCapabilities } from '@agent/core/virtual/os-app-adapters';
 import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
@@ -841,10 +841,9 @@ export async function runBaselineCheck() {
     // current focused control or missing capture backend is not confused with
     // adapter availability. These readiness values describe source access,
     // not whether each source currently has data to return.
-    const windows = getWindowList('');
     const screen = await createScreenCaptureBridge().probe();
     const applications = listKnownAppCapabilities();
-    const uiAutomationAvailable = windows.length > 0;
+    const uiAutomationAvailable = isUIAutomationAvailable();
     const chromeTabAdapterAvailable = applications.some(
       (application) =>
         application.application === 'Google Chrome' &&
