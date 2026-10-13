@@ -24,6 +24,7 @@ import {
   knowledgeMetadataScore,
   loadKnowledgeRankingWeights,
   type KnowledgeRankingMetadata,
+  type KnowledgeRankingWeights,
 } from '../ranking-signals.js';
 import { loadKnowledgeUsageAggregateAtPath } from './knowledge-usage-aggregate.js';
 import {
@@ -228,7 +229,12 @@ function usageYieldFor(source: string, scope?: ScopeContext): number | undefined
   return cached.values.get(source) ?? cached.values.get(parent);
 }
 
-function metadataScore(hint: KnowledgeHint, options: KnowledgeQueryOptions): number {
+function metadataScore(
+  hint: KnowledgeHint,
+  options: KnowledgeQueryOptions,
+  weights?: KnowledgeRankingWeights,
+  nowMs?: number
+): number {
   const usageYield =
     hint.usage_yield ?? usageYieldFor(hint.parentSource || hint.source, options.scopeContext);
   return knowledgeMetadataScore(
@@ -238,8 +244,8 @@ function metadataScore(hint: KnowledgeHint, options: KnowledgeQueryOptions): num
       ...(usageYield === undefined ? {} : { usage_yield: usageYield }),
     },
     options.scope,
-    loadKnowledgeRankingWeights(options.scopeContext),
-    Date.now(),
+    weights ?? loadKnowledgeRankingWeights(options.scopeContext),
+    nowMs ?? Date.now(),
     options.scopeContext
   );
 }
@@ -1336,8 +1342,22 @@ export function queryKnowledge(
     }
   }
 
+  // Resolve metadata only for lexical ties, once per hint in this query.
+  // Sorting can revisit the same hint many times; loading scoped weights in
+  // the comparator repeats governed I/O and can observe inconsistent settings.
+  const metadataScores = new Map<KnowledgeHint, number>();
+  let metadataWeights: KnowledgeRankingWeights | undefined;
+  const nowMs = Date.now();
+  const cachedMetadataScore = (hint: KnowledgeHint): number => {
+    const cached = metadataScores.get(hint);
+    if (cached !== undefined) return cached;
+    metadataWeights ??= loadKnowledgeRankingWeights(options.scopeContext);
+    const score = metadataScore(hint, options, metadataWeights, nowMs);
+    metadataScores.set(hint, score);
+    return score;
+  };
   scored.sort(
-    (a, b) => b.score - a.score || metadataScore(b.hint, options) - metadataScore(a.hint, options)
+    (a, b) => b.score - a.score || cachedMetadataScore(b.hint) - cachedMetadataScore(a.hint)
   );
   // DA-07: opt-in score exposure. Copies (never mutations) so shared index
   // hint objects and non-opted callers keep the historical shape.
