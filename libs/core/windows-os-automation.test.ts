@@ -4,11 +4,18 @@ import { clearMarks, resolveMarkTarget, saveMarks } from './mark-target-resolver
 import { fuseSetOfMarks } from './set-of-marks.js';
 import { POWERSHELL_STDIN_BOOTSTRAP, powerShellStdinArgs } from './windows-powershell.js';
 
-const mocks = vi.hoisted(() => ({ safeExec: vi.fn(() => ''), safeExecResult: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  safeExec: vi.fn(() => ''),
+  safeExecResult: vi.fn(),
+}));
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
-  return { ...actual, safeExec: mocks.safeExec, safeExecResult: mocks.safeExecResult };
+  return {
+    ...actual,
+    safeExec: mocks.safeExec,
+    safeExecResult: mocks.safeExecResult,
+  };
 });
 
 const {
@@ -32,6 +39,7 @@ const {
   rightClickAt,
   runWindowsPointerActions,
   scrollAt,
+  toggleDictation,
   windowsPointerOptions,
 } = await import('./windows-os-automation.js');
 
@@ -98,6 +106,19 @@ describe('Windows pointer script', () => {
     expect(WINDOWS_POINTER_SCRIPT).toMatch(
       /if \(-not \$N::SetCursorPos\(\[int\]\$a\.x, \[int\]\$a\.y\)\) \{ \$moveFailures \+= 1; break \}/
     );
+  });
+});
+
+describe('Windows dictation shortcut', () => {
+  it('sends Win+H with key-down and key-up events', () => {
+    toggleDictation();
+    const [command, args] = mocks.safeExec.mock.calls[0];
+    expect(command).toBe('powershell.exe');
+    expect(args.join(' ')).toContain('keybd_event(0x5B,0,0');
+    expect(args.join(' ')).toContain('keybd_event(0x48,0,0');
+    expect(args.join(' ')).toContain('keybd_event(0x48,0,2');
+    expect(args.join(' ')).toContain('keybd_event(0x5B,0,2');
+    expect(args.join(' ')).not.toContain('^{ESC}');
   });
 });
 
@@ -176,7 +197,11 @@ describe('Windows pointer actions', () => {
 
 describe('Windows application and window operations', () => {
   it('launches an application through a fixed script with separate request data', () => {
-    mocks.safeExecResult.mockReturnValue({ stdout: 'true', stderr: '', status: 0 });
+    mocks.safeExecResult.mockReturnValue({
+      stdout: 'true',
+      stderr: '',
+      status: 0,
+    });
     expect(launchApplication('notepad.exe')).toBe(true);
     const call = calls().at(-1)!;
     expect(call.options.input).toBe(WINDOWS_APP_LAUNCH_SCRIPT);
@@ -193,7 +218,11 @@ describe('Windows application and window operations', () => {
   });
 
   it('focuses and maximizes only a unique UI Automation window match', () => {
-    mocks.safeExecResult.mockReturnValue({ stdout: 'true', stderr: '', status: 0 });
+    mocks.safeExecResult.mockReturnValue({
+      stdout: 'true',
+      stderr: '',
+      status: 0,
+    });
     expect(activateWindowByTitle('chrome', 'Docs', 'strict')).toBe(true);
     const focusCall = calls().at(-1)!;
     expect(focusCall.options.input).toBe(WINDOWS_WINDOW_ACTION_SCRIPT);
@@ -282,17 +311,31 @@ describe('Set-of-Marks to Windows click mapping (150 % display scaling)', () => 
   const session = `windows-click-mapping-${process.pid}`;
   const HASH = '0f0f0f0f0f0f0f0f';
   // UIA rect of an OK button, physical pixels (the detector runs per-monitor DPI aware).
-  const OK = { role: 'AXButton', title: 'OK', x: 1500, y: 900, width: 150, height: 45 };
+  const OK = {
+    role: 'AXButton',
+    title: 'OK',
+    x: 1500,
+    y: 900,
+    width: 150,
+    height: 45,
+  };
 
   afterEach(() => clearMarks(session));
 
   async function clickMark(image: { width: number; height: number }, scale: number) {
     const marks = fuseSetOfMarks(
-      candidatesFromAccessibility([OK], { origin: { x: 0, y: 0 }, scale, image }),
+      candidatesFromAccessibility([OK], {
+        origin: { x: 0, y: 0 },
+        scale,
+        image,
+      }),
       { imageSize: image }
     );
     saveMarks({ session_id: session, marks, image, image_dhash: HASH, scale });
-    const point = await resolveMarkTarget('mark:1', { session_id: session, current_dhash: HASH });
+    const point = await resolveMarkTarget('mark:1', {
+      session_id: session,
+      current_dhash: HASH,
+    });
     clickAt(point.x, point.y);
     return actionsOf(calls()[calls().length - 1])[0];
   }
