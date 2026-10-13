@@ -23160,9 +23160,9 @@
         "qps-ploc": "⟦Ḓůė {value} ŀőř⟧"
       },
       "progress_filter_active": {
-        "en": "In progress {count}",
-        "ja": "進行中 {count}",
-        "qps-ploc": "⟦Ïñ ṗřőɠřėşş {count} ŀőřėɱ ⟧"
+        "en": "Open work {count}",
+        "ja": "未完了の仕事 {count}",
+        "qps-ploc": "⟦Őṗėñ ẇőřķ {count} ŀőřėɱ⟧"
       },
       "progress_filter_delivered": {
         "en": "Delivered {count}",
@@ -23180,9 +23180,9 @@
         "qps-ploc": "⟦Ẇħȧŧ ẏőů ȧşķėḓ ŀőřė⟧"
       },
       "progress_detail_now": {
-        "en": "What is happening now",
-        "ja": "いまやっていること",
-        "qps-ploc": "⟦Ẇħȧŧ ïş ħȧṗṗėñïñɠ ñőẇ ŀőřėɱ ⟧"
+        "en": "Recorded detail",
+        "ja": "記録されている内容",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ḓėŧȧïŀ ŀőřė⟧"
       },
       "progress_detail_next": {
         "en": "What comes next",
@@ -23220,9 +23220,9 @@
         "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŧő ƀė řėƈėïṽėḓ ŀőřėɱ ïṗşů⟧"
       },
       "progress_empty_active": {
-        "en": "Nothing is in progress.",
-        "ja": "進行中の作業はありません。",
-        "qps-ploc": "⟦Ñőŧħïñɠ ïş ïñ ṗřőɠřėşş. ŀőřėɱ ï⟧"
+        "en": "No open work is recorded.",
+        "ja": "未完了の仕事の記録はありません。",
+        "qps-ploc": "⟦Ñő őṗėñ ẇőřķ ïş řėƈőřḓėḓ. ŀőřėɱ ïṗ⟧"
       },
       "progress_empty_delivered": {
         "en": "Nothing is waiting to be received.",
@@ -26333,6 +26333,111 @@
         "en": "Stay on this page",
         "ja": "この画面に留まる",
         "qps-ploc": "⟦Şŧȧẏ őñ ŧħïş ṗȧɠė ŀőřėɱ⟧"
+      },
+      "progress_task_state_collecting_requirements": {
+        "en": "Requirements being gathered (recorded)",
+        "ja": "要件整理中の記録",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ƀėïñɠ ɠȧŧħėřėḓ (řėƈőřḓėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "progress_task_state_awaiting_input": {
+        "en": "Waiting for input",
+        "ja": "入力待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ïñṗůŧ ŀőřėɱ⟧"
+      },
+      "progress_task_state_awaiting_confirmation": {
+        "en": "Waiting for confirmation",
+        "ja": "確認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ƈőñƒïřɱȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "progress_task_state_planning": {
+        "en": "Planning (recorded)",
+        "ja": "計画中の記録",
+        "qps-ploc": "⟦Ṗŀȧññïñɠ (řėƈőřḓėḓ) ŀőřėɱ ⟧"
+      },
+      "progress_task_state_executing": {
+        "en": "Executing (recorded)",
+        "ja": "実行中の記録",
+        "qps-ploc": "⟦Ėẋėƈůŧïñɠ (řėƈőřḓėḓ) ŀőřėɱ ⟧"
+      },
+      "progress_task_state_verifying": {
+        "en": "Checking result (recorded)",
+        "ja": "結果を確認中の記録",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ řėşůŀŧ (řėƈőřḓėḓ) ŀőřėɱ ïṗ⟧"
+      },
+      "progress_task_state_paused": {
+        "en": "Paused",
+        "ja": "一時停止",
+        "qps-ploc": "⟦Ṗȧůşėḓ ŀőř⟧"
+      },
+      "progress_task_state_blocked": {
+        "en": "Blocked",
+        "ja": "作業が停止中",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "progress_task_state_completed": {
+        "en": "Completion recorded",
+        "ja": "完了の記録あり",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧïőñ řėƈőřḓėḓ ŀőřėɱ ⟧"
+      },
+      "progress_task_state_failed": {
+        "en": "Failed",
+        "ja": "失敗の記録あり",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "progress_task_state_released": {
+        "en": "Stopped or released",
+        "ja": "停止・終了した仕事",
+        "qps-ploc": "⟦Şŧőṗṗėḓ őř řėŀėȧşėḓ ŀőřėɱ ⟧"
+      },
+      "progress_task_state_unknown": {
+        "en": "Status unconfirmed",
+        "ja": "状況未確認",
+        "qps-ploc": "⟦Şŧȧŧůş ůñƈőñƒïřɱėḓ ŀőřėɱ⟧"
+      },
+      "progress_task_recorded_state": {
+        "en": "Recorded task status",
+        "ja": "記録された仕事の状態",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ŧȧşķ şŧȧŧůş ŀőřėɱ ⟧"
+      },
+      "progress_task_latest_update": {
+        "en": "Latest recorded update",
+        "ja": "最後に記録された更新",
+        "qps-ploc": "⟦Ŀȧŧėşŧ řėƈőřḓėḓ ůṗḓȧŧė ŀőřėɱ ï⟧"
+      },
+      "progress_task_next_input": {
+        "en": "Input is awaited. Review the recorded request to see what is missing.",
+        "ja": "入力待ちの記録です。元の依頼を確認して不足している内容を確かめてください。",
+        "qps-ploc": "⟦Ïñṗůŧ ïş ȧẇȧïŧėḓ. Řėṽïėẇ ŧħė řėƈőřḓėḓ řėɋůėşŧ ŧő şėė ẇħȧŧ ïş ɱïşşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "progress_task_next_confirmation": {
+        "en": "Confirmation is awaited. Review the recorded request and its scope before continuing.",
+        "ja": "確認待ちの記録です。元の依頼と対象範囲を確認してから次の操作を決めてください。",
+        "qps-ploc": "⟦Ƈőñƒïřɱȧŧïőñ ïş ȧẇȧïŧėḓ. Řėṽïėẇ ŧħė řėƈőřḓėḓ řėɋůėşŧ ȧñḓ ïŧş şƈőṗė ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "progress_task_next_refresh": {
+        "en": "This is the latest recorded state, not a live execution check. Refresh to check for newer records.",
+        "ja": "これは記録された状態です。現在も実行中かは確認していません。更新して新しい記録を確認できます。",
+        "qps-ploc": "⟦Ŧħïş ïş ŧħė ŀȧŧėşŧ řėƈőřḓėḓ şŧȧŧė, ñőŧ ȧ ŀïṽė ėẋėƈůŧïőñ ƈħėƈķ. Řėƒřėşħ ŧő ƈħėƈķ ƒőř ñėẇėř řėƈőřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "progress_task_next_inspect": {
+        "en": "Review the recorded context before deciding what to do.",
+        "ja": "記録されている状況を確認してから次の操作を決めてください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė řėƈőřḓėḓ ƈőñŧėẋŧ ƀėƒőřė ḓėƈïḓïñɠ ẇħȧŧ ŧő ḓő. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "progress_task_next_result": {
+        "en": "Check the recorded result before treating this work as complete.",
+        "ja": "完了とみなす前に記録された成果を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė řėƈőřḓėḓ řėşůŀŧ ƀėƒőřė ŧřėȧŧïñɠ ŧħïş ẇőřķ ȧş ƈőɱṗŀėŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "progress_open_work": {
+        "en": "Open work",
+        "ja": "未完了の仕事",
+        "qps-ploc": "⟦Őṗėñ ẇőřķ ŀőř⟧"
+      },
+      "progress_recorded_subtitle": {
+        "en": "Recorded work and results",
+        "ja": "仕事と成果の記録",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ẇőřķ ȧñḓ řėşůŀŧş ŀőřėɱ ïṗ⟧"
       }
     },
     "operator": {

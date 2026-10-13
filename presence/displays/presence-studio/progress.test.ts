@@ -370,3 +370,86 @@ describe('resolveComputerSurfaceMirrorHref', () => {
     expect(resolveComputerSurfaceMirrorHref()).toBe(MIRROR_HREF);
   });
 });
+
+describe('recorded task-state provenance', () => {
+  it.each([
+    ['awaiting_instruction', 'awaiting_input'],
+    ['collecting_requirements', 'collecting_requirements'],
+    ['planning', 'planning'],
+    ['awaiting_confirmation', 'awaiting_confirmation'],
+    ['executing', 'executing'],
+    ['verifying', 'verifying'],
+    ['paused', 'paused'],
+    ['blocked', 'blocked'],
+    ['new_runtime_state', 'unknown'],
+  ])('projects %s without claiming every nonterminal task is running', (status, expected) => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      taskSessions: [{ id: 'task', title: 'Task', status }],
+      artifacts: [],
+      mirrorHref: MIRROR_HREF,
+    });
+    expect(payload.active[0].task_state).toBe(expected);
+    expect(payload.active[0].latest_update).toBeUndefined();
+  });
+  it('honors explicit input wait but never overrides a terminal record', () => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      taskSessions: [
+        { id: 'waiting', title: 'Waiting', status: 'executing', awaiting_user_input: true },
+        ...['completed', 'failed', 'released'].map((status) => ({
+          id: status,
+          title: status,
+          status,
+          awaiting_user_input: true,
+        })),
+      ],
+      artifacts: [],
+      mirrorHref: MIRROR_HREF,
+    });
+    expect(payload.active[0].task_state).toBe('awaiting_input');
+    expect(payload.done.map((item) => item.task_state)).toEqual([
+      'completed',
+      'failed',
+      'released',
+    ]);
+  });
+  it('keeps a historical update separate from the task state and from artifact detail', () => {
+    const history = [{ when: hoursAgo(8), text: 'Drafting earlier.' }];
+    const payload = buildProgressPayload({
+      now: NOW,
+      taskSessions: [{ id: 'blocked', title: 'Blocked', status: 'blocked', history }],
+      artifacts: [],
+      mirrorHref: MIRROR_HREF,
+    });
+    expect(payload.active[0].task_state).toBe('blocked');
+    expect(payload.active[0].latest_update).toEqual(history[0]);
+    const detail = buildProgressDetail(
+      { kind: 'task_session', goal_summary: 'Task', status: 'paused', awaiting_user_input: false },
+      history
+    );
+    expect(detail.task_state).toBe('paused');
+    expect(detail.latest_update).toEqual(history[0]);
+    expect(
+      buildProgressDetail(
+        { kind: 'artifact', goal_summary: 'Artifact', status: 'completed' },
+        history
+      ).task_state
+    ).toBeUndefined();
+  });
+});
+
+it.each([false, undefined])(
+  'does not infer input wait from requirements collection with flag %s',
+  (awaiting_user_input) => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      taskSessions: [
+        { id: 'task', title: 'Task', status: 'collecting_requirements', awaiting_user_input },
+      ],
+      artifacts: [],
+      mirrorHref: MIRROR_HREF,
+    });
+    expect(payload.active[0].task_state).toBe('collecting_requirements');
+  }
+);

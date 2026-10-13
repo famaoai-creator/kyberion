@@ -40,10 +40,44 @@ export interface ProgressHistoryEntryInput {
   text: string;
 }
 
+/** A recorded task state is not proof that a worker is currently running. */
+export type ProgressTaskState =
+  | 'collecting_requirements'
+  | 'awaiting_input'
+  | 'awaiting_confirmation'
+  | 'planning'
+  | 'executing'
+  | 'verifying'
+  | 'paused'
+  | 'blocked'
+  | 'completed'
+  | 'failed'
+  | 'released'
+  | 'unknown';
+
+function recordedTaskState(status: string, awaitingInput?: boolean): ProgressTaskState {
+  // Terminal records win over a stale control flag, as on Work Home.
+  if (status === 'completed' || status === 'failed' || status === 'released') return status;
+  if (awaitingInput === true || status === 'awaiting_instruction') return 'awaiting_input';
+  if (
+    status === 'collecting_requirements' ||
+    status === 'awaiting_confirmation' ||
+    status === 'planning' ||
+    status === 'executing' ||
+    status === 'verifying' ||
+    status === 'paused' ||
+    status === 'blocked'
+  )
+    return status;
+  return 'unknown';
+}
+
 export interface ProgressTaskSessionInput {
   id: string;
   title: string;
   status: string;
+  /** Explicit runtime wait signal; never inferred from history text. */
+  awaiting_user_input?: boolean;
   /** The real request correlation carried by the task session, when present. */
   correlation_id?: string;
   /** ISO timestamp of the session's last update. */
@@ -73,6 +107,8 @@ export interface ProgressArtifactInput {
 }
 
 export interface ProgressActiveItem {
+  task_state: ProgressTaskState;
+  latest_update?: ProgressHistoryEntryInput;
   id: string;
   title: string;
   now: string;
@@ -99,6 +135,7 @@ export interface ProgressDoneItem {
   id: string;
   title: string;
   kind: 'task_session' | 'artifact';
+  task_state?: ProgressTaskState;
   /** Preserve the concrete terminal/verdict outcome; history is not success. */
   status: string;
   correlation_id?: string;
@@ -131,19 +168,21 @@ function toTimeMs(when: string | undefined, fallbackMs: number): number {
   return Number.isFinite(parsed) ? parsed : fallbackMs;
 }
 
-/** The one-line "いまやっていること" — the latest non-empty history entry's
- * text, falling back to the raw status when there is no history yet. */
-function latestNonEmptyText(history: ProgressHistoryEntryInput[] | undefined): string | undefined {
+/** Latest recorded update only; history is not evidence of current execution. */
+function latestUpdate(
+  history: ProgressHistoryEntryInput[] | undefined
+): ProgressHistoryEntryInput | undefined {
   if (!history?.length) return undefined;
   for (let index = history.length - 1; index >= 0; index -= 1) {
     const text = history[index]?.text?.trim();
-    if (text) return text;
+    if (text) return { ...history[index], text };
   }
   return undefined;
 }
 
+/** Legacy wire field retained for other readers; the UI uses explicit provenance. */
 function deriveNowText(status: string, history: ProgressHistoryEntryInput[] | undefined): string {
-  return latestNonEmptyText(history) || status;
+  return latestUpdate(history)?.text || status;
 }
 
 export function buildProgressPayload(input: BuildProgressPayloadInput): ProgressPayload {
@@ -161,6 +200,8 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
       id: session.id,
       title: session.title,
       now: deriveNowText(session.status, session.history),
+      task_state: recordedTaskState(session.status, session.awaiting_user_input),
+      ...(latestUpdate(session.history) ? { latest_update: latestUpdate(session.history) } : {}),
       status: session.status,
       ...(session.correlation_id ? { correlation_id: session.correlation_id } : {}),
       percent: estimateTaskSessionPercent(session.status),
@@ -201,6 +242,7 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
       id: session.id,
       title: session.title,
       kind: 'task_session' as const,
+      task_state: recordedTaskState(session.status, session.awaiting_user_input),
       status: session.status,
       ...(session.correlation_id ? { correlation_id: session.correlation_id } : {}),
       when: session.when,
@@ -227,6 +269,9 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
 }
 
 export interface ProgressDetailSessionInput {
+  /** Explicit source provenance; artifacts must not inherit task semantics. */
+  kind?: 'task_session' | 'artifact';
+  awaiting_user_input?: boolean;
   goal_summary: string;
   success_condition?: string;
   status: string;
@@ -243,6 +288,9 @@ export interface ProgressDetailLogEntry {
 }
 
 export interface ProgressDetail {
+  kind?: 'task_session' | 'artifact';
+  task_state?: ProgressTaskState;
+  latest_update?: ProgressHistoryEntryInput;
   status: string;
   requested: string;
   now: string;
@@ -269,6 +317,13 @@ export function buildProgressDetail(
   const log = events.slice(-8).map((event) => ({ when: event.when, text: event.text }));
 
   return {
+    ...(session.kind ? { kind: session.kind } : {}),
+    ...(session.kind === 'task_session'
+      ? {
+          task_state: recordedTaskState(session.status, session.awaiting_user_input),
+          ...(latestUpdate(events) ? { latest_update: latestUpdate(events) } : {}),
+        }
+      : {}),
     status: session.status,
     requested,
     now,
