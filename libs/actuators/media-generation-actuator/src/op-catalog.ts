@@ -198,6 +198,8 @@ const MEDIA_GENERATION_CONTRACTS: Record<string, InputSchema> = {
       targetPath: { type: 'string' },
       tenant_slug: { type: 'string' },
       timeout_ms: { type: 'number' },
+      vocals: { type: 'boolean' },
+      lyrics: { type: 'string' },
       workflow: {},
       workflow_path: { type: 'string' },
     },

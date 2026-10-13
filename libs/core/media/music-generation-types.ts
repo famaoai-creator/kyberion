@@ -15,6 +15,14 @@ export interface MusicGenerationRequest {
    * and the provider writes its own format, as before.
    */
   format?: string;
+  /**
+   * Vocal (sung/lyrics) request. Providers that cannot synthesize vocals
+   * declare `supportsVocals !== true` and are excluded from selection when
+   * this is true. Lyrics text goes in `lyrics`.
+   */
+  vocals?: boolean;
+  /** Lyrics for vocal requests (used by vocal-capable providers). */
+  lyrics?: string;
   outputDir?: string;
   targetPath?: string;
 }
@@ -34,6 +42,12 @@ export interface MusicGenerationProvider {
   readonly executionLocality?: 'local' | 'remote' | 'hybrid';
   /** Formats the provider writes (e.g. ['wav']); undefined = not declared. */
   readonly outputFormats?: readonly string[];
+  /**
+   * Whether the provider can synthesize vocals (sung voice). Providers that
+   * only render instrumental audio leave this unset/false and are excluded
+   * from selection when the request asks for vocals.
+   */
+  readonly supportsVocals?: boolean;
   /** Longest clip the provider generates; longer requests are clamped when it is named explicitly. */
   maxDurationSec?(): number;
   isAvailable(): Promise<boolean>;
