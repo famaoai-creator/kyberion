@@ -13,10 +13,12 @@
  */
 import { createLogger } from '../logger.js';
 import {
+  CO_SESSION_PROVIDERS,
   CoSessionError,
   type CoSessionHandoff,
   type CoSessionProvider,
-  getCoSessionStatus,
+  coSessionHandoffTargets,
+  getCoSessionLease,
   getCurrentCoSessionId,
   heartbeatCoSession,
   joinCoSession,
@@ -24,7 +26,6 @@ import {
   listCoSessionHandoffs,
   listCoSessionPresence,
   normalizeCoSessionPath,
-  pathHashForLease,
 } from '../co-session.js';
 
 const logger = createLogger('co-session-hook');
@@ -47,17 +48,7 @@ export interface CoSessionHookIdentity {
 }
 
 function toProvider(value: string): CoSessionProvider | undefined {
-  return [
-    'claude',
-    'cursor',
-    'codex',
-    'agy',
-    'grok',
-    'gemini',
-    'copilot',
-    'opencode',
-    'other',
-  ].includes(value)
+  return (CO_SESSION_PROVIDERS as readonly string[]).includes(value)
     ? (value as CoSessionProvider)
     : undefined;
 }
@@ -147,14 +138,8 @@ export function coSessionHookDrain(input: {
         participant_id: identity.participant_id,
       });
     }
-    const handoffs = listCoSessionHandoffs(session_id, { pendingOnly: true }).filter(
-      (h) =>
-        // Match ack semantics: a participant-targeted handoff addressed to a
-        // different provider can never be acked — don't deliver it.
-        (h.to_participant_id === identity.participant_id &&
-          (!h.to_provider || h.to_provider === identity.provider)) ||
-        (!h.to_participant_id && h.to_provider === identity.provider) ||
-        (!h.to_provider && !h.to_participant_id)
+    const handoffs = listCoSessionHandoffs(session_id, { pendingOnly: true }).filter((h) =>
+      coSessionHandoffTargets(h, identity.provider, identity.participant_id)
     );
     return { session_id, participant_id: identity.participant_id, handoffs };
   } catch (error) {
@@ -211,17 +196,13 @@ export function coSessionHookLeaseGate(input: {
     input.participant_id?.trim() || resolveHookParticipantId(input.provider, input.session_key);
   try {
     const repoPath = normalizeCoSessionPath(input.file_path);
-    const path_hash = pathHashForLease(repoPath);
     const session_id = input.session_id ?? getCurrentCoSessionId();
     if (!session_id) return { decision: 'allow' };
-    const status = getCoSessionStatus(session_id);
+    const { session_status, lease } = getCoSessionLease(session_id, input.file_path);
     // Leases on a closed session never block (close force-releases first;
     // this is only a defense against a stranded record).
-    if (status.session.status !== 'open') return { decision: 'allow' };
-    const lease = status.leases.find(
-      (row) => row.path_hash === path_hash && row.status === 'active'
-    );
-    if (!lease) return { decision: 'allow' };
+    if (session_status !== 'open') return { decision: 'allow' };
+    if (!lease || lease.status !== 'active') return { decision: 'allow' };
     if (
       lease.holder_provider === input.provider &&
       lease.holder_participant_id === participant_id
