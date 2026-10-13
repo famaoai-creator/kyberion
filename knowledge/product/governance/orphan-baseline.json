@@ -85,10 +85,6 @@
       "reason": "OW-05 example pipeline: the runnable caller of browser:action_trail / export_failure_bundle (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
     {
-      "id": "pipelines/ce-adoption-validation.json",
-      "reason": "Validation bundle for the claw-empire adoption slice (CE-01..12), run by hand per pipelines/README.md when that slice changes; not a CI gate."
-    },
-    {
       "id": "pipelines/ceo-strategic-report.json",
       "reason": "Scenario pipeline documented in docs/SCENARIOS.md and the ADF pipeline strategy/validation reports; run by hand, nothing schedules or invokes it."
     },
@@ -175,10 +171,6 @@
     {
       "id": "pipelines/project-management-validation.json",
       "reason": "Validation bundle for project control / mission reassignment, run by hand per pipelines/README.md; not a CI gate."
-    },
-    {
-      "id": "pipelines/qm02-trigger-validation.json",
-      "reason": "Validation bundle for QM-02 trigger unification, run by hand per pipelines/README.md; not a CI gate."
     },
     {
       "id": "pipelines/setup-oauth.json",
