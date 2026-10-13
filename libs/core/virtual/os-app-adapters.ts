@@ -261,28 +261,33 @@ function listWindowsChromeTabs(): BrowserTabInfo[] {
   const script = `$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-$p = Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if (-not $p) { [Console]::Out.WriteLine('[]'); exit 0 }
-$root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
-$all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
 $tabs = @()
-$activeUrl = ''
-$activeIndex = 0
-for ($i = 0; $i -lt $all.Count; $i++) {
-  $e = $all.Item($i)
-  $id = [string]$e.Current.AutomationId
-  if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit) {
-    try {
-      $value = [string]$e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
-      if ($value -match '^[^\s]+\.[^\s]+$') { $activeUrl = $value }
-    } catch { }
-  }
-  if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::TabItem) {
-    $tabs += [pscustomobject]@{ index = $tabs.Count + 1; title = [string]$e.Current.Name; url = '' }
-    try { if ($e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) { $activeIndex = $tabs.Count } } catch { }
-  }
+foreach ($p in (Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) {
+  try {
+    $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+    $all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    $candidateTabs = @()
+    $activeUrl = ''
+    $activeIndex = 0
+    for ($i = 0; $i -lt $all.Count; $i++) {
+      $e = $all.Item($i)
+      if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit) {
+        try {
+          $value = [string]$e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+          if ($value -match '^[^\s]+\.[^\s]+$') { $activeUrl = $value }
+        } catch { }
+      }
+      if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::TabItem) {
+        $candidateTabs += [pscustomobject]@{ index = $candidateTabs.Count + 1; title = [string]$e.Current.Name; url = '' }
+        try { if ($e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) { $activeIndex = $candidateTabs.Count } } catch { }
+      }
+    }
+    if ($candidateTabs.Count -gt $tabs.Count) {
+      $tabs = @($candidateTabs)
+      if ($activeIndex -gt 0 -and $activeUrl) { $tabs[$activeIndex - 1].url = $(if ($activeUrl -match '^https?://') { $activeUrl } else { 'https://' + $activeUrl }) }
+    }
+  } catch { }
 }
-if ($activeIndex -gt 0 -and $activeUrl) { $tabs[$activeIndex - 1].url = $(if ($activeUrl -match '^https?://') { $activeUrl } else { 'https://' + $activeUrl }) }
 ConvertTo-Json -InputObject @($tabs) -Compress | ForEach-Object { [Console]::Out.WriteLine($_) }`;
   const result = safeExecResult(
     'powershell.exe',

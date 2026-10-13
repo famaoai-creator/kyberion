@@ -13,7 +13,29 @@ export const WINDOWS_APP_LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
 $raw = [string]$env:${WINDOWS_APP_LAUNCH_ENV}
 if (-not $raw) { throw 'Application launch options are missing' }
 $options = ConvertFrom-Json -InputObject $raw
-Start-Process -FilePath ([string]$options.application) | Out-Null
+$requested = ([string]$options.application).Trim()
+if (-not $requested) { throw 'Application name is required' }
+$resolved = $null
+if (Test-Path -LiteralPath $requested -PathType Leaf) {
+  $resolved = (Resolve-Path -LiteralPath $requested).Path
+} else {
+  $normalized = ($requested -replace '[.]exe$', '' -replace '[^a-zA-Z0-9]', '').ToLowerInvariant()
+  $aliases = @{ googlechrome = 'chrome.exe'; microsoftedge = 'msedge.exe'; fileexplorer = 'explorer.exe'; mozillafirefox = 'firefox.exe'; microsoftword = 'winword.exe'; microsoftexcel = 'excel.exe'; microsoftpowerpoint = 'powerpnt.exe' }
+  $executable = if ($aliases.ContainsKey($normalized)) { $aliases[$normalized] } elseif ($requested -match '[.]exe$') { $requested } else { "$requested.exe" }
+  $command = Get-Command -Name $executable -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($command) { $resolved = $command.Source }
+  if (-not $resolved) {
+    foreach ($registryPath in @("HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$executable", "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$executable", "HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$executable")) {
+      $appPath = Get-Item -LiteralPath $registryPath -ErrorAction SilentlyContinue
+      if ($appPath) {
+        $candidate = [string]$appPath.GetValue('')
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { $resolved = $candidate; break }
+      }
+    }
+  }
+  if (-not $resolved) { throw "Application could not be resolved to an executable: $requested" }
+}
+Start-Process -FilePath $resolved | Out-Null
 [Console]::Out.WriteLine('true')`;
 
 export const WINDOWS_WINDOW_ACTION_SCRIPT = `$ErrorActionPreference = 'Stop'

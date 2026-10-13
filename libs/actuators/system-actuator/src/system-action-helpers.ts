@@ -27,6 +27,7 @@ import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';
+import { executeComputerAssist } from './computer-assist.js';
 
 /** Separation of duties: an unusable approval is treated as missing (refusal audited). */
 const isUsableComputerApproval = (request: ApprovalRequestRecord): boolean =>
@@ -84,7 +85,10 @@ export interface ComputerInteractionAction {
       | 'type'
       | 'key'
       | 'voice_input_toggle'
-      | 'wait';
+      | 'wait'
+      | 'llm_assist';
+    goal?: string;
+    observation?: string;
     coordinate?: { x: number; y: number };
     /** `mark:<n>` from vision mark_elements; used only when coordinate is absent. */
     target_mark?: string;
@@ -848,6 +852,23 @@ async function performReconcile(input: SystemAction) {
 export async function handleSystemAction(
   input: SystemAction | ComputerInteractionAction
 ): Promise<any> {
+  if (
+    (input as ComputerInteractionAction).kind === 'computer_interaction' &&
+    (input as ComputerInteractionAction).action.type === 'llm_assist'
+  ) {
+    const assist = input as ComputerInteractionAction;
+    return executeComputerAssist(
+      {
+        version: '0.1',
+        kind: 'computer_assist',
+        session_id: assist.session_id,
+        target: assist.target,
+        goal: assist.action.goal || '',
+        observation: assist.action.observation || '',
+      },
+      (action) => handleSystemAction(action)
+    );
+  }
   if ((input as any).kind === 'computer_interaction') {
     const interaction = input as ComputerInteractionAction;
     ensureDefaultOpPreflight();
