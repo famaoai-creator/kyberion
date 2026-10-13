@@ -186,6 +186,7 @@
     verdictStorageVerified: false,
     pendingVerdicts: Object.create(null),
     uncertainVerdicts: Object.create(null),
+    correctionDrafts: Object.create(null),
   };
 
   // WI-11: the "業務の自動化候補" panel's own vocab + read model, fetched and
@@ -403,28 +404,79 @@
       reviseButton.addEventListener('click', function (event) {
         event.stopPropagation();
         if (row.querySelector('.progress-revise-form')) return;
-        var form = document.createElement('div');
-        form.className = 'progress-revise-form';
-        var textarea = document.createElement('textarea');
-        textarea.className = 'kb-input kb-textarea progress-revise-note';
-        var submit = document.createElement('button');
-        submit.type = 'button';
-        submit.className = 'kb-btn kb-btn--primary progress-row-action';
-        submit.textContent = vt(vocab, 'action_revise');
-        textarea.setAttribute('aria-label', vt(vocab, 'action_revise'));
-        submit.addEventListener('click', function (innerEvent) {
-          innerEvent.stopPropagation();
-          var note = textarea.value.trim() || undefined;
-          submitVerdict(item, 'rejected', note, row);
-        });
-        form.appendChild(textarea);
-        form.appendChild(submit);
-        row.appendChild(form);
+        state.correctionDrafts[item.entry_id] = { text: '' };
+        renderCorrectionForm(row, item, vocab);
+        var note = row.querySelector('.progress-revise-note');
+        if (note && note.focus) note.focus();
       });
     }
 
+    renderCorrectionForm(row, item, vocab);
     li.appendChild(row);
     return li;
+  }
+
+  function renderCorrectionForm(row, item, vocab) {
+    var draft = state.correctionDrafts[item.entry_id];
+    if (!draft || !state.verdictStorageKey || row.querySelector('.progress-revise-form')) return;
+    var locked = Boolean(
+      state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]
+    );
+    var form = document.createElement('div');
+    form.className = 'progress-revise-form';
+    var textarea = document.createElement('textarea');
+    textarea.className = 'kb-input kb-textarea progress-revise-note';
+    textarea.setAttribute('aria-label', vt(vocab, 'action_revise'));
+    textarea.value = draft.text;
+    textarea.maxLength = 4000;
+    textarea.disabled = locked;
+    textarea.addEventListener('input', function () {
+      if (!locked && state.correctionDrafts[item.entry_id] === draft) draft.text = textarea.value;
+    });
+    var note = document.createElement('p');
+    note.textContent = vt(vocab, 'progress_correction_draft_note');
+    var submit = document.createElement('button');
+    submit.type = 'button';
+    submit.className = 'kb-btn kb-btn--primary progress-row-action';
+    submit.textContent = vt(vocab, 'progress_correction_save');
+    submit.disabled = locked || !state.verdictStorageVerified;
+    submit.addEventListener('click', function (event) {
+      event.stopPropagation();
+      submitVerdict(item, 'rejected', textarea.value.trim() || undefined, row);
+    });
+    var discard = document.createElement('button');
+    discard.type = 'button';
+    discard.className = 'kb-btn kb-btn--secondary progress-row-action';
+    discard.setAttribute('data-action', 'discard-correction');
+    discard.textContent = vt(vocab, 'progress_correction_discard');
+    discard.disabled = locked;
+    discard.addEventListener('click', function (event) {
+      event.stopPropagation();
+      delete state.correctionDrafts[item.entry_id];
+      renderList();
+    });
+    form.appendChild(textarea);
+    form.appendChild(note);
+    form.appendChild(submit);
+    form.appendChild(discard);
+    row.appendChild(form);
+  }
+
+  function correctionRecorded(item) {
+    return (
+      item.kind === 'artifact' &&
+      item.entry_id &&
+      ['rejected', 'changes_requested'].indexOf(item.status) >= 0
+    );
+  }
+
+  function correctionHref(item) {
+    return scopedUrl(
+      '/ask?correction=' +
+        encodeURIComponent(item.entry_id) +
+        '&artifact=' +
+        encodeURIComponent(item.id)
+    );
   }
 
   function renderDoneRow(item) {
@@ -452,13 +504,21 @@
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       actionsHtml +
-      (needsRecovery(item)
-        ? '<a class="kb-btn kb-btn--secondary progress-row-action" href="' +
-          escapeHtml(askHref(item.title)) +
+      (correctionRecorded(item)
+        ? '<p role="status">' +
+          escapeHtml(vt(state.vocab, 'progress_correction_recorded')) +
+          '</p><a class="kb-btn kb-btn--secondary progress-row-action" href="' +
+          escapeHtml(correctionHref(item)) +
           '">' +
-          escapeHtml(vt(state.vocab, 'progress_recovery')) +
+          escapeHtml(vt(state.vocab, 'progress_correction_prepare')) +
           '</a>'
-        : '');
+        : needsRecovery(item)
+          ? '<a class="kb-btn kb-btn--secondary progress-row-action" href="' +
+            escapeHtml(askHref(item.title)) +
+            '">' +
+            escapeHtml(vt(state.vocab, 'progress_recovery')) +
+            '</a>'
+          : '');
     row.addEventListener('keydown', function (event) {
       if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('[href]')) {
         event.preventDefault();
@@ -648,10 +708,21 @@
     blocks +=
       '<div class="progress-detail-actions">' +
       '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
-      escapeHtml(askHref(state.selectedTitle)) +
+      escapeHtml(
+        found && correctionRecorded(found.item)
+          ? correctionHref(found.item)
+          : askHref(state.selectedTitle)
+      ) +
       '">' +
       escapeHtml(
-        vt(vocab, found && needsRecovery(found.item) ? 'progress_recovery' : 'progress_action_note')
+        vt(
+          vocab,
+          found && correctionRecorded(found.item)
+            ? 'progress_correction_prepare'
+            : found && needsRecovery(found.item)
+              ? 'progress_recovery'
+              : 'progress_action_note'
+        )
       ) +
       '</a>' +
       '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
@@ -689,6 +760,7 @@
         ? 'front-desk.progress.uncertain.' + encodeURIComponent(viewerScopeId)
         : null;
     if (state.verdictStorageKey !== storageKey) {
+      state.correctionDrafts = Object.create(null);
       state.verdictStorageKey = storageKey;
       state.verdictStorageVerified = false;
       state.pendingVerdicts = Object.create(null);
@@ -762,11 +834,21 @@
     row.querySelectorAll('button').forEach(function (button) {
       button.disabled = true;
     });
+    var submittedDraft = state.correctionDrafts[item.entry_id];
+    var textarea = row.querySelector('.progress-revise-note');
+    if (textarea) textarea.disabled = true;
     postVerdict(item.entry_id, status, note)
       .then(function (result) {
         if (writeScopeKey !== state.verdictStorageKey) return;
         delete state.pendingVerdicts[item.entry_id];
         if (!result.ok || !result.body || !result.body.ok) throw new Error('verdict-unconfirmed');
+        if (
+          status === 'rejected' &&
+          submittedDraft &&
+          state.correctionDrafts[item.entry_id] === submittedDraft &&
+          submittedDraft.text.trim() === (note || '')
+        )
+          delete state.correctionDrafts[item.entry_id];
         // The write was confirmed, but actions remain locked until a fresh read.
         state.uncertainVerdicts[item.entry_id] = ++state.verdictGeneration;
         persistVerdictLocks();

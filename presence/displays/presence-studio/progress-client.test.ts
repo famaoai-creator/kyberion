@@ -44,6 +44,7 @@ class Element {
   }
   setAttribute(key: string, value: string) {
     this.attributes[key] = value;
+    if (key === 'data-action') this.action = value;
   }
   getAttribute(key: string) {
     return this.attributes[key] || null;
@@ -63,7 +64,9 @@ class Element {
           ? child.attributes['data-notice-text'] === 'true'
           : selector === '.progress-revise-form'
             ? child.className === 'progress-revise-form'
-            : selector.match(/^\[data-action="(.*)"\]$/)?.[1] === child.action;
+            : selector === '.progress-revise-note'
+              ? child.className === 'kb-input kb-textarea progress-revise-note'
+              : selector.match(/^\[data-action="(.*)"\]$/)?.[1] === child.action;
     return this.children.flatMap((child) => [
       ...(matches(child) ? [child] : []),
       ...child.querySelectorAll(selector),
@@ -95,6 +98,8 @@ async function flush() {
   for (let i = 0; i < 40; i += 1) await Promise.resolve();
 }
 const texts: Record<string, string> = {
+  'front_desk:progress_correction_recorded': 'Correction feedback recorded',
+  'front_desk:progress_correction_prepare': 'Prepare correction request',
   'front_desk:progress_history': 'History',
   'front_desk:progress_filter_active': 'In progress {count}',
   'front_desk:progress_filter_delivered': 'Delivered {count}',
@@ -1606,5 +1611,172 @@ describe('Progress bounded read recovery', () => {
     await flush();
     expect(h.noticeText.textContent).toContain('uncertain');
     expect(button.disabled).toBe(true);
+  });
+});
+
+describe('Progress correction continuity', () => {
+  function correctionPayload() {
+    const payload = emptyPayload();
+    payload.delivered = ['alpha', 'beta'].map((id) => ({
+      id,
+      title: id,
+      status: 'read',
+      can_verdict: true,
+      entry_id: 'inbox-' + id,
+    }));
+    return payload;
+  }
+  const rowAt = (h: ReturnType<typeof harness>, index = 0) =>
+    h.elements['progress-list'].children[index].children[0];
+  function editCorrection(h: ReturnType<typeof harness>, text: string) {
+    const row = rowAt(h);
+    row.querySelector('[data-action="revise"]')!.fire();
+    const note = row.querySelector('.progress-revise-note')!;
+    note.value = text;
+    note.fire('input');
+  }
+  it('preserves correction draft and form across same-result selection, filters and read refresh without persistent content', async () => {
+    const payload = correctionPayload();
+    const storage = new Map<string, string>();
+    const h = harness({ hash: '#alpha', storage, fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Keep this correction');
+    rowAt(h).fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Keep this correction');
+    h.elements['filter-active'].fire();
+    h.elements['filter-delivered'].fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Keep this correction');
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Keep this correction');
+    expect([...storage.values()].join('')).not.toContain('Keep this correction');
+    expect(h.fetch.mock.calls.some(([, input]) => input?.method === 'POST')).toBe(false);
+  });
+  it('retains correction draft through read failure and recovery but clears it for a newly verified principal', async () => {
+    const payload = correctionPayload();
+    let fail = false;
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress' && fail ? Promise.reject(new Error('offline')) : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Private correction');
+    fail = true;
+    h.refresh.fire();
+    await flush();
+    fail = false;
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Private correction');
+    payload.viewer_scope_id = 'principal-beta';
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')).toBeNull();
+    rowAt(h).querySelector('[data-action="revise"]')!.fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('');
+  });
+  it('explicitly discards only the selected entry correction', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Discard me');
+    rowAt(h).querySelector('[data-action="discard-correction"]')!.fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')).toBeNull();
+    rowAt(h).querySelector('[data-action="revise"]')!.fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('');
+  });
+  it('labels saved feedback honestly and prepares a scoped ID-only Ask handoff', async () => {
+    const payload = emptyPayload();
+    payload.done = [
+      {
+        id: 'artifact-1',
+        title: 'Result',
+        kind: 'artifact',
+        status: 'rejected',
+        entry_id: 'inbox-1',
+      },
+    ];
+    const h = harness({ hash: '#artifact-1', fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    const html = rowAt(h).innerHTML;
+    expect(html).toContain('Correction feedback recorded');
+    expect(h.elements['progress-detail'].innerHTML).toContain('correction=inbox-1');
+    expect(html).toContain('correction=inbox-1');
+    expect(html).toContain('artifact=artifact-1');
+    expect(html).toContain('tenant=alpha');
+    expect(html).not.toContain('send=1');
+  });
+  it('preserves separate entry drafts through Back/Forward and explicit discard', async () => {
+    const h = harness({
+      search: '?tenant=alpha',
+      hash: '#alpha',
+      fetcher: dataFetcher(correctionPayload()),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Alpha note');
+    const beta = rowAt(h, 1);
+    beta.querySelector('[data-action="revise"]')!.fire();
+    const betaNote = beta.querySelector('.progress-revise-note')!;
+    betaNote.value = 'Beta note';
+    betaNote.fire('input');
+    h.window.location.href = '/progress?tenant=alpha&filter=done';
+    h.listeners.popstate();
+    h.window.location.href = '/progress?tenant=alpha#alpha';
+    h.listeners.popstate();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Alpha note');
+    expect(rowAt(h, 1).querySelector('.progress-revise-note')?.value).toBe('Beta note');
+    rowAt(h).querySelector('[data-action="discard-correction"]')!.fire();
+    expect(rowAt(h, 1).querySelector('.progress-revise-note')?.value).toBe('Beta note');
+  });
+  it('retains an uncertain correction and prevents duplicate decisions after navigation', async () => {
+    const payload = correctionPayload();
+    const write = deferred<MockResponse>();
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? write.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Preserve on lost response');
+    rowAt(h)
+      .querySelector('.progress-revise-form')!
+      .children.find((el) => el.tag === 'button')!
+      .fire();
+    write.reject(new Error('lost response'));
+    await flush();
+    rowAt(h).fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe(
+      'Preserve on lost response'
+    );
+    expect(rowAt(h).querySelector('.progress-revise-note')?.disabled).toBe(true);
+    rowAt(h).querySelector('[data-action="revise"]')!.fire();
+    expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+  });
+  it('clears submitted correction only after successful save and records exact note once', async () => {
+    const payload = correctionPayload();
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? Promise.resolve(response({ ok: true })) : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Saved note');
+    rowAt(h)
+      .querySelector('.progress-revise-form')!
+      .children.find((el) => el.tag === 'button')!
+      .fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')).toBeNull();
+    const posts = h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(posts[0][1]!.body!)).toMatchObject({
+      status: 'rejected',
+      note: 'Saved note',
+    });
   });
 });
