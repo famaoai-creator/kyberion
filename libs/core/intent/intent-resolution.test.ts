@@ -337,6 +337,29 @@ describe('intent-resolution', () => {
     ).toBe(true);
   });
 
+  it('does not emit overlap for a single shared token', () => {
+    // '議事録をまとめて' shares only まとめ with summarize-conversation's
+    // "会話をまとめて" — below the two-token floor, so no overlap reason.
+    const packet = resolveIntentResolutionPacket('議事録をまとめて');
+    const candidate = packet.candidates.find(
+      (entry) => entry.intent_id === 'summarize-conversation'
+    );
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')) ?? false,
+      'single shared token must not produce an overlap reason'
+    ).toBe(false);
+  });
+
+  it('fires overlap on a paraphrase sharing two content words', () => {
+    // lifestyle-booking example: "日用品をまとめて買って".
+    const packet = resolveIntentResolutionPacket('日用品をまとめて注文して');
+    const candidate = packet.candidates.find((entry) => entry.intent_id === 'lifestyle-booking');
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+      'two shared content words (日用品, まとめ) should produce overlap'
+    ).toBe(true);
+  });
+
   it('routes common unhandled-intent examples to usable surface paths', () => {
     const inventory = resolveIntentResolutionPacket('ミッション一覧を教えて');
     expect(inventory.selected_intent_id).toBe('inspect-mission-inventory');
@@ -546,6 +569,15 @@ describe('normalizeForTriggerMatch', () => {
     expect(normalizeForTriggerMatch('会議を調整してください')).toBe('会議を調整');
     expect(normalizeForTriggerMatch('レポートを作ってほしい')).toBe('れぽーとを作っ');
     expect(normalizeForTriggerMatch('確認します')).toBe('確認し');
+    expect(normalizeForTriggerMatch('確認しました')).toBe('確認し');
+    expect(normalizeForTriggerMatch('確認しています')).toBe('確認し');
+  });
+
+  it('does not cascade copula/masu endings through loanwords', () => {
+    // です strips once; the remaining クリスマス must not then lose ます.
+    expect(normalizeForTriggerMatch('クリスマスです')).toBe('くりすます');
+    expect(normalizeForTriggerMatch('コスモス')).toBe('こすもす');
+    expect(normalizeForTriggerMatch('ナマス')).toBe('なます');
   });
 
   it('drops honorific prefixes only before kanji', () => {

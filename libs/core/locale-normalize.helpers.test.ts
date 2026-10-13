@@ -57,4 +57,16 @@ describe('locale helpers (IT-03)', () => {
     expect(segmentWords('   ')).toEqual([]);
     expect(segmentWords(null)).toEqual([]);
   });
+
+  it('passes well-formed non-catalog locale tags through to the segmenter', () => {
+    // 'zh' is not a catalog locale — it must reach Intl.Segmenter untouched
+    // rather than silently degrading to en-US (which returns CJK as one run).
+    const tokens = segmentWords('これはテストです', 'zh');
+    expect(tokens.length).toBeGreaterThan(1);
+  });
+
+  it('degrades safely on malformed locale tags', () => {
+    expect(() => segmentWords('hello world', 'not a locale!')).not.toThrow();
+    expect(segmentWords('hello world', 'not a locale!')).toEqual(['hello', 'world']);
+  });
 });

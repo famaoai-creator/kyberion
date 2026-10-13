@@ -73,9 +73,17 @@ export const DEFAULT_THRESHOLDS: DriftThresholds = {
 };
 
 // Intl.Segmenter-backed: splits spaceless scripts (ja) into real words instead
-// of one whole-sentence token.
+// of one whole-sentence token; TOKEN_SPLIT still applies afterwards because
+// ICU keeps "config.json"-style dotted/under-scored tokens joined.
+const TOKEN_SPLIT = /[\s,.;:!?()\[\]{}"'`\-—–/\\|]+/u;
+
 function tokenize(text: string): Set<string> {
-  return new Set(segmentWords(text.toLowerCase()));
+  return new Set(
+    segmentWords(text.toLowerCase())
+      .flatMap((token) => token.split(TOKEN_SPLIT))
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0)
+  );
 }
 
 /** Jaccard similarity on tokenized strings. 1.0 when both strings are empty. */
