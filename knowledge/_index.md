@@ -392,6 +392,7 @@
 - [Human Intervention Census — measuring where a human is still needed](./product/orchestration/human-intervention-census.md) (public | Ecosystem Architect)
 - [Hypothesis Tree Protocol](./product/orchestration/hypothesis-tree-protocol.md) (public | Ecosystem Architect)
 - [Intuition Capture Protocol](./product/orchestration/intuition-capture-protocol.md) (public | Ecosystem Architect)
+- [Japanese Voiceover + HyperFrames Video Production Playbook](./product/orchestration/japanese-voiceover-production-playbook.md) (public | ecosystem_architect)
 - [Kyberion Development Workflow](./product/orchestration/kyberion-development-workflow.md) (public | Ecosystem Architect)
 - [Kyberion Intent Scenario Catalog](./product/orchestration/intent-scenario-catalog.md) (public | Ecosystem Architect)
 - [Lifestyle Booking Playbook](./product/orchestration/lifestyle-booking-playbook.md) (public | Unknown)

@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.local_flux",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.acestep-cpp"
+  },
+  "backends": [
+    {
+      "backend_id": "voice.mlx_audio_kokoro",
+      "modality": "voice",
+      "display_name": "Kokoro-82M-4bit via mlx_audio",
+      "kind": "local",
+      "provider": "mlx_audio",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "playback": false,
+        "artifact_formats": ["wav"]
+      },
+      "command": "<venv_python>",
+      "args": ["-m", "mlx_audio.tts.generate"],
+      "accelerators": ["mlx"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "notes": "Japanese voices jf_alpha/jf_gongitsune/jf_nezumi/jf_tebukuro/jm_kumo (upstream grade C-/C/C+). misaki cutlet G2P: Latin alphabet is not phonemized (write エーアイ in katakana), no pitch-accent marks, number+counter misreads (write だいさんい/みっつ in kana). JAG2P version='pyopenjtalk' degrades output on this model — do not use. Procedure: knowledge/product/orchestration/japanese-voiceover-production-playbook.md"
+    }
+  ]
+}
