@@ -19,19 +19,31 @@ const captured = vi.hoisted(() => ({
 vi.mock('../src/app/settings/sections/ProfileSection', () => ({
   ProfileSection: (props: ProfileSectionProps) => {
     captured.profile = props;
-    return null;
+    return createElement(SettingsSaveFeedback, {
+      feedback: props.saveFeedback,
+      hasUnsavedChanges: props.hasUnsavedChanges,
+      t: props.t,
+    });
   },
 }));
 vi.mock('../src/app/settings/sections/NotificationsSection', () => ({
   NotificationsSection: (props: NotificationsSectionProps) => {
     captured.notifications = props;
-    return null;
+    return createElement(SettingsSaveFeedback, {
+      feedback: props.saveFeedback,
+      hasUnsavedChanges: props.hasUnsavedChanges,
+      t: props.t,
+    });
   },
 }));
 vi.mock('../src/app/settings/sections/ServicesSection', () => ({
   ServicesSection: (props: ServicesSectionProps) => {
     captured.services = props;
-    return null;
+    return createElement(SettingsSaveFeedback, {
+      feedback: props.saveFeedback,
+      hasUnsavedChanges: props.hasUnsavedChanges,
+      t: props.t,
+    });
   },
 }));
 vi.mock('../src/app/settings/sections/MembersSection', () => ({
@@ -75,6 +87,7 @@ vi.mock('../src/lib/settings-exit-guard', () => ({
   },
 }));
 import SettingsPage from '../src/app/settings/page';
+import { SettingsSaveFeedback } from '../src/app/settings/sections/SettingsSaveFeedback';
 
 const setup = () => ({
   ok: true,
@@ -260,6 +273,9 @@ describe('settings submitted snapshots and outcomes', () => {
       await profileName(newer);
       await act(async () => pending.resolve(receipt()));
       expect(captured.profile!.profile.name).toBe(newer);
+      expect(captured.profile!.saveFeedback?.phase).toBe('saved');
+      expect(captured.profile!.hasUnsavedChanges).toBe(true);
+      expect(view.text()).toContain('setup.section_save_newer_edits');
       expect(view.text()).toContain('data-state=dirty');
       await view.click('settings.discard');
       expect(captured.profile!.profile.name).toBe('Submitted');
@@ -282,6 +298,9 @@ describe('settings submitted snapshots and outcomes', () => {
     await notificationTarget('newer');
     await act(async () => pending.resolve(json(preferences('submitted'))));
     expect(captured.notifications!.notif.target).toBe('newer');
+    expect(captured.notifications!.saveFeedback?.phase).toBe('saved');
+    expect(captured.notifications!.hasUnsavedChanges).toBe(true);
+    expect(view.text()).toContain('setup.section_save_newer_edits');
     await view.click('settings.discard');
     expect(captured.notifications!.notif.target).toBe('submitted');
   });
@@ -300,6 +319,7 @@ describe('settings submitted snapshots and outcomes', () => {
     await act(async () => captured.profile!.onSaveProfile());
     expect(captured.profile!.profile.name).toBe('Submitted');
     expect(view.text()).toContain('setup.draft_refresh_failed');
+    expect(captured.profile!.saveFeedback?.phase).toBe('saved');
     await profileName('Newer');
     await view.click('settings.discard');
     expect(captured.profile!.profile.name).toBe('Submitted');
@@ -924,4 +944,76 @@ it('ignores an old identity display response after the retry has loaded a newer 
   expect(captured.members!.meTenants).toEqual([tenant]);
   expect(captured.members!.meViewing).toEqual(tenant);
   expect(posts()).toHaveLength(0);
+});
+
+describe('section save feedback ownership', () => {
+  it('keeps an unconfirmed notification outcome at its initiating section', async () => {
+    const pending = deferred<Response>();
+    serve((url, init) =>
+      url === '/api/notification-preferences' && init?.method === 'POST'
+        ? pending.promise
+        : undefined
+    );
+    const view = await mount();
+    await notificationTarget('edited');
+    await act(async () => captured.notifications!.onSaveNotification());
+    expect(captured.notifications).toHaveProperty('saveFeedback.phase', 'saving');
+    expect(captured.profile).toHaveProperty('saveFeedback', null);
+    await act(async () => pending.resolve(json({ ok: false }, 503)));
+    expect(captured.notifications).toHaveProperty('saveFeedback.phase', 'unconfirmed');
+    expect(captured.notifications!.notif.target).toBe('edited');
+    expect(posts()).toHaveLength(1);
+    await view.click('settings.discard');
+    expect(captured.notifications).toHaveProperty('saveFeedback', null);
+  });
+  it('shows confirmed service feedback only at the initiating service section', async () => {
+    serve();
+    await mount();
+    await act(async () => captured.services!.onSaveConnections());
+    expect(captured.services).toHaveProperty('saveFeedback.phase', 'saved');
+    expect(captured.profile).toHaveProperty('saveFeedback', null);
+    expect(captured.notifications).toHaveProperty('saveFeedback', null);
+  });
+});
+
+describe('section feedback interruption boundaries', () => {
+  it('reports a failed preflight locally without posting', async () => {
+    let unavailable = false;
+    serve((url) => (url === '/api/me' && unavailable ? json({ ok: false }, 503) : undefined));
+    const view = await mount();
+    unavailable = true;
+    await act(async () => captured.notifications!.onSaveNotification());
+    expect(captured.notifications!.saveFeedback?.phase).toBe('unavailable');
+    expect(view.text()).toContain('setup.draft_context_unavailable');
+    expect(posts()).toHaveLength(0);
+  });
+  it('replaces earlier section feedback with the grouped save summary', async () => {
+    serve();
+    const view = await mount();
+    await act(async () => captured.services!.onSaveConnections());
+    expect(captured.services!.saveFeedback?.phase).toBe('saved');
+    await notificationTarget('grouped');
+    await view.click('settings.save');
+    expect(captured.services!.saveFeedback).toBeNull();
+    expect(captured.notifications!.saveFeedback).toBeNull();
+    expect(view.text()).toContain('data-state=saved');
+  });
+  it('does not restore pending feedback after identity invalidates the page', async () => {
+    const pending = deferred<Response>();
+    let changed = false;
+    serve((url, init) => {
+      if (url === '/api/notification-preferences' && init?.method === 'POST')
+        return pending.promise;
+      if (url === '/api/me' && changed)
+        return json({ ...me(), member: { ...me().member, member_id: 'bob' } });
+    });
+    const view = await mount();
+    await act(async () => captured.notifications!.onSaveNotification());
+    changed = true;
+    await act(async () => pending.resolve(json(preferences())));
+    expect(view.text()).toContain('setup.draft_context_changed');
+    expect(view.text()).not.toContain('setup.section_save_pending');
+    expect(view.text()).not.toContain('setup.notification_saved');
+    expect(posts()).toHaveLength(1);
+  });
 });
