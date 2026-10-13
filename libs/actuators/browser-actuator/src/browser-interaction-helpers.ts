@@ -48,6 +48,7 @@ interface BrowserAction {
   action: 'pipeline';
   steps: PipelineStep[];
   session_id?: string;
+  task_session_id?: string;
   options?: {
     headless?: boolean;
     viewport?: { width: number; height: number };
@@ -121,7 +122,17 @@ export interface ComputerInteractionAction {
       | 'extract_text_ref'
       | 'click_if_present'
       | 'capture_console'
-      | 'capture_network';
+      | 'capture_network'
+      | 'llm_assist';
+    goal?: string;
+    task_session_id?: string;
+    max_actions?: number;
+    allowed_origins?: string[];
+    browser_options?: {
+      headless?: boolean;
+      browser_channel?: 'chromium' | 'chrome';
+      viewport?: { width: number; height: number };
+    };
     coordinate?: { x: number; y: number };
     to_coordinate?: { x: number; y: number };
     button?: 'left' | 'right' | 'middle';
