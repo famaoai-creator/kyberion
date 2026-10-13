@@ -113,9 +113,15 @@ function parseAction(input: unknown): BrowserAssistAction {
   }
   switch (value.type) {
     case 'navigate':
-      return { type: 'navigate', url: requireBoundedString(value.url, 'URL', 2_000) };
+      return {
+        type: 'navigate',
+        url: requireBoundedString(value.url, 'URL', 2_000),
+      };
     case 'click_ref':
-      return { type: 'click_ref', ref: requireBoundedString(value.ref, 'element ref', 32) };
+      return {
+        type: 'click_ref',
+        ref: requireBoundedString(value.ref, 'element ref', 32),
+      };
     case 'fill_ref':
       return {
         type: 'fill_ref',
@@ -127,10 +133,17 @@ function parseAction(input: unknown): BrowserAssistAction {
       if (!/^(Enter|Tab|Escape|ArrowDown|ArrowUp|ArrowLeft|ArrowRight|Home|End)$/i.test(key)) {
         throw new Error('browser_assist proposed a key outside the safe key allowlist');
       }
-      return { type: 'press_ref', ref: requireBoundedString(value.ref, 'element ref', 32), key };
+      return {
+        type: 'press_ref',
+        ref: requireBoundedString(value.ref, 'element ref', 32),
+        key,
+      };
     }
     case 'extract_text_ref':
-      return { type: 'extract_text_ref', ref: requireBoundedString(value.ref, 'element ref', 32) };
+      return {
+        type: 'extract_text_ref',
+        ref: requireBoundedString(value.ref, 'element ref', 32),
+      };
     case 'extract_page_text':
       return { type: 'extract_page_text' };
     case 'complete':
@@ -276,7 +289,11 @@ function actionStep(
         id: `step-${index}`,
         type: 'apply',
         op: 'click_ref',
-        params: { ref: action.ref, role: target.role || undefined, name: target.name || undefined },
+        params: {
+          ref: action.ref,
+          role: target.role || undefined,
+          name: target.name || undefined,
+        },
       };
     }
     case 'fill_ref': {
@@ -293,7 +310,12 @@ function actionStep(
         id: `step-${index}`,
         type: 'apply',
         op: 'fill_ref',
-        params: { ref: action.ref, role: target.role, name: target.name, text: action.text },
+        params: {
+          ref: action.ref,
+          role: target.role,
+          name: target.name,
+          text: action.text,
+        },
       };
     }
     case 'press_ref': {
@@ -454,7 +476,12 @@ export function prepareBrowserPipelineReplay(input: {
     );
   }
   const candidate = session.artifact?.browser_pipeline_candidate as
-    { session_id?: string; options?: Record<string, unknown>; steps?: PipelineStep[] } | undefined;
+    | {
+        session_id?: string;
+        options?: Record<string, unknown>;
+        steps?: PipelineStep[];
+      }
+    | undefined;
   if (
     !candidate?.steps?.length ||
     JSON.stringify(candidate.steps) !== JSON.stringify(input.steps || [])
@@ -564,7 +591,13 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
   progress('running', 'snapshot', 'Capturing the initial browser page.', 0);
   let snapshot = pageSnapshot(
     await deps.executePipeline(
-      [{ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } }],
+      [
+        {
+          type: 'capture',
+          op: 'snapshot',
+          params: { export_as: 'last_snapshot' },
+        },
+      ],
       sessionId,
       options
     )
@@ -594,7 +627,10 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
         {
           effort: 'low',
           model_tier: 'fast',
-          budget: { max_prompt_chars: MAX_SNAPSHOT_CHARS + 3_500, max_response_chars: 2_000 },
+          budget: {
+            max_prompt_chars: MAX_SNAPSHOT_CHARS + 3_500,
+            max_response_chars: 2_000,
+          },
           signal: controller.signal,
         }
       );
@@ -631,10 +667,43 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
     } finally {
       clearTimeout(modelTimeout);
     }
-    if (response.toolCalls?.length !== 1 || response.toolCalls[0]?.name !== TOOL.name) {
-      throw new Error('browser_assist requires exactly one structured browser_action proposal');
+    let action: BrowserAssistAction;
+    try {
+      if (response.toolCalls?.length !== 1 || response.toolCalls[0]?.name !== TOOL.name) {
+        throw new Error('browser_assist requires exactly one structured browser_action proposal');
+      }
+      action = parseAction(response.toolCalls[0].input);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      progress(
+        'needs_clarification',
+        'llm_assist',
+        'The model proposed an unsupported action; partial exploration was preserved.',
+        actionResults.length
+      );
+      const candidate = steps.length
+        ? buildCandidate(steps, sessionId, options, origins)
+        : undefined;
+      persistLinkedTaskSession({
+        taskSessionId,
+        browserSessionId: sessionId,
+        status: 'paused',
+        stage: 'invalid_model_action',
+        latestAction: 'llm_assist',
+        actionCount: actionResults.length,
+        detail: reason,
+        candidate,
+      });
+      return {
+        status: 'needs_clarification',
+        reason: `Local model proposed an unsupported browser action: ${reason}`,
+        session_id: sessionId,
+        task_session_id: taskSessionId,
+        actions: actionResults,
+        final_observation: safeObservation(snapshot),
+        pipeline_candidate: candidate,
+      };
     }
-    const action = parseAction(response.toolCalls[0].input);
     if (
       (action.type === 'extract_page_text' || action.type === 'extract_text_ref') &&
       actionResults.some(
@@ -764,7 +833,13 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
     steps.push(step);
     snapshot = pageSnapshot(
       await deps.executePipeline(
-        [{ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } }],
+        [
+          {
+            type: 'capture',
+            op: 'snapshot',
+            params: { export_as: 'last_snapshot' },
+          },
+        ],
         sessionId,
         options
       )

@@ -206,7 +206,13 @@ export function detectFocusedInput(): FocusedInputState {
       editable: focused.editable === true,
     };
   } catch {
-    return { application: '', windowTitle: '', role: '', description: '', editable: false };
+    return {
+      application: '',
+      windowTitle: '',
+      role: '',
+      description: '',
+      editable: false,
+    };
   }
 }
 
@@ -243,7 +249,13 @@ export function pressKeyCode(keyCode: number): void {
 
 export function toggleDictation(): void {
   // Windows dictation shortcut (Win+H).
-  run(`$ws = New-Object -ComObject WScript.Shell; $ws.SendKeys('^{ESC}')`);
+  run(
+    `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class KyberionKeys { [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra); }'; ` +
+      '[KyberionKeys]::keybd_event(0x5B,0,0,[UIntPtr]::Zero); ' +
+      '[KyberionKeys]::keybd_event(0x48,0,0,[UIntPtr]::Zero); ' +
+      '[KyberionKeys]::keybd_event(0x48,0,2,[UIntPtr]::Zero); ' +
+      '[KyberionKeys]::keybd_event(0x5B,0,2,[UIntPtr]::Zero)'
+  );
 }
 
 /**
@@ -503,6 +515,19 @@ export function getWindowList(appName: string): string[] {
   )
     .split(/\r?\n/)
     .filter(Boolean);
+}
+
+/** Probe the Windows UI Automation root directly, without process-title fallback. */
+export function isUIAutomationAvailable(): boolean {
+  const result = runResult(
+    [
+      'Add-Type -AssemblyName UIAutomationClient',
+      '$root = [System.Windows.Automation.AutomationElement]::RootElement',
+      'if ($null -eq $root) { exit 1 }',
+      "Write-Output 'KYBERION_UIA_READY'",
+    ].join('; ')
+  );
+  return result.trim() === 'KYBERION_UIA_READY';
 }
 export function activateWindowByTitle(
   appName: string,
