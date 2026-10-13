@@ -15,7 +15,7 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
         setAttribute: vi.fn(),
         addEventListener: vi.fn(),
       },
-    ]),
+    ])
   );
   const state = {
     historyState: 'ready',
@@ -70,9 +70,9 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
     String(
       safeReadFile('presence/displays/presence-studio/static/ask-correction.js', {
         encoding: 'utf8',
-      }),
+      })
     ),
-    { window, document: { getElementById: (id: string) => elements.get(id) }, URLSearchParams },
+    { window, document: { getElementById: (id: string) => elements.get(id) }, URLSearchParams }
   );
   if (!window.KyberionAskCorrection) throw new Error('Correction helper was not loaded');
   const helper = window.KyberionAskCorrection.create({
@@ -102,7 +102,7 @@ describe('Ask recorded correction handoff (read-only client)', () => {
     const h = harness();
     await h.helper.apply();
     expect(h.fetchJson).toHaveBeenCalledWith(
-      '/api/progress/artifact-1/correction-context?entry=entry-1&tenant=alpha',
+      '/api/progress/artifact-1/correction-context?entry=entry-1&tenant=alpha'
     );
     const draft = h.proposeDraft.mock.calls[0][0];
     expect(draft).toContain('entry-1');
@@ -118,7 +118,7 @@ describe('Ask recorded correction handoff (read-only client)', () => {
     expect(h.proposeDraft).not.toHaveBeenCalled();
     expect(h.window.history.replaceState).not.toHaveBeenCalled();
     expect(h.elements.get('ask-correction-text')!.textContent).not.toContain(
-      h.payload.body.context.note,
+      h.payload.body.context.note
     );
     expect(h.elements.get('ask-correction-retry')!.hidden).toBe(false);
   });
@@ -147,7 +147,7 @@ describe('Ask recorded correction handoff (read-only client)', () => {
       h.fetchJson.mockReturnValue(
         new Promise((done) => {
           resolve = done;
-        }),
+        })
       );
       const pending = h.helper.apply();
       h.helper.apply();
@@ -232,7 +232,7 @@ describe('Ask recorded correction handoff (read-only client)', () => {
       encoding: 'utf8',
     }) as string;
     expect(source.indexOf("params.has('correction')")).toBeLessThan(
-      source.indexOf("var ask = params.get('ask')"),
+      source.indexOf("var ask = params.get('ask')")
     );
     expect(source).toContain('state.proposedDraft.isCurrent');
     const html = safeReadFile('presence/displays/presence-studio/static/ask.html', {

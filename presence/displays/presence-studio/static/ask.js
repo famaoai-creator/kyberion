@@ -255,7 +255,7 @@
         'placeholder',
         state.turns.length
           ? vt(state.vocab, 'front_desk:ask_placeholder_followup')
-          : vt(state.vocab, 'front_desk:home_ask_placeholder'),
+          : vt(state.vocab, 'front_desk:home_ask_placeholder')
       );
     }
 
@@ -299,7 +299,7 @@
     button.textContent =
       vt(
         state.vocab,
-        state.handsFree ? 'front_desk:ask_handsfree_on' : 'front_desk:ask_handsfree_off',
+        state.handsFree ? 'front_desk:ask_handsfree_on' : 'front_desk:ask_handsfree_off'
       ) ||
       button.getAttribute(state.handsFree ? 'data-label-on' : 'data-label-off') ||
       button.textContent;
@@ -410,7 +410,7 @@
     setBlockText(
       'about-deliverable',
       vt(state.vocab, 'front_desk:ask_deliverable'),
-      deliverableText,
+      deliverableText
     );
   }
 
@@ -462,7 +462,7 @@
       notice.hidden = false;
       notice.textContent = vt(
         state.vocab,
-        match ? 'front_desk:work_home_resume_readonly' : 'front_desk:work_home_request_unavailable',
+        match ? 'front_desk:work_home_resume_readonly' : 'front_desk:work_home_request_unavailable'
       );
     }
     state.focusedRequest = request;
@@ -771,7 +771,7 @@
         '?locale=' +
         encodeURIComponent(state.locale) +
         '&scenario_id=' +
-        encodeURIComponent(state.hearingScenarioId),
+        encodeURIComponent(state.hearingScenarioId)
     )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
@@ -796,7 +796,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
-      },
+      }
     )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
@@ -827,7 +827,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
-      },
+      }
     )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
@@ -865,7 +865,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
-      },
+      }
     )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
@@ -1468,7 +1468,7 @@
         window.history.replaceState(
           window.history.state,
           '',
-          window.location.pathname + (query ? '?' + query : '') + window.location.hash,
+          window.location.pathname + (query ? '?' + query : '') + window.location.hash
         );
       }
     } catch (err) {
