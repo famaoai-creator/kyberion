@@ -31,6 +31,7 @@ import { readTextFile } from '../foundation/text.js';
 import { safeReaddir, safeExistsSync, safeLstat } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { segmentWords } from '../locale-normalize.js';
 import {
   getEmbeddingBackend,
   cosineSimilarity,
@@ -170,11 +171,11 @@ function firstParagraph(body: string, max = 400): string {
 }
 
 function tokenize(s: string): string[] {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9\u3000-\u9fff\s_-]/g, ' ')
-    .split(/\s+/)
-    .filter((t) => t.length >= 2);
+  // Intl.Segmenter-backed: Japanese titles/queries segment into real words
+  // instead of one whole-sentence token.
+  return segmentWords(s.toLowerCase())
+    .flatMap((t) => t.split(/[-_.]/))
+    .filter((t) => t.length >= 2 || /[\u3400-\u9fff]/u.test(t));
 }
 
 function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {

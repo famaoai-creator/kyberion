@@ -44,6 +44,24 @@ describe('intent reconciliation', () => {
     expect(result.confidence).toBeLessThan(0.5);
   });
 
+  it('matches joined identifiers against separated evidence words', async () => {
+    // ICU keeps 'auth_handler' joined; the secondary split restores it so the
+    // goal token matches evidence written with spaces.
+    const evidencePath = `${tmpDir}/identifier.md`;
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(evidencePath, 'auth handler module updated');
+
+    const result = await reconcileCompletion({
+      goal: {
+        summary: 'Update the auth_handler module',
+        success_condition: 'The auth_handler module is updated',
+      },
+      evidenceRefs: [evidencePath],
+    });
+
+    expect(result.satisfied).toBe(true);
+  });
+
   it('does not satisfy on single-token overlap alone', async () => {
     const evidencePath = `${tmpDir}/token-overlap.md`;
     safeMkdir(tmpDir, { recursive: true });

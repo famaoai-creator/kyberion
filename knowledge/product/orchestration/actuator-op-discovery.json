@@ -22359,6 +22359,12 @@
               "timeout_ms": {
                 "type": "number"
               },
+              "vocals": {
+                "type": "boolean"
+              },
+              "lyrics": {
+                "type": "string"
+              },
               "workflow": {},
               "workflow_path": {
                 "type": "string"
