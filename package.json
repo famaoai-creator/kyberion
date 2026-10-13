@@ -241,7 +241,7 @@
     "fast-check": "^4.10.2",
     "globals": "^17.13.0",
     "husky": "^9.1.7",
-    "hyperframes": "^0.8.105",
+    "hyperframes": "^0.8.147",
     "json-schema-to-typescript": "^16.0.0",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",

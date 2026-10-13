@@ -1,0 +1,160 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "narrated-explainer-video",
+  "version": "1.0.0",
+  "name": "Narrated Explainer Video (Japanese / HyperFrames)",
+  "description": "Script → pronunciation lint → Kokoro narration (governed voice op) → whisper round-trip verification → subtitle timing sync → hyperframes check → preview approval → render → ffprobe verify. Follows knowledge/product/orchestration/japanese-voiceover-production-playbook.md.",
+  "_playbook": "knowledge/product/orchestration/japanese-voiceover-production-playbook.md",
+  "context": {
+    "work_dir": "active/shared/tmp/narrated-video",
+    "script_path": "active/shared/tmp/narrated-video/script.txt",
+    "script_text": "Replace with the narration script. Write readings in kana for anything risky: エーアイ not AI, だいさんい not 第3位, みっつ not 3つ.",
+    "voice": "jf_gongitsune",
+    "profile_id": "operator-ja-default",
+    "narration_path": "active/shared/tmp/narrated-video/narr.wav",
+    "timings_path": "active/shared/tmp/narrated-video/narr_timings.json",
+    "python_bin": "<venv_python_with_misaki_mlxwhisper>",
+    "whisper_model": "mlx-community/whisper-large-v3-turbo",
+    "project_dir": "active/shared/tmp/narrated-video/proj",
+    "output_path": "active/shared/tmp/narrated-video/proj/out.mp4",
+    "quality": "looks",
+    "reasoning_provider": "claude-cli"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/narrated-video-preflight.json"
+      }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 [NARRATED-VIDEO] Starting narrated-explainer-video — playbook: knowledge/product/orchestration/japanese-voiceover-production-playbook.md"
+      }
+    },
+    {
+      "id": "write_script",
+      "role": "source",
+      "op": "system:write_file",
+      "produces": { "channel": "script_written", "type": "WriteResult" },
+      "params": {
+        "path": "{{script_path}}",
+        "content": "{{script_text}}"
+      }
+    },
+    {
+      "id": "g2p_lint",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "g2p_lint_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "{{python_bin}} -c \"from misaki.ja import JAG2P; g=JAG2P(version='cutlet'); [print(g(l.strip())[0]) for l in open('{{script_path}}') if l.strip()]\" > {{work_dir}}/g2p-lint.txt && cat {{work_dir}}/g2p-lint.txt"
+      }
+    },
+    {
+      "id": "review_readings",
+      "role": "gate",
+      "op": "reasoning:analyze",
+      "params": {
+        "input": "Review {{work_dir}}/g2p-lint.txt against the intended readings of {{script_path}}. Any Latin alphabet fragment left unphonemized or counter misread (e.g. 第3位 → だいさんくらい) must be fixed by rewriting the token in kana/katakana in the script before continuing. Rules: knowledge/product/orchestration/japanese-voiceover-production-playbook.md §1. Do NOT propose switching JAG2P to version='pyopenjtalk' (verified degraded on Kokoro-82M-4bit)."
+      }
+    },
+    {
+      "id": "generate_narration",
+      "role": "source",
+      "op": "voice:generate_voice",
+      "produces": { "channel": "voice_result", "type": "VoiceGenerationResult" },
+      "params": {
+        "request_id": "narrated-explainer-video",
+        "text": "{{script_text}}",
+        "profile_ref": { "profile_id": "{{profile_id}}" },
+        "engine": { "engine_id": "kokoro" },
+        "voice": "{{voice}}",
+        "rendering": {
+          "language": "ja",
+          "chunking": { "max_chunk_chars": 4000, "crossfade_ms": 50 }
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "wav",
+          "artifact_path": "{{narration_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": { "personal_voice_mode": "allow_fallback" }
+      }
+    },
+    {
+      "id": "transcribe_timings",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "timings_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "{{python_bin}} -c \"import mlx_whisper,json; r=mlx_whisper.transcribe('{{narration_path}}',path_or_hf_repo='{{whisper_model}}',language='ja',verbose=False); json.dump([{'start':s['start'],'end':s['end'],'text':s['text']} for s in r['segments']],open('{{timings_path}}','w'),ensure_ascii=False,indent=1); print(json.dumps(r['segments'] and [{'t':s['text']} for s in r['segments']],ensure_ascii=False))\""
+      }
+    },
+    {
+      "id": "verify_roundtrip",
+      "role": "gate",
+      "op": "reasoning:analyze",
+      "params": {
+        "input": "Compare the transcript in {{timings_path}} against {{script_path}} intended readings. Latin 'AI'/'LLM' in the transcript means the katakana reading was spoken correctly; a kana rendering or wrong word means the script needs more kana — fix the script and re-run from generate_narration. Only proceed when every segment reads as intended."
+      }
+    },
+    {
+      "id": "sync_subtitles",
+      "role": "gate",
+      "op": "reasoning:analyze",
+      "params": {
+        "input": "Update {{project_dir}}/index.html so each subtitle clip's data-start/data-duration matches the segment bounds in {{timings_path}}; set root data-duration to audio length + 0.3s and the audio element's to the audio length; re-time GSAP beats (kicker pops, pulses) to just before each segment start. See playbook §4."
+      }
+    },
+    {
+      "id": "hf_check",
+      "role": "gate",
+      "op": "system:shell",
+      "produces": { "channel": "hf_check_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "cd {{project_dir}} && npx hyperframes check"
+      }
+    },
+    {
+      "id": "preview_gate",
+      "role": "gate",
+      "op": "reasoning:analyze",
+      "params": {
+        "input": "Run `cd {{project_dir}} && npx hyperframes preview --background`, hand the Studio URL to the operator, and proceed only after the operator accepts the picture and narration. Rendering without an explicit accept violates the review gate (playbook §6)."
+      }
+    },
+    {
+      "id": "render",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "render_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "cd {{project_dir}} && HYPERFRAMES_RENDER_DETACHED=1 npx hyperframes render --quality {{quality}} --output {{output_path}}"
+      }
+    },
+    {
+      "id": "verify_output",
+      "role": "gate",
+      "op": "system:shell",
+      "produces": { "channel": "ffprobe_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "ffprobe -v error -show_entries format=duration -show_entries stream=codec_type -of default=nw=1 {{output_path}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 [NARRATED-VIDEO] Done — {{output_path}}"
+      }
+    }
+  ]
+}

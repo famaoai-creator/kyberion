@@ -253,10 +253,8 @@ same tests; use an envelope when re-validating the slice after touching it.
 
 | Pipeline                        | Description                                                                                                                                  |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ce-adoption-validation`        | Claw-empire adoption slice (CE-01..12): full build, core workforce/CE tests, Chronos collaboration-stream/live-sync tests, DOM-contrast gate |
 | `cloudflare-os-validation`      | Cloudflare OS control plane (OS-01..15): core control-plane/egress/OAuth tests, service-actuator tests, operator- and computer-surface tests |
 | `project-management-validation` | Project control and mission reassignment: project tests, typecheck, package build, Chronos typecheck                                         |
-| `qm02-trigger-validation`       | QM-02 trigger unification: core build, trigger-runner/managed-process/scheduler tests, `script-integrity` gate                               |
 | `media-review-fix-validation`   | Media review gates: compile a canonical brief and fail on unapproved PPTX layout overflow (deterministic, no rendering)                      |
 | `soak-restart-e2e`              | AO-04 soak restart: boots a worker, kills it, resumes and checks that state was restored (`core:run_soak_restart_e2e`)                       |
 
