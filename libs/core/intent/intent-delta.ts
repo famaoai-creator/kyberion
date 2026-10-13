@@ -12,6 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { nowIso } from '../foundation/time.js';
+import { segmentWords } from '../locale-normalize.js';
 
 export interface IntentBody {
   goal: string;
@@ -71,13 +72,15 @@ export const DEFAULT_THRESHOLDS: DriftThresholds = {
   blocking: 0.6,
 };
 
-const TOKEN_SPLIT = /[\s,.;:!?()\[\]{}"'`\-—–/\\|]+/u;
+// Intl.Segmenter-backed: splits spaceless scripts (ja) into real words instead
+// of one whole-sentence token; TOKEN_SPLIT still applies afterwards because
+// ICU keeps "config.json"-style dotted/under-scored tokens joined.
+const TOKEN_SPLIT = /[\s,.;:!?()\[\]{}"'`\-—–/\\|_]+/u;
 
 function tokenize(text: string): Set<string> {
   return new Set(
-    text
-      .toLowerCase()
-      .split(TOKEN_SPLIT)
+    segmentWords(text.toLowerCase())
+      .flatMap((token) => token.split(TOKEN_SPLIT))
       .map((token) => token.trim())
       .filter((token) => token.length > 0)
   );

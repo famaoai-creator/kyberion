@@ -190,6 +190,96 @@ const LANGUAGE_NEUTRAL_ACKS: ReadonlySet<string> = new Set([
   'lgtm',
 ]);
 
+/**
+ * Word-level segmentation for matching and scoring.
+ *
+ * Spaceless scripts (ja, zh, th, …) carry no whitespace, so a delimiter
+ * `split()` returns the whole sentence as one token and token-overlap
+ * scoring silently never fires on them. `Intl.Segmenter` word granularity is
+ * a web-standard, dependency-free segmenter present in modern Node and
+ * browsers; it is typed structurally here because this file must stay
+ * import-free and runnable under any lib target. Falls back to a
+ * letter/number run match when the API is absent.
+ *
+ * `locale` is a locale-ish value (`ja`, `ja-JP`, …). When omitted the script
+ * of `text` decides via {@link detectTextLocale}, so call sites stay
+ * locale-agnostic instead of hard-wiring a Japanese segmenter.
+ */
+interface WordSegmentLike {
+  readonly segment: string;
+  readonly isWordLike: boolean;
+}
+
+interface WordSegmenterLike {
+  segment(text: string): Iterable<WordSegmentLike>;
+}
+
+type WordSegmenterCtor = new (
+  locale: string,
+  options: { granularity: 'word' }
+) => WordSegmenterLike;
+
+const wordSegmenters = new Map<string, WordSegmenterLike>();
+/** Locales the segmenter could not be constructed for (shimmed/absent Intl). */
+const failedSegmenterLocales = new Set<string>();
+
+function getWordSegmenter(bcp47: string): WordSegmenterLike | null {
+  const ctor = (globalThis as { Intl?: { Segmenter?: WordSegmenterCtor } }).Intl?.Segmenter;
+  if (typeof ctor !== 'function' || failedSegmenterLocales.has(bcp47)) return null;
+  let segmenter = wordSegmenters.get(bcp47);
+  if (!segmenter) {
+    try {
+      segmenter = new ctor(bcp47, { granularity: 'word' });
+    } catch {
+      // Host exposes the API but cannot build it (invalid tag, --without-intl
+      // build, broken shim) — degrade to the regex path instead of throwing.
+      if (failedSegmenterLocales.size > 32) failedSegmenterLocales.clear();
+      failedSegmenterLocales.add(bcp47);
+      return null;
+    }
+    // Caller-supplied tags are unbounded — cap like the other memos.
+    if (wordSegmenters.size > 32) wordSegmenters.clear();
+    wordSegmenters.set(bcp47, segmenter);
+  }
+  return segmenter;
+}
+
+/** Loose BCP-47 shape — enough to hand a caller's tag through to ICU. */
+const BCP47_LIKE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * Resolves the tag to segment with. A catalog locale maps through
+ * {@link localeToBcp47}; any other well-formed BCP-47-ish tag passes through
+ * untouched so callers can segment languages this repo does not list yet (zh,
+ * th, …) — silently mapping them to en-US would defeat the spaceless-script
+ * fix this helper exists for.
+ */
+function segmenterTag(locale: unknown, text: string): string {
+  if (locale !== undefined && locale !== null) {
+    const normalized = normalizeLocale(locale);
+    if (normalized) return localeToBcp47(normalized);
+    const raw = String(locale).trim();
+    return BCP47_LIKE.test(raw) ? raw : 'en-US';
+  }
+  return detectTextLocale(text) === 'ja' ? 'ja-JP' : 'en-US';
+}
+
+/**
+ * Splits `text` into word-like tokens (whitespace and punctuation dropped).
+ * Locale resolution: explicit `locale` → {@link detectTextLocale} guess → en.
+ */
+export function segmentWords(text: unknown, locale?: unknown): string[] {
+  const value = String(text ?? '');
+  if (!value.trim()) return [];
+  const segmenter = getWordSegmenter(segmenterTag(locale, value));
+  if (!segmenter) return value.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const out: string[] = [];
+  for (const piece of segmenter.segment(value)) {
+    if (piece.isWordLike) out.push(piece.segment);
+  }
+  return out;
+}
+
 export type BrowserVocabularyEntry = Record<string, string>;
 
 export interface BrowserVocabularyCatalog {

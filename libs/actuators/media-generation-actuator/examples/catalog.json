@@ -58,6 +58,20 @@
       "tags": ["music", "direct", "stable-audio", "local", "example"]
     },
     {
+      "id": "direct-musicgen-audiogen",
+      "title": "Direct Local MusicGen Variants (MLX AudioGen)",
+      "path": "libs/actuators/media-generation-actuator/examples/direct-musicgen-audiogen.json",
+      "description": "Runs Apple Silicon MusicGen mono/stereo/melody variants through the music-generation-bridge without ComfyUI (tool-runtime: musicgen_audiogen / KYBERION_MUSAUDIOGEN_*; variant follows KYBERION_MUSAUDIOGEN_WEIGHTS_DIR).",
+      "tags": ["music", "direct", "musicgen", "mlx", "local", "example"]
+    },
+    {
+      "id": "direct-chatmusician-mlx",
+      "title": "Direct ChatMusician Composition (MLX)",
+      "path": "libs/actuators/media-generation-actuator/examples/direct-chatmusician-mlx.json",
+      "description": "Composes with ChatMusician via mlx-lm and renders ABC to WAV through the music-generation-bridge (tool-runtime: chatmusician_mlx / KYBERION_CHATMUSICIAN_*; abcmidi + fluid-synth + SoundFont required).",
+      "tags": ["music", "direct", "chatmusician", "mlx", "local", "example"]
+    },
+    {
       "id": "submit-music-generation-job",
       "title": "Submit Music Generation Job",
       "path": "libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json",

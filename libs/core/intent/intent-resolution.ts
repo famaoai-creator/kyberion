@@ -13,6 +13,7 @@ import {
   type ContextualIntentFrame,
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
+import { segmentWords } from '../locale-normalize.js';
 import {
   intentPhraseFlags,
   intentPhraseSource,
@@ -382,20 +383,201 @@ function normalizeKatakanaToHiragana(text: string): string {
   return text.replace(/[\u30a1-\u30f6]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
-/**
- * Locale-aware normalization for trigger matching.
- * Applies full-width\u2192half-width and katakana\u2192hiragana before standard text normalization,
- * so Japanese utterances match ASCII trigger keywords and vice versa.
- */
-export function normalizeForTriggerMatch(utterance: string): string {
-  return normalizeFreeText(normalizeKatakanaToHiragana(normalizeFullWidthToHalfWidth(utterance)));
+// Maps half-width katakana (\uff76-\uff9f) to full-width via per-run NFKC,
+// which also composes voicing marks (\uff76\uff9e -> \u30ac), so the
+// katakana->hiragana pass below unifies it too. Voice input and legacy
+// systems emit half-width kana.
+function normalizeHalfWidthKatakana(text: string): string {
+  return text.replace(/[\uff61-\uff9f]+/g, (run) => run.normalize('NFKC'));
 }
 
+// Word-final prolonged marks are dropped (\u30b5\u30fc\u30d0\u30fc ==
+// \u30b5\u30fc\u30d0), the dominant loanword spelling variant; internal
+// ones stay so \u30ab\u30fc\u30c9 and \u304b\u3060 still differ.
+// Implemented as a plain scan — a /\u30fc+(?=\s|$)/-style pattern
+// backtracks polynomially on attacker-controlled runs of \u30fc (CodeQL).
+function normalizeJaTrailingProlonged(text: string): string {
+  const parts = text.split(/(\s+)/u);
+  for (let i = 0; i < parts.length; i += 1) {
+    if (i % 2 === 1) continue; // whitespace runs sit at odd indices
+    const word = parts[i]!;
+    let end = word.length;
+    while (end > 0 && word.charCodeAt(end - 1) === 0x30fc) end -= 1;
+    if (end !== word.length) parts[i] = word.slice(0, end);
+  }
+  return parts.join('');
+}
+
+// Honorific prefixes are dropped only before a 2+ kanji stem (\u3054\u78ba\u8a8d ->
+// \u78ba\u8a8d, \u3054\u5229\u7528 -> \u5229\u7528). Lexicalized
+// \u304a/\u3054 words — \u304a\u91d1, \u3054\u98ef, \u304a\u9858\u3044, \u304a\u77e5\u3089\u305b — keep the
+// prefix, because the single-kanji remnant is either dropped downstream or
+// becomes an over-broad keyword (\u304a\u91d1 -> \u91d1 would hit \u91d1\u66dc\u65e5/\u6599\u91d1/\u73fe\u91d1).
+function stripJaHonorificPrefixes(text: string): string {
+  return text.replace(/(^|\s)[\u304a\u3054](?=[\u3400-\u9fff][\u3400-\u9fff])/g, '$1');
+}
+
+// Trailing request / politeness markers collapse onto the stem, so a request
+// ending in "してください"/"します" hits the same triggers as the bare noun.
+// Two ending classes behave differently:
+//   - chain (te-form / request): may peel repeatedly ("確認してください" ->
+//     "確認して" -> "確認");
+//   - terminal (copula / masu): strip once and stop — "クリスマスです" must
+//     keep "クリスマス", not cascade through "ます" into "クリスマ".
+// Masu-family endings additionally require a hiragana/kanji char before them,
+// so loanword tails ("クリスマス", "コスモス") never look like verb stems.
+// Deliberately conservative overall: bare \u305f\u3044 / \u3057\u305f\u3044 stay
+// excluded because real words end that way (\u671f\u5f85, \u72b6\u614b), and
+// single-kana tails are never stripped. Longest-first so layered endings peel
+// correctly.
+const JA_CHAIN_ENDINGS =
+  // i18n-exempt: Japanese request-ending rule data for trigger matching, not user-facing copy
+  'ていただけないでしょうか ていただけますか ていただきたい ていただけます していただければ してもらえませんか してもらえますか してもらいたい てもらえますか てもらいたい してください くださいませんか くださいませ ください 下さい ておいてください ておいて ておきました ておきます てみました てみます ていました ています てくれますか てきました ていた てある てみて してほしい てほしい てくれ してね して ちょうだい おねがいします おねがい お願いします お願い ねがいします'
+    .split(' ')
+    .sort((a, b) => b.length - a.length);
+
+const JA_TERMINAL_COPULA_ENDINGS =
+  // i18n-exempt: Japanese copula endings for trigger matching, not user-facing copy
+  'でしょうか でしょう でした ですか です'.split(' ').sort((a, b) => b.length - a.length);
+
+const JA_TERMINAL_MASU_ENDINGS =
+  // i18n-exempt: Japanese masu-form endings for trigger matching, not user-facing copy
+  'ませんでした ませんか いません いました ました ません ましょうか ましょう ますか います ます'
+    .split(' ')
+    .sort((a, b) => b.length - a.length);
+
+// Hiragana or kanji — a masu stem never ends in katakana (or ascii/digits),
+// which is what keeps "クリスマスです" from peeling "ます" off "クリスマス".
+const JA_STEM_CHAR = /[\u3040-\u309f\u3400-\u9fff]/;
+
+function stripJaRequestEndings(text: string): string {
+  let out = text;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const candidates: Array<{ ending: string; terminal: boolean }> = [];
+    const chain = JA_CHAIN_ENDINGS.find(
+      (entry) => out.endsWith(entry) && out.length > entry.length
+    );
+    if (chain) candidates.push({ ending: chain, terminal: false });
+    for (const entry of JA_TERMINAL_COPULA_ENDINGS) {
+      if (out.endsWith(entry) && out.length > entry.length) {
+        candidates.push({ ending: entry, terminal: true });
+        break;
+      }
+    }
+    for (const entry of JA_TERMINAL_MASU_ENDINGS) {
+      if (
+        out.endsWith(entry) &&
+        out.length > entry.length &&
+        JA_STEM_CHAR.test(out[out.length - entry.length - 1] ?? '')
+      ) {
+        candidates.push({ ending: entry, terminal: true });
+        break;
+      }
+    }
+    candidates.sort((a, b) => b.ending.length - a.ending.length);
+    const pick = candidates[0];
+    if (!pick) break;
+    out = out.slice(0, -pick.ending.length).trimEnd();
+    if (pick.terminal) break;
+  }
+  return out;
+}
+
+/**
+ * Script-preserving normalization — everything except katakana\u2192hiragana.
+ * Full-width\u2192half-width, half-width katakana NFKC, standard text
+ * normalization, then word-final \u30fc, honorific \u304a/\u3054, and trailing
+ * request endings. Katakana survives on purpose: the ending stripper needs it
+ * to tell loanword tails (\u30af\u30ea\u30b9\u30de\u30b9) from verb stems, and
+ * word segmentation needs it because ICU groups katakana runs as words while
+ * an unknown hiragana run splits per character.
+ */
+function normalizePreSegment(utterance: string): string {
+  const prepped = normalizeFreeText(
+    normalizeHalfWidthKatakana(normalizeFullWidthToHalfWidth(utterance))
+  );
+  return stripJaRequestEndings(stripJaHonorificPrefixes(normalizeJaTrailingProlonged(prepped)));
+}
+
+/**
+ * Locale-aware normalization for trigger matching. Japanese utterances match
+ * ASCII trigger keywords and vice versa.
+ */
+export function normalizeForTriggerMatch(utterance: string): string {
+  return normalizeKatakanaToHiragana(normalizePreSegment(utterance));
+}
+
+const preSegmentMemo = new Map<string, string>();
+const tokenizeMemo = new Map<string, string[]>();
+
+// Memoized so the per-intent scoring loop does not re-run the pipeline for the
+// same utterance/keyword strings; bounded so a long session cannot grow it.
+function normalizePreSegmentCached(utterance: string): string {
+  const cached = preSegmentMemo.get(utterance);
+  if (cached !== undefined) return cached;
+  const out = normalizePreSegment(utterance);
+  if (preSegmentMemo.size > 256) preSegmentMemo.clear();
+  preSegmentMemo.set(utterance, out);
+  return out;
+}
+
+function normalizeForTriggerMatchCached(utterance: string): string {
+  return normalizeKatakanaToHiragana(normalizePreSegmentCached(utterance));
+}
+
+// Word-final prolonged marks and honorific prefixes applied per token: in
+// spaceless text "サーバーの費用" has no \s boundary, so the string-level pass
+// only fires at the very end — the token-level pass makes \u30fc-stripping and
+// \u304a/\u3054-stripping fire mid-sentence too.
+const JA_TOKEN_HONORIFIC_PREFIX = /^[\u304a\u3054](?=[\u3400-\u9fff][\u3400-\u9fff])/;
+
+// Linear scan rather than /\u30fc+$/ — a quantifier over attacker-controlled
+// input can still backtrack polynomially per start position (CodeQL).
+function stripTokenProlongedTail(token: string): string {
+  let end = token.length;
+  while (end > 0 && token.charCodeAt(end - 1) === 0x30fc) end -= 1;
+  return token.slice(0, end);
+}
+
+// Post-normalization auxiliary/particle fragments that ICU emits as tokens.
+// They recur across unrelated utterances, so they must not count as evidence
+// for surface-example overlap.
+const JA_TOKEN_STOPWORDS = new Set(
+  // i18n-exempt: Japanese auxiliary/particle rule data for overlap scoring, not user-facing copy
+  'して くだ さい おい ます あり おり いる いた こと ため など から まで より ので のに でも けど これ それ あれ この その あの よう'.split(
+    ' '
+  )
+);
+
+// Single kanji are content words (駅, 雨, 猫) — only single kana/latin
+// fragments get dropped by the length floor.
+const JA_SINGLE_KANJI = /[\u3400-\u9fff]/u;
+
 function tokenize(value: string): string[] {
-  return normalizeFreeText(value)
-    .split(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff]+/i)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2);
+  // Word segmentation (not delimiter splitting): spaceless scripts like
+  // Japanese would otherwise arrive as a single token and the surface-example
+  // overlap score below could never fire on them.
+  const cached = tokenizeMemo.get(value);
+  if (cached) return cached;
+  // Segment on the script-preserving text — ICU keeps katakana runs together
+  // but splits unknown hiragana per character — then unify per token, and
+  // split identifiers (foo_bar, file.txt) that ICU keeps joined.
+  const tokens = segmentWords(normalizePreSegmentCached(value))
+    .map((token) =>
+      stripTokenProlongedTail(normalizeKatakanaToHiragana(token))
+        .replace(JA_TOKEN_HONORIFIC_PREFIX, '')
+        .trim()
+    )
+    .flatMap((token) => token.split(/[^\p{L}\p{N}]+/u))
+    .filter(
+      (token) =>
+        !JA_TOKEN_STOPWORDS.has(token) && (token.length >= 2 || JA_SINGLE_KANJI.test(token))
+    );
+  // Frozen because the memo hands out the same array to every caller.
+  Object.freeze(tokens);
+  if (tokenizeMemo.size > 256) tokenizeMemo.clear();
+  tokenizeMemo.set(value, tokens);
+  return tokens;
 }
 
 /**
@@ -450,15 +632,30 @@ function scoreCatalogIntent(
 ): IntentResolutionCandidate | null {
   const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
-  const localizedNormalized = normalizeForTriggerMatch(utterance);
+  const localizedNormalized = normalizeForTriggerMatchCached(utterance);
+  const utteranceTokens = tokenize(utterance);
   const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => {
     const kw = String(keyword).toLowerCase();
+    // Empty/whitespace keywords must not become a universal includes() match.
+    if (!kw.trim()) return false;
     // ASCII keywords match whole words only ("search" must not fire inside "research").
     if (/^[a-z0-9][a-z0-9 ._/-]*$/.test(kw)) {
       const pattern = wholeWordPattern(kw);
       return pattern.test(normalized) || pattern.test(localizedNormalized);
     }
-    return normalized.includes(kw) || localizedNormalized.includes(kw);
+    // Keywords run through the same locale-aware normalization as the
+    // utterance, so a keyword authored as "スラック" still matches "すらっく"
+    // input (and vice versa) and request endings on either side peel equally.
+    // A keyword that normalizes to empty (punctuation-only) must not become a
+    // universal includes('') match.
+    const normalizedKeyword = normalizeForTriggerMatchCached(kw);
+    return (
+      normalized.includes(kw) ||
+      (normalizedKeyword.length >= 2 && localizedNormalized.includes(normalizedKeyword)) ||
+      // A keyword ending-strip can collapse to one char ("押して" -> "押") —
+      // still useful, but only as an exact token so 押印/押さえて don't fire it.
+      (normalizedKeyword.length === 1 && utteranceTokens.includes(normalizedKeyword))
+    );
   });
   const reasons: string[] = [];
   let score = 0;
@@ -479,7 +676,6 @@ function scoreCatalogIntent(
     reasons.push(`matched keywords: ${matchedKeywords.join(', ')}`);
   }
 
-  const utteranceTokens = tokenize(utterance);
   const exactExample = (intent.surface_examples || []).find(
     (example) => normalizeFreeText(example) === normalized
   );
@@ -500,9 +696,15 @@ function scoreCatalogIntent(
     reasons.push(`surface example containment: ${containingExample}`);
   }
 
-  const exampleTokens = (intent.surface_examples || []).flatMap((example) => tokenize(example));
-  const overlap = utteranceTokens.filter((token) => exampleTokens.includes(token));
-  if (overlap.length > 0) {
+  const exampleTokens = new Set(
+    (intent.surface_examples || []).flatMap((example) => tokenize(example))
+  );
+  // Distinct tokens only — an utterance repeating one word must not satisfy
+  // the two-token floor below with a single shared term.
+  const overlap = [...new Set(utteranceTokens)].filter((token) => exampleTokens.has(token));
+  // A single shared word is weak evidence — common verbs (まとめ, 作成) recur
+  // across unrelated intents and would hijack the ranking on a one-token hit.
+  if (overlap.length >= 2) {
     score = Math.max(
       score,
       Math.min(
@@ -703,7 +905,7 @@ function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | n
 }
 
 function scoreBrowserFillIntent(utterance: string): IntentResolutionCandidate | null {
-  const normalized = normalizeForTriggerMatch(utterance);
+  const normalized = normalizeForTriggerMatchCached(utterance);
   const fillVerb = matchesIntentPhrase(normalized, 'intent_resolution.browser_fill_verb');
   const fieldHint = matchesIntentPhrase(normalized, 'intent_resolution.browser_field_hint');
   if (!fillVerb || !fieldHint) return null;
@@ -735,7 +937,7 @@ function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
 }
 
 function inferMessagingBridgePlatformId(utterance: string): string | undefined {
-  const normalized = normalizeForTriggerMatch(utterance);
+  const normalized = normalizeForTriggerMatchCached(utterance);
   if (!normalized) return undefined;
 
   // i18n-exempt: JA input keyword matcher

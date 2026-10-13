@@ -4,6 +4,7 @@ import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-decl
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { clamp, readTextFile } from '../foundation/text.js';
+import { segmentWords } from '../locale-normalize.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -90,11 +91,16 @@ function tokenize(text: string): string[] {
     'note',
     'result',
   ]);
+  // Secondary non-alnum split restores the old match(/[\p{L}\p{N}]+/) shape:
+  // ICU keeps "foo_bar" and "file.txt" joined, which would lose evidence hits.
   return (
-    normalizeReconciliationText(text)
-      .toLowerCase()
-      .match(/[\p{L}\p{N}]+/gu)
-      ?.filter((token) => token.length >= 2 && !stopwords.has(token)) || []
+    segmentWords(normalizeReconciliationText(text).toLowerCase())
+      .flatMap((token) => token.split(/[^\p{L}\p{N}]+/u))
+      // Single kanji are content words (駅, 雨); only single kana/latin
+      // fragments and stopwords are dropped.
+      .filter(
+        (token) => (token.length >= 2 || /[\u3400-\u9fff]/u.test(token)) && !stopwords.has(token)
+      )
   );
 }
 
