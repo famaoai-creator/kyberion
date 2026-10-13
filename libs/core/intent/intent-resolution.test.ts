@@ -585,6 +585,24 @@ describe('intent-resolution', () => {
     }
   });
 
+  it('matches collapsed single-kanji keywords as tokens, not substrings', () => {
+    // browser-step keyword '押して' normalizes to '押' — it must fire on
+    // 'ボタンを押して' (token 押) but not on 押印/押さえて compounds.
+    const press = resolveIntentResolutionPacket('ボタンを押して');
+    const pressCandidate = press.candidates.find((entry) => entry.intent_id === 'browser-step');
+    expect(
+      pressCandidate?.reasons.some((reason) => reason.startsWith('matched keywords')),
+      '押して keyword must still fire on a token-level 押'
+    ).toBe(true);
+
+    const stamp = resolveIntentResolutionPacket('押印の書類を作成して');
+    const stampCandidate = stamp.candidates.find((entry) => entry.intent_id === 'browser-step');
+    expect(
+      stampCandidate?.reasons.some((reason) => reason.includes('押して')) ?? false,
+      'collapsed remnant 押 must not substring-match 押印'
+    ).toBe(false);
+  });
+
   it('never matches on an empty or punctuation-only trigger keyword', () => {
     // Overlay catalogs accept arbitrary keywords; '' or '！！' must not become
     // a universal includes() hit on every utterance.
