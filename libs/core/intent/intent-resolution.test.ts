@@ -531,6 +531,82 @@ describe('intent-resolution', () => {
       resetIntentOverlayTestRoot();
     }
   });
+
+  it('unifies ー variants mid-sentence via per-token normalization', () => {
+    // Example spelled サーバ vs utterance サーバー — the prolonged mark sits
+    // mid-string (no \s anchor), so only the per-token strip in tokenize()
+    // unifies them. With keywords disabled, overlap is the only scoring path.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'server.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: [], surface_examples: ['サーバ確認'] },
+      ]);
+      const packet = resolveIntentResolutionPacket('サーバーを確認して', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(
+        candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+        'サーバー/サーバ must unify for overlap'
+      ).toBe(true);
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
+
+  it('counts single-kanji content tokens toward overlap', () => {
+    // 猫 is a real content word — without the single-kanji allowance the
+    // length filter drops it and this overlap never reaches the floor.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'kanji.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: [], surface_examples: ['猫の世話リスト'] },
+      ]);
+      const packet = resolveIntentResolutionPacket('猫の世話をして', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(
+        candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+        'single-kanji token 猫 must count toward overlap'
+      ).toBe(true);
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
+
+  it('never matches on an empty or punctuation-only trigger keyword', () => {
+    // Overlay catalogs accept arbitrary keywords; '' or '！！' must not become
+    // a universal includes() hit on every utterance.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'empty.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: ['', '  ', '！！！'], surface_examples: [] },
+      ]);
+      const packet = resolveIntentResolutionPacket('猫の世話をして', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(candidate).toBeUndefined();
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
 });
 
 describe('normalizeForTriggerMatch', () => {
@@ -580,9 +656,22 @@ describe('normalizeForTriggerMatch', () => {
     expect(normalizeForTriggerMatch('ナマス')).toBe('なます');
   });
 
-  it('drops honorific prefixes only before kanji', () => {
+  it('does not strip endings written in katakana', () => {
+    // Endings are matched on pre-hiragana text — katakana クダサイ is not the
+    // request ending ください.
+    expect(normalizeForTriggerMatch('確認シテクダサイ')).toBe('確認してください');
+  });
+
+  it('drops honorific prefixes only before a multi-kanji stem', () => {
     expect(normalizeForTriggerMatch('ご確認をお願いします')).toBe('確認を');
     expect(normalizeForTriggerMatch('おもしろい')).toBe('おもしろい');
+    // Lexicalized お/ご words keep the prefix — the single-kanji remnant would
+    // be an over-broad match (金 hits 金曜日/料金/現金).
+    expect(normalizeForTriggerMatch('お金を確認して')).toBe('お金を確認');
+    expect(normalizeForTriggerMatch('お知らせを読んで')).toBe('お知らせを読んで');
+    // 'お願いします' keeps お (one kanji after it) but the masu ending still
+    // peels to the stem, like 確認します → 確認し.
+    expect(normalizeForTriggerMatch('お願いします')).toBe('お願いし');
   });
 
   it('does not strip endings that would corrupt real words', () => {

@@ -958,7 +958,7 @@
       "description": "Form field vocabulary.",
       "locales": {
         "ja": {
-          "phrases": ["欄", "フィールド", "入力フィールド", "フォーム"]
+          "phrases": ["欄", "フィールド", "ふぃーるど", "入力フィールド", "フォーム", "ふぉーむ"]
         },
         "en": {
           "phrases": ["field", "form", "input", "textbox", "email"]

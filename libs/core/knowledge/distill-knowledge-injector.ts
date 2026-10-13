@@ -175,7 +175,7 @@ function tokenize(s: string): string[] {
   // instead of one whole-sentence token.
   return segmentWords(s.toLowerCase())
     .flatMap((t) => t.split(/[-_.]/))
-    .filter((t) => t.length >= 2);
+    .filter((t) => t.length >= 2 || /[\u3400-\u9fff]/u.test(t));
 }
 
 function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
