@@ -126,7 +126,7 @@ describe('ASK_SHAPE_LABEL_KEY', () => {
 });
 
 describe('viewFromIntentResolution', () => {
-  it('maps human_clarification_required to clarification with a more_detail next action', () => {
+  it('maps human_clarification_required to clarification with a draft_input next action', () => {
     const contract = baseContract({
       authority_level: 'human_clarification_required',
       next_action: {
@@ -140,11 +140,18 @@ describe('viewFromIntentResolution', () => {
 
     expect(view).toEqual({
       shape: 'clarification',
-      nextActions: [{ id: 'more_detail', label: 'Which meeting?' }],
+      nextActions: [
+        {
+          id: 'draft_input',
+          label: 'Which meeting?',
+          consequence: 'Cannot draft minutes without a meeting.',
+          missing_inputs: [],
+        },
+      ],
     });
   });
 
-  it('maps approval_required to execution_preview with a proceed next action', () => {
+  it('maps approval_required to execution_preview with a draft_review next action', () => {
     const contract = baseContract({
       authority_level: 'approval_required',
       next_action: {
@@ -158,7 +165,14 @@ describe('viewFromIntentResolution', () => {
 
     expect(view).toEqual({
       shape: 'execution_preview',
-      nextActions: [{ id: 'proceed', label: 'Approve sending the email' }],
+      nextActions: [
+        {
+          id: 'draft_review',
+          label: 'Approve sending the email',
+          consequence: 'The email is sent to the recipient.',
+          missing_inputs: [],
+        },
+      ],
     });
   });
 
@@ -221,5 +235,55 @@ describe('parseAskVoiceHubReply', () => {
   it('rejects a body with a prototype-pollution-shaped key', () => {
     const malicious = JSON.parse('{"reply":"hi","__proto__":{"polluted":true}}');
     expect(parseAskVoiceHubReply(malicious)).toBeUndefined();
+  });
+});
+
+describe('bounded draft-only projection', () => {
+  const draft = () =>
+    baseContract({
+      authority_level: 'human_clarification_required',
+      next_action: {
+        kind: 'provide_input',
+        label: 'Audience?',
+        consequence: 'Needed for useful suggestions.',
+      },
+      missing_inputs: ['Audience'],
+    });
+  it.each([
+    { next_action: { kind: 'request_approval', label: 'Other', consequence: 'Other' } },
+    { next_action: null },
+    { next_action: { kind: 'provide_input', label: '', consequence: 'Other' } },
+    { next_action: { kind: 'provide_input', label: ' '.repeat(5), consequence: 'Other' } },
+    { next_action: { kind: 'provide_input', label: 'x'.repeat(257), consequence: 'Other' } },
+    { next_action: { kind: 'provide_input', label: 'Other', consequence: '' } },
+    { next_action: { kind: 'provide_input', label: 'Other', consequence: 'x'.repeat(513) } },
+    { missing_inputs: ['x'.repeat(97)] },
+    { missing_inputs: Array(9).fill('field') },
+    { missing_inputs: [''] },
+    { missing_inputs: [null] },
+    { missing_inputs: 'field' },
+  ])('keeps shape but suppresses malformed or inconsistent action %j', (changed) => {
+    const contract = { ...draft(), ...changed } as unknown as IntentResolutionContract;
+    expect(viewFromIntentResolution(contract)).toEqual({ shape: 'clarification' });
+  });
+  it('preserves bounded trimmed details without promoting an intent hash to provenance', () => {
+    const contract = draft();
+    contract.next_action.label = ' Audience? ';
+    contract.next_action.consequence = ' Consequence ';
+    contract.missing_inputs = [' Audience '];
+    expect(viewFromIntentResolution(contract).nextActions).toEqual([
+      {
+        id: 'draft_input',
+        label: 'Audience?',
+        consequence: 'Consequence',
+        missing_inputs: ['Audience'],
+      },
+    ]);
+    expect(JSON.stringify(viewFromIntentResolution(contract))).not.toContain('ir_test');
+  });
+  it('suppresses mismatched approval kinds', () => {
+    expect(viewFromIntentResolution({ ...draft(), authority_level: 'approval_required' })).toEqual({
+      shape: 'execution_preview',
+    });
   });
 });
