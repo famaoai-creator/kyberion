@@ -380,6 +380,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
           correlation_id: session.correlation_id,
           title: session.goal?.summary || session.session_id,
           status: session.status,
+          awaiting_user_input: session.control?.awaiting_user_input === true,
           when: session.updated_at,
           history: progressHistoryFromTaskSession(session),
         }));
@@ -458,6 +459,8 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         }
         const detail = buildProgressDetail(
           {
+            kind: directSession ? 'task_session' : 'artifact',
+            awaiting_user_input: session.control?.awaiting_user_input === true,
             goal_summary: session.goal?.summary || session.session_id,
             success_condition: session.goal?.success_condition,
             status: session.status,
@@ -481,6 +484,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         );
         const detail = buildProgressDetail(
           {
+            kind: 'artifact',
             goal_summary: deriveHomeArtifactTitle(artifact),
             status: matchedEntry?.status || artifact.kind,
           },
