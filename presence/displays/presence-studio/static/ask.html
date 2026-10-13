@@ -47,6 +47,8 @@
               <button
                 type="button"
                 id="handsfree-toggle"
+                data-label-on="{{t:front_desk:ask_handsfree_on}}"
+                data-label-off="{{t:front_desk:ask_handsfree_off}}"
                 class="kb-btn kb-btn--ghost ask-handsfree-toggle"
                 aria-pressed="false"
               >
@@ -58,6 +60,13 @@
               <p class="ask-empty" id="ask-empty">{{t:front_desk:ask_empty}}</p>
             </div>
 
+            <div id="ask-startup-status" class="kb-callout" role="status" aria-live="polite">
+              <p id="ask-startup-loading">{{t:front_desk:ask_startup_loading}}</p>
+              <p id="ask-startup-error" hidden>{{t:front_desk:ask_startup_failed}}</p>
+              <button type="button" id="ask-startup-retry" class="kb-btn kb-btn--secondary" hidden>
+                {{t:front_desk:ask_startup_retry}}
+              </button>
+            </div>
             <p id="conversation-selection" class="kb-callout" role="status" hidden></p>
             <div id="conversation-status" class="kb-section" role="status" aria-live="polite"></div>
             <details id="conversation-legacy" class="hidden">
@@ -102,6 +111,7 @@
               <button
                 type="submit"
                 id="ask-send"
+                disabled
                 class="kb-btn kb-btn--primary ask-icon-button"
                 aria-label="{{t:front_desk:home_ask_send}}"
               ></button>
@@ -184,24 +194,20 @@
 
             <section class="kb-section" id="recent-card">
               <h2 class="kb-section__title" id="recent-title">{{t:front_desk:ask_recent}}</h2>
-              <ul class="ask-recent-list" id="recent-list">
-                <li>
-                  <div
-                    class="kb-skeleton"
-                    role="status"
-                    aria-busy="true"
-                    aria-label="{{t:ui:skeleton_loading}}"
-                  >
-                    <span class="kb-skeleton__line" aria-hidden="true"></span>
-                    <span class="kb-skeleton__line" aria-hidden="true"></span>
-                  </div>
-                </li>
-              </ul>
+              <div id="recent-status" role="status" aria-live="polite">
+                <p id="recent-loading">{{t:front_desk:ask_recent_loading}}</p>
+                <p id="recent-error" hidden>{{t:front_desk:ask_recent_failed}}</p>
+                <button type="button" id="recent-retry" class="kb-btn kb-btn--secondary" hidden>
+                  {{t:front_desk:ask_recent_retry}}
+                </button>
+              </div>
+              <ul class="ask-recent-list" id="recent-list" hidden></ul>
             </section>
           </aside>
         </div>
       </main>
     </div>
+    <script src="/ask-read-recovery.js"></script>
     <script src="/ask.js"></script>
     <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
     <script type="module" src="/front-desk-rail.js"></script>
