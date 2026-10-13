@@ -201,12 +201,18 @@
 
   var readRecovery = window.KyberionAskReadRecovery.create({
     state: state,
-    fetchJson: fetchJson,
+    fetch: fetch,
+    render: render,
+    renderConversationStatus: renderConversationStatus,
+    draftKey: draftKey,
+    saveDraft: saveDraft,
+    onHistoryReady: applyUrlPrefill,
     scopedUrl: scopedUrl,
     renderRecent: renderRecent,
     vt: vt,
   });
   var fetchReadJson = readRecovery.fetchJson;
+  var restoreConversation = readRecovery.restoreConversation;
   var hasBootVocabulary = readRecovery.hasBootVocabulary;
   var refreshRecent = readRecovery.refreshRecent;
   var renderStartup = readRecovery.renderStartup;
@@ -1048,6 +1054,7 @@
     var send = document.getElementById('ask-send');
     if (send)
       send.disabled = state.sending || state.historyState !== 'ready' || !state.storageVerified;
+    host.setAttribute('aria-busy', String(Boolean(state.historyReadPending)));
     host.classList.toggle('hidden', !key);
     if (!key) {
       host.innerHTML = '';
@@ -1070,83 +1077,11 @@
       '">' +
       escapeHtml(vt(state.vocab, 'front_desk:nav_settings')) +
       '</a>';
-    document.getElementById('conversation-reload').addEventListener('click', function () {
-      restoreConversation(false).then(applyUrlPrefill);
+    var retry = document.getElementById('conversation-reload');
+    retry.disabled = Boolean(state.historyReadPending || state.sending);
+    retry.addEventListener('click', function () {
+      restoreConversation(false);
     });
-  }
-
-  function restoreConversation(restoreDraft) {
-    state.historyState = 'loading';
-    renderConversationStatus();
-    return fetchJson(scopedUrl('/api/conversation'), { cache: 'no-store' })
-      .then(function (result) {
-        var body = result.body || {};
-        if (result.status === 401 || result.status === 403) {
-          state.errorKey = 'front_desk:conversation_access_required';
-          throw new Error('access denied');
-        }
-        if (
-          !result.ok ||
-          !body.ok ||
-          typeof body.sessionId !== 'string' ||
-          !/^concierge-[a-f0-9]{64}$/.test(body.sessionId) ||
-          !Array.isArray(body.messages)
-        )
-          throw new Error('history unavailable');
-        state.conversationId = body.sessionId;
-        state.historyState = 'ready';
-        state.pending = body.pending || 0;
-        state.errorKey = null;
-        if (body.next_action && typeof body.next_action.href === 'string')
-          state.setupHref = body.next_action.href;
-        // Only display data is restored. Historical approval actions never reactivate.
-        state.turns = body.messages
-          .filter(function (m) {
-            return m && typeof m.text === 'string' && (m.role === 'user' || m.role === 'secretary');
-          })
-          .map(function (m) {
-            return {
-              id: m.id,
-              role: m.role === 'user' ? 'user' : 'companion',
-              text: m.text,
-              createdAt: m.createdAt,
-            };
-          });
-        var input = document.getElementById('ask-input');
-        try {
-          var savedDraft = window.sessionStorage.getItem(draftKey());
-          var savedRaw = window.sessionStorage.getItem(draftKey() + '.request');
-          var saved = savedRaw === null ? null : JSON.parse(savedRaw);
-          if (
-            savedRaw !== null &&
-            (!saved ||
-              typeof saved !== 'object' ||
-              Array.isArray(saved) ||
-              typeof saved.id !== 'string' ||
-              !/^[a-f0-9-]{36}$/.test(saved.id) ||
-              typeof saved.text !== 'string' ||
-              typeof saved.createdAt !== 'number' ||
-              !isFinite(saved.createdAt))
-          )
-            throw new Error('invalid saved request');
-          if (saved) state.pendingRequest = saved;
-          state.storageVerified = true;
-          if ((restoreDraft || !state.draftRestored) && input && !state.draftEdited)
-            input.value = savedDraft || input.value;
-          state.draftRestored = true;
-          // Early edits, including deliberate clearing, outrank delayed restoration.
-          // Retry after an initial history failure also reaches this verified boundary.
-          if (state.draftEdited) saveDraft();
-        } catch (err) {
-          state.storageVerified = false;
-          state.errorKey = 'front_desk:conversation_storage_required';
-        }
-        render();
-      })
-      .catch(function () {
-        state.historyState = 'failed';
-        render();
-      });
   }
 
   function sendText(text) {
@@ -1563,7 +1498,7 @@
             })
             .join('');
         }
-        restoreConversation(true).then(applyUrlPrefill);
+        restoreConversation(true);
       })
       .catch(function () {
         if (!currentShell()) return;
