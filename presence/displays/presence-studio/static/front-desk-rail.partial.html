@@ -1,15 +1,34 @@
-<nav class="kb-nav-rail" aria-label="{{t:front_desk:nav_aria_label}}">
-  <div class="kb-nav-rail__brand">
-    <span class="kb-nav-rail__brand-mark" aria-hidden="true"></span>
-    <span class="kb-nav-rail__brand-text"
-      ><strong class="kb-nav-rail__brand-name">Kyberion</strong
-      ><span class="kb-nav-rail__brand-subtitle">{{t:front_desk:brand_tagline}}</span></span
-    >
-  </div>
-  <div class="kb-skeleton" role="status" aria-busy="true" aria-label="{{t:ui:skeleton_loading}}">
-    <span class="kb-skeleton__line" aria-hidden="true"></span>
-    <span class="kb-skeleton__line" aria-hidden="true"></span>
-    <span class="kb-skeleton__line" aria-hidden="true"></span>
-    <span class="kb-skeleton__line" aria-hidden="true"></span>
-  </div>
-</nav>
+<div data-front-desk-content>
+  <nav class="kb-nav-rail" aria-label="{{t:front_desk:nav_aria_label}}">
+    <div class="kb-nav-rail__brand">
+      <span class="kb-nav-rail__brand-mark" aria-hidden="true"></span>
+      <span class="kb-nav-rail__brand-text"
+        ><strong class="kb-nav-rail__brand-name">Kyberion</strong
+        ><span class="kb-nav-rail__brand-subtitle">{{t:front_desk:brand_tagline}}</span></span
+      >
+    </div>
+    <div class="kb-skeleton" role="status" aria-busy="true" aria-label="{{t:ui:skeleton_loading}}">
+      <span class="kb-skeleton__line" aria-hidden="true"></span>
+      <span class="kb-skeleton__line" aria-hidden="true"></span>
+      <span class="kb-skeleton__line" aria-hidden="true"></span>
+      <span class="kb-skeleton__line" aria-hidden="true"></span>
+    </div>
+  </nav>
+</div>
+<section
+  data-front-desk-recovery
+  class="kb-nav-rail"
+  role="status"
+  aria-live="polite"
+  hidden
+  data-shell-loading="{{t:front_desk:shell_loading}}"
+  data-shell-unavailable="{{t:front_desk:shell_unavailable}}"
+  data-shell-authentication="{{t:front_desk:shell_authentication}}"
+  data-shell-permission="{{t:front_desk:shell_permission}}"
+  data-shell-changed="{{t:front_desk:shell_changed}}"
+>
+  <p data-shell-status></p>
+  <button type="button" class="kb-btn kb-btn--secondary" hidden>
+    {{t:front_desk:shell_retry}}
+  </button>
+</section>

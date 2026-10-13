@@ -132,6 +132,7 @@ function harness(
     url.searchParams.set('tenant', 'alpha');
     return url.origin === location.origin ? url.pathname + url.search : url.href;
   };
+  const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
   const window = {
     location,
     setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
@@ -156,7 +157,13 @@ function harness(
       removeItem: (key: string) => storage.delete(key),
     },
     KyberionPrefs: { locale: () => 'en', tenant: () => 'alpha', scopedUrl },
-    FrontDeskRail: { ready: options.ready ?? Promise.resolve() },
+    FrontDeskRail: {
+      ready: options.ready ?? Promise.resolve(),
+      subscribe(listener: (state: { phase: string; message: string }) => void) {
+        shellListeners.push(listener);
+        return () => {};
+      },
+    },
     KyberionAsk: undefined as undefined | { mount: () => void },
   };
   const texts =
@@ -224,6 +231,8 @@ function harness(
   window.KyberionAsk?.mount();
   return {
     elements,
+    shell: (phase: string, message = '') =>
+      shellListeners.forEach((listener) => listener({ phase, message })),
     chips,
     storage,
     fetch,
@@ -1162,4 +1171,41 @@ it('shows SSR startup recovery and only reloads the page when the helper script 
   h.elements.get('ask-startup-retry')!.fire('click');
   expect(h.window.location.reload).toHaveBeenCalledTimes(1);
   expect(h.fetch).not.toHaveBeenCalled();
+});
+
+describe('Ask shared shell recovery presentation', () => {
+  it('shows the blocked reason, preserves an early draft, and starts once after ready', async () => {
+    const ready = deferred<void>();
+    const h = harness({ ready: ready.promise });
+    await flush();
+    h.input.value = 'Unsent draft';
+    h.input.fire('input');
+    h.shell('blocked', 'Check access, then Retry in the menu.');
+    expect(h.elements.get('ask-startup-loading')!.textContent).toBe(
+      'Check access, then Retry in the menu.'
+    );
+    expect(h.elements.get('ask-startup-status')!.attributes['aria-busy']).toBe('false');
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(h.fetch).not.toHaveBeenCalled();
+    h.elements.get('ask-startup-retry')!.fire('click');
+    await flush();
+    expect(h.fetch).not.toHaveBeenCalled();
+    h.shell('loading');
+    h.shell('ready');
+    ready.resolve();
+    await flush();
+    expect(h.input.value).toBe('Unsent draft');
+    expect(h.fetch.mock.calls.filter(([url]) => url.startsWith('/api/conversation'))).toHaveLength(
+      1
+    );
+    expect(h.fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+  it('does not start page reads from a superseded already-resolved ready promise', async () => {
+    const ready = deferred<void>();
+    const h = harness({ ready: ready.promise });
+    ready.resolve();
+    h.window.FrontDeskRail.ready = new Promise(() => {});
+    await flush();
+    expect(h.fetch).not.toHaveBeenCalled();
+  });
 });
