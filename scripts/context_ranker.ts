@@ -308,7 +308,7 @@ export function tokenize(text: string): string[] {
   // useful; identifier separators are still split afterwards for paths/tags.
   return segmentWords(text.toLowerCase())
     .flatMap((t) => t.split(/[-_/.]+/))
-    .filter((t) => t.length > 1 || /[\u3400-\u9fff]/u.test(t));
+    .filter((t) => t.length > 1);
 }
 
 export function scoreEntry(

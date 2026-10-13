@@ -617,6 +617,7 @@ function scoreCatalogIntent(
   const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
   const localizedNormalized = normalizeForTriggerMatchCached(utterance);
+  const utteranceTokens = tokenize(utterance);
   const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => {
     const kw = String(keyword).toLowerCase();
     // Empty/whitespace keywords must not become a universal includes() match.
@@ -634,7 +635,10 @@ function scoreCatalogIntent(
     const normalizedKeyword = normalizeForTriggerMatchCached(kw);
     return (
       normalized.includes(kw) ||
-      (normalizedKeyword.length > 0 && localizedNormalized.includes(normalizedKeyword))
+      (normalizedKeyword.length >= 2 && localizedNormalized.includes(normalizedKeyword)) ||
+      // A keyword ending-strip can collapse to one char ("押して" -> "押") —
+      // still useful, but only as an exact token so 押印/押さえて don't fire it.
+      (normalizedKeyword.length === 1 && utteranceTokens.includes(normalizedKeyword))
     );
   });
   const reasons: string[] = [];
@@ -656,7 +660,6 @@ function scoreCatalogIntent(
     reasons.push(`matched keywords: ${matchedKeywords.join(', ')}`);
   }
 
-  const utteranceTokens = tokenize(utterance);
   const exactExample = (intent.surface_examples || []).find(
     (example) => normalizeFreeText(example) === normalized
   );
