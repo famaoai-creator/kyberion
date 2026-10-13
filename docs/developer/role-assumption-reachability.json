@@ -2327,6 +2327,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/lib/work-inventory-cli-shared.ts#governed",
       "roles": ["sovereign_concierge"],
       "unresolved": []

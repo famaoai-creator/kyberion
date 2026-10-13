@@ -46,6 +46,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'scripts/audit_mirror_reconcile.ts', consumer: 'audit_mirror_reconcile' },
   { file: 'scripts/entity_governance_cleanup.ts', consumer: 'entity_governance_cleanup' },
   { file: 'scripts/mission_alignment_decision.ts', consumer: 'mission_alignment_gate' },
+  { file: 'scripts/lib/video-production-evidence.ts', consumer: 'video_production' },
   { file: 'scripts/organization_decision_approval.ts', consumer: 'organization_decision' },
   { file: 'scripts/org.ts', consumer: 'org_security_policy_write' },
   { file: 'scripts/personal-workbench/actions.ts', consumer: 'personal_workbench' },

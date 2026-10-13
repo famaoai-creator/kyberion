@@ -7531,6 +7531,10 @@
     "./security-asset-ledger": {
       "types": "./dist/security-asset-ledger.d.ts",
       "default": "./dist/security-asset-ledger.js"
+    },
+    "./mission/mission-team-selection": {
+      "types": "./dist/mission/mission-team-selection.d.ts",
+      "default": "./dist/mission/mission-team-selection.js"
     }
   },
   "dependencies": {
