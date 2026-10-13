@@ -3832,6 +3832,7 @@
         "presence/displays/concierge/src/app/settings/sections/QuietHoursPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/RecordingConsentSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ServicesSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/SettingsSaveFeedback.tsx",
         "presence/displays/concierge/src/app/settings/sections/VoiceSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/form-scope.tsx",
         "presence/displays/concierge/src/app/settings/settings-api.ts",

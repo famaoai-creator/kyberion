@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 import { Button, SettingRow, SettingsGroup, TextField, Textarea } from '@agent/shared-ui';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
@@ -23,6 +24,8 @@ export type ProfileSectionProps = {
   profile: ProfileSectionProfile;
   setProfile: (profile: ProfileSectionProfile) => void;
   busy: boolean;
+  saveFeedback?: SettingsSaveFeedbackState | null;
+  hasUnsavedChanges?: boolean;
   onSaveProfile: () => void;
   sectionRef: (element: HTMLElement | null) => void;
   /** Extra groups rendered under the profile card (表示 preferences). */
@@ -35,6 +38,8 @@ export function ProfileSection({
   profile,
   setProfile,
   busy,
+  saveFeedback,
+  hasUnsavedChanges,
   onSaveProfile,
   sectionRef,
   children,
@@ -91,6 +96,11 @@ export function ProfileSection({
               placeholder={t('setup.priority_placeholder')}
             />
           </SettingRow>
+          <SettingsSaveFeedback
+            feedback={saveFeedback}
+            hasUnsavedChanges={hasUnsavedChanges}
+            t={t}
+          />
           <div className="settings-row-actions">
             <Button
               label={t('setup.save_profile')}

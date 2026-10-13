@@ -51,3 +51,24 @@ navigation and a guarded API through the local startup without supplied IP
 headers. Check that an ordinary Next startup rejects forged proof and forwarded
 loopback headers. Unit fixtures alone do not establish that the custom server,
 middleware, and bundled route handlers share the process registry.
+
+## Settings save feedback checks
+
+Run the focused state and accessibility checks before changing grouped or section saves:
+
+```sh
+pnpm --dir presence/displays/concierge exec vitest run test/settings-drafts-ui.test.ts test/settings-save-feedback.test.ts
+```
+
+Then inspect the actual Settings page component in a browser with isolated synthetic
+responses. Scroll to the initiating profile, service-selection, or notification
+save control and check pending, confirmed, and unconfirmed results without moving
+the viewport. A submitted request with a missing or invalid receipt is unconfirmed;
+it must not be described as definitely unwritten or retried automatically.
+
+Edit again while a response is pending: the submitted snapshot may be confirmed
+while newer edits remain unsaved. Check repeated clicks, discard, a subsequent
+grouped save, failed post-save reads, and identity invalidation. Feedback belongs
+to the initiating control; announce it through one live region. Repeat in English
+and Japanese and at a narrow viewport. Synthetic response coverage does not prove
+backend write behavior; separately verify healthy navigation in the built app.
