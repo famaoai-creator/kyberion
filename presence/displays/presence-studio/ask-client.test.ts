@@ -46,6 +46,10 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
+const vocabularyTexts = () =>
+  new Proxy({} as Record<string, string>, {
+    get: (_target, key) => String(key),
+  });
 const session = 'concierge-' + 'a'.repeat(64);
 const response = (body: unknown, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -64,13 +68,21 @@ function harness(
     historyStatus?: number;
     conversation?: () => Promise<ReturnType<typeof response>>;
     vocabulary?: Promise<ReturnType<typeof response>>;
+    progress?: () => Promise<ReturnType<typeof response>>;
+    vocabularyRead?: () => Promise<ReturnType<typeof response>>;
     texts?: Record<string, string>;
+    speech?: boolean;
+    recoveryScript?: boolean;
     query?: string;
     hash?: string;
   } = {}
 ) {
   const elements = new Map(
     [
+      'ask-mic',
+      'handsfree-toggle',
+      'about-title',
+      'about-empty',
       'ask-form',
       'ask-input',
       'ask-send',
@@ -86,6 +98,17 @@ function harness(
       'draft-keep',
       'draft-replace',
       'draft-storage-warning',
+      'recent-card',
+      'recent-title',
+      'recent-list',
+      'recent-status',
+      'recent-loading',
+      'recent-error',
+      'recent-retry',
+      'ask-startup-status',
+      'ask-startup-loading',
+      'ask-startup-error',
+      'ask-startup-retry',
     ].map((id) => [id, new Element()])
   );
   const chips = new Map(
@@ -97,6 +120,7 @@ function harness(
   );
   const storage = options.storage ?? new Map<string, string>();
   const location = {
+    reload: vi.fn(),
     href: 'http://localhost/ask' + (options.query ?? '?tenant=alpha') + (options.hash ?? ''),
     origin: 'http://localhost',
     pathname: '/ask',
@@ -110,6 +134,20 @@ function harness(
   };
   const window = {
     location,
+    setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
+    AbortController,
+    SpeechRecognition: options.speech
+      ? class {
+          onstart?: () => void;
+          onerror?: () => void;
+          start() {
+            this.onstart?.();
+            this.onerror?.();
+          }
+          stop() {}
+        }
+      : undefined,
     crypto: { randomUUID },
     history: { state: null, replaceState: vi.fn() },
     sessionStorage: {
@@ -123,20 +161,31 @@ function harness(
   };
   const texts =
     options.texts ??
-    new Proxy({} as Record<string, string>, { get: (_target, key) => String(key) });
+    new Proxy({} as Record<string, string>, {
+      get: (_target, key) => String(key),
+    });
   const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     if (init?.method === 'POST')
       return options.post
         ? options.post(JSON.parse(init.body!))
         : response({ ok: true, reply: 'Done', mode: 'orchestrator' });
     if (url.startsWith('/api/ask-vocabulary'))
-      return options.vocabulary ?? response({ ok: true, texts });
-    if (url.startsWith('/api/progress')) return response({ ok: true, active: [] });
+      return options.vocabularyRead
+        ? options.vocabularyRead()
+        : (options.vocabulary ?? response({ ok: true, texts }));
+    if (url.startsWith('/api/progress'))
+      return options.progress ? options.progress() : response({ ok: true, active: [] });
     if (url.startsWith('/api/conversation'))
       return options.conversation
         ? options.conversation()
         : response(
-            { ok: true, sessionId: session, messages: [], pending: 0, ...options.history },
+            {
+              ok: true,
+              sessionId: session,
+              messages: [],
+              pending: 0,
+              ...options.history,
+            },
             options.historyStatus ?? 200
           );
     throw new Error('unexpected ' + url);
@@ -150,11 +199,29 @@ function harness(
     },
     querySelectorAll: (selector: string) => (selector === '.ask-chip' ? [...chips.values()] : []),
   };
+  elements.get('ask-send')!.disabled = true;
+  const scripts =
+    options.recoveryScript === false ? ['ask.js'] : ['ask-read-recovery.js', 'ask.js'];
   runInNewContext(
-    String(safeReadFile('presence/displays/presence-studio/static/ask.js', { encoding: 'utf8' })),
-    { window, document, fetch, navigator: {}, URL, URLSearchParams, crypto: window.crypto, console }
+    scripts
+      .map((name) =>
+        safeReadFile('presence/displays/presence-studio/static/' + name, {
+          encoding: 'utf8',
+        })
+      )
+      .join('\n'),
+    {
+      window,
+      document,
+      fetch,
+      navigator: {},
+      URL,
+      URLSearchParams,
+      crypto: window.crypto,
+      console,
+    }
   );
-  window.KyberionAsk!.mount();
+  window.KyberionAsk?.mount();
   return {
     elements,
     chips,
@@ -186,7 +253,9 @@ describe('Ask durable browser behavior (DOM doubles, no visual claim)', () => {
     expect(h.fetch).not.toHaveBeenCalled();
     ready.resolve();
     await flush();
-    expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', { cache: 'no-store' });
+    expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
+      cache: 'no-store',
+    });
     expect(h.elements.get('turns')!.innerHTML).toContain('Old answer');
     expect(h.elements.get('turns')!.innerHTML).not.toContain('Execute again');
   });
@@ -237,7 +306,11 @@ describe('Ask durable browser behavior (DOM doubles, no visual claim)', () => {
   });
   it('keeps legacy history local and read-only instead of importing or replaying it', async () => {
     const raw = JSON.stringify([
-      { role: 'companion', text: '<script>unsafe</script>', next_actions: [{ label: 'Run now' }] },
+      {
+        role: 'companion',
+        text: '<script>unsafe</script>',
+        next_actions: [{ label: 'Run now' }],
+      },
     ]);
     const storage = new Map([
       ['kyberion.ask.turns', raw],
@@ -312,7 +385,11 @@ it.each([
   const h = harness({
     post: async () =>
       response(
-        { ok: false, error, retry_safe: error !== 'conversation_capability_unsupported' },
+        {
+          ok: false,
+          error,
+          retry_safe: error !== 'conversation_capability_unsupported',
+        },
         error === 'conversation_capability_unsupported' ? 422 : 409
       ),
   });
@@ -344,7 +421,14 @@ describe('work-home inert conversation selection', () => {
     const h = harness({
       query: '?tenant=alpha&request=' + id + '&ask=retry&send=1',
       history: {
-        messages: [{ id: id + '-user', role: 'user', text: 'First request', createdAt: 1 }],
+        messages: [
+          {
+            id: id + '-user',
+            role: 'user',
+            text: 'First request',
+            createdAt: 1,
+          },
+        ],
       },
     });
     await flush();
@@ -359,7 +443,14 @@ describe('work-home inert conversation selection', () => {
     const h = harness({
       query: '?request=missing',
       history: {
-        messages: [{ id: 'another-user', role: 'user', text: 'Other request', createdAt: 1 }],
+        messages: [
+          {
+            id: 'another-user',
+            role: 'user',
+            text: 'Other request',
+            createdAt: 1,
+          },
+        ],
       },
     });
     await flush();
@@ -370,7 +461,10 @@ describe('work-home inert conversation selection', () => {
   });
 
   it('retains uncertainty and sends nothing when the selected history is unavailable', async () => {
-    const h = harness({ query: '?request=missing&ask=retry&send=1', historyStatus: 503 });
+    const h = harness({
+      query: '?request=missing&ask=retry&send=1',
+      historyStatus: 503,
+    });
     await flush();
     expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
     expect(h.elements.get('ask-send')!.disabled).toBe(true);
@@ -516,14 +610,15 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
           conversation: () => conversation.promise,
         });
         if (stage !== 'before readiness') ready.resolve();
-        if (stage === 'during history') vocabulary.resolve(response({ ok: true, texts: {} }));
+        if (stage === 'during history')
+          vocabulary.resolve(response({ ok: true, texts: vocabularyTexts() }));
         await flush();
         edit(h, 'Typed then changed');
         edit(h, text);
         expect(storage.get(draftKey)).toBe('Stale saved draft');
         expect(posts(h)).toHaveLength(0);
         ready.resolve();
-        vocabulary.resolve(response({ ok: true, texts: {} }));
+        vocabulary.resolve(response({ ok: true, texts: vocabularyTexts() }));
         conversation.resolve(historyResponse());
         await flush();
         expect(h.input.value).toBe(text);
@@ -550,7 +645,9 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
     ]);
     const h = harness({ storage, conversation: () => conversation.promise });
     await flush();
-    expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', { cache: 'no-store' });
+    expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
+      cache: 'no-store',
+    });
     expect(h.chips.get('email')!.disabled).toBe(true);
     // Deliberately invoke the handler even while disabled to exercise its own guard.
     h.chips.get('email')!.fire('click');
@@ -702,7 +799,9 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
     h.chips.get('email')!.fire('click');
     h.chips.get('unknown')!.fire('click');
     expect(h.input.value).toBe('Keep me');
-    expect(h.storage.get(draftKey)).toBe('Keep me');
+    expect(h.storage.get(draftKey)).toBeUndefined();
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
     expect(h.elements.get('draft-choice')!.hidden).toBe(true);
     expect(posts(h)).toHaveLength(0);
   });
@@ -775,7 +874,9 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
     });
     await flush();
     expect(posts(h)).toHaveLength(1);
-    expect(JSON.parse(posts(h)[0][1]!.body!)).toMatchObject({ text: 'Explicit submission' });
+    expect(JSON.parse(posts(h)[0][1]!.body!)).toMatchObject({
+      text: 'Explicit submission',
+    });
     expect(h.elements.get('draft-choice')!.hidden).toBe(true);
     pending.resolve(response({ ok: true, reply: 'Done', mode: 'orchestrator' }));
     await flush();
@@ -794,4 +895,271 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
     expect(h.window.history.replaceState).not.toHaveBeenCalled();
     expect(posts(h)).toHaveLength(0);
   });
+});
+
+describe('Ask optional recent-read isolation', () => {
+  it.each(['rejected', 'pending'])(
+    'restores conversation when recent requests are %s',
+    async (mode) => {
+      const recent = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        progress: () =>
+          mode === 'rejected' ? Promise.reject(new Error('offline')) : recent.promise,
+        history: {
+          messages: [{ id: 'display-only', role: 'secretary', text: 'Restored history' }],
+        },
+      });
+      await flush();
+      expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
+        cache: 'no-store',
+      });
+      expect(h.elements.get('turns')!.innerHTML).toContain('Restored history');
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(h.chips.get('email')!.innerHTML).toContain('front_desk:chip_email');
+      expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+      recent.resolve(response({ ok: true, active: [] }));
+      await flush();
+    }
+  );
+});
+
+describe('Ask read recovery', () => {
+  it('retries only recent reads without restoring history or changing the draft', async () => {
+    let attempts = 0;
+    const retry = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      progress: async () => (++attempts === 1 ? response({ ok: false }, 503) : retry.promise),
+    });
+    await flush();
+    expect(h.elements.get('recent-error')!.hidden).toBe(false);
+    expect(h.elements.get('recent-retry')!.hidden).toBe(false);
+    h.input.value = 'Keep this draft';
+    h.input.fire('input');
+    h.elements.get('recent-retry')!.fire('click');
+    h.elements.get('recent-retry')!.fire('click');
+    await flush();
+    expect(attempts).toBe(2);
+    expect(h.elements.get('recent-retry')!.disabled).toBe(true);
+    retry.resolve(response({ ok: true, active: [{ id: 'new', title: 'Current request' }] }));
+    await flush();
+    expect(h.elements.get('recent-list')!.innerHTML).toContain('Current request');
+    expect(h.elements.get('recent-error')!.hidden).toBe(true);
+    expect(h.input.value).toBe('Keep this draft');
+    expect(h.fetch.mock.calls.filter(([url]) => url.startsWith('/api/conversation'))).toHaveLength(
+      1
+    );
+    expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  });
+
+  it('times out optional reads and rejects a late result after an explicit retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let attempts = 0;
+      const h = harness({
+        progress: () =>
+          ++attempts === 1
+            ? old.promise
+            : Promise.resolve(
+                response({
+                  ok: true,
+                  active: [{ id: 'new', title: 'New result' }],
+                })
+              ),
+      });
+      await flush();
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(h.elements.get('recent-error')!.hidden).toBe(false);
+      h.elements.get('recent-retry')!.fire('click');
+      await flush();
+      old.resolve(response({ ok: true, active: [{ id: 'old', title: 'Old result' }] }));
+      await flush();
+      expect(h.elements.get('recent-list')!.innerHTML).toContain('New result');
+      expect(h.elements.get('recent-list')!.innerHTML).not.toContain('Old result');
+      expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps rendered labels on vocabulary failure and restores early edits after read-only retry', async () => {
+    let attempts = 0;
+    const retry = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      vocabularyRead: () =>
+        ++attempts === 1 ? Promise.reject(new Error('offline')) : retry.promise,
+    });
+    h.chips.get('email')!.innerHTML = 'Server-rendered mail label';
+    await flush();
+    expect(h.chips.get('email')!.innerHTML).toBe('Server-rendered mail label');
+    expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    h.input.value = 'Edited while preparing';
+    h.input.fire('input');
+    h.elements.get('ask-startup-retry')!.fire('click');
+    h.elements.get('ask-startup-retry')!.fire('click');
+    await flush();
+    expect(attempts).toBe(2);
+    retry.resolve(response({ ok: true, texts: vocabularyTexts() }));
+    await flush();
+    expect(h.input.value).toBe('Edited while preparing');
+    expect(h.elements.get('ask-startup-status')!.hidden).toBe(true);
+    expect(h.elements.get('ask-send')!.disabled).toBe(false);
+    expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  });
+});
+
+it('keeps startup retries behind verified rail readiness', async () => {
+  const ready = deferred<void>();
+  const h = harness({ ready: ready.promise });
+  h.elements.get('ask-startup-retry')!.fire('click');
+  await flush();
+  expect(h.fetch).not.toHaveBeenCalled();
+  ready.resolve();
+  await flush();
+  expect(h.fetch.mock.calls.filter(([url]) => url.startsWith('/api/ask-vocabulary'))).toHaveLength(
+    1
+  );
+  expect(h.elements.get('ask-send')!.disabled).toBe(false);
+});
+
+describe('Ask startup fallback contracts', () => {
+  it.each([null, {}, [], { 'front_desk:home_ask_send': ' ' }])(
+    'rejects unusable vocabulary %j without wiping labels',
+    async (texts) => {
+      const h = harness({
+        vocabulary: Promise.resolve(response({ ok: true, texts })),
+      });
+      h.chips.get('email')!.innerHTML = 'Server mail label';
+      await flush();
+      expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
+      expect(h.chips.get('email')!.innerHTML).toBe('Server mail label');
+      expect(h.fetch.mock.calls.some(([url]) => url.startsWith('/api/conversation'))).toBe(false);
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    }
+  );
+
+  it('preserves voice labels while vocabulary is unavailable without changing voice actions', async () => {
+    const h = harness({
+      speech: true,
+      vocabulary: Promise.reject(new Error('offline')),
+    });
+    const toggle = h.elements.get('handsfree-toggle')!;
+    toggle.textContent = 'Server off';
+    toggle.setAttribute('data-label-on', 'Server on');
+    toggle.setAttribute('data-label-off', 'Server off');
+    h.elements.get('about-title')!.textContent = 'Server about title';
+    h.elements.get('about-empty')!.textContent = 'Server about text';
+    await flush();
+    h.elements.get('ask-mic')!.fire('click');
+    toggle.fire('click');
+    await flush();
+    expect(toggle.attributes['aria-pressed']).toBe('true');
+    expect(toggle.textContent).toBe('Server on');
+    expect(h.elements.get('about-title')!.textContent).toBe('Server about title');
+    expect(h.elements.get('about-empty')!.textContent).toBe('Server about text');
+    expect(
+      h.fetch.mock.calls.some(
+        ([url, init]) => url === '/api/conversation' && init?.method === 'POST'
+      )
+    ).toBe(false);
+    toggle.fire('click');
+    await flush();
+    expect(toggle.textContent).toBe('Server off');
+  });
+
+  it('times out startup and ignores its late response after a manual retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let attempts = 0;
+      const h = harness({
+        vocabularyRead: () =>
+          ++attempts === 1
+            ? old.promise
+            : Promise.resolve(response({ ok: true, texts: vocabularyTexts() })),
+      });
+      await flush();
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
+      h.elements.get('ask-startup-retry')!.fire('click');
+      await flush();
+      old.resolve(response({ ok: true, texts: {} }));
+      await flush();
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(h.elements.get('ask-startup-status')!.hidden).toBe(true);
+      expect(
+        h.fetch.mock.calls.filter(([url]) => url.startsWith('/api/conversation'))
+      ).toHaveLength(1);
+      expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not bypass failed rail readiness on retry', async () => {
+    const h = harness({
+      ready: Promise.reject(new Error('scope unavailable')),
+    });
+    await flush();
+    expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
+    h.elements.get('ask-startup-retry')!.fire('click');
+    await flush();
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+  });
+});
+
+it.each([null, { ok: false }, { ok: true }, { ok: true, active: {} }])(
+  'does not mistake malformed recent data %j for an empty list',
+  async (body) => {
+    const h = harness({ progress: async () => response(body) });
+    await flush();
+    expect(h.elements.get('recent-error')!.hidden).toBe(false);
+    expect(h.elements.get('recent-list')!.hidden).toBe(true);
+    expect(h.elements.get('recent-retry')!.hidden).toBe(false);
+    expect(h.elements.get('ask-send')!.disabled).toBe(false);
+    expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  }
+);
+
+it('keeps a newer post-success recent refresh when the initial read arrives late', async () => {
+  const old = deferred<ReturnType<typeof response>>();
+  let reads = 0;
+  const h = harness({
+    progress: () =>
+      ++reads === 1
+        ? old.promise
+        : Promise.resolve(
+            response({
+              ok: true,
+              active: [{ id: 'new', title: 'New result' }],
+            })
+          ),
+  });
+  await flush();
+  h.input.value = 'One synthetic request';
+  h.form.fire('submit');
+  await flush();
+  expect(reads).toBe(2);
+  old.resolve(response({ ok: true, active: [{ id: 'old', title: 'Old result' }] }));
+  await flush();
+  expect(h.elements.get('recent-list')!.innerHTML).toContain('New result');
+  expect(h.elements.get('recent-list')!.innerHTML).not.toContain('Old result');
+  expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+});
+
+it('shows SSR startup recovery and only reloads the page when the helper script is missing', () => {
+  const h = harness({ recoveryScript: false });
+  expect(h.window.KyberionAsk).toBeUndefined();
+  expect(h.elements.get('ask-startup-status')!.hidden).toBe(false);
+  expect(h.elements.get('ask-startup-loading')!.hidden).toBe(true);
+  expect(h.elements.get('ask-startup-error')!.hidden).toBe(false);
+  expect(h.elements.get('ask-startup-retry')!.hidden).toBe(false);
+  expect(h.elements.get('ask-send')!.disabled).toBe(true);
+  expect(h.fetch).not.toHaveBeenCalled();
+  h.elements.get('ask-startup-retry')!.fire('click');
+  expect(h.window.location.reload).toHaveBeenCalledTimes(1);
+  expect(h.fetch).not.toHaveBeenCalled();
 });

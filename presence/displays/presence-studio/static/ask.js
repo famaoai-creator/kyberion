@@ -39,6 +39,25 @@
 (function () {
   'use strict';
 
+  // A missing helper is a delivery failure: retain SSR copy and offer a full-page GET retry.
+  if (!window.KyberionAskReadRecovery) {
+    var host = document.getElementById('ask-startup-status');
+    if (host) host.hidden = false;
+    var loading = document.getElementById('ask-startup-loading');
+    if (loading) loading.hidden = true;
+    var error = document.getElementById('ask-startup-error');
+    if (error) error.hidden = false;
+    var retry = document.getElementById('ask-startup-retry');
+    if (retry) {
+      retry.hidden = false;
+      retry.disabled = false;
+      retry.addEventListener('click', function () {
+        window.location.reload();
+      });
+    }
+    return;
+  }
+
   var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
   var TURNS_STORAGE_KEY = 'kyberion.ask.turns';
@@ -133,6 +152,13 @@
 
   var state = {
     vocab: {},
+    vocabularyReady: false,
+    startupReadPending: false,
+    startupFailed: false,
+    recentPhase: 'loading',
+    recentFailedOnce: false,
+    recentSequence: 0,
+    recentItems: [],
     locale: 'en',
     sessionId: readSessionId(),
     turns: [],
@@ -172,6 +198,18 @@
     // PA-09: the talking avatar handle (null until ask.html attaches it).
     avatar: null,
   };
+
+  var readRecovery = window.KyberionAskReadRecovery.create({
+    state: state,
+    fetchJson: fetchJson,
+    scopedUrl: scopedUrl,
+    renderRecent: renderRecent,
+    vt: vt,
+  });
+  var fetchReadJson = readRecovery.fetchJson;
+  var hasBootVocabulary = readRecovery.hasBootVocabulary;
+  var refreshRecent = readRecovery.refreshRecent;
+  var renderStartup = readRecovery.renderStartup;
 
   var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
   var HEARING_CANVAS_POLL_MAX_TRIES = 10;
@@ -255,10 +293,13 @@
       return;
     }
     button.setAttribute('aria-pressed', state.handsFree ? 'true' : 'false');
-    button.textContent = vt(
-      state.vocab,
-      state.handsFree ? 'front_desk:ask_handsfree_on' : 'front_desk:ask_handsfree_off'
-    );
+    button.textContent =
+      vt(
+        state.vocab,
+        state.handsFree ? 'front_desk:ask_handsfree_on' : 'front_desk:ask_handsfree_off'
+      ) ||
+      button.getAttribute(state.handsFree ? 'data-label-on' : 'data-label-off') ||
+      button.textContent;
   }
 
   var AUTHORITY_LABEL_KEY = {
@@ -297,6 +338,7 @@
   // resolution, plus a live `ask_thinking` / `ask_listening` override on the
   // state block while a request is in flight or the mic is open.
   function renderAboutCard() {
+    if (!state.vocabularyReady) return;
     var titleEl = document.getElementById('about-title');
     if (titleEl) titleEl.textContent = vt(state.vocab, 'front_desk:ask_about_title');
 
@@ -510,6 +552,8 @@
   }
 
   function render() {
+    // Until vocabulary is verified, retain the page's localized server-rendered labels.
+    if (!state.vocabularyReady) return;
     renderInputShell();
     renderHandsFreeToggle();
     renderAboutCard();
@@ -649,7 +693,9 @@
       statusEl.textContent =
         vt(state.vocab, 'front_desk:hearing_handoff_done') +
         ' ' +
-        formatTemplate(vt(state.vocab, 'front_desk:hearing_mission_label'), { id: handoff.refId });
+        formatTemplate(vt(state.vocab, 'front_desk:hearing_mission_label'), {
+          id: handoff.refId,
+        });
       statusEl.classList.remove('hidden');
       if (handoff.href) {
         linkEl.textContent = vt(state.vocab, 'front_desk:hearing_open_decide');
@@ -866,7 +912,9 @@
   function speakReply(text) {
     if (!state.handsFree) return;
     if (state.avatar) {
-      state.avatar.speak(text, { lang: state.locale === 'ja' ? 'ja-JP' : 'en-US' });
+      state.avatar.speak(text, {
+        lang: state.locale === 'ja' ? 'ja-JP' : 'en-US',
+      });
       return;
     }
     if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
@@ -877,19 +925,6 @@
     } catch (err) {
       // Best effort only.
     }
-  }
-
-  function refreshRecent() {
-    fetchJson(scopedUrl('/api/progress'))
-      .then(function (result) {
-        if (result.ok && result.body && result.body.ok) {
-          renderRecent(result.body.active || []);
-        }
-      })
-      .catch(function () {
-        // Recent requests are additive chrome — a fetch failure must not
-        // interrupt the conversation.
-      });
   }
 
   function scopedUrl(path) {
@@ -1474,25 +1509,42 @@
     wireChips();
     wireHearingDecision();
 
-    Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+    var retryRecent = document.getElementById('recent-retry');
+    if (retryRecent)
+      retryRecent.addEventListener('click', function () {
+        if (state.recentPhase === 'failed') refreshRecent();
+      });
+    var retryStartup = document.getElementById('ask-startup-retry');
+    if (retryStartup) retryStartup.addEventListener('click', loadStartup);
+    renderStartup();
+    loadStartup();
+  }
+
+  function loadStartup() {
+    if (state.vocabularyReady || state.startupReadPending) return;
+    state.startupReadPending = true;
+    renderStartup();
+    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
       .then(function () {
-        return Promise.all([
-          fetchJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale)),
-          fetchJson(scopedUrl('/api/progress')),
-        ]);
+        return fetchReadJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale));
       })
-      .then(function (pair) {
-        var vocabResult = pair[0];
-        var progressResult = pair[1];
-        if (vocabResult.ok && vocabResult.body && vocabResult.body.ok) {
-          state.vocab = vocabResult.body.texts || {};
-        }
+      .then(function (vocabResult) {
+        var texts = vocabResult.body && vocabResult.body.texts;
+        if (
+          !vocabResult.ok ||
+          !vocabResult.body ||
+          !vocabResult.body.ok ||
+          !hasBootVocabulary(texts)
+        )
+          throw new Error('Vocabulary unavailable');
+        state.vocab = texts;
+        state.vocabularyReady = true;
+        state.startupReadPending = false;
+        renderStartup();
         render();
         loadHearing();
-        if (progressResult.ok && progressResult.body && progressResult.body.ok) {
-          renderRecent(progressResult.body.active || []);
-        }
-
+        // Optional recent activity must never delay or block the conversation.
+        refreshRecent();
         var legacy = loadTurns();
         var archive = document.getElementById('conversation-legacy');
         var archiveTurns = document.getElementById('conversation-legacy-turns');
@@ -1507,9 +1559,9 @@
         restoreConversation(true).then(applyUrlPrefill);
       })
       .catch(function () {
-        // The ask page is additive chrome around the rail — a fetch failure
-        // must never throw and break the rest of the page.
-        render();
+        state.startupReadPending = false;
+        state.startupFailed = true;
+        renderStartup();
       });
   }
 
