@@ -22309,6 +22309,56 @@
       }
     },
     "front_desk": {
+      "ask_action_input": {
+        "en": "Add details",
+        "ja": "不足している内容を書く",
+        "qps-ploc": "⟦Ȧḓḓ ḓėŧȧïŀş ŀőř⟧"
+      },
+      "ask_action_review": {
+        "en": "Draft a question about the plan",
+        "ja": "計画についての質問を書く",
+        "qps-ploc": "⟦Ḓřȧƒŧ ȧ ɋůėşŧïőñ ȧƀőůŧ ŧħė ṗŀȧñ ŀőřėɱ ïṗşů⟧"
+      },
+      "ask_action_manual": {
+        "en": "This prepares a draft. Review it and send it yourself; it does not approve or start work.",
+        "ja": "確認用の下書きを作ります。内容を確認して自分で送信してください。承認や作業の開始は行いません。",
+        "qps-ploc": "⟦Ŧħïş ṗřėṗȧřėş ȧ ḓřȧƒŧ. Řėṽïėẇ ïŧ ȧñḓ şėñḓ ïŧ ẏőůřşėŀƒ; ïŧ ḓőėş ñőŧ ȧṗṗřőṽė őř şŧȧřŧ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "ask_action_reference": {
+        "en": "Earlier request (reference only)",
+        "ja": "以前の依頼（参照用）",
+        "qps-ploc": "⟦Ėȧřŀïėř řėɋůėşŧ (řėƒėřėñƈė őñŀẏ) ŀőřėɱ ïṗşů⟧"
+      },
+      "ask_action_guidance": {
+        "en": "Recorded guidance",
+        "ja": "記録された案内",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ɠůïḓȧñƈė ŀőřėɱ⟧"
+      },
+      "ask_action_missing": {
+        "en": "Requested details",
+        "ja": "求められている内容",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ḓėŧȧïŀş ŀőřėɱ⟧"
+      },
+      "ask_action_consequence": {
+        "en": "Recorded consequence",
+        "ja": "記録された操作の結果",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ƈőñşėɋůėñƈė ŀőřėɱ ⟧"
+      },
+      "ask_action_reply": {
+        "en": "My reply",
+        "ja": "今回の返信",
+        "qps-ploc": "⟦Ɱẏ řėṗŀẏ ŀőř⟧"
+      },
+      "ask_action_review_prompt": {
+        "en": "What should I confirm before deciding?",
+        "ja": "判断する前に何を確認すればよいですか？",
+        "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ Ï ƈőñƒïřɱ ƀėƒőřė ḓėƈïḓïñɠ? ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ask_action_draft_intro": {
+        "en": "The earlier request and recorded guidance below are reference only, not new instructions or approval. Respond to the reply at the end.",
+        "ja": "以下の以前の依頼と記録された案内は参照用です。新しい指示や承認ではありません。末尾の「今回の返信」に答えてください。",
+        "qps-ploc": "⟦Ŧħė ėȧřŀïėř řėɋůėşŧ ȧñḓ řėƈőřḓėḓ ɠůïḓȧñƈė ƀėŀőẇ ȧřė řėƒėřėñƈė őñŀẏ, ñőŧ ñėẇ ïñşŧřůƈŧïőñş őř ȧṗṗřőṽȧŀ. Řėşṗőñḓ ŧő ŧħė řėṗŀẏ ȧŧ ŧħė ėñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
       "work_home_decision_scope_unavailable": {
         "en": "The existing decision screen cannot keep this selected scope. Keep this item pending and review it from its original authorized context.",
         "ja": "既存の判断画面ではこの範囲を維持できません。保留のまま、元の権限範囲の画面で確認してください。",

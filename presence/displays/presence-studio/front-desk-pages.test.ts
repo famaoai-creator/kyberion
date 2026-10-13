@@ -327,3 +327,20 @@ it('delivers every required Ask boot label and keeps localized SSR recovery cont
     expect(html).toContain(catalogT('front_desk:ask_recent_failed', undefined, locale));
   }
 });
+
+it('loads draft actions before Ask and bounds multiline context', () => {
+  const html = readStatic('ask.html');
+  expect(html).toContain('<script src="/ask-next-actions.js"></script>');
+  expect(html.indexOf('/ask-next-actions.js')).toBeLessThan(html.indexOf('/ask.js'));
+  const css = readStatic('ask.css');
+  const group = css.match(/\.ask-turn-next-actions \{([\s\S]*?)\}/)?.[1];
+  expect(group).toContain('flex-direction: column');
+  expect(group).toContain('min-width: 0');
+  expect(group).toContain('max-width: 100%');
+  const paragraph = css.match(/\.ask-turn-next-actions p \{([\s\S]*?)\}/)?.[1];
+  expect(paragraph).toContain('white-space: pre-wrap');
+  expect(paragraph).toContain('overflow-wrap: anywhere');
+  const button = css.match(/\.ask-turn-next-actions button \{([\s\S]*?)\}/)?.[1];
+  expect(button).toContain('white-space: normal');
+  expect(button).toContain('overflow-wrap: anywhere');
+});
