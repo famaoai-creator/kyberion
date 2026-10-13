@@ -1,0 +1,9 @@
+{
+  "action": "generate_music",
+  "params": {
+    "await_completion": true,
+    "backend_id": "media-generation.chatmusician_mlx",
+    "prompt": "a cheerful Irish-style jig in G major with a repeating A/B structure",
+    "target_path": "active/shared/tmp/chatmusician-demo.wav"
+  }
+}

@@ -5,7 +5,9 @@ import {
   safeExistsSync,
   safeExecResult,
   safeMkdir,
+  safeWriteFile,
 } from '../secure-io.js';
+import { commandLocatorAdapter } from '../platform-command-adapters.js';
 import { logger } from '../core.js';
 import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
 import { isAppleSilicon } from '../platform.js';
@@ -19,10 +21,16 @@ import {
 } from '../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 import {
+  MUSAUDIOGEN_REQUIRED_FILES,
+  MUSAUDIOGEN_VARIANT_HF_REPO,
+  clampMlAudioGenDurationSec,
   clampMusicGenDurationSec,
   clampStableAudioDurationSec,
+  resolveChatMusicianGenerationPolicy,
   resolveLocalMusicGenMlxGenerationPolicy,
   resolveLocalStableAudioGenerationPolicy,
+  resolveMlAudioGenGenerationPolicy,
+  resolveMlAudioGenVariant,
 } from './music-generation-policy.js';
 import type {
   MusicGenerationProvider,
@@ -224,12 +232,342 @@ async function runLocalStableAudioGeneration(
   };
 }
 
+/**
+ * Resolve the `--weights-dir` for mlx-audiogen. An explicit env value that
+ * looks like a path is used as-is (user-managed). Otherwise the variant
+ * short name maps to a pre-converted weight repo that is downloaded once
+ * into the tool's own model cache (`~/.mlx-audiogen/models/<variant>`).
+ */
+function provisionMlAudioGenWeights(
+  variant: string,
+  policy: { weightsDir?: string; timeoutMs: number }
+): { dir: string } | { error: string } {
+  const explicit = variant.trim();
+  if (explicit.includes('/') || explicit.includes('\\')) {
+    return { dir: explicit };
+  }
+  const repo = MUSAUDIOGEN_VARIANT_HF_REPO[explicit];
+  if (!repo) {
+    return {
+      error:
+        `musicgen_audiogen_weights_required: set KYBERION_MUSAUDIOGEN_WEIGHTS_DIR to a converted ` +
+        `weights dir (mlx-audiogen-convert --model facebook/<variant> --output <dir>)`,
+    };
+  }
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const cacheDir = home
+    ? path.join(home, '.mlx-audiogen', 'models', explicit)
+    : path.join('active', 'shared', 'cache', 'mlx-audiogen', explicit);
+  const complete = MUSAUDIOGEN_REQUIRED_FILES.every((file) =>
+    safeExistsSync(path.join(cacheDir, file))
+  );
+  if (complete) return { dir: cacheDir };
+  // huggingface_hub renamed its CLI to `hf`; older installs still ship
+  // `huggingface-cli`. Try the new name first, then the legacy one.
+  let downloadError = '';
+  for (const cli of ['hf', 'huggingface-cli']) {
+    const download = safeExecResult(
+      'uvx',
+      ['--from', 'huggingface_hub', cli, 'download', repo, '--local-dir', cacheDir],
+      { timeoutMs: policy.timeoutMs, maxOutputMB: 20 }
+    );
+    if (download.status === 0 && !download.error) {
+      downloadError = '';
+      break;
+    }
+    downloadError = download.stderr?.trim() || download.stdout?.trim() || '';
+  }
+  if (downloadError) {
+    return {
+      error:
+        downloadError ||
+        `musicgen_audiogen_weights_download_failed: pre-converted weights for '${explicit}' ` +
+          `could not be fetched from ${repo}; convert manually (mlx-audiogen-convert --model ` +
+          `facebook/${explicit} --output <dir>) and set KYBERION_MUSAUDIOGEN_WEIGHTS_DIR`,
+    };
+  }
+  const ready = MUSAUDIOGEN_REQUIRED_FILES.every((file) =>
+    safeExistsSync(path.join(cacheDir, file))
+  );
+  if (!ready) {
+    return {
+      error: `musicgen_audiogen_weights_incomplete: ${cacheDir} lacks ${MUSAUDIOGEN_REQUIRED_FILES.join(', ')}`,
+    };
+  }
+  return { dir: cacheDir };
+}
+
+async function runMlAudioGenGeneration(
+  request: MusicGenerationRequest,
+  startedAt: number,
+  providerId: string
+): Promise<MusicGenerationResult> {
+  const outputPath = ensureWavTargetPath(getFallbackTargetPath(request));
+  const outputDir = path.dirname(outputPath);
+  if (!safeExistsSync(outputDir)) {
+    safeMkdir(outputDir, { recursive: true });
+  }
+
+  const policy = resolveMlAudioGenGenerationPolicy();
+  const durationSec = clampMlAudioGenDurationSec(request.durationSec, policy);
+  const prompt = request.prompt.trim();
+  if (!prompt) {
+    return {
+      status: 'failed',
+      provider: providerId,
+      elapsedMs: Date.now() - startedAt,
+      error: 'musicgen_audiogen_prompt_required',
+    };
+  }
+
+  const runtime = probeToolRuntime('musicgen_audiogen', 'trial');
+  if (runtime.selected_action === 'install') {
+    return {
+      status: 'failed',
+      provider: providerId,
+      elapsedMs: Date.now() - startedAt,
+      error: 'musicgen_audiogen_install_required',
+    };
+  }
+
+  const runner = runtime.selected_backend || runtime.trial_backend;
+  let args = [...(runner.args || [])];
+  if (runner.command === 'uvx') {
+    args = patchUvxPackageSpec(args, policy.packageSpec);
+  }
+
+  // mlx-audiogen CLI: mlx-audiogen --model musicgen --prompt "<p>" --seconds <s> --output <path>
+  // The model variant (mono/stereo/melody) follows --weights-dir, which the
+  // bridge always passes: explicit env path as-is, otherwise a provisioned
+  // pre-converted weights dir (auto-downloaded once). request.model selects
+  // the variant (never forwarded).
+  const weights = provisionMlAudioGenWeights(
+    resolveMlAudioGenVariant(request.model, policy),
+    policy
+  );
+  if ('error' in weights) {
+    return {
+      status: 'failed',
+      provider: providerId,
+      elapsedMs: Date.now() - startedAt,
+      error: weights.error,
+    };
+  }
+  args.push(
+    '--model',
+    'musicgen',
+    '--prompt',
+    prompt,
+    '--seconds',
+    String(durationSec),
+    '--output',
+    outputPath,
+    '--weights-dir',
+    weights.dir,
+    '--top-k',
+    String(policy.topK),
+    '--guidance-coef',
+    String(policy.guidance)
+  );
+  const seed = request.seed?.trim() || policy.seed;
+  if (seed) {
+    args.push('--seed', seed);
+  }
+
+  const result = safeExecResult(runner.command, args, {
+    timeoutMs: policy.timeoutMs,
+    maxOutputMB: 50,
+  });
+
+  if (result.status !== 0 || result.error) {
+    return {
+      status: 'failed',
+      provider: providerId,
+      elapsedMs: Date.now() - startedAt,
+      error:
+        result.stderr?.trim() ||
+        result.stdout?.trim() ||
+        result.error?.message ||
+        'musicgen_audiogen_generation_failed',
+    };
+  }
+
+  if (!safeExistsSync(outputPath)) {
+    return {
+      status: 'failed',
+      provider: providerId,
+      elapsedMs: Date.now() - startedAt,
+      error: 'musicgen_audiogen_output_missing',
+    };
+  }
+
+  return {
+    status: 'succeeded',
+    provider: providerId,
+    path: outputPath,
+    elapsedMs: Date.now() - startedAt,
+  };
+}
+
+/**
+ * Extract an ABC notation block from free-form LLM output. ChatMusician
+ * answers with prose around the score; the score starts at the first `X:`
+ * reference-number header.
+ */
+export function extractAbcNotation(output: string): string | null {
+  const lines = output.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^X:\s*\d/.test(line.trim()));
+  if (start < 0) return null;
+  const abc = lines.slice(start).join('\n').trim();
+  return abc && /^(T|M|L|R|K):/m.test(abc) ? abc : null;
+}
+
+function locateSystemCommand(command: string): string | null {
+  const found = commandLocatorAdapter.locate(command);
+  return found.length > 0 ? found[0]! : null;
+}
+
+async function runChatMusicianGeneration(
+  request: MusicGenerationRequest,
+  startedAt: number,
+  providerId: string
+): Promise<MusicGenerationResult> {
+  const failed = (error: string): MusicGenerationResult => ({
+    status: 'failed',
+    provider: providerId,
+    elapsedMs: Date.now() - startedAt,
+    error,
+  });
+
+  const outputPath = ensureWavTargetPath(getFallbackTargetPath(request));
+  const outputDir = path.dirname(outputPath);
+  if (!safeExistsSync(outputDir)) {
+    safeMkdir(outputDir, { recursive: true });
+  }
+
+  const policy = resolveChatMusicianGenerationPolicy();
+  const prompt = request.prompt.trim();
+  if (!prompt) return failed('chatmusician_prompt_required');
+
+  // Cheap static preconditions first: never burn a full LLM composition run
+  // when the render toolchain is missing (explicit preferences bypass
+  // isAvailable, so this check must live on the generate path too).
+  if (!locateSystemCommand('abc2midi')) return failed('chatmusician_abc2midi_install_required');
+  if (!locateSystemCommand('fluidsynth')) return failed('chatmusician_fluidsynth_install_required');
+  if (!policy.soundfont || !safeExistsSync(policy.soundfont)) {
+    return failed('chatmusician_soundfont_missing');
+  }
+
+  const runtime = probeToolRuntime('chatmusician_mlx', 'trial');
+  if (runtime.selected_action === 'install') {
+    return failed('chatmusician_mlx_install_required');
+  }
+  const runner = runtime.selected_backend || runtime.trial_backend;
+  let llmArgs = [...(runner.args || [])];
+  if (runner.command === 'uvx') {
+    llmArgs = patchUvxPackageSpec(llmArgs, policy.packageSpec);
+  }
+
+  // Stage 1: compose ABC notation with the ChatMusician LLM. durationSec
+  // cannot clamp symbolic composition, so it rides along as a soft hint.
+  const durationHint =
+    typeof request.durationSec === 'number' && Number.isFinite(request.durationSec)
+      ? ` Aim for approximately ${Math.round(request.durationSec)} seconds of music.`
+      : '';
+  const abcPrompt =
+    `Using ABC notation, compose a well-structured instrumental score for the following brief. ` +
+    `Output the ABC notation (X:/T:/M:/L:/K: headers followed by the tune) and keep prose minimal.${durationHint}\n${prompt}`;
+  llmArgs.push(
+    '--model',
+    policy.model || policy.hfRepo,
+    '--prompt',
+    abcPrompt,
+    '--max-tokens',
+    String(policy.maxTokens),
+    '--temp',
+    String(policy.temperature)
+  );
+  const seed = request.seed?.trim() || policy.seed;
+  if (seed) {
+    llmArgs.push('--seed', seed);
+  }
+  const llmResult = safeExecResult(runner.command, llmArgs, {
+    timeoutMs: policy.timeoutMs,
+    maxOutputMB: 10,
+  });
+  if (llmResult.status !== 0 || llmResult.error) {
+    return failed(
+      llmResult.stderr?.trim() ||
+        llmResult.stdout?.trim() ||
+        llmResult.error?.message ||
+        'chatmusician_compose_failed'
+    );
+  }
+  const abc = extractAbcNotation(llmResult.stdout ?? '');
+  if (!abc) return failed('chatmusician_abc_parse_failed');
+
+  const stem = outputPath.slice(0, -'.wav'.length);
+  const abcPath = `${stem}.abc`;
+  const midiPath = `${stem}.midi`;
+  safeWriteFile(abcPath, abc + '\n');
+
+  // Stage 2: ABC -> MIDI.
+  if (!locateSystemCommand('abc2midi')) return failed('chatmusician_abc2midi_install_required');
+  // Sub-stage budget: bounded by the policy timeout, never more than 5 min.
+  const convertBudgetMs = Math.min(5 * 60 * 1000, policy.timeoutMs);
+  const abc2midiDirect = safeExecResult('abc2midi', [abcPath, '-o', midiPath], {
+    timeoutMs: convertBudgetMs,
+    maxOutputMB: 10,
+  });
+  let renderedMidi: string | null = safeExistsSync(midiPath) ? midiPath : null;
+  let legacyStderr = '';
+  if (!renderedMidi) {
+    // Older abcmidi builds ignore -o; fall back to the default output name.
+    const legacy = safeExecResult('abc2midi', [abcPath], {
+      timeoutMs: convertBudgetMs,
+      maxOutputMB: 10,
+    });
+    legacyStderr = legacy.stderr?.trim() || '';
+    renderedMidi =
+      [`${stem}.midi`, `${stem}.mid`].find((candidate) => safeExistsSync(candidate)) || null;
+    if (!renderedMidi) {
+      return failed(legacyStderr || abc2midiDirect.stderr?.trim() || 'chatmusician_midi_missing');
+    }
+  }
+
+  // Stage 3: MIDI -> WAV via a SoundFont synthesizer.
+  if (!locateSystemCommand('fluidsynth')) return failed('chatmusician_fluidsynth_install_required');
+  if (!policy.soundfont || !safeExistsSync(policy.soundfont)) {
+    return failed('chatmusician_soundfont_missing');
+  }
+  // NB: fluidsynth parses options positionally — every flag must precede
+  // the SoundFont and MIDI file arguments.
+  const render = safeExecResult(
+    'fluidsynth',
+    ['-ni', '-F', outputPath, '-r', '44100', policy.soundfont, renderedMidi],
+    { timeoutMs: policy.timeoutMs, maxOutputMB: 20 }
+  );
+  if (render.status !== 0 || render.error) {
+    return failed(render.stderr?.trim() || 'chatmusician_render_failed');
+  }
+  if (!safeExistsSync(outputPath)) return failed('chatmusician_output_missing');
+
+  return {
+    status: 'succeeded',
+    provider: providerId,
+    path: outputPath,
+    elapsedMs: Date.now() - startedAt,
+  };
+}
+
 export class LocalMusicGenMlxGenerationProvider implements MusicGenerationProvider {
   readonly id = 'musicgen_mlx';
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
   readonly outputFormats = ['wav'] as const;
+  /** MusicGen renders instrumental audio only — no sung voice. */
+  readonly supportsVocals = false;
 
   maxDurationSec(): number {
     return resolveLocalMusicGenMlxGenerationPolicy().maxDurationSec;
@@ -250,6 +588,8 @@ export class LocalStableAudioGenerationProvider implements MusicGenerationProvid
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
   readonly outputFormats = ['wav'] as const;
+  /** Stable Audio renders instrumental audio only — no sung voice. */
+  readonly supportsVocals = false;
 
   maxDurationSec(): number {
     return resolveLocalStableAudioGenerationPolicy().maxDurationSec;
@@ -261,6 +601,66 @@ export class LocalStableAudioGenerationProvider implements MusicGenerationProvid
 
   async generate(request: MusicGenerationRequest): Promise<MusicGenerationResult> {
     return await runLocalStableAudioGeneration(request, Date.now(), this.id);
+  }
+}
+
+export class MlAudioGenGenerationProvider implements MusicGenerationProvider {
+  readonly id = 'musicgen_audiogen';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
+  readonly outputFormats = ['wav'] as const;
+  /** mlx-audiogen musicgen renders instrumental audio only — no sung voice. */
+  readonly supportsVocals = false;
+
+  maxDurationSec(): number {
+    return resolveMlAudioGenGenerationPolicy().maxDurationSec;
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      return (
+        isAppleSilicon() && probeToolRuntime('musicgen_audiogen').selected_action !== 'install'
+      );
+    } catch {
+      // Availability probes must never throw (see ChatMusician provider).
+      return false;
+    }
+  }
+
+  async generate(request: MusicGenerationRequest): Promise<MusicGenerationResult> {
+    return await runMlAudioGenGeneration(request, Date.now(), this.id);
+  }
+}
+
+export class ChatMusicianGenerationProvider implements MusicGenerationProvider {
+  readonly id = 'chatmusician_mlx';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
+  readonly outputFormats = ['wav'] as const;
+  /** ABC scores render through a GM SoundFont — instrumental only. */
+  readonly supportsVocals = false;
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      if (!isAppleSilicon()) return false;
+      if (probeToolRuntime('chatmusician_mlx').selected_action === 'install') return false;
+      const policy = resolveChatMusicianGenerationPolicy();
+      return (
+        locateSystemCommand('abc2midi') !== null &&
+        locateSystemCommand('fluidsynth') !== null &&
+        Boolean(policy.soundfont && safeExistsSync(policy.soundfont))
+      );
+    } catch {
+      // Availability probes must never throw — an unprovable toolchain
+      // simply means the provider cannot run here.
+      return false;
+    }
+  }
+
+  async generate(request: MusicGenerationRequest): Promise<MusicGenerationResult> {
+    return await runChatMusicianGeneration(request, Date.now(), this.id);
   }
 }
 
@@ -297,7 +697,9 @@ function ensureBuiltinMusicGenerationProviders(): void {
   if (musicGenerationBuiltinsRegistered) return;
   for (const provider of [
     new LocalMusicGenMlxGenerationProvider(),
+    new MlAudioGenGenerationProvider(),
     new LocalStableAudioGenerationProvider(),
+    new ChatMusicianGenerationProvider(),
   ]) {
     registerMusicGenerationProvider(provider, {
       provenance: 'builtin',
@@ -322,22 +724,35 @@ export function resetMusicGenerationProviders(): void {
   musicGenerationBuiltinsRegistered = false;
 }
 
-/** Order used without a purpose: MLX first on Apple Silicon, Stable Audio elsewhere. */
+/**
+ * Order used without a purpose: MLX first on Apple Silicon, Stable Audio
+ * elsewhere. Composition-only providers (chatmusician_mlx) are intentionally
+ * absent here, but resolveMusicProviderChain still tries eligible leftovers
+ * as a sorted last-resort tail — so chatmusician may run without a purpose
+ * when every platform-ordered provider is ineligible. Prefer purpose
+ * 'compose' or an explicit preference to select it deliberately.
+ */
 function platformOrder(): string[] {
-  return isAppleSilicon() ? ['musicgen_mlx', 'stable_audio_3'] : ['stable_audio_3', 'musicgen_mlx'];
+  return isAppleSilicon()
+    ? ['musicgen_mlx', 'musicgen_audiogen', 'stable_audio_3']
+    : ['stable_audio_3', 'musicgen_mlx', 'musicgen_audiogen'];
 }
 
 /**
  * Which providers can run this request here and now: availability
- * (isAvailable) plus the declared duration and output-format limits.
+ * (isAvailable) plus the declared duration, vocal, and output-format limits.
  */
 export async function listMusicGenerationCandidates(
-  request: Pick<MusicGenerationRequest, 'durationSec' | 'format'>
+  request: Pick<MusicGenerationRequest, 'durationSec' | 'format' | 'vocals'>
 ): Promise<SeamProviderCandidate[]> {
   const format = request.format?.trim().toLowerCase().replace(/^\./u, '');
+  const wantsVocals = request.vocals === true;
   const candidates: SeamProviderCandidate[] = [];
   for (const provider of listMusicGenerationProviders()) {
     const unmet: string[] = [];
+    if (wantsVocals && provider.supportsVocals !== true) {
+      unmet.push('vocals requested (instrumental-only provider)');
+    }
     if (format && provider.outputFormats && !provider.outputFormats.includes(format)) {
       unmet.push(`format ${format} (writes ${provider.outputFormats.join(', ')})`);
     }
@@ -416,7 +831,11 @@ async function resolveMusicProviderChain(
   ];
   if (chain.length > 0) return chain;
   const reasons = candidates.map((c) => `${c.id}: ${(c.unmet ?? []).join(', ') || 'ineligible'}`);
-  return `No available Music Generation provider could be resolved (${reasons.join('; ')})`;
+  const vocalHint =
+    request.vocals === true
+      ? ' No vocal-capable provider is registered (all local providers are instrumental-only; singing-voice synthesis via SongGeneration-MLX is a documented future path).'
+      : '';
+  return `No available Music Generation provider could be resolved (${reasons.join('; ')}).${vocalHint}`;
 }
 
 /**
@@ -438,12 +857,26 @@ export async function generateMusic(
   const preference = resolved;
 
   let lastError: string | undefined;
+  const wantsVocals = request.vocals === true;
   for (const providerId of preference) {
     const provider = getMusicGenerationProvider(providerId);
     if (!provider) continue;
-    const result = await provider.generate(request);
-    if (result.status !== 'failed') return result;
-    lastError = result.error;
+    // Explicit naming does not bypass the vocal split: an
+    // instrumental-only provider fails closed instead of silently
+    // rendering vocals:true requests as instrumentals.
+    if (wantsVocals && provider.supportsVocals !== true) {
+      lastError = `No vocal-capable provider: '${providerId}' is instrumental-only.`;
+      continue;
+    }
+    try {
+      const result = await provider.generate(request);
+      if (result.status !== 'failed') return result;
+      lastError = result.error;
+    } catch (error) {
+      // Policy-gated exec rejections surface as throws; contain them so
+      // direct bridge consumers always get a failed result, not a throw.
+      lastError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   return {
