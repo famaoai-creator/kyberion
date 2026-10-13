@@ -26118,6 +26118,36 @@
         "en": "This draft could not be kept in this tab. Copy it before leaving or reloading.",
         "ja": "このタブに下書きを保存できませんでした。画面を離れる前や再読み込みの前に、文章をコピーしてください。",
         "qps-ploc": "⟦Ŧħïş ḓřȧƒŧ ƈőůŀḓ ñőŧ ƀė ķėṗŧ ïñ ŧħïş ŧȧƀ. Ƈőṗẏ ïŧ ƀėƒőřė ŀėȧṽïñɠ őř řėŀőȧḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "progress_loading": {
+        "en": "Loading progress…",
+        "ja": "進み具合を確認しています…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ṗřőɠřėşş… ŀőřėɱ⟧"
+      },
+      "progress_refreshing": {
+        "en": "Checking the latest progress…",
+        "ja": "最新の進み具合を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė ŀȧŧėşŧ ṗřőɠřėşş… ŀőřėɱ ïṗş⟧"
+      },
+      "progress_detail_loading": {
+        "en": "Loading details for {title}…",
+        "ja": "「{title}」の詳細を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ḓėŧȧïŀş ƒőř {title}… ŀőřėɱ ïṗş⟧"
+      },
+      "progress_detail_failed": {
+        "en": "Could not load details for {title}. Try loading them again.",
+        "ja": "「{title}」の詳細を読み込めませんでした。もう一度読み込んでください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ḓėŧȧïŀş ƒőř {title}. Ŧřẏ ŀőȧḓïñɠ ŧħėɱ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "progress_detail_ready": {
+        "en": "Details for {title}",
+        "ja": "「{title}」の詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ƒőř {title} ŀőřėɱ ⟧"
+      },
+      "progress_detail_retry": {
+        "en": "Try loading details again",
+        "ja": "詳細を再読み込み",
+        "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ḓėŧȧïŀş ȧɠȧïñ ŀőřėɱ ïṗ⟧"
       }
     },
     "operator": {
