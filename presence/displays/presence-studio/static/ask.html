@@ -67,6 +67,23 @@
                 {{t:front_desk:ask_startup_retry}}
               </button>
             </div>
+            <div
+              id="ask-correction-status"
+              class="kb-callout"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <p id="ask-correction-text">{{t:front_desk:ask_correction_failed}}</p>
+              <button
+                type="button"
+                id="ask-correction-retry"
+                class="kb-btn kb-btn--secondary"
+                hidden
+              >
+                {{t:front_desk:ask_correction_retry}}
+              </button>
+            </div>
             <p id="conversation-selection" class="kb-callout" role="status" hidden></p>
             <div id="conversation-status" class="kb-section" role="status" aria-live="polite"></div>
             <details id="conversation-legacy" class="hidden">
@@ -92,16 +109,24 @@
               </div>
             </section>
             <p id="draft-storage-warning" class="kb-callout" role="status" hidden></p>
+            <p
+              id="draft-length-warning"
+              class="kb-callout"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
             <form id="ask-form" class="ask-input-row">
-              <input
-                type="text"
+              <textarea
                 id="ask-input"
                 class="kb-input ask-input"
+                rows="2"
+                aria-describedby="ask-keyboard-hint draft-length-warning"
                 autocomplete="off"
                 maxlength="4000"
                 placeholder="{{t:front_desk:home_ask_placeholder}}"
                 aria-label="{{t:front_desk:nav_ask}}"
-              />
+              ></textarea>
               <button
                 type="button"
                 id="ask-mic"
@@ -116,6 +141,7 @@
                 aria-label="{{t:front_desk:home_ask_send}}"
               ></button>
             </form>
+            <p id="ask-keyboard-hint" class="kb-note">{{t:front_desk:ask_keyboard_hint}}</p>
             <div class="ask-chips" id="ask-chips">
               <button
                 type="button"
@@ -208,6 +234,7 @@
       </main>
     </div>
     <script src="/ask-read-recovery.js"></script>
+    <script src="/ask-correction.js"></script>
     <script src="/ask.js"></script>
     <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
     <script type="module" src="/front-desk-rail.js"></script>

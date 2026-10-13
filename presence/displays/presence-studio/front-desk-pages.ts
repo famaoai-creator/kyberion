@@ -436,6 +436,11 @@ export const HOME_VOCABULARY_KEYS = [
 // `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
 // `front-desk-routes.ts`.
 export const PROGRESS_VOCABULARY_KEYS = [
+  'front_desk:progress_correction_draft_note',
+  'front_desk:progress_correction_save',
+  'front_desk:progress_correction_discard',
+  'front_desk:progress_correction_recorded',
+  'front_desk:progress_correction_prepare',
   'front_desk:progress_loading',
   'front_desk:progress_refreshing',
   'front_desk:progress_detail_loading',
@@ -490,6 +495,17 @@ export const PROGRESS_VOCABULARY_KEYS = [
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
 // intent-resolution rendering).
 export const ASK_VOCABULARY_KEYS = [
+  'front_desk:ask_keyboard_hint',
+  'front_desk:ask_draft_too_long',
+  'front_desk:ask_correction_loading',
+  'front_desk:ask_correction_failed',
+  'front_desk:ask_correction_retry',
+  'front_desk:ask_correction_prepared',
+  'front_desk:ask_correction_draft_intro',
+  'front_desk:ask_correction_entry',
+  'front_desk:ask_correction_artifact',
+  'front_desk:ask_correction_title',
+  'front_desk:ask_correction_note',
   'front_desk:work_home_resume_readonly',
   'front_desk:work_home_request_unavailable',
   'front_desk:conversation_access_required',
