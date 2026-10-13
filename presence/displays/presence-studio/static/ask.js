@@ -1516,6 +1516,7 @@
       });
     var retryStartup = document.getElementById('ask-startup-retry');
     if (retryStartup) retryStartup.addEventListener('click', loadStartup);
+    readRecovery.observeShell();
     renderStartup();
     loadStartup();
   }
@@ -1524,11 +1525,17 @@
     if (state.vocabularyReady || state.startupReadPending) return;
     state.startupReadPending = true;
     renderStartup();
-    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+    var ready = window.FrontDeskRail && window.FrontDeskRail.ready;
+    function currentShell() {
+      return !window.FrontDeskRail || ready === window.FrontDeskRail.ready;
+    }
+    return Promise.resolve(ready)
       .then(function () {
+        if (!currentShell()) throw new Error('Superseded shell');
         return fetchReadJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale));
       })
       .then(function (vocabResult) {
+        if (!currentShell()) throw new Error('Superseded shell');
         var texts = vocabResult.body && vocabResult.body.texts;
         if (
           !vocabResult.ok ||
@@ -1559,6 +1566,7 @@
         restoreConversation(true).then(applyUrlPrefill);
       })
       .catch(function () {
+        if (!currentShell()) return;
         state.startupReadPending = false;
         state.startupFailed = true;
         renderStartup();
