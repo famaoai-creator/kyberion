@@ -174,7 +174,7 @@ function tokenize(s: string): string[] {
   // Intl.Segmenter-backed: Japanese titles/queries segment into real words
   // instead of one whole-sentence token.
   return segmentWords(s.toLowerCase())
-    .flatMap((t) => t.split(/[-_]/))
+    .flatMap((t) => t.split(/[-_.]/))
     .filter((t) => t.length >= 2);
 }
 
