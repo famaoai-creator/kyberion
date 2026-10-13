@@ -71,6 +71,7 @@
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "generate:pii-rules": "node --import ./scripts/ts-loader.mjs scripts/generate_pii_rules.ts",
     "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts",
+    "generate:provider-hooks": "node --import ./scripts/ts-loader.mjs scripts/generate_provider_hook_configs.ts",
     "generate:types": "node scripts/run_built.mjs dist/scripts/generate_types.js",
     "generate:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate_vocabulary_types.ts",
     "generation:schedule": "node scripts/run_built.mjs dist/scripts/run_generation_schedule.js",

@@ -3,6 +3,13 @@ import { metrics } from '../metrics.js';
 import { evaluateShellCommandPolicy } from '../shell/shell-command-policy.js';
 import { detectTier, validateWritePermission } from '../tier-guard.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import {
+  coSessionHookDrain,
+  coSessionHookEnd,
+  coSessionHookJoin,
+  coSessionHookLeaseGate,
+  formatPendingHandoffs,
+} from './co-session-hook.js';
 
 /**
  * Claude Code hook bridge (Direction A: Claude Code as front-end → Kyberion).
@@ -26,6 +33,7 @@ export interface PreToolUseInput {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   cwd?: string;
+  session_id?: string;
 }
 
 export interface PostToolUseInput extends PreToolUseInput {
@@ -165,6 +173,16 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
       );
     }
   }
+  for (const p of targetPaths(input.tool_input)) {
+    const gate = coSessionHookLeaseGate({
+      provider: 'claude',
+      session_key: input.session_id,
+      file_path: p,
+    });
+    if (gate.decision === 'deny') {
+      return pre('deny', `Kyberion co-session lease gate: ${gate.reason}`);
+    }
+  }
   return pre('allow', 'Kyberion tier-guard: write permitted.');
 }
 
@@ -192,6 +210,10 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
     hints,
   });
 
+  const handoffBlock = formatPendingHandoffs(
+    coSessionHookDrain({ provider: 'claude', session_key: input.session_id as string | undefined })
+  );
+
   return [
     'Kyberion captured the user prompt for coordination.',
     `Prompt summary: ${summary}`,
@@ -199,6 +221,7 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
       ? ['Next-step hints:', ...hints.map((hint) => `- ${hint}`)]
       : ['Next-step hints: keep the work inside the shared coordination brief.']),
     'If this becomes scoped work, start a Kyberion mission; if it is closing work, run /ky-review.',
+    ...(handoffBlock ? ['', handoffBlock] : []),
   ].join('\n');
 }
 
@@ -216,6 +239,22 @@ export function buildStopContext(input: Record<string, unknown> = {}): string {
     'If code or knowledge changed, run /ky-review before ending the work.',
     'If the task is incomplete, checkpoint the mission instead of leaving it implicit.',
   ].join('\n');
+}
+
+/**
+ * SessionEnd (fires once when the session actually ends — unlike Stop, which
+ * fires after every agent turn). Releases this participant's co-session path
+ * leases so they don't linger to TTL. Returns a note for the transcript when
+ * anything was released.
+ */
+export function buildSessionEndContext(input: Record<string, unknown> = {}): string {
+  const ended = coSessionHookEnd({
+    provider: 'claude',
+    session_key: input.session_id as string | undefined,
+  });
+  return ended.released_leases > 0
+    ? `Released ${ended.released_leases} co-session path lease(s) held by this participant.`
+    : '';
 }
 
 export interface CliUsageSummary {
@@ -318,7 +357,11 @@ export function recordPostToolUse(input: PostToolUseInput): {
 }
 
 /** Context injected at session start so Claude Code follows the operating guide. */
-export function buildSessionStartContext(): string {
+export function buildSessionStartContext(input: Record<string, unknown> = {}): string {
+  const join = coSessionHookJoin({
+    provider: 'claude',
+    session_key: input.session_id as string | undefined,
+  });
   return [
     'Kyberion governance is active for this session (kyberion-claude-code plugin).',
     '- Writes into knowledge/ tiers are gated by tier-guard (PreToolUse) — leaks are denied.',
@@ -327,5 +370,13 @@ export function buildSessionStartContext(): string {
     '- Stop emits a review reminder so the session closes with an explicit handoff.',
     '- Follow the Operating Guide (CLAUDE.md §3): capture intent → align → execute → review.',
     'Use /ky-baseline to check system health, or /ky-mission-start to open a governed mission.',
+    ...(join.joined
+      ? [
+          `Co-session ${join.session_id}: joined as ${join.participant_id}. ` +
+            `Acquire a path lease before editing shared paths: ` +
+            `\`co-session lease --action acquire --as claude --participant-id ${join.participant_id} --path <repo/path>\`. ` +
+            'Pending handoffs arrive via prompt context.',
+        ]
+      : []),
   ].join('\n');
 }

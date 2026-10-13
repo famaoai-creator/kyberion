@@ -201,6 +201,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion dot wake`                      |                                     | Run one bounded wake for a dot immediately                                                                            |
 | `pnpm kyberion email archive-inbox`           |                                     | Archive processed inbox messages                                                                                      |
 | `pnpm kyberion email workflow`                | `pnpm email:workflow`               | Run the email workflow                                                                                                |
+| `pnpm kyberion generate provider-hooks`       | `pnpm generate:provider-hooks`      | Regenerate provider CLI hook configs (.gemini/settings.json)                                                          |
 | `pnpm kyberion generation schedule`           | `pnpm generation:schedule`          | Run the generation schedule tick                                                                                      |
 | `pnpm kyberion gws meet-create`               |                                     | Create a Google Meet                                                                                                  |
 | `pnpm kyberion halt engage`                   |                                     | Halt all autonomous operations (work claims, dot wakes, auto-proceed) until resumed.                                  |

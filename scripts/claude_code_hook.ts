@@ -18,6 +18,7 @@
  */
 
 import {
+  buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
@@ -67,7 +68,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         JSON.stringify({
           hookSpecificOutput: {
             hookEventName: 'SessionStart',
-            additionalContext: buildSessionStartContext(),
+            additionalContext: buildSessionStartContext(payload),
           },
         })
       );
@@ -133,6 +134,26 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
           },
         })
       );
+      return;
+    }
+    case 'SessionEnd': {
+      // Fires once when the session ends (unlike Stop, which fires per turn):
+      // release this participant's co-session leases, then emit any note.
+      try {
+        const note = buildSessionEndContext(payload);
+        if (note) {
+          process.stdout.write(
+            JSON.stringify({
+              hookSpecificOutput: {
+                hookEventName: 'SessionEnd',
+                additionalContext: note,
+              },
+            })
+          );
+        }
+      } catch {
+        // cleanup is best-effort; lease TTL is the safety net
+      }
       return;
     }
     default:
