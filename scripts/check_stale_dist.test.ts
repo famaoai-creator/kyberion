@@ -208,56 +208,74 @@ describe('check_stale_dist', () => {
     expect(scan.stale).toEqual([]);
   });
 
-  // This must run on a Windows filesystem, not merely pass by returning on Unix.
-  it.skipIf(process.platform !== 'win32').each([
+  // Case-folding hosts (win32 always; darwin because tsc canonicalizes
+  // buildinfo paths with a host flag that is OS-level, not volume-level).
+  // This must run on a case-folding filesystem, not merely pass by returning
+  // on case-sensitive Unix.
+  // Backslash separators only resolve on win32 path semantics; POSIX hosts
+  // exercise the slash variants.
+  const CASE_SLASH_IDENTITY_CASES = [
     { separator: '/', absolutePaths: false },
-    { separator: '\\', absolutePaths: false },
     { separator: '/', absolutePaths: true },
-    { separator: '\\', absolutePaths: true },
-  ])('matches Windows case/slash buildinfo identities: %j', (options) => {
-    const contents = 'export const chart = 1;\n';
-    const source = write('src/charts/ChartView.tsx', contents);
-    write('dist/charts/ChartView.js');
-    write('dist/other.js');
-    writeBuildInfo(
-      '.tsbuildinfo',
-      { [source]: sha256(contents) },
-      {
-        ...options,
-        lowercasePaths: true,
-      }
-    );
-    setMtime('src/charts/ChartView.tsx', T_NEW);
-    setMtime('dist/charts/ChartView.js', T_OLD);
-    setMtime('dist/other.js', T_NEW);
-    setMtime('.tsbuildinfo', T_OLD);
+    ...(process.platform === 'win32'
+      ? [
+          { separator: '\\', absolutePaths: false },
+          { separator: '\\', absolutePaths: true },
+        ]
+      : []),
+  ];
+  it
+    .skipIf(process.platform !== 'win32' && process.platform !== 'darwin')
+    .each(CASE_SLASH_IDENTITY_CASES)(
+    'matches Windows case/slash buildinfo identities: %j',
+    (options) => {
+      const contents = 'export const chart = 1;\n';
+      const source = write('src/charts/ChartView.tsx', contents);
+      write('dist/charts/ChartView.js');
+      write('dist/other.js');
+      writeBuildInfo(
+        '.tsbuildinfo',
+        { [source]: sha256(contents) },
+        {
+          ...options,
+          lowercasePaths: true,
+        }
+      );
+      setMtime('src/charts/ChartView.tsx', T_NEW);
+      setMtime('dist/charts/ChartView.js', T_OLD);
+      setMtime('dist/other.js', T_NEW);
+      setMtime('.tsbuildinfo', T_OLD);
 
-    const targets = [spec({ buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })];
-    expect(findStaleDistTargets({ targets }).stale).toEqual([]);
-    safeRmSync(pathResolver.sharedTmp('check-stale-dist/dist/charts/ChartView.js'));
-    expect(findStaleDistTargets({ targets }).stale[0]).toMatchObject({
-      reason: 'emit_missing',
-      source_file: FIXTURE_ROOT + '/src/charts/ChartView.tsx',
-      source_mtime_ms: T_NEW,
-      dist_file: FIXTURE_ROOT + '/dist/charts/ChartView.js',
-      dist_mtime_ms: null,
-    });
-  });
+      const targets = [spec({ buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })];
+      expect(findStaleDistTargets({ targets }).stale).toEqual([]);
+      safeRmSync(pathResolver.sharedTmp('check-stale-dist/dist/charts/ChartView.js'));
+      expect(findStaleDistTargets({ targets }).stale[0]).toMatchObject({
+        reason: 'emit_missing',
+        source_file: FIXTURE_ROOT + '/src/charts/ChartView.tsx',
+        source_mtime_ms: T_NEW,
+        dist_file: FIXTURE_ROOT + '/dist/charts/ChartView.js',
+        dist_mtime_ms: null,
+      });
+    }
+  );
 
-  it.skipIf(process.platform === 'win32')('does not case-fold buildinfo identities on Unix', () => {
-    const contents = 'export const chart = 1;\n';
-    const source = write('src/charts/ChartView.tsx', contents);
-    write('dist/charts/ChartView.js');
-    writeBuildInfo('.tsbuildinfo', { [source]: sha256(contents) }, { lowercasePaths: true });
-    setMtime('src/charts/ChartView.tsx', T_OLD);
-    setMtime('.tsbuildinfo', T_NEW);
+  it.skipIf(process.platform === 'win32' || process.platform === 'darwin')(
+    'does not case-fold buildinfo identities on case-sensitive Unix',
+    () => {
+      const contents = 'export const chart = 1;\n';
+      const source = write('src/charts/ChartView.tsx', contents);
+      write('dist/charts/ChartView.js');
+      writeBuildInfo('.tsbuildinfo', { [source]: sha256(contents) }, { lowercasePaths: true });
+      setMtime('src/charts/ChartView.tsx', T_OLD);
+      setMtime('.tsbuildinfo', T_NEW);
 
-    expect(
-      findStaleDistTargets({
-        targets: [spec({ required: true, buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
-      }).stale[0]?.reason
-    ).toBe('unrecorded_source');
-  });
+      expect(
+        findStaleDistTargets({
+          targets: [spec({ required: true, buildInfo: [FIXTURE_ROOT + '/.tsbuildinfo'] })],
+        }).stale[0]?.reason
+      ).toBe('unrecorded_source');
+    }
+  );
 
   it('flags a content change even when mtimes still look fresh', () => {
     write('src/a.ts', 'const a = 2;\n');
