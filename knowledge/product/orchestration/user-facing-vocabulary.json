@@ -26208,6 +26208,86 @@
         "en": "Retry",
         "ja": "再試行",
         "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
+      },
+      "progress_correction_draft_note": {
+        "en": "Draft kept while this page is open. Reloading the page clears unsaved text.",
+        "ja": "この画面を開いている間は下書きを保持します。画面の再読み込みで未保存の内容は消えます。",
+        "qps-ploc": "⟦Ḓřȧƒŧ ķėṗŧ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Řėŀőȧḓïñɠ ŧħė ṗȧɠė ƈŀėȧřş ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "progress_correction_save": {
+        "en": "Save correction feedback",
+        "ja": "修正コメントを記録",
+        "qps-ploc": "⟦Şȧṽė ƈőřřėƈŧïőñ ƒėėḓƀȧƈķ ŀőřėɱ ï⟧"
+      },
+      "progress_correction_discard": {
+        "en": "Discard draft",
+        "ja": "下書きを破棄",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ḓřȧƒŧ ŀőřė⟧"
+      },
+      "progress_correction_recorded": {
+        "en": "Correction feedback recorded. You can review it before sending a new request.",
+        "ja": "修正コメントを記録しました。内容を確認して、次の依頼を送れます。",
+        "qps-ploc": "⟦Ƈőřřėƈŧïőñ ƒėėḓƀȧƈķ řėƈőřḓėḓ. Ẏőů ƈȧñ řėṽïėẇ ïŧ ƀėƒőřė şėñḓïñɠ ȧ ñėẇ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "progress_correction_prepare": {
+        "en": "Prepare correction request",
+        "ja": "修正依頼を準備",
+        "qps-ploc": "⟦Ṗřėṗȧřė ƈőřřėƈŧïőñ řėɋůėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "ask_correction_loading": {
+        "en": "Loading recorded feedback…",
+        "ja": "記録済みの修正コメントを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ řėƈőřḓėḓ ƒėėḓƀȧƈķ… ŀőřėɱ ïṗ⟧"
+      },
+      "ask_correction_failed": {
+        "en": "Recorded feedback could not be loaded. Your draft is unchanged.",
+        "ja": "記録済みの修正コメントを読み込めませんでした。入力中の下書きは変更していません。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ẏőůř ḓřȧƒŧ ïş ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ask_correction_retry": {
+        "en": "Retry loading feedback",
+        "ja": "修正コメントを再読み込み",
+        "qps-ploc": "⟦Řėŧřẏ ŀőȧḓïñɠ ƒėėḓƀȧƈķ ŀőřėɱ ï⟧"
+      },
+      "ask_correction_prepared": {
+        "en": "Recorded feedback is ready to review as a draft. Review the text before sending.",
+        "ja": "記録済みの修正コメントを下書きとして確認できます。内容を確認してから送信してください。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ïş řėȧḓẏ ŧő řėṽïėẇ ȧş ȧ ḓřȧƒŧ. Řėṽïėẇ ŧħė ŧėẋŧ ƀėƒőřė şėñḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "ask_correction_draft_intro": {
+        "en": "Please revise the artifact using this recorded feedback:",
+        "ja": "以下の記録済みの修正コメントに沿って成果物の修正をお願いします：",
+        "qps-ploc": "⟦Ṗŀėȧşė řėṽïşė ŧħė ȧřŧïƒȧƈŧ ůşïñɠ ŧħïş řėƈőřḓėḓ ƒėėḓƀȧƈķ: ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ask_correction_entry": {
+        "en": "Feedback ID",
+        "ja": "修正コメントID",
+        "qps-ploc": "⟦Ƒėėḓƀȧƈķ ÏḒ ŀőř⟧"
+      },
+      "ask_correction_artifact": {
+        "en": "Artifact ID",
+        "ja": "成果物ID",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ÏḒ ŀőř⟧"
+      },
+      "ask_correction_title": {
+        "en": "Artifact",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ŀőř⟧"
+      },
+      "ask_correction_note": {
+        "en": "Recorded feedback",
+        "ja": "記録済みの修正コメント",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ŀőřėɱ⟧"
+      },
+      "ask_draft_too_long": {
+        "en": "Drafts can contain up to 4,000 characters. Shorten this draft before sending.",
+        "ja": "下書きは4,000文字までです。送信する前に内容を短くしてください。",
+        "qps-ploc": "⟦Ḓřȧƒŧş ƈȧñ ƈőñŧȧïñ ůṗ ŧő 4,000 ƈħȧřȧƈŧėřş. Şħőřŧėñ ŧħïş ḓřȧƒŧ ƀėƒőřė şėñḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ask_keyboard_hint": {
+        "en": "Enter to send · Shift+Enter for a new line",
+        "ja": "Enterで送信・Shift+Enterで改行",
+        "qps-ploc": "⟦Ėñŧėř ŧő şėñḓ · Şħïƒŧ+Ėñŧėř ƒőř ȧ ñėẇ ŀïñė ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
     "operator": {
