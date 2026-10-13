@@ -21,13 +21,22 @@ interface RailItem {
   href: string;
 }
 interface RailRender {
-  components: Array<{ props: { items: RailItem[]; footer_items?: RailItem[] } }>;
+  components: Array<{
+    id?: string;
+    props: { items: RailItem[]; footer_items?: RailItem[]; locale?: string };
+  }>;
   options: { onAction(action: { id: string; payload: { value: string } }): void };
 }
-function harness(pathname: string, fetchOverride?: (url: string) => Promise<unknown>) {
+function harness(
+  pathname: string,
+  fetchOverride?: (url: string) => Promise<unknown>,
+  showControls = false
+) {
   const rendered: RailRender[] = [];
   const location = { pathname, search: '', href: 'http://localhost' + pathname, reload: vi.fn() };
   let tenant = 'alpha';
+  const selectFocus = vi.fn();
+  const controls = { querySelector: () => ({ focus: selectFocus }) };
   const menu = resolveFrontDeskMenu({
     currentSurface: 'presence-studio',
     role: 'owner',
@@ -71,6 +80,9 @@ function harness(pathname: string, fetchOverride?: (url: string) => Promise<unkn
     },
     KyberionPrefs: {
       locale: () => 'en',
+      theme: () => 'system',
+      setTheme: vi.fn(),
+      setLocale: vi.fn(),
       tenant: () => tenant,
       setTenant: (value: string) => {
         tenant = value;
@@ -84,7 +96,7 @@ function harness(pathname: string, fetchOverride?: (url: string) => Promise<unkn
   };
   runInNewContext(source, {
     window,
-    document: { querySelector: () => null },
+    document: { querySelector: () => (showControls ? controls : null) },
     fetch,
     URL,
     URLSearchParams,
@@ -106,6 +118,7 @@ function harness(pathname: string, fetchOverride?: (url: string) => Promise<unkn
   };
   return {
     window,
+    selectFocus,
     rendered,
     menu,
     me,
@@ -168,6 +181,113 @@ describe('shipped grouped front-desk rail client', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(h.tenant()).toBe('gamma');
     expect(h.window.location.reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('draft-safe context changes', () => {
+  it('defers tenant preference changes until the page approves leaving', async () => {
+    const h = harness('/progress');
+    const requests: Array<() => void> = [];
+    Object.assign(h.window, {
+      FrontDeskPageLeave: {
+        requestLeave(proceed: () => void) {
+          requests.push(proceed);
+        },
+      },
+    });
+    await h.mount();
+    h.rendered.at(-1)!.options.onAction({ id: 'tenant.switch', payload: { value: 'beta' } });
+    for (let i = 0; i < 25; i++) await Promise.resolve();
+    expect(requests).toHaveLength(1);
+    expect(h.tenant()).toBe('alpha');
+    expect(h.window.location.reload).not.toHaveBeenCalled();
+    requests[0]();
+    for (let i = 0; i < 25; i++) await Promise.resolve();
+    expect(h.tenant()).toBe('beta');
+    expect(h.window.location.reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('guarded locale and context intent races', () => {
+  it('defers locale persistence and restores the control on Stay; theme and same locale are unguarded', async () => {
+    const h = harness('/progress', undefined, true);
+    const requests: Array<{ proceed: () => void; valid: () => boolean; cancel: () => void }> = [];
+    Object.assign(h.window, {
+      FrontDeskPageLeave: {
+        requestLeave(proceed: () => void, valid: () => boolean, cancel: () => void) {
+          requests.push({ proceed, valid, cancel });
+        },
+      },
+    });
+    await h.mount();
+    const display = () =>
+      h.rendered.filter((r) => r.components[0].id === 'display-controls').at(-1)!;
+    const action = display().options.onAction;
+    action({ id: 'display.locale', payload: { value: 'en' } });
+    expect(requests).toHaveLength(0);
+    action({ id: 'display.theme', payload: { value: 'dark' } });
+    expect(h.window.KyberionPrefs.setTheme).toHaveBeenCalledWith('dark');
+    expect(requests).toHaveLength(0);
+    action({ id: 'display.locale', payload: { value: 'ja' } });
+    expect(requests).toHaveLength(1);
+    expect(h.window.KyberionPrefs.setLocale).not.toHaveBeenCalled();
+    requests[0].cancel();
+    for (let i = 0; i < 25; i++) await Promise.resolve();
+    expect(display().components[0].props.locale).toBe('en');
+    expect(h.selectFocus).toHaveBeenCalledTimes(1);
+    action({ id: 'display.locale', payload: { value: 'ja' } });
+    requests[0].proceed();
+    expect(h.window.KyberionPrefs.setLocale).not.toHaveBeenCalled();
+    requests[1].proceed();
+    expect(h.window.KyberionPrefs.setLocale).toHaveBeenCalledOnce();
+  });
+  it('invalidates a pending target when the current tenant is selected again', async () => {
+    const late = deferred<unknown>();
+    const h = harness('/progress', (url) =>
+      url.includes('tenant=beta') ? late.promise : Promise.resolve(undefined)
+    );
+    await h.mount();
+    const action = h.rendered.at(-1)!.options.onAction;
+    action({ id: 'tenant.switch', payload: { value: 'beta' } });
+    action({ id: 'tenant.switch', payload: { value: 'alpha' } });
+    late.resolve({ ok: true, status: 200, json: async () => h.me('beta') });
+    for (let i = 0; i < 30; i++) await Promise.resolve();
+    expect(h.tenant()).toBe('alpha');
+    expect(h.window.location.reload).not.toHaveBeenCalled();
+  });
+  it('does not revive an older tenant lookup after a newer locale intent, even when locale is canceled', async () => {
+    const late = deferred<unknown>();
+    const h = harness(
+      '/progress',
+      (url) => (url.includes('tenant=beta') ? late.promise : Promise.resolve(undefined)),
+      true
+    );
+    let generation = 0;
+    const requests: Array<{ proceed: () => void; valid: () => boolean; cancel: () => void }> = [];
+    Object.assign(h.window, {
+      FrontDeskPageLeave: {
+        begin() {
+          const current = ++generation;
+          return () => current === generation;
+        },
+        requestLeave(proceed: () => void, valid: () => boolean, cancel: () => void) {
+          requests.push({ proceed, valid, cancel });
+        },
+      },
+    });
+    await h.mount();
+    h.rendered
+      .find((r) => r.components[0].id === 'front-desk-rail')!
+      .options.onAction({ id: 'tenant.switch', payload: { value: 'beta' } });
+    h.rendered
+      .find((r) => r.components[0].id === 'display-controls')!
+      .options.onAction({ id: 'display.locale', payload: { value: 'ja' } });
+    requests[0].cancel();
+    late.resolve({ ok: true, status: 200, json: async () => h.me('beta') });
+    for (let i = 0; i < 30; i++) await Promise.resolve();
+    expect(requests).toHaveLength(1);
+    expect(h.tenant()).toBe('alpha');
+    expect(h.window.location.reload).not.toHaveBeenCalled();
   });
 });
 

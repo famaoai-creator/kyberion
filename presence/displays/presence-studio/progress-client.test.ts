@@ -98,6 +98,19 @@ async function flush() {
   for (let i = 0; i < 40; i += 1) await Promise.resolve();
 }
 const texts: Record<string, string> = {
+  'front_desk:progress_leave_title': 'Leave this page?',
+  'front_desk:progress_leave_draft':
+    'Your correction draft has not been recorded. Leaving this page discards it.',
+  'front_desk:progress_leave_pending':
+    'A decision is still being recorded. Leaving does not cancel it and discards any draft text on this page. Check Progress when you return before trying again.',
+  'front_desk:progress_leave_uncertain':
+    'A decision still needs confirmation from the latest progress. Leaving discards any draft text on this page. Your pending decision remains protected from duplicate submission. Check Progress when you return.',
+  'front_desk:progress_leave_stay_page': 'Stay on this page',
+  'front_desk:progress_leave_stay': 'Keep editing',
+  'front_desk:progress_leave_discard': 'Discard and leave',
+  'front_desk:progress_leave_anyway': 'Leave anyway',
+  'front_desk:progress_leave_unavailable':
+    'The leave confirmation could not be displayed. Your draft is unchanged. Try the navigation again.',
   'front_desk:progress_correction_recorded': 'Correction feedback recorded',
   'front_desk:progress_correction_prepare': 'Prepare correction request',
   'front_desk:progress_history': 'History',
@@ -167,6 +180,7 @@ function harness(
   } = {}
 ) {
   const ids = [
+    'progress-leave-dialog',
     'filter-active',
     'filter-delivered',
     'filter-done',
@@ -216,7 +230,16 @@ function harness(
   );
   const listeners: Record<string, () => void> = {};
   const storage = options.storage || new Map<string, string>();
-  const renders: Array<{ container: Element; components: Array<Record<string, unknown>> }> = [];
+  type RenderOptions = {
+    isCurrent?: () => boolean;
+    onAction?: (action: { id: string; payload?: { choice: string } }) => void;
+  };
+  const renders: Array<{
+    container: Element;
+    components: Array<Record<string, unknown>>;
+    options?: RenderOptions;
+  }> = [];
+  const documentListeners: Record<string, (event: MockEvent) => void> = {};
   const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
   const window = {
     setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
@@ -236,6 +259,7 @@ function harness(
     },
     location: {
       reload: vi.fn(),
+      assign: vi.fn(),
       get href() {
         return location.href;
       },
@@ -283,8 +307,12 @@ function harness(
         ok: true,
         items: [{ id: 'decide', href: 'https://decide.example.test/decide' }],
       }),
-      render(container: Element, components: Array<Record<string, unknown>>) {
-        renders.push({ container, components });
+      render(
+        container: Element,
+        components: Array<Record<string, unknown>>,
+        options?: RenderOptions
+      ) {
+        renders.push({ container, components, options });
       },
     },
   };
@@ -293,6 +321,9 @@ function harness(
   );
   const document = {
     documentElement: { getAttribute: () => 'en' },
+    addEventListener(type: string, listener: (event: MockEvent) => void) {
+      documentListeners[type] = listener;
+    },
     getElementById: (id: string) => elements[id] || null,
     querySelector: () => null,
     createElement(tag: string) {
@@ -319,12 +350,17 @@ function harness(
       shellListeners.forEach((listener) => listener({ phase, message })),
     window: window as typeof window & {
       KyberionProgress: { mount(): Promise<void> };
+      FrontDeskPageLeave: {
+        begin(): () => boolean;
+        requestLeave(proceed: () => void, isCurrent?: () => boolean, cancel?: () => void): void;
+      };
       KyberionHome: { mount(): Promise<void> };
     },
     fetch,
     refresh,
     noticeText,
     renders,
+    documentListeners,
     listeners,
   };
 }
@@ -1614,27 +1650,27 @@ describe('Progress bounded read recovery', () => {
   });
 });
 
+function correctionPayload() {
+  const payload = emptyPayload();
+  payload.delivered = ['alpha', 'beta'].map((id) => ({
+    id,
+    title: id,
+    status: 'read',
+    can_verdict: true,
+    entry_id: 'inbox-' + id,
+  }));
+  return payload;
+}
+const rowAt = (h: ReturnType<typeof harness>, index = 0) =>
+  h.elements['progress-list'].children[index].children[0];
+function editCorrection(h: ReturnType<typeof harness>, text: string) {
+  const row = rowAt(h);
+  row.querySelector('[data-action="revise"]')!.fire();
+  const note = row.querySelector('.progress-revise-note')!;
+  note.value = text;
+  note.fire('input');
+}
 describe('Progress correction continuity', () => {
-  function correctionPayload() {
-    const payload = emptyPayload();
-    payload.delivered = ['alpha', 'beta'].map((id) => ({
-      id,
-      title: id,
-      status: 'read',
-      can_verdict: true,
-      entry_id: 'inbox-' + id,
-    }));
-    return payload;
-  }
-  const rowAt = (h: ReturnType<typeof harness>, index = 0) =>
-    h.elements['progress-list'].children[index].children[0];
-  function editCorrection(h: ReturnType<typeof harness>, text: string) {
-    const row = rowAt(h);
-    row.querySelector('[data-action="revise"]')!.fire();
-    const note = row.querySelector('.progress-revise-note')!;
-    note.value = text;
-    note.fire('input');
-  }
   it('preserves correction draft and form across same-result selection, filters and read refresh without persistent content', async () => {
     const payload = correctionPayload();
     const storage = new Map<string, string>();
@@ -1778,5 +1814,252 @@ describe('Progress correction continuity', () => {
       status: 'rejected',
       note: 'Saved note',
     });
+  });
+});
+
+describe('Progress app-controlled leave confirmation', () => {
+  function dialog(h: ReturnType<typeof harness>) {
+    return h.renders.filter((r) => r.container === h.elements['progress-leave-dialog']).at(-1)!;
+  }
+  function choose(h: ReturnType<typeof harness>, choice: string) {
+    dialog(h).options!.onAction!({ id: 'progress.leave.choose', payload: { choice } });
+  }
+  it('keeps exact drafts on Stay and discards only on one current explicit leave', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Keep exact\ntext');
+    const proceed = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    expect(proceed).not.toHaveBeenCalled();
+    expect(dialog(h).components[0]).toMatchObject({
+      props: {
+        open: true,
+        choices: [
+          { id: 'stay', variant: 'primary' },
+          { id: 'leave', variant: 'danger' },
+        ],
+      },
+    });
+    choose(h, 'stay');
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')!.value).toBe('Keep exact\ntext');
+    expect(proceed).not.toHaveBeenCalled();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    const action = dialog(h).options!.onAction!;
+    action({ id: 'progress.leave.choose', payload: { choice: 'leave' } });
+    action({ id: 'progress.leave.choose', payload: { choice: 'leave' } });
+    expect(proceed).toHaveBeenCalledTimes(1);
+    expect(h.fetch.mock.calls.some(([, input]) => input?.method === 'POST')).toBe(false);
+  });
+  it('invalidates old intents and Escape keeps current drafts', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Draft');
+    const old = vi.fn(),
+      next = vi.fn(),
+      cancel = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(old);
+    const oldAction = dialog(h).options!.onAction!;
+    h.window.FrontDeskPageLeave.requestLeave(next, undefined, cancel);
+    oldAction({ id: 'progress.leave.choose', payload: { choice: 'leave' } });
+    dialog(h).options!.onAction!({ id: 'progress.leave.cancel' });
+    await flush();
+    expect(old).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(rowAt(h).querySelector('.progress-revise-note')!.value).toBe('Draft');
+  });
+  it('guards ordinary query-changing anchors but ignores hash, modified, download and new-tab gestures', async () => {
+    const h = harness({
+      search: '?tenant=alpha',
+      hash: '#alpha',
+      fetcher: dataFetcher(correctionPayload()),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Draft');
+    const fire = (
+      href: string,
+      extra: Record<string, unknown> = {},
+      attrs: Record<string, string> = {}
+    ) => {
+      const link = {
+        target: attrs.target || '',
+        hasAttribute: (name: string) => name in attrs,
+        getAttribute: () => href,
+      };
+      const preventDefault = vi.fn();
+      h.documentListeners.click({
+        target: { closest: () => link } as unknown as Element,
+        button: 0,
+        preventDefault,
+        stopPropagation: vi.fn(),
+        ...extra,
+      });
+      return preventDefault;
+    };
+    expect(fire('#beta')).not.toHaveBeenCalled();
+    expect(fire('#')).not.toHaveBeenCalled();
+    expect(fire('/ask', { ctrlKey: true })).not.toHaveBeenCalled();
+    expect(fire('/ask', {}, { target: '_blank' })).not.toHaveBeenCalled();
+    expect(fire('/file', {}, { download: '' })).not.toHaveBeenCalled();
+    expect(fire('mailto:test@example.test')).not.toHaveBeenCalled();
+    expect(fire('/progress?tenant=alpha')).toHaveBeenCalledTimes(1);
+    choose(h, 'stay');
+    await flush();
+    expect(fire('/progress?tenant=alpha&filter=done')).toHaveBeenCalledTimes(1);
+    expect(h.window.location.assign).not.toHaveBeenCalled();
+    choose(h, 'leave');
+    expect(h.window.location.assign).toHaveBeenCalledWith(
+      'https://studio.example.test/progress?tenant=alpha&filter=done'
+    );
+  });
+  it('keeps protection through read failure and invalidates a dialog for a new verified principal', async () => {
+    const payload = correctionPayload();
+    let fail = false;
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress' && fail ? Promise.reject(new Error('offline')) : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Secret');
+    fail = true;
+    h.refresh.fire();
+    await flush();
+    const proceed = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    expect(proceed).not.toHaveBeenCalled();
+    const stale = dialog(h).options!.onAction!;
+    fail = false;
+    payload.viewer_scope_id = 'new-principal';
+    h.refresh.fire();
+    await flush();
+    stale({ id: 'progress.leave.choose', payload: { choice: 'leave' } });
+    expect(proceed).not.toHaveBeenCalled();
+  });
+  it('closes safely when a predicate is invalidated before Escape and supersedes a pending context lookup', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Draft');
+    let valid = true;
+    const proceed = vi.fn(),
+      cancel = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed, () => valid, cancel);
+    const action = dialog(h).options!.onAction!;
+    valid = false;
+    action({ id: 'progress.leave.cancel' });
+    await flush();
+    expect(dialog(h).components[0]).toMatchObject({ props: { open: false } });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(proceed).not.toHaveBeenCalled();
+    const old = h.window.FrontDeskPageLeave.begin();
+    const navigate = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(navigate);
+    choose(h, 'leave');
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(old()).toBe(false);
+    h.window.FrontDeskPageLeave.requestLeave(proceed, old);
+    expect(proceed).not.toHaveBeenCalled();
+  });
+  it('fails closed and keeps a visible recovery notice when the dialog renderer fails', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Keep me');
+    h.window.FrontDeskRail.render = () => {
+      throw new Error('renderer unavailable');
+    };
+    const proceed = vi.fn(),
+      cancel = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed, undefined, cancel);
+    await flush();
+    expect(proceed).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(h.noticeText.textContent).toContain('could not be displayed');
+    expect(rowAt(h).querySelector('.progress-revise-note')!.value).toBe('Keep me');
+  });
+  it('ignores a late failed close instead of clearing or focusing over a newer dialog', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Draft');
+    const render = h.window.FrontDeskRail.render;
+    const close = deferred<void>();
+    let closes = 0;
+    h.window.FrontDeskRail.render = (host, components, options) => {
+      render(host, components, options);
+      if ((components[0].props as { open: boolean }).open === false && ++closes === 1)
+        return close.promise;
+    };
+    const oldCancel = vi.fn(),
+      nextCancel = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(vi.fn(), undefined, oldCancel);
+    choose(h, 'stay');
+    h.window.FrontDeskPageLeave.requestLeave(vi.fn(), undefined, nextCancel);
+    close.reject(new Error('late close failure'));
+    await flush();
+    expect(oldCancel).not.toHaveBeenCalled();
+    expect(dialog(h).components[0]).toMatchObject({ props: { open: true } });
+    choose(h, 'stay');
+    await flush();
+    expect(nextCancel).toHaveBeenCalledTimes(1);
+    expect(rowAt(h).querySelector('.progress-revise-note')!.value).toBe('Draft');
+  });
+  it('fences old context lookups even when a draft was already discarded before clean anchor navigation', async () => {
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(correctionPayload()) });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Draft');
+    const old = h.window.FrontDeskPageLeave.begin();
+    rowAt(h).querySelector('[data-action="discard-correction"]')!.fire();
+    const link = { target: '', hasAttribute: () => false, getAttribute: () => '/ask' };
+    const preventDefault = vi.fn();
+    h.documentListeners.click({
+      target: { closest: () => link } as unknown as Element,
+      button: 0,
+      preventDefault,
+      stopPropagation: vi.fn(),
+    });
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(old()).toBe(false);
+  });
+  it('marks actual delivered and historical artifact links as downloads', async () => {
+    const payload = correctionPayload();
+    payload.delivered[0].downloadable = true;
+    payload.done = [{ id: 'done-file', kind: 'artifact', status: 'accepted', downloadable: true }];
+    const h = harness({ hash: '#alpha', fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    expect(rowAt(h).innerHTML).toMatch(/<a[^>]*download[^>]*href="[^"]*api\/artifacts\/alpha/);
+    h.elements['filter-done'].fire();
+    expect(rowAt(h).innerHTML).toMatch(/<a[^>]*download[^>]*href="[^"]*api\/artifacts\/done-file/);
+  });
+  it('prompts for pending and uncertain decisions without draft text and preserves locks when leaving', async () => {
+    const payload = correctionPayload();
+    const write = deferred<MockResponse>();
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? write.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    rowAt(h).querySelector('[data-action="receive"]')!.fire();
+    const proceed = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    expect(dialog(h).components[0]).toMatchObject({
+      props: { message: texts['front_desk:progress_leave_pending'] },
+    });
+    const oldAction = dialog(h).options!.onAction!;
+    write.resolve(response({ ok: false }, false));
+    await flush();
+    expect(dialog(h).components[0]).toMatchObject({
+      props: { message: texts['front_desk:progress_leave_uncertain'] },
+    });
+    oldAction({ id: 'progress.leave.choose', payload: { choice: 'leave' } });
+    expect(proceed).not.toHaveBeenCalled();
+    choose(h, 'leave');
+    expect(proceed).toHaveBeenCalledTimes(1);
+    expect(
+      h.window.sessionStorage.getItem('front-desk.progress.uncertain.principal-alpha')
+    ).toContain('inbox-alpha');
+    expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
   });
 });
