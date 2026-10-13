@@ -93,6 +93,17 @@ async function flush() {
 }
 const texts: Record<string, string> = {
   'front_desk:progress_history': 'History',
+  'front_desk:progress_filter_active': 'In progress {count}',
+  'front_desk:progress_filter_delivered': 'Delivered {count}',
+  'front_desk:progress_delivered_title': 'Delivered',
+  'front_desk:progress_empty_active': 'Nothing is in progress.',
+  'front_desk:progress_select_hint': 'Choose an item to see its details.',
+  'front_desk:progress_loading': 'Loading progress…',
+  'front_desk:progress_refreshing': 'Checking the latest progress…',
+  'front_desk:progress_detail_loading': 'Loading details for {title}…',
+  'front_desk:progress_detail_failed': 'Could not load details for {title}.',
+  'front_desk:progress_detail_ready': 'Details for {title}',
+  'front_desk:progress_detail_retry': 'Try loading details again',
   'front_desk:progress_status_released': 'Released',
   'front_desk:progress_recovery': 'Discuss next steps',
   'front_desk:progress_load_failed': 'Could not load progress. Try again.',
@@ -153,6 +164,9 @@ function harness(
     'progress-list',
     'progress-empty',
     'progress-detail',
+    'progress-read-status',
+    'progress-detail-status',
+    'progress-detail-retry',
     'delivered-header',
     'delivered-title',
     'delivered-waiting',
@@ -179,6 +193,7 @@ function harness(
   Object.entries(texts).forEach(([key, value]) =>
     elements['progress-notice'].setAttribute('data-' + key.replace('front_desk:', ''), value)
   );
+  elements['progress-detail-retry'].tag = 'button';
   let location = new URL(
     'https://studio.example.test/' +
       (options.page || 'progress') +
@@ -306,6 +321,179 @@ function dataFetcher(
 }
 
 describe('progress browser-script contracts', () => {
+  it('keeps pending and failed list reads distinct from a verified empty result', async () => {
+    const pending = deferred<MockResponse>();
+    let reads = 0;
+    const h = harness({
+      fetcher: dataFetcher(emptyPayload(), (path) =>
+        path === '/api/progress' && ++reads === 1 ? pending.promise : undefined
+      ),
+    });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.elements['filter-delivered'].textContent).toBe('Delivered');
+    expect(h.elements['progress-empty'].textContent).toBe('');
+    expect(h.elements['progress-read-status'].textContent).toBe('Loading progress…');
+    expect(h.elements['progress-list'].attributes['aria-busy']).toBe('true');
+    pending.reject(new Error('private transport information'));
+    await mounted;
+    expect(h.elements['progress-list'].attributes['aria-busy']).toBe('false');
+    expect(h.elements['progress-empty'].textContent).toBe('');
+    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.noticeText.textContent).toContain('Could not load');
+    h.refresh.fire();
+    await flush();
+    expect(h.elements['filter-active'].textContent).toBe('In progress 0');
+    expect(h.elements['progress-empty'].textContent).toBe('Nothing is in progress.');
+  });
+  it('labels a revalidation while clearing old data and keeping its target URL', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'old', title: 'Old', selected_default: true }];
+    payload.counts.active = 1;
+    const pending = deferred<MockResponse>();
+    let reads = 0;
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress' && ++reads === 2 ? pending.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    h.refresh.fire();
+    await flush();
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('/api/progress/old');
+    expect(h.elements['progress-read-status'].textContent).toBe('Checking the latest progress…');
+    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.window.location.hash).toBe('#old');
+    pending.resolve(response(payload));
+    await flush();
+    expect(h.elements['filter-active'].textContent).toBe('In progress 1');
+    expect(h.elements['progress-read-status'].textContent).toBe('');
+  });
+  it('identifies selected-detail loading and retries only that failed GET once', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'alpha', title: 'Alpha', selected_default: true }];
+    const first = deferred<MockResponse>();
+    const retry = deferred<MockResponse>();
+    let details = 0;
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/alpha'
+          ? ++details === 1
+            ? first.promise
+            : retry.promise
+          : undefined
+      ),
+    });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    expect(h.elements['progress-detail-status'].textContent).toBe('Loading details for Alpha…');
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('Choose an item');
+    expect(h.elements['progress-detail'].attributes['aria-busy']).toBe('true');
+    first.reject(new Error('private network failure'));
+    await mounted;
+    expect(h.elements['progress-detail-status'].textContent).toBe(
+      'Could not load details for Alpha.'
+    );
+    expect(h.elements['progress-detail'].attributes['aria-busy']).toBe('false');
+    expect(h.elements['progress-detail-retry'].hidden).toBe(false);
+    const before = h.fetch.mock.calls.length;
+    h.elements['progress-detail-retry'].fire();
+    h.elements['progress-detail-retry'].fire();
+    await flush();
+    expect(h.fetch.mock.calls.length).toBe(before + 1);
+    expect(h.fetch.mock.calls.at(-1)?.[0]).toBe('/api/progress/alpha?tenant=alpha');
+    expect(h.elements['progress-detail-retry'].disabled).toBe(true);
+    retry.resolve(response(detail('confirmed Alpha')));
+    await flush();
+    expect(h.elements['progress-detail-status'].textContent).toBe('Details for Alpha');
+    expect(h.elements['progress-detail'].innerHTML).toContain('confirmed Alpha');
+    expect(h.elements['progress-detail'].attributes['aria-busy']).toBe('false');
+    expect(h.fetch.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
+  });
+
+  it('clears the failed-read notice during one pending refresh and keeps counts unknown', async () => {
+    let reads = 0;
+    const pending = deferred<MockResponse>();
+    const h = harness({
+      fetcher: dataFetcher(emptyPayload(), (path) =>
+        path === '/api/progress'
+          ? ++reads === 1
+            ? Promise.reject(new Error('offline'))
+            : pending.promise
+          : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    expect(h.elements['progress-notice'].hidden).toBe(false);
+    h.refresh.fire();
+    h.refresh.fire();
+    await flush();
+    expect(reads).toBe(2);
+    expect(h.refresh.disabled).toBe(true);
+    expect(h.elements['progress-notice'].hidden).toBe(true);
+    expect(h.elements['progress-read-status'].textContent).toBe('Loading progress…');
+    expect(h.elements['progress-empty'].textContent).toBe('');
+    pending.resolve(response(emptyPayload()));
+    await flush();
+    expect(h.refresh.disabled).toBe(false);
+  });
+  it('keeps late detail failures from replacing newer selection feedback or enabling old retry', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'alpha', title: 'Alpha' },
+      { id: 'beta', title: 'Beta' },
+    ];
+    const first = deferred<MockResponse>();
+    const second = deferred<MockResponse>();
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/alpha'
+          ? first.promise
+          : path === '/api/progress/beta'
+            ? second.promise
+            : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    h.elements['progress-list'].children[0].children[0].fire();
+    h.elements['progress-list'].children[1].children[0].fire();
+    expect(h.elements['progress-detail-status'].textContent).toBe('Loading details for Beta…');
+    first.reject(new Error('old failure'));
+    await flush();
+    expect(h.elements['progress-detail-status'].textContent).toBe('Loading details for Beta…');
+    expect(h.elements['progress-detail-retry'].hidden).toBe(true);
+    second.resolve({ ...response({ ok: false, error: 'private detail' }, false), status: 500 });
+    await flush();
+    expect(h.elements['progress-detail-status'].textContent).toBe(
+      'Could not load details for Beta.'
+    );
+    h.elements['filter-delivered'].fire();
+    expect(h.elements['progress-detail-status'].textContent).toBe('');
+    expect(h.elements['progress-detail-retry'].hidden).toBe(true);
+    expect(h.elements['progress-detail'].attributes['aria-busy']).toBe('false');
+  });
+  it('places live feedback outside busy content without announcing all result details', () => {
+    const html = safeReadFile(
+      'presence/displays/presence-studio/static/progress.html',
+      {}
+    ).toString();
+    expect(html).toMatch(/id="progress-read-status"[^>]*role="status"/);
+    expect(html).toMatch(/id="progress-detail-status"[^>]*role="status"/);
+    expect(html).toMatch(/id="progress-list"[^>]*aria-busy="true"/);
+    expect(html).toMatch(/id="progress-detail"[^>]*aria-busy="false"/);
+    expect(html).not.toMatch(/id="progress-detail"[^>]*(?:role="status"|aria-live)/);
+    const css = safeReadFile(
+      'presence/displays/presence-studio/static/progress.css',
+      {}
+    ).toString();
+    expect(css).not.toMatch(/#progress-(?:read|detail)-status:empty/);
+    expect(html.indexOf('id="progress-detail-status"')).toBeLessThan(
+      html.indexOf('id="progress-detail"')
+    );
+  });
+
   it.each(['active', 'delivered', 'done'])(
     'restores explicit %s filter without selecting unrelated default work',
     async (filter) => {
@@ -686,6 +874,9 @@ describe('progress browser-script contracts', () => {
       await flush();
       expect(h.elements['progress-list'].children).toHaveLength(0);
       expect(h.elements['progress-detail'].innerHTML).not.toContain('Private result');
+      expect(h.elements['progress-detail-status'].textContent).toBe('');
+      expect(h.elements['progress-detail-retry'].hidden).toBe(true);
+      expect(h.elements['progress-detail'].attributes['aria-busy']).toBe('false');
       expect(h.noticeText.textContent).toContain('work item is unavailable');
       expect(storage.get(key)).toBe(JSON.stringify(['inbox-1']));
       expect(h.fetch.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
