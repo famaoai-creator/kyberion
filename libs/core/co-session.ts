@@ -437,7 +437,7 @@ export function leaveCoSession(input: {
 }): { released_leases: number } {
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
-  const session = readSession(session_id);
+  readSession(session_id);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
   let released = 0;
   for (const lease of listCoSessionLeases(session_id)) {
@@ -456,16 +456,23 @@ export function leaveCoSession(input: {
         released += 1;
       } catch (error) {
         // A vanished or re-held lease must not strand the remaining releases
-        // or suppress the leave event.
-        if (error instanceof CoSessionError && error.code === 'not_found') continue;
+        // or suppress the leave event — a lease whose holder changed is no
+        // longer this participant's to release.
+        if (
+          error instanceof CoSessionError &&
+          (error.code === 'not_found' || error.code === 'lease_held')
+        ) {
+          continue;
+        }
         throw error;
       }
     }
   }
   // Emit the event only when there is something to report — on closed
   // sessions or for participants that never joined, session_left is noise
-  // (SessionEnd hooks fire this for every provider session).
-  if (session.status === 'closed') return { released_leases: released };
+  // (SessionEnd hooks fire this for every provider session). Re-read the
+  // session after the loop: it may have closed mid-release.
+  if (readSession(session_id).status === 'closed') return { released_leases: released };
   const joined = listCoSessionPresence(session_id, { staleMs: Number.MAX_SAFE_INTEGER }).some(
     (row) => row.provider === provider && row.participant_id === participant_id
   );
@@ -574,7 +581,16 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
     const onDisk = readJsonIfPresent<CoSessionPathLease>(
       leaseFile(lease.session_id, lease.path_hash)
     );
-    if (onDisk?.lease_id !== lease.lease_id || onDisk.status !== 'active') return false;
+    // lease_id is preserved across same-holder renewals, so identity alone
+    // is not enough — persist only when the on-disk record is still the
+    // genuinely expired lease the caller observed.
+    if (
+      onDisk?.lease_id !== lease.lease_id ||
+      onDisk.status !== 'active' ||
+      Date.parse(onDisk.expires_at) > Date.now()
+    ) {
+      return false;
+    }
     writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
     return true;
   });
@@ -584,6 +600,25 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
       lease_id: lease.lease_id,
     });
   }
+}
+
+/**
+ * Read a single lease for a repo path — the cheap hot path for hook gates
+ * (no dir scan, no presence/handoff reads, no expiry persistence). Returns
+ * the refreshed (possibly expired-marked) lease, or undefined.
+ */
+export function getCoSessionLease(
+  sessionId: string | undefined,
+  repoPath: string
+): { session_status: CoSessionRecord['status']; lease: CoSessionPathLease | undefined } {
+  const session_id = resolveCoSessionId(sessionId);
+  const session = readSession(session_id);
+  const path_hash = pathHashForLease(normalizeCoSessionPath(repoPath));
+  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+  return {
+    session_status: session.status,
+    lease: existing ? refreshLeaseStatus(existing) : undefined,
+  };
 }
 
 export function listCoSessionLeases(sessionId?: string): CoSessionPathLease[] {
@@ -621,6 +656,7 @@ export function acquireCoSessionLease(input: {
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
+  let displacedLease: CoSessionPathLease | undefined;
   const lease = withLockSync(leaseLockId(session_id, path_hash), () => {
     // closeCoSession flips the session to closed BEFORE releasing leases, so
     // re-checking inside the per-path lock closes the acquire-vs-close race.
@@ -629,6 +665,9 @@ export function acquireCoSessionLease(input: {
     }
     const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
     const current = existing ? refreshLeaseStatus(existing) : undefined;
+    if (existing?.status === 'active' && current?.status === 'expired') {
+      displacedLease = current;
+    }
     if (
       current?.status === 'active' &&
       !(current.holder_provider === provider && current.holder_participant_id === participant_id)
@@ -657,8 +696,21 @@ export function acquireCoSessionLease(input: {
       safeMkdir(leasesDir(session_id), { recursive: true });
       writeJson(leaseFile(session_id, path_hash), next);
     });
+    // Post-write re-check: a close that flipped the session after our earlier
+    // check enumerated leases before our write — self-delete so no active
+    // lease survives on a closed session.
+    if (readSession(session_id).status !== 'open') {
+      withCoSessionWrite(() => safeRmSync(leaseFile(session_id, path_hash)));
+      throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+    }
     return next;
   });
+  if (displacedLease) {
+    appendEvent(session_id, 'lease_expired', displacedLease.holder_provider, {
+      path: repoPath,
+      lease_id: displacedLease.lease_id,
+    });
+  }
   appendEvent(session_id, 'lease_acquired', provider, {
     path: repoPath,
     lease_id: lease.lease_id,
@@ -780,9 +832,11 @@ export function listCoSessionHandoffs(
     const target = opts.to_participant_id.trim();
     const provider = opts.to_provider ? assertProvider(opts.to_provider) : undefined;
     rows = rows.filter((row) => {
+      if (provider) {
+        // Ack-able only — mirrors ackCoSessionHandoff's targeting rules.
+        return coSessionHandoffTargets(row, provider, target);
+      }
       if (row.to_participant_id === target) return true;
-      // Provider-broadcast handoffs (no participant) are visible to every instance.
-      if (!row.to_participant_id && provider && row.to_provider === provider) return true;
       return false;
     });
   } else if (opts.to_provider) {
@@ -790,6 +844,26 @@ export function listCoSessionHandoffs(
     rows = rows.filter((row) => row.to_provider === provider);
   }
   return rows;
+}
+
+/**
+ * Whether a handoff can be delivered AND acked by <provider>/<participant_id>
+ * — mirrors ackCoSessionHandoff's targeting rules: a participant-targeted
+ * handoff addressed to a different provider is invisible, a provider-targeted
+ * handoff is visible to every participant of that provider, and a handoff
+ * with no addressing is a broadcast.
+ */
+export function coSessionHandoffTargets(
+  handoff: Pick<CoSessionHandoff, 'to_provider' | 'to_participant_id'>,
+  provider: string,
+  participant_id: string
+): boolean {
+  return (
+    (handoff.to_participant_id === participant_id &&
+      (!handoff.to_provider || handoff.to_provider === provider)) ||
+    (!handoff.to_participant_id && handoff.to_provider === provider) ||
+    (!handoff.to_provider && !handoff.to_participant_id)
+  );
 }
 
 export function ackCoSessionHandoff(input: {
