@@ -39,6 +39,7 @@ import {
 } from '@agent/core/knowledge/knowledge-scope';
 import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop';
 import { loadAnalysisConfigAtPath } from '@agent/core/analysis/analysis-config';
+import { segmentWords } from '@agent/core/locale-normalize';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';
 import { isRecord, readTextFile } from '@agent/core/foundation';
@@ -303,9 +304,10 @@ export function scanKnowledgeFiles(
 // Scoring
 // ---------------------------------------------------------------------------
 export function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[\s\-_/,;:]+/)
+  // Intl.Segmenter-backed word segmentation keeps spaceless scripts (ja)
+  // useful; identifier separators are still split afterwards for paths/tags.
+  return segmentWords(text.toLowerCase())
+    .flatMap((t) => t.split(/[-_/.]+/))
     .filter((t) => t.length > 1);
 }
 

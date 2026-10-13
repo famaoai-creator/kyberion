@@ -13,6 +13,7 @@ import {
   type ContextualIntentFrame,
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
+import { segmentWords } from '../locale-normalize.js';
 import {
   intentPhraseFlags,
   intentPhraseSource,
@@ -382,18 +383,77 @@ function normalizeKatakanaToHiragana(text: string): string {
   return text.replace(/[\u30a1-\u30f6]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
+// Maps half-width katakana (\uff76-\uff9f) to full-width via per-run NFKC,
+// which also composes voicing marks (\uff76\uff9e -> \u30ac), so the
+// katakana->hiragana pass above unifies it too. Voice input and legacy
+// systems emit half-width kana.
+function normalizeHalfWidthKatakana(text: string): string {
+  return text.replace(/[\uff61-\uff9f]+/g, (run) => run.normalize('NFKC'));
+}
+
+// Word-final prolonged marks are dropped (\u30b5\u30fc\u30d0\u30fc ==
+// \u30b5\u30fc\u30d0), the dominant loanword spelling variant; internal
+// ones stay so \u30ab\u30fc\u30c9 and \u304b\u3069 still differ.
+function normalizeJaTrailingProlonged(text: string): string {
+  return text.replace(/\u30fc+(?=\s|$)/g, '');
+}
+
+// Honorific prefixes before kanji are dropped for matching (\u304a\u9858\u3044 ->
+// \u9858\u3044, \u3054\u78ba\u8a8d -> \u78ba\u8a8d) — only before kanji,
+// so \u304a\u3082\u3057\u308d\u3044 keeps its leading \u304a.
+function stripJaHonorificPrefixes(text: string): string {
+  return text.replace(/(^|\s)[\u304a\u3054](?=[\u3400-\u9fff])/g, '$1');
+}
+
+// Trailing request / politeness markers collapse onto the stem, so a request
+// ending in "してください"/"します" hits the same triggers as the bare noun.
+// Deliberately conservative: bare \u305f\u3044 / \u3057\u305f\u3044 are excluded because
+// real words end that way (\u671f\u5f85, \u72b6\u614b), and single-kana tails
+// are never stripped. Longest-first so layered endings peel correctly.
+const JA_REQUEST_ENDINGS =
+  // i18n-exempt: Japanese request-ending rule data for trigger matching, not user-facing copy
+  'ていただけないでしょうか ていただけますか ていただきたい ていただけます していただければ してもらえませんか してもらえますか してもらいたい てもらえますか てもらいたい してください くださいませんか くださいませ ください 下さい ておいてください ておいて てくれますか してほしい てほしい てくれ してね して ちょうだい おねがいします おねがい お願いします お願い ねがいします ましょうか でしょうか ませんか ましょう でしょう ますか ですか ます です'
+    .split(' ')
+    .sort((a, b) => b.length - a.length);
+
+function stripJaRequestEndings(text: string): string {
+  let out = text;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const ending = JA_REQUEST_ENDINGS.find(
+      (entry) => out.endsWith(entry) && out.length > entry.length
+    );
+    if (!ending) break;
+    out = out.slice(0, -ending.length).trimEnd();
+  }
+  return out;
+}
+
 /**
  * Locale-aware normalization for trigger matching.
- * Applies full-width\u2192half-width and katakana\u2192hiragana before standard text normalization,
- * so Japanese utterances match ASCII trigger keywords and vice versa.
+ * Applies full-width\u2192half-width, half-width katakana unification, and
+ * katakana\u2192hiragana before standard text normalization, then drops
+ * word-final \u30fc, honorific \u304a/\u3054, and trailing request endings so
+ * Japanese utterances match ASCII trigger keywords and vice versa.
  */
 export function normalizeForTriggerMatch(utterance: string): string {
-  return normalizeFreeText(normalizeKatakanaToHiragana(normalizeFullWidthToHalfWidth(utterance)));
+  return stripJaRequestEndings(
+    stripJaHonorificPrefixes(
+      normalizeJaTrailingProlonged(
+        normalizeFreeText(
+          normalizeKatakanaToHiragana(
+            normalizeHalfWidthKatakana(normalizeFullWidthToHalfWidth(utterance))
+          )
+        )
+      )
+    )
+  );
 }
 
 function tokenize(value: string): string[] {
-  return normalizeFreeText(value)
-    .split(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff]+/i)
+  // Word segmentation (not delimiter splitting): spaceless scripts like
+  // Japanese would otherwise arrive as a single token and the surface-example
+  // overlap score below could never fire on them.
+  return segmentWords(normalizeForTriggerMatch(value))
     .map((token) => token.trim())
     .filter((token) => token.length >= 2);
 }
@@ -458,7 +518,10 @@ function scoreCatalogIntent(
       const pattern = wholeWordPattern(kw);
       return pattern.test(normalized) || pattern.test(localizedNormalized);
     }
-    return normalized.includes(kw) || localizedNormalized.includes(kw);
+    // Keywords run through the same locale-aware normalization as the
+    // utterance, so a keyword authored as "スラック" still matches "すらっく"
+    // input (and vice versa) and request endings on either side peel equally.
+    return normalized.includes(kw) || localizedNormalized.includes(normalizeForTriggerMatch(kw));
   });
   const reasons: string[] = [];
   let score = 0;
@@ -502,7 +565,9 @@ function scoreCatalogIntent(
 
   const exampleTokens = (intent.surface_examples || []).flatMap((example) => tokenize(example));
   const overlap = utteranceTokens.filter((token) => exampleTokens.includes(token));
-  if (overlap.length > 0) {
+  // A single shared word is weak evidence — common verbs (まとめ, 作成) recur
+  // across unrelated intents and would hijack the ranking on a one-token hit.
+  if (overlap.length >= 2) {
     score = Math.max(
       score,
       Math.min(
