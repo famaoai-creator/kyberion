@@ -20,6 +20,8 @@ import {
   CoSessionError,
 } from './co-session.js';
 import { registerLockIo, type LockIo } from './foundation/lock-utils.js';
+import { readJsonLines } from './foundation/json.js';
+import { pathResolver } from './path-resolver.js';
 
 beforeEach(() => {
   setCoSessionNamespace(`co-session-test-${process.pid}`);
@@ -142,6 +144,28 @@ describe('co-session', () => {
         path: 'libs/core/co-session.ts',
       })
     ).toThrow(/closed/);
+  });
+
+  it('leaveCoSession on a closed session is quiet and non-throwing', () => {
+    startCoSession({ goal: 'x', provider: 'claude', session_id: 'cos-leave-closed' });
+    joinCoSession({
+      provider: 'claude',
+      participant_id: 'claude-p1',
+      session_id: 'cos-leave-closed',
+    });
+    closeCoSession({ session_id: 'cos-leave-closed', provider: 'claude' });
+    const result = leaveCoSession({
+      provider: 'claude',
+      participant_id: 'claude-p1',
+      session_id: 'cos-leave-closed',
+    });
+    expect(result.released_leases).toBe(0);
+    const events = readJsonLines<Record<string, unknown>>(
+      pathResolver.rootResolve(
+        `active/shared/observability/co-sessions/co-session-test-${process.pid}/cos-leave-closed/events.jsonl`
+      )
+    );
+    expect(events.filter((e) => e.event === 'session_left')).toHaveLength(0);
   });
 
   it('records Mesh-aligned handoffs and ack', () => {

@@ -27,8 +27,8 @@ Add this directory as a plugin (or via a marketplace entry pointing here). The h
 Note: in this checkout the same hooks are also wired directly in the tracked
 `.claude/settings.json` (`$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js`),
 so they fire without installing this plugin. If the plugin IS installed too the
-events fire twice — handlers are written to tolerate that (join/drain are
-idempotent), though context blocks may appear duplicated.
+events fire twice — handlers tolerate that (join appends a duplicate presence
+row, context blocks may appear twice), which is safe but noisy.
 
 ## Scope / roadmap
 
