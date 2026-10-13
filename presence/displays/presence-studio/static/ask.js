@@ -12,25 +12,12 @@
  * per-tab history is retained locally as a read-only archive, never replayed.
  * Hearing sessions keep their independent legacy IDs.
  *
- * Voice: the mic button and the header hands-free toggle both use the
- * browser's `SpeechRecognition` (ported, in a much smaller form, from
- * `static/index.html`'s `setupMic()` — no push-to-talk, no engine/device
- * selects, which stay on `/work`). Barge-in is a best-effort
- * `POST /api/voice/stop-speaking` call before every hands-free recognition
- * cycle (this page has no live speech-state poll, unlike `/work`, so it
- * cannot gate the call on "is the companion currently speaking" — calling it
- * when nothing is playing is a harmless no-op). TTS of the companion's reply
- * only happens while hands-free is on, via `speechSynthesis` — this surface
- * has no dedicated "speak this text" HTTP endpoint (`/api/voice/ingest`'s own
- * `auto_reply`/`reflect_to_surface` server-side speech is a property of the
- * voice-hub bridge itself, not something this page controls per-request).
- *
- * PA-09: once `ask.html` attaches the talking avatar (`attachAvatar`, from
- * `static/partner-avatar.js`), hands-free replies are spoken through it
- * instead — voice-hub audio via `POST /api/voice/synthesize` played in the
- * browser with analyser lip-sync, falling back to `speechSynthesis` with a
- * synthetic mouth — and the avatar mirrors listening / thinking. Send, mic and
- * hands-free clicks unlock its audio (autoplay policy).
+ * Voice uses browser SpeechRecognition; dedicated engine controls remain on /work.
+ * Hands-free cycles send a best-effort stop-speaking request before recognition.
+ * Replies speak only with hands-free enabled. The attached partner avatar prefers
+ * voice-hub synthesis with analyser lip-sync, then speechSynthesis as a fallback.
+ * Send, mic and hands-free gestures unlock avatar audio for autoplay policies.
+ * Voice-hub bridge auto-reply remains independent from this browser's controls.
  *
  * See docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
  * §2.1 / FD-03 and docs/USER_EXPERIENCE_CONTRACT.md.
@@ -216,6 +203,16 @@
   var hasBootVocabulary = readRecovery.hasBootVocabulary;
   var refreshRecent = readRecovery.refreshRecent;
   var renderStartup = readRecovery.renderStartup;
+
+  var correction =
+    window.KyberionAskCorrection &&
+    window.KyberionAskCorrection.create({
+      state: state,
+      fetchJson: fetchReadJson,
+      scopedUrl: scopedUrl,
+      proposeDraft: proposeDraft,
+      vt: vt,
+    });
 
   var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
   var HEARING_CANVAS_POLL_MAX_TRIES = 10;
@@ -567,6 +564,7 @@
     renderHearing();
     syncAvatar();
     renderConversationStatus();
+    renderDraftChoice();
   }
 
   // PA-09: page state -> avatar controller (the avatar overlays `speaking`
@@ -953,11 +951,21 @@
       state.draftSaveFailed = true;
     }
     renderDraftChoice();
+    renderConversationStatus();
   }
 
   function renderDraftChoice() {
     var host = document.getElementById('draft-choice');
     if (host) host.hidden = !state.proposedDraft;
+    var lengthWarning = document.getElementById('draft-length-warning');
+    var input = document.getElementById('ask-input');
+    if (lengthWarning) {
+      lengthWarning.hidden = !(
+        (input && input.value.length > 4000) ||
+        (state.proposedDraft && state.proposedDraft.text.length > 4000)
+      );
+      lengthWarning.textContent = vt(state.vocab, 'front_desk:ask_draft_too_long');
+    }
     var warning = document.getElementById('draft-storage-warning');
     if (warning) {
       warning.hidden = !state.draftSaveFailed;
@@ -986,12 +994,14 @@
     saveDraft();
   }
 
-  function proposeDraft(text) {
+  function proposeDraft(text, isCurrent, onAccepted) {
     var input = document.getElementById('ask-input');
     if (!input || !text || state.historyState !== 'ready' || !state.storageVerified) return false;
     if (input.value.trim() && input.value !== text) {
       state.proposedDraft = {
         text: text,
+        isCurrent: isCurrent,
+        onAccepted: onAccepted,
         start: input.selectionStart,
         end: input.selectionEnd,
         direction: input.selectionDirection,
@@ -1003,6 +1013,7 @@
       if (keep) keep.focus();
     } else {
       editDraft(text);
+      if (onAccepted) onAccepted();
       input.focus();
     }
     return true;
@@ -1025,7 +1036,13 @@
     if (replace)
       replace.addEventListener('click', function () {
         if (!state.proposedDraft) return;
+        if (state.proposedDraft.isCurrent && !state.proposedDraft.isCurrent()) {
+          cancelDraftChoice(true);
+          return;
+        }
+        var accepted = state.proposedDraft.onAccepted;
         editDraft(state.proposedDraft.text);
+        if (accepted) accepted();
         if (input) input.focus();
       });
     function cancelOnEscape(event) {
@@ -1036,7 +1053,25 @@
     }
     var choice = document.getElementById('draft-choice');
     if (choice) choice.addEventListener('keydown', cancelOnEscape);
-    if (input) input.addEventListener('keydown', cancelOnEscape);
+    if (input)
+      input.addEventListener('keydown', function (event) {
+        cancelOnEscape(event);
+        if (
+          event.key !== 'Enter' ||
+          event.shiftKey ||
+          event.ctrlKey ||
+          event.altKey ||
+          event.metaKey ||
+          event.isComposing ||
+          event.keyCode === 229 ||
+          event.repeat ||
+          event.defaultPrevented
+        )
+          return;
+        event.preventDefault();
+        var form = document.getElementById('ask-form');
+        if (form && form.requestSubmit) form.requestSubmit();
+      });
   }
 
   function renderConversationStatus() {
@@ -1052,8 +1087,13 @@
             ? 'concierge:dock.history.pending'
             : null);
     var send = document.getElementById('ask-send');
+    var input = document.getElementById('ask-input');
     if (send)
-      send.disabled = state.sending || state.historyState !== 'ready' || !state.storageVerified;
+      send.disabled =
+        state.sending ||
+        state.historyState !== 'ready' ||
+        !state.storageVerified ||
+        Boolean(input && input.value.length > 4000);
     host.setAttribute('aria-busy', String(Boolean(state.historyReadPending)));
     host.classList.toggle('hidden', !key);
     if (!key) {
@@ -1088,6 +1128,7 @@
     var trimmed = String(text || '').trim();
     if (
       !trimmed ||
+      String(text || '').length > 4000 ||
       state.sending ||
       state.historyState !== 'ready' ||
       !state.conversationId ||
@@ -1396,6 +1437,16 @@
       var params = new URLSearchParams(window.location.search);
       // A resume URL is always read-only, even when unrelated prefill parameters are present.
       if (params.has('request')) return;
+      if (params.has('correction')) {
+        if (correction) correction.apply();
+        else {
+          var status = document.getElementById('ask-correction-status');
+          var retry = document.getElementById('ask-correction-retry');
+          if (status) status.hidden = false;
+          if (retry) retry.hidden = false;
+        }
+        return;
+      }
       var ask = params.get('ask');
       var mic = params.get('mic') === '1';
       if (ask) {
@@ -1436,6 +1487,14 @@
       if (scenarioParam) state.hearingScenarioId = scenarioParam;
     } catch (err) {
       state.hearingMode = false;
+    }
+    if (correction) correction.mount();
+    else {
+      var correctionRetry = document.getElementById('ask-correction-retry');
+      if (correctionRetry)
+        correctionRetry.addEventListener('click', function () {
+          window.location.reload();
+        });
     }
     wireDraft();
     wireForm();
