@@ -93,9 +93,15 @@ function tokenize(text: string): string[] {
   ]);
   // Secondary non-alnum split restores the old match(/[\p{L}\p{N}]+/) shape:
   // ICU keeps "foo_bar" and "file.txt" joined, which would lose evidence hits.
-  return segmentWords(normalizeReconciliationText(text).toLowerCase())
-    .flatMap((token) => token.split(/[^\p{L}\p{N}]+/u))
-    .filter((token) => token.length >= 2 && !stopwords.has(token));
+  return (
+    segmentWords(normalizeReconciliationText(text).toLowerCase())
+      .flatMap((token) => token.split(/[^\p{L}\p{N}]+/u))
+      // Single kanji are content words (駅, 雨); only single kana/latin
+      // fragments and stopwords are dropped.
+      .filter(
+        (token) => (token.length >= 2 || /[\u3400-\u9fff]/u.test(token)) && !stopwords.has(token)
+      )
+  );
 }
 
 function normalizeTokens(text: string): Set<string> {
