@@ -203,6 +203,7 @@ function harness(
   const listeners: Record<string, () => void> = {};
   const storage = options.storage || new Map<string, string>();
   const renders: Array<{ container: Element; components: Array<Record<string, unknown>> }> = [];
+  const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
   const window = {
     sessionStorage: {
       getItem(key: string) {
@@ -256,6 +257,10 @@ function harness(
       },
     },
     FrontDeskRail: {
+      subscribe(listener: (state: { phase: string; message: string }) => void) {
+        shellListeners.push(listener);
+        return () => {};
+      },
       ready: options.ready || Promise.resolve(),
       nav: async () => ({
         ok: true,
@@ -293,6 +298,8 @@ function harness(
   );
   return {
     elements,
+    shell: (phase: string, message = '') =>
+      shellListeners.forEach((listener) => listener({ phase, message })),
     window: window as typeof window & {
       KyberionProgress: { mount(): Promise<void> };
       KyberionHome: { mount(): Promise<void> };
@@ -1358,4 +1365,62 @@ describe('work home browser-script scope readiness', () => {
       'https://studio.example.test/ask?ask=Prepare+my+request&send=1&tenant=alpha'
     );
   });
+});
+
+describe('Progress shared shell startup feedback', () => {
+  it('shows blocked copy without reading scoped data, then starts once after successful retry', async () => {
+    const ready = deferred<void>();
+    const h = harness({ ready: ready.promise, fetcher: dataFetcher(emptyPayload()) });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    h.shell('blocked', 'Sign in again, then Retry in the menu.');
+    expect(h.elements['progress-read-status'].textContent).toBe(
+      'Sign in again, then Retry in the menu.'
+    );
+    expect(h.elements['progress-list'].attributes['aria-busy']).toBe('false');
+    expect(h.fetch).not.toHaveBeenCalled();
+    h.shell('loading');
+    expect(h.elements['progress-list'].attributes['aria-busy']).toBe('true');
+    h.shell('ready');
+    ready.resolve();
+    await mounted;
+    expect(
+      h.fetch.mock.calls.filter(
+        ([url]) => new URL(url, 'http://localhost').pathname === '/api/progress'
+      )
+    ).toHaveLength(1);
+    expect(h.fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+  it('ignores readiness superseded before the consumer continuation', async () => {
+    const ready = deferred<void>();
+    const h = harness({ ready: ready.promise, fetcher: dataFetcher(emptyPayload()) });
+    const mounted = h.window.KyberionProgress.mount();
+    ready.resolve();
+    h.window.FrontDeskRail.ready = new Promise(() => {});
+    await mounted;
+    expect(h.fetch).not.toHaveBeenCalled();
+  });
+});
+
+it('does not let a superseded vocabulary rejection erase the newer Progress mount', async () => {
+  const old = deferred<MockResponse>();
+  let reads = 0;
+  const payload = emptyPayload();
+  payload.active = [{ id: 'current', title: 'Current item', status: 'running' }];
+  payload.counts.active = 1;
+  const h = harness({
+    fetcher: dataFetcher(payload, (path) =>
+      path === '/api/progress-vocabulary' && ++reads === 1 ? old.promise : undefined
+    ),
+  });
+  const first = h.window.KyberionProgress.mount();
+  await flush();
+  h.window.FrontDeskRail.ready = Promise.resolve();
+  await h.window.KyberionProgress.mount();
+  expect(h.elements['progress-list'].children).toHaveLength(1);
+  const before = h.elements['progress-list'].children[0];
+  old.reject(new Error('older request failed'));
+  await first;
+  expect(h.elements['progress-list'].children[0]).toBe(before);
+  expect(h.noticeText.textContent).not.toContain('Could not load progress');
 });
