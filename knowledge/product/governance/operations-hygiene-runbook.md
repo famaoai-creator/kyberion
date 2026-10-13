@@ -733,6 +733,10 @@ call fails.
 
 ## §8 Mission evidence: generated files and recorded deliverables
 
+Video gates that derive approval scope through strict `findMissionPath` must register
+the caller as `scope-derivation` in `tests/mission-lookup-boundary.test.ts`. Run that
+boundary test with the production regression suite before publishing.
+
 **Video production preflight.** A phase exit gate alone does not defer the next
 task under the default warning rollout. For generated video, wire validated
 spec/scene planning, current prototype acceptance, selected-take lineage and
