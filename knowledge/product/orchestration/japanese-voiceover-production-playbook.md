@@ -25,7 +25,7 @@ returns word timestamps) → **ElevenLabs** → **local Kokoro-82M** (always
 available fallback). The Japanese Kokoro voices are graded **C−/C/C+** in the
 upstream VOICES.md — the weakest tier. For a deliverable anyone else will hear,
 run `npx hyperframes auth status` and offer the user the sign-in choice first;
-for scratch/local iteration Kokoro is acceptable.
+for scratch or local iteration Kokoro is acceptable.
 
 ## 1. Script: write the reading, not just the text
 
