@@ -3,6 +3,8 @@
   "order": [
     "mflux",
     "musicgen_mlx",
+    "musicgen_audiogen",
+    "chatmusician_mlx",
     "stable_audio_3",
     "agy_sdk",
     "playwright",
