@@ -53,6 +53,7 @@ import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { useRecordingConsent } from '../../lib/use-recording-consent';
 import { ProfileSection } from './sections/ProfileSection';
+import type { SettingsSaveFeedbackState } from './sections/SettingsSaveFeedback';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
 import { ServicesSection } from './sections/ServicesSection';
 import { VoiceSection } from './sections/VoiceSection';
@@ -138,6 +139,7 @@ export default function SettingsPage() {
   const retryPending = React.useRef(false);
   const [notice, setNotice] = React.useState<Notice>(null);
   const [busy, setBusy] = React.useState(false);
+  const [saveFeedback, setSaveFeedback] = React.useState<SettingsSaveFeedbackState | null>(null);
   const profileDraft = useSettingsDraft(
     {
       name: '',
@@ -257,6 +259,7 @@ export default function SettingsPage() {
     setSetup(null);
     setNotice(null);
     setBusy(false);
+    setSaveFeedback(null);
     setError('context-changed');
   });
 
@@ -616,7 +619,11 @@ export default function SettingsPage() {
   const saveNotification = React.useCallback(
     async (grouped = false): Promise<boolean> => {
       if (savePending.current && !grouped) return false;
-      if (!grouped) savePending.current = true;
+      if (!grouped) {
+        savePending.current = true;
+        setSaveFeedback({ section: 'notifications', phase: 'saving' });
+        setNotice(null);
+      }
       const epoch = draftSession.epoch();
       const submitted = { ...notif };
       setBusy(true);
@@ -645,11 +652,17 @@ export default function SettingsPage() {
         draftSession.advance('notifications');
         ackNotif(submitted, saved);
         setNotifCurrent(receipt ?? null);
-        setNotice({ text: t('setup.notification_saved') });
+        if (!grouped) setSaveFeedback({ section: 'notifications', phase: 'saved' });
+        if (grouped) setNotice({ text: t('setup.notification_saved') });
         await Promise.all([refreshNotifications(), refresh()]);
         return draftSession.current(epoch);
       } catch {
-        if (draftSession.current(epoch))
+        if (!grouped && draftSession.current(epoch))
+          setSaveFeedback({
+            section: 'notifications',
+            phase: submittedRequest ? 'unconfirmed' : 'unavailable',
+          });
+        if (grouped && draftSession.current(epoch))
           setNotice({
             text: t(
               submittedRequest ? 'setup.draft_save_unconfirmed' : 'setup.draft_context_unavailable'
@@ -705,9 +718,17 @@ export default function SettingsPage() {
   );
 
   const applyOnboarding = React.useCallback(
-    async (includeVoice: boolean, grouped = false): Promise<boolean> => {
+    async (
+      includeVoice: boolean,
+      grouped = false,
+      section?: 'profile' | 'services'
+    ): Promise<boolean> => {
       if (!setup || (savePending.current && !grouped)) return false;
-      if (!grouped) savePending.current = true;
+      if (!grouped) {
+        savePending.current = true;
+        setSaveFeedback(section ? { section, phase: 'saving' } : null);
+        if (section) setNotice(null);
+      }
       const epoch = draftSession.epoch();
       const submitted = { ...profile };
       const submittedServices = [...services];
@@ -781,13 +802,17 @@ export default function SettingsPage() {
         draftSession.advance('setup');
         ackProfile(submitted, saved);
         ackServices(submittedServices);
-        setNotice({
-          text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
-        });
+        if (section) setSaveFeedback({ section, phase: 'saved' });
+        if (!section)
+          setNotice({
+            text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
+          });
         await refresh();
         return draftSession.current(epoch);
       } catch {
-        if (draftSession.current(epoch))
+        if (section && draftSession.current(epoch))
+          setSaveFeedback({ section, phase: submittedRequest ? 'unconfirmed' : 'unavailable' });
+        if (!section && draftSession.current(epoch))
           setNotice({
             text: t(
               submittedRequest ? 'setup.draft_save_unconfirmed' : 'setup.draft_context_unavailable'
@@ -969,6 +994,7 @@ export default function SettingsPage() {
   const anyDirty = profileDirty || servicesDirty || notifDirty;
   const discardAll = () => {
     if (savePending.current) return false;
+    setSaveFeedback(null);
     profileDraft.discard();
     servicesDraft.discard();
     notifDraft.discard();
@@ -1026,6 +1052,7 @@ export default function SettingsPage() {
   // exactly the calls their per-section buttons make.
   const saveAll = async () => {
     if (savePending.current) return;
+    setSaveFeedback(null);
     if (notifDirty && notif.surface !== 'none' && !notif.target.trim()) {
       setNotice({ text: t('api.notification_target'), error: true });
       setSaveBarPhase('error');
@@ -1071,7 +1098,9 @@ export default function SettingsPage() {
             profile={profile}
             setProfile={setProfile}
             busy={busy}
-            onSaveProfile={() => void applyOnboarding(false)}
+            saveFeedback={saveFeedback?.section === 'profile' ? saveFeedback : null}
+            hasUnsavedChanges={profileDirty || servicesDirty}
+            onSaveProfile={() => void applyOnboarding(false, false, 'profile')}
             sectionRef={setSectionRef('profile')}
           >
             <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
@@ -1121,7 +1150,9 @@ export default function SettingsPage() {
             oauthBusyId={oauthBusyId}
             oauthMessage={oauthMessage}
             onConnectOAuth={(serviceId, serviceLabel) => void connectOAuth(serviceId, serviceLabel)}
-            onSaveConnections={() => void applyOnboarding(false)}
+            saveFeedback={saveFeedback?.section === 'services' ? saveFeedback : null}
+            hasUnsavedChanges={profileDirty || servicesDirty}
+            onSaveConnections={() => void applyOnboarding(false, false, 'services')}
             sectionRef={setSectionRef('services')}
           />
         );
@@ -1163,6 +1194,8 @@ export default function SettingsPage() {
             notifChannels={notifChannels}
             channelDisplayName={channelDisplayName}
             busy={busy}
+            saveFeedback={saveFeedback?.section === 'notifications' ? saveFeedback : null}
+            hasUnsavedChanges={notifDirty}
             onSaveNotification={() => void saveNotification()}
             sectionRef={setSectionRef('notifications')}
           />

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
@@ -21,6 +22,8 @@ export type NotificationsSectionProps = {
   notifChannels: NotificationChannelOption[];
   channelDisplayName: (surface: string) => string;
   busy: boolean;
+  saveFeedback?: SettingsSaveFeedbackState | null;
+  hasUnsavedChanges?: boolean;
   onSaveNotification: () => void;
   sectionRef: (element: HTMLElement | null) => void;
 };
@@ -34,6 +37,8 @@ export function NotificationsSection({
   notifChannels,
   channelDisplayName,
   busy,
+  saveFeedback,
+  hasUnsavedChanges,
   onSaveNotification,
   sectionRef,
 }: NotificationsSectionProps) {
@@ -92,6 +97,11 @@ export function NotificationsSection({
               />
             </SettingRow>
           ) : null}
+          <SettingsSaveFeedback
+            feedback={saveFeedback}
+            hasUnsavedChanges={hasUnsavedChanges}
+            t={t}
+          />
           <div className="settings-row-actions">
             <Button
               label={t('setup.notification_save')}
