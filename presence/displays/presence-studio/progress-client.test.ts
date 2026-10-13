@@ -98,6 +98,21 @@ async function flush() {
   for (let i = 0; i < 40; i += 1) await Promise.resolve();
 }
 const texts: Record<string, string> = {
+  'front_desk:progress_open_work': 'Open work',
+  'front_desk:progress_task_state_awaiting_input': 'Waiting for input',
+  'front_desk:progress_task_state_awaiting_confirmation': 'Waiting for confirmation',
+  'front_desk:progress_task_state_executing': 'Executing (recorded)',
+  'front_desk:progress_task_state_blocked': 'Blocked',
+  'front_desk:progress_task_state_paused': 'Paused',
+  'front_desk:progress_task_state_unknown': 'Status unconfirmed',
+  'front_desk:progress_task_state_completed': 'Completion recorded',
+  'front_desk:progress_task_state_failed': 'Failed',
+  'front_desk:progress_task_state_released': 'Stopped or released',
+  'front_desk:progress_task_recorded_state': 'Recorded task status',
+  'front_desk:progress_task_latest_update': 'Latest recorded update',
+  'front_desk:progress_task_next_inspect':
+    'Review the recorded context before deciding what to do.',
+
   'front_desk:progress_leave_title': 'Leave this page?',
   'front_desk:progress_leave_draft':
     'Your correction draft has not been recorded. Leaving this page discards it.',
@@ -391,7 +406,7 @@ describe('progress browser-script contracts', () => {
     });
     const mounted = h.window.KyberionProgress.mount();
     await flush();
-    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.elements['filter-active'].textContent).toBe('Open work');
     expect(h.elements['filter-delivered'].textContent).toBe('Delivered');
     expect(h.elements['progress-empty'].textContent).toBe('');
     expect(h.elements['progress-read-status'].textContent).toBe('Loading progress…');
@@ -400,7 +415,7 @@ describe('progress browser-script contracts', () => {
     await mounted;
     expect(h.elements['progress-list'].attributes['aria-busy']).toBe('false');
     expect(h.elements['progress-empty'].textContent).toBe('');
-    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.elements['filter-active'].textContent).toBe('Open work');
     expect(h.noticeText.textContent).toContain('Could not load');
     h.refresh.fire();
     await flush();
@@ -424,7 +439,7 @@ describe('progress browser-script contracts', () => {
     expect(h.elements['progress-list'].children).toHaveLength(0);
     expect(h.elements['progress-detail'].innerHTML).not.toContain('/api/progress/old');
     expect(h.elements['progress-read-status'].textContent).toBe('Checking the latest progress…');
-    expect(h.elements['filter-active'].textContent).toBe('In progress');
+    expect(h.elements['filter-active'].textContent).toBe('Open work');
     expect(h.window.location.hash).toBe('#old');
     pending.resolve(response(payload));
     await flush();
@@ -687,7 +702,9 @@ describe('progress browser-script contracts', () => {
     vocabularyAvailable = true;
     h.refresh.fire();
     await flush();
-    expect(h.elements['progress-list'].children[0].children[0].innerHTML).toContain('In progress');
+    expect(h.elements['progress-list'].children[0].children[0].innerHTML).toContain(
+      'Status unconfirmed'
+    );
     expect(h.elements['progress-notice'].hidden).toBe(true);
   });
 
@@ -724,6 +741,7 @@ describe('progress browser-script contracts', () => {
     ].map((status) => ({
       id: status,
       status,
+      ...(['completed', 'failed', 'released'].includes(status) ? { task_state: status } : {}),
       title: status,
       kind: ['accepted', 'rejected', 'changes_requested'].includes(status)
         ? 'artifact'
@@ -736,9 +754,9 @@ describe('progress browser-script contracts', () => {
       .map((li) => li.children[0].innerHTML)
       .join('\n');
     for (const label of [
-      'Completed',
+      'Completion recorded',
       'Failed',
-      'Released',
+      'Stopped or released',
       'Accepted',
       'Sent back',
       'Changes requested',
@@ -2062,4 +2080,158 @@ describe('Progress app-controlled leave confirmation', () => {
     ).toContain('inbox-alpha');
     expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
   });
+});
+
+describe('Progress recorded task-state cues', () => {
+  it('labels wait and blocked states and separates historical text', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      {
+        id: 'wait',
+        title: 'Wait',
+        status: 'awaiting_confirmation',
+        task_state: 'awaiting_confirmation',
+        now: 'awaiting_confirmation',
+      },
+      {
+        id: 'blocked',
+        title: 'Blocked task',
+        status: 'blocked',
+        task_state: 'blocked',
+        now: 'Previously drafting',
+        latest_update: { text: 'Previously drafting' },
+      },
+    ];
+    const h = harness({ fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    const waiting = h.elements['progress-list'].children[0].children[0].innerHTML;
+    const blocked = h.elements['progress-list'].children[1].children[0].innerHTML;
+    expect(waiting).toContain('Waiting for confirmation');
+    expect(waiting).not.toContain('awaiting_confirmation');
+    expect(waiting).not.toContain('In progress');
+    expect(blocked).toContain('Blocked');
+    expect(blocked).toContain('Latest recorded update');
+    expect(blocked).toContain('Previously drafting');
+  });
+  it('uses newer detail state rather than repeating an older running row', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      {
+        id: 'task',
+        title: 'Task',
+        status: 'executing',
+        task_state: 'executing',
+        selected_default: true,
+      },
+    ];
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/task'
+          ? Promise.resolve(
+              response({
+                ok: true,
+                item: {
+                  kind: 'task_session',
+                  status: 'paused',
+                  task_state: 'paused',
+                  requested: 'Task',
+                  now: 'Old update',
+                  latest_update: { text: 'Old update' },
+                  log: [],
+                },
+              })
+            )
+          : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    const html = h.elements['progress-detail'].innerHTML;
+    expect(html).toContain('Paused');
+    expect(html).not.toContain('Executing (recorded)');
+    expect(html).toContain('Recorded task status');
+    expect(html).toContain('Latest recorded update');
+    expect(html).toContain('Review the recorded context');
+    expect(h.fetch.mock.calls.every(([, input]) => input?.method !== 'POST')).toBe(true);
+  });
+  it('does not borrow a running list state when the newer detail has no recognized state', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      {
+        id: 'task',
+        title: 'Task',
+        status: 'executing',
+        task_state: 'executing',
+        selected_default: true,
+      },
+    ];
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/task'
+          ? Promise.resolve(
+              response({ ok: true, item: { requested: 'Task', now: 'executing', log: [] } })
+            )
+          : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    expect(h.elements['progress-detail'].innerHTML).toContain('Status unconfirmed');
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('Executing (recorded)');
+  });
+});
+
+it('preserves artifact verdict semantics when its detail was backed by a task session', async () => {
+  const payload = emptyPayload();
+  payload.delivered = [
+    { id: 'artifact', title: 'Artifact', status: 'delivered', can_verdict: false },
+  ];
+  const h = harness({
+    hash: '#artifact',
+    fetcher: dataFetcher(payload, (path) =>
+      path === '/api/progress/artifact'
+        ? Promise.resolve(
+            response({
+              ok: true,
+              item: {
+                kind: 'artifact',
+                status: 'blocked',
+                requested: 'Source task context',
+                now: 'Recorded source update',
+                log: [],
+              },
+            })
+          )
+        : undefined
+    ),
+  });
+  await h.window.KyberionProgress.mount();
+  const html = h.elements['progress-detail'].innerHTML;
+  expect(html).toContain('Delivered');
+  expect(html).not.toContain('Recorded task status');
+  expect(html).not.toContain('Status unconfirmed');
+});
+
+it('treats a prototype-name detail state as unconfirmed rather than inheriting running state', async () => {
+  const payload = emptyPayload();
+  payload.active = [{ id: 'task', title: 'Task', task_state: 'executing', selected_default: true }];
+  const h = harness({
+    fetcher: dataFetcher(payload, (path) =>
+      path === '/api/progress/task'
+        ? Promise.resolve(
+            response({
+              ok: true,
+              item: {
+                kind: 'task_session',
+                task_state: 'constructor',
+                requested: 'Task',
+                now: 'ignored',
+                log: [],
+              },
+            })
+          )
+        : undefined
+    ),
+  });
+  await h.window.KyberionProgress.mount();
+  expect(h.elements['progress-detail'].innerHTML).toContain('Status unconfirmed');
+  expect(h.elements['progress-detail'].innerHTML).not.toContain('Executing (recorded)');
 });
