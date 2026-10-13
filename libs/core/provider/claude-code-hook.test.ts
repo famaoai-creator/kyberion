@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../tier-guard.js', () => ({
   detectTier: (p: string) =>
@@ -47,6 +47,12 @@ vi.mock('../shell/shell-command-policy.js', () => ({
 }));
 
 import {
+  clearCoSessionNamespace,
+  clearCoSessionStore,
+  setCoSessionNamespace,
+} from '../co-session.js';
+import {
+  buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
@@ -54,6 +60,17 @@ import {
   evaluatePreToolUseShellDeny,
   recordPostToolUse,
 } from './claude-code-hook.js';
+
+// Hermeticity: the co-session bridge joins/drains/releases against the real
+// store — keep every case in a throwaway namespace.
+beforeEach(() => {
+  setCoSessionNamespace(`claude-hook-test-${process.pid}`);
+  clearCoSessionStore();
+});
+afterEach(() => {
+  clearCoSessionStore();
+  clearCoSessionNamespace();
+});
 
 describe('claude-code-hook — PreToolUse tier-guard', () => {
   it('policy-gates Bash commands', () => {
@@ -162,5 +179,20 @@ describe('claude-code-hook — UserPromptSubmit and Stop', () => {
 
     expect(ctx).toContain('Stop summary');
     expect(ctx).toContain('/ky-review');
+  });
+});
+
+describe('claude-code-hook — SessionEnd', () => {
+  // The release path itself (coSessionHookEnd → leaveCoSession) is covered in
+  // co-session-hook.test.ts; the mocked tier-guard here keeps secure-io writes
+  // fail-closed, so only the store-free properties are asserted.
+  it('Stop no longer touches co-session leases', () => {
+    const ctx = buildStopContext({ reason: 'turn done', session_id: 's7' });
+    expect(ctx).toContain('Stop summary');
+    expect(ctx).not.toContain('co-session');
+  });
+
+  it('is silent when nothing was leased', () => {
+    expect(buildSessionEndContext({ session_id: 'nobody' })).toBe('');
   });
 });

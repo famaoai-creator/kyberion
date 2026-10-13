@@ -60,6 +60,16 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" SessionEnd"
+          }
+        ]
+      }
     ]
   }
 }
