@@ -67,6 +67,7 @@ import {
   type KnowledgeHint,
 } from './knowledge-index.js';
 import { registerEmbeddingBackend } from '../embedding-backend.js';
+import * as rankingSignals from '../ranking-signals.js';
 
 const TEST_ROOT = '/tmp/test-knowledge-base';
 const OUTSIDE_ROOT = '/tmp/test-knowledge-outside';
@@ -293,6 +294,159 @@ describe('knowledge-index', () => {
       const results = queryKnowledge(index, 'browser', { maxResults: 1 });
 
       expect(results).toHaveLength(1);
+    });
+
+    describe('query-local metadata ranking', () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('scores each tied hint once and loads weights once, including zero scores', () => {
+        const hints = Array.from({ length: 1000 }, (_, i) => ({
+          topic: 'shared query',
+          hint: 'same lexical relevance',
+          source: 'hints/' + i + '.json',
+          confidence: 1,
+          usage_yield: 0,
+        }));
+        const score = vi.spyOn(rankingSignals, 'knowledgeMetadataScore');
+        const weights = vi.spyOn(rankingSignals, 'loadKnowledgeRankingWeights');
+
+        let nowMs = Date.UTC(2026, 0, 1);
+        vi.spyOn(Date, 'now').mockImplementation(() => nowMs++);
+        const results = queryKnowledge(new KnowledgeHintIndex(hints), 'shared query', {
+          maxResults: hints.length,
+        });
+
+        expect(results).toEqual(hints);
+        expect(weights).toHaveBeenCalledTimes(1);
+        expect(score).toHaveBeenCalledTimes(hints.length);
+        expect(new Set(score.mock.calls.map((call) => call[3])).size).toBe(1);
+      });
+
+      it('does not load metadata when no lexical tie needs resolving', () => {
+        const hints = [
+          { topic: 'query', hint: '', source: 'first.md', confidence: 1 },
+          { topic: 'query', hint: '', source: 'second.md', confidence: 0.5 },
+        ];
+        const score = vi.spyOn(rankingSignals, 'knowledgeMetadataScore');
+        const weights = vi.spyOn(rankingSignals, 'loadKnowledgeRankingWeights');
+        for (const entries of [[], hints.slice(0, 1), hints]) {
+          const index = new KnowledgeHintIndex(entries);
+          queryKnowledge(index, '');
+          queryKnowledge(index, 'unmatched');
+          queryKnowledge(index, 'query');
+        }
+        expect(weights).not.toHaveBeenCalled();
+        expect(score).not.toHaveBeenCalled();
+      });
+
+      it('reloads scoped weights and reranks the same hint objects on every query', () => {
+        const hints = [
+          {
+            topic: 'query',
+            hint: '',
+            source: 'scope.md',
+            confidence: 1,
+            scope: 'global',
+            usage_yield: 0,
+          },
+          {
+            topic: 'query',
+            hint: '',
+            source: 'policy.md',
+            confidence: 1,
+            doc_authority: 'policy',
+            usage_yield: 0,
+          },
+        ];
+        const index = new KnowledgeHintIndex(hints);
+        const weights = vi
+          .spyOn(rankingSignals, 'loadKnowledgeRankingWeights')
+          .mockReturnValueOnce({ scope: 12, authority: 8, proximity: 0 })
+          .mockReturnValueOnce({ scope: 1, authority: 8, proximity: 0 })
+          .mockReturnValueOnce({ scope: 12, authority: 8, proximity: 0 });
+        const firstScope = { tier: 'confidential' as const, tenant_slug: 'alpha' };
+        const secondScope = { tier: 'confidential' as const, tenant_slug: 'beta' };
+
+        expect(
+          queryKnowledge(index, 'query', { scopeContext: firstScope }).map((hint) => hint.source)
+        ).toEqual(['scope.md', 'policy.md']);
+        expect(
+          queryKnowledge(index, 'query', { scopeContext: firstScope }).map((hint) => hint.source)
+        ).toEqual(['policy.md', 'scope.md']);
+        expect(
+          queryKnowledge(index, 'query', { scopeContext: secondScope }).map((hint) => hint.source)
+        ).toEqual(['scope.md', 'policy.md']);
+        expect(weights).toHaveBeenCalledTimes(3);
+        expect(weights).toHaveBeenNthCalledWith(1, firstScope);
+        expect(weights).toHaveBeenNthCalledWith(2, firstScope);
+        expect(weights).toHaveBeenNthCalledWith(3, secondScope);
+      });
+
+      it('keeps lexical priority, hint identity, aggregation and score copies intact', () => {
+        const hints: KnowledgeHint[] = [
+          {
+            topic: 'shared query',
+            hint: '',
+            source: 'duplicate.md',
+            confidence: 1,
+            scope: 'environment',
+            usage_yield: 0,
+          },
+          {
+            topic: 'shared query',
+            hint: '',
+            source: 'duplicate.md',
+            confidence: 1,
+            scope: 'global',
+            usage_yield: 0,
+          },
+          {
+            topic: 'shared query',
+            hint: '',
+            source: 'chunk.md#chunk0',
+            parentSource: 'chunk.md',
+            chunkIndex: 0,
+            confidence: 1,
+            scope: 'environment',
+            usage_yield: 0,
+          },
+          {
+            topic: 'shared query',
+            hint: '',
+            source: 'chunk.md#chunk1',
+            parentSource: 'chunk.md',
+            chunkIndex: 1,
+            confidence: 1,
+            scope: 'global',
+            usage_yield: 0,
+          },
+          {
+            topic: 'shared',
+            hint: '',
+            source: 'partial.md',
+            confidence: 1,
+            scope: 'global',
+            doc_authority: 'policy',
+            usage_yield: 0,
+          },
+        ];
+        const original = structuredClone(hints);
+        const results = queryKnowledge(new KnowledgeHintIndex(hints), 'shared query', {
+          includeScores: true,
+        });
+        expect(results.map((hint) => hint.source)).toEqual([
+          'duplicate.md',
+          'chunk.md',
+          'partial.md',
+        ]);
+        expect(results[0]).toMatchObject({ scope: 'global', score: 1 });
+        expect(results[1]).toMatchObject({ scope: 'global', score: 1, matchedChunkIndex: 1 });
+        expect(results[2].score).toBe(0.5);
+        expect(results[0]).not.toBe(hints[1]);
+        expect(hints).toEqual(original);
+      });
     });
 
     it('should complete within the cross-platform CI budget', () => {
