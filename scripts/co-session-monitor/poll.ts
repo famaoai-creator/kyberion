@@ -1,5 +1,11 @@
 /** Poll the current co-session for handoffs addressed to a provider/participant. */
-import { heartbeatCoSession, joinCoSession, listCoSessionHandoffs } from '@agent/core/co-session';
+import {
+  CO_SESSION_PROVIDERS,
+  heartbeatCoSession,
+  joinCoSession,
+  listCoSessionHandoffs,
+} from '@agent/core/co-session';
+import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
 const DEFAULT_INTERVAL_MS = 5000;
@@ -7,9 +13,13 @@ const DEFAULT_MAX_WAIT_MS = 300_000;
 
 function argValue(argv: string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
-  if (index >= 0 && argv[index + 1]) return argv[index + 1];
+  // A following token that is itself a flag is not a value.
+  if (index >= 0 && argv[index + 1] && !argv[index + 1]!.startsWith('-')) {
+    return argv[index + 1];
+  }
   const inline = argv.find((arg) => arg.startsWith(`${flag}=`));
-  return inline?.slice(flag.length + 1);
+  const value = inline?.slice(flag.length + 1);
+  return value || undefined;
 }
 
 export interface MonitorOptions {
@@ -21,6 +31,15 @@ export interface MonitorOptions {
 
 export function parseMonitorArgs(argv: string[]): MonitorOptions {
   const provider = argValue(argv, '--provider') ?? 'agy';
+  // Fail fast at parse time — an invalid provider would otherwise throw
+  // inside the swallowed poll loop forever and exit silently as timeout.
+  if (!(CO_SESSION_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new DiagnosticError({
+      code: 'co-session-monitor',
+      what: `invalid --provider '${provider}'`,
+      next: `expected one of: ${CO_SESSION_PROVIDERS.join(', ')}`,
+    });
+  }
   const participant_id = argValue(argv, '--participant-id') ?? `${provider}-monitor`;
   const interval = Number(argValue(argv, '--interval-ms'));
   const maxWait = Number(argValue(argv, '--max-wait-ms'));

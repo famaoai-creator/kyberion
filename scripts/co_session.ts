@@ -188,6 +188,17 @@ export async function main(args: string[] = [], print: Print = console.log): Pro
         }
         if (!argv.as || !argv.path) throw new Error(`lease ${action} requires --as and --path`);
         if (action === 'acquire') {
+          if (!argv['participant-id']) {
+            // Without an explicit id the holder is recorded as
+            // {provider}-{pid} of this one-shot process — the hook lease
+            // gate compares against {provider}-{session_id} and would deny
+            // the holder's own writes; use the id shown by the hook's
+            // SessionStart context.
+            process.stderr.write(
+              `[co-session] warning: no --participant-id; holder will be '${String(argv.as)}-<pid>'. ` +
+                `Pass --participant-id '${String(argv.as)}-<session_id>' when acquiring from a provider hook session.\n`
+            );
+          }
           print(
             acquireCoSessionLease({
               session_id: sessionId,

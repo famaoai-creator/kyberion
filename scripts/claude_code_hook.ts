@@ -12,6 +12,7 @@
  *   node dist/scripts/claude_code_hook.js PreToolUseShellDeny < event.json
  *   node dist/scripts/claude_code_hook.js PostToolUse    < event.json
  *   node dist/scripts/claude_code_hook.js Stop           < event.json
+ *   node dist/scripts/claude_code_hook.js SessionEnd     < event.json
  *
  * Hook failures fail closed for shell execution so a policy outage cannot turn
  * a denied command into an allowed command.
@@ -86,7 +87,14 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
       return;
     }
     case 'PreToolUse': {
-      process.stdout.write(JSON.stringify(evaluatePreToolUse(payload)));
+      // Deny-only: emitting 'allow' would silently auto-approve every file
+      // write (including tools merely matched by the Write|Edit regex).
+      // deny/ask reach stdout; everything else defers to Claude Code's own
+      // permission flow — same posture as the shell-deny adapter below.
+      const response = evaluatePreToolUse(payload);
+      if (response.hookSpecificOutput.permissionDecision !== 'allow') {
+        process.stdout.write(JSON.stringify(response));
+      }
       return;
     }
     case 'PreToolUseShellDeny': {

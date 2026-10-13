@@ -437,7 +437,7 @@ export function leaveCoSession(input: {
 }): { released_leases: number } {
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
-  readSession(session_id);
+  const session = readSession(session_id);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
   let released = 0;
   for (const lease of listCoSessionLeases(session_id)) {
@@ -446,16 +446,35 @@ export function leaveCoSession(input: {
       lease.holder_provider === provider &&
       lease.holder_participant_id === participant_id
     ) {
-      releaseCoSessionLease({
-        session_id,
-        path: lease.path,
-        provider,
-        participant_id,
-      });
-      released += 1;
+      try {
+        releaseCoSessionLease({
+          session_id,
+          path: lease.path,
+          provider,
+          participant_id,
+        });
+        released += 1;
+      } catch (error) {
+        // A vanished or re-held lease must not strand the remaining releases
+        // or suppress the leave event.
+        if (error instanceof CoSessionError && error.code === 'not_found') continue;
+        throw error;
+      }
     }
   }
-  appendEvent(session_id, 'session_left', provider, { participant_id, released_leases: released });
+  // Emit the event only when there is something to report — on closed
+  // sessions or for participants that never joined, session_left is noise
+  // (SessionEnd hooks fire this for every provider session).
+  if (session.status === 'closed') return { released_leases: released };
+  const joined = listCoSessionPresence(session_id, { staleMs: Number.MAX_SAFE_INTEGER }).some(
+    (row) => row.provider === provider && row.participant_id === participant_id
+  );
+  if (released > 0 || joined) {
+    appendEvent(session_id, 'session_left', provider, {
+      participant_id,
+      released_leases: released,
+    });
+  }
   return { released_leases: released };
 }
 
@@ -464,6 +483,11 @@ export function closeCoSession(input: { session_id?: string; provider: string })
   const session_id = resolveCoSessionId(input.session_id);
   const session = readSession(session_id);
   if (session.status === 'closed') return session;
+  // Flip to closed BEFORE releasing leases: an acquire that slips between
+  // release-enumeration and the status write would otherwise leave an active
+  // lease behind (acquire re-checks status inside the path lock).
+  const closed: CoSessionRecord = { ...session, status: 'closed', closed_at: nowIso() };
+  writeSession(closed);
   for (const lease of listCoSessionLeases(session_id)) {
     if (lease.status === 'active') {
       releaseCoSessionLease({
@@ -475,8 +499,6 @@ export function closeCoSession(input: { session_id?: string; provider: string })
       });
     }
   }
-  const closed: CoSessionRecord = { ...session, status: 'closed', closed_at: nowIso() };
-  writeSession(closed);
   const current = getCurrentCoSessionId();
   if (current === session_id && safeExistsSync(currentPointerFile())) {
     withCoSessionWrite(() => safeRmSync(currentPointerFile()));
@@ -527,18 +549,41 @@ function leaseLockId(sessionId: string, pathHash: string): string {
   return `co-session-lease:${sessionId}:${pathHash}`;
 }
 
+/**
+ * Pure expiry evaluation — no writes. Readers must not persist state: a
+ * lock-free write here could clobber an active lease created between the
+ * read and the write. Persisting the flip is hygiene, done separately by
+ * `persistLeaseExpiry` under the path lock.
+ */
 function refreshLeaseStatus(lease: CoSessionPathLease): CoSessionPathLease {
-  if (lease.status !== 'active') return lease;
-  if (Date.parse(lease.expires_at) <= Date.now()) {
-    const expired: CoSessionPathLease = { ...lease, status: 'expired' };
-    writeJson(leaseFile(lease.session_id, lease.path_hash), expired);
+  if (lease.status === 'active' && Date.parse(lease.expires_at) <= Date.now()) {
+    return { ...lease, status: 'expired' };
+  }
+  return lease;
+}
+
+/**
+ * Persist an expired-status flip under the path lock, re-reading first and
+ * skipping when the file no longer matches what the caller observed (a new
+ * lease may have been acquired meanwhile). Never called from inside the
+ * lease lock — it takes the lock itself.
+ */
+function persistLeaseExpiry(lease: CoSessionPathLease): void {
+  if (lease.status !== 'expired') return;
+  const flipped = withLockSync(leaseLockId(lease.session_id, lease.path_hash), () => {
+    const onDisk = readJsonIfPresent<CoSessionPathLease>(
+      leaseFile(lease.session_id, lease.path_hash)
+    );
+    if (onDisk?.lease_id !== lease.lease_id || onDisk.status !== 'active') return false;
+    writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
+    return true;
+  });
+  if (flipped) {
     appendEvent(lease.session_id, 'lease_expired', lease.holder_provider, {
       path: lease.path,
       lease_id: lease.lease_id,
     });
-    return expired;
   }
-  return lease;
 }
 
 export function listCoSessionLeases(sessionId?: string): CoSessionPathLease[] {
@@ -550,7 +595,13 @@ export function listCoSessionLeases(sessionId?: string): CoSessionPathLease[] {
   return files
     .map((name) => readJsonIfPresent<CoSessionPathLease>(path.join(dir, name)))
     .filter((row): row is CoSessionPathLease => Boolean(row))
-    .map(refreshLeaseStatus);
+    .map((lease) => {
+      const refreshed = refreshLeaseStatus(lease);
+      if (refreshed.status === 'expired' && refreshed.status !== lease.status) {
+        persistLeaseExpiry(refreshed);
+      }
+      return refreshed;
+    });
 }
 
 export function acquireCoSessionLease(input: {
@@ -571,6 +622,11 @@ export function acquireCoSessionLease(input: {
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
   const lease = withLockSync(leaseLockId(session_id, path_hash), () => {
+    // closeCoSession flips the session to closed BEFORE releasing leases, so
+    // re-checking inside the per-path lock closes the acquire-vs-close race.
+    if (readSession(session_id).status !== 'open') {
+      throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+    }
     const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
     const current = existing ? refreshLeaseStatus(existing) : undefined;
     if (
