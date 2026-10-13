@@ -133,7 +133,9 @@ const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = 
 export default function SettingsPage() {
   const { locale, setLocale, t } = useConciergeI18n();
   const [setup, setSetup] = React.useState<Setup | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<'unavailable' | 'context-changed' | null>(null);
+  const [retrying, setRetrying] = React.useState(false);
+  const retryPending = React.useRef(false);
   const [notice, setNotice] = React.useState<Notice>(null);
   const [busy, setBusy] = React.useState(false);
   const profileDraft = useSettingsDraft(
@@ -255,7 +257,7 @@ export default function SettingsPage() {
     setSetup(null);
     setNotice(null);
     setBusy(false);
-    setError(textRef.current('setup.draft_context_changed'));
+    setError('context-changed');
   });
 
   const refresh = React.useCallback(async () => {
@@ -306,18 +308,11 @@ export default function SettingsPage() {
       );
       loadServices(loadedServices);
       setError(null);
-    } catch (err) {
+    } catch {
       if (!current()) return;
       if (setupRef.current)
         setNotice({ text: textRef.current('setup.draft_refresh_failed'), error: true });
-      else
-        setError(
-          err instanceof Error && err.message === 'settings_context_unavailable'
-            ? textRef.current('setup.draft_context_unavailable')
-            : err instanceof Error
-              ? err.message
-              : String(err)
-        );
+      else setError('unavailable');
     }
   }, [draftSession, loadProfile, loadServices]);
 
@@ -376,16 +371,36 @@ export default function SettingsPage() {
   // shape front-desk-rail.tsx fetches. Degrades to an empty tenant list —
   // every other section still works without it.
   const refreshMe = React.useCallback(async () => {
+    const current = draftSession.startRead('me');
     try {
+      if (!current()) return;
       const response = await fetch('/api/me', { cache: 'no-store' });
+      if (!current() || !draftSession.inspect(response)) return;
       const parsed = parseSettingsMe(await response.json().catch(() => null));
       if (!response.ok || !parsed) throw new Error('Invalid me response');
+      if (!current()) return;
       setMeTenants(parsed.tenants);
       setMeViewing(parsed.viewing);
     } catch {
       // 組織とメンバー shows an empty list rather than blocking the page.
     }
-  }, []);
+  }, [draftSession]);
+
+  // Retry only initial reads in the same valid draft session. A terminal
+  // authorization/context invalidation still requires a fresh page.
+  const retryLoad = React.useCallback(async () => {
+    const epoch = draftSession.epoch();
+    if (retryPending.current || setupRef.current || !draftSession.current(epoch)) return;
+    retryPending.current = true;
+    setRetrying(true);
+    setNotice(null);
+    try {
+      await Promise.all([refresh(), refreshNotifications(), refreshMe()]);
+    } finally {
+      retryPending.current = false;
+      if (draftSession.current(epoch)) setRetrying(false);
+    }
+  }, [draftSession, refresh, refreshNotifications, refreshMe]);
 
   // FD-07: the member list itself. Degrades to an empty list — a non-owner
   // viewer simply sees nothing here (the section stays visible, matching
@@ -970,7 +985,29 @@ export default function SettingsPage() {
   invalidateExit.current = exitRegistration.invalidate;
 
   // The concierge shell supplies the shared-ui locale bundle (KbI18nProvider).
-  if (error) return <Callout tone="danger" title={t('setup.load_error', { error })} />;
+  if (error)
+    return (
+      <FormScope actions={{ 'settings.retry-load': () => void retryLoad() }}>
+        <Callout
+          tone="danger"
+          title={t('setup.load_retry_title')}
+          body={t(
+            error === 'context-changed' ? 'setup.draft_context_changed' : 'setup.load_retry_help'
+          )}
+        >
+          {error === 'unavailable' ? (
+            <div aria-busy={retrying}>
+              {retrying ? <p role="status">{t('setup.load_retry_pending')}</p> : null}
+              <Button
+                label={t('setup.load_retry_action')}
+                action={{ id: 'settings.retry-load' }}
+                disabled={retrying}
+              />
+            </div>
+          ) : null}
+        </Callout>
+      </FormScope>
+    );
   if (!setup) return <Skeleton shape="card" lines={4} label={t('setup.loading')} />;
 
   const saveBarState: SaveBarState =
