@@ -165,7 +165,7 @@ describe('co-session', () => {
         `active/shared/observability/co-sessions/co-session-test-${process.pid}/cos-leave-closed/events.jsonl`
       )
     );
-    expect(events.filter((e) => e.event === 'session_left')).toHaveLength(0);
+    expect(events.filter((e) => e.type === 'session_left')).toHaveLength(0);
   });
 
   it('records Mesh-aligned handoffs and ack', () => {

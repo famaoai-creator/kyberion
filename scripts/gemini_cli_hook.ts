@@ -135,8 +135,8 @@ export async function main(args: string[] = currentProcessArgv()): Promise<void>
 
 export const runGeminiCliHook = defineScript({
   name: 'gemini-cli-hook',
-  run: async () => {
-    await main();
+  run: async ({ argv }) => {
+    await main(['node', 'gemini_cli_hook', ...argv]);
   },
 });
 

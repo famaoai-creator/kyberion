@@ -1,6 +1,7 @@
 /** Poll the current co-session for handoffs addressed to a provider/participant. */
 import {
   CO_SESSION_PROVIDERS,
+  coSessionHandoffTargets,
   heartbeatCoSession,
   joinCoSession,
   listCoSessionHandoffs,
@@ -73,11 +74,8 @@ async function main(print: (value: unknown) => void, options: MonitorOptions): P
         participant_id: participantId,
       });
 
-      const pending = listCoSessionHandoffs(undefined, { pendingOnly: true }).filter(
-        (h) =>
-          h.to_provider === provider ||
-          h.to_participant_id === participantId ||
-          (!h.to_provider && !h.to_participant_id)
+      const pending = listCoSessionHandoffs(undefined, { pendingOnly: true }).filter((h) =>
+        coSessionHandoffTargets(h, provider, participantId)
       );
 
       if (pending.length > 0) {
