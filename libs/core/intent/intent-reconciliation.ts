@@ -4,6 +4,7 @@ import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-decl
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { clamp, readTextFile } from '../foundation/text.js';
+import { segmentWords } from '../locale-normalize.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -90,11 +91,8 @@ function tokenize(text: string): string[] {
     'note',
     'result',
   ]);
-  return (
-    normalizeReconciliationText(text)
-      .toLowerCase()
-      .match(/[\p{L}\p{N}]+/gu)
-      ?.filter((token) => token.length >= 2 && !stopwords.has(token)) || []
+  return segmentWords(normalizeReconciliationText(text).toLowerCase()).filter(
+    (token) => token.length >= 2 && !stopwords.has(token)
   );
 }
 

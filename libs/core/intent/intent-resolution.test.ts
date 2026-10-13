@@ -323,6 +323,20 @@ describe('intent-resolution', () => {
     expect(packet.selected_resolution?.task_kind).toBe('service_operation');
   });
 
+  it('scores surface-example overlap on segmented Japanese utterances', () => {
+    // Paraphrase of the inspect-mission-inventory example "ミッション一覧を教えて".
+    // Without word segmentation the whole utterance arrives as one token and the
+    // overlap reason can never fire for spaceless scripts.
+    const packet = resolveIntentResolutionPacket('ミッション一覧を見せてほしい');
+    const candidate = packet.candidates.find(
+      (entry) => entry.intent_id === 'inspect-mission-inventory'
+    );
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+      'expected Japanese surface-example overlap to fire'
+    ).toBe(true);
+  });
+
   it('routes common unhandled-intent examples to usable surface paths', () => {
     const inventory = resolveIntentResolutionPacket('ミッション一覧を教えて');
     expect(inventory.selected_intent_id).toBe('inspect-mission-inventory');
@@ -365,9 +379,18 @@ describe('intent-resolution', () => {
     const packet = resolveIntentResolutionPacket('voice-hub の状態とログを見せて');
     expect(packet.selected_intent_id).toBe('inspect-service');
     expect(packet.selected_confidence || 0).toBeGreaterThan(0.45);
+    // The dedupe keeps the best-evidenced inspect-service candidate: the
+    // keyword/overlap heuristic entry now outranks the legacy fallback, which
+    // is the policy working as designed (legacy fills in only when catalog
+    // evidence is absent).
     expect(
-      packet.candidates.some((candidate) =>
-        candidate.reasons.includes('service operation heuristic')
+      packet.candidates.some(
+        (candidate) =>
+          candidate.intent_id === 'inspect-service' &&
+          candidate.reasons.some(
+            (reason) =>
+              reason === 'service operation heuristic' || reason.startsWith('matched keywords')
+          )
       )
     ).toBe(true);
   });
@@ -506,6 +529,33 @@ describe('normalizeForTriggerMatch', () => {
   it('handles mixed full-width and regular characters', () => {
     const result = normalizeForTriggerMatch('スラックSlack');
     expect(result).toContain('slack');
+  });
+
+  it('unifies half-width katakana', () => {
+    expect(normalizeForTriggerMatch('ｽﾗｯｸ')).toBe('すらっく');
+    expect(normalizeForTriggerMatch('ﾃﾞｰﾀ')).toBe('でーた');
+  });
+
+  it('drops word-final prolonged marks but keeps internal ones', () => {
+    expect(normalizeForTriggerMatch('サーバー')).toBe('さーば');
+    expect(normalizeForTriggerMatch('サーバ')).toBe('さーば');
+    expect(normalizeForTriggerMatch('カード')).toBe('かーど');
+  });
+
+  it('strips trailing request endings to the stem', () => {
+    expect(normalizeForTriggerMatch('会議を調整してください')).toBe('会議を調整');
+    expect(normalizeForTriggerMatch('レポートを作ってほしい')).toBe('れぽーとを作っ');
+    expect(normalizeForTriggerMatch('確認します')).toBe('確認し');
+  });
+
+  it('drops honorific prefixes only before kanji', () => {
+    expect(normalizeForTriggerMatch('ご確認をお願いします')).toBe('確認を');
+    expect(normalizeForTriggerMatch('おもしろい')).toBe('おもしろい');
+  });
+
+  it('does not strip endings that would corrupt real words', () => {
+    expect(normalizeForTriggerMatch('きたい')).toBe('きたい');
+    expect(normalizeForTriggerMatch('じょうたい')).toBe('じょうたい');
   });
 
   it('returns empty string for empty input', () => {

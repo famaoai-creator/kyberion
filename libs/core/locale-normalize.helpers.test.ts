@@ -4,6 +4,7 @@ import {
   localeToBcp47,
   localeUsesWordSpaces,
   pickByLocale,
+  segmentWords,
 } from './locale-normalize.js';
 
 describe('locale helpers (IT-03)', () => {
@@ -31,5 +32,29 @@ describe('locale helpers (IT-03)', () => {
     expect(coerceLocale('en-US', ['en', 'ja'] as const, 'ja')).toBe('en');
     expect(coerceLocale('qps-ploc', ['en', 'ja'] as const, 'ja')).toBe('ja');
     expect(coerceLocale('fr', ['en', 'ja'] as const, 'en')).toBe('en');
+  });
+
+  it('segments spaceless Japanese into word-like tokens', () => {
+    const tokens = segmentWords('会議の資料を作成しておいてください');
+    expect(tokens.length).toBeGreaterThan(3);
+    expect(tokens).toContain('会議');
+    expect(tokens).toContain('資料');
+    expect(tokens).toContain('作成');
+  });
+
+  it('segments English words and drops punctuation', () => {
+    expect(segmentWords('ship the report, please')).toEqual(['ship', 'the', 'report', 'please']);
+  });
+
+  it('respects an explicit locale and keeps mixed-script words', () => {
+    const tokens = segmentWords('Slackに投稿して', 'ja');
+    expect(tokens).toContain('Slack');
+    expect(tokens).toContain('投稿');
+  });
+
+  it('returns an empty list for blank input', () => {
+    expect(segmentWords('')).toEqual([]);
+    expect(segmentWords('   ')).toEqual([]);
+    expect(segmentWords(null)).toEqual([]);
   });
 });
