@@ -497,13 +497,26 @@ export function closeCoSession(input: { session_id?: string; provider: string })
   writeSession(closed);
   for (const lease of listCoSessionLeases(session_id)) {
     if (lease.status === 'active') {
-      releaseCoSessionLease({
-        session_id,
-        path: lease.path,
-        provider: lease.holder_provider,
-        participant_id: lease.holder_participant_id,
-        force: true,
-      });
+      try {
+        releaseCoSessionLease({
+          session_id,
+          path: lease.path,
+          provider: lease.holder_provider,
+          participant_id: lease.holder_participant_id,
+          force: true,
+        });
+      } catch (error) {
+        // A lease that vanished (self-deleted by a losing acquirer) or
+        // changed hands must not strand the remaining releases — and close
+        // cannot be retried once closed.
+        if (
+          error instanceof CoSessionError &&
+          (error.code === 'not_found' || error.code === 'lease_held')
+        ) {
+          continue;
+        }
+        throw error;
+      }
     }
   }
   const current = getCurrentCoSessionId();
@@ -577,23 +590,31 @@ function refreshLeaseStatus(lease: CoSessionPathLease): CoSessionPathLease {
  */
 function persistLeaseExpiry(lease: CoSessionPathLease): void {
   if (lease.status !== 'expired') return;
-  const flipped = withLockSync(leaseLockId(lease.session_id, lease.path_hash), () => {
-    const onDisk = readJsonIfPresent<CoSessionPathLease>(
-      leaseFile(lease.session_id, lease.path_hash)
-    );
-    // lease_id is preserved across same-holder renewals, so identity alone
-    // is not enough — persist only when the on-disk record is still the
-    // genuinely expired lease the caller observed.
-    if (
-      onDisk?.lease_id !== lease.lease_id ||
-      onDisk.status !== 'active' ||
-      Date.parse(onDisk.expires_at) > Date.now()
-    ) {
-      return false;
-    }
-    writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
-    return true;
-  });
+  let flipped = false;
+  try {
+    flipped = withLockSync(leaseLockId(lease.session_id, lease.path_hash), () => {
+      const onDisk = readJsonIfPresent<CoSessionPathLease>(
+        leaseFile(lease.session_id, lease.path_hash)
+      );
+      // lease_id is preserved across same-holder renewals, so identity alone
+      // is not enough — persist only when the on-disk record is still the
+      // genuinely expired lease the caller observed.
+      if (
+        onDisk?.lease_id !== lease.lease_id ||
+        onDisk.status !== 'active' ||
+        Date.parse(onDisk.expires_at) > Date.now()
+      ) {
+        return false;
+      }
+      writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
+      return true;
+    });
+  } catch {
+    // Persisting the flip is hygiene — the in-memory refresh already gave
+    // callers the correct answer; a contended or failing lock must not crash
+    // read/status/cleanup paths.
+    return;
+  }
   if (flipped) {
     appendEvent(lease.session_id, 'lease_expired', lease.holder_provider, {
       path: lease.path,
@@ -705,17 +726,17 @@ export function acquireCoSessionLease(input: {
     }
     return next;
   });
+  appendEvent(session_id, 'lease_acquired', provider, {
+    path: repoPath,
+    lease_id: lease.lease_id,
+    expires_at: lease.expires_at,
+  });
   if (displacedLease) {
     appendEvent(session_id, 'lease_expired', displacedLease.holder_provider, {
       path: repoPath,
       lease_id: displacedLease.lease_id,
     });
   }
-  appendEvent(session_id, 'lease_acquired', provider, {
-    path: repoPath,
-    lease_id: lease.lease_id,
-    expires_at: lease.expires_at,
-  });
   return lease;
 }
 
@@ -836,12 +857,15 @@ export function listCoSessionHandoffs(
         // Ack-able only — mirrors ackCoSessionHandoff's targeting rules.
         return coSessionHandoffTargets(row, provider, target);
       }
-      if (row.to_participant_id === target) return true;
-      return false;
+      // No provider context: exact participant match plus unaddressed
+      // broadcasts (ack-able by anyone).
+      return row.to_participant_id === target || (!row.to_provider && !row.to_participant_id);
     });
   } else if (opts.to_provider) {
     const provider = assertProvider(opts.to_provider);
-    rows = rows.filter((row) => row.to_provider === provider);
+    rows = rows.filter(
+      (row) => row.to_provider === provider || (!row.to_provider && !row.to_participant_id)
+    );
   }
   return rows;
 }
