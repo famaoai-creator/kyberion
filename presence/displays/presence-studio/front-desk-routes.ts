@@ -1,3 +1,4 @@
+import { registerCorrectionContextRoute } from './correction-context.js';
 import { registerFirstJobRoutes } from './first-job-routes.js';
 // Front-desk API routes, split out of `server.ts` purely to keep that file
 // under the repo's `max-file-lines` gate (knowledge/product/governance/
@@ -611,6 +612,12 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     res.json({ ok: true, locale, texts });
   });
 
+  registerCorrectionContextRoute(app, {
+    resolveViewer: resolvePresenceStudioViewerContext,
+    readEntries: (entryId) =>
+      withExecutionContext('ecosystem_architect', () => listInboxEntries({ entryId, limit: 2 })),
+    readArtifacts: () => withExecutionContext('ecosystem_architect', () => listArtifactRecords()),
+  });
   registerFirstJobRoutes(app);
   registerConversationRoutes(app);
 }
