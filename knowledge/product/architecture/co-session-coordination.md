@@ -61,7 +61,7 @@ co-session はその coordination の **same-checkout 面**である。
 [`multi-provider-coexecution-contract.md`](../governance/multi-provider-coexecution-contract.md) を継承する。
 
 1. **読み取り**は全参加者並行可。
-2. **mission-optional の書き込み調整**には path lease を使う（短 TTL、heartbeat 切れで解放可）。これは協調用の目印であり、認可や強制的な permission enforcement ではない。WorkItem claim が必要な作業では claim が書き込み権限の正本となる。
+2. **mission-optional の書き込み調整**には path lease を使う（短 TTL、heartbeat 切れで解放可）。これは協調用の目印であり、認可や強制的な permission enforcement ではない。WorkItem claim が必要な作業では claim が書き込み権限の正本となる。**例外（実効化）**: hook 対応 CLI（Claude Code・Gemini CLI）では PreToolUse / BeforeTool hook が他 participant の active lease への書き込みを deny する。その CLI 内では lease は実効的な排他として働くが、store 読み取り不能時は fail-open で advisory に戻る。hook を持たない CLI では従来どおり advisory のみ。lease の read-check-write 自体は `withLockSync('co-session-lease:<session>:<path_hash>')` でプロセス間直列化される。
 3. **`.git` / repo config** は co-session では触らない。commit が要る場合は mission owner へ昇格。
 4. **一時ファイル**は `active/shared/tmp/` または session 配下のみ。
 5. **peer / Mesh の禁止を継承**: co-session → peer の bridge は mission を作らない・承認しない（Mesh ADR）。
@@ -111,6 +111,20 @@ Handoff / 依頼の `kind` は Mesh Hub の allowlist と同系:
 
 同一モデルが複数並走する場合、参加者は `provider` + `participant_id`（既定 `{provider}-{pid}`）で区別する。path lease と handoff の宛先・ack は participant 単位。`--to claude` のみはプロバイダ種へのブロードキャスト、`--to-participant-id claude-b` は特定インスタンス宛て。
 
+### 6.1 hook ブリッジ（対応 CLI への自動配線）
+
+handoff の配送は pull（`handoff list`）が基本だが、hook を持つ CLI では session イベント駆動で join / heartbeat / drain / lease deny / release が自動で走る。コアは `libs/core/provider/co-session-hook.ts`（provider 非依存）で、CLI ごとの薄いエントリが入出力を変換する。
+
+| CLI                   | 配線                                                                                                                                                                            | イベント → 動作                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Claude Code           | tracked な `.claude/settings.json` が `dist/scripts/claude_code_hook.js` を直接呼ぶ（plugin 無しでも発火。plugin install 済みなら二重発火しうるが join/drain は重複許容で安全） | `SessionStart` join / `UserPromptSubmit` handoff drain 注入 / `PreToolUse` lease deny / `SessionEnd` 自 lease 解放    |
+| Gemini CLI            | `pnpm generate:provider-hooks`（generation ceremony）が `.gemini/settings.json` を冪等生成し `dist/scripts/gemini_cli_hook.js` を指す                                           | `SessionStart` join / `BeforeAgent` drain 注入 / `BeforeTool` (`write_file`/`replace`) lease deny / `SessionEnd` 解放 |
+| codex / agy / grok 等 | hook を持たない。`scripts/co-session-monitor/poll.ts --provider <p> --participant-id <id>` で pull。instruction file 側から `co-session handoff list` 定期確認を促す            | —                                                                                                                     |
+
+participant_id は `<provider>-<session_id>`（hook payload の `session_id`）。lease 取得コマンドは SessionStart 注入テキストに `--participant-id` 込みで提示される — hook 経由の CLI で `co-session lease acquire` を素のまま実行すると holder が `{provider}-{pid}` になり、lease gate の自己判定と一致しないため、注入どおりに引くこと。
+
+制限: deny は file-write ツール（Write/Edit/MultiEdit、write_file/replace）にのみ効く。`Bash` / `run_shell_command` 経由の書き込みは hook の対象外で lease を迂回しうる — advisory の範囲であり、強い排他が要るなら work-item claim へ昇格する。deny 理由には保持者・期限・代替手段（lease list / handoff）を含める。
+
 ## 7. 昇格ゲート
 
 同じ host にあるという理由だけで Co-Session と Peer Messaging を混同しない。同一 checkout を共有する provider CLI は Co-Session、別 Kyberion runtime は peer として扱う。別 runtime は peer ID、port、secret、runtime root / namespace を分離する。
@@ -123,8 +137,11 @@ Handoff / 依頼の `kind` は Mesh Hub の allowlist と同系:
 
 ## 8. 実装マップ
 
-- Core: `libs/core/co-session.ts`
-- CLI: `scripts/co_session.ts`
+- Core: `libs/core/co-session.ts`（lease 直列化は `foundation/lock-utils.ts` の `withLockSync`）
+- Hook bridge core: `libs/core/provider/co-session-hook.ts`
+- Hook entries: `scripts/claude_code_hook.ts`（Claude: 同 `libs/core/provider/claude-code-hook.ts`）、`scripts/gemini_cli_hook.ts`（Gemini）
+- 配線: `.claude/settings.json`（tracked・直接配線）、`pnpm generate:provider-hooks` → `.gemini/settings.json`（gitignore・生成物）
+- CLI: `scripts/co_session.ts`、`scripts/co-session-monitor/poll.ts`（`--provider`/`--participant-id` 汎用）
 - 契約参照: 本ファイル + multi-provider coexecution + work-coordination platform + peer-network
 
 ## 9. 関連

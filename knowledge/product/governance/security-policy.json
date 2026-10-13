@@ -663,6 +663,9 @@
         ".codex/agents/"
       ]
     },
+    "generate_provider_hook_configs": {
+      "allow_write": [".gemini/"]
+    },
     "ingest_commit": {
       "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
     },

@@ -13,6 +13,9 @@
 /.claude/*
 !/.claude/agents/
 !/.claude/hooks/
+# Deliberately tracked: the repo-level Kyberion hook wiring (co-session
+# bridge, tier-guard) lives here so it fires without a plugin install.
+!/.claude/settings.json
 *.skill
 tmp/
 # Python bytecode written when tests or bridges import voice/media scripts.
