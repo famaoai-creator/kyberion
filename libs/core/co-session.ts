@@ -489,36 +489,44 @@ export function closeCoSession(input: { session_id?: string; provider: string })
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
   const session = readSession(session_id);
-  if (session.status === 'closed') return session;
+  const sweepLeases = () => {
+    for (const lease of listCoSessionLeases(session_id)) {
+      if (lease.status === 'active') {
+        try {
+          releaseCoSessionLease({
+            session_id,
+            path: lease.path,
+            provider: lease.holder_provider,
+            participant_id: lease.holder_participant_id,
+            force: true,
+          });
+        } catch (error) {
+          // A lease that vanished (self-deleted by a losing acquirer) or
+          // changed hands must not strand the remaining releases — and the
+          // sweep must remain retryable after a partial failure.
+          if (
+            error instanceof CoSessionError &&
+            (error.code === 'not_found' || error.code === 'lease_held')
+          ) {
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+  };
+  if (session.status === 'closed') {
+    // Still sweep: a prior close may have died mid-loop — retry is the only
+    // path to finish the cleanup.
+    sweepLeases();
+    return session;
+  }
   // Flip to closed BEFORE releasing leases: an acquire that slips between
   // release-enumeration and the status write would otherwise leave an active
   // lease behind (acquire re-checks status inside the path lock).
   const closed: CoSessionRecord = { ...session, status: 'closed', closed_at: nowIso() };
   writeSession(closed);
-  for (const lease of listCoSessionLeases(session_id)) {
-    if (lease.status === 'active') {
-      try {
-        releaseCoSessionLease({
-          session_id,
-          path: lease.path,
-          provider: lease.holder_provider,
-          participant_id: lease.holder_participant_id,
-          force: true,
-        });
-      } catch (error) {
-        // A lease that vanished (self-deleted by a losing acquirer) or
-        // changed hands must not strand the remaining releases — and close
-        // cannot be retried once closed.
-        if (
-          error instanceof CoSessionError &&
-          (error.code === 'not_found' || error.code === 'lease_held')
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-  }
+  sweepLeases();
   const current = getCurrentCoSessionId();
   if (current === session_id && safeExistsSync(currentPointerFile())) {
     withCoSessionWrite(() => safeRmSync(currentPointerFile()));
@@ -546,10 +554,14 @@ export function appendCoSessionBlackboard(input: {
   const text = input.text.trim();
   if (!text) throw new CoSessionError('invalid_text', 'blackboard text is required');
   const file = blackboardFile(session_id);
-  const prev = safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
   const block = `\n## ${nowIso()} — ${provider}\n\n${text}\n`;
-  withCoSessionWrite(() => {
-    safeWriteFile(file, prev + block, { encoding: 'utf8', mkdir: true });
+  // read+rewrite must be serialized: two appends racing on the previous
+  // content lose one note.
+  withLockSync(`co-session-blackboard:${session_id}`, () => {
+    const prev = safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
+    withCoSessionWrite(() => {
+      safeWriteFile(file, prev + block, { encoding: 'utf8', mkdir: true });
+    });
   });
   appendEvent(session_id, 'blackboard_appended', provider, { chars: text.length });
   return readCoSessionBlackboard(session_id);
@@ -824,7 +836,11 @@ export function createCoSessionHandoff(input: {
     body,
     created_at: nowIso(),
   };
-  appendJsonl(handoffsFile(session_id), handoff);
+  // Same fence as ack: an unprotected append landing between ack's
+  // read and rewrite would be silently deleted.
+  withLockSync(handoffsLockId(session_id), () => {
+    appendJsonl(handoffsFile(session_id), handoff);
+  });
   appendEvent(session_id, 'handoff_created', from_provider, {
     handoff_id: handoff.handoff_id,
     kind,
@@ -890,6 +906,13 @@ export function coSessionHandoffTargets(
   );
 }
 
+/** Per-session fence for handoffs.jsonl — the file is read-modify-rewritten
+ * on ack, so create and ack must share one lock to avoid lost appends and
+ * reverted acks. */
+function handoffsLockId(sessionId: string): string {
+  return `co-session-handoffs:${sessionId}`;
+}
+
 export function ackCoSessionHandoff(input: {
   session_id?: string;
   handoff_id: string;
@@ -900,41 +923,50 @@ export function ackCoSessionHandoff(input: {
   const session_id = resolveCoSessionId(input.session_id);
   readSession(session_id);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  const rows = listCoSessionHandoffs(session_id);
-  const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
-  if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
-  const current = rows[index]!;
-  if (current.acked_at) return current;
-  if (current.to_participant_id && current.to_participant_id !== participant_id) {
-    throw new CoSessionError(
-      'handoff_not_for_participant',
-      `handoff is addressed to ${current.to_participant_id}, not ${participant_id}`
-    );
-  }
-  if (current.to_provider && current.to_provider !== provider) {
-    throw new CoSessionError(
-      'handoff_not_for_provider',
-      `handoff is addressed to provider ${current.to_provider}, not ${provider}`
-    );
-  }
-  const acked: CoSessionHandoff = {
-    ...current,
-    acked_at: nowIso(),
-    acked_by: provider,
-    acked_by_participant_id: participant_id,
-  };
-  // Rewrite handoffs file deterministically (small local log).
-  const file = handoffsFile(session_id);
-  withCoSessionWrite(() => {
-    if (safeExistsSync(file)) safeRmSync(file);
-    for (const row of rows.map((row, i) => (i === index ? acked : row))) {
-      appendJsonLine(assertSafeRepositoryPath(file, { allowMissingLeaf: true }), row);
+  let freshlyAcked = false;
+  const acked = withLockSync(handoffsLockId(session_id), () => {
+    // Read inside the lock — a row appended between an outside read and the
+    // rewrite would be silently deleted.
+    const rows = listCoSessionHandoffs(session_id);
+    const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
+    if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
+    const current = rows[index]!;
+    if (current.acked_at) return current;
+    if (current.to_participant_id && current.to_participant_id !== participant_id) {
+      throw new CoSessionError(
+        'handoff_not_for_participant',
+        `handoff is addressed to ${current.to_participant_id}, not ${participant_id}`
+      );
     }
+    if (current.to_provider && current.to_provider !== provider) {
+      throw new CoSessionError(
+        'handoff_not_for_provider',
+        `handoff is addressed to provider ${current.to_provider}, not ${provider}`
+      );
+    }
+    freshlyAcked = true;
+    const next: CoSessionHandoff = {
+      ...current,
+      acked_at: nowIso(),
+      acked_by: provider,
+      acked_by_participant_id: participant_id,
+    };
+    // Rewrite handoffs file deterministically (small local log).
+    const file = handoffsFile(session_id);
+    withCoSessionWrite(() => {
+      if (safeExistsSync(file)) safeRmSync(file);
+      for (const row of rows.map((row, i) => (i === index ? next : row))) {
+        appendJsonLine(assertSafeRepositoryPath(file, { allowMissingLeaf: true }), row);
+      }
+    });
+    return next;
   });
-  appendEvent(session_id, 'handoff_acked', provider, {
-    handoff_id: acked.handoff_id,
-    participant_id,
-  });
+  if (freshlyAcked) {
+    appendEvent(session_id, 'handoff_acked', provider, {
+      handoff_id: acked.handoff_id,
+      participant_id,
+    });
+  }
   return acked;
 }
 
