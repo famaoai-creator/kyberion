@@ -146,19 +146,11 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
     }
     case 'SessionEnd': {
       // Fires once when the session ends (unlike Stop, which fires per turn):
-      // release this participant's co-session leases, then emit any note.
+      // release this participant's co-session leases. SessionEnd consumes no
+      // context injection — the note goes to stderr for transcript/debug.
       try {
         const note = buildSessionEndContext(payload);
-        if (note) {
-          process.stdout.write(
-            JSON.stringify({
-              hookSpecificOutput: {
-                hookEventName: 'SessionEnd',
-                additionalContext: note,
-              },
-            })
-          );
-        }
+        if (note) process.stderr.write(`${note}\n`);
       } catch {
         // cleanup is best-effort; lease TTL is the safety net
       }
