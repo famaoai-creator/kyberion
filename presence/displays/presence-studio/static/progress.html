@@ -96,13 +96,21 @@
                   <p class="kb-section__description" id="delivered-waiting"></p>
                 </div>
               </header>
-              <ul class="progress-list" id="progress-list">
+              <p
+                id="progress-read-status"
+                role="status"
+                aria-atomic="true"
+                data-progress_loading="{{t:front_desk:progress_loading}}"
+                data-progress_refreshing="{{t:front_desk:progress_refreshing}}"
+              >
+                {{t:front_desk:progress_loading}}
+              </p>
+              <ul class="progress-list" id="progress-list" aria-busy="true">
                 <li>
                   <div
                     class="kb-skeleton"
                     data-shape="table"
-                    role="status"
-                    aria-busy="true"
+                    aria-hidden="true"
                     aria-label="{{t:ui:skeleton_loading}}"
                   >
                     <span class="kb-skeleton__line" aria-hidden="true"></span>
@@ -117,11 +125,17 @@
             <section
               class="kb-section progress-detail-col"
               aria-label="{{t:presence_studio:progress_detail_label}}"
-              id="progress-detail"
             >
-              <p class="progress-select-hint" id="progress-select-hint">
-                {{t:front_desk:progress_select_hint}}
-              </p>
+              <p id="progress-detail-status" role="status" aria-atomic="true"></p>
+              <button
+                id="progress-detail-retry"
+                type="button"
+                class="kb-btn kb-btn--secondary"
+                hidden
+              >
+                {{t:front_desk:progress_detail_retry}}
+              </button>
+              <div id="progress-detail" aria-busy="false"></div>
             </section>
           </div>
 

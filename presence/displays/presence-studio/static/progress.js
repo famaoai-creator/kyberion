@@ -129,6 +129,9 @@
     vocab: {},
     vocabularyReady: false,
     loaded: false,
+    readPending: true,
+    hasLoaded: false,
+    detailPending: false,
     navigationPending: false,
     noticeKey: null,
     payload: { counts: {}, active: [], delivered: [], done: [], mirror_href: '' },
@@ -185,6 +188,7 @@
   }
 
   function renderFilters() {
+    if (!state.vocabularyReady) return;
     var vocab = state.vocab;
     var counts = state.payload.counts || {};
     var buttons = {
@@ -193,14 +197,14 @@
       done: document.getElementById('filter-done'),
     };
     if (buttons.active) {
-      buttons.active.textContent = renderTemplate(vt(vocab, 'progress_filter_active'), {
-        count: counts.active || 0,
-      });
+      buttons.active.textContent = state.loaded
+        ? renderTemplate(vt(vocab, 'progress_filter_active'), { count: counts.active || 0 })
+        : vt(vocab, 'tag_in_progress');
     }
     if (buttons.delivered) {
-      buttons.delivered.textContent = renderTemplate(vt(vocab, 'progress_filter_delivered'), {
-        count: counts.delivered || 0,
-      });
+      buttons.delivered.textContent = state.loaded
+        ? renderTemplate(vt(vocab, 'progress_filter_delivered'), { count: counts.delivered || 0 })
+        : vt(vocab, 'progress_delivered_title');
     }
     if (buttons.done) {
       buttons.done.textContent = vt(vocab, 'progress_history');
@@ -435,8 +439,19 @@
     var headerEl = document.getElementById('delivered-header');
     if (!listEl || !emptyEl) return;
 
+    listEl.setAttribute('aria-busy', state.readPending ? 'true' : 'false');
+    var notice = document.getElementById('progress-notice');
+    var refresh = notice && notice.querySelector('button');
+    if (refresh) refresh.disabled = state.readPending;
+    var readStatus = document.getElementById('progress-read-status');
+    if (readStatus) {
+      var readKey = state.hasLoaded ? 'progress_refreshing' : 'progress_loading';
+      readStatus.textContent = state.readPending
+        ? vt(vocab, readKey) || readStatus.getAttribute('data-' + readKey) || ''
+        : '';
+    }
     if (headerEl) {
-      if (state.filter === 'delivered') {
+      if (state.loaded && state.filter === 'delivered') {
         headerEl.classList.remove('hidden');
         var titleEl = document.getElementById('delivered-title');
         var waitingEl = document.getElementById('delivered-waiting');
@@ -453,6 +468,11 @@
 
     var items = itemsForFilter(state.filter);
     listEl.innerHTML = '';
+    if (!state.loaded) {
+      emptyEl.textContent = '';
+      emptyEl.classList.add('hidden');
+      return;
+    }
     if (!items.length) {
       var emptyKey =
         state.filter === 'active'
@@ -480,12 +500,32 @@
     });
   }
 
+  function renderDetailReadState(kind) {
+    state.detailPending = kind === 'loading';
+    var detailEl = document.getElementById('progress-detail');
+    if (detailEl) detailEl.setAttribute('aria-busy', state.detailPending ? 'true' : 'false');
+    var status = document.getElementById('progress-detail-status');
+    if (status) {
+      status.textContent = kind
+        ? renderTemplate(vt(state.vocab, 'progress_detail_' + kind), { title: state.selectedTitle })
+        : '';
+    }
+    var retry = document.getElementById('progress-detail-retry');
+    if (retry) {
+      retry.hidden = kind !== 'failed' && !(kind === 'loading' && !retry.hidden);
+      retry.disabled = kind !== 'failed';
+      retry.textContent = vt(state.vocab, 'progress_detail_retry') || retry.textContent;
+    }
+  }
+
   function renderDetailHint() {
     var vocab = state.vocab;
     var detailEl = document.getElementById('progress-detail');
     if (!detailEl) return;
-    detailEl.innerHTML =
-      '<p class="progress-select-hint">' + escapeHtml(vt(vocab, 'progress_select_hint')) + '</p>';
+    renderDetailReadState(null);
+    detailEl.innerHTML = state.loaded
+      ? '<p class="progress-select-hint">' + escapeHtml(vt(vocab, 'progress_select_hint')) + '</p>'
+      : '';
   }
 
   function askHref(title) {
@@ -575,6 +615,7 @@
       '</a>' +
       '</div>';
 
+    renderDetailReadState('ready');
     detailEl.innerHTML = blocks;
   }
 
@@ -702,8 +743,9 @@
 
   // A failed/currently refreshing read cannot leave old scope data or actions
   // available to hash/filter handlers. Keep uncertain verdict storage intact.
-  function clearPresentation() {
+  function clearPresentation(pending) {
     state.loaded = false;
+    state.readPending = Boolean(pending);
     state.payload = { counts: {}, active: [], delivered: [], done: [], mirror_href: '' };
     state.selectedId = null;
     state.selectedTitle = '';
@@ -716,8 +758,13 @@
   function loadDetail() {
     var sequence = ++state.detailSequence;
     var selectedId = state.selectedId;
-    renderDetailHint();
-    if (!state.loaded || !selectedId) return Promise.resolve();
+    if (!state.loaded || !selectedId) {
+      renderDetailHint();
+      return Promise.resolve();
+    }
+    var detailEl = document.getElementById('progress-detail');
+    if (detailEl) detailEl.innerHTML = '';
+    renderDetailReadState('loading');
     return fetchJson('/api/progress/' + encodeURIComponent(selectedId))
       .then(function (result) {
         if (sequence !== state.detailSequence || selectedId !== state.selectedId) return;
@@ -726,7 +773,7 @@
             state.loadSequence += 1;
             clearPresentation();
             showNotice('progress_item_unavailable');
-          } else showNotice('progress_load_failed');
+          } else renderDetailReadState('failed');
           return;
         }
         if (state.noticeKey === 'progress_load_failed') showNotice(null);
@@ -734,7 +781,7 @@
       })
       .catch(function () {
         if (sequence === state.detailSequence && selectedId === state.selectedId)
-          showNotice('progress_load_failed');
+          renderDetailReadState('failed');
       });
   }
 
@@ -812,7 +859,7 @@
   function reload() {
     if (state.navigationPending) return Promise.resolve();
     var sequence = ++state.loadSequence;
-    clearPresentation();
+    clearPresentation(true);
     // A read can reconcile only decisions already uncertain when that read began.
     // An in-flight older snapshot must never unlock a later uncertain write.
     var reconciliationGeneration = state.verdictGeneration;
@@ -822,6 +869,8 @@
         if (!result.ok || !result.body || !result.body.ok) throw new Error('progress-unavailable');
         state.payload = result.body;
         state.loaded = true;
+        state.hasLoaded = true;
+        state.readPending = false;
         var scopeReady = restoreVerdictLocks(
           state.payload.viewer_scope_id,
           reconciliationGeneration
@@ -1010,6 +1059,8 @@
 
   function refreshProgress() {
     if (state.navigationPending) return Promise.resolve();
+    clearPresentation(true);
+    if (state.noticeKey === 'progress_load_failed' || isSelectionNotice()) showNotice(null);
     return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
       .then(function () {
         if (state.navigationPending) return;
@@ -1025,6 +1076,7 @@
         });
       })
       .catch(function () {
+        clearPresentation();
         showNotice('progress_load_failed');
       });
   }
@@ -1041,11 +1093,16 @@
   function mount() {
     var locale = normalizeLocale();
     wireFilters();
+    var detailRetry = document.getElementById('progress-detail-retry');
+    if (detailRetry)
+      detailRetry.addEventListener('click', function () {
+        if (!state.detailPending && state.loaded && state.selectedId) loadDetail();
+      });
     var notice = document.getElementById('progress-notice');
     var refresh = notice && notice.querySelector('button');
     if (refresh)
       refresh.addEventListener('click', function () {
-        refreshProgress();
+        if (!state.readPending) refreshProgress();
       });
     var initialScope = null;
     function navigateSelection() {
@@ -1055,7 +1112,7 @@
         // traversal needs a fresh page rather than using its old cached scope.
         state.navigationPending = true;
         state.loadSequence += 1;
-        clearPresentation();
+        clearPresentation(true);
         wi.payload = { scope: null, candidates: [], counts: {} };
         renderWorkInventoryPanel();
         window.location.reload();
@@ -1076,6 +1133,7 @@
         return refreshProgress();
       })
       .catch(function () {
+        clearPresentation();
         showNotice('progress_load_failed');
       });
   }

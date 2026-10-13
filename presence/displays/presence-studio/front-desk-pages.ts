@@ -436,6 +436,12 @@ export const HOME_VOCABULARY_KEYS = [
 // `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
 // `front-desk-routes.ts`.
 export const PROGRESS_VOCABULARY_KEYS = [
+  'front_desk:progress_loading',
+  'front_desk:progress_refreshing',
+  'front_desk:progress_detail_loading',
+  'front_desk:progress_detail_failed',
+  'front_desk:progress_detail_ready',
+  'front_desk:progress_detail_retry',
   'front_desk:progress_scope_required',
   'front_desk:progress_storage_required',
   'front_desk:progress_phase_estimate',
