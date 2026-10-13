@@ -336,7 +336,7 @@
     var actionsHtml = '';
     if (item.downloadable) {
       actionsHtml +=
-        '<a class="kb-btn kb-btn--secondary progress-row-action" data-action="open" href="' +
+        '<a class="kb-btn kb-btn--secondary progress-row-action" data-action="open" download href="' +
         escapeHtml(scopedUrl('/api/artifacts/' + encodeURIComponent(item.id))) +
         '">' +
         escapeHtml(vt(vocab, 'action_open')) +
@@ -488,7 +488,7 @@
     row.setAttribute('tabindex', '0');
     var actionsHtml =
       item.kind === 'artifact' && item.downloadable
-        ? '<div class="progress-row-actions"><a class="kb-btn kb-btn--secondary progress-row-action" href="' +
+        ? '<div class="progress-row-actions"><a class="kb-btn kb-btn--secondary progress-row-action" download href="' +
           escapeHtml(scopedUrl('/api/artifacts/' + encodeURIComponent(item.id))) +
           '">' +
           escapeHtml(vt(state.vocab, 'action_open')) +
@@ -534,6 +534,7 @@
   }
 
   function renderList() {
+    renderLeave();
     var vocab = state.vocab;
     var listEl = document.getElementById('progress-list');
     var emptyEl = document.getElementById('progress-empty');
@@ -859,6 +860,7 @@
         delete state.pendingVerdicts[item.entry_id];
         state.uncertainVerdicts[item.entry_id] = ++state.verdictGeneration;
         persistVerdictLocks();
+        renderLeave();
         showNotice(
           state.verdictStorageVerified ? 'progress_action_failed' : 'progress_storage_required'
         );
@@ -1222,7 +1224,234 @@
     );
   }
 
+  // Only app-controlled departures are deterministic. Native browser reload/close
+  // can discard memory without a prompt, so never promise protection there.
+  var leaveIntent = null;
+  var leaveGeneration = 0;
+  var leaveRequestSequence = 0;
+  var leavePresentation = '';
+  function leavePhase() {
+    if (Object.keys(state.pendingVerdicts).length) return 'pending';
+    if (Object.keys(state.uncertainVerdicts).length) return 'uncertain';
+    return Object.keys(state.correctionDrafts).some(function (id) {
+      return Boolean(state.correctionDrafts[id].text.trim());
+    })
+      ? 'draft'
+      : '';
+  }
+  function leaveIsCurrent(intent) {
+    return (
+      leaveIntent === intent &&
+      !state.navigationPending &&
+      intent.scope === state.verdictStorageKey &&
+      (!intent.isCurrent || intent.isCurrent())
+    );
+  }
+  function drawLeave(host, components, options) {
+    try {
+      return Promise.resolve(window.FrontDeskRail.render(host, components, options));
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  }
+  function closeLeave(intent, cancelled) {
+    if (leaveIntent !== intent) return;
+    leaveIntent = null;
+    leavePresentation = '';
+    var generation = ++leaveGeneration;
+    var host = document.getElementById('progress-leave-dialog');
+    if (host && window.FrontDeskRail && window.FrontDeskRail.render) {
+      drawLeave(
+        host,
+        [
+          {
+            id: 'progress-leave',
+            type: 'ui:dialog',
+            props: { open: false },
+          },
+        ],
+        {
+          isCurrent: function () {
+            return generation === leaveGeneration;
+          },
+        }
+      )
+        .then(function () {
+          if (cancelled && generation === leaveGeneration && intent.cancel) intent.cancel();
+        })
+        .catch(function () {
+          if (generation !== leaveGeneration) return;
+          host.textContent = '';
+          showNotice('progress_leave_unavailable');
+          if (cancelled && intent.cancel) intent.cancel();
+        });
+    } else if (cancelled && intent.cancel) intent.cancel();
+  }
+  function renderLeave() {
+    var intent = leaveIntent;
+    if (!intent) return;
+    var phase = leavePhase();
+    if (!leaveIsCurrent(intent) || !phase) {
+      closeLeave(intent, true);
+      return;
+    }
+    if (leavePresentation === phase) return;
+    leavePresentation = phase;
+    var generation = ++leaveGeneration;
+    var host = document.getElementById('progress-leave-dialog');
+    if (!host || !window.FrontDeskRail || !window.FrontDeskRail.render) {
+      showNotice('progress_leave_unavailable');
+      closeLeave(intent, true);
+      return;
+    }
+    var current = function () {
+      return generation === leaveGeneration && leaveIsCurrent(intent);
+    };
+    drawLeave(
+      host,
+      [
+        {
+          id: 'progress-leave',
+          type: 'ui:dialog',
+          props: {
+            open: true,
+            title: vt(state.vocab, 'progress_leave_title'),
+            message: vt(state.vocab, 'progress_leave_' + phase),
+            action: { id: 'progress.leave.choose' },
+            cancel_action: { id: 'progress.leave.cancel' },
+            choices: [
+              {
+                id: 'stay',
+                label: vt(
+                  state.vocab,
+                  phase === 'draft' ? 'progress_leave_stay' : 'progress_leave_stay_page'
+                ),
+                variant: 'primary',
+              },
+              {
+                id: 'leave',
+                label: vt(
+                  state.vocab,
+                  phase === 'draft' ? 'progress_leave_discard' : 'progress_leave_anyway'
+                ),
+                variant: 'danger',
+              },
+            ],
+          },
+        },
+      ],
+      {
+        isCurrent: current,
+        onAction: function (action) {
+          if (!leaveIsCurrent(intent)) {
+            closeLeave(intent, true);
+            return;
+          }
+          if (!current()) return;
+          var choice = action && action.payload && action.payload.choice;
+          if (action.id === 'progress.leave.cancel' || choice === 'stay') {
+            closeLeave(intent, true);
+            return;
+          }
+          if (action.id !== 'progress.leave.choose' || choice !== 'leave') return;
+          // A verdict can settle while the dialog is open. Re-present the actual
+          // state rather than accepting a stale warning or retrying any write.
+          if (leavePhase() !== phase) {
+            leavePresentation = '';
+            renderLeave();
+            return;
+          }
+          if (!leaveIsCurrent(intent)) return;
+          state.correctionDrafts = Object.create(null);
+          closeLeave(intent, false);
+          // Persisted unknown-outcome identifiers are deliberately untouched.
+          intent.proceed();
+        },
+      }
+    ).catch(function () {
+      if (!current()) return;
+      leavePresentation = '';
+      showNotice('progress_leave_unavailable');
+      closeLeave(intent, true);
+    });
+  }
+  function mountLeaveGuard() {
+    window.FrontDeskPageLeave = {
+      begin: function () {
+        var sequence = ++leaveRequestSequence;
+        if (leaveIntent) closeLeave(leaveIntent, true);
+        return function () {
+          return sequence === leaveRequestSequence;
+        };
+      },
+      requestLeave: function (proceed, isCurrent, cancel) {
+        if (!isCurrent) isCurrent = window.FrontDeskPageLeave.begin();
+        if (!isCurrent()) return;
+        if (leaveIntent) closeLeave(leaveIntent, true);
+        if (!leavePhase()) {
+          proceed();
+          return;
+        }
+        leaveIntent = {
+          proceed: proceed,
+          isCurrent: isCurrent,
+          cancel: cancel,
+          scope: state.verdictStorageKey,
+        };
+        renderLeave();
+      },
+    };
+    document.addEventListener(
+      'click',
+      function (event) {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        var link = event.target && event.target.closest && event.target.closest('a[href]');
+        if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download'))
+          return;
+        var href = link.getAttribute('href');
+        var target;
+        try {
+          target = new URL(href, window.location.href);
+        } catch (err) {
+          return;
+        }
+        if (['http:', 'https:'].indexOf(target.protocol) < 0) return;
+        var current = new URL(window.location.href);
+        if (
+          target.origin === current.origin &&
+          target.pathname === current.pathname &&
+          target.search === current.search &&
+          href.indexOf('#') >= 0
+        )
+          return;
+        var pageIntent = window.FrontDeskPageLeave.begin();
+        if (!leavePhase()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.FrontDeskPageLeave.requestLeave(
+          function () {
+            window.location.assign(target.href);
+          },
+          pageIntent,
+          function () {
+            if (link.focus) link.focus();
+          }
+        );
+      },
+      true
+    );
+  }
+
   function mount() {
+    mountLeaveGuard();
     var locale = normalizeLocale();
     if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
       window.FrontDeskRail.subscribe(function (shell) {
