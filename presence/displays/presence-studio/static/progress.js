@@ -153,8 +153,44 @@
     return ['failed', 'released', 'rejected', 'changes_requested'].indexOf(item.status) >= 0;
   }
 
+  var TASK_STATE = {
+    collecting_requirements: { status: 'pending', next: 'refresh' },
+    awaiting_input: { status: 'pending', next: 'input' },
+    awaiting_confirmation: { status: 'pending', next: 'confirmation' },
+    planning: { status: 'pending', next: 'refresh' },
+    executing: { status: 'active', next: 'refresh' },
+    verifying: { status: 'pending', next: 'refresh' },
+    paused: { status: 'idle', next: 'inspect' },
+    blocked: { status: 'pending', next: 'inspect' },
+    completed: { status: 'idle', next: 'result' },
+    failed: { status: 'failed', next: 'inspect' },
+    released: { status: 'idle', next: 'inspect' },
+    unknown: { status: 'idle', next: 'inspect' },
+  };
+  function taskState(value) {
+    return Object.prototype.hasOwnProperty.call(TASK_STATE, value) ? value : 'unknown';
+  }
+  function taskPillHtml(value) {
+    var key = taskState(value);
+    return pillHtml({ status: TASK_STATE[key].status, labelKey: 'progress_task_state_' + key });
+  }
+  function recordedUpdateHtml(update) {
+    if (!update || !update.text) return '';
+    return (
+      '<p class="progress-row-now">' +
+      escapeHtml(vt(state.vocab, 'progress_task_latest_update')) +
+      ': ' +
+      escapeHtml(update.text) +
+      '</p>'
+    );
+  }
   function statusPillHtml(filter, item) {
+    if (filter === 'active' || (item && item.kind === 'task_session'))
+      return taskPillHtml(item && item.task_state);
     var def = (item && OUTCOME_STATUS[item.status]) || ROW_STATUS[filter];
+    return pillHtml(def);
+  }
+  function pillHtml(def) {
     if (!def) return '';
     return (
       '<span class="kb-status-pill" data-status="' +
@@ -241,7 +277,7 @@
     if (buttons.active) {
       buttons.active.textContent = state.loaded
         ? renderTemplate(vt(vocab, 'progress_filter_active'), { count: counts.active || 0 })
-        : vt(vocab, 'tag_in_progress');
+        : vt(vocab, 'progress_open_work');
     }
     if (buttons.delivered) {
       buttons.delivered.textContent = state.loaded
@@ -293,12 +329,11 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      statusPillHtml('active', item) +
       svgIcon('chevron', 'progress-row-chevron') +
+      '</div><div class="progress-row-now">' +
+      statusPillHtml('active', item) +
       '</div>' +
-      '<p class="progress-row-now">' +
-      escapeHtml(item.now) +
-      '</p>' +
+      recordedUpdateHtml(item.latest_update) +
       bar;
     row.addEventListener('click', function () {
       selectItem(item.id, item.title);
@@ -500,9 +535,12 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      statusPillHtml('done', item) +
+      (item.kind === 'task_session' ? '' : statusPillHtml('done', item)) +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
+      (item.kind === 'task_session'
+        ? '<div class="progress-row-now">' + statusPillHtml('done', item) + '</div>'
+        : '') +
       actionsHtml +
       (correctionRecorded(item)
         ? '<p role="status">' +
@@ -649,7 +687,25 @@
     if (!detailEl) return;
 
     var found = findSection(state.selectedId);
-    var blocks = found ? statusPillHtml(found.filter, found.item) : '';
+    // The selected list may predate this detail. Never borrow its task state.
+    var isTask =
+      detail.kind === 'task_session' ||
+      (!detail.kind && found && (found.filter === 'active' || found.item.kind === 'task_session'));
+    var blocks =
+      found && found.filter !== 'active' && found.item.kind !== 'task_session'
+        ? statusPillHtml(found.filter, found.item)
+        : '';
+    if (isTask) {
+      var currentTaskState = taskState(detail.task_state);
+      blocks +=
+        '<div class="progress-detail-block"><p class="progress-detail-label">' +
+        escapeHtml(vt(vocab, 'progress_task_recorded_state')) +
+        '</p>' +
+        taskPillHtml(currentTaskState) +
+        '<p class="progress-detail-text">' +
+        escapeHtml(vt(vocab, 'progress_task_next_' + TASK_STATE[currentTaskState].next)) +
+        '</p></div>';
+    }
     blocks +=
       '<div class="progress-detail-block">' +
       '<p class="progress-detail-label">' +
@@ -659,15 +715,17 @@
       escapeHtml(detail.requested) +
       '</p>' +
       '</div>';
-    blocks +=
-      '<div class="progress-detail-block">' +
-      '<p class="progress-detail-label">' +
-      escapeHtml(vt(vocab, 'progress_detail_now')) +
-      '</p>' +
-      '<p class="progress-detail-text">' +
-      escapeHtml(detail.now) +
-      '</p>' +
-      '</div>';
+    if (!isTask || detail.latest_update) {
+      blocks +=
+        '<div class="progress-detail-block">' +
+        '<p class="progress-detail-label">' +
+        escapeHtml(vt(vocab, isTask ? 'progress_task_latest_update' : 'progress_detail_now')) +
+        '</p>' +
+        '<p class="progress-detail-text">' +
+        escapeHtml(isTask ? detail.latest_update.text : detail.now) +
+        '</p>' +
+        '</div>';
+    }
     if (Array.isArray(detail.next) && detail.next.length) {
       blocks +=
         '<div class="progress-detail-block">' +
