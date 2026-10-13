@@ -202,3 +202,23 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Read feedback stays outside busy content so announcements are not deferred. */
+#progress-read-status,
+#progress-detail-status {
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+  overflow-wrap: anywhere;
+}
+#progress-detail:empty {
+  display: none;
+}
+#progress-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+}
+[data-density='compact'] #progress-detail {
+  gap: var(--kb-ui-space-2);
+}
