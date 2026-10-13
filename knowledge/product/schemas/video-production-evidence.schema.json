@@ -1,0 +1,470 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Video production mission evidence",
+  "description": "Bounded structured evidence for video-production phase preflight. Additional creative fields may remain on top-level artifacts.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/spec"
+    },
+    {
+      "$ref": "#/definitions/scene_plan"
+    },
+    {
+      "$ref": "#/definitions/prototypes"
+    },
+    {
+      "$ref": "#/definitions/prototype_acceptance"
+    },
+    {
+      "$ref": "#/definitions/assets"
+    },
+    {
+      "$ref": "#/definitions/evaluation"
+    },
+    {
+      "$ref": "#/definitions/playback"
+    }
+  ],
+  "definitions": {
+    "artifact": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^evidence/[^\\\\]*$",
+          "minLength": 10
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": ["path", "sha256"],
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-production-spec"
+        },
+        "duration_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "unit": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$"
+            },
+            "cap": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "available": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "base_cost": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_repair_rounds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            }
+          },
+          "required": ["unit", "cap", "available", "base_cost", "max_repair_rounds"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["kind", "duration_sec", "budget"],
+      "additionalProperties": true
+    },
+    "scene_plan": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-scene-plan"
+        },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
+              },
+              "duration_sec": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "narration": {
+                "type": "string"
+              },
+              "visual": {
+                "type": "string",
+                "minLength": 1
+              },
+              "overlay": {
+                "type": "string"
+              },
+              "audio": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "enum": ["none", "text_only", "reference_image"]
+                  },
+                  "max_attempts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4
+                  },
+                  "cost_per_attempt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "quote_source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quoted_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "max_attempts",
+                  "cost_per_attempt",
+                  "quote_source",
+                  "quoted_at"
+                ],
+                "additionalProperties": false
+              },
+              "quality_criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "action_cues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "time_sec": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "action": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["time_sec", "action"],
+                  "additionalProperties": false
+                },
+                "minItems": 0
+              },
+              "audio_cues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "time_sec": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "cue": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["time_sec", "cue"],
+                  "additionalProperties": false
+                },
+                "minItems": 0
+              }
+            },
+            "required": [
+              "scene_id",
+              "duration_sec",
+              "message",
+              "narration",
+              "visual",
+              "overlay",
+              "audio",
+              "generation",
+              "quality_criteria",
+              "action_cues",
+              "audio_cues"
+            ],
+            "additionalProperties": true
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["kind", "scenes"],
+      "additionalProperties": true
+    },
+    "prototypes": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-prototype-manifest"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "artifact": {
+                "$ref": "#/definitions/artifact"
+              }
+            },
+            "required": ["scene_id", "revision", "artifact"],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["kind", "references"],
+      "additionalProperties": true
+    },
+    "prototype_acceptance": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-prototype-acceptance"
+        },
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": ["scene_id", "request_id"],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["kind", "requests"],
+      "additionalProperties": true
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-asset-manifest"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_spent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": ["ready", "failed", "pending"]
+              },
+              "generation_mode": {
+                "enum": ["none", "text_only", "reference_image"]
+              },
+              "selected_take": {
+                "$ref": "#/definitions/artifact"
+              },
+              "source_reference": {
+                "$ref": "#/definitions/artifact"
+              },
+              "job_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "generation_contract": {
+                "$ref": "#/definitions/artifact"
+              },
+              "attempt_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4
+              },
+              "repair_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "spent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scene_plan_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "scene_id",
+              "status",
+              "generation_mode",
+              "attempt_count",
+              "repair_count",
+              "spent",
+              "scene_plan_hash"
+            ],
+            "additionalProperties": true
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["kind", "unit", "base_spent", "assets"],
+      "additionalProperties": true
+    },
+    "evaluation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-eval-report"
+        },
+        "verdict": {
+          "enum": ["pass", "repair"]
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["scene_id", "reason"],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "repair_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "evaluated_render": {
+          "$ref": "#/definitions/artifact"
+        },
+        "scene_reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selected_take_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "criteria_checked": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            },
+            "required": ["scene_id", "selected_take_sha256", "criteria_checked"],
+            "additionalProperties": true
+          },
+          "minItems": 1
+        },
+        "scene_plan_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "kind",
+        "verdict",
+        "flags",
+        "repair_rounds",
+        "evaluated_render",
+        "scene_reviews",
+        "scene_plan_sha256"
+      ],
+      "additionalProperties": true
+    },
+    "playback": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "video-playback-approval"
+        },
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "not_required": {
+          "type": "boolean"
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    }
+  }
+}
