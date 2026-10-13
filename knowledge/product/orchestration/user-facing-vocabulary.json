@@ -26210,9 +26210,9 @@
         "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
       },
       "progress_correction_draft_note": {
-        "en": "Draft kept while this page is open. Reloading the page clears unsaved text.",
-        "ja": "この画面を開いている間は下書きを保持します。画面の再読み込みで未保存の内容は消えます。",
-        "qps-ploc": "⟦Ḓřȧƒŧ ķėṗŧ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Řėŀőȧḓïñɠ ŧħė ṗȧɠė ƈŀėȧřş ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Draft kept while this page is open. Leaving or reloading can clear unsaved text.",
+        "ja": "この画面を開いている間は下書きを保持します。画面の移動や再読み込みで未保存の内容が消えることがあります。",
+        "qps-ploc": "⟦Ḓřȧƒŧ ķėṗŧ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Ŀėȧṽïñɠ őř řėŀőȧḓïñɠ ƈȧñ ƈŀėȧř ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "progress_correction_save": {
         "en": "Save correction feedback",
@@ -26288,6 +26288,51 @@
         "en": "Enter to send · Shift+Enter for a new line",
         "ja": "Enterで送信・Shift+Enterで改行",
         "qps-ploc": "⟦Ėñŧėř ŧő şėñḓ · Şħïƒŧ+Ėñŧėř ƒőř ȧ ñėẇ ŀïñė ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "progress_leave_title": {
+        "en": "Leave this page?",
+        "ja": "この画面から移動しますか？",
+        "qps-ploc": "⟦Ŀėȧṽė ŧħïş ṗȧɠė? ŀőřėɱ⟧"
+      },
+      "progress_leave_draft": {
+        "en": "Your correction draft has not been recorded. Leaving this page discards it.",
+        "ja": "修正コメントの下書きは記録されていません。移動すると下書きは破棄されます。",
+        "qps-ploc": "⟦Ẏőůř ƈőřřėƈŧïőñ ḓřȧƒŧ ħȧş ñőŧ ƀėėñ řėƈőřḓėḓ. Ŀėȧṽïñɠ ŧħïş ṗȧɠė ḓïşƈȧřḓş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "progress_leave_pending": {
+        "en": "A decision is still being recorded. Leaving may not cancel it and discards any draft text on this page. Check Progress when you return before trying again.",
+        "ja": "判定を記録しています。移動しても処理が続く場合があり、この画面の下書きは破棄されます。戻ったら、再試行する前に進み具合を確認してください。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş şŧïŀŀ ƀėïñɠ řėƈőřḓėḓ. Ŀėȧṽïñɠ ɱȧẏ ñőŧ ƈȧñƈėŀ ïŧ ȧñḓ ḓïşƈȧřḓş ȧñẏ ḓřȧƒŧ ŧėẋŧ őñ ŧħïş ṗȧɠė. Ƈħėƈķ Ṗřőɠřėşş ẇħėñ ẏőů řėŧůřñ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "progress_leave_uncertain": {
+        "en": "A decision still needs confirmation from the latest progress. Leaving discards any draft text on this page. Your pending decision remains protected from duplicate submission. Check Progress when you return.",
+        "ja": "最新の進み具合で判定結果を確認する必要があります。移動すると、この画面の下書きは破棄されます。判定の重複送信を防ぐ状態は保持されます。戻ったら進み具合を確認してください。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ şŧïŀŀ ñėėḓş ƈőñƒïřɱȧŧïőñ ƒřőɱ ŧħė ŀȧŧėşŧ ṗřőɠřėşş. Ŀėȧṽïñɠ ḓïşƈȧřḓş ȧñẏ ḓřȧƒŧ ŧėẋŧ őñ ŧħïş ṗȧɠė. Ẏőůř ṗėñḓïñɠ ḓėƈïşïőñ řėɱȧïñş ṗřőŧėƈŧėḓ ƒřőɱ ḓůṗŀïƈȧŧė şůƀɱïşşïőñ. Ƈħėƈķ Ṗřőɠřėşş ẇħėñ ẏőů řėŧůřñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "progress_leave_stay": {
+        "en": "Keep editing",
+        "ja": "入力を続ける",
+        "qps-ploc": "⟦Ķėėṗ ėḓïŧïñɠ ŀőř⟧"
+      },
+      "progress_leave_discard": {
+        "en": "Discard and leave",
+        "ja": "破棄して移動",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ȧñḓ ŀėȧṽė ŀőřėɱ⟧"
+      },
+      "progress_leave_anyway": {
+        "en": "Leave anyway",
+        "ja": "確認して移動",
+        "qps-ploc": "⟦Ŀėȧṽė ȧñẏẇȧẏ ŀőř⟧"
+      },
+      "progress_leave_unavailable": {
+        "en": "The leave confirmation could not be displayed. Your draft is unchanged. Try the navigation again.",
+        "ja": "移動の確認を表示できませんでした。下書きは変更していません。もう一度移動を選んでください。",
+        "qps-ploc": "⟦Ŧħė ŀėȧṽė ƈőñƒïřɱȧŧïőñ ƈőůŀḓ ñőŧ ƀė ḓïşṗŀȧẏėḓ. Ẏőůř ḓřȧƒŧ ïş ůñƈħȧñɠėḓ. Ŧřẏ ŧħė ñȧṽïɠȧŧïőñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "progress_leave_stay_page": {
+        "en": "Stay on this page",
+        "ja": "この画面に留まる",
+        "qps-ploc": "⟦Şŧȧẏ őñ ŧħïş ṗȧɠė ŀőřėɱ⟧"
       }
     },
     "operator": {
