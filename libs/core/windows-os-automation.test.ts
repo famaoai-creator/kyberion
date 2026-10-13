@@ -186,6 +186,12 @@ describe('Windows application and window operations', () => {
     expect(WINDOWS_APP_LAUNCH_SCRIPT).not.toContain('notepad.exe');
   });
 
+  it('resolves common display names such as Google Chrome to installed Windows applications', () => {
+    expect(WINDOWS_APP_LAUNCH_SCRIPT).toContain("googlechrome = 'chrome.exe'");
+    expect(WINDOWS_APP_LAUNCH_SCRIPT).toContain('App Paths');
+    expect(WINDOWS_APP_LAUNCH_SCRIPT).toContain("$appPath.GetValue('')");
+  });
+
   it('focuses and maximizes only a unique UI Automation window match', () => {
     mocks.safeExecResult.mockReturnValue({ stdout: 'true', stderr: '', status: 0 });
     expect(activateWindowByTitle('chrome', 'Docs', 'strict')).toBe(true);
