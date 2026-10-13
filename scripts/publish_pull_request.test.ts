@@ -27,6 +27,7 @@ import {
   resolveKnowledgeDiffBase,
   resolvePublishTitle,
   runKnowledgeReadinessGate,
+  runPrePrReadiness,
 } from './publish_pull_request.js';
 
 /** Default `safeExec` stub covering every gh/git call `main()` makes before `gh pr create`. */
@@ -344,5 +345,67 @@ describe('main() wiring (KL-03)', () => {
       await expect(main(['--titel', 'fix(pr): typo'])).rejects.toMatchObject({ code: 2 });
       expect(mocks.safeExec).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('publication check concurrency', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('parses bounded --check-jobs without changing defaults', () => {
+    expect(parsePublishArgs([]).checkJobs).toBeUndefined();
+    for (let jobs = 1; jobs <= 6; jobs++) {
+      expect(parsePublishArgs(['--check-jobs', String(jobs)]).checkJobs).toBe(jobs);
+    }
+  });
+
+  it.each(['0', '7', '-1', '1.5', '', '01', '1e0', 'NaN', ' 1'])(
+    'rejects invalid concurrency before any external operation: %j',
+    async (value) => {
+      await expect(main(['--check-jobs', value])).rejects.toThrow();
+      expect(mocks.safeExec).not.toHaveBeenCalled();
+      expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['--check-jobs'],
+    ['--check-jobs', '1', '--check-jobs', '2'],
+    ['--check-jobs=1', '--check-jobs', '2'],
+  ])('rejects missing or duplicate concurrency before external operations: %j', async (...args) => {
+    await expect(main(args)).rejects.toThrow();
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 1, 6])('forwards jobs=%s to the real readiness command', (jobs) => {
+    mocks.safeExec.mockReturnValue('');
+    const print = vi.fn();
+    runPrePrReadiness(print, jobs);
+    expect(mocks.safeExec).toHaveBeenCalledExactlyOnceWith(
+      'pnpm',
+      ['check', '--', '--scope', 'pr', ...(jobs === undefined ? [] : ['--jobs', String(jobs)])],
+      { cwd: pathResolver.rootDir(), timeoutMs: 1_800_000 }
+    );
+    expect(print).toHaveBeenLastCalledWith('[pr:publish] PR readiness gate passed.');
+  });
+
+  it('forwards the option through main and prevents publication when readiness fails', async () => {
+    mocks.safeExec.mockImplementation((command: string, args: string[]) => {
+      if (command === 'pnpm') throw new Error('readiness fixture failed');
+      if (command === 'gh' && args[0] === '--version') return 'gh version 2.0.0';
+      if (command === 'gh' && args[0] === 'auth') return 'Logged in';
+      throw new Error('unexpected operation');
+    });
+    await expect(main(['--check-jobs=1', '--title', 'fix(check): concurrency'])).rejects.toThrow(
+      'readiness fixture failed'
+    );
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'pnpm',
+      ['check', '--', '--scope', 'pr', '--jobs', '1'],
+      expect.any(Object)
+    );
+    expect(
+      mocks.safeExec.mock.calls.some(([command, args]) => command === 'gh' && args[0] === 'pr')
+    ).toBe(false);
+    expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
   });
 });
