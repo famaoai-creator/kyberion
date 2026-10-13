@@ -115,7 +115,10 @@ export interface DesktopRecording {
   created_at: string;
   target: DesktopRecordingTarget;
   steps: DesktopRecordingStep[];
-  risk_summary: { requires_manual_review: boolean; approval_required_count: number };
+  risk_summary: {
+    requires_manual_review: boolean;
+    approval_required_count: number;
+  };
   /** Hash of the generated intent source, excluding the mutable review decision. */
   intent_hash?: string;
   recording_hash: string;
@@ -266,7 +269,9 @@ export function validateDesktopRecording(input: unknown): DesktopRecordingValida
 
 /** Load one persisted desktop recording through its regular-file and contract boundary. */
 export function loadDesktopRecordingAtPath(filePath: string): DesktopRecording {
-  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const safeFilePath = assertSafeRepositoryPath(filePath, {
+    allowMissingLeaf: true,
+  });
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[DESKTOP_RECORDING] recording must be a regular file: ${filePath}`);
   }
@@ -445,7 +450,9 @@ function stepFrom(snapshot: DesktopObservationSnapshot): DesktopRecordingStep | 
       ? { app: safeObservedText(snapshot.application) }
       : {}),
     ...(safeObservedText(snapshot.window_title || focused?.windowTitle)
-      ? { window_title: safeObservedText(snapshot.window_title || focused?.windowTitle) }
+      ? {
+          window_title: safeObservedText(snapshot.window_title || focused?.windowTitle),
+        }
       : {}),
     ...(safeObservedText(focused?.role, 80) ? { role: safeObservedText(focused?.role, 80) } : {}),
     ...(safeObservedText(focused?.description)
@@ -551,7 +558,10 @@ export function buildDesktopRecording(
     created_at: nowIso(),
     // A recording is a human demonstration artifact even when every observed
     // step is read-only. Promotion and execution must still pass review.
-    risk_summary: { requires_manual_review: true, approval_required_count: highRisk },
+    risk_summary: {
+      requires_manual_review: true,
+      approval_required_count: highRisk,
+    },
     recording_hash: computeDesktopRecordingHash(body),
     policy_version: options.policyVersion || 'desktop-policy.v1',
     review: options.review || { status: 'pending' },
@@ -591,17 +601,33 @@ export interface DesktopObservationReadiness {
  * a reason instead of silently disappearing from a recording.
  */
 export function assessDesktopObservationReadiness(
-  probe: Pick<MacOSAutomationProbe, 'platform' | 'available' | 'permissions'>
+  probe: Pick<MacOSAutomationProbe, 'platform' | 'available' | 'permissions'> & {
+    sourceAvailability?: Partial<Record<DesktopObservationSource['id'], boolean>>;
+  }
 ): DesktopObservationReadiness[] {
   return DESKTOP_OBSERVATION_SOURCES.map((source) => {
     if (source.permission === 'none') {
-      return { source_id: source.id, available: true, reason: 'permission_not_required' };
+      return {
+        source_id: source.id,
+        available: true,
+        reason: 'permission_not_required',
+      };
+    }
+    if (probe.platform === 'win32') {
+      const available = probe.sourceAvailability?.[source.id] === true;
+      return {
+        source_id: source.id,
+        available,
+        reason: available
+          ? 'windows_observation_probe_succeeded'
+          : 'windows_observation_unavailable',
+      };
     }
     if (probe.platform !== 'darwin') {
       return {
         source_id: source.id,
         available: false,
-        reason: `macos_only_capability:${probe.platform}`,
+        reason: `platform_observation_probe_unsupported:${probe.platform}`,
       };
     }
     if (!probe.available) {
@@ -735,7 +761,11 @@ export class DesktopDemonstrationRecorder {
       const source = includeFrame
         ? sampled
         : { ...sampled, frame_hash: undefined, frame_ref: undefined };
-      const rawSnapshot = { ...source, ...(event ? { event } : {}), observed_at: this.now() };
+      const rawSnapshot = {
+        ...source,
+        ...(event ? { event } : {}),
+        observed_at: this.now(),
+      };
       const snapshot = {
         ...rawSnapshot,
         ...(rawSnapshot.clipboard_text
