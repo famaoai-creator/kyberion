@@ -218,7 +218,9 @@ export function coSessionHookLeaseGate(input: {
         `or wait for expiry.`,
     };
   } catch (error) {
-    if (!isAbsence(error)) {
+    // 'invalid_path' = the write target is outside the repo — unleaseable by
+    // definition; warn would fire on every routine out-of-repo write.
+    if (!isAbsence(error) && !(error instanceof CoSessionError && error.code === 'invalid_path')) {
       logger.warn(
         `co-session lease gate could not be evaluated — ${(error as Error)?.message ?? error} | allowing (advisory) | path: ${input.file_path}`
       );
