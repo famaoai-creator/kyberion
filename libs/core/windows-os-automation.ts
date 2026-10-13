@@ -524,10 +524,10 @@ export function isUIAutomationAvailable(): boolean {
       'Add-Type -AssemblyName UIAutomationClient',
       '$root = [System.Windows.Automation.AutomationElement]::RootElement',
       'if ($null -eq $root) { exit 1 }',
-      "Write-Output 'KYBERION_UIA_READY'",
+      "Write-Output 'UIA_READY'",
     ].join('; ')
   );
-  return result.trim() === 'KYBERION_UIA_READY';
+  return result.trim() === 'UIA_READY';
 }
 export function activateWindowByTitle(
   appName: string,

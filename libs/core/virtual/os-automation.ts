@@ -22,6 +22,7 @@ export const dragFrom = platform.dragFrom;
 export const runAppleScript = platform.runAppleScript;
 export const getScreenSize = platform.getScreenSize;
 export const getWindowList = platform.getWindowList;
+export const isUIAutomationAvailable = () => platform.isUIAutomationAvailable?.() ?? false;
 export const activateWindowByTitle = platform.activateWindowByTitle;
 export const setWindowState = platform.setWindowState;
 export const quitApplication = platform.quitApplication;
