@@ -14775,6 +14775,26 @@
         "ja": "破棄して移動",
         "en": "Discard and leave",
         "qps-ploc": "⟦Ḓïşƈȧřḓ ȧñḓ ŀėȧṽė ŀőřėɱ⟧"
+      },
+      "setup.load_retry_title": {
+        "en": "Could not load settings",
+        "ja": "設定を読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ şėŧŧïñɠş ŀőřėɱ ï⟧"
+      },
+      "setup.load_retry_help": {
+        "en": "The current settings could not be checked. Check your connection, then try loading again.",
+        "ja": "現在の設定を確認できませんでした。接続状況を確認してから、もう一度読み込んでください。",
+        "qps-ploc": "⟦Ŧħė ƈůřřėñŧ şėŧŧïñɠş ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ, ŧħėñ ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "setup.load_retry_action": {
+        "en": "Try loading again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ ŀőřėɱ⟧"
+      },
+      "setup.load_retry_pending": {
+        "en": "Loading settings…",
+        "ja": "設定を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şėŧŧïñɠş… ŀőřėɱ⟧"
       }
     },
     "onboarding": {
