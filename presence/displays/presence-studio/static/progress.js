@@ -71,6 +71,47 @@
     });
   }
 
+  // Only critical GET reads use this deadline. Verdict POSTs retain their
+  // existing unknown-outcome protection and are never timed out or retried here.
+  function fetchReadJson(url) {
+    return new Promise(function (resolve, reject) {
+      var controller = window.AbortController ? new window.AbortController() : null;
+      var timer = window.setTimeout(function () {
+        reject(new Error('Progress read unavailable'));
+        if (controller) controller.abort();
+      }, 20000);
+      Promise.resolve()
+        .then(function () {
+          return fetch(scopedUrl(url), {
+            cache: 'no-store',
+            signal: controller ? controller.signal : undefined,
+          });
+        })
+        .then(function (response) {
+          if (!response.ok) {
+            // Denial headers are authoritative even if the body never finishes.
+            // Error bodies are not displayed; release the remaining transfer.
+            if (controller) controller.abort();
+            return { ok: false, status: response.status, body: null };
+          }
+          return response.json().then(function (body) {
+            return { ok: true, status: response.status, body: body };
+          });
+        })
+        .then(
+          function (result) {
+            window.clearTimeout(timer);
+            resolve(result);
+          },
+          function (error) {
+            window.clearTimeout(timer);
+            reject(error);
+            if (controller) controller.abort();
+          }
+        );
+    });
+  }
+
   var ICON_PATHS = {
     chevron: '<path d="M9 6l6 6-6 6"/>',
     box: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
@@ -770,7 +811,7 @@
     var detailEl = document.getElementById('progress-detail');
     if (detailEl) detailEl.innerHTML = '';
     renderDetailReadState('loading');
-    return fetchJson('/api/progress/' + encodeURIComponent(selectedId))
+    return fetchReadJson('/api/progress/' + encodeURIComponent(selectedId))
       .then(function (result) {
         if (sequence !== state.detailSequence || selectedId !== state.selectedId) return;
         if (!result.ok || !result.body || !result.body.ok) {
@@ -868,7 +909,7 @@
     // A read can reconcile only decisions already uncertain when that read began.
     // An in-flight older snapshot must never unlock a later uncertain write.
     var reconciliationGeneration = state.verdictGeneration;
-    return fetchJson('/api/progress')
+    return fetchReadJson('/api/progress')
       .then(function (result) {
         if (sequence !== state.loadSequence) return;
         if (!result.ok || !result.body || !result.body.ok) throw new Error('progress-unavailable');
@@ -1072,7 +1113,7 @@
         if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
         if (state.navigationPending) return;
         if (state.vocabularyReady) return reload();
-        return fetchJson(
+        return fetchReadJson(
           '/api/progress-vocabulary?locale=' + encodeURIComponent(normalizeLocale())
         ).then(function (result) {
           if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
