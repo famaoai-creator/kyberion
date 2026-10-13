@@ -15,6 +15,7 @@ import {
   readJsonIfPresent,
 } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import {
@@ -516,6 +517,16 @@ function leaseFile(sessionId: string, pathHash: string): string {
   return path.join(leasesDir(sessionId), `${pathHash}.json`);
 }
 
+/**
+ * One inter-process fence per (session, path). The lease read-check-write
+ * below was previously unserialized, so two competing processes could both
+ * observe "no active lease" and both acquire. Same pattern as
+ * work-coordination's `withCoordinationMutation`.
+ */
+function leaseLockId(sessionId: string, pathHash: string): string {
+  return `co-session-lease:${sessionId}:${pathHash}`;
+}
+
 function refreshLeaseStatus(lease: CoSessionPathLease): CoSessionPathLease {
   if (lease.status !== 'active') return lease;
   if (Date.parse(lease.expires_at) <= Date.now()) {
@@ -552,39 +563,45 @@ export function acquireCoSessionLease(input: {
 }): CoSessionPathLease {
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
-  readSession(session_id);
+  const session = readSession(session_id);
+  if (session.status !== 'open') {
+    throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+  }
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
-  const current = existing ? refreshLeaseStatus(existing) : undefined;
-  if (
-    current?.status === 'active' &&
-    !(current.holder_provider === provider && current.holder_participant_id === participant_id)
-  ) {
-    throw new CoSessionError(
-      'lease_held',
-      `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
-    );
-  }
-  const now = nowIso();
-  const ttl = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
-  const lease: CoSessionPathLease = {
-    lease_id: current?.lease_id || `csl-${randomUUID()}`,
-    session_id,
-    path: repoPath,
-    path_hash,
-    holder_provider: provider,
-    holder_participant_id: participant_id,
-    purpose: input.purpose?.trim() || 'implementation',
-    status: 'active',
-    created_at: current?.created_at || now,
-    expires_at: new Date(Date.now() + ttl).toISOString(),
-    renewed_at: now,
-  };
-  withCoSessionWrite(() => {
-    safeMkdir(leasesDir(session_id), { recursive: true });
-    writeJson(leaseFile(session_id, path_hash), lease);
+  const lease = withLockSync(leaseLockId(session_id, path_hash), () => {
+    const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+    const current = existing ? refreshLeaseStatus(existing) : undefined;
+    if (
+      current?.status === 'active' &&
+      !(current.holder_provider === provider && current.holder_participant_id === participant_id)
+    ) {
+      throw new CoSessionError(
+        'lease_held',
+        `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
+      );
+    }
+    const now = nowIso();
+    const ttl = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
+    const next: CoSessionPathLease = {
+      lease_id: current?.lease_id || `csl-${randomUUID()}`,
+      session_id,
+      path: repoPath,
+      path_hash,
+      holder_provider: provider,
+      holder_participant_id: participant_id,
+      purpose: input.purpose?.trim() || 'implementation',
+      status: 'active',
+      created_at: current?.created_at || now,
+      expires_at: new Date(Date.now() + ttl).toISOString(),
+      renewed_at: now,
+    };
+    withCoSessionWrite(() => {
+      safeMkdir(leasesDir(session_id), { recursive: true });
+      writeJson(leaseFile(session_id, path_hash), next);
+    });
+    return next;
   });
   appendEvent(session_id, 'lease_acquired', provider, {
     path: repoPath,
@@ -606,26 +623,29 @@ export function releaseCoSessionLease(input: {
   readSession(session_id);
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
-  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
-  if (!existing) throw new CoSessionError('not_found', `no lease for path: ${repoPath}`);
-  const current = refreshLeaseStatus(existing);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  if (
-    !input.force &&
-    current.status === 'active' &&
-    (current.holder_provider !== provider || current.holder_participant_id !== participant_id)
-  ) {
-    throw new CoSessionError(
-      'lease_held',
-      `cannot release lease held by ${current.holder_provider}/${current.holder_participant_id}`
-    );
-  }
-  const released: CoSessionPathLease = {
-    ...current,
-    status: 'released',
-    released_at: nowIso(),
-  };
-  writeJson(leaseFile(session_id, path_hash), released);
+  const released = withLockSync(leaseLockId(session_id, path_hash), () => {
+    const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+    if (!existing) throw new CoSessionError('not_found', `no lease for path: ${repoPath}`);
+    const current = refreshLeaseStatus(existing);
+    if (
+      !input.force &&
+      current.status === 'active' &&
+      (current.holder_provider !== provider || current.holder_participant_id !== participant_id)
+    ) {
+      throw new CoSessionError(
+        'lease_held',
+        `cannot release lease held by ${current.holder_provider}/${current.holder_participant_id}`
+      );
+    }
+    const next: CoSessionPathLease = {
+      ...current,
+      status: 'released',
+      released_at: nowIso(),
+    };
+    writeJson(leaseFile(session_id, path_hash), next);
+    return next;
+  });
   appendEvent(session_id, 'lease_released', provider, {
     path: repoPath,
     lease_id: released.lease_id,

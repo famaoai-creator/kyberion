@@ -7463,6 +7463,11 @@
         "ja": "プロバイダのサブエージェント定義を再生成",
         "qps-ploc": "⟦Řėɠėñėřȧŧė ṗřőṽïḓėř şůƀȧɠėñŧ ḓėƒïñïŧïőñş ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "cli_cmd_script_generate_provider_hooks": {
+        "en": "Regenerate provider CLI hook configs (.gemini/settings.json)",
+        "ja": "プロバイダ CLI の hook 設定 (.gemini/settings.json) を再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ṗřőṽïḓėř ƇĿÏ ħőőķ ƈőñƒïɠş (.ɠėɱïñï/şėŧŧïñɠş.ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "cli_cmd_script_check_apple_fm": {
         "en": "Check on-device Apple Intelligence availability",
         "ja": "オンデバイス Apple Intelligence の利用可否を確認",
