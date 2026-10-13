@@ -3,6 +3,43 @@ import type { KyberionVideoGenerationADF } from './contracts/video-generation-ad
 import { slugify } from './foundation/text.js';
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
 
+export function compileComfyUiImageRequest(
+  request: {
+    prompt: string;
+    aspectRatio?: string;
+    width?: number;
+    height?: number;
+    awaitCompletion?: boolean;
+  },
+  targetPath?: string
+) {
+  const match = request.aspectRatio?.match(/^\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*$/);
+  const parsedRatio = match ? Number(match[1]) / Number(match[2]) : 1;
+  const ratio = Number.isFinite(parsedRatio) && parsedRatio > 0 ? parsedRatio : 1;
+  const width = Math.max(
+    256,
+    Math.round((request.width ?? (ratio >= 1 ? 1024 : Math.round((1024 * ratio) / 64) * 64)) / 8) *
+      8
+  );
+  const height = Math.max(
+    256,
+    Math.round((request.height ?? (ratio <= 1 ? 1024 : Math.round(1024 / ratio / 64) * 64)) / 8) * 8
+  );
+  return compileImageGenerationADF({
+    kind: 'image-generation-adf',
+    version: '1.0.0',
+    intent: request.prompt,
+    prompt: request.prompt,
+    canvas: { width, height },
+    engine: { provider: 'comfyui' },
+    output: {
+      format: 'png',
+      ...(targetPath ? { target_path: targetPath } : {}),
+      await_completion: request.awaitCompletion ?? true,
+    },
+  }).workflow;
+}
+
 function seedOrRandom(seed?: number): number {
   return Number.isInteger(seed) ? Number(seed) : Math.floor(Date.now() % 2147483647);
 }
