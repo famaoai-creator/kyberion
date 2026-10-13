@@ -8,6 +8,8 @@
     var scopedUrl = options.scopedUrl;
     var renderRecent = options.renderRecent;
     var vt = options.vt;
+    var startupLoading = document.getElementById('ask-startup-loading');
+    var startupLoadingText = startupLoading ? startupLoading.textContent : '';
     // Only read-only startup/projection requests use this bounded wait. No mutation retries.
     function fetchReadJson(url) {
       return new Promise(function (resolve, reject) {
@@ -127,9 +129,18 @@
 
     function renderStartup() {
       var host = document.getElementById('ask-startup-status');
-      if (host) host.hidden = state.vocabularyReady;
+      if (host) {
+        host.hidden = state.vocabularyReady;
+        host.setAttribute(
+          'aria-busy',
+          state.startupReadPending && !state.shellBlockedMessage ? 'true' : 'false'
+        );
+      }
       var loading = document.getElementById('ask-startup-loading');
-      if (loading) loading.hidden = state.startupFailed && !state.startupReadPending;
+      if (loading) {
+        loading.hidden = state.startupFailed && !state.startupReadPending;
+        loading.textContent = state.shellBlockedMessage || startupLoadingText;
+      }
       var error = document.getElementById('ask-startup-error');
       if (error) error.hidden = !state.startupFailed || state.startupReadPending;
       var retry = document.getElementById('ask-startup-retry');
@@ -141,7 +152,18 @@
       if (send && !state.vocabularyReady) send.disabled = true;
     }
 
+    function observeShell() {
+      if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
+        window.FrontDeskRail.subscribe(function (shell) {
+          state.shellBlockedMessage = shell.phase === 'blocked' ? shell.message : '';
+          renderStartup();
+          var recent = document.getElementById('recent-card');
+          if (recent && !state.vocabularyReady) recent.hidden = Boolean(state.shellBlockedMessage);
+        });
+    }
+
     return {
+      observeShell: observeShell,
       renderStartup: renderStartup,
       fetchJson: fetchReadJson,
       hasBootVocabulary: hasBootVocabulary,

@@ -64,3 +64,16 @@ a {
   height: 18px;
   flex: none;
 }
+
+/* The recovery slot shares the established rail width and sticky geometry.
+ * This presentation-only wrapper must not become a shorter containing block. */
+.kb-app-shell__nav > [data-front-desk-content] {
+  display: contents;
+}
+.kb-app-shell__nav > [data-front-desk-content][hidden],
+.kb-app-shell__nav > [data-front-desk-recovery][hidden] {
+  display: none;
+}
+.kb-app-shell__nav > [data-front-desk-content] > .kb-nav-rail {
+  border-right: 0;
+}

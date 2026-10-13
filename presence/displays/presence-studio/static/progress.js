@@ -439,16 +439,21 @@
     var headerEl = document.getElementById('delivered-header');
     if (!listEl || !emptyEl) return;
 
-    listEl.setAttribute('aria-busy', state.readPending ? 'true' : 'false');
+    listEl.setAttribute(
+      'aria-busy',
+      state.readPending && !state.shellBlockedMessage ? 'true' : 'false'
+    );
     var notice = document.getElementById('progress-notice');
     var refresh = notice && notice.querySelector('button');
     if (refresh) refresh.disabled = state.readPending;
     var readStatus = document.getElementById('progress-read-status');
     if (readStatus) {
       var readKey = state.hasLoaded ? 'progress_refreshing' : 'progress_loading';
-      readStatus.textContent = state.readPending
-        ? vt(vocab, readKey) || readStatus.getAttribute('data-' + readKey) || ''
-        : '';
+      readStatus.textContent =
+        state.shellBlockedMessage ||
+        (state.readPending
+          ? vt(vocab, readKey) || readStatus.getAttribute('data-' + readKey) || ''
+          : '');
     }
     if (headerEl) {
       if (state.loaded && state.filter === 'delivered') {
@@ -1061,13 +1066,16 @@
     if (state.navigationPending) return Promise.resolve();
     clearPresentation(true);
     if (state.noticeKey === 'progress_load_failed' || isSelectionNotice()) showNotice(null);
-    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+    var ready = window.FrontDeskRail && window.FrontDeskRail.ready;
+    return Promise.resolve(ready)
       .then(function () {
+        if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
         if (state.navigationPending) return;
         if (state.vocabularyReady) return reload();
         return fetchJson(
           '/api/progress-vocabulary?locale=' + encodeURIComponent(normalizeLocale())
         ).then(function (result) {
+          if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
           if (!result.ok || !result.body || !result.body.ok)
             throw new Error('vocabulary-unavailable');
           state.vocab = result.body.texts || {};
@@ -1076,6 +1084,7 @@
         });
       })
       .catch(function () {
+        if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
         clearPresentation();
         showNotice('progress_load_failed');
       });
@@ -1092,6 +1101,12 @@
 
   function mount() {
     var locale = normalizeLocale();
+    if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
+      window.FrontDeskRail.subscribe(function (shell) {
+        if (state.vocabularyReady) return;
+        state.shellBlockedMessage = shell.phase === 'blocked' ? shell.message : '';
+        renderList();
+      });
     wireFilters();
     var detailRetry = document.getElementById('progress-detail-retry');
     if (detailRetry)
@@ -1126,13 +1141,16 @@
     window.addEventListener('hashchange', navigateSelection);
     window.addEventListener('popstate', navigateSelection);
     // The shared rail validates the selected scope before any tenant read.
-    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+    var ready = window.FrontDeskRail && window.FrontDeskRail.ready;
+    return Promise.resolve(ready)
       .then(function () {
+        if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
         initialScope = navigationScope();
         loadWorkInventoryPanel(locale);
         return refreshProgress();
       })
       .catch(function () {
+        if (window.FrontDeskRail && ready !== window.FrontDeskRail.ready) return;
         clearPresentation();
         showNotice('progress_load_failed');
       });
