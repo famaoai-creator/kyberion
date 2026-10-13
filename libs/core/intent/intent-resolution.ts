@@ -394,8 +394,18 @@ function normalizeHalfWidthKatakana(text: string): string {
 // Word-final prolonged marks are dropped (\u30b5\u30fc\u30d0\u30fc ==
 // \u30b5\u30fc\u30d0), the dominant loanword spelling variant; internal
 // ones stay so \u30ab\u30fc\u30c9 and \u304b\u3060 still differ.
+// Implemented as a plain scan — a /\u30fc+(?=\s|$)/-style pattern
+// backtracks polynomially on attacker-controlled runs of \u30fc (CodeQL).
 function normalizeJaTrailingProlonged(text: string): string {
-  return text.replace(/\u30fc+(?=\s|$)/g, '');
+  const parts = text.split(/(\s+)/u);
+  for (let i = 0; i < parts.length; i += 1) {
+    if (i % 2 === 1) continue; // whitespace runs sit at odd indices
+    const word = parts[i]!;
+    let end = word.length;
+    while (end > 0 && word.charCodeAt(end - 1) === 0x30fc) end -= 1;
+    if (end !== word.length) parts[i] = word.slice(0, end);
+  }
+  return parts.join('');
 }
 
 // Honorific prefixes are dropped only before a 2+ kanji stem (\u3054\u78ba\u8a8d ->
@@ -519,8 +529,15 @@ function normalizeForTriggerMatchCached(utterance: string): string {
 // spaceless text "サーバーの費用" has no \s boundary, so the string-level pass
 // only fires at the very end — the token-level pass makes \u30fc-stripping and
 // \u304a/\u3054-stripping fire mid-sentence too.
-const JA_TOKEN_TRAILING_PROLONGED = /\u30fc+$/;
 const JA_TOKEN_HONORIFIC_PREFIX = /^[\u304a\u3054](?=[\u3400-\u9fff][\u3400-\u9fff])/;
+
+// Linear scan rather than /\u30fc+$/ — a quantifier over attacker-controlled
+// input can still backtrack polynomially per start position (CodeQL).
+function stripTokenProlongedTail(token: string): string {
+  let end = token.length;
+  while (end > 0 && token.charCodeAt(end - 1) === 0x30fc) end -= 1;
+  return token.slice(0, end);
+}
 
 // Post-normalization auxiliary/particle fragments that ICU emits as tokens.
 // They recur across unrelated utterances, so they must not count as evidence
@@ -547,8 +564,7 @@ function tokenize(value: string): string[] {
   // split identifiers (foo_bar, file.txt) that ICU keeps joined.
   const tokens = segmentWords(normalizePreSegmentCached(value))
     .map((token) =>
-      normalizeKatakanaToHiragana(token)
-        .replace(JA_TOKEN_TRAILING_PROLONGED, '')
+      stripTokenProlongedTail(normalizeKatakanaToHiragana(token))
         .replace(JA_TOKEN_HONORIFIC_PREFIX, '')
         .trim()
     )
