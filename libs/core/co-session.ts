@@ -515,24 +515,33 @@ export function closeCoSession(input: { session_id?: string; provider: string })
       }
     }
   };
-  if (session.status === 'closed') {
+  const alreadyClosed = session.status === 'closed';
+  const record: CoSessionRecord = alreadyClosed
+    ? session
+    : { ...session, status: 'closed', closed_at: nowIso() };
+  const cleanupCurrent = () => {
+    const current = getCurrentCoSessionId();
+    if (current === session_id && safeExistsSync(currentPointerFile())) {
+      withCoSessionWrite(() => safeRmSync(currentPointerFile()));
+    }
+  };
+  if (alreadyClosed) {
     // Still sweep: a prior close may have died mid-loop — retry is the only
-    // path to finish the cleanup.
+    // path to finish the cleanup (leases + CURRENT pointer).
     sweepLeases();
-    return session;
+    cleanupCurrent();
+    return record;
   }
   // Flip to closed BEFORE releasing leases: an acquire that slips between
   // release-enumeration and the status write would otherwise leave an active
-  // lease behind (acquire re-checks status inside the path lock).
-  const closed: CoSessionRecord = { ...session, status: 'closed', closed_at: nowIso() };
-  writeSession(closed);
-  sweepLeases();
-  const current = getCurrentCoSessionId();
-  if (current === session_id && safeExistsSync(currentPointerFile())) {
-    withCoSessionWrite(() => safeRmSync(currentPointerFile()));
-  }
+  // lease behind (acquire re-checks status inside the path lock). The
+  // transition event is journaled before the fallible sweep so a retry that
+  // only finishes cleanup does not lose it.
+  writeSession(record);
   appendEvent(session_id, 'session_closed', provider);
-  return closed;
+  sweepLeases();
+  cleanupCurrent();
+  return record;
 }
 
 export function readCoSessionBlackboard(sessionId?: string): string {
