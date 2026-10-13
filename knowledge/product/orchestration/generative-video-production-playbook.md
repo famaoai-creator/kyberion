@@ -18,10 +18,10 @@ when a film contains generated footage: commercials, character films, product sh
 POV sequences, trailers, or generated scenes in a music video. Keep discovery in
 scratch; promote an accepted recipe only when it will be reused.
 
-This is an operator planning and review procedure. The scene sheet below is
-Markdown mission evidence, not a new ADF schema or an automatically enforced gate.
-Execute through existing actuators and validated contracts. Stage acceptance does
-not grant provider access, spending authority, or publication approval.
+The scene sheet below supports creative planning. The existing video-production
+mission also has typed evidence and phase-entry checks, described below. Execute
+through existing actuators and validated contracts. Stage acceptance does not grant
+provider access, spending authority, or publication approval.
 
 ## Production stages and exit evidence
 
@@ -152,3 +152,89 @@ and public-release approval. This playbook adds the missing per-scene decisions
 and their evidence. It does not install AZ8, add a provider, adopt the video's
 prices or model ranking as defaults, or claim the tutorial's time savings were
 reproduced in Kyberion.
+
+## Connection to the video-production mission
+
+The canonical workflow now expands prototype_assets → prototype_acceptance before
+asset_generation, and playback_review before promotion. Existing goal/spec/scene
+planning, independent artifact evaluation, partial repair, and publication approval
+remain in that workflow. Entry gates use the read-only
+scripts/check_video_production_evidence.ts checker; failed checks defer phase
+dispatch even when mission exit-gate enforcement is set to warn.
+
+Author the existing mission artifacts using
+[video-production-evidence.schema.json](../schemas/video-production-evidence.schema.json):
+
+| Artifact                     | Added structured evidence                                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| production-spec.json         | kind=video-production-spec, duration_sec, budget.unit/cap/available/base_cost/max_repair_rounds.                                                                                           |
+| scene-plan.json              | kind=video-scene-plan, stable scene_id, duration and semantic content, generation.mode/quote_source/quoted_at/cost_per_attempt/max_attempts, quality_criteria, action_cues and audio_cues. |
+| prototype-manifest.json      | kind=video-prototype-manifest, references with scene_id, revision, and mission-relative artifact path plus SHA-256. Only reference_image scenes have entries.                              |
+| prototype-acceptance.json    | kind=video-prototype-acceptance, scene_id/request_id references to usable human decisions in the shared approval store.                                                                    |
+| asset-manifest.json          | kind=video-asset-manifest, unit/base_spent and per-scene status, selected_take, source_reference, job_id, generation_contract, attempt_count/repair_count/spent, and scene_plan_hash.      |
+| video-eval-report.json       | kind=video-eval-report, verdict/flags/repair_rounds, evaluated_render path and SHA-256, scene_plan_sha256, per-scene selected_take_sha256 and criteria_checked.                            |
+| video-playback-approval.json | kind=video-playback-approval, request_id for generated footage, or not_required=true for a video whose scenes all use mode=none.                                                           |
+
+All media/contract references in these mission manifests are relative to the
+mission directory under evidence/. Store immutable files there through the scoped
+artifact writer; other runtime stores and tenant artifacts retain their own
+canonical locations. Absolute paths, traversal, symbolic-link escapes, missing
+files, and changed bytes do not satisfy these checks.
+
+Use integer amounts in one explicit billing unit, such as credit or usd-cent, to
+avoid floating-point currency sums. base_cost is the planned image/audio/composition
+and comparison allowance; base_spent is its actual recorded consumption. Video
+attempt spend stays on the scene asset entry. Include failed attempts and model
+comparisons in consumption, and retain cumulative counts/costs when replacing a
+selected take. generation_contract points at the immutable validated submitted
+request. scene_plan_hash is computeApprovalPayloadHash of that scene object;
+scene_plan_sha256 is SHA-256 of the current scene-plan.json file bytes.
+
+### Image and playback decisions
+
+The explicit request command opens or reuses shared human-only requests:
+
+```bash
+node --import ./scripts/ts-loader.mjs scripts/check_video_production_evidence.ts \
+  --mission <ID> --request-approval prototypes
+node --import ./scripts/ts-loader.mjs scripts/check_video_production_evidence.ts \
+  --mission <ID> --request-approval playback
+```
+
+These commands write prototype-approval-requests.json and
+playback-approval-request.json under evidence/. They do not write the task's
+operator-owned acceptance deliverables. Inspect the requests on the shared
+approval surfaces and have a server-identified human decide after reviewing the
+images or playing the full render with sound. The task owner then records the
+returned scene/request references in prototype-acceptance.json or
+video-playback-approval.json and runs record-evidence. A local approved boolean
+does not substitute for the approval-store record.
+
+A prototype decision binds scene ID, source artifact bytes/path, revision, and
+visual intent. Re-request only changed, expired, or revoked decisions; still-valid
+decisions for unaffected scenes remain usable. Playback acceptance binds the exact
+composed final-video.mp4 and evaluation report. It is a creative acceptance
+decision and does not authorize publication.
+
+For text_only and none scenes, prototype manifests/acceptance contain empty
+arrays and no image request is opened. Text-only generated footage still requires
+the final listening/playback decision. When all scenes use none, the owner records
+not_required=true for playback; the existing independent evaluation still applies.
+
+### Repair limits and enforcement boundary
+
+max_repair_rounds is at most three. A generated scene's max_attempts includes its
+initial generation and is at most 1 + max_repair_rounds (therefore at most four).
+For a repair, remaining attempts and the cost of the flagged scenes' next pass
+must fit the remaining cap. If the evaluation already passes, repair is a
+pass-through and no new generation allowance is needed.
+
+Before each new submission inside a generation/repair task, run the relevant
+generation or repair checker again and update the cumulative asset manifest and
+evaluation after collection. Fix only flagged scenes and preserve unaffected
+selections. Changed take bytes or scene planning invalidate dependent evaluation.
+
+These are mission phase preflight and evidence checks. They do not provide an
+atomic provider billing reservation or prevent an unrelated ad-hoc provider call.
+Price quotes and consumption must come from the current provider/job evidence;
+technical stream/mux validation and independent quality review remain necessary.

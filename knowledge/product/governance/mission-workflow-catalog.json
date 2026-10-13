@@ -1887,7 +1887,7 @@
       "id": "video-production",
       "pattern": "creative_assembly_loop",
       "playbook_ref": "knowledge/product/orchestration/narrated-video-production-playbook.md",
-      "description": "Goal → Video Spec → Scene Plan → シーン単位素材生成 → タイムライン合成 → 完成動画のAI評価 → 問題シーンのみ再生成のループ → レシピ昇格 → 公開パッケージ → 学習フィードバックの動画制作プロセス。scratch-first: 判断フェーズは semantic brief、素材生成/合成は voice / media-generation / video-composition の op をスクラッチ的に試行し、完成動画そのものを評価・部分修復してから、採用レシピを governed pipeline へ promote する(scratch-to-pipeline-video-promotion 準拠)。",
+      "description": "Goal → Video Spec → Scene Plan → 原型画像生成・人間採用 → シーン単位素材生成 → タイムライン合成 → 完成動画の独立AI評価 → 予算・試行上限内の部分修復 → 人間による全編再生・聴取 → レシピ昇格 → 公開パッケージ → 学習フィードバック。scratch-first の既存工程を維持し、mission 相対の evidence を video-production-evidence.schema.json と check_video_production_evidence.ts で検証する。生成なしは原型採用・生成動画の視聴承認を通過扱いにするが公開承認は維持する。",
       "match": {
         "mission_classes": ["content_and_media"],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
@@ -1938,11 +1938,12 @@
             {
               "task_id_suffix": "production-spec",
               "team_role": "experience_designer",
-              "description": "goal-brief を踏まえ動画全体の仕様を evidence/production-spec.json に定義する: テーマ・尺・構成・トーン・媒体・KPI・禁止事項",
+              "description": "goal-brief を踏まえ evidence/production-spec.json を video-production-evidence.schema.json の spec 定義で作成する(kind=video-production-spec)。テーマ・duration_sec・構成・トーン・媒体・KPI・禁止事項、budget の unit/cap/available/base_cost/max_repair_rounds を定義する。初回生成費と再生成費を含め、修復上限は既存上限3回以下にする。",
               "deliverable": "evidence/production-spec.json",
               "acceptance_criteria": [
-                "theme / duration / structure / tone / medium が揃っている",
-                "禁止事項が明記されている"
+                "theme / duration_sec / structure / tone / medium が揃っている",
+                "禁止事項と予算単位・総額上限・利用可能額・固定費が明記されている",
+                "max_repair_rounds は0以上3以下で再生成予算が計画できる"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
@@ -1957,6 +1958,22 @@
                 "params": {
                   "path": "evidence/production-spec.json"
                 }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "spec"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
               }
             ]
           }
@@ -1969,11 +1986,13 @@
             {
               "task_id_suffix": "scene-plan",
               "team_role": "experience_designer",
-              "description": "production-spec をシーン単位に分解し evidence/scene-plan.json に設計する。各シーンは 伝える内容・ナレーション・映像・テロップ・音・尺 を持つ",
+              "description": "evidence/scene-plan.json を video-production-evidence.schema.json の scene_plan 定義で作成する(kind=video-scene-plan)。各シーンに scene_id/duration_sec/message/narration/visual/overlay/audio と generation.mode(none|text_only|reference_image)、cost_per_attempt/max_attempts/quote_source/quoted_at、ジャンル別 quality_criteria、秒単位 action_cues/audio_cues を定義する。初回と再生成を合わせ max_attempts は1〜4、総見積額は固定費込みで cap/available の範囲内。style は既存 design cascade に委譲する。",
               "deliverable": "evidence/scene-plan.json",
               "acceptance_criteria": [
                 "全シーンに 内容/ナレーション/映像/テロップ/音/尺 がある",
-                "シーン尺の合計が production-spec の尺と整合する"
+                "シーン尺の合計が production-spec の duration_sec と整合する",
+                "生成方式・見積根拠・試行上限・ジャンル別品質基準・動作と音の時刻が揃う",
+                "全試行と固定費を含めた予算が cap と available の範囲内"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
@@ -1989,6 +2008,148 @@
                 "params": {
                   "path": "evidence/scene-plan.json"
                 }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "plan"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "prototype_assets",
+          "title": "原型画像生成",
+          "kind": "judgment",
+          "entry_gate": {
+            "id": "VIDEO_PROTOTYPE_ASSETS_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "plan"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          },
+          "default_tasks": [
+            {
+              "task_id_suffix": "produce-prototypes",
+              "team_role": "implementer",
+              "description": "generation.mode=reference_image のシーンだけ原型画像を生成する。evidence/prototype-manifest.json(kind=video-prototype-manifest) の references に scene_id/revision/artifact(path,sha256) を記録する。実ファイルは mission 相対 evidence 配下。text_only / none のみなら references=[] を明示する。原型は人物・商品・構図など計画のジャンル基準でレビューできる版を保存する。",
+              "deliverable": "evidence/prototype-manifest.json",
+              "acceptance_criteria": [
+                "reference_image の全シーンに原型の版と実ファイル hash がある",
+                "原型不要なら references=[] を記録する"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_PROTOTYPE_ASSETS_PASSED",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "prototypes"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "prototype_acceptance",
+          "title": "原型画像採用",
+          "kind": "judgment",
+          "entry_gate": {
+            "id": "VIDEO_PROTOTYPE_ACCEPTANCE_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "prototypes"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          },
+          "default_tasks": [
+            {
+              "task_id_suffix": "accept-prototypes",
+              "team_role": "implementer",
+              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval prototypes を実行し共有 approval request を作成・再利用する。evidence/prototype-acceptance.json(kind=video-prototype-acceptance) に requests(scene_id/request_id) を記録し、人間が具体的な画像の hash を採用するまで待つ。agent は承認を決定しない。reference_image がなければ requests=[] を記録する。 request コマンドの生成物は evidence/prototype-approval-requests.json であり deliverable は書かない。人判断の後にタスク担当者が採用参照を prototype-acceptance.json へ記録する。",
+              "deliverable": "evidence/prototype-acceptance.json",
+              "acceptance_criteria": [
+                "現在の原型 hash に人間の採用承認が結びついている",
+                "原型不要なら requests=[] で通過する"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_PROTOTYPE_ACCEPTANCE_PASSED",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "generation"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
               }
             ]
           }
@@ -2001,11 +2162,13 @@
             {
               "task_id_suffix": "generate-assets",
               "team_role": "implementer",
-              "description": "scene-plan の各シーンについて必要素材を並列生成する(音声は voice:generate_voice、映像・静止画は media:generate_video / generate_image、BGM は generate_music、図解・テロップは artifact ops)。成果物は evidence/assets/ に置き、scene_id → asset パスの対応表を evidence/asset-manifest.json に記録する",
+              "description": "scene-plan の素材を既存 voice/media-generation/artifact ops で生成し evidence/assets/ に保存する。evidence/asset-manifest.json(kind=video-asset-manifest) に unit/base_spent とシーン別 scene_id/status/generation_mode/selected_take(path,sha256)/job_id/generation_contract(path,sha256)/source_reference(path,sha256)/attempt_count/spent/repair_count を記録する。reference_image は現在の原型 hash の人間採用を必須とし generation_contract は実行した検証済みADFを保持する。新規投入前に全体残予算とシーン残試行を確認し、不足なら停止する。原型や台本・合成内容を変えた場合は依存素材の選択と評価を無効化し再採用する。失敗にも理由・実費・試行数を記録する。 各素材の scene_plan_hash は computeApprovalPayloadHash(scene オブジェクト)で計算する。金額は明示した最小請求単位の整数で記録する。",
               "deliverable": "evidence/asset-manifest.json",
               "acceptance_criteria": [
                 "全シーンの必須素材が manifest に記録されている",
-                "生成失敗素材は manifest に理由つきで記録されている"
+                "生成失敗素材は manifest に理由つきで記録されている",
+                "採用テイク・生成ジョブ・検証済み生成契約・採用原型の実ファイル hash と実費が記録されている",
+                "全体残予算とシーン試行上限を超える投入がない"
               ],
               "expected_output_format": "files",
               "estimated_scope": "L",
@@ -2020,6 +2183,43 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/asset-manifest.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "assets"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          },
+          "entry_gate": {
+            "id": "VIDEO_ASSET_GENERATION_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "generation"
+                  ],
+                  "cwd": "{REPO_ROOT}"
                 }
               }
             ]
@@ -2055,6 +2255,27 @@
                 }
               }
             ]
+          },
+          "entry_gate": {
+            "id": "VIDEO_ASSEMBLY_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "assets"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
           }
         },
         {
@@ -2066,7 +2287,7 @@
               "task_id_suffix": "evaluate-video",
               "team_role": "reviewer",
               "review_target_suffix": "assemble-video",
-              "description": "完成動画そのものをAIが視聴して独立評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 に加え、読みやすさ(字幕の有無と文字量・ナレーション速度・用語統一)を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする",
+              "description": "完成動画そのものをAIが視聴して独立評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 に加え、読みやすさ(字幕の有無と文字量・ナレーション速度・用語統一)を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする evaluation 定義(kind=video-eval-report) に従い repair_rounds、evaluated_render(path,sha256)、scene_reviews(scene_id,selected_take_sha256,criteria_checked) を記録する。現在の全採用テイク hash と全 quality_criteria を照合し、顔・手・商品・動作・カメラ・音声など計画のジャンル基準を評価する。 scene_plan_sha256 に現行 scene-plan.json の SHA-256 を記録する。",
               "acceptance_criteria": [
                 "全シーンが評価済み",
                 "verdict と per-scene flags が記録されている",
@@ -2104,11 +2325,13 @@
             {
               "task_id_suffix": "repair-scenes",
               "team_role": "implementer",
-              "description": "video-eval-report.json の verdict=pass かつ flags 空なら pass-through を記録する。flags がある場合は該当シーンの素材だけを再生成して再合成し evidence/final-video.mp4 を更新、eval-report を再評価つきで更新する(verdict=pass まで繰り返し、上限3回。超過時は残 flags と理由を報告)",
+              "description": "verdict=pass かつ flags=[] なら pass-through を記録し評価対象と同一内容の evidence/final-video.mp4 を保存する。repair なら指摘と依存シーンだけを既存opsで再生成・再合成し独立レビューを更新する。修復上限は min(production-spec.budget.max_repair_rounds,3)、初回込み attempt_count はシーン max_attempts(最大4)以内。新規投入前に全体残予算とシーン残試行を確認し、不足時は投入停止し残 flags と理由を報告する。manifest の実費・試行・採用テイク・原型/契約/ジョブ系譜と evaluation の repair_rounds/evaluated_render/scene_reviews を更新する。原型や素材変更後の古い選択・評価を使わない。現在の final-video.mp4 と全採用テイクに結びついた verdict=pass が昇格条件。",
               "deliverable": "evidence/final-video.mp4",
               "acceptance_criteria": [
                 "eval-report が再評価つきで更新されている",
-                "verdict=pass または残 flags の理由が記録されている"
+                "verdict=pass または残 flags の理由が記録されている",
+                "修復回数・シーン試行数・実費が更新され予算と既存上限3回を超えない",
+                "最終レンダー hash と現在の全採用テイク hash が pass 評価に結びついている"
               ],
               "expected_output_format": "files",
               "estimated_scope": "M",
@@ -2136,6 +2359,106 @@
                     "評価が台本ではなく完成動画そのものを対象にしている"
                   ]
                 }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "render"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          },
+          "entry_gate": {
+            "id": "VIDEO_REPAIR_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "repair"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "playback_review",
+          "title": "全編再生・聴取確認",
+          "kind": "judgment",
+          "entry_gate": {
+            "id": "VIDEO_PLAYBACK_REVIEW_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "render"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          },
+          "default_tasks": [
+            {
+              "task_id_suffix": "accept-playback",
+              "team_role": "implementer",
+              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval playback を実行し共有 approval request を作成・再利用する。人間に現在の final-video.mp4 の全編再生・音声聴取を依頼し、evidence/video-playback-approval.json(kind=video-playback-approval) に request_id を記録する。承認は評価通過したレンダー hash に結びつく。agent は承認を決定しない。全シーン generation.mode=none の場合は依頼なしで通過し request_id を省略する。 request コマンドは evidence/playback-approval-request.json に候補を保存し deliverable は書かない。担当者が判断後に video-playback-approval.json を記録する。",
+              "deliverable": "evidence/video-playback-approval.json",
+              "acceptance_criteria": [
+                "生成シーンがあれば現在の最終レンダーを人間が全編再生・聴取し承認している",
+                "生成なしなら承認依頼なしで通過する"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_PLAYBACK_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "final"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
               }
             ]
           }
@@ -2148,7 +2471,7 @@
             {
               "task_id_suffix": "promote-video-recipe",
               "team_role": "implementer",
-              "description": "評価を通過した scene-plan / production-spec / asset-manifest を governed な narrated-video-brief に凍結して evidence/promoted-video-brief.json に記録する(scratch-to-pipeline-video-promotion 準拠: シーン別 VO・テロップ・尺・配色/タイプを storyboard 項目へ移す)。同じ動画を再実行する見込みがある場合のみ pipelines/<slug>.json を登録し、一過性なら brief は mission evidence に留める",
+              "description": "評価を通過した scene-plan / production-spec / asset-manifest を governed な narrated-video-brief に凍結して evidence/promoted-video-brief.json に記録する(scratch-to-pipeline-video-promotion 準拠: シーン別 VO・テロップ・尺・配色/タイプを storyboard 項目へ移す)。同じ動画を再実行する見込みがある場合のみ pipelines/<slug>.json を登録し、一過性なら brief は mission evidence に留める 予算・実費・試行数・原型/生成契約/ジョブ/採用テイクの系譜・hash・画像採用と最終視聴の approval request を凍結レシピから追跡可能に保つ。最終MP4だけを昇格しない。",
               "deliverable": "evidence/promoted-video-brief.json",
               "acceptance_criteria": [
                 "採用レシピが promoted-video-brief.json に凍結されている",
@@ -2167,6 +2490,27 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/promoted-video-brief.json"
+                }
+              }
+            ]
+          },
+          "entry_gate": {
+            "id": "VIDEO_PROMOTION_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "final"
+                  ],
+                  "cwd": "{REPO_ROOT}"
                 }
               }
             ]
@@ -2203,6 +2547,27 @@
               },
               {
                 "kind": "human_override"
+              }
+            ]
+          },
+          "entry_gate": {
+            "id": "VIDEO_PUBLISH_READY",
+            "checks": [
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "final"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
               }
             ]
           }

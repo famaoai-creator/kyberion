@@ -5,6 +5,7 @@ import {
 } from './mission-process-task-expansion.js';
 import { pathResolver } from '../path-resolver.js';
 import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
+import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 
 const PRESENTATION_LIKE_PHASES: WorkflowPhaseSpec[] = [
   {
@@ -63,6 +64,49 @@ const PRESENTATION_LIKE_PHASES: WorkflowPhaseSpec[] = [
 ];
 
 describe('mission-process-task-expansion', () => {
+  it('connects video acceptance tasks to generation and promotion without replacing independent review', () => {
+    const design = resolveMissionWorkflowDesign({
+      missionClass: 'content_and_media',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      intentId: 'video-production',
+    });
+    const tasks = expandProcessTemplateTasks({ missionId: 'MSN-VIDEO-TEST', design });
+    const byId = (id: string) => tasks.find((task) => task.task_id === id);
+    expect(byId('prototype_acceptance-accept-prototypes')?.dependencies).toContain(
+      'prototype_assets-produce-prototypes'
+    );
+    expect(byId('asset_generation-generate-assets')?.dependencies).toContain(
+      'prototype_acceptance-accept-prototypes'
+    );
+    expect(byId('promotion-promote-video-recipe')?.dependencies).toContain(
+      'playback_review-accept-playback'
+    );
+    const review = byId('artifact_evaluation-evaluate-video');
+    expect(review?.assigned_to.role).toBe('reviewer');
+    expect(review?.review_target).toBe('assembly-assemble-video');
+    const gates = processTemplateGateDefinitions('MSN-VIDEO-TEST', design);
+    const generationGate = gates.find(
+      (gate) => gate.phase === 'asset_generation' && gate.position === 'entry'
+    );
+    expect(generationGate?.gate.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'command_succeeds',
+          params: expect.objectContaining({
+            args: expect.arrayContaining(['--mission', 'MSN-VIDEO-TEST', '--stage', 'generation']),
+            cwd: pathResolver.rootDir(),
+          }),
+        }),
+      ])
+    );
+    expect(byId('prototype_acceptance-accept-prototypes')?.description).toContain(
+      '--mission MSN-VIDEO-TEST --request-approval prototypes'
+    );
+  });
+
   it('chains dependencies across task-bearing phases', () => {
     const tasks = expandProcessTemplateTasks({
       missionId: 'MSN-TEST-001',
