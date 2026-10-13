@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-12
+last_updated: 2026-10-13
 ---
 
 # Operations Hygiene Runbook
@@ -202,6 +202,16 @@ it (for example `mission_controller`) print them, and check every pipeline op th
 gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
+
+**Query performance: bound work before relaxing time budgets.** When a query smoke
+test exceeds its cross-platform budget, retain the failing timing evidence and
+count expensive operations on a deterministic tied-score fixture. Ranking
+comparators must not reload scoped settings or recompute the same hint's metadata
+on every comparison. Keep reuse local to one query, keyed by hint identity; load
+weights lazily only when a lexical tie requires metadata. Pin call counts, zero-score
+ties, per-query scope/settings refresh, and document aggregation in tests, alongside
+the unchanged latency budget. `libs/core/knowledge/knowledge-index.test.ts` enforces
+this contract; a faster Linux run alone is not evidence that macOS CI passed.
 
 **Rules** (details in [WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md)):
 
