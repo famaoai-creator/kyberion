@@ -14,6 +14,7 @@ import {
   registerFrontDeskHomeWorkPages,
   registerFrontDeskAuxPages,
   FIRST_JOB_VOCABULARY_KEYS,
+  ASK_VOCABULARY_KEYS,
   PRESENCE_STUDIO_VOCABULARY_KEYS,
   renderFrontDeskPageTemplate,
   resolveFrontDeskPageLocale,
@@ -31,7 +32,9 @@ const PAGES = [
 
 function readStatic(file: string): string {
   return String(
-    safeReadFile(pathResolver.rootResolve(path.join(STATIC_DIR, file)), { encoding: 'utf8' }) || ''
+    safeReadFile(pathResolver.rootResolve(path.join(STATIC_DIR, file)), {
+      encoding: 'utf8',
+    }) || ''
   );
 }
 
@@ -39,9 +42,16 @@ describe('resolveFrontDeskPageLocale', () => {
   it('prefers the shell cookie, then Accept-Language, then English', () => {
     expect(resolveFrontDeskPageLocale({ cookie: 'a=1; kb-ui-locale=ja; b=2' })).toBe('ja');
     expect(
-      resolveFrontDeskPageLocale({ cookie: 'kb-ui-locale=en', 'accept-language': 'ja-JP' })
+      resolveFrontDeskPageLocale({
+        cookie: 'kb-ui-locale=en',
+        'accept-language': 'ja-JP',
+      })
     ).toBe('en');
-    expect(resolveFrontDeskPageLocale({ 'accept-language': 'fr-FR,ja;q=0.8,en;q=0.5' })).toBe('ja');
+    expect(
+      resolveFrontDeskPageLocale({
+        'accept-language': 'fr-FR,ja;q=0.8,en;q=0.5',
+      })
+    ).toBe('ja');
     expect(resolveFrontDeskPageLocale({ 'accept-language': 'en-US,en;q=0.9' })).toBe('en');
     expect(resolveFrontDeskPageLocale({ cookie: 'kb-ui-locale=de' })).toBe('en');
     expect(resolveFrontDeskPageLocale({})).toBe('en');
@@ -289,4 +299,31 @@ describe('First-job receipt viewer chrome', () => {
     expect(readStatic('home.css')).toContain('@media (max-width: 48rem)');
     expect(readStatic('home.css')).toContain('white-space: pre-wrap');
   });
+});
+
+it('delivers every required Ask boot label and keeps localized SSR recovery controls', () => {
+  const script = readStatic('ask-read-recovery.js');
+  const required = script.match(/var REQUIRED_BOOT_LABELS = \[([\s\S]*?)\];/)?.[1];
+  expect(required).toBeTruthy();
+  const requiredKeys = [...required!.matchAll(/['"]([^'"]+)['"]/g)];
+  expect(requiredKeys.length).toBeGreaterThan(0);
+  for (const match of requiredKeys) {
+    expect(ASK_VOCABULARY_KEYS).toContain(match[1]);
+    for (const locale of ['en', 'ja'] as const) {
+      const text = catalogT(match[1] as VocabularyKey, undefined, locale);
+      expect(text.trim()).not.toBe('');
+      expect(text).not.toBe(match[1]);
+    }
+  }
+  const source = readStatic('ask.html');
+  expect(source).toContain('<script src="/ask-read-recovery.js"></script>');
+  expect(source.indexOf('/ask-read-recovery.js')).toBeLessThan(source.indexOf('/ask.js'));
+  expect(source).toMatch(/id="ask-send"\s+disabled/);
+  expect(source).toContain('data-label-on="{{t:front_desk:ask_handsfree_on}}"');
+  expect(source).toContain('data-label-off="{{t:front_desk:ask_handsfree_off}}"');
+  for (const locale of ['en', 'ja'] as const) {
+    const html = renderFrontDeskPageTemplate(source, locale, readStatic);
+    expect(html).toContain(catalogT('front_desk:ask_startup_failed', undefined, locale));
+    expect(html).toContain(catalogT('front_desk:ask_recent_failed', undefined, locale));
+  }
 });
