@@ -138,10 +138,15 @@ function loadBuildInfoVersions(buildInfoPath: string): Map<string, string> | nul
 
 function pathKey(filePath: string): string {
   const resolved = path.resolve(filePath);
-  // TypeScript lowercases paths in Windows tsbuildinfo while directory scans
-  // retain the on-disk spelling. Windows paths are case-insensitive, so use
-  // the same identity for buildinfo and scanned source paths.
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  // TypeScript canonicalizes tsbuildinfo paths with getCanonicalFileName,
+  // which lowercases whenever the host is not case-sensitive — an OS-level
+  // flag that is false on win32 AND darwin (regardless of volume format),
+  // while directory scans retain the on-disk spelling. Mirror the producer
+  // here, or every PascalCase source false-positives as unrecorded_source
+  // on macOS.
+  return process.platform === 'win32' || process.platform === 'darwin'
+    ? resolved.toLowerCase()
+    : resolved;
 }
 
 function fileMtime(filePath: string): number | null {
