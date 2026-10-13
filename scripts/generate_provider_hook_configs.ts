@@ -87,6 +87,13 @@ export const runGenerateProviderHookConfigs = defineGenerator({
   outputs: [GEMINI_SETTINGS],
   executionContext: 'generate_provider_hook_configs',
   render: async () => {
+    const hookJs = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'gemini_cli_hook.js');
+    if (!safeExistsSync(hookJs)) {
+      process.stderr.write(
+        '[generate:provider-hooks] warning: dist/scripts/gemini_cli_hook.js does not exist yet — ' +
+          'hook commands target dist/; run `pnpm run build` before relying on the wiring.\n'
+      );
+    }
     const merged = buildGeminiSettings(loadExistingSettings());
     return [{ path: GEMINI_SETTINGS, content: `${JSON.stringify(merged, null, 2)}\n` }];
   },

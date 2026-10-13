@@ -16,12 +16,12 @@ import {
   CoSessionError,
   type CoSessionHandoff,
   type CoSessionProvider,
+  getCoSessionStatus,
   getCurrentCoSessionId,
   heartbeatCoSession,
   joinCoSession,
   leaveCoSession,
   listCoSessionHandoffs,
-  listCoSessionLeases,
   listCoSessionPresence,
   normalizeCoSessionPath,
   pathHashForLease,
@@ -29,7 +29,12 @@ import {
 
 const logger = createLogger('co-session-hook');
 
-/** Claude Code and Gemini CLI both pass `session_id`; fallback keeps identity stable per process. */
+/**
+ * Claude Code and Gemini CLI both pass `session_id`; the pid fallback is
+ * deliberately unstable (per hook process) and is only used for read-side
+ * identity — join/drain/end skip keyless invocations. OS pid reuse could, in
+ * principle, collide a dead holder's `provider-<pid>`; lease TTL backstops.
+ */
 export function resolveHookParticipantId(provider: string, sessionKey?: string): string {
   const raw = sessionKey?.trim() || `${process.pid}`;
   const key = raw.replace(/[^A-Za-z0-9._-]/g, '-');
@@ -144,7 +149,10 @@ export function coSessionHookDrain(input: {
     }
     const handoffs = listCoSessionHandoffs(session_id, { pendingOnly: true }).filter(
       (h) =>
-        (h.to_participant_id && h.to_participant_id === identity.participant_id) ||
+        // Match ack semantics: a participant-targeted handoff addressed to a
+        // different provider can never be acked — don't deliver it.
+        (h.to_participant_id === identity.participant_id &&
+          (!h.to_provider || h.to_provider === identity.provider)) ||
         (!h.to_participant_id && h.to_provider === identity.provider) ||
         (!h.to_provider && !h.to_participant_id)
     );
@@ -206,7 +214,11 @@ export function coSessionHookLeaseGate(input: {
     const path_hash = pathHashForLease(repoPath);
     const session_id = input.session_id ?? getCurrentCoSessionId();
     if (!session_id) return { decision: 'allow' };
-    const lease = listCoSessionLeases(session_id).find(
+    const status = getCoSessionStatus(session_id);
+    // Leases on a closed session never block (close force-releases first;
+    // this is only a defense against a stranded record).
+    if (status.session.status !== 'open') return { decision: 'allow' };
+    const lease = status.leases.find(
       (row) => row.path_hash === path_hash && row.status === 'active'
     );
     if (!lease) return { decision: 'allow' };
