@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 import { Badge, Button, SettingsGroup, Switch } from '@agent/shared-ui';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
@@ -17,6 +18,8 @@ export type ServicesSectionProps = {
   services: string[];
   setServices: React.Dispatch<React.SetStateAction<string[]>>;
   busy: boolean;
+  saveFeedback?: SettingsSaveFeedbackState | null;
+  hasUnsavedChanges?: boolean;
   oauthBusyId: string | null;
   oauthMessage: string | null;
   onConnectOAuth: (serviceId: string, serviceLabel: string) => void;
@@ -31,6 +34,8 @@ export function ServicesSection({
   services,
   setServices,
   busy,
+  saveFeedback,
+  hasUnsavedChanges,
   onSaveConnections,
   sectionRef,
 }: ServicesSectionProps) {
@@ -90,6 +95,11 @@ export function ServicesSection({
             })}
           </div>
           {(setup.connections ?? []).length > 0 ? <ConnectionsByOwner t={t} setup={setup} /> : null}
+          <SettingsSaveFeedback
+            feedback={saveFeedback}
+            hasUnsavedChanges={hasUnsavedChanges}
+            t={t}
+          />
           <div className="settings-row-actions">
             <Button
               label={t('settings.operator_save_selections')}
