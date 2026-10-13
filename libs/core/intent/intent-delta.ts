@@ -75,7 +75,7 @@ export const DEFAULT_THRESHOLDS: DriftThresholds = {
 // Intl.Segmenter-backed: splits spaceless scripts (ja) into real words instead
 // of one whole-sentence token; TOKEN_SPLIT still applies afterwards because
 // ICU keeps "config.json"-style dotted/under-scored tokens joined.
-const TOKEN_SPLIT = /[\s,.;:!?()\[\]{}"'`\-—–/\\|]+/u;
+const TOKEN_SPLIT = /[\s,.;:!?()\[\]{}"'`\-—–/\\|_]+/u;
 
 function tokenize(text: string): Set<string> {
   return new Set(

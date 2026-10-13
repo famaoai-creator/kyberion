@@ -233,9 +233,12 @@ function getWordSegmenter(bcp47: string): WordSegmenterLike | null {
     } catch {
       // Host exposes the API but cannot build it (invalid tag, --without-intl
       // build, broken shim) — degrade to the regex path instead of throwing.
+      if (failedSegmenterLocales.size > 32) failedSegmenterLocales.clear();
       failedSegmenterLocales.add(bcp47);
       return null;
     }
+    // Caller-supplied tags are unbounded — cap like the other memos.
+    if (wordSegmenters.size > 32) wordSegmenters.clear();
     wordSegmenters.set(bcp47, segmenter);
   }
   return segmenter;
