@@ -436,6 +436,16 @@ describe('ComfyUiImageGenerationProvider', () => {
         prompt: 'cyberpunk city',
         aspect_ratio: '16:9',
         target_path: 'output.png',
+        workflow: expect.objectContaining({
+          '2': expect.objectContaining({
+            class_type: 'CLIPTextEncode',
+            inputs: expect.objectContaining({ text: 'cyberpunk city' }),
+          }),
+          '4': expect.objectContaining({
+            class_type: 'EmptyLatentImage',
+            inputs: expect.objectContaining({ width: 1024, height: 576 }),
+          }),
+        }),
       })
     );
   });
