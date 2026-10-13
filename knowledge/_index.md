@@ -388,6 +388,7 @@
 - [Design Clone Delivery Flow](./product/orchestration/design-clone-delivery-flow.md) (public | Unknown)
 - [Document File Reading Playbook (PDF / PPTX / XLSX / DOCX → text, tables, OCR)](./product/orchestration/document-file-reading-playbook.md) (public | Ecosystem Architect)
 - [Full Graph Handoff and Recovery Flow](./product/orchestration/full-graph-handoff-recovery-flow.md) (public | Unknown)
+- [Generative Video Production Playbook](./product/orchestration/generative-video-production-playbook.md) (public | ecosystem_architect)
 - [Guided Coordination Protocol](./product/orchestration/guided-coordination-protocol.md) (public | Codex)
 - [HITL Decision Loop — when a human is asked, and how](./product/orchestration/hitl-decision-loop.md) (public | Ecosystem Architect)
 - [Human Intervention Census — measuring where a human is still needed](./product/orchestration/human-intervention-census.md) (public | Ecosystem Architect)

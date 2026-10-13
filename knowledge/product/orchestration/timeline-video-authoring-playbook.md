@@ -7,7 +7,7 @@ phase: [alignment, execution, review]
 role_affinity: [media_producer, ecosystem_architect]
 tags: [video, narrated, timeline-html, hyperframes, scratch-first, design]
 owner: ecosystem_architect
-last_updated: 2026-10-04
+last_updated: 2026-10-14
 ---
 
 # Timeline Video Authoring Playbook
@@ -51,10 +51,13 @@ Parent: [`narrated-video-production-playbook.md`](./narrated-video-production-pl
    breaking and balanced headings automatically (`data-kb-typography`). Do not
    use negative letter-spacing on Japanese headlines. Don't truncate with
    `…`; shorten the copy.
-6. **Check frames before delivering.** Pull a contact sheet
-   (`ffmpeg -vf "fps=1/5,scale=480:-1,tile=4x3"`) and look at it. Every bug in
-   the rebuild (an overlapped badge, a blank CTA, a late cue) was visible on
-   the contact sheet and invisible in the logs.
+6. **Check frames and listen before delivering.** Use
+   `pnpm kyberion watch <artifact> --every 5 --frames <governed-scratch-dir>`
+   to extract samples through the perception path. Inspect transitions and
+   overlays as well as evenly sampled frames, then play the complete video with
+   sound. Frames reveal overlap and blank content; full playback also catches
+   motion defects, late cues, and unclear narration. Generated footage additionally
+   follows the [genre review and scene-sheet process](generative-video-production-playbook.md).
 
 ## Authoring a `timeline-html` scene
 
