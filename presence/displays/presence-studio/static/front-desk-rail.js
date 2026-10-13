@@ -216,6 +216,17 @@ function railComponents(nav, me, current) {
   return [{ id: 'front-desk-rail', type: 'ui:nav-rail', props }];
 }
 
+function beginPageLeaveIntent() {
+  const guard = window.FrontDeskPageLeave;
+  return guard && guard.begin ? guard.begin() : () => true;
+}
+
+function requestPageLeave(proceed, isCurrent, cancel) {
+  const guard = window.FrontDeskPageLeave;
+  if (guard && guard.requestLeave) guard.requestLeave(proceed, isCurrent, cancel);
+  else if (!isCurrent || isCurrent()) proceed();
+}
+
 function drawRail(el, nav, me, current, isCurrent) {
   let tenantGeneration = 0;
   return render(el, railComponents(nav, me, current), {
@@ -224,15 +235,27 @@ function drawRail(el, nav, me, current, isCurrent) {
       if (!isCurrent() || !action || action.id !== TENANT_SWITCH_ACTION) return;
       const slug = action.payload && action.payload.value;
       if (typeof slug !== 'string' || !slug) return;
+      const pageIntent = beginPageLeaveIntent();
       const generation = ++tenantGeneration;
+      if (slug === readStoredTenant()) return;
       loadMe(slug)
         .then((next) => {
-          if (generation !== tenantGeneration || !isCurrent()) return;
+          if (generation !== tenantGeneration || !isCurrent() || !pageIntent()) return;
           if (!next || !next.viewing || next.viewing.tenant_slug !== slug) return;
-          storeTenant(slug);
-          if (prefs.setTenant) prefs.setTenant(slug);
-          // Reload every panel together; durable drafts/history remain scoped.
-          window.location.reload();
+          const valid = () => generation === tenantGeneration && isCurrent() && pageIntent();
+          requestPageLeave(
+            () => {
+              if (!valid()) return;
+              storeTenant(slug);
+              if (prefs.setTenant) prefs.setTenant(slug);
+              window.location.reload();
+            },
+            valid,
+            () => {
+              const button = el.querySelector && el.querySelector('.kb-nav-rail__context-button');
+              if (button && button.focus) button.focus();
+            }
+          );
         })
         .catch(() => null);
     },
@@ -248,7 +271,8 @@ function drawRail(el, nav, me, current, isCurrent) {
 function mountDisplayControls() {
   const host = document.querySelector('[data-front-desk-display-controls]');
   if (!host) return Promise.resolve(null);
-  const draw = () =>
+  let displayGeneration = 0;
+  const draw = (isCurrent) =>
     render(
       host,
       [
@@ -259,13 +283,32 @@ function mountDisplayControls() {
         },
       ],
       {
+        isCurrent,
         onAction(action) {
           const value = action && action.payload ? action.payload.value : undefined;
           if (action.id === 'display.theme') {
             prefs.setTheme(value);
             draw();
           } else if (action.id === 'display.locale') {
-            prefs.setLocale(value);
+            if (!['en', 'ja'].includes(value)) return;
+            const pageIntent = beginPageLeaveIntent();
+            const generation = ++displayGeneration;
+            if (value === prefs.locale()) return;
+            const valid = () => generation === displayGeneration && pageIntent();
+            requestPageLeave(
+              () => {
+                if (valid()) prefs.setLocale(value);
+              },
+              valid,
+              () => {
+                if (!valid()) return;
+                draw(valid).then(() => {
+                  if (!valid()) return;
+                  const select = host.querySelector && host.querySelector('select');
+                  if (select && select.focus) select.focus();
+                });
+              }
+            );
           }
         },
       }
