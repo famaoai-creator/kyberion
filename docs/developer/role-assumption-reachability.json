@@ -3195,18 +3195,8 @@
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3518,18 +3508,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4092,19 +4072,14 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/setup/route.ts#<module>",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "ingest_commit": {
@@ -4370,18 +4345,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4714,18 +4679,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5040,18 +4995,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5865,18 +5810,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6192,18 +6127,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6506,18 +6431,14 @@
         "infrastructure_sentinel": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6795,18 +6716,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -7151,18 +7062,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -7435,18 +7336,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -7750,18 +7641,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -8037,18 +7918,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
-            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
-            "libs/core/provider/bundles/index.ts#<module>",
-            "libs/core/provider/bundles/claude-agent.ts#<module>",
-            "libs/core/provider/claude-agent-reasoning-backend.ts#ClaudeAgentReasoningBackend",
-            "libs/core/provider/claude-agent-governance.ts#createKyberionCanUseTool",
-            "libs/core/provider/claude-code-hook.ts#evaluatePreToolUse",
-            "libs/core/provider/co-session-hook.ts#coSessionHookLeaseGate",
-            "libs/core/co-session.ts#listCoSessionLeases",
-            "libs/core/co-session.ts#refreshLeaseStatus",
-            "libs/core/co-session.ts#writeJson",
-            "libs/core/co-session.ts#withCoSessionWrite"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
