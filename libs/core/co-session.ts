@@ -15,6 +15,7 @@ import {
   readJsonIfPresent,
 } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import {
@@ -445,16 +446,42 @@ export function leaveCoSession(input: {
       lease.holder_provider === provider &&
       lease.holder_participant_id === participant_id
     ) {
-      releaseCoSessionLease({
-        session_id,
-        path: lease.path,
-        provider,
-        participant_id,
-      });
-      released += 1;
+      try {
+        releaseCoSessionLease({
+          session_id,
+          path: lease.path,
+          provider,
+          participant_id,
+        });
+        released += 1;
+      } catch (error) {
+        // A vanished or re-held lease must not strand the remaining releases
+        // or suppress the leave event — a lease whose holder changed is no
+        // longer this participant's to release.
+        if (
+          error instanceof CoSessionError &&
+          (error.code === 'not_found' || error.code === 'lease_held')
+        ) {
+          continue;
+        }
+        throw error;
+      }
     }
   }
-  appendEvent(session_id, 'session_left', provider, { participant_id, released_leases: released });
+  // Emit the event only when there is something to report — on closed
+  // sessions or for participants that never joined, session_left is noise
+  // (SessionEnd hooks fire this for every provider session). Re-read the
+  // session after the loop: it may have closed mid-release.
+  if (readSession(session_id).status === 'closed') return { released_leases: released };
+  const joined = listCoSessionPresence(session_id, { staleMs: Number.MAX_SAFE_INTEGER }).some(
+    (row) => row.provider === provider && row.participant_id === participant_id
+  );
+  if (released > 0 || joined) {
+    appendEvent(session_id, 'session_left', provider, {
+      participant_id,
+      released_leases: released,
+    });
+  }
   return { released_leases: released };
 }
 
@@ -462,26 +489,59 @@ export function closeCoSession(input: { session_id?: string; provider: string })
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
   const session = readSession(session_id);
-  if (session.status === 'closed') return session;
-  for (const lease of listCoSessionLeases(session_id)) {
-    if (lease.status === 'active') {
-      releaseCoSessionLease({
-        session_id,
-        path: lease.path,
-        provider: lease.holder_provider,
-        participant_id: lease.holder_participant_id,
-        force: true,
-      });
+  const sweepLeases = () => {
+    for (const lease of listCoSessionLeases(session_id)) {
+      if (lease.status === 'active') {
+        try {
+          releaseCoSessionLease({
+            session_id,
+            path: lease.path,
+            provider: lease.holder_provider,
+            participant_id: lease.holder_participant_id,
+            force: true,
+          });
+        } catch (error) {
+          // A lease that vanished (self-deleted by a losing acquirer) or
+          // changed hands must not strand the remaining releases — and the
+          // sweep must remain retryable after a partial failure.
+          if (
+            error instanceof CoSessionError &&
+            (error.code === 'not_found' || error.code === 'lease_held')
+          ) {
+            continue;
+          }
+          throw error;
+        }
+      }
     }
+  };
+  const alreadyClosed = session.status === 'closed';
+  const record: CoSessionRecord = alreadyClosed
+    ? session
+    : { ...session, status: 'closed', closed_at: nowIso() };
+  const cleanupCurrent = () => {
+    const current = getCurrentCoSessionId();
+    if (current === session_id && safeExistsSync(currentPointerFile())) {
+      withCoSessionWrite(() => safeRmSync(currentPointerFile()));
+    }
+  };
+  if (alreadyClosed) {
+    // Still sweep: a prior close may have died mid-loop — retry is the only
+    // path to finish the cleanup (leases + CURRENT pointer).
+    sweepLeases();
+    cleanupCurrent();
+    return record;
   }
-  const closed: CoSessionRecord = { ...session, status: 'closed', closed_at: nowIso() };
-  writeSession(closed);
-  const current = getCurrentCoSessionId();
-  if (current === session_id && safeExistsSync(currentPointerFile())) {
-    withCoSessionWrite(() => safeRmSync(currentPointerFile()));
-  }
+  // Flip to closed BEFORE releasing leases: an acquire that slips between
+  // release-enumeration and the status write would otherwise leave an active
+  // lease behind (acquire re-checks status inside the path lock). The
+  // transition event is journaled before the fallible sweep so a retry that
+  // only finishes cleanup does not lose it.
+  writeSession(record);
   appendEvent(session_id, 'session_closed', provider);
-  return closed;
+  sweepLeases();
+  cleanupCurrent();
+  return record;
 }
 
 export function readCoSessionBlackboard(sessionId?: string): string {
@@ -503,10 +563,14 @@ export function appendCoSessionBlackboard(input: {
   const text = input.text.trim();
   if (!text) throw new CoSessionError('invalid_text', 'blackboard text is required');
   const file = blackboardFile(session_id);
-  const prev = safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
   const block = `\n## ${nowIso()} — ${provider}\n\n${text}\n`;
-  withCoSessionWrite(() => {
-    safeWriteFile(file, prev + block, { encoding: 'utf8', mkdir: true });
+  // read+rewrite must be serialized: two appends racing on the previous
+  // content lose one note.
+  withLockSync(`co-session-blackboard:${session_id}`, () => {
+    const prev = safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
+    withCoSessionWrite(() => {
+      safeWriteFile(file, prev + block, { encoding: 'utf8', mkdir: true });
+    });
   });
   appendEvent(session_id, 'blackboard_appended', provider, { chars: text.length });
   return readCoSessionBlackboard(session_id);
@@ -516,18 +580,87 @@ function leaseFile(sessionId: string, pathHash: string): string {
   return path.join(leasesDir(sessionId), `${pathHash}.json`);
 }
 
+/**
+ * One inter-process fence per (session, path). The lease read-check-write
+ * below was previously unserialized, so two competing processes could both
+ * observe "no active lease" and both acquire. Same pattern as
+ * work-coordination's `withCoordinationMutation`.
+ */
+function leaseLockId(sessionId: string, pathHash: string): string {
+  return `co-session-lease:${sessionId}:${pathHash}`;
+}
+
+/**
+ * Pure expiry evaluation — no writes. Readers must not persist state: a
+ * lock-free write here could clobber an active lease created between the
+ * read and the write. Persisting the flip is hygiene, done separately by
+ * `persistLeaseExpiry` under the path lock.
+ */
 function refreshLeaseStatus(lease: CoSessionPathLease): CoSessionPathLease {
-  if (lease.status !== 'active') return lease;
-  if (Date.parse(lease.expires_at) <= Date.now()) {
-    const expired: CoSessionPathLease = { ...lease, status: 'expired' };
-    writeJson(leaseFile(lease.session_id, lease.path_hash), expired);
+  if (lease.status === 'active' && Date.parse(lease.expires_at) <= Date.now()) {
+    return { ...lease, status: 'expired' };
+  }
+  return lease;
+}
+
+/**
+ * Persist an expired-status flip under the path lock, re-reading first and
+ * skipping when the file no longer matches what the caller observed (a new
+ * lease may have been acquired meanwhile). Never called from inside the
+ * lease lock — it takes the lock itself.
+ */
+function persistLeaseExpiry(lease: CoSessionPathLease): void {
+  if (lease.status !== 'expired') return;
+  let flipped = false;
+  try {
+    flipped = withLockSync(leaseLockId(lease.session_id, lease.path_hash), () => {
+      const onDisk = readJsonIfPresent<CoSessionPathLease>(
+        leaseFile(lease.session_id, lease.path_hash)
+      );
+      // lease_id is preserved across same-holder renewals, so identity alone
+      // is not enough — persist only when the on-disk record is still the
+      // genuinely expired lease the caller observed.
+      if (
+        onDisk?.lease_id !== lease.lease_id ||
+        onDisk.status !== 'active' ||
+        Date.parse(onDisk.expires_at) > Date.now()
+      ) {
+        return false;
+      }
+      writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
+      return true;
+    });
+  } catch {
+    // Persisting the flip is hygiene — the in-memory refresh already gave
+    // callers the correct answer; a contended or failing lock must not crash
+    // read/status/cleanup paths.
+    return;
+  }
+  if (flipped) {
     appendEvent(lease.session_id, 'lease_expired', lease.holder_provider, {
       path: lease.path,
       lease_id: lease.lease_id,
     });
-    return expired;
   }
-  return lease;
+}
+
+/**
+ * Read a single lease for a repo path — the cheap hot path for hook gates
+ * (no dir scan, no presence/handoff reads, no expiry persistence). Returns
+ * the refreshed (possibly expired-marked) lease, or undefined.
+ */
+export function getCoSessionLease(
+  sessionId: string | undefined,
+  repoPath: string
+): { session_status: CoSessionRecord['status']; lease: CoSessionPathLease | undefined } {
+  const session_id = resolveCoSessionId(sessionId);
+  const session = readSession(session_id);
+  const path_hash = pathHashForLease(normalizeCoSessionPath(repoPath));
+  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+  return {
+    session_status: session.status,
+    lease: existing ? refreshLeaseStatus(existing) : undefined,
+  };
 }
 
 export function listCoSessionLeases(sessionId?: string): CoSessionPathLease[] {
@@ -539,7 +672,13 @@ export function listCoSessionLeases(sessionId?: string): CoSessionPathLease[] {
   return files
     .map((name) => readJsonIfPresent<CoSessionPathLease>(path.join(dir, name)))
     .filter((row): row is CoSessionPathLease => Boolean(row))
-    .map(refreshLeaseStatus);
+    .map((lease) => {
+      const refreshed = refreshLeaseStatus(lease);
+      if (refreshed.status === 'expired' && refreshed.status !== lease.status) {
+        persistLeaseExpiry(refreshed);
+      }
+      return refreshed;
+    });
 }
 
 export function acquireCoSessionLease(input: {
@@ -552,45 +691,73 @@ export function acquireCoSessionLease(input: {
 }): CoSessionPathLease {
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
-  readSession(session_id);
+  const session = readSession(session_id);
+  if (session.status !== 'open') {
+    throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+  }
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
-  const current = existing ? refreshLeaseStatus(existing) : undefined;
-  if (
-    current?.status === 'active' &&
-    !(current.holder_provider === provider && current.holder_participant_id === participant_id)
-  ) {
-    throw new CoSessionError(
-      'lease_held',
-      `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
-    );
-  }
-  const now = nowIso();
-  const ttl = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
-  const lease: CoSessionPathLease = {
-    lease_id: current?.lease_id || `csl-${randomUUID()}`,
-    session_id,
-    path: repoPath,
-    path_hash,
-    holder_provider: provider,
-    holder_participant_id: participant_id,
-    purpose: input.purpose?.trim() || 'implementation',
-    status: 'active',
-    created_at: current?.created_at || now,
-    expires_at: new Date(Date.now() + ttl).toISOString(),
-    renewed_at: now,
-  };
-  withCoSessionWrite(() => {
-    safeMkdir(leasesDir(session_id), { recursive: true });
-    writeJson(leaseFile(session_id, path_hash), lease);
+  let displacedLease: CoSessionPathLease | undefined;
+  const lease = withLockSync(leaseLockId(session_id, path_hash), () => {
+    // closeCoSession flips the session to closed BEFORE releasing leases, so
+    // re-checking inside the per-path lock closes the acquire-vs-close race.
+    if (readSession(session_id).status !== 'open') {
+      throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+    }
+    const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+    const current = existing ? refreshLeaseStatus(existing) : undefined;
+    if (existing?.status === 'active' && current?.status === 'expired') {
+      displacedLease = current;
+    }
+    if (
+      current?.status === 'active' &&
+      !(current.holder_provider === provider && current.holder_participant_id === participant_id)
+    ) {
+      throw new CoSessionError(
+        'lease_held',
+        `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
+      );
+    }
+    const now = nowIso();
+    const ttl = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
+    const next: CoSessionPathLease = {
+      lease_id: current?.lease_id || `csl-${randomUUID()}`,
+      session_id,
+      path: repoPath,
+      path_hash,
+      holder_provider: provider,
+      holder_participant_id: participant_id,
+      purpose: input.purpose?.trim() || 'implementation',
+      status: 'active',
+      created_at: current?.created_at || now,
+      expires_at: new Date(Date.now() + ttl).toISOString(),
+      renewed_at: now,
+    };
+    withCoSessionWrite(() => {
+      safeMkdir(leasesDir(session_id), { recursive: true });
+      writeJson(leaseFile(session_id, path_hash), next);
+    });
+    // Post-write re-check: a close that flipped the session after our earlier
+    // check enumerated leases before our write — self-delete so no active
+    // lease survives on a closed session.
+    if (readSession(session_id).status !== 'open') {
+      withCoSessionWrite(() => safeRmSync(leaseFile(session_id, path_hash)));
+      throw new CoSessionError('closed', `co-session is closed: ${session_id}`);
+    }
+    return next;
   });
   appendEvent(session_id, 'lease_acquired', provider, {
     path: repoPath,
     lease_id: lease.lease_id,
     expires_at: lease.expires_at,
   });
+  if (displacedLease) {
+    appendEvent(session_id, 'lease_expired', displacedLease.holder_provider, {
+      path: repoPath,
+      lease_id: displacedLease.lease_id,
+    });
+  }
   return lease;
 }
 
@@ -606,26 +773,29 @@ export function releaseCoSessionLease(input: {
   readSession(session_id);
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
-  const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
-  if (!existing) throw new CoSessionError('not_found', `no lease for path: ${repoPath}`);
-  const current = refreshLeaseStatus(existing);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  if (
-    !input.force &&
-    current.status === 'active' &&
-    (current.holder_provider !== provider || current.holder_participant_id !== participant_id)
-  ) {
-    throw new CoSessionError(
-      'lease_held',
-      `cannot release lease held by ${current.holder_provider}/${current.holder_participant_id}`
-    );
-  }
-  const released: CoSessionPathLease = {
-    ...current,
-    status: 'released',
-    released_at: nowIso(),
-  };
-  writeJson(leaseFile(session_id, path_hash), released);
+  const released = withLockSync(leaseLockId(session_id, path_hash), () => {
+    const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
+    if (!existing) throw new CoSessionError('not_found', `no lease for path: ${repoPath}`);
+    const current = refreshLeaseStatus(existing);
+    if (
+      !input.force &&
+      current.status === 'active' &&
+      (current.holder_provider !== provider || current.holder_participant_id !== participant_id)
+    ) {
+      throw new CoSessionError(
+        'lease_held',
+        `cannot release lease held by ${current.holder_provider}/${current.holder_participant_id}`
+      );
+    }
+    const next: CoSessionPathLease = {
+      ...current,
+      status: 'released',
+      released_at: nowIso(),
+    };
+    writeJson(leaseFile(session_id, path_hash), next);
+    return next;
+  });
   appendEvent(session_id, 'lease_released', provider, {
     path: repoPath,
     lease_id: released.lease_id,
@@ -675,7 +845,11 @@ export function createCoSessionHandoff(input: {
     body,
     created_at: nowIso(),
   };
-  appendJsonl(handoffsFile(session_id), handoff);
+  // Same fence as ack: an unprotected append landing between ack's
+  // read and rewrite would be silently deleted.
+  withLockSync(handoffsLockId(session_id), () => {
+    appendJsonl(handoffsFile(session_id), handoff);
+  });
   appendEvent(session_id, 'handoff_created', from_provider, {
     handoff_id: handoff.handoff_id,
     kind,
@@ -704,16 +878,48 @@ export function listCoSessionHandoffs(
     const target = opts.to_participant_id.trim();
     const provider = opts.to_provider ? assertProvider(opts.to_provider) : undefined;
     rows = rows.filter((row) => {
-      if (row.to_participant_id === target) return true;
-      // Provider-broadcast handoffs (no participant) are visible to every instance.
-      if (!row.to_participant_id && provider && row.to_provider === provider) return true;
-      return false;
+      if (provider) {
+        // Ack-able only — mirrors ackCoSessionHandoff's targeting rules.
+        return coSessionHandoffTargets(row, provider, target);
+      }
+      // No provider context: exact participant match plus unaddressed
+      // broadcasts (ack-able by anyone).
+      return row.to_participant_id === target || (!row.to_provider && !row.to_participant_id);
     });
   } else if (opts.to_provider) {
     const provider = assertProvider(opts.to_provider);
-    rows = rows.filter((row) => row.to_provider === provider);
+    rows = rows.filter(
+      (row) => row.to_provider === provider || (!row.to_provider && !row.to_participant_id)
+    );
   }
   return rows;
+}
+
+/**
+ * Whether a handoff can be delivered AND acked by <provider>/<participant_id>
+ * — mirrors ackCoSessionHandoff's targeting rules: a participant-targeted
+ * handoff addressed to a different provider is invisible, a provider-targeted
+ * handoff is visible to every participant of that provider, and a handoff
+ * with no addressing is a broadcast.
+ */
+export function coSessionHandoffTargets(
+  handoff: Pick<CoSessionHandoff, 'to_provider' | 'to_participant_id'>,
+  provider: string,
+  participant_id: string
+): boolean {
+  return (
+    (handoff.to_participant_id === participant_id &&
+      (!handoff.to_provider || handoff.to_provider === provider)) ||
+    (!handoff.to_participant_id && handoff.to_provider === provider) ||
+    (!handoff.to_provider && !handoff.to_participant_id)
+  );
+}
+
+/** Per-session fence for handoffs.jsonl — the file is read-modify-rewritten
+ * on ack, so create and ack must share one lock to avoid lost appends and
+ * reverted acks. */
+function handoffsLockId(sessionId: string): string {
+  return `co-session-handoffs:${sessionId}`;
 }
 
 export function ackCoSessionHandoff(input: {
@@ -726,41 +932,50 @@ export function ackCoSessionHandoff(input: {
   const session_id = resolveCoSessionId(input.session_id);
   readSession(session_id);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  const rows = listCoSessionHandoffs(session_id);
-  const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
-  if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
-  const current = rows[index]!;
-  if (current.acked_at) return current;
-  if (current.to_participant_id && current.to_participant_id !== participant_id) {
-    throw new CoSessionError(
-      'handoff_not_for_participant',
-      `handoff is addressed to ${current.to_participant_id}, not ${participant_id}`
-    );
-  }
-  if (current.to_provider && current.to_provider !== provider) {
-    throw new CoSessionError(
-      'handoff_not_for_provider',
-      `handoff is addressed to provider ${current.to_provider}, not ${provider}`
-    );
-  }
-  const acked: CoSessionHandoff = {
-    ...current,
-    acked_at: nowIso(),
-    acked_by: provider,
-    acked_by_participant_id: participant_id,
-  };
-  // Rewrite handoffs file deterministically (small local log).
-  const file = handoffsFile(session_id);
-  withCoSessionWrite(() => {
-    if (safeExistsSync(file)) safeRmSync(file);
-    for (const row of rows.map((row, i) => (i === index ? acked : row))) {
-      appendJsonLine(assertSafeRepositoryPath(file, { allowMissingLeaf: true }), row);
+  let freshlyAcked = false;
+  const acked = withLockSync(handoffsLockId(session_id), () => {
+    // Read inside the lock — a row appended between an outside read and the
+    // rewrite would be silently deleted.
+    const rows = listCoSessionHandoffs(session_id);
+    const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
+    if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
+    const current = rows[index]!;
+    if (current.acked_at) return current;
+    if (current.to_participant_id && current.to_participant_id !== participant_id) {
+      throw new CoSessionError(
+        'handoff_not_for_participant',
+        `handoff is addressed to ${current.to_participant_id}, not ${participant_id}`
+      );
     }
+    if (current.to_provider && current.to_provider !== provider) {
+      throw new CoSessionError(
+        'handoff_not_for_provider',
+        `handoff is addressed to provider ${current.to_provider}, not ${provider}`
+      );
+    }
+    freshlyAcked = true;
+    const next: CoSessionHandoff = {
+      ...current,
+      acked_at: nowIso(),
+      acked_by: provider,
+      acked_by_participant_id: participant_id,
+    };
+    // Rewrite handoffs file deterministically (small local log).
+    const file = handoffsFile(session_id);
+    withCoSessionWrite(() => {
+      if (safeExistsSync(file)) safeRmSync(file);
+      for (const row of rows.map((row, i) => (i === index ? next : row))) {
+        appendJsonLine(assertSafeRepositoryPath(file, { allowMissingLeaf: true }), row);
+      }
+    });
+    return next;
   });
-  appendEvent(session_id, 'handoff_acked', provider, {
-    handoff_id: acked.handoff_id,
-    participant_id,
-  });
+  if (freshlyAcked) {
+    appendEvent(session_id, 'handoff_acked', provider, {
+      handoff_id: acked.handoff_id,
+      participant_id,
+    });
+  }
   return acked;
 }
 

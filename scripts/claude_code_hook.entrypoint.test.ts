@@ -16,6 +16,17 @@ describe('claude_code_hook entrypoint', () => {
     expect(source).toContain('readClaudeCodeHookTranscript(filePath: string)');
   });
 
+  it('keeps PreToolUse deny-only (no auto-approve output)', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/claude_code_hook.ts'));
+    expect(source).toContain("permissionDecision !== 'allow'");
+  });
+
+  it('dispatches SessionEnd for co-session lease cleanup', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/claude_code_hook.ts'));
+    expect(source).toContain("case 'SessionEnd'");
+    expect(source).toContain('buildSessionEndContext');
+  });
+
   it('rejects a directory before reading a transcript', () => {
     expect(() => readClaudeCodeHookTranscript(pathResolver.rootResolve('scripts'))).toThrow(
       'must be a regular file'
