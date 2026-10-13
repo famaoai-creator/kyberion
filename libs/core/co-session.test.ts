@@ -6,6 +6,7 @@ import {
   buildCoSessionPromoteHint,
   clearCoSessionNamespace,
   clearCoSessionStore,
+  closeCoSession,
   createCoSessionHandoff,
   getCoSessionStatus,
   joinCoSession,
@@ -18,6 +19,9 @@ import {
   startCoSession,
   CoSessionError,
 } from './co-session.js';
+import { registerLockIo, type LockIo } from './foundation/lock-utils.js';
+import { readJsonLines } from './foundation/json.js';
+import { pathResolver } from './path-resolver.js';
 
 beforeEach(() => {
   setCoSessionNamespace(`co-session-test-${process.pid}`);
@@ -74,6 +78,94 @@ describe('co-session', () => {
       participant_id: 'cursor-1',
     });
     expect(again.holder_provider).toBe('cursor');
+  });
+
+  it('serializes lease mutations through the shared inter-process lock', () => {
+    // The lease read-check-write must run inside withLockSync — otherwise two
+    // processes racing on the same path can both observe "free" and acquire.
+    // A recording LockIo proves the lock file is touched around the mutation.
+    const previous = registerLockIo(undefined);
+    const published: string[] = [];
+    const files = new Map<string, string>();
+    const io: LockIo = {
+      exists: (filePath) => files.has(filePath) || filePath.endsWith('locks'),
+      mkdir: () => {},
+      createExclusive: (filePath, content) => {
+        if (files.has(filePath)) throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' });
+        files.set(filePath, content);
+        published.push(filePath);
+      },
+      publishExclusive: (filePath, content) => {
+        if (files.has(filePath)) throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' });
+        files.set(filePath, content);
+        published.push(filePath);
+      },
+      unlink: (filePath) => {
+        files.delete(filePath);
+      },
+      loadJson: (filePath) => JSON.parse(files.get(filePath) ?? 'null'),
+    };
+    registerLockIo(io);
+    try {
+      startCoSession({ goal: 'lock check', provider: 'claude', session_id: 'cos-lock' });
+      acquireCoSessionLease({
+        session_id: 'cos-lock',
+        provider: 'claude',
+        path: 'libs/core/co-session.ts',
+        participant_id: 'claude-1',
+      });
+      const leaseLocks = published.filter((file) =>
+        decodeURIComponent(file).includes('co-session-lease:')
+      );
+      expect(leaseLocks).toHaveLength(1);
+      expect(decodeURIComponent(leaseLocks[0]!)).toContain('cos-lock:');
+      // The lock is released after the mutation so a second participant proceeds.
+      releaseCoSessionLease({
+        session_id: 'cos-lock',
+        provider: 'claude',
+        path: 'libs/core/co-session.ts',
+        participant_id: 'claude-1',
+      });
+      expect(
+        published.filter((file) => decodeURIComponent(file).includes('co-session-lease:'))
+      ).toHaveLength(2);
+    } finally {
+      registerLockIo(previous);
+    }
+  });
+
+  it('refuses lease acquisition on a closed session', () => {
+    startCoSession({ goal: 'x', provider: 'claude', session_id: 'cos-closed' });
+    closeCoSession({ session_id: 'cos-closed', provider: 'claude' });
+    expect(() =>
+      acquireCoSessionLease({
+        session_id: 'cos-closed',
+        provider: 'claude',
+        path: 'libs/core/co-session.ts',
+      })
+    ).toThrow(/closed/);
+  });
+
+  it('leaveCoSession on a closed session is quiet and non-throwing', () => {
+    startCoSession({ goal: 'x', provider: 'claude', session_id: 'cos-leave-closed' });
+    joinCoSession({
+      provider: 'claude',
+      participant_id: 'claude-p1',
+      session_id: 'cos-leave-closed',
+    });
+    closeCoSession({ session_id: 'cos-leave-closed', provider: 'claude' });
+    const result = leaveCoSession({
+      provider: 'claude',
+      participant_id: 'claude-p1',
+      session_id: 'cos-leave-closed',
+    });
+    expect(result.released_leases).toBe(0);
+    const events = readJsonLines<Record<string, unknown>>(
+      pathResolver.rootResolve(
+        `active/shared/observability/co-sessions/co-session-test-${process.pid}/cos-leave-closed/events.jsonl`
+      )
+    );
+    expect(events.filter((e) => e.type === 'session_left')).toHaveLength(0);
   });
 
   it('records Mesh-aligned handoffs and ack', () => {

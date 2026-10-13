@@ -12,12 +12,14 @@
  *   node dist/scripts/claude_code_hook.js PreToolUseShellDeny < event.json
  *   node dist/scripts/claude_code_hook.js PostToolUse    < event.json
  *   node dist/scripts/claude_code_hook.js Stop           < event.json
+ *   node dist/scripts/claude_code_hook.js SessionEnd     < event.json
  *
  * Hook failures fail closed for shell execution so a policy outage cannot turn
  * a denied command into an allowed command.
  */
 
 import {
+  buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
@@ -67,7 +69,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         JSON.stringify({
           hookSpecificOutput: {
             hookEventName: 'SessionStart',
-            additionalContext: buildSessionStartContext(),
+            additionalContext: buildSessionStartContext(payload),
           },
         })
       );
@@ -85,7 +87,14 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
       return;
     }
     case 'PreToolUse': {
-      process.stdout.write(JSON.stringify(evaluatePreToolUse(payload)));
+      // Deny-only: emitting 'allow' would silently auto-approve every file
+      // write (including tools merely matched by the Write|Edit regex).
+      // deny/ask reach stdout; everything else defers to Claude Code's own
+      // permission flow — same posture as the shell-deny adapter below.
+      const response = evaluatePreToolUse(payload);
+      if (response.hookSpecificOutput.permissionDecision !== 'allow') {
+        process.stdout.write(JSON.stringify(response));
+      }
       return;
     }
     case 'PreToolUseShellDeny': {
@@ -133,6 +142,18 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
           },
         })
       );
+      return;
+    }
+    case 'SessionEnd': {
+      // Fires once when the session ends (unlike Stop, which fires per turn):
+      // release this participant's co-session leases. SessionEnd consumes no
+      // context injection — the note goes to stderr for transcript/debug.
+      try {
+        const note = buildSessionEndContext(payload);
+        if (note) process.stderr.write(`${note}\n`);
+      } catch {
+        // cleanup is best-effort; lease TTL is the safety net
+      }
       return;
     }
     default:

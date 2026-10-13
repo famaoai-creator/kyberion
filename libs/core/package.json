@@ -4096,6 +4096,10 @@
       "types": "./dist/provider/claude-task-session-executor.d.ts",
       "default": "./dist/provider/claude-task-session-executor.js"
     },
+    "./provider/co-session-hook": {
+      "types": "./dist/provider/co-session-hook.d.ts",
+      "default": "./dist/provider/co-session-hook.js"
+    },
     "./provider/codex-cli-intent-extractor": {
       "types": "./dist/provider/codex-cli-intent-extractor.d.ts",
       "default": "./dist/provider/codex-cli-intent-extractor.js"

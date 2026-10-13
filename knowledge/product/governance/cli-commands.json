@@ -973,6 +973,16 @@
       "group": "operate"
     },
     {
+      "id": "script.generate.provider-hooks",
+      "script": "generate:provider-hooks",
+      "command": "generate provider-hooks",
+      "noun": "generate",
+      "verb": "provider-hooks",
+      "audience": "operator",
+      "description": "cli_cmd_script_generate_provider_hooks",
+      "group": "operate"
+    },
+    {
       "id": "script.agy.profile",
       "module": "scripts/agy_profile_controller.ts",
       "command": "agy profile",
