@@ -220,16 +220,45 @@ type WordSegmenterCtor = new (
 ) => WordSegmenterLike;
 
 const wordSegmenters = new Map<string, WordSegmenterLike>();
+/** Locales the segmenter could not be constructed for (shimmed/absent Intl). */
+const failedSegmenterLocales = new Set<string>();
 
 function getWordSegmenter(bcp47: string): WordSegmenterLike | null {
   const ctor = (globalThis as { Intl?: { Segmenter?: WordSegmenterCtor } }).Intl?.Segmenter;
-  if (typeof ctor !== 'function') return null;
+  if (typeof ctor !== 'function' || failedSegmenterLocales.has(bcp47)) return null;
   let segmenter = wordSegmenters.get(bcp47);
   if (!segmenter) {
-    segmenter = new ctor(bcp47, { granularity: 'word' });
+    try {
+      segmenter = new ctor(bcp47, { granularity: 'word' });
+    } catch {
+      // Host exposes the API but cannot build it (invalid tag, --without-intl
+      // build, broken shim) — degrade to the regex path instead of throwing.
+      failedSegmenterLocales.add(bcp47);
+      return null;
+    }
     wordSegmenters.set(bcp47, segmenter);
   }
   return segmenter;
+}
+
+/** Loose BCP-47 shape — enough to hand a caller's tag through to ICU. */
+const BCP47_LIKE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * Resolves the tag to segment with. A catalog locale maps through
+ * {@link localeToBcp47}; any other well-formed BCP-47-ish tag passes through
+ * untouched so callers can segment languages this repo does not list yet (zh,
+ * th, …) — silently mapping them to en-US would defeat the spaceless-script
+ * fix this helper exists for.
+ */
+function segmenterTag(locale: unknown, text: string): string {
+  if (locale !== undefined && locale !== null) {
+    const normalized = normalizeLocale(locale);
+    if (normalized) return localeToBcp47(normalized);
+    const raw = String(locale).trim();
+    return BCP47_LIKE.test(raw) ? raw : 'en-US';
+  }
+  return detectTextLocale(text) === 'ja' ? 'ja-JP' : 'en-US';
 }
 
 /**
@@ -239,13 +268,7 @@ function getWordSegmenter(bcp47: string): WordSegmenterLike | null {
 export function segmentWords(text: unknown, locale?: unknown): string[] {
   const value = String(text ?? '');
   if (!value.trim()) return [];
-  const tag =
-    locale !== undefined && locale !== null
-      ? localeToBcp47(locale)
-      : detectTextLocale(value) === 'ja'
-        ? 'ja-JP'
-        : 'en-US';
-  const segmenter = getWordSegmenter(tag);
+  const segmenter = getWordSegmenter(segmenterTag(locale, value));
   if (!segmenter) return value.match(/[\p{L}\p{N}]+/gu) ?? [];
   const out: string[] = [];
   for (const piece of segmenter.segment(value)) {
