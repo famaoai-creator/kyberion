@@ -32,8 +32,38 @@ const prefs = window.KyberionPrefs || {
 };
 const locale = prefs.locale();
 
+function readError(reason = 'unavailable') {
+  return Object.assign(new Error('Front-desk read unavailable'), { reason });
+}
+
+// Bound both headers and body. Only GET reads use this helper, never mutations.
 function fetchJson(url) {
-  return fetch(url).then((response) => response.json());
+  return new Promise((resolve, reject) => {
+    const controller = window.AbortController ? new window.AbortController() : null;
+    const timer = window.setTimeout(() => {
+      reject(readError());
+      if (controller) controller.abort();
+    }, 20000);
+    Promise.resolve()
+      .then(() => fetch(url, { cache: 'no-store', signal: controller?.signal }))
+      .then((response) => {
+        if (response.status === 401) throw readError('authentication');
+        if (response.status === 403) throw readError('permission');
+        if (!response.ok) throw readError();
+        return response.json();
+      })
+      .then(
+        (body) => {
+          window.clearTimeout(timer);
+          resolve(body);
+        },
+        (error) => {
+          window.clearTimeout(timer);
+          if (controller) controller.abort();
+          reject(error);
+        }
+      );
+  });
 }
 
 let messagesPromise = null;
@@ -48,13 +78,16 @@ function uiMessages() {
 }
 
 let navPromise = null;
-/** `/api/front-desk/nav` for the viewer's locale (null on failure). */
-function loadNav() {
+/** `/api/front-desk/nav` for the viewer's locale (rejects failed reads). */
+function loadNav(pinnedUrl) {
   if (!navPromise) {
     const url = '/api/front-desk/nav?locale=' + encodeURIComponent(locale);
-    navPromise = fetchJson(prefs.scopedUrl ? prefs.scopedUrl(url) : url)
-      .then((body) => (body && body.ok ? body : null))
-      .catch(() => null);
+    navPromise = fetchJson(pinnedUrl || (prefs.scopedUrl ? prefs.scopedUrl(url) : url)).then(
+      (body) => {
+        if (!body || body.ok !== true || !Array.isArray(body.items)) throw readError();
+        return body;
+      }
+    );
   }
   return navPromise;
 }
@@ -77,9 +110,20 @@ function storeTenant(slug) {
 
 function loadMe(tenantSlug) {
   const url = tenantSlug ? '/api/me?tenant=' + encodeURIComponent(tenantSlug) : '/api/me';
-  return fetchJson(url)
-    .then((body) => (body && body.ok ? body : null))
-    .catch(() => null);
+  return fetchJson(url).then((body) => {
+    if (
+      !body ||
+      body.ok !== true ||
+      !Array.isArray(body.tenants) ||
+      (body.viewing !== null &&
+        (!body.viewing ||
+          typeof body.viewing.tenant_slug !== 'string' ||
+          !body.viewing.tenant_slug ||
+          typeof body.viewing.role !== 'string'))
+    )
+      throw readError();
+    return body;
+  });
 }
 
 function renderTemplate(template, params) {
@@ -93,9 +137,10 @@ function renderTemplate(template, params) {
  * and the shared `ui` message bundle. Resolves to the container.
  */
 function render(container, components, options) {
-  return uiMessages().then((messages) =>
-    renderA2UI(container, components, Object.assign({ locale, messages }, options || {}))
-  );
+  return uiMessages().then((messages) => {
+    if (options && options.isCurrent && !options.isCurrent()) return container;
+    return renderA2UI(container, components, Object.assign({ locale, messages }, options || {}));
+  });
 }
 
 /** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug }`). */
@@ -171,22 +216,25 @@ function railComponents(nav, me, current) {
   return [{ id: 'front-desk-rail', type: 'ui:nav-rail', props }];
 }
 
-function drawRail(el, nav, me, current) {
+function drawRail(el, nav, me, current, isCurrent) {
   let tenantGeneration = 0;
   return render(el, railComponents(nav, me, current), {
+    isCurrent,
     onAction(action) {
-      if (!action || action.id !== TENANT_SWITCH_ACTION) return;
+      if (!isCurrent() || !action || action.id !== TENANT_SWITCH_ACTION) return;
       const slug = action.payload && action.payload.value;
       if (typeof slug !== 'string' || !slug) return;
       const generation = ++tenantGeneration;
-      loadMe(slug).then((next) => {
-        if (generation !== tenantGeneration) return;
-        if (!next || !next.viewing || next.viewing.tenant_slug !== slug) return;
-        storeTenant(slug);
-        if (prefs.setTenant) prefs.setTenant(slug);
-        // Reload every panel together; durable drafts/history remain scoped.
-        window.location.reload();
-      });
+      loadMe(slug)
+        .then((next) => {
+          if (generation !== tenantGeneration || !isCurrent()) return;
+          if (!next || !next.viewing || next.viewing.tenant_slug !== slug) return;
+          storeTenant(slug);
+          if (prefs.setTenant) prefs.setTenant(slug);
+          // Reload every panel together; durable drafts/history remain scoped.
+          window.location.reload();
+        })
+        .catch(() => null);
     },
   });
 }
@@ -228,30 +276,116 @@ function mountDisplayControls() {
 /**
  * Mount the rail into `el` (the `.kb-app-shell__nav` slot) with the item
  * `options.current` marked as the current page. The server-rendered
- * placeholder stays until the menu has loaded; a fetch failure never blocks
- * the rest of the page.
+ * placeholder is replaced by explicit recovery when reads fail. Dependent
+ * page initialization waits for validated scope; optional chrome stays additive.
  */
 let mountGeneration = 0;
+let retryCurrent = () => Promise.resolve(null);
+let shellState = { phase: 'loading', reason: null, message: '' };
+const listeners = new Set();
+
+function subscribe(listener) {
+  listeners.add(listener);
+  listener(shellState);
+  return () => listeners.delete(listener);
+}
+
+function scopeFingerprint() {
+  const query = new URLSearchParams(window.location.search || '');
+  return JSON.stringify([
+    readStoredTenant(),
+    ...['tenant', 'organizationId', 'organization_id', 'projectId', 'project_id'].map((key) =>
+      query.getAll(key)
+    ),
+  ]);
+}
+
 function mount(el, options) {
   const generation = ++mountGeneration;
   mountDisplayControls().catch(() => null);
   if (!el) return Promise.resolve(null);
   const current = (options && options.current) || null;
-  const ready = loadMe(readStoredTenant()).then((me) => {
-    if (generation !== mountGeneration) return [null, null];
-    const tenant = me && me.viewing ? me.viewing.tenant_slug : readStoredTenant();
-    if (prefs.setTenant) prefs.setTenant(tenant);
-    navPromise = null;
-    return loadNav().then((nav) => [nav, me]);
+  const content = (el.querySelector && el.querySelector('[data-front-desk-content]')) || el;
+  const recovery = el.querySelector && el.querySelector('[data-front-desk-recovery]');
+  const retry = recovery && recovery.querySelector('button');
+  let resolveReady;
+  // Failure does not release dependent pages. Manual retry resumes this same waiter.
+  // A superseded mount owns a different waiter and can never release the old one.
+  window.FrontDeskRail.ready = new Promise((resolve) => {
+    resolveReady = resolve;
   });
-  window.FrontDeskRail.ready = ready;
-  return ready
-    .then(([nav, me]) => {
-      if (generation !== mountGeneration) return null;
-      if (!nav) return null;
-      return drawRail(el, nav, me, current).then(() => nav);
-    })
-    .catch(() => null);
+  let attempt = 0;
+  let pending = false;
+  function present(phase, reason = null) {
+    const key = reason || phase;
+    const message = recovery ? recovery.getAttribute('data-shell-' + key) || '' : '';
+    if (recovery) {
+      recovery.hidden = phase === 'ready';
+      const status = recovery.querySelector('[data-shell-status]');
+      if (status) status.textContent = message;
+      if (retry) {
+        retry.hidden = phase !== 'blocked';
+        retry.disabled = pending;
+      }
+      content.hidden = phase !== 'ready';
+    }
+    shellState = { phase, reason, message };
+    listeners.forEach((listener) => {
+      try {
+        listener(shellState);
+      } catch {
+        /* additive presentation */
+      }
+    });
+  }
+  function run() {
+    if (pending || generation !== mountGeneration) return Promise.resolve(null);
+    pending = true;
+    const token = ++attempt;
+    let expectedScope = scopeFingerprint();
+    const isCurrent = () =>
+      generation === mountGeneration && token === attempt && expectedScope === scopeFingerprint();
+    function assertCurrent() {
+      if (!isCurrent()) throw readError('changed');
+    }
+    present('loading');
+    const query = new URLSearchParams(window.location.search || '');
+    const requestedTenant = query.get('tenant') || readStoredTenant();
+    return loadMe(requestedTenant)
+      .then((me) => {
+        assertCurrent();
+        if (prefs.setTenant) prefs.setTenant(me.viewing ? me.viewing.tenant_slug : null);
+        expectedScope = scopeFingerprint();
+        navPromise = null;
+        const url = '/api/front-desk/nav?locale=' + encodeURIComponent(locale);
+        return loadNav(prefs.scopedUrl ? prefs.scopedUrl(url) : url).then((nav) => {
+          assertCurrent();
+          return drawRail(content, nav, me, current, isCurrent).then(() => {
+            assertCurrent();
+            pending = false;
+            present('ready');
+            resolveReady([nav, me]);
+            return nav;
+          });
+        });
+      })
+      .catch((error) => {
+        if (generation !== mountGeneration || token !== attempt) return null;
+        pending = false;
+        present('blocked', error.reason || 'unavailable');
+        return null;
+      });
+  }
+  retryCurrent = () => (shellState.phase === 'blocked' ? run() : Promise.resolve(null));
+  if (retry) retry.onclick = () => retryCurrent();
+  return run();
 }
 
-window.FrontDeskRail = { mount, render, nav: loadNav, locale: () => locale };
+window.FrontDeskRail = {
+  mount,
+  render,
+  nav: loadNav,
+  subscribe,
+  retry: () => retryCurrent(),
+  locale: () => locale,
+};

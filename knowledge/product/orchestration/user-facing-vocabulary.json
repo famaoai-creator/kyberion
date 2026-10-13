@@ -26178,6 +26178,36 @@
         "en": "Try loading details again",
         "ja": "詳細を再読み込み",
         "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ḓėŧȧïŀş ȧɠȧïñ ŀőřėɱ ïṗ⟧"
+      },
+      "shell_loading": {
+        "en": "Checking your account and workspace…",
+        "ja": "利用者と作業対象を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ẏőůř ȧƈƈőůñŧ ȧñḓ ẇőřķşṗȧƈė… ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "shell_unavailable": {
+        "en": "Your account or workspace could not be checked. Use Retry in the menu to continue safely.",
+        "ja": "利用者または作業対象を確認できませんでした。メニューの「再試行」で確認し直してください。",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ őř ẇőřķşṗȧƈė ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ůşė Řėŧřẏ ïñ ŧħė ɱėñů ŧő ƈőñŧïñůė şȧƒėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "shell_authentication": {
+        "en": "Sign in again before continuing. After signing in, use Retry in the menu.",
+        "ja": "続けるには再度ログインしてください。ログイン後、メニューの「再試行」で確認し直してください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ȧɠȧïñ ƀėƒőřė ƈőñŧïñůïñɠ. Ȧƒŧėř şïɠñïñɠ ïñ, ůşė Řėŧřẏ ïñ ŧħė ɱėñů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "shell_permission": {
+        "en": "Access to this workspace could not be confirmed. Ask its owner to check your access, then use Retry in the menu.",
+        "ja": "この作業対象へのアクセス権を確認できませんでした。管理者に権限を確認してから、メニューの「再試行」で確認し直してください。",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧő ŧħïş ẇőřķşṗȧƈė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Ȧşķ ïŧş őẇñėř ŧő ƈħėƈķ ẏőůř ȧƈƈėşş, ŧħėñ ůşė Řėŧřẏ ïñ ŧħė ɱėñů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "shell_changed": {
+        "en": "The selected workspace changed while loading. Use Retry in the menu to check the current selection.",
+        "ja": "読み込み中に作業対象が変わりました。メニューの「再試行」で現在の対象を確認してください。",
+        "qps-ploc": "⟦Ŧħė şėŀėƈŧėḓ ẇőřķşṗȧƈė ƈħȧñɠėḓ ẇħïŀė ŀőȧḓïñɠ. Ůşė Řėŧřẏ ïñ ŧħė ɱėñů ŧő ƈħėƈķ ŧħė ƈůřřėñŧ şėŀėƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "shell_retry": {
+        "en": "Retry",
+        "ja": "再試行",
+        "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
       }
     },
     "operator": {
