@@ -43,6 +43,7 @@ import {
 } from '../windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from '../provider/gemini-api-backend.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { compileComfyUiImageRequest } from '../visual-workflow-compiler.js';
 import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from '../host-image-handoff.js';
 import { isAppleSilicon } from '../platform.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
@@ -329,9 +330,10 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
     const startedAt = Date.now();
     try {
       const targetPath = request.targetPath ? getFallbackTargetPath(request) : undefined;
-      // Delegate to existing ComfyUI service preset
+      const workflow = compileComfyUiImageRequest(request, targetPath);
       const res = await executeServicePreset('media-generation', 'generate_image', {
         prompt: request.prompt,
+        workflow,
         aspect_ratio: request.aspectRatio,
         target_path: targetPath,
         await_completion: request.awaitCompletion ?? true,
