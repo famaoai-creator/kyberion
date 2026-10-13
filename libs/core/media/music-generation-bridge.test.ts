@@ -1,17 +1,24 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ChatMusicianGenerationProvider,
   LocalMusicGenMlxGenerationProvider,
   LocalStableAudioGenerationProvider,
+  MlAudioGenGenerationProvider,
+  extractAbcNotation,
   generateMusic,
   listMusicGenerationCandidates,
 } from './music-generation-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  clampMlAudioGenDurationSec,
   clampMusicGenDurationSec,
   clampStableAudioDurationSec,
+  resolveChatMusicianGenerationPolicy,
   resolveLocalMusicGenMlxGenerationPolicy,
   resolveLocalStableAudioGenerationPolicy,
+  resolveMlAudioGenGenerationPolicy,
+  resolveMlAudioGenVariant,
 } from './music-generation-policy.js';
 import { buildMusicPromptFromAdf } from './music-workflow-compiler.js';
 
@@ -19,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
+  safeWriteFile: vi.fn(),
   probeToolRuntime: vi.fn(),
   assertSafeRepositoryPath: vi.fn((value: string) => value),
 }));
@@ -30,6 +38,7 @@ vi.mock('../secure-io.js', async () => {
     safeExecResult: mocks.safeExecResult,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
+    safeWriteFile: mocks.safeWriteFile,
     assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
   };
 });
@@ -297,6 +306,433 @@ describe('LocalStableAudioGenerationProvider', () => {
   });
 });
 
+describe('MlAudioGenGenerationProvider', () => {
+  const cacheDirFor = (variant: string): string =>
+    path.join(process.env.HOME || '', '.mlx-audiogen', 'models', variant);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.safeExistsSync.mockImplementation(
+      (candidate: string) =>
+        String(candidate).includes('active/shared/') || String(candidate).includes('.mlx-audiogen')
+    );
+    mocks.safeExecResult.mockImplementation((_command: string, args: string[]) => {
+      const outputIndex = args.indexOf('--output');
+      if (outputIndex >= 0) {
+        mocks.safeExistsSync.mockImplementation(
+          (candidate: string) =>
+            String(candidate) === args[outputIndex + 1] ||
+            String(candidate).includes('active/shared/') ||
+            String(candidate).includes('.mlx-audiogen')
+        );
+      }
+      return { stdout: '', stderr: '', status: 0 };
+    });
+    mocks.probeToolRuntime.mockReturnValue({
+      selected_action: 'run_trial',
+      selected_backend: {
+        kind: 'uvx',
+        command: 'uvx',
+        args: ['--from', 'mlx-audiogen', 'mlx-audiogen'],
+      },
+      trial_backend: {
+        kind: 'uvx',
+        command: 'uvx',
+        args: ['--from', 'mlx-audiogen', 'mlx-audiogen'],
+      },
+      install_backend: null,
+      installed_backend: null,
+      installed: false,
+      requires_install: false,
+      managed_env_path: '/tmp/tool-runtime/musicgen-audiogen',
+      state_path: '/tmp/tool-runtime/musicgen-audiogen/state.json',
+      available_commands: ['uvx'],
+      reason: 'mocked tool runtime',
+    });
+  });
+
+  it('invokes mlx-audiogen via uvx with musicgen text-to-music flags', async () => {
+    const provider = new MlAudioGenGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'upbeat synthwave, 110 BPM, no vocals',
+      durationSec: 12,
+      targetPath: 'active/shared/tmp/audiogen-demo.wav',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('musicgen_audiogen');
+    expect(result.path).toBe('active/shared/tmp/audiogen-demo.wav');
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'uvx',
+      expect.arrayContaining([
+        '--from',
+        'mlx-audiogen',
+        'mlx-audiogen',
+        '--model',
+        'musicgen',
+        '--prompt',
+        'upbeat synthwave, 110 BPM, no vocals',
+        '--seconds',
+        '12',
+        '--output',
+        'active/shared/tmp/audiogen-demo.wav',
+        '--weights-dir',
+        cacheDirFor('musicgen-small'),
+      ]),
+      expect.anything()
+    );
+  });
+
+  it('maps request models to provisioned variant weights', async () => {
+    const provider = new MlAudioGenGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'orchestral swell',
+      model: 'facebook/musicgen-medium',
+      targetPath: 'active/shared/tmp/audiogen-medium.wav',
+    });
+    expect(result.status).toBe('succeeded');
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'uvx',
+      expect.arrayContaining(['--weights-dir', cacheDirFor('musicgen-medium')]),
+      expect.anything()
+    );
+    expect(resolveMlAudioGenVariant('facebook/musicgen-stereo-large')).toBe(
+      'musicgen-stereo-large'
+    );
+    expect(resolveMlAudioGenVariant('unknown-model')).toBe('musicgen-small');
+  });
+
+  it('auto-downloads pre-converted weights once when the cache is empty', async () => {
+    mocks.safeExistsSync.mockImplementation((candidate: string) =>
+      String(candidate).includes('active/shared/')
+    );
+    mocks.safeExecResult.mockImplementation((command: string, args: string[]) => {
+      if (args.includes('hf') || args.includes('huggingface-cli')) {
+        mocks.safeExistsSync.mockImplementation(() => true);
+        return { stdout: 'downloaded', stderr: '', status: 0 };
+      }
+      return { stdout: '', stderr: '', status: 0 };
+    });
+    const result = await new MlAudioGenGenerationProvider().generate({
+      prompt: 'first-run pad',
+      targetPath: 'active/shared/tmp/audiogen-first-run.wav',
+    });
+    expect(result.status).toBe('succeeded');
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'uvx',
+      expect.arrayContaining([
+        '--from',
+        'huggingface_hub',
+        'hf',
+        'download',
+        'jasonvassallo/mlx-musicgen-small',
+      ]),
+      expect.anything()
+    );
+  });
+
+  it('fails with setup guidance when weights download fails', async () => {
+    mocks.safeExistsSync.mockImplementation((candidate: string) =>
+      String(candidate).includes('active/shared/')
+    );
+    mocks.safeExecResult.mockImplementation(() => ({
+      stdout: '',
+      stderr: 'network unreachable',
+      status: 1,
+    }));
+    const result = await new MlAudioGenGenerationProvider().generate({
+      prompt: 'offline pad',
+      targetPath: 'active/shared/tmp/audiogen-offline.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('network unreachable');
+  });
+
+  it('forwards the configured weights dir for stereo/melody variants', async () => {
+    vi.stubEnv('KYBERION_MUSAUDIOGEN_WEIGHTS_DIR', '/models/musicgen-stereo-medium');
+    try {
+      const provider = new MlAudioGenGenerationProvider();
+      const result = await provider.generate({
+        prompt: 'wide stereo pad',
+        targetPath: 'active/shared/tmp/audiogen-stereo.wav',
+      });
+      expect(result.status).toBe('succeeded');
+      expect(mocks.safeExecResult).toHaveBeenCalledWith(
+        'uvx',
+        expect.arrayContaining(['--weights-dir', '/models/musicgen-stereo-medium']),
+        expect.anything()
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('fails closed when the tool runtime requires install', async () => {
+    mocks.probeToolRuntime.mockReturnValue({ selected_action: 'install' });
+    const result = await generateMusic({
+      prompt: 'ambient pad',
+      targetPath: 'active/shared/tmp/audiogen-install.wav',
+      providerPreference: ['musicgen_audiogen'],
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('musicgen_audiogen_install_required');
+  });
+
+  it('fails on empty prompts and missing outputs', async () => {
+    const empty = await new MlAudioGenGenerationProvider().generate({
+      prompt: '   ',
+      targetPath: 'active/shared/tmp/audiogen-empty.wav',
+    });
+    expect(empty.status).toBe('failed');
+    expect(empty.error).toBe('musicgen_audiogen_prompt_required');
+
+    mocks.safeExistsSync.mockImplementation(
+      (candidate: string) =>
+        String(candidate).includes('.mlx-audiogen') &&
+        !String(candidate).endsWith('audiogen-gone.wav')
+    );
+    // Plain exec mock: the describe default re-arms file existence on --output.
+    mocks.safeExecResult.mockReturnValue({ stdout: '', stderr: '', status: 0 });
+    const missing = await new MlAudioGenGenerationProvider().generate({
+      prompt: 'audible pad',
+      targetPath: 'active/shared/tmp/audiogen-gone.wav',
+    });
+    expect(missing.status).toBe('failed');
+    expect(missing.error).toBe('musicgen_audiogen_output_missing');
+  });
+
+  it('applies mlx-audiogen defaults and clamps duration', () => {
+    const policy = resolveMlAudioGenGenerationPolicy({} as NodeJS.ProcessEnv);
+    expect(policy).toEqual(
+      expect.objectContaining({
+        packageSpec: 'mlx-audiogen',
+        model: 'facebook/musicgen-small',
+        durationSec: 10,
+        maxDurationSec: 30,
+        topK: 250,
+        guidance: 3,
+      })
+    );
+    expect(clampMlAudioGenDurationSec(90, policy)).toBe(30);
+  });
+});
+
+describe('ChatMusicianGenerationProvider', () => {
+  const ABC_STDOUT = [
+    'Here is your score:',
+    'X:1',
+    'T:Trial Jig',
+    'M:6/8',
+    'L:1/8',
+    'R:jig',
+    'K:G',
+    'GAB c2B|d2B dBA|',
+  ].join('\n');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.safeExistsSync.mockImplementation((candidate: string) =>
+      String(candidate).includes('active/shared/')
+    );
+    mocks.safeExecResult.mockImplementation((command: string, args: string[]) => {
+      if (command === 'which') {
+        return {
+          stdout: '/opt/homebrew/bin/abc2midi\n/opt/homebrew/bin/fluidsynth\n',
+          stderr: '',
+          status: 0,
+        };
+      }
+      if (command === 'uvx') {
+        return { stdout: ABC_STDOUT, stderr: '', status: 0 };
+      }
+      return { stdout: '', stderr: '', status: 0 };
+    });
+    mocks.probeToolRuntime.mockReturnValue({
+      selected_action: 'run_trial',
+      selected_backend: {
+        kind: 'uvx',
+        command: 'uvx',
+        args: ['--from', 'mlx-lm', 'mlx_lm.generate'],
+      },
+      trial_backend: {
+        kind: 'uvx',
+        command: 'uvx',
+        args: ['--from', 'mlx-lm', 'mlx_lm.generate'],
+      },
+      install_backend: null,
+      installed_backend: null,
+      installed: false,
+      requires_install: false,
+      managed_env_path: '/tmp/tool-runtime/chatmusician-mlx',
+      state_path: '/tmp/tool-runtime/chatmusician-mlx/state.json',
+      available_commands: ['uvx'],
+      reason: 'mocked tool runtime',
+    });
+    vi.stubEnv('KYBERION_CHATMUSICIAN_SOUNDFONT', 'active/shared/soundfont.sf2');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('extracts ABC blocks from prose-wrapped LLM output', () => {
+    expect(extractAbcNotation(ABC_STDOUT)).toContain('X:1');
+    expect(extractAbcNotation(ABC_STDOUT)).toContain('K:G');
+    expect(extractAbcNotation('no score here')).toBeNull();
+    expect(extractAbcNotation('X:1\njust a header')).toBeNull();
+  });
+
+  it('composes ABC, converts to MIDI, and renders WAV', async () => {
+    const provider = new ChatMusicianGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'a cheerful jig in G major',
+      targetPath: 'active/shared/tmp/chatmusician-demo.wav',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('chatmusician_mlx');
+    expect(result.path).toBe('active/shared/tmp/chatmusician-demo.wav');
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'uvx',
+      expect.arrayContaining(['mlx_lm.generate', '--model', 'm-a-p/ChatMusician']),
+      expect.anything()
+    );
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      'active/shared/tmp/chatmusician-demo.abc',
+      expect.stringContaining('X:1')
+    );
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'abc2midi',
+      ['active/shared/tmp/chatmusician-demo.abc', '-o', 'active/shared/tmp/chatmusician-demo.midi'],
+      expect.anything()
+    );
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'fluidsynth',
+      [
+        '-ni',
+        '-F',
+        'active/shared/tmp/chatmusician-demo.wav',
+        '-r',
+        '44100',
+        'active/shared/soundfont.sf2',
+        'active/shared/tmp/chatmusician-demo.midi',
+      ],
+      expect.anything()
+    );
+  });
+
+  it('fails with abc_parse_failed when the LLM returns no score', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command === 'which') {
+        return { stdout: '/opt/homebrew/bin/abc2midi\n', stderr: '', status: 0 };
+      }
+      return { stdout: 'sorry, no music today', stderr: '', status: 0 };
+    });
+    const result = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-noabc.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('chatmusician_abc_parse_failed');
+  });
+
+  it('fails closed when abc2midi is missing', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command === 'which') return { stdout: '', stderr: '', status: 1 };
+      return { stdout: ABC_STDOUT, stderr: '', status: 0 };
+    });
+    const result = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-noabc2midi.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('chatmusician_abc2midi_install_required');
+  });
+
+  it('fails closed when fluidsynth is missing', async () => {
+    mocks.safeExecResult.mockImplementation((command: string, args: string[]) => {
+      if (command === 'which') {
+        const found =
+          String(args[args.length - 1]) === 'abc2midi' ? '/opt/homebrew/bin/abc2midi\n' : '';
+        return { stdout: found, stderr: '', status: found ? 0 : 1 };
+      }
+      return { stdout: ABC_STDOUT, stderr: '', status: 0 };
+    });
+    const result = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-nofluid.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('chatmusician_fluidsynth_install_required');
+  });
+
+  it('fails when no MIDI comes out of abc2midi', async () => {
+    mocks.safeExistsSync.mockImplementation(
+      (candidate: string) =>
+        String(candidate).includes('active/shared/') &&
+        !String(candidate).endsWith('.midi') &&
+        !String(candidate).endsWith('.mid')
+    );
+    const result = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-nomidi.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('chatmusician_midi_missing');
+  });
+
+  it('fails on render errors and empty prompts', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command === 'fluidsynth') {
+        return { stdout: '', stderr: 'no instruments', status: 1 };
+      }
+      if (command === 'which') {
+        return {
+          stdout: '/opt/homebrew/bin/abc2midi\n/opt/homebrew/bin/fluidsynth\n',
+          stderr: '',
+          status: 0,
+        };
+      }
+      return { stdout: ABC_STDOUT, stderr: '', status: 0 };
+    });
+    const renderFailed = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-badrender.wav',
+    });
+    expect(renderFailed.status).toBe('failed');
+    expect(renderFailed.error).toBe('no instruments');
+
+    const empty = await new ChatMusicianGenerationProvider().generate({
+      prompt: '',
+      targetPath: 'active/shared/tmp/chatmusician-empty.wav',
+    });
+    expect(empty.status).toBe('failed');
+    expect(empty.error).toBe('chatmusician_prompt_required');
+  });
+
+  it('fails closed when no SoundFont is configured', async () => {
+    vi.stubEnv('KYBERION_CHATMUSICIAN_SOUNDFONT', '');
+    const result = await new ChatMusicianGenerationProvider().generate({
+      prompt: 'x',
+      targetPath: 'active/shared/tmp/chatmusician-nosf.wav',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toBe('chatmusician_soundfont_missing');
+  });
+
+  it('applies ChatMusician defaults', () => {
+    const policy = resolveChatMusicianGenerationPolicy({} as NodeJS.ProcessEnv);
+    expect(policy).toEqual(
+      expect.objectContaining({
+        packageSpec: 'mlx-lm',
+        hfRepo: 'm-a-p/ChatMusician',
+        maxTokens: 1024,
+        temperature: 0.7,
+      })
+    );
+  });
+});
+
 describe('generateMusic provider selection', () => {
   const runnable = {
     selected_action: 'run_trial',
@@ -316,6 +752,8 @@ describe('generateMusic provider selection', () => {
   const rulesFile = path.join(rulesDir, 'rules.json');
   let musicgen: ReturnType<typeof vi.spyOn>;
   let stableAudio: ReturnType<typeof vi.spyOn>;
+  let audiogen: ReturnType<typeof vi.spyOn>;
+  let chatmusician: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -332,10 +770,18 @@ describe('generateMusic provider selection', () => {
     stableAudio = vi
       .spyOn(LocalStableAudioGenerationProvider.prototype, 'generate')
       .mockResolvedValue(succeeded('stable_audio_3'));
+    audiogen = vi
+      .spyOn(MlAudioGenGenerationProvider.prototype, 'generate')
+      .mockResolvedValue(succeeded('musicgen_audiogen'));
+    chatmusician = vi
+      .spyOn(ChatMusicianGenerationProvider.prototype, 'generate')
+      .mockResolvedValue(succeeded('chatmusician_mlx'));
   });
   afterEach(async () => {
     musicgen.mockRestore();
     stableAudio.mockRestore();
+    audiogen.mockRestore();
+    chatmusician.mockRestore();
     vi.unstubAllEnvs();
     const actual = await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js');
     actual.safeRmSync(rulesDir, { recursive: true, force: true });
@@ -357,6 +803,12 @@ describe('generateMusic provider selection', () => {
   it('treats declared duration and format limits as hard requirements', async () => {
     const candidates = await listMusicGenerationCandidates({ durationSec: 60, format: 'mp3' });
     expect(candidates).toEqual([
+      { id: 'chatmusician_mlx', eligible: false, unmet: ['format mp3 (writes wav)'] },
+      {
+        id: 'musicgen_audiogen',
+        eligible: false,
+        unmet: ['format mp3 (writes wav)', 'duration 60s exceeds max 30s'],
+      },
       {
         id: 'musicgen_mlx',
         eligible: false,
@@ -372,17 +824,22 @@ describe('generateMusic provider selection', () => {
 
   it('skips unavailable providers without a purpose instead of running them', async () => {
     mocks.probeToolRuntime.mockImplementation((toolId: string) =>
-      toolId === 'musicgen_mlx' ? { selected_action: 'install' } : runnable
+      toolId === 'musicgen_mlx' || toolId === 'musicgen_audiogen'
+        ? { selected_action: 'install' }
+        : runnable
     );
     const result = await generateMusic({ prompt: 'x' });
     expect(result.provider).toBe('stable_audio_3');
     expect(musicgen).not.toHaveBeenCalled();
+    expect(audiogen).not.toHaveBeenCalled();
     expect(selectionMocks.record).not.toHaveBeenCalled();
 
     mocks.probeToolRuntime.mockReturnValue({ selected_action: 'install' });
     const none = await generateMusic({ prompt: 'x' });
     expect(none.status).toBe('failed');
-    expect(none.error).toMatch(/musicgen_mlx: unavailable; stable_audio_3: unavailable/);
+    expect(none.error).toMatch(
+      /chatmusician_mlx: unavailable; musicgen_audiogen: unavailable; musicgen_mlx: unavailable; stable_audio_3: unavailable/
+    );
   });
 
   it('keeps the platform order without a purpose', async () => {
@@ -433,7 +890,32 @@ describe('generateMusic provider selection', () => {
 
   it('throws on an unknown purpose naming the known ones', async () => {
     await expect(generateMusic({ prompt: 'x', purpose: 'vibes' })).rejects.toThrow(
-      /unknown purpose 'vibes'.*known: quality, speed/
+      /unknown purpose 'vibes'.*known: compose, quality, speed/
     );
+  });
+
+  it('fails closed when vocals are requested with an explicit instrumental provider', async () => {
+    const result = await generateMusic({
+      prompt: 'a lullaby',
+      vocals: true,
+      lyrics: 'hush now',
+      providerPreference: ['musicgen_mlx'],
+    });
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('instrumental-only');
+    expect(musicgen).not.toHaveBeenCalled();
+  });
+
+  it('excludes instrumental-only providers from vocal requests with an actionable error', async () => {
+    const candidates = await listMusicGenerationCandidates({ vocals: true });
+    expect(candidates.every((candidate) => !candidate.eligible)).toBe(true);
+    expect(candidates[0]?.unmet).toContain('vocals requested (instrumental-only provider)');
+    const result = await generateMusic({ prompt: 'x', vocals: true, lyrics: 'la la' });
+    expect(result.status).toBe('failed');
+    expect(result.error).toMatch(/No vocal-capable provider/);
+    expect(musicgen).not.toHaveBeenCalled();
+    expect(audiogen).not.toHaveBeenCalled();
+    expect(stableAudio).not.toHaveBeenCalled();
+    expect(chatmusician).not.toHaveBeenCalled();
   });
 });

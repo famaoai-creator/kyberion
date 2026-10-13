@@ -11,6 +11,8 @@
     "media-generation.minimax.hailuo-2.3",
     "media-generation.comfyui.music",
     "media-generation.musicgen_mlx",
+    "media-generation.musicgen_audiogen",
+    "media-generation.chatmusician_mlx",
     "media-generation.stable_audio_3_small_music",
     "media-generation.gemini.imagen-3-fast",
     "media-generation.gemini",

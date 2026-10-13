@@ -43,6 +43,12 @@ describe('intent-delta', () => {
     it('ignores punctuation and case', () => {
       expect(goalSimilarity('Prepare, the Q4 Report.', 'prepare the q4 report')).toBe(1);
     });
+
+    it('splits joined identifiers into component tokens', () => {
+      // ICU keeps "config.json" joined; TOKEN_SPLIT restores the old shape.
+      expect(goalSimilarity('update config.json file', 'update config json file')).toBe(1);
+      expect(goalSimilarity('fix auth-handler bug', 'fix auth handler bug')).toBe(1);
+    });
   });
 
   describe('classifyDrift', () => {

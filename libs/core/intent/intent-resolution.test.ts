@@ -323,6 +323,43 @@ describe('intent-resolution', () => {
     expect(packet.selected_resolution?.task_kind).toBe('service_operation');
   });
 
+  it('scores surface-example overlap on segmented Japanese utterances', () => {
+    // Paraphrase of the inspect-mission-inventory example "ミッション一覧を教えて".
+    // Without word segmentation the whole utterance arrives as one token and the
+    // overlap reason can never fire for spaceless scripts.
+    const packet = resolveIntentResolutionPacket('ミッション一覧を見せてほしい');
+    const candidate = packet.candidates.find(
+      (entry) => entry.intent_id === 'inspect-mission-inventory'
+    );
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+      'expected Japanese surface-example overlap to fire'
+    ).toBe(true);
+  });
+
+  it('does not emit overlap for a single shared token', () => {
+    // '議事録をまとめて' shares only まとめ with summarize-conversation's
+    // "会話をまとめて" — below the two-token floor, so no overlap reason.
+    const packet = resolveIntentResolutionPacket('議事録をまとめて');
+    const candidate = packet.candidates.find(
+      (entry) => entry.intent_id === 'summarize-conversation'
+    );
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')) ?? false,
+      'single shared token must not produce an overlap reason'
+    ).toBe(false);
+  });
+
+  it('fires overlap on a paraphrase sharing two content words', () => {
+    // lifestyle-booking example: "日用品をまとめて買って".
+    const packet = resolveIntentResolutionPacket('日用品をまとめて注文して');
+    const candidate = packet.candidates.find((entry) => entry.intent_id === 'lifestyle-booking');
+    expect(
+      candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+      'two shared content words (日用品, まとめ) should produce overlap'
+    ).toBe(true);
+  });
+
   it('routes common unhandled-intent examples to usable surface paths', () => {
     const inventory = resolveIntentResolutionPacket('ミッション一覧を教えて');
     expect(inventory.selected_intent_id).toBe('inspect-mission-inventory');
@@ -365,9 +402,18 @@ describe('intent-resolution', () => {
     const packet = resolveIntentResolutionPacket('voice-hub の状態とログを見せて');
     expect(packet.selected_intent_id).toBe('inspect-service');
     expect(packet.selected_confidence || 0).toBeGreaterThan(0.45);
+    // The dedupe keeps the best-evidenced inspect-service candidate: the
+    // keyword/overlap heuristic entry now outranks the legacy fallback, which
+    // is the policy working as designed (legacy fills in only when catalog
+    // evidence is absent).
     expect(
-      packet.candidates.some((candidate) =>
-        candidate.reasons.includes('service operation heuristic')
+      packet.candidates.some(
+        (candidate) =>
+          candidate.intent_id === 'inspect-service' &&
+          candidate.reasons.some(
+            (reason) =>
+              reason === 'service operation heuristic' || reason.startsWith('matched keywords')
+          )
       )
     ).toBe(true);
   });
@@ -485,6 +531,100 @@ describe('intent-resolution', () => {
       resetIntentOverlayTestRoot();
     }
   });
+
+  it('unifies ー variants mid-sentence via per-token normalization', () => {
+    // Example spelled サーバ vs utterance サーバー — the prolonged mark sits
+    // mid-string (no \s anchor), so only the per-token strip in tokenize()
+    // unifies them. With keywords disabled, overlap is the only scoring path.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'server.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: [], surface_examples: ['サーバ確認'] },
+      ]);
+      const packet = resolveIntentResolutionPacket('サーバーを確認して', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(
+        candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+        'サーバー/サーバ must unify for overlap'
+      ).toBe(true);
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
+
+  it('counts single-kanji content tokens toward overlap', () => {
+    // 猫 is a real content word — without the single-kanji allowance the
+    // length filter drops it and this overlap never reaches the floor.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'kanji.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: [], surface_examples: ['猫の世話リスト'] },
+      ]);
+      const packet = resolveIntentResolutionPacket('猫の世話をして', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(
+        candidate?.reasons.some((reason) => reason.startsWith('surface example overlap')),
+        'single-kanji token 猫 must count toward overlap'
+      ).toBe(true);
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
+
+  it('matches collapsed single-kanji keywords as tokens, not substrings', () => {
+    // browser-step keyword '押して' normalizes to '押' — it must fire on
+    // 'ボタンを押して' (token 押) but not on 押印/押さえて compounds.
+    const press = resolveIntentResolutionPacket('ボタンを押して');
+    const pressCandidate = press.candidates.find((entry) => entry.intent_id === 'browser-step');
+    expect(
+      pressCandidate?.reasons.some((reason) => reason.startsWith('matched keywords')),
+      '押して keyword must still fire on a token-level 押'
+    ).toBe(true);
+
+    const stamp = resolveIntentResolutionPacket('押印の書類を作成して');
+    const stampCandidate = stamp.candidates.find((entry) => entry.intent_id === 'browser-step');
+    expect(
+      stampCandidate?.reasons.some((reason) => reason.includes('押して')) ?? false,
+      'collapsed remnant 押 must not substring-match 押印'
+    ).toBe(false);
+  });
+
+  it('never matches on an empty or punctuation-only trigger keyword', () => {
+    // Overlay catalogs accept arbitrary keywords; '' or '！！' must not become
+    // a universal includes() hit on every utterance.
+    resetIntentOverlayTestRoot();
+    const generateReport = loadStandardIntentCatalog().find(
+      (intent) => intent.id === 'generate-report'
+    )!;
+    const overlayPath = path.join(INTENT_OVERLAY_TEST_ROOT, 'empty.intent-catalog.json');
+    try {
+      writeIntentOverlayCatalog(overlayPath, [
+        { ...generateReport, trigger_keywords: ['', '  ', '！！！'], surface_examples: [] },
+      ]);
+      const packet = resolveIntentResolutionPacket('猫の世話をして', {
+        tier: 'personal',
+        overlayPaths: [overlayPath],
+      });
+      const candidate = packet.candidates.find((entry) => entry.intent_id === 'generate-report');
+      expect(candidate).toBeUndefined();
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
+  });
 });
 
 describe('normalizeForTriggerMatch', () => {
@@ -506,6 +646,55 @@ describe('normalizeForTriggerMatch', () => {
   it('handles mixed full-width and regular characters', () => {
     const result = normalizeForTriggerMatch('スラックSlack');
     expect(result).toContain('slack');
+  });
+
+  it('unifies half-width katakana', () => {
+    expect(normalizeForTriggerMatch('ｽﾗｯｸ')).toBe('すらっく');
+    expect(normalizeForTriggerMatch('ﾃﾞｰﾀ')).toBe('でーた');
+  });
+
+  it('drops word-final prolonged marks but keeps internal ones', () => {
+    expect(normalizeForTriggerMatch('サーバー')).toBe('さーば');
+    expect(normalizeForTriggerMatch('サーバ')).toBe('さーば');
+    expect(normalizeForTriggerMatch('カード')).toBe('かーど');
+  });
+
+  it('strips trailing request endings to the stem', () => {
+    expect(normalizeForTriggerMatch('会議を調整してください')).toBe('会議を調整');
+    expect(normalizeForTriggerMatch('レポートを作ってほしい')).toBe('れぽーとを作っ');
+    expect(normalizeForTriggerMatch('確認します')).toBe('確認し');
+    expect(normalizeForTriggerMatch('確認しました')).toBe('確認し');
+    expect(normalizeForTriggerMatch('確認しています')).toBe('確認し');
+  });
+
+  it('does not cascade copula/masu endings through loanwords', () => {
+    // です strips once; the remaining クリスマス must not then lose ます.
+    expect(normalizeForTriggerMatch('クリスマスです')).toBe('くりすます');
+    expect(normalizeForTriggerMatch('コスモス')).toBe('こすもす');
+    expect(normalizeForTriggerMatch('ナマス')).toBe('なます');
+  });
+
+  it('does not strip endings written in katakana', () => {
+    // Endings are matched on pre-hiragana text — katakana クダサイ is not the
+    // request ending ください.
+    expect(normalizeForTriggerMatch('確認シテクダサイ')).toBe('確認してください');
+  });
+
+  it('drops honorific prefixes only before a multi-kanji stem', () => {
+    expect(normalizeForTriggerMatch('ご確認をお願いします')).toBe('確認を');
+    expect(normalizeForTriggerMatch('おもしろい')).toBe('おもしろい');
+    // Lexicalized お/ご words keep the prefix — the single-kanji remnant would
+    // be an over-broad match (金 hits 金曜日/料金/現金).
+    expect(normalizeForTriggerMatch('お金を確認して')).toBe('お金を確認');
+    expect(normalizeForTriggerMatch('お知らせを読んで')).toBe('お知らせを読んで');
+    // 'お願いします' keeps お (one kanji after it) but the masu ending still
+    // peels to the stem, like 確認します → 確認し.
+    expect(normalizeForTriggerMatch('お願いします')).toBe('お願いし');
+  });
+
+  it('does not strip endings that would corrupt real words', () => {
+    expect(normalizeForTriggerMatch('きたい')).toBe('きたい');
+    expect(normalizeForTriggerMatch('じょうたい')).toBe('じょうたい');
   });
 
   it('returns empty string for empty input', () => {

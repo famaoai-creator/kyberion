@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "display_name": "ChatMusician ABC Composition (MLX)",
+      "ecosystem": "python",
+      "install_backend": {
+        "args": ["tool", "install", "mlx-lm"],
+        "command": "uv",
+        "description": "Install mlx-lm into the managed Python tool environment.",
+        "kind": "uv"
+      },
+      "installed_backend": {
+        "args": ["tool", "run", "mlx_lm.generate"],
+        "command": "uv",
+        "description": "Run mlx_lm.generate from the managed Python tool environment.",
+        "kind": "uv"
+      },
+      "managed_env_subpath": "tool-runtimes/chatmusician-mlx",
+      "notes": "ChatMusician (m-a-p/ChatMusician, LLaMA-2 7B) ABC composition via mlx-lm, rendered ABC->MIDI->WAV with system abcmidi (abc2midi) + fluid-synth and a .sf2 SoundFont (KYBERION_CHATMUSICIAN_SOUNDFONT). Prefer a pre-converted 4-bit model dir (mlx_lm.convert -q) for 16GB Macs. Weights follow the Llama 2 Community License. Tuned via KYBERION_CHATMUSICIAN_* env policy. Trial: `uvx --from mlx-lm mlx_lm.generate`.",
+      "platforms": ["darwin"],
+      "status": "active",
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "tool_id": "chatmusician_mlx",
+      "trial_backend": {
+        "args": ["--from", "mlx-lm", "mlx_lm.generate"],
+        "command": "uvx",
+        "description": "Temporary ChatMusician composition on Apple Silicon without a managed install.",
+        "kind": "uvx"
+      }
+    }
+  ]
+}

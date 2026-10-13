@@ -226,6 +226,8 @@ async function handlePromptBasedGeneration(action: string, params: any) {
           providerPreference: resolveMusicProviderPreference(prepared.params),
           ...(musicPurpose ? { purpose: musicPurpose } : {}),
           ...(format ? { format } : {}),
+          ...(bridgeRequest.vocals !== undefined ? { vocals: bridgeRequest.vocals } : {}),
+          ...(bridgeRequest.lyrics ? { lyrics: bridgeRequest.lyrics } : {}),
         });
         const generatedBy = describeGeneratedBackend(
           backend,
