@@ -264,6 +264,7 @@ describe('Ask durable browser behavior (DOM doubles, no visual claim)', () => {
     await flush();
     expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
       cache: 'no-store',
+      signal: expect.any(AbortSignal),
     });
     expect(h.elements.get('turns')!.innerHTML).toContain('Old answer');
     expect(h.elements.get('turns')!.innerHTML).not.toContain('Execute again');
@@ -656,6 +657,7 @@ describe('Ask draft consistency (DOM doubles, no visual claim)', () => {
     await flush();
     expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
       cache: 'no-store',
+      signal: expect.any(AbortSignal),
     });
     expect(h.chips.get('email')!.disabled).toBe(true);
     // Deliberately invoke the handler even while disabled to exercise its own guard.
@@ -921,6 +923,7 @@ describe('Ask optional recent-read isolation', () => {
       await flush();
       expect(h.fetch).toHaveBeenCalledWith('/api/conversation?tenant=alpha', {
         cache: 'no-store',
+        signal: expect.any(AbortSignal),
       });
       expect(h.elements.get('turns')!.innerHTML).toContain('Restored history');
       expect(h.elements.get('ask-send')!.disabled).toBe(false);
@@ -1208,4 +1211,229 @@ describe('Ask shared shell recovery presentation', () => {
     await flush();
     expect(h.fetch).not.toHaveBeenCalled();
   });
+});
+
+describe('Ask critical history read recovery', () => {
+  const history = (text = 'Current verified history') =>
+    response({
+      ok: true,
+      sessionId: session,
+      pending: 0,
+      messages: [{ id: text, role: 'secretary', text }],
+    });
+  it.each(['headers', 'body'])(
+    'bounds stalled history %s, deduplicates retry and ignores late results',
+    async (stage) => {
+      vi.useFakeTimers();
+      try {
+        const old = deferred<ReturnType<typeof response>>();
+        const body = deferred<unknown>();
+        const retry = deferred<ReturnType<typeof response>>();
+        let reads = 0;
+        const h = harness({
+          conversation: () => {
+            reads++;
+            return reads > 1
+              ? retry.promise
+              : stage === 'headers'
+                ? old.promise
+                : Promise.resolve({ ...history('Old history'), json: () => body.promise });
+          },
+        });
+        await flush();
+        expect(h.elements.get('conversation-reload')!.disabled).toBe(true);
+        h.elements.get('conversation-reload')!.fire('click');
+        await flush();
+        expect(reads).toBe(1);
+        h.input.value = 'Keep early edits';
+        h.input.fire('input');
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.failed');
+        expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+        expect(h.elements.get('ask-send')!.disabled).toBe(true);
+        h.elements.get('conversation-reload')!.fire('click');
+        h.elements.get('conversation-reload')!.fire('click');
+        await flush();
+        expect(reads).toBe(2);
+        expect(h.elements.get('conversation-reload')!.disabled).toBe(true);
+        retry.resolve(history());
+        await flush();
+        old.resolve(history('Old history'));
+        body.resolve({
+          ok: true,
+          sessionId: session,
+          messages: [{ role: 'secretary', text: 'Old history' }],
+        });
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).toContain('Current verified history');
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Old history');
+        expect(h.input.value).toBe('Keep early edits');
+        expect(h.storage.get('kyberion.ask.draft.' + session)).toBe('Keep early edits');
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it.each([401, 403])(
+    'retains authoritative history status %s without awaiting an error body',
+    async (status) => {
+      const body = deferred<unknown>();
+      const h = harness({
+        conversation: async () => ({ ok: false, status, json: () => body.promise }),
+      });
+      await flush();
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain(
+        'conversation_access_required'
+      );
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+      expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+      body.resolve({ ok: false });
+      await flush();
+      expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+    }
+  );
+  it.each([401, 403])('retains authoritative status %s for a malformed body', async (status) => {
+    const h = harness({
+      conversation: async () => ({
+        ok: false,
+        status,
+        json: () => Promise.reject(new Error('HTML denial')),
+      }),
+    });
+    await flush();
+    expect(h.elements.get('conversation-status')!.innerHTML).toContain(
+      'conversation_access_required'
+    );
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+  });
+  it.each(['send', 'mic'])(
+    'does not consume URL %s before current history verification',
+    async (action) => {
+      vi.useFakeTimers();
+      try {
+        const old = deferred<ReturnType<typeof response>>();
+        let reads = 0;
+        const h = harness({
+          query:
+            action === 'send'
+              ? '?tenant=alpha&ask=Explicit+submission&send=1'
+              : '?tenant=alpha&mic=1',
+          speech: true,
+          conversation: () => (++reads === 1 ? old.promise : Promise.resolve(history())),
+        });
+        const speechStart = vi.spyOn(h.window.SpeechRecognition!.prototype, 'start');
+        await flush();
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(h.window.history.replaceState).not.toHaveBeenCalled();
+        expect(speechStart).not.toHaveBeenCalled();
+        expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+        h.elements.get('conversation-reload')!.fire('click');
+        await flush();
+        expect(h.window.history.replaceState).toHaveBeenCalledTimes(1);
+        expect(speechStart).toHaveBeenCalledTimes(action === 'mic' ? 1 : 0);
+        expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(
+          action === 'send' ? 1 : 0
+        );
+        old.resolve(history('Obsolete'));
+        await flush();
+        expect(h.window.history.replaceState).toHaveBeenCalledTimes(1);
+        expect(speechStart).toHaveBeenCalledTimes(action === 'mic' ? 1 : 0);
+        speechStart.mockRestore();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it('keeps pending request identity and a cleared early draft through timeout and recovery', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      const request = {
+        id: '33333333-3333-4333-8333-333333333333',
+        text: 'Pending original',
+        createdAt: 100,
+      };
+      const key = 'kyberion.ask.draft.' + session;
+      const storage = new Map([
+        [key, 'Saved draft'],
+        [key + '.request', JSON.stringify(request)],
+      ]);
+      let reads = 0;
+      const h = harness({
+        storage,
+        conversation: () => (++reads === 1 ? old.promise : Promise.resolve(history())),
+      });
+      await flush();
+      h.input.value = 'Typing';
+      h.input.fire('input');
+      h.input.value = '';
+      h.input.fire('input');
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(storage.get(key)).toBe('Saved draft');
+      expect(storage.get(key + '.request')).toBe(JSON.stringify(request));
+      h.elements.get('conversation-reload')!.fire('click');
+      await flush();
+      expect(h.input.value).toBe('');
+      expect(storage.get(key)).toBe('');
+      expect(storage.get(key + '.request')).toBe(JSON.stringify(request));
+      old.resolve(response({ ok: false }, 403));
+      await flush();
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(h.elements.get('conversation-status')!.innerHTML).not.toContain(
+        'conversation_access_required'
+      );
+      expect(h.fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+it.each(['send', 'mic'])(
+  'retains URL %s action when stored history metadata cannot be verified',
+  async (action) => {
+    const key = 'kyberion.ask.draft.' + session;
+    const h = harness({
+      storage: new Map([
+        [key, 'Saved draft'],
+        [key + '.request', '{invalid'],
+      ]),
+      query:
+        action === 'send' ? '?tenant=alpha&ask=Explicit+submission&send=1' : '?tenant=alpha&mic=1',
+      speech: true,
+    });
+    const speechStart = vi.spyOn(h.window.SpeechRecognition!.prototype, 'start');
+    await flush();
+    expect(h.elements.get('conversation-status')!.innerHTML).toContain(
+      'conversation_storage_required'
+    );
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
+    expect(speechStart).not.toHaveBeenCalled();
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.storage.get(key)).toBe('Saved draft');
+    speechStart.mockRestore();
+  }
+);
+
+it('does not start history recovery while a reply POST is outstanding', async () => {
+  const post = deferred<ReturnType<typeof response>>();
+  const h = harness({ history: { pending: 1 }, post: () => post.promise });
+  await flush();
+  h.input.value = 'Explicit request';
+  h.input.fire('input');
+  h.form.fire('submit');
+  await flush();
+  expect(h.elements.get('conversation-reload')!.disabled).toBe(true);
+  h.elements.get('conversation-reload')!.fire('click');
+  await flush();
+  expect(
+    h.fetch.mock.calls.filter(
+      ([url, init]) => url.startsWith('/api/conversation') && init?.method !== 'POST'
+    )
+  ).toHaveLength(1);
+  post.resolve(response({ ok: true, reply: 'Current submitted reply', mode: 'orchestrator' }));
+  await flush();
+  expect(h.elements.get('turns')!.innerHTML).toContain('Current submitted reply');
 });
