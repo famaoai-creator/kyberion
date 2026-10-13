@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -12,6 +13,7 @@ function loadJson(filePath: string) {
 describe('Computer interaction contract schema', () => {
   it('accepts a governed snapshot request', () => {
     const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
@@ -53,6 +55,7 @@ describe('Computer interaction contract schema', () => {
 
   it('accepts a risky publish-style click proposal', () => {
     const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
@@ -78,6 +81,7 @@ describe('Computer interaction contract schema', () => {
 
   it('accepts a voice input toggle proposal', () => {
     const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
@@ -103,6 +107,7 @@ describe('Computer interaction contract schema', () => {
 
   it('accepts a secret fill with durable identity', () => {
     const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
@@ -133,6 +138,7 @@ describe('Computer interaction contract schema', () => {
 
   it('rejects payloads without action', () => {
     const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
