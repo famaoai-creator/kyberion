@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { safeReadFile } from '@agent/core/secure-io';
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
 type MockEvent = {
   target: Element;
@@ -89,7 +92,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 async function flush() {
-  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+  for (let i = 0; i < 40; i += 1) await Promise.resolve();
 }
 const texts: Record<string, string> = {
   'front_desk:progress_history': 'History',
@@ -154,6 +157,7 @@ function harness(
     hash?: string;
     ready?: Promise<unknown>;
     page?: 'home' | 'progress';
+    withoutAbort?: boolean;
     fetcher?: (path: string, options?: FetchInput) => Promise<MockResponse>;
   } = {}
 ) {
@@ -184,6 +188,11 @@ function harness(
     'ask-input',
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
+  elements['progress-read-status'].setAttribute('data-progress_loading', 'Loading progress…');
+  elements['progress-read-status'].setAttribute(
+    'data-progress_refreshing',
+    'Checking the latest progress…'
+  );
   const noticeText = new Element();
   noticeText.setAttribute('data-notice-text', 'true');
   const refresh = new Element();
@@ -205,6 +214,9 @@ function harness(
   const renders: Array<{ container: Element; components: Array<Record<string, unknown>> }> = [];
   const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
   const window = {
+    setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
+    AbortController: options.withoutAbort ? undefined : AbortController,
     sessionStorage: {
       getItem(key: string) {
         return storage.get(key) ?? null;
@@ -1423,4 +1435,176 @@ it('does not let a superseded vocabulary rejection erase the newer Progress moun
   await first;
   expect(h.elements['progress-list'].children[0]).toBe(before);
   expect(h.noticeText.textContent).not.toContain('Could not load progress');
+});
+
+describe('Progress bounded read recovery', () => {
+  const cases = ['vocabulary', 'list', 'detail'].flatMap((target) =>
+    ['headers', 'body'].map((phase) => ({ target, phase }))
+  );
+  it.each(cases)(
+    'recovers $target stalled $phase with one explicit GET retry',
+    async ({ target, phase }) => {
+      const payload = emptyPayload();
+      payload.active = [{ id: 'alpha', title: 'Alpha' }];
+      payload.counts.active = 1;
+      const path =
+        target === 'vocabulary'
+          ? '/api/progress-vocabulary'
+          : target === 'list'
+            ? '/api/progress'
+            : '/api/progress/alpha';
+      const body =
+        target === 'vocabulary'
+          ? { ok: true, texts }
+          : target === 'list'
+            ? payload
+            : detail('Recovered Alpha');
+      const headers = deferred<MockResponse>();
+      const stalledBody = deferred<unknown>();
+      const retry = deferred<MockResponse>();
+      let reads = 0;
+      const h = harness({
+        hash: '#alpha',
+        fetcher: dataFetcher(payload, (url) => {
+          if (url !== path) return;
+          reads += 1;
+          return reads === 1
+            ? phase === 'headers'
+              ? headers.promise
+              : Promise.resolve({ ...response(body), json: () => stalledBody.promise })
+            : retry.promise;
+        }),
+      });
+      const mounted = h.window.KyberionProgress.mount();
+      await flush();
+      await vi.advanceTimersByTimeAsync(19999);
+      expect(
+        h.elements[target === 'detail' ? 'progress-detail-status' : 'progress-read-status']
+          .textContent
+      ).toContain('Loading');
+      await vi.advanceTimersByTimeAsync(1);
+      await flush();
+      expect(
+        h.elements[target === 'detail' ? 'progress-detail-status' : 'progress-notice'].hidden
+      ).not.toBe(true);
+      expect(
+        target === 'detail'
+          ? h.elements['progress-detail-status'].textContent
+          : h.noticeText.textContent
+      ).toContain('Could not load');
+      const firstRead = h.fetch.mock.calls.find(([url]) => url.startsWith(path + '?'))!;
+      expect((firstRead[1]?.signal as AbortSignal).aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      const button = target === 'detail' ? h.elements['progress-detail-retry'] : h.refresh;
+      expect(button.disabled).toBe(false);
+      expect(h.window.location.hash).toBe('#alpha');
+      button.fire();
+      button.fire();
+      await flush();
+      expect(reads).toBe(2);
+      expect(button.disabled).toBe(true);
+      retry.resolve(response(body));
+      await flush();
+      await mounted;
+      expect(h.elements['progress-detail-status'].textContent).toBe('Details for Alpha');
+      expect(h.elements['progress-detail'].innerHTML).toContain(
+        target === 'detail' ? 'Recovered Alpha' : '/api/progress/alpha'
+      );
+      const beforeLate = h.fetch.mock.calls.length;
+      const stale =
+        target === 'detail'
+          ? detail('STALE')
+          : target === 'list'
+            ? emptyPayload()
+            : { ok: true, texts: { ...texts, 'front_desk:progress_detail_ready': 'STALE' } };
+      headers.resolve(response(stale));
+      stalledBody.resolve(stale);
+      await flush();
+      expect(h.elements['progress-detail'].innerHTML).not.toContain('STALE');
+      expect(h.elements['progress-detail-status'].textContent).toBe('Details for Alpha');
+      expect(h.elements['progress-list'].children).toHaveLength(1);
+      expect(h.fetch.mock.calls).toHaveLength(beforeLate);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(
+        h.fetch.mock.calls.every(([, input]) => !input?.method || input.method === 'GET')
+      ).toBe(true);
+    }
+  );
+  it('settles without AbortController and ignores a timed-out older selection', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'alpha', title: 'Alpha' },
+      { id: 'beta', title: 'Beta' },
+    ];
+    const old = deferred<MockResponse>();
+    const h = harness({
+      hash: '#alpha',
+      withoutAbort: true,
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/alpha' ? old.promise : undefined
+      ),
+    });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(h.elements['progress-detail-retry'].hidden).toBe(false);
+    h.elements['progress-list'].children[1].children[0].fire();
+    await flush();
+    old.resolve(response(detail('STALE')));
+    await mounted;
+    await flush();
+    expect(h.window.location.hash).toBe('#beta');
+    expect(h.elements['progress-detail-status'].textContent).toBe('Details for Beta');
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('STALE');
+  });
+  it.each([401, 403, 404])(
+    'clears denied detail status %s before a stalled body',
+    async (status) => {
+      const payload = emptyPayload();
+      payload.active = [{ id: 'alpha', title: 'Alpha' }];
+      const json = vi.fn(() => new Promise<never>(() => {}));
+      const h = harness({
+        hash: '#alpha',
+        fetcher: dataFetcher(payload, (path) =>
+          path === '/api/progress/alpha' ? Promise.resolve({ ok: false, status, json }) : undefined
+        ),
+      });
+      h.window.KyberionProgress.mount();
+      await flush();
+      expect(h.elements['progress-list'].children).toHaveLength(0);
+      expect(h.noticeText.textContent).toContain('unavailable');
+      expect(json).not.toHaveBeenCalled();
+      const denied = h.fetch.mock.calls.find(([url]) => url.startsWith('/api/progress/alpha?'))!;
+      expect((denied[1]?.signal as AbortSignal).aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(h.elements['progress-detail-retry'].hidden).toBe(true);
+    }
+  );
+  it('does not time out or retry an outstanding verdict POST', async () => {
+    const payload = emptyPayload();
+    payload.delivered = [
+      { id: 'artifact', title: 'Result', can_verdict: true, entry_id: 'inbox-1', status: 'read' },
+    ];
+    const write = deferred<MockResponse>();
+    const h = harness({
+      hash: '#artifact',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? write.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    const button =
+      h.elements['progress-list'].children[0].children[0].querySelector('[data-action="receive"]')!;
+    button.fire();
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(button.disabled).toBe(true);
+    expect(h.elements['progress-notice'].hidden).toBe(true);
+    const posts = h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(posts[0][1]?.signal).toBeUndefined();
+    write.reject(new Error('Unknown outcome'));
+    await flush();
+    expect(h.noticeText.textContent).toContain('uncertain');
+    expect(button.disabled).toBe(true);
+  });
 });
