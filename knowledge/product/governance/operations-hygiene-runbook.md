@@ -733,6 +733,30 @@ call fails.
 
 ## §8 Mission evidence: generated files and recorded deliverables
 
+Video gates that derive approval scope through strict `findMissionPath` must register
+the caller as `scope-derivation` in `tests/mission-lookup-boundary.test.ts`. Run that
+boundary test with the production regression suite before publishing.
+
+**Video production preflight.** A phase exit gate alone does not defer the next
+task under the default warning rollout. For generated video, wire validated
+spec/scene planning, current prototype acceptance, selected-take lineage and
+remaining spend to phase entry gates before generation, assembly, repair and
+promotion. Reuse command_succeeds with the typed video evidence checker; keep
+semantic quality decisions with the existing independent review.
+
+Approval request helpers write their own request artifacts, never
+prototype-acceptance.json or video-playback-approval.json: these are task-owned
+decisions. Bind image decisions to source bytes/revision/scene intent and playback
+decisions to the final render plus evaluation; reject pending, expired, revoked,
+cross-scope or stale decisions. A changed scene/take requires corresponding
+evaluation evidence. Stage checks stay read-only and never create an approval.
+
+Regression gate: scripts/lib/video-production-evidence.test.ts exercises the real
+persisted generation entry gate, approval/version invalidation, cost and attempt
+limits, lineage/review changes, non-generated pass-through, and mission path
+confinement. Mission catalogue expansion tests pin phase dependencies and gate
+wiring. Provider-side spend reservation remains a separate capability.
+
 **Closure observations:** `completed` can precede delivery, retrospective, or independent review
 evidence. Read-only status and triage must inspect the strict task graph before suggesting
 `finish`; they must not translate this lifecycle label directly into archive advice. Missing or

@@ -53,6 +53,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'scripts/pipeline-execution-part-results.ts': 'lifecycle',
   'scripts/pipeline-reasoning-visibility.ts': 'lifecycle',
   // scope-derivation
+  // Production approvals derive their authorization scope from canonical mission state.
+  'scripts/lib/video-production-evidence.ts': 'scope-derivation',
   'libs/core/history-search-index.ts': 'scope-derivation',
   'libs/core/injection-signal.ts': 'scope-derivation',
   'libs/core/mark-target-resolver.ts': 'scope-derivation',
