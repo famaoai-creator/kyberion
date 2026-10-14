@@ -108,6 +108,10 @@ function harness(
       'draft-keep',
       'draft-replace',
       'draft-storage-warning',
+      'home-draft-preserved',
+      'pending-request-review',
+      'pending-request-recovery',
+      'pending-request-description',
       'recent-card',
       'recent-title',
       'recent-list',
@@ -2031,5 +2035,386 @@ describe('Ask current contextual draft actions', () => {
     });
     await send(h);
     expect(h.actions()).toHaveLength(0);
+  });
+});
+
+describe('Home submission draft and retry preservation', () => {
+  const draftKey = 'kyberion.ask.draft.' + session;
+  const requestKey = draftKey + '.request';
+  const original = {
+    id: '33333333-3333-4333-8333-333333333333',
+    text: 'Earlier unresolved request',
+    createdAt: 1,
+  };
+  const postCalls = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter((call) => call[1]?.method === 'POST');
+  it('keeps an older draft during and after explicit Home submission', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    const storage = new Map([[draftKey, 'Older draft']]);
+    const h = harness({
+      storage,
+      query: '?tenant=alpha&ask=New+Home+request&send=1',
+      post: () => pending.promise,
+    });
+    await flush();
+    expect(postCalls(h)).toHaveLength(1);
+    expect(h.input.value).toBe('Older draft');
+    expect(storage.get(draftKey)).toBe('Older draft');
+    expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+    pending.resolve(response({ ok: true, reply: 'Done', mode: 'orchestrator' }));
+    await flush();
+    expect(h.input.value).toBe('Older draft');
+    expect(storage.get(draftKey)).toBe('Older draft');
+  });
+  it('withholds a distinct Home send and retains its text without the send flag', async () => {
+    const raw = JSON.stringify(original);
+    const storage = new Map([
+      [draftKey, 'Older draft'],
+      [requestKey, raw],
+    ]);
+    const h = harness({
+      storage,
+      query: '?tenant=alpha&ask=New+Home+request&send=1',
+      hash: '#details',
+    });
+    await flush();
+    expect(postCalls(h)).toHaveLength(0);
+    expect(storage.get(requestKey)).toBe(raw);
+    expect(h.input.value).toBe('Older draft');
+    const url = h.window.history.replaceState.mock.calls.at(-1)![2] as string;
+    expect(url).toContain('ask=New+Home+request');
+    expect(url).not.toContain('send=');
+    expect(url).toContain('#details');
+    h.elements.get('draft-replace')!.fire('click');
+    h.form.fire('submit');
+    await flush();
+    expect(postCalls(h)).toHaveLength(0);
+    expect(storage.get(requestKey)).toBe(raw);
+  });
+  it('keeps failed Home text review-only and reuses its identity on explicit retry', async () => {
+    const storage = new Map([[draftKey, 'Older draft']]);
+    const h = harness({
+      storage,
+      query: '?tenant=alpha&ask=New+Home+request&send=1',
+      post: async () => response({ ok: false, retry_safe: true }, 503),
+    });
+    await flush();
+    const request = JSON.parse(storage.get(requestKey)!);
+    expect(h.input.value).toBe('Older draft');
+    const reloaded = harness({ storage });
+    await flush();
+    expect(postCalls(reloaded)).toHaveLength(0);
+    reloaded.elements.get('pending-request-review')!.fire('click');
+    expect(reloaded.input.value).toBe('Older draft');
+    expect(reloaded.elements.get('draft-choice')!.hidden).toBe(false);
+    reloaded.elements.get('draft-replace')!.fire('click');
+    expect(reloaded.input.value).toBe('New Home request');
+    expect(postCalls(reloaded)).toHaveLength(0);
+    reloaded.form.fire('submit');
+    await flush();
+    expect(JSON.parse(postCalls(reloaded)[0][1]!.body!)).toMatchObject({
+      request_id: request.id,
+      request_created_at: request.createdAt,
+    });
+  });
+  it.each(['typing', 'clearing', 'same-text-edit'])(
+    'preserves %s while a Home request completes',
+    async (action) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        storage: new Map([[draftKey, 'Older draft']]),
+        query: '?tenant=alpha&ask=Home+request&send=1',
+        post: () => pending.promise,
+      });
+      await flush();
+      const text =
+        action === 'clearing' ? '' : action === 'same-text-edit' ? 'Home request' : 'New typing';
+      h.input.value = text;
+      h.input.fire('input');
+      pending.resolve(response({ ok: true, reply: 'Done', mode: 'orchestrator' }));
+      await flush();
+      expect(h.input.value).toBe(text);
+      expect(h.storage.get(draftKey)).toBe(text);
+    }
+  );
+  it.each(['empty', 'equal'])('retains ordinary Home send behavior for %s drafts', async (kind) => {
+    const h = harness({
+      storage: new Map([[draftKey, kind === 'equal' ? 'Home request' : '']]),
+      query: '?tenant=alpha&ask=Home+request&send=1',
+    });
+    await flush();
+    expect(postCalls(h)).toHaveLength(1);
+    expect(h.input.value).toBe('');
+  });
+  it.each(['keep', 'escape'])(
+    'keeps the older draft when failed-text review is dismissed with %s',
+    async (action) => {
+      const raw = JSON.stringify(original);
+      const storage = new Map([
+        [draftKey, 'Older draft'],
+        [requestKey, raw],
+      ]);
+      const h = harness({ storage });
+      await flush();
+      h.elements.get('pending-request-review')!.fire('click');
+      if (action === 'keep') h.elements.get('draft-keep')!.fire('click');
+      else h.elements.get('draft-choice')!.fire('keydown', { key: 'Escape' });
+      expect(h.input.value).toBe('Older draft');
+      expect(storage.get(requestKey)).toBe(raw);
+      expect(postCalls(h)).toHaveLength(0);
+    }
+  );
+  it.each([
+    'id',
+    'text',
+    'timestamp',
+    'corrupt',
+    'removed',
+    'scope',
+    'shell',
+    'rail',
+    'popstate',
+    'pagehide',
+  ])('rejects deferred review after %s changes', async (change) => {
+    const raw = JSON.stringify(original);
+    const storage = new Map([
+      [draftKey, 'Older draft'],
+      [requestKey, raw],
+    ]);
+    const h = harness({ storage });
+    await flush();
+    h.elements.get('pending-request-review')!.fire('click');
+    if (change === 'id')
+      storage.set(
+        requestKey,
+        JSON.stringify({ ...original, id: '44444444-4444-4444-8444-444444444444' })
+      );
+    if (change === 'text')
+      storage.set(requestKey, JSON.stringify({ ...original, text: 'Newer request' }));
+    if (change === 'timestamp')
+      storage.set(requestKey, JSON.stringify({ ...original, createdAt: 2 }));
+    if (change === 'corrupt') storage.set(requestKey, '{broken');
+    if (change === 'removed') storage.delete(requestKey);
+    if (change === 'scope')
+      h.window.location.search = '?tenant=beta&organizationId=other&projectId=other';
+    if (change === 'shell') h.shell('loading');
+    if (change === 'rail') h.window.FrontDeskRail.ready = Promise.resolve();
+    if (change === 'popstate' || change === 'pagehide') h.browserEvent(change);
+    h.elements.get('draft-replace')!.fire('click');
+    expect(h.input.value).toBe('Older draft');
+    expect(postCalls(h)).toHaveLength(0);
+  });
+  it('keeps the stored retry identity when server history contains a different waiting ID', async () => {
+    const raw = JSON.stringify(original);
+    const h = harness({
+      storage: new Map([
+        [draftKey, original.text],
+        [requestKey, raw],
+      ]),
+      history: {
+        messages: [
+          {
+            id: '55555555-5555-4555-8555-555555555555-user',
+            role: 'user',
+            text: original.text,
+            createdAt: 2,
+          },
+        ],
+      },
+    });
+    await flush();
+    h.form.fire('submit');
+    await flush();
+    expect(JSON.parse(postCalls(h)[0][1]!.body!)).toMatchObject({
+      request_id: original.id,
+      request_created_at: 1,
+    });
+  });
+  it('does not clear a newer durable request when an earlier response completes', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      query: '?tenant=alpha&ask=Home+request&send=1',
+      post: () => pending.promise,
+    });
+    await flush();
+    const raw = JSON.stringify(original);
+    h.storage.set(requestKey, raw);
+    pending.resolve(response({ ok: true, reply: 'Done', mode: 'orchestrator' }));
+    await flush();
+    expect(h.storage.get(requestKey)).toBe(raw);
+  });
+  it.each(['throws', 'drops'])(
+    'retains Home text without auto-send when request storage %s',
+    async (failure) => {
+      const ready = deferred<void>();
+      const h = harness({
+        ready: ready.promise,
+        storage: new Map([[draftKey, 'Older draft']]),
+        query: '?tenant=alpha&ask=Home+request&send=1',
+      });
+      const set = h.window.sessionStorage.setItem;
+      h.window.sessionStorage.setItem = (key, value) => {
+        if (key !== requestKey) return set(key, value);
+        if (failure === 'throws') throw new Error('blocked');
+        return h.storage;
+      };
+      ready.resolve();
+      await flush();
+      expect(postCalls(h)).toHaveLength(0);
+      expect(h.input.value).toBe('Older draft');
+      const url = h.window.history.replaceState.mock.calls.at(-1)![2] as string;
+      expect(url).toContain('ask=Home+request');
+      expect(url).not.toContain('send=');
+    }
+  );
+  it('isolates recovery by the server-issued conversation key', async () => {
+    const other = 'concierge-' + 'b'.repeat(64);
+    const raw = JSON.stringify(original);
+    const storage = new Map([
+      [draftKey, 'Other viewer draft'],
+      [requestKey, raw],
+    ]);
+    const h = harness({ storage, history: { sessionId: other } });
+    await flush();
+    expect(h.input.value).toBe('');
+    expect(h.elements.get('pending-request-recovery')!.hidden).toBe(true);
+    h.elements.get('pending-request-review')!.fire('click');
+    expect(h.input.value).toBe('');
+    expect(storage.get(requestKey)).toBe(raw);
+    expect(postCalls(h)).toHaveLength(0);
+  });
+
+  it('releases a confirmed saved request after matching scoped history without resending', async () => {
+    const storage = new Map([
+      [draftKey, 'Older draft'],
+      [requestKey, JSON.stringify(original)],
+    ]);
+    const h = harness({
+      storage,
+      history: {
+        messages: [
+          { id: original.id + '-user', role: 'user', text: original.text },
+          { id: original.id + '-secretary', role: 'secretary', text: 'Done' },
+        ],
+      },
+    });
+    await flush();
+    expect(storage.has(requestKey)).toBe(false);
+    expect(h.input.value).toBe('Older draft');
+    expect(postCalls(h)).toHaveLength(0);
+    h.form.fire('submit');
+    await flush();
+    expect(postCalls(h)).toHaveLength(1);
+  });
+  it.each(['user-only', 'reply-only', 'wrong-text'])(
+    'retains request identity for incomplete history: %s',
+    async (kind) => {
+      const raw = JSON.stringify(original);
+      const messages = [
+        {
+          id: original.id + '-user',
+          role: 'user',
+          text: kind === 'wrong-text' ? 'Different text' : original.text,
+        },
+        { id: original.id + '-secretary', role: 'secretary', text: 'Done' },
+      ];
+      const h = harness({
+        storage: new Map([
+          [draftKey, 'Older draft'],
+          [requestKey, raw],
+        ]),
+        history: {
+          messages:
+            kind === 'user-only'
+              ? messages.slice(0, 1)
+              : kind === 'reply-only'
+                ? messages.slice(1)
+                : messages,
+        },
+      });
+      await flush();
+      h.form.fire('submit');
+      await flush();
+      expect(h.storage.get(requestKey)).toBe(raw);
+      expect(postCalls(h)).toHaveLength(0);
+    }
+  );
+  it.each(['scope', 'popstate', 'pagehide', 'shell', 'rail'])(
+    'rejects old history after %s changes during its read',
+    async (change) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const raw = JSON.stringify(original);
+      const storage = new Map([
+        [draftKey, 'Private older draft'],
+        [requestKey, raw],
+      ]);
+      const h = harness({
+        storage,
+        conversation: () => pending.promise,
+        query: '?tenant=alpha&ask=Home+request&send=1',
+      });
+      await flush();
+      if (change === 'scope')
+        h.window.location.search = '?tenant=beta&organizationId=other&projectId=other';
+      if (change === 'popstate' || change === 'pagehide') h.browserEvent(change);
+      if (change === 'shell') h.shell('loading');
+      if (change === 'rail') h.window.FrontDeskRail.ready = Promise.resolve();
+      pending.resolve(response({ ok: true, sessionId: session, messages: [], pending: 1 }));
+      await flush();
+      expect(h.input.value).toBe('');
+      expect(h.elements.get('pending-request-recovery')!.hidden).toBe(true);
+      h.elements.get('pending-request-review')!.fire('click');
+      h.elements.get('draft-replace')!.fire('click');
+      expect(h.input.value).toBe('');
+      expect(storage.get(draftKey)).toBe('Private older draft');
+      expect(storage.get(requestKey)).toBe(raw);
+      expect(postCalls(h)).toHaveLength(0);
+    }
+  );
+  it.each(['throws', 'drops'])('fails closed if confirmed-request cleanup %s', async (failure) => {
+    const ready = deferred<void>();
+    const raw = JSON.stringify(original);
+    const storage = new Map([
+      [draftKey, 'Older draft'],
+      [requestKey, raw],
+    ]);
+    const h = harness({
+      ready: ready.promise,
+      storage,
+      history: {
+        messages: [
+          { id: original.id + '-user', role: 'user', text: original.text },
+          { id: original.id + '-secretary', role: 'secretary', text: 'Done' },
+        ],
+      },
+    });
+    h.window.sessionStorage.removeItem = () => {
+      if (failure === 'throws') throw new Error('blocked');
+      return false;
+    };
+    ready.resolve();
+    await flush();
+    expect(storage.get(requestKey)).toBe(raw);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(postCalls(h)).toHaveLength(0);
+  });
+  it('fails closed for explicit Home sends when the recovery helper is missing', async () => {
+    const raw = JSON.stringify(original);
+    const storage = new Map([
+      [draftKey, 'Older draft'],
+      [requestKey, raw],
+    ]);
+    const h = harness({
+      storage,
+      recoveryScript: false,
+      query: '?tenant=alpha&ask=New+Home+request&send=1',
+    });
+    await flush();
+    expect(postCalls(h)).toHaveLength(0);
+    expect(storage.get(draftKey)).toBe('Older draft');
+    expect(storage.get(requestKey)).toBe(raw);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(h.elements.get('ask-startup-retry')!.hidden).toBe(false);
+    expect(h.window.history.replaceState).not.toHaveBeenCalled();
   });
 });
