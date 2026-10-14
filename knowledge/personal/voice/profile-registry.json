@@ -6,13 +6,11 @@
       "profile_id": "operator-personal-voice-v1",
       "display_name": "Operator Personal Voice v1",
       "tier": "personal",
-      "languages": [
-        "ja"
-      ],
+      "languages": ["ja"],
       "sample_refs": [
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-01.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-02.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-03.wav"
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-01.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-02.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-03.wav"
       ],
       "default_engine_id": "mlx_audio_qwen3",
       "status": "active",
@@ -22,13 +20,11 @@
       "profile_id": "operator-personal-voice-v2",
       "display_name": "Operator Personal Voice v2",
       "tier": "personal",
-      "languages": [
-        "ja"
-      ],
+      "languages": ["ja"],
       "sample_refs": [
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-01.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-02.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-03.wav"
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-01.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-02.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-03.wav"
       ],
       "default_engine_id": "mlx_audio_qwen3",
       "status": "shadow",
@@ -38,13 +34,11 @@
       "profile_id": "operator-personal-voice-v5",
       "display_name": "Operator Personal Voice v5",
       "tier": "personal",
-      "languages": [
-        "ja"
-      ],
+      "languages": ["ja"],
       "sample_refs": [
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-01.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-02.wav",
-        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-03.wav"
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-01.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-02.wav",
+        "active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-03.wav"
       ],
       "default_engine_id": "mlx_audio_qwen3",
       "status": "active",
@@ -54,9 +48,7 @@
       "profile_id": "sovereign-personal",
       "display_name": "Sovereign Personal",
       "tier": "personal",
-      "languages": [
-        "ja"
-      ],
+      "languages": ["ja"],
       "sample_refs": [
         "active/shared/tmp/voice-sample-collection/MSN-SOVEREIGN-ONBOARDING-2026-04-23/sample-01.wav",
         "active/shared/tmp/voice-sample-collection/MSN-SOVEREIGN-ONBOARDING-2026-04-23/sample-02.wav",
@@ -70,12 +62,8 @@
       "profile_id": "user-cloned",
       "display_name": "User Cloned Voice",
       "tier": "personal",
-      "languages": [
-        "ja"
-      ],
-      "sample_refs": [
-        "active/shared/runtime/voice-profiles/user-cloned/sample-01.wav"
-      ],
+      "languages": ["ja"],
+      "sample_refs": ["active/shared/runtime/voice-profiles/user-cloned/sample-01.wav"],
       "default_engine_id": "open_voice_clone",
       "status": "active",
       "notes": "Custom voice cloned via zero-shot voice training bridge."
