@@ -54,16 +54,27 @@ describe('desktop recording and distillation', () => {
     expect(parseDesktopEventLine([])).toBeUndefined();
     expect(parseDesktopEventLine({ op: 'click_at', x: '10', y: 20 })).toBeUndefined();
     expect(
-      parseDesktopEventLine({ op: 'click_at', x: 10, y: 20, params: { text: 'secret' } })
+      parseDesktopEventLine({
+        op: 'click_at',
+        x: 10,
+        y: 20,
+        params: { text: 'secret' },
+      })
     ).toBe(undefined);
     expect(
-      parseDesktopEventLine({ op: 'press_key', params: { key_code: 36, key: 'return' } })
+      parseDesktopEventLine({
+        op: 'press_key',
+        params: { key_code: 36, key: 'return' },
+      })
     ).toBe(undefined);
     expect(
       parseDesktopEventLine({ op: 'press_key', params: { key_code: 70_000 } })
     ).toBeUndefined();
     expect(
-      parseDesktopEventLine({ op: 'press_key', params: { constructor: { polluted: true } } })
+      parseDesktopEventLine({
+        op: 'press_key',
+        params: { constructor: { polluted: true } },
+      })
     ).toBeUndefined();
   });
 
@@ -91,6 +102,35 @@ describe('desktop recording and distillation', () => {
     expect(readiness.find((entry) => entry.source_id === 'screen_frame')).toMatchObject({
       available: false,
       reason: 'screen_recording_permission_unknown',
+    });
+  });
+
+  it('uses Windows source probes instead of reporting every accessibility source as macOS-only', () => {
+    const readiness = assessDesktopObservationReadiness({
+      platform: 'win32',
+      available: false,
+      permissions: {
+        automation: 'unsupported',
+        accessibility: 'unsupported',
+        screen_recording: 'unsupported',
+      },
+      sourceAvailability: {
+        active_window: true,
+        browser_tabs: true,
+        focused_input: true,
+        screen_frame: false,
+      },
+    });
+    expect(readiness.find((entry) => entry.source_id === 'active_window')).toMatchObject({
+      available: true,
+      reason: 'windows_observation_probe_succeeded',
+    });
+    expect(readiness.find((entry) => entry.source_id === 'browser_tabs')).toMatchObject({
+      available: true,
+    });
+    expect(readiness.find((entry) => entry.source_id === 'screen_frame')).toMatchObject({
+      available: false,
+      reason: 'windows_observation_unavailable',
     });
   });
 
@@ -127,7 +167,10 @@ describe('desktop recording and distillation', () => {
     let index = 0;
     const recorder = new DesktopDemonstrationRecorder({
       sample: () =>
-        snapshot({ application: index++ === 0 ? 'Notes' : 'Calendar', event: undefined }),
+        snapshot({
+          application: index++ === 0 ? 'Notes' : 'Calendar',
+          event: undefined,
+        }),
       eventSource: () => undefined,
     });
     recorder.start();
@@ -186,7 +229,12 @@ describe('desktop recording and distillation', () => {
           params: { token: 'raw-secret', message: 'private' },
         },
       },
-      { event: { op: 'press_key', params: { key_code: 36, key: 'Return', secret: 'raw-secret' } } },
+      {
+        event: {
+          op: 'press_key',
+          params: { key_code: 36, key: 'Return', secret: 'raw-secret' },
+        },
+      },
     ]);
     expect(JSON.stringify(recording)).not.toContain('raw-secret');
     expect(recording.steps[0]?.params).toBeUndefined();
@@ -222,7 +270,9 @@ describe('desktop recording and distillation', () => {
 
   it('rejects a directory at the persisted recording path', () => {
     safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
-    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), { recursive: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), {
+      recursive: true,
+    });
 
     expect(() =>
       loadDesktopRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
@@ -246,7 +296,9 @@ describe('desktop recording and distillation', () => {
 
   it('rejects a directory at the persisted desktop intent path', () => {
     safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
-    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'), { recursive: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'), {
+      recursive: true,
+    });
 
     expect(() =>
       loadDesktopIntentDraftAtPath(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'))
@@ -294,7 +346,10 @@ describe('desktop recording and distillation', () => {
 
   it('keeps inferred native suggestions in intent without turning them into an execution binding', () => {
     const recording = buildDesktopRecording([
-      snapshot({ application: 'GitHub issue tracker', event: { op: 'click_at', x: 10, y: 20 } }),
+      snapshot({
+        application: 'GitHub issue tracker',
+        event: { op: 'click_at', x: 10, y: 20 },
+      }),
     ]);
     const compiled = compileDesktopRecording(recording, {
       procedureId: 'desktop.github.issue',
@@ -306,7 +361,10 @@ describe('desktop recording and distillation', () => {
 
   it('rejects an explicit native binding until a governed executor is registered', () => {
     const recording = buildDesktopRecording([
-      snapshot({ application: 'GitHub issue tracker', event: { op: 'click_at', x: 10, y: 20 } }),
+      snapshot({
+        application: 'GitHub issue tracker',
+        event: { op: 'click_at', x: 10, y: 20 },
+      }),
     ]);
     recording.steps[0] = { ...recording.steps[0], native_op: 'gh:issue' };
     recording.recording_hash = computeDesktopRecordingHash(recording);
