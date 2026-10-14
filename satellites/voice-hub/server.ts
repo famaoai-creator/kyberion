@@ -158,6 +158,13 @@ const inflightResponses = new Map<string, Promise<VoiceHubResponseRecord>>();
 const conversationMemory = new Map<string, ConversationTurn[]>();
 let activeSpeechProcess: ChildProcess | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
+/**
+ * Speech marked by an external caller (POST /api/speech/state) — e.g. the
+ * realtime loop's local streaming playback, which produces audio without a
+ * host process voice-hub can observe. `until` bounds the mark in case the
+ * caller dies without marking idle.
+ */
+let externalSpeechState: SpeechPlaybackState & { until?: number } = { status: 'idle' };
 let recentSpeechGuardState: RecentSpeechGuardState = {};
 
 function normalizeSpeechEchoText(text: string): string {
@@ -369,6 +376,12 @@ function getSpeechPlaybackState(): SpeechPlaybackState {
   if (activeSpeechProcess && activeSpeechProcess.exitCode === null && !activeSpeechProcess.killed) {
     return { ...activeSpeechState };
   }
+  if (
+    externalSpeechState.status === 'speaking' &&
+    (externalSpeechState.until === undefined || Date.now() < externalSpeechState.until)
+  ) {
+    return { ...externalSpeechState };
+  }
   return { status: 'idle' };
 }
 
@@ -377,6 +390,7 @@ async function stopSpeechPlayback(
 ): Promise<{ ok: boolean; stopped: boolean; reason: string }> {
   if (!activeSpeechProcess) {
     activeSpeechState = { status: 'idle' };
+    externalSpeechState = { status: 'idle' };
     return { ok: true, stopped: false, reason };
   }
 
@@ -1052,6 +1066,36 @@ app.get('/api/speech/state', (_req, res) => {
     ok: true,
     speech: getSpeechPlaybackState(),
   });
+});
+
+// External callers that produce speech audio without a host process (e.g.
+// the realtime loop's local PCM streaming playback) mark their state here so
+// surfaces polling /api/speech/state — talking avatar, concierge dock — still
+// track turns. Real playback wins; marks carry a bounded `until`.
+app.post('/api/speech/state', (req, res) => {
+  const body = req.body ?? {};
+  const status = body.status;
+  if (status !== 'speaking' && status !== 'idle') {
+    return res.status(400).json({ ok: false, error: 'status must be speaking or idle' });
+  }
+  if (status === 'idle') {
+    externalSpeechState = { status: 'idle' };
+    return res.json({ ok: true, speech: getSpeechPlaybackState() });
+  }
+  const estimatedMs =
+    typeof body.estimated_ms === 'number' && body.estimated_ms > 0
+      ? Math.round(body.estimated_ms)
+      : undefined;
+  externalSpeechState = {
+    status: 'speaking',
+    text: typeof body.text === 'string' ? body.text.slice(0, 2000) : undefined,
+    engine_id: 'external_stream',
+    startedAt: Date.now(),
+    estimated_ms: estimatedMs,
+    // Outlive a caller that dies without marking idle; refreshed by re-marks.
+    until: Date.now() + (estimatedMs ?? 60_000) + 5_000,
+  };
+  return res.json({ ok: true, speech: getSpeechPlaybackState() });
 });
 
 // PA-09: synthesize and RETURN the audio (no host playback). Host playback via

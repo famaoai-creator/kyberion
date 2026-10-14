@@ -739,10 +739,11 @@ export async function runRealtimeVoiceConversationLoop(
   }
   if (avatarFollow && getRegisteredEnvText('KYBERION_TTS_COMMAND')) {
     print(
-      '⚠️ --avatar-follow + streaming TTS: audio plays locally (not via voice-hub); ' +
-        'the avatar tracks the presence speaking state instead.'
+      '⚠️ --avatar-follow + streaming TTS: audio plays locally; ' +
+        'voice-hub speech state is marked externally for the avatar.'
     );
   }
+  const voiceHubUrl = avatarFollow ? resolveSurfaceUrl('voice-hub') : '';
   const reflectLoopState = avatarFollow
     ? (state: string) => {
         void dispatchPresenceFrame({
@@ -752,6 +753,15 @@ export async function runRealtimeVoiceConversationLoop(
           expression: state === 'listening' || state === 'thinking' ? state : 'neutral',
         }).catch(() => {
           /* presence surface is best effort */
+        });
+        // Streaming playback bypasses voice-hub audio — mark the speech state
+        // explicitly so surfaces polling /api/speech/state still track turns.
+        void fetch(`${voiceHubUrl}/api/speech/state`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: state === 'speaking' ? 'speaking' : 'idle' }),
+        }).catch(() => {
+          /* voice-hub is best effort */
         });
       }
     : undefined;
