@@ -146,6 +146,79 @@ describe('realtime voice conversation', () => {
     expect(generated.artifactPath).toMatch(/\.wav$/u);
   });
 
+  it('honours a per-call tts engine override and guards require_personal_voice', () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    safeWriteFile(
+      PROFILE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Me JA',
+            tier: 'personal',
+            languages: ['ja'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      ENGINE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_engine_id: 'open_voice_clone',
+        engines: [
+          {
+            engine_id: 'open_voice_clone',
+            display_name: 'Open Voice Clone',
+            kind: 'voice_clone_service',
+            provider: 'test',
+            status: 'active',
+            platforms: ['any'],
+            supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+          },
+          {
+            engine_id: 'fast_neural',
+            display_name: 'Fast Neural',
+            kind: 'native_local',
+            provider: 'test',
+            status: 'active',
+            platforms: ['any'],
+            supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
+
+    const generated = buildRealtimeVoiceGenerationPayload({
+      sessionId: 'rtc-engine-override',
+      profileId: 'me-ja',
+      language: 'ja',
+      text: 'こんにちは。',
+      deliveryMode: 'artifact',
+      personalVoiceMode: 'allow_fallback',
+      engineId: 'fast_neural',
+    });
+    expect(generated.payload.engine).toMatchObject({ engine_id: 'fast_neural' });
+
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: 'rtc-engine-override',
+        profileId: 'me-ja',
+        language: 'ja',
+        text: 'こんにちは。',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'require_personal_voice',
+        engineId: 'fast_neural',
+      })
+    ).toThrow(/require_personal_voice/u);
+  });
+
   it('rejects traversal-shaped session ids and request tags before artifact generation', () => {
     expect(() =>
       buildRealtimeVoiceGenerationPayload({
