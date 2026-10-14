@@ -46,7 +46,10 @@ const taskSessionMocks = vi.hoisted(() => {
     recordTaskSessionHistory: vi.fn((id: string, entry: Record<string, unknown>) => {
       const current = sessions.get(id);
       if (!current) return null;
-      const next = { ...current, history: [...(current.history || []), entry] };
+      const next = {
+        ...current,
+        history: [...(current.history || []), entry],
+      };
       sessions.set(id, next);
       return next;
     }),
@@ -148,7 +151,10 @@ describe('browser assist exploration loop', () => {
         id: 'step-1',
         type: 'apply',
         op: 'goto',
-        params: { url: 'https://www.rakuten.co.jp/', waitUntil: 'domcontentloaded' },
+        params: {
+          url: 'https://www.rakuten.co.jp/',
+          waitUntil: 'domcontentloaded',
+        },
       },
     ]);
     expect(result).toMatchObject({
@@ -173,7 +179,10 @@ describe('browser assist exploration loop', () => {
   it('stops when a proposed navigation leaves the explicitly allowed origins', async () => {
     generateWithTools.mockResolvedValue({
       toolCalls: [
-        { name: 'browser_action', input: { type: 'navigate', url: 'https://example.com/' } },
+        {
+          name: 'browser_action',
+          input: { type: 'navigate', url: 'https://example.com/' },
+        },
       ],
     });
     const executePipeline = vi.fn().mockResolvedValue(snapshot());
@@ -238,7 +247,10 @@ describe('browser assist exploration loop', () => {
         toolCalls: [
           {
             name: 'browser_action',
-            input: { type: 'complete', summary: '20% point back on a pack of rice.' },
+            input: {
+              type: 'complete',
+              summary: '20% point back on a pack of rice.',
+            },
           },
         ],
       });
@@ -269,6 +281,40 @@ describe('browser assist exploration loop', () => {
     });
   });
 
+  it('pauses and preserves the candidate when the model proposes an unsupported action', async () => {
+    generateWithTools
+      .mockResolvedValueOnce({
+        toolCalls: [
+          {
+            name: 'browser_action',
+            input: { type: 'navigate', url: 'https://www.rakuten.co.jp/' },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        toolCalls: [{ name: 'browser_action', input: { type: 'activate_app' } }],
+      });
+    const executePipeline = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce({ status: 'succeeded' })
+      .mockResolvedValueOnce(snapshot('https://www.rakuten.co.jp/'));
+
+    const result = await runBrowserAssist(input, { executePipeline });
+
+    expect(result).toMatchObject({
+      status: 'needs_clarification',
+      reason: expect.stringContaining('unsupported browser action'),
+      pipeline_candidate: { steps: [{ op: 'goto' }] },
+    });
+    expect(taskSessionMocks.sessions.get('TSK-BROWSER-TEST')).toMatchObject({
+      status: 'paused',
+      payload: { workflow_stage: 'invalid_model_action' },
+      artifact: { kind: 'browser_pipeline_candidate' },
+    });
+    expect(executePipeline).toHaveBeenCalledTimes(3);
+  });
+
   it('stops on a repeated page-text extraction and preserves the existing evidence', async () => {
     generateWithTools
       .mockResolvedValueOnce({
@@ -294,7 +340,9 @@ describe('browser assist exploration loop', () => {
     expect(result).toMatchObject({
       status: 'needs_clarification',
       actions: [{ extracted_text: 'Observed deal: 20% points back' }],
-      pipeline_candidate: { steps: [{ op: 'content', params: { selector: 'body' } }] },
+      pipeline_candidate: {
+        steps: [{ op: 'content', params: { selector: 'body' } }],
+      },
     });
     expect(executePipeline).toHaveBeenCalledTimes(3);
   });
@@ -314,7 +362,10 @@ describe('browser assist exploration loop', () => {
       })
       .mockResolvedValueOnce({
         toolCalls: [
-          { name: 'browser_action', input: { type: 'complete', reason: 'Opened the deal page.' } },
+          {
+            name: 'browser_action',
+            input: { type: 'complete', reason: 'Opened the deal page.' },
+          },
         ],
       });
     const executePipeline = vi
@@ -329,7 +380,10 @@ describe('browser assist exploration loop', () => {
 
     expect(result.pipeline_candidate.steps).toEqual([
       expect.objectContaining({ op: 'goto' }),
-      expect.objectContaining({ op: 'snapshot', params: { export_as: 'last_snapshot' } }),
+      expect.objectContaining({
+        op: 'snapshot',
+        params: { export_as: 'last_snapshot' },
+      }),
       expect.objectContaining({
         op: 'click_ref',
         params: { ref: '@e1', name: expect.any(String), role: 'searchbox' },
@@ -349,7 +403,10 @@ describe('browser assist exploration loop', () => {
       })
       .mockResolvedValueOnce({
         toolCalls: [
-          { name: 'browser_action', input: { type: 'complete', reason: 'The page is open.' } },
+          {
+            name: 'browser_action',
+            input: { type: 'complete', reason: 'The page is open.' },
+          },
         ],
       });
     const executePipeline = vi
@@ -384,8 +441,14 @@ describe('browser assist exploration loop', () => {
 
     expect(taskSessionMocks.sessions.get(exploration.task_session_id)).toMatchObject({
       status: 'completed',
-      artifact: { kind: 'browser_pipeline_replay', replay_session_id: 'browser-replay-fresh' },
-      payload: { workflow_stage: 'completed', replay_session_id: 'browser-replay-fresh' },
+      artifact: {
+        kind: 'browser_pipeline_replay',
+        replay_session_id: 'browser-replay-fresh',
+      },
+      payload: {
+        workflow_stage: 'completed',
+        replay_session_id: 'browser-replay-fresh',
+      },
     });
   });
 });
