@@ -13431,6 +13431,21 @@
         "ja": "よくあるご依頼",
         "qps-ploc": "⟦Ɋůïƈķ řėɋůėşŧş ŀőřė⟧"
       },
+      "home.load_unavailable": {
+        "en": "Could not load decisions and outcomes. Check your connection and sign-in, then retry.",
+        "ja": "判断待ちと成果を読み込めませんでした。接続とログイン状態を確認して再試行してください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ḓėƈïşïőñş ȧñḓ őůŧƈőɱėş. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ȧñḓ şïɠñ-ïñ, ŧħėñ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "home.load_retry": {
+        "en": "Load again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŀőȧḓ ȧɠȧïñ ŀőř⟧"
+      },
+      "home.ask_start": {
+        "en": "Ask your AI assistant",
+        "ja": "AIに仕事を依頼する",
+        "qps-ploc": "⟦Ȧşķ ẏőůř ȦÏ ȧşşïşŧȧñŧ ŀőřėɱ ⟧"
+      },
       "dock.quick.meeting": {
         "en": "Please join my meeting",
         "ja": "会議に参加してほしい",
@@ -24508,6 +24523,21 @@
         "en": "Set up Kyberion",
         "ja": "Kyberion の初回セットアップ",
         "qps-ploc": "⟦Şėŧ ůṗ Ķẏƀėřïőñ ŀőřė⟧"
+      },
+      "first_run_loading": {
+        "en": "Checking setup status…",
+        "ja": "初回設定の状態を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ şėŧůṗ şŧȧŧůş… ŀőřėɱ ï⟧"
+      },
+      "first_run_unavailable": {
+        "en": "Could not check setup status. Check your connection and try again.",
+        "ja": "初回設定の状態を確認できませんでした。接続を確認して再試行してください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈħėƈķ şėŧůṗ şŧȧŧůş. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "first_run_retry": {
+        "en": "Check again",
+        "ja": "もう一度確認する",
+        "qps-ploc": "⟦Ƈħėƈķ ȧɠȧïñ ŀőř⟧"
       },
       "first_run_lead": {
         "en": "No one can sign in from a browser yet. Use the one-time setup code issued on the server to create the owner.",

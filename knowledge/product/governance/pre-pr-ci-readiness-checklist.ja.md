@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-10-11
+last_updated: 2026-10-14
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -177,6 +177,14 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 | project / track の lifecycle command・status 更新     | 専用 lifecycle command と汎用 status 更新が同じ guarded facade を通ること、archive からの復帰は明示的な restore だけであることを確認し、`libs/core/project/project-management.test.ts` の lifecycle regression と core + repo CLI の build を通す。→ [operations-hygiene-runbook §9](./operations-hygiene-runbook.md)                                                                                            |
 | 大規模変更、release、CI failure repair                | `pnpm run validate` または `pnpm check -- --scope full` を実行し、全 test suite と未実行項目を PR 本文へ記録する。                                                                                                                                                                                                                                                                                               |
 | locale 解決・語彙文字列の変更                         | CI と同じ環境 `env -u KYBERION_LOCALE LANG=C.UTF-8 LC_ALL=C.UTF-8 CI=true ./node_modules/.bin/vitest run` でも全 suite を流す（日本語ロケールの開発機は locale 未固定の test を隠す）。→ [multi-branch-audit-delivery-lessons](../orchestration/multi-branch-audit-delivery-lessons.md)                                                                                                                          |     |
+
+### 語彙カタログを変更した場合
+
+文言の変更・キーの追加削除後は、`pnpm generate:vocabulary-types` と
+`pnpm generate:pseudo-locale` を実行し、生成された差分も同じPRに含める。
+`pnpm check -- --only vocabulary-types,pseudo-locale` で生成物の一致を確認する。
+PR scopeには `vocabulary-types` が含まれないため、PR scopeの成功だけでは
+型定義の更新漏れを検出できない。上記の追加検査とlocale行の全suite検証を行う。
 
 ## よく落ちる gate（実測パターン）
 
