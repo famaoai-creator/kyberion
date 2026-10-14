@@ -874,6 +874,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CODEX_CLI_CWD",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Working directory passed to `codex exec -C`. Pointing it at a directory outside the governed workspace keeps repo agent context (AGENTS.md) out of conversational calls such as the realtime voice reply path.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_CODEX_CLI_EXTRA_ARGS",
       "category": "runtime",
       "type": "string",

@@ -510,13 +510,17 @@ async function playVoiceArtifact(
       pid: player.pid,
       estimated_ms: estimatedMs,
     };
-    player.on('close', () => {
+    player.on('close', (code, signal) => {
       if (activeSpeechProcess === player) {
         activeSpeechProcess = null;
         recentSpeechGuardState = { text, finishedAt: Date.now() };
         activeSpeechState = { status: 'idle' };
       }
-      resolve();
+      // Intentional stops arrive as SIGTERM (see stopSpeechPlayback); every
+      // other non-zero exit means the artifact never reached the speakers —
+      // surface it instead of reporting a fully-spoken turn.
+      if (code === 0 || signal === 'SIGTERM') return resolve();
+      reject(new Error(`afplay_exited_${code ?? signal ?? 'unknown'}`));
     });
     player.on('error', (error) => {
       if (activeSpeechProcess === player) {
@@ -1059,6 +1063,48 @@ app.post('/api/speech/synthesize', async (req, res) => {
   return res.end(
     Buffer.from(result.audio.buffer, result.audio.byteOffset, result.audio.byteLength)
   );
+});
+
+// Realtime-loop playback delegate: plays an already-synthesized artifact on
+// the host speakers so /api/speech/state (and surfaces polling it, e.g. the
+// talking avatar) track the loop's turns. Blocks until playback finishes or
+// /api/stop-speaking interrupts it.
+app.post('/api/speech/play', async (req, res) => {
+  // If the caller disconnects mid-playback, stop the player too — otherwise
+  // the host keeps speaking a turn nobody is waiting for.
+  req.on('close', () => {
+    if (!res.writableFinished) void stopSpeechPlayback('client_disconnect');
+  });
+  let body: Record<string, unknown>;
+  try {
+    body = readVoiceHubRequestObject(req.body === undefined ? {} : req.body);
+  } catch (error: unknown) {
+    return res
+      .status(400)
+      .json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+  const audioPath = typeof body.audio_path === 'string' ? body.audio_path.trim() : '';
+  if (!audioPath) {
+    return res.status(400).json({ ok: false, error: 'audio_path is required' });
+  }
+  const label = typeof body.text === 'string' ? body.text : '';
+  let safePath: string;
+  try {
+    safePath = resolveRegularRepositoryFile(audioPath, 'speech playback artifact');
+  } catch (error: unknown) {
+    return res
+      .status(400)
+      .json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+  try {
+    await stopSpeechPlayback('replace_playback');
+    await playVoiceArtifact(safePath, label, 'external_playback');
+    return res.json({ ok: true });
+  } catch (error: unknown) {
+    return res
+      .status(500)
+      .json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 app.post('/api/stop-speaking', async (req, res) => {

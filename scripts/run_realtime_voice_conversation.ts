@@ -32,6 +32,9 @@ import type {
 } from '@agent/core/voice/realtime-voice-preferences';
 import type { PlaybackHandle } from '@agent/core/voice/audio-playback';
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
+import { createVoiceHubSegmentPlayback } from '@agent/core/voice/voice-hub-playback';
+import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
+import { dispatchPresenceFrame, reflectPresenceAgentReply } from '@agent/core/presence-bridge';
 import {
   getSpeechToTextBridge,
   installAvailableSpeechToTextBridges,
@@ -160,6 +163,17 @@ export interface RealtimeVoiceConversationCliOptions {
   streamingStt: boolean;
   /** Keep one warm voice-actuator process instead of spawning per segment. */
   warmActuator: boolean;
+  /**
+   * Play reply segments through the voice-hub daemon and reflect loop state
+   * to the presence surface, so the talking avatar follows the conversation
+   * (mouth via /api/speech/state, status via presence frames).
+   */
+  avatarFollow?: boolean;
+  /**
+   * Per-call TTS engine override (e.g. 'kokoro' for low-latency replies).
+   * Overrides the voice profile's default engine.
+   */
+  ttsEngine?: string;
   /** Mission id carrying recording consent (coordinator-style fail-closed gate). */
   mission?: string;
   /** End the conversation loop after this much listening silence. */
@@ -607,7 +621,20 @@ export async function runRealtimeVoiceConversationLoop(
     );
   }
   const playbackEnabled = options.deliveryMode === 'artifact_and_playback';
-  if (playbackEnabled) {
+  if (playbackEnabled && options.avatarFollow) {
+    // With avatar-follow the actual player lives inside the voice-hub daemon —
+    // probe its health instead of the local afplay/aplay path.
+    try {
+      const health = await fetch(`${resolveSurfaceUrl('voice-hub')}/health`);
+      if (!health.ok) throw new Error(`http_${health.status}`);
+    } catch (error) {
+      throw new Error(
+        `--avatar-follow requires voice-hub (${resolveSurfaceUrl('voice-hub')}): ` +
+          `${error instanceof Error ? error.message : String(error)}. ` +
+          'Start it with: pnpm surfaces --action start --surface voice-hub'
+      );
+    }
+  } else if (playbackEnabled) {
     const playbackProbe = probeAudioPlayback();
     if (!playbackProbe.available) {
       throw new Error(
@@ -701,7 +728,33 @@ export async function runRealtimeVoiceConversationLoop(
     ?.split(',')
     .map((part) => part.trim())
     .filter(Boolean);
-  if (playbackEnabled) {
+  // Avatar follow delegates playback to voice-hub, which is what lets the
+  // talking avatar track turns — the direct-PCM streaming path bypasses it,
+  // so artifact playback wins when both are configured.
+  const avatarFollow = Boolean(options.avatarFollow) && playbackEnabled;
+  if (options.avatarFollow && !playbackEnabled) {
+    print(
+      `⚠️ --avatar-follow has no effect without playback (delivery-mode ${options.deliveryMode}).`
+    );
+  }
+  if (avatarFollow && getRegisteredEnvText('KYBERION_TTS_COMMAND')) {
+    print(
+      '⚠️ --avatar-follow plays through voice-hub; KYBERION_TTS_COMMAND streaming is bypassed.'
+    );
+  }
+  const reflectLoopState = avatarFollow
+    ? (state: string) => {
+        void dispatchPresenceFrame({
+          surfaceId: options.surfaceId,
+          agentId: 'presence-surface-agent',
+          status: state === 'calibrating' ? 'listening' : state,
+          expression: state === 'listening' || state === 'thinking' ? state : 'neutral',
+        }).catch(() => {
+          /* presence surface is best effort */
+        });
+      }
+    : undefined;
+  if (playbackEnabled && !avatarFollow) {
     const installed = installShellStreamingTtsBridgeFromEnv();
     if (installed.installed) {
       const probe = probePcmAudioStreaming();
@@ -737,6 +790,7 @@ export async function runRealtimeVoiceConversationLoop(
               deliveryMode: 'artifact',
               personalVoiceMode: options.personalVoiceMode,
               requestTag: `t${turn + 1}s${segmentIndex}`,
+              ...(options.ttsEngine ? { engineId: options.ttsEngine } : {}),
             },
             warmClient
               ? (payload, requestSignal) => warmClient.request(payload, requestSignal)
@@ -878,10 +932,15 @@ export async function runRealtimeVoiceConversationLoop(
               }),
           }
         : {}),
-      ...(!playbackEnabled ? { play: () => IMMEDIATE_PLAYBACK } : {}),
+      ...(!playbackEnabled
+        ? { play: () => IMMEDIATE_PLAYBACK }
+        : avatarFollow
+          ? { play: createVoiceHubSegmentPlayback() }
+          : {}),
       onEvent: (event) => {
         const message = describeRealtimeVoiceLoopEvent(event);
         if (message) print(message);
+        if (event.kind === 'state') reflectLoopState?.(event.state);
       },
       onTurn: (turn) => {
         recordRealtimeVoiceConversationExchange({
@@ -891,6 +950,17 @@ export async function runRealtimeVoiceConversationLoop(
           userAudioRef: turn.audio_path,
           assistantAudioRef: turn.assistant_audio_paths[0],
         });
+        if (avatarFollow) {
+          void reflectPresenceAgentReply({
+            agentId: 'presence-surface-agent',
+            surfaceId: options.surfaceId,
+            text: turn.assistant_text,
+            speaker: session.assistant_name,
+            speakingMs: turn.metrics.speak_ms,
+          }).catch(() => {
+            /* presence surface is best effort */
+          });
+        }
         print(`\nUser: ${turn.user_text}`);
         print(`${session.assistant_name}: ${turn.assistant_text}`);
         print(
@@ -902,6 +972,7 @@ export async function runRealtimeVoiceConversationLoop(
     });
 
     const report = await handle.done;
+    reflectLoopState?.('ready');
     print(
       `\n=== Loop finished: ${report.turns_completed} turns, ` +
         `${report.interruptions} barge-ins, ended by ${report.ended_by} ===`
@@ -936,6 +1007,7 @@ async function runOneShotConversation(
     reasoningModel: options.reasoningModel,
     reasoningModelTier: reasoningModelTierForOptions(options),
     reasoningEffort: reasoningEffortForOptions(options),
+    ...(options.ttsEngine ? { ttsEngineId: options.ttsEngine } : {}),
   });
   print(JSON.stringify(result, null, 2));
 }
@@ -1084,6 +1156,8 @@ export function parseRealtimeVoiceConversationCli(
     ...(argv['stt-purpose'] ? { sttPurpose: String(argv['stt-purpose']) } : {}),
     streamingStt: argv['streaming-stt'] === undefined ? true : Boolean(argv['streaming-stt']),
     warmActuator: argv['warm-actuator'] === undefined ? true : Boolean(argv['warm-actuator']),
+    avatarFollow: Boolean(argv['avatar-follow']),
+    ...(argv['tts-engine'] ? { ttsEngine: String(argv['tts-engine']) } : {}),
     ...(argv.mission ? { mission: String(argv.mission) } : {}),
     idleTimeoutSeconds: (() => {
       const value = Number(argv['idle-timeout-seconds'] ?? 120);
@@ -1283,6 +1357,17 @@ export async function main(
       type: 'boolean',
       default: true,
       describe: 'Transcribe during the utterance via KYBERION_STT_COMMAND when configured',
+    })
+    .option('avatar-follow', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Play replies through voice-hub and reflect loop state to the presence surface so the talking avatar follows the conversation',
+    })
+    .option('tts-engine', {
+      type: 'string',
+      describe:
+        "Per-call TTS engine override for reply segments (e.g. 'kokoro' for low latency). Overrides the voice profile's default engine",
     })
     .option('warm-actuator', {
       type: 'boolean',

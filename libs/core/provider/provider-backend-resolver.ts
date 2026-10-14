@@ -112,11 +112,13 @@ function readCodexOptionsWithoutSpawn(env: NodeJS.ProcessEnv): CodexCliQueryOpti
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
+  const cwd = envText(env, 'KYBERION_CODEX_CLI_CWD')?.trim();
   return {
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
+    ...(cwd ? { cwd } : {}),
   };
 }
 
