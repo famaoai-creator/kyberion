@@ -595,3 +595,29 @@ it('a late chat completion preserves requests reserved while that chat was pendi
   completeConversationTurn(viewer, request.id, 'Report draft');
   expect(readConversationHistory(viewer).pending).toBe(0);
 });
+
+describe('durable intake reference projection', () => {
+  it('projects status and followup references without execution authority', () => {
+    const a = '11111111-1111-4111-8111-111111111111';
+    const b = '22222222-2222-4222-8222-222222222222';
+    const c = '33333333-3333-4333-8333-333333333333';
+    reserveConversationTurn(viewer, 'Aの報告書を作って', a);
+    completeConversationTurn(viewer, a, 'Draft', 'answered');
+    reserveConversationTurn(viewer, 'Aの件どう？', b);
+    reserveConversationTurn(viewer, 'Aの報告書に表を追加して', c);
+    const history = readConversationHistory(viewer, { readOnly: true });
+    expect(history.messages.find((m) => m.id === b + '-user')?.requestRefs).toEqual([a]);
+    expect(history.messages.find((m) => m.id === c + '-user')?.requestRefs).toEqual([a]);
+    expect(
+      history.messages.filter((m) => m.role === 'secretary').every((m) => !m.requestRefs)
+    ).toBe(true);
+    expect(
+      readConversationHistory({ ...viewer, projectIds: ['other'] }, { readOnly: true }).messages
+    ).toEqual([]);
+  });
+  it('does not infer references from an assistant promise', () => {
+    const turn = reserveConversationTurn(viewer, 'Hello');
+    completeConversationTurn(viewer, turn.id, 'I started a mission and finished it');
+    expect(readConversationHistory(viewer).messages.every((m) => !m.requestRefs)).toBe(true);
+  });
+});

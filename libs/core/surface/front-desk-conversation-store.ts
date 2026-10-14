@@ -193,12 +193,19 @@ export function projectConversationHistory(
       ? readOnlyExecutionHistoryText(liveProjections.get(requestId))
       : (turn.reply ?? '');
   };
+  const taskIds = new Set((transcript.taskState?.tasks ?? []).map((task) => task.id));
+  const requestRefs = (turn: Turn): string[] =>
+    [...new Set(turn.routing?.taskIds ?? [])].filter(
+      (id) =>
+        taskIds.has(id) && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)
+    );
   const messages: ConversationHistoryMessage[] = transcript.turns.flatMap((turn) => [
     {
       id: `${turn.id}-user`,
       role: 'user' as const,
       createdAt: turn.createdAt,
       text: storedText(turn.text, CONVERSATION_MAX_INPUT),
+      ...(requestRefs(turn).length ? { requestRefs: requestRefs(turn) } : {}),
     },
     ...(turn.reply === undefined
       ? []

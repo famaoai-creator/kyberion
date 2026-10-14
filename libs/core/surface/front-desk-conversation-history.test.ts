@@ -33,3 +33,24 @@ describe('inert verified version history', () => {
     ).toBeUndefined();
   });
 });
+
+describe('inert durable request references', () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const value = (requestRefs: unknown, role = 'user') => ({
+    sessionId: 'concierge-' + 'b'.repeat(64),
+    pending: 0,
+    messages: [{ id: id + '-user', role, text: 'Request', requestRefs }],
+  });
+  it('preserves only a validated bounded reference list', () => {
+    expect(parseConversationHistory(value([id]))?.messages[0].requestRefs).toEqual([id]);
+  });
+  it.each([null, 'id', ['bad'], [id, id], [id, 1], Array(65).fill(id)].map((refs) => ({ refs })))(
+    'rejects invalid references %j',
+    ({ refs }) => {
+      expect(parseConversationHistory(value(refs))).toBeUndefined();
+    }
+  );
+  it('does not attach reference authority to assistant messages', () => {
+    expect(parseConversationHistory(value([id], 'secretary'))).toBeUndefined();
+  });
+});
