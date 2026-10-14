@@ -180,6 +180,15 @@ export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; r
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean);
-  installShellStreamingTtsBridge({ bridge_id: 'shell', command, args });
+  // Most streaming engines emit their model's native rate (kokoro: 24000).
+  // Declaring the real rate keeps the ffplay sink from mis-pitching it —
+  // chunks carry this format through. Non-governed rates (e.g. piper 22050)
+  // must be resampled inside the TTS command wrapper instead.
+  const rateRaw = getRegisteredEnvText('KYBERION_TTS_SAMPLE_RATE_HZ')?.trim();
+  const parsedRate = rateRaw ? Number.parseInt(rateRaw, 10) : NaN;
+  const format = [16000, 24000, 48000].includes(parsedRate)
+    ? { ...DEFAULT_FORMAT, sample_rate_hz: parsedRate as AudioFormat['sample_rate_hz'] }
+    : DEFAULT_FORMAT;
+  installShellStreamingTtsBridge({ bridge_id: 'shell', command, args, format });
   return { installed: true };
 }

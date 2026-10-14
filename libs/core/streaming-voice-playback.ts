@@ -171,8 +171,10 @@ export function playPcmAudioStream(
                 's16le',
                 '-ar',
                 String(format.sample_rate_hz),
-                '-ac',
-                String(format.channels),
+                // ffmpeg ≥7 renamed -ac to -ch_layout; ffplay 9 drops -ac
+                // entirely, so use the new spelling (mono/stereo).
+                '-ch_layout',
+                format.channels === 2 ? 'stereo' : 'mono',
                 '-i',
                 'pipe:0',
               ];
