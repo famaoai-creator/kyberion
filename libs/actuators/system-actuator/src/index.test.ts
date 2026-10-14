@@ -287,7 +287,13 @@ const macosAutomationBridge = {
       screen_recording: 'unknown',
     },
     known_applications: [],
-    reason: 'screen_recording_probe_not_attempted',
+    sourceAvailability: {
+      active_window: true,
+      focused_input: true,
+      browser_tabs: false,
+      screen_frame: false,
+    },
+    reason: 'screen_recording_permission_unknown',
   })),
   listCapabilities: vi.fn(() => [
     { application: 'Finder', adapter: 'file_manager', capabilities: ['open_path'] },

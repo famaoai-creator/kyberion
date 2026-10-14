@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-MACOS-AUTOMATION-PARITY-20261014-2026_10_14",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Native macOS automation: independent permissions, safe cache construction and evidence boundaries",
+  "summary": "Use nonprompting independent permission probes, exact-source native caches and explicit verification limits when integrating macOS automation through the shared platform adapter.",
+  "candidate_id": "mem-MSN-MACOS-AUTOMATION-PARITY-20261014-2026_10_14",
+  "evidence_refs": [
+    "active/missions/public/MSN-MACOS-AUTOMATION-PARITY-20261014/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-14T03:42:24.308Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "# Native macOS automation integration\n\n## Permission readiness\nCheck Accessibility, Screen Recording and each Apple Event target independently. Use AXIsProcessTrusted, CGPreflightScreenCaptureAccess and AEDeterminePermissionToAutomateTarget with askUserIfNeeded=false. Never use a mutating automation operation as a readiness probe. An absent target, undecided grant or failed helper is unknown, not denied; unsupported APIs remain unsupported. Preserve per-source readiness so a denied AX grant does not hide an available screen source, and a System Events grant does not imply Chrome access.\n\n## Native cache construction\nBind executable cache identity to exact source bytes, platform, architecture and compiler version. Compile an immutable source snapshot under the canonical cache floor; reserve temporary files exclusively, serialize same-key builds with an interprocess lock and publish only a validated executable atomically. Allow lock acquisition to outlast the bounded compiler execution plus cleanup margin; regression checks must assert the actual lock and compiler bounds.\n\n## Pointer and observation boundaries\nValidate input coordinates and operation amounts before native execution. Check AX trust again immediately before event posting, and explicitly set a scroll event's location to its requested point. Generic AX window and focused-control metadata should not require application scripting dictionaries or retrieve focused AXValue.\n\n## Verification evidence\nRecord mocked protocol/cache tests, SDK typechecking, actual helper compilation and read-only native probes separately. Read-only probes establish observed access and metadata availability on the current host; they do not establish successful live pointer injection or target application acceptance. Permission states and timings are host observations, never universal guarantees. Event submission receipts are not proof that an intended action succeeded."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-MACOS-AUTOMATION-PARITY-20261014/evidence/distillation.md"
+  ],
+  "source_branch": "feat/macos-automation-parity-20261014",
+  "source_commit": "d9389ce4db110626c4443d425d7a5e0422e68dcf"
+}

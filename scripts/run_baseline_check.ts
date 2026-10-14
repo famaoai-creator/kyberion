@@ -64,10 +64,7 @@ import {
   hasRequiredServiceConnectionValue,
   loadServiceConnectionReadinessConfig,
 } from '@agent/core/service/service-connection-readiness';
-import {
-  assessDesktopObservationReadiness,
-  listDesktopObservationSources,
-} from '@agent/core/virtual/desktop-recording';
+import { buildDesktopObservationReport } from '@agent/core/virtual/desktop-recording';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { isUIAutomationAvailable } from '@agent/core/virtual/os-automation';
 import { listKnownAppCapabilities } from '@agent/core/virtual/os-app-adapters';
@@ -834,7 +831,7 @@ export async function runBaselineCheck() {
   } = macosAutomationBridge.probe();
   let desktopObservationAvailability:
     | Partial<Record<'active_window' | 'browser_tabs' | 'focused_input' | 'screen_frame', boolean>>
-    | undefined;
+    | undefined = desktopObservationProbe.sourceAvailability;
   if (process.platform === 'win32') {
     // Windows has native UI Automation, Chrome UIA tab enumeration, and a
     // platform screen-capture seam. Probe each source separately so an empty
@@ -870,17 +867,12 @@ export async function runBaselineCheck() {
       screen_frame: screen.available && screen.backend !== 'stub',
     };
   }
-  const desktopObservation = {
-    registry: listDesktopObservationSources(),
-    readiness: assessDesktopObservationReadiness({
-      ...desktopObservationProbe,
-      ...(desktopObservationAvailability
-        ? { sourceAvailability: desktopObservationAvailability }
-        : {}),
-    }),
-    bridge: desktopObservationProbe,
-    data_tier_note: 'observation_tier is separate from personal/confidential/public data tier',
-  };
+  const desktopObservation = buildDesktopObservationReport({
+    ...desktopObservationProbe,
+    ...(desktopObservationAvailability
+      ? { sourceAvailability: desktopObservationAvailability }
+      : {}),
+  });
 
   // LC-01b/LC-01c: escalate via ops alerts with day-level dedup (the baseline
   // runs hourly; one alert per class per UTC day). Hard-gated under vitest so
