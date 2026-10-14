@@ -155,6 +155,8 @@
     draftEdited: false,
     draftRestored: false,
     draftSaveFailed: false,
+    draftRevision: 0,
+    homeDraftPreserved: false,
     proposedDraft: null,
     pending: 0,
     errorKey: null,
@@ -192,8 +194,11 @@
     render: render,
     renderConversationStatus: renderConversationStatus,
     draftKey: draftKey,
+    randomId: randomId,
     saveDraft: saveDraft,
     onHistoryReady: applyUrlPrefill,
+    proposeDraft: proposeDraft,
+    cancelDraftChoice: cancelDraftChoice,
     scopedUrl: scopedUrl,
     renderRecent: renderRecent,
     vt: vt,
@@ -974,6 +979,8 @@
     var input = document.getElementById('ask-input');
     if (!input) return;
     state.draftEdited = true;
+    state.draftRevision += 1;
+    state.homeDraftPreserved = false;
     cancelDraftChoice(false);
     input.value = text;
     saveDraft();
@@ -1010,6 +1017,8 @@
     if (input)
       input.addEventListener('input', function () {
         state.draftEdited = true;
+        state.draftRevision += 1;
+        state.homeDraftPreserved = false;
         cancelDraftChoice(false);
         saveDraft();
       });
@@ -1061,6 +1070,7 @@
   }
 
   function renderConversationStatus() {
+    readRecovery.renderDraftRecovery();
     var host = document.getElementById('conversation-status');
     if (!host) return;
     var key =
@@ -1121,36 +1131,12 @@
       !state.storageVerified
     )
       return;
-    var waiting = state.turns.find(function (turn) {
-      return (
-        turn.role === 'user' &&
-        turn.text === trimmed &&
-        typeof turn.id === 'string' &&
-        !state.turns.some(function (reply) {
-          return reply.id === turn.id.replace(/-user$/, '-secretary');
-        })
-      );
-    });
-    var request = waiting
-      ? {
-          id: waiting.id.replace(/-user$/, ''),
-          text: trimmed,
-          createdAt: waiting.createdAt || Date.now(),
-        }
-      : state.pendingRequest && state.pendingRequest.text === trimmed
-        ? state.pendingRequest
-        : { id: randomId(), text: trimmed, createdAt: Date.now() };
-    try {
-      var serialized = JSON.stringify(request);
-      window.sessionStorage.setItem(draftKey() + '.request', serialized);
-      if (window.sessionStorage.getItem(draftKey() + '.request') !== serialized)
-        throw new Error('request not retained');
-    } catch (err) {
-      state.storageVerified = false;
-      state.errorKey = 'front_desk:conversation_storage_required';
-      render();
-      return;
-    }
+    var request = readRecovery.prepareRequest(trimmed);
+    if (!request) return;
+    var composer = document.getElementById('ask-input');
+    var ownsComposer = Boolean(composer && composer.value.trim() === trimmed);
+    var draftRevision = state.draftRevision;
+    var sentScope = readRecovery.scopeSnapshot();
     state.pendingRequest = request;
     state.sending = true;
     var actionAttempt = nextActions ? nextActions.begin() : null;
@@ -1227,12 +1213,16 @@
         };
         pushTurn(replyTurn);
         if (nextActions) nextActions.bind(body, request, replyTurn, actionAttempt);
-        state.pendingRequest = null;
-        try {
-          window.sessionStorage.removeItem(draftKey() + '.request');
-        } catch (err) {}
+        readRecovery.completeRequest(request, sentScope);
         var input = document.getElementById('ask-input');
-        if (input && input.value.trim() === trimmed) input.value = '';
+        if (
+          ownsComposer &&
+          draftRevision === state.draftRevision &&
+          sentScope === readRecovery.scopeSnapshot() &&
+          input &&
+          input.value.trim() === trimmed
+        )
+          input.value = '';
         saveDraft();
         if (body.historySaved === false) state.errorKey = 'concierge:dock.history.unsaved';
         speakReply(body.reply);
@@ -1439,9 +1429,35 @@
       var mic = params.get('mic') === '1';
       if (ask) {
         if (params.get('send') === '1') {
-          // Explicit home send keeps its existing contract.
-          editDraft(ask);
+          if (state.pendingRequest && state.pendingRequest.text !== ask.trim()) {
+            // Keep the new hand-off reviewable, but never replay it on reload.
+            params.delete('send');
+            window.history.replaceState(
+              window.history.state,
+              '',
+              window.location.pathname + '?' + params.toString() + window.location.hash
+            );
+            state.errorKey = 'front_desk:ask_pending_send_blocked';
+            proposeDraft(ask);
+            renderConversationStatus();
+            return;
+          }
+          var input = document.getElementById('ask-input');
+          if (input && input.value.trim() && input.value.trim() !== ask.trim()) {
+            state.homeDraftPreserved = true;
+          } else editDraft(ask);
           sendText(ask);
+          if (!state.sending) {
+            // Readiness or storage failed: keep the text, never an auto-send instruction.
+            params.delete('send');
+            window.history.replaceState(
+              window.history.state,
+              '',
+              window.location.pathname + '?' + params.toString() + window.location.hash
+            );
+            proposeDraft(ask);
+            return;
+          }
         } else if (!proposeDraft(ask)) {
           // Keep this hand-off in the URL until draft ownership can be checked.
           return;

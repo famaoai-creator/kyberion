@@ -1,4 +1,4 @@
-/* Ask read recovery: bounded GETs, current history, vocabulary and recent projection. */
+/* Ask conversation recovery: bounded GETs, safe drafts, retry identity and read projections. */
 /* global window, document */
 (function () {
   'use strict';
@@ -6,6 +6,9 @@
     var state = options.state;
     var fetch = options.fetch;
     var historySequence = 0;
+    state.draftScopeEpoch = 0;
+    state.draftShellReady = true;
+    state.draftRecoveryScope = null;
     var scopedUrl = options.scopedUrl;
     var renderRecent = options.renderRecent;
     var vt = options.vt;
@@ -49,9 +52,162 @@
       });
     }
 
+    function draftScopeSnapshot(includeConversation) {
+      var params = new URLSearchParams(window.location.search);
+      ['ask', 'send', 'mic'].forEach(function (key) {
+        params.delete(key);
+      });
+      return JSON.stringify([
+        window.location.pathname,
+        params.toString(),
+        window.location.hash,
+        scopedUrl('/api/conversation'),
+        includeConversation === false ? null : state.conversationId,
+        state.locale,
+        window.KyberionPrefs && window.KyberionPrefs.tenant ? window.KyberionPrefs.tenant() : null,
+        state.draftScopeEpoch,
+      ]);
+    }
+
+    function pendingReviewCurrent(request, scope, shell) {
+      if (
+        !request ||
+        state.sending ||
+        state.historyReadPending ||
+        state.historyState !== 'ready' ||
+        !state.storageVerified ||
+        !state.draftShellReady ||
+        state.shellBlockedMessage ||
+        scope !== state.draftRecoveryScope ||
+        scope !== draftScopeSnapshot() ||
+        shell !== (window.FrontDeskRail && window.FrontDeskRail.ready)
+      )
+        return false;
+      try {
+        var saved = readPendingRequest();
+        return Boolean(
+          saved &&
+          saved.id === request.id &&
+          saved.text === request.text &&
+          saved.createdAt === request.createdAt
+        );
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function renderPendingReview() {
+      var host = document.getElementById('pending-request-recovery');
+      var button = document.getElementById('pending-request-review');
+      var description = document.getElementById('pending-request-description');
+      var request = state.pendingRequest;
+      var scope = state.draftRecoveryScope;
+      var shell = window.FrontDeskRail && window.FrontDeskRail.ready;
+      var current = function () {
+        return pendingReviewCurrent(request, scope, shell);
+      };
+      if (host) host.hidden = !current();
+      if (description)
+        description.textContent = vt(state.vocab, 'front_desk:ask_pending_review_description');
+      if (button) {
+        button.disabled = !current();
+        button.textContent = vt(state.vocab, 'front_desk:ask_pending_review');
+      }
+      var preserved = document.getElementById('home-draft-preserved');
+      if (preserved) {
+        preserved.hidden = !state.homeDraftPreserved;
+        preserved.textContent = vt(state.vocab, 'front_desk:ask_home_draft_preserved');
+      }
+    }
+
+    function readPendingRequest() {
+      var savedRaw = window.sessionStorage.getItem(options.draftKey() + '.request');
+      var saved = savedRaw === null ? null : JSON.parse(savedRaw);
+      if (
+        savedRaw !== null &&
+        (!saved ||
+          typeof saved !== 'object' ||
+          Array.isArray(saved) ||
+          typeof saved.id !== 'string' ||
+          !/^[a-f0-9-]{36}$/.test(saved.id) ||
+          typeof saved.text !== 'string' ||
+          typeof saved.createdAt !== 'number' ||
+          !isFinite(saved.createdAt))
+      )
+        throw new Error('invalid saved request');
+      return saved;
+    }
+
+    function completeRequest(request, sentScope) {
+      try {
+        var retained = readPendingRequest();
+        if (
+          retained &&
+          retained.id === request.id &&
+          retained.text === request.text &&
+          retained.createdAt === request.createdAt &&
+          sentScope === draftScopeSnapshot()
+        ) {
+          window.sessionStorage.removeItem(options.draftKey() + '.request');
+          state.pendingRequest = null;
+        } else state.pendingRequest = retained;
+      } catch (err) {}
+    }
+
+    function prepareRequest(trimmed) {
+      try {
+        state.pendingRequest = readPendingRequest();
+      } catch (err) {
+        state.storageVerified = false;
+        state.errorKey = 'front_desk:conversation_storage_required';
+        options.render();
+        return null;
+      }
+      if (state.pendingRequest && state.pendingRequest.text !== trimmed) {
+        state.errorKey = 'front_desk:ask_pending_send_blocked';
+        options.render();
+        return null;
+      }
+      var waiting = state.turns.find(function (turn) {
+        return (
+          turn.role === 'user' &&
+          turn.text === trimmed &&
+          typeof turn.id === 'string' &&
+          !state.turns.some(function (reply) {
+            return reply.id === turn.id.replace(/-user$/, '-secretary');
+          })
+        );
+      });
+      var request = state.pendingRequest
+        ? state.pendingRequest
+        : waiting
+          ? {
+              id: waiting.id.replace(/-user$/, ''),
+              text: trimmed,
+              createdAt: waiting.createdAt || Date.now(),
+            }
+          : { id: options.randomId(), text: trimmed, createdAt: Date.now() };
+      try {
+        var serialized = JSON.stringify(request);
+        window.sessionStorage.setItem(options.draftKey() + '.request', serialized);
+        if (window.sessionStorage.getItem(options.draftKey() + '.request') !== serialized)
+          throw new Error('request not retained');
+      } catch (err) {
+        state.storageVerified = false;
+        state.errorKey = 'front_desk:conversation_storage_required';
+        options.render();
+        return null;
+      }
+      return request;
+    }
+
     function restoreConversation(restoreDraft) {
       if (state.historyReadPending || state.sending) return Promise.resolve(false);
       var sequence = ++historySequence;
+      var readStart = {
+        scope: draftScopeSnapshot(false),
+        shell: window.FrontDeskRail && window.FrontDeskRail.ready,
+      };
       state.historyReadPending = true;
       state.historyState = 'loading';
       state.errorKey = null;
@@ -59,6 +215,16 @@
       return fetchReadJson(scopedUrl('/api/conversation'))
         .then(function (result) {
           if (sequence !== historySequence) return false;
+          if (
+            !state.draftShellReady ||
+            readStart.scope !== draftScopeSnapshot(false) ||
+            readStart.shell !== (window.FrontDeskRail && window.FrontDeskRail.ready)
+          ) {
+            state.historyReadPending = false;
+            state.historyState = 'failed';
+            options.render();
+            return false;
+          }
           var body = result.body || {};
           if (result.status === 401 || result.status === 403) {
             state.errorKey = 'front_desk:conversation_access_required';
@@ -96,21 +262,28 @@
           var input = document.getElementById('ask-input');
           try {
             var savedDraft = window.sessionStorage.getItem(options.draftKey());
-            var savedRaw = window.sessionStorage.getItem(options.draftKey() + '.request');
-            var saved = savedRaw === null ? null : JSON.parse(savedRaw);
+            state.pendingRequest = readPendingRequest();
+            var pending = state.pendingRequest;
+            // A matching completed pair in this server-scoped history is confirmation,
+            // not permission to replay. Unknown or truncated history retains the identity.
             if (
-              savedRaw !== null &&
-              (!saved ||
-                typeof saved !== 'object' ||
-                Array.isArray(saved) ||
-                typeof saved.id !== 'string' ||
-                !/^[a-f0-9-]{36}$/.test(saved.id) ||
-                typeof saved.text !== 'string' ||
-                typeof saved.createdAt !== 'number' ||
-                !isFinite(saved.createdAt))
-            )
-              throw new Error('invalid saved request');
-            if (saved) state.pendingRequest = saved;
+              pending &&
+              state.turns.some(function (turn) {
+                return (
+                  turn.id === pending.id + '-user' &&
+                  turn.role === 'user' &&
+                  turn.text === pending.text
+                );
+              }) &&
+              state.turns.some(function (turn) {
+                return turn.id === pending.id + '-secretary' && turn.role === 'companion';
+              })
+            ) {
+              window.sessionStorage.removeItem(options.draftKey() + '.request');
+              if (window.sessionStorage.getItem(options.draftKey() + '.request') !== null)
+                throw new Error('confirmed request not cleared');
+              state.pendingRequest = null;
+            }
             state.storageVerified = true;
             if ((restoreDraft || !state.draftRestored) && input && !state.draftEdited)
               input.value = savedDraft || input.value;
@@ -123,6 +296,7 @@
             state.errorKey = 'front_desk:conversation_storage_required';
           }
           state.historyReadPending = false;
+          if (state.storageVerified) state.draftRecoveryScope = draftScopeSnapshot();
           options.render();
           if (state.storageVerified) options.onHistoryReady();
           return state.storageVerified;
@@ -255,6 +429,37 @@
     }
 
     function observeShell() {
+      var review = document.getElementById('pending-request-review');
+      if (review)
+        review.addEventListener('click', function () {
+          var request = state.pendingRequest;
+          var scope = state.draftRecoveryScope;
+          var shell = window.FrontDeskRail && window.FrontDeskRail.ready;
+          var current = function () {
+            return pendingReviewCurrent(request, scope, shell);
+          };
+          if (current()) options.proposeDraft(request.text, current);
+        });
+      function retireDraftRecovery() {
+        state.draftScopeEpoch += 1;
+        if (
+          state.proposedDraft &&
+          state.proposedDraft.isCurrent &&
+          !state.proposedDraft.isCurrent()
+        )
+          options.cancelDraftChoice(false);
+        renderPendingReview();
+      }
+      if (window.addEventListener) {
+        window.addEventListener('popstate', retireDraftRecovery);
+        window.addEventListener('pagehide', retireDraftRecovery);
+      }
+      if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
+        window.FrontDeskRail.subscribe(function (shell) {
+          state.draftShellReady = shell.phase === 'ready';
+          if (!state.draftShellReady) retireDraftRecovery();
+        });
+
       if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
         window.FrontDeskRail.subscribe(function (shell) {
           state.shellBlockedMessage = shell.phase === 'blocked' ? shell.message : '';
@@ -265,6 +470,10 @@
     }
 
     return {
+      scopeSnapshot: draftScopeSnapshot,
+      renderDraftRecovery: renderPendingReview,
+      prepareRequest: prepareRequest,
+      completeRequest: completeRequest,
       restoreConversation: restoreConversation,
       observeShell: observeShell,
       renderStartup: renderStartup,
