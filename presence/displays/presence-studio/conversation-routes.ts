@@ -289,7 +289,7 @@ export function registerConversationRoutes(app: express.Express): void {
         mode: 'orchestrator',
         shape: view.shape,
         conversation_runtime: conversation.conversationRuntime,
-        ...(view.nextActions ? { next_actions: view.nextActions } : {}),
+        ...(historySaved && view.nextActions ? { next_actions: view.nextActions } : {}),
         ...(contract ? { intent_resolution: contract } : {}),
         ...(intentLabel
           ? { intent_label: intentLabel.label, intent_label_source: intentLabel.source }

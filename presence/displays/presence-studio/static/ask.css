@@ -102,8 +102,22 @@
 
 .ask-turn-next-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--kb-ui-space-2);
+}
+.ask-turn-next-actions p {
+  margin: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ask-turn-next-actions button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .ask-empty {
