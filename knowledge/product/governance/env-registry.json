@@ -4344,6 +4344,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_TTS_SAMPLE_RATE_HZ",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Sample rate of the PCM emitted by KYBERION_TTS_COMMAND (16000, 24000 or 48000). Defaults to 16000; engines emitting other rates must resample inside their TTS command wrapper.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_TUI_DISABLE_AUDIT",
       "category": "runtime",
       "type": "string",
