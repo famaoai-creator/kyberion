@@ -4,9 +4,19 @@ const fixtures = vi.hoisted(() => ({
   files: new Map<string, unknown>(),
   run: vi.fn(),
   failWrites: false,
+  sessions: [] as Record<string, unknown>[],
+  failSessions: false,
+  sessionReads: 0,
 }));
 vi.mock('@agent/core/surface/channel-surface', () => ({
   runSurfaceMessageConversation: fixtures.run,
+}));
+vi.mock('@agent/core/task/task-session', () => ({
+  listTaskSessions: () => {
+    fixtures.sessionReads += 1;
+    if (fixtures.failSessions) throw new Error('synthetic session read failure');
+    return fixtures.sessions;
+  },
 }));
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
@@ -75,6 +85,9 @@ async function request(method = 'GET', body: unknown = {}, tenant?: string, remo
 }
 beforeEach(() => {
   fixtures.files.clear();
+  fixtures.sessions = [];
+  fixtures.failSessions = false;
+  fixtures.sessionReads = 0;
   fixtures.failWrites = false;
   fixtures.run.mockReset();
   vi.stubEnv('KYBERION_TENANT', 'alpha-team');
@@ -417,5 +430,116 @@ describe('contextual next-action provenance', () => {
     const result = await request('POST', { ...body, source_request_id: body.request_id });
     expect(result.statusCode).toBe(400);
     expect(fixtures.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('authoritative conversation navigation', () => {
+  const a = '11111111-1111-4111-8111-111111111111';
+  const b = '22222222-2222-4222-8222-222222222222';
+  const messages = (body: Record<string, unknown>) =>
+    body.messages as Array<{ id: string; requestRefs?: string[]; navigation?: unknown }>;
+  it('projects durable original request identically in POST, replay and history', async () => {
+    await request('POST', { text: 'Aの報告書を作って', request_id: a });
+    const result = await request('POST', { text: 'Aの件どう？', request_id: b });
+    expect(result.body.navigation).toEqual([{ kind: 'request', id: a }]);
+    const replay = await request('POST', { text: 'Aの件どう？', request_id: b });
+    expect(replay.body.navigation).toEqual(result.body.navigation);
+    const restored = await request();
+    expect(messages(restored.body).find((m) => m.id === b + '-user')).toMatchObject({
+      requestRefs: [a],
+      navigation: result.body.navigation,
+    });
+  });
+  it('keeps greeting history usable without inventing progress', async () => {
+    const result = await request('POST', { text: 'Hello', request_id: a });
+    expect(result.body.navigation).toEqual([]);
+    expect(result.body).not.toHaveProperty('progress_href');
+    expect(messages((await request()).body)[0].navigation).toBeUndefined();
+  });
+  it('preserves positive legacy session correlation and scans once for a history response', async () => {
+    fixtures.sessions = [{ session_id: 'session-a', correlation_id: a, tenant_slug: 'alpha-team' }];
+    const result = await request('POST', { text: 'Hello', request_id: a }, 'alpha-team');
+    expect(result.body.navigation).toEqual([{ kind: 'progress', id: 'session-a' }]);
+    fixtures.sessionReads = 0;
+    const restored = await request('GET', {}, 'alpha-team');
+    expect(messages(restored.body)[0].navigation).toEqual(result.body.navigation);
+    expect(fixtures.sessionReads).toBe(1);
+  });
+  it('does not enrich from a session in another tenant', async () => {
+    fixtures.sessions = [{ session_id: 'foreign', correlation_id: a, tenant_slug: 'other-team' }];
+    const result = await request('POST', { text: 'Hello', request_id: a }, 'alpha-team');
+    expect(result.body.navigation).toEqual([]);
+    expect(messages((await request('GET', {}, 'alpha-team')).body)[0].navigation).toBeUndefined();
+  });
+  it('retains original request navigation when optional session reads fail', async () => {
+    await request('POST', { text: 'Aの報告書を作って', request_id: a });
+    fixtures.failSessions = true;
+    const result = await request('POST', { text: 'Aの件どう？', request_id: b });
+    expect(result.statusCode).toBe(200);
+    expect(result.body.navigation).toEqual([{ kind: 'request', id: a }]);
+    expect((await request()).statusCode).toBe(200);
+  });
+  it.each(['organization', 'project', 'missing'])(
+    'rejects %s scope mismatch on a correlated session',
+    async (mismatch) => {
+      const scope: Record<string, string> = {
+        scope_kind: 'tenant',
+        tier: 'public',
+        tenant_slug: 'alpha-team',
+        organization_id: 'org-a',
+        project_id: 'proj-a',
+      };
+      if (mismatch === 'organization') scope.organization_id = 'other';
+      if (mismatch === 'project') scope.project_id = 'other';
+      fixtures.sessions = [
+        {
+          session_id: 'foreign',
+          correlation_id: a,
+          tenant_slug: 'alpha-team',
+          ...(mismatch === 'missing' ? {} : { scope }),
+        },
+      ];
+      const result = await request(
+        'POST',
+        {
+          text: 'Hello',
+          request_id: a,
+          tenant: 'alpha-team',
+          organizationId: 'org-a',
+          projectId: 'proj-a',
+        },
+        'alpha-team'
+      );
+      expect(result.statusCode).toBe(200);
+      expect(result.body.navigation).toEqual([]);
+    }
+  );
+  it('keeps a positively correlated session in the exact organization and project', async () => {
+    fixtures.sessions = [
+      {
+        session_id: 'session-a',
+        correlation_id: a,
+        scope: {
+          scope_kind: 'tenant',
+          tier: 'public',
+          tenant_slug: 'alpha-team',
+          organization_id: 'org-a',
+          project_id: 'proj-a',
+        },
+      },
+    ];
+    const result = await request(
+      'POST',
+      {
+        text: 'Hello',
+        request_id: a,
+        tenant: 'alpha-team',
+        organizationId: 'org-a',
+        projectId: 'proj-a',
+      },
+      'alpha-team'
+    );
+    expect(result.statusCode).toBe(200);
+    expect(result.body.navigation).toEqual([{ kind: 'progress', id: 'session-a' }]);
   });
 });

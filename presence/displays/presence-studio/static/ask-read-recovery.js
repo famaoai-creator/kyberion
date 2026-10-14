@@ -52,6 +52,66 @@
       });
     }
 
+    function bindNavigation(requestId, navigation, scope, epoch) {
+      state.turns.forEach(function (turn) {
+        if (turn.role === 'user' && turn.id === requestId + '-user') {
+          turn.navigation = navigation;
+          turn.navigationScope = scope;
+          turn.navigationEpoch = epoch;
+        }
+      });
+    }
+
+    function renderNavigation(turn) {
+      if (
+        !state.draftShellReady ||
+        turn.navigationScope !== draftScopeSnapshot() ||
+        turn.navigationEpoch !== state.draftScopeEpoch ||
+        turn.role !== 'user' ||
+        typeof turn.id !== 'string' ||
+        !/^[a-f0-9-]{36}-user$/.test(turn.id) ||
+        !Array.isArray(turn.navigation) ||
+        turn.navigation.length > 64
+      )
+        return '';
+      var seen = {};
+      return turn.navigation
+        .map(function (link, index) {
+          if (!link || Object.keys(link).length !== 2 || typeof link.id !== 'string') return '';
+          var href;
+          var label;
+          if (
+            link.kind === 'request' &&
+            /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(link.id)
+          ) {
+            var original = state.turns.find(function (item) {
+              return item.role === 'user' && item.id === link.id + '-user';
+            });
+            if (!original || original.id === turn.id) return '';
+            href = '/ask?request=' + encodeURIComponent(link.id);
+            label = vt(state.vocab, 'front_desk:ask_original_request');
+            if (turn.navigation.length > 1) label += ': ' + original.text.slice(0, 80);
+          } else if (
+            link.kind === 'progress' &&
+            /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,255}$/.test(link.id)
+          ) {
+            href = '/progress#' + encodeURIComponent(link.id);
+            label = vt(state.vocab, 'front_desk:nav_progress');
+            if (turn.navigation.length > 1) label += ' ' + (index + 1);
+          } else return '';
+          if (!label || seen[href]) return '';
+          seen[href] = true;
+          return (
+            '<a href="' +
+            options.escapeHtml(scopedUrl(href)) +
+            '">' +
+            options.escapeHtml(label) +
+            '</a>'
+          );
+        })
+        .join(' ');
+    }
+
     function draftScopeSnapshot(includeConversation) {
       var params = new URLSearchParams(window.location.search);
       ['ask', 'send', 'mic'].forEach(function (key) {
@@ -257,6 +317,9 @@
                 role: m.role === 'user' ? 'user' : 'companion',
                 text: m.text,
                 createdAt: m.createdAt,
+                navigation: m.navigation,
+                navigationScope: draftScopeSnapshot(),
+                navigationEpoch: state.draftScopeEpoch,
               };
             });
           var input = document.getElementById('ask-input');
@@ -448,7 +511,7 @@
           !state.proposedDraft.isCurrent()
         )
           options.cancelDraftChoice(false);
-        renderPendingReview();
+        options.render();
       }
       if (window.addEventListener) {
         window.addEventListener('popstate', retireDraftRecovery);
@@ -471,6 +534,8 @@
 
     return {
       scopeSnapshot: draftScopeSnapshot,
+      renderNavigation: renderNavigation,
+      bindNavigation: bindNavigation,
       renderDraftRecovery: renderPendingReview,
       prepareRequest: prepareRequest,
       completeRequest: completeRequest,
