@@ -1089,6 +1089,24 @@ evidence instead of relying on scratch files after their retention window.
 
 ---
 
+### Native desktop permission and input checks
+
+Probe Accessibility, Screen Recording and each Apple Event target separately without
+prompting. Unexpected compiler/process/API failures are unknown, not denial. Do not infer
+AX trust from reading a process name, Chrome permission from System Events, or screen access
+from aggregate bridge readiness. Keep the source-specific result visible.
+
+Compile the macOS helper from the exact bytes used by its cache key. Use the canonical
+system cache floor, exclusive temporary files, a process-shared build lock and atomic
+publication. Reject invalid coordinates/counts/directions before spawning; recheck AX
+trust immediately before input injection. A failed native request must not become a
+successful pointer receipt.
+
+Regression gates: macos-native-automation.test.ts, apple-event-bridge.test.ts,
+macos-automation-bridge.test.ts and virtual/desktop-recording.test.ts cover permission
+separation, invalid/malformed input, cache publication and partial readiness. Verify native
+Swift compilation and nonprompting probes on macOS. Keep live input outside these tests.
+
 ## Maintenance
 
 When a defect class not listed here recurs:

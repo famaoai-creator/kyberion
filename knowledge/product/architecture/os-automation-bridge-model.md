@@ -1,7 +1,8 @@
 ---
 title: 'OS Automation Bridge Model'
 kind: evergreen
-last_updated: 2026-10-05
+last_updated: 2026-10-14
+tags: [os-automation, macos, windows, accessibility, native-input]
 ---
 
 # OS Automation Bridge Model
@@ -63,7 +64,7 @@ With the bridge:
 
 1. Extract the current macOS AppleScript helpers into a shared bridge.
 2. Add known-app logical adapters on top of the bridge.
-3. Add environment doctor checks for `cliclick` and display calibration.
+3. Add environment doctor checks for native input backends and display calibration.
 4. Add approval gates for destructive logical actions.
 5. Only then consider richer discovery such as SDEF inspection.
 
@@ -84,3 +85,35 @@ Initial adapters should be small and explicit:
 
 These adapters should remain declarative and human-auditable.
 If richer support is needed later, SDEF-based discovery can extend them without changing the L1 contract.
+
+## Native macOS parity
+
+The shared `OsAutomationPlatformAdapter` exposes the same logical pointer and
+observation API on macOS and Windows. macOS uses a small native Swift helper
+(`libs/core/macos-native-automation.swift`) through the governed synchronous
+`macos-native-automation.ts` boundary:
+
+- CGEvent performs move, left/right/multiple click, directional scroll and drag.
+  Coordinates and operation amounts are validated before execution. Accessibility
+  refusal blocks input, and the helper checks trust again immediately before posting.
+- AXUIElement reads generic application window titles and focused-control metadata.
+  Applications need no scripting dictionary; focused values and typed text are never read.
+- AXIsProcessTrusted and CGPreflightScreenCaptureAccess report independent grants.
+  Apple Event readiness is checked separately for fixed System Events and Chrome targets
+  with AEDeterminePermissionToAutomateTarget and `askUserIfNeeded=false`.
+  A target that is not running, an undecided grant, or an unexpected tool failure stays
+  unknown. Missing platform APIs are unsupported; only an explicit refusal is denied.
+- Per-source desktop observation readiness preserves a usable screen or native AX source
+  when another source lacks permission. Chrome tabs require the Chrome-specific grant;
+  a System Events grant does not imply Chrome access.
+
+Swift Command Line Tools are required for the helper. The executable is cached under
+the canonical system cache floor, keyed by source bytes, platform, architecture and
+compiler version. The compiler receives an immutable source snapshot; exclusive temporary
+files, a process-shared lock and atomic publication protect cache construction.
+Permission changes are checked on each probe/operation without requesting prompts.
+
+Application-specific Apple Event operations (such as Chrome tab actions and Finder commands)
+retain their existing intent/approval boundaries. Source availability describes access,
+not that a particular window or focused control currently has content. Native input receipts
+confirm event submission, not that the target application accepted the user's intended action.
