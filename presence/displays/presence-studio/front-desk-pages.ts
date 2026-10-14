@@ -588,6 +588,7 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:ask_action_draft_intro',
   'front_desk:ask_empty',
   'front_desk:ask_today',
+  'front_desk:ask_original_request',
   'front_desk:ask_voice_settings',
   'front_desk:ask_send_failed',
   'front_desk:chip_email',

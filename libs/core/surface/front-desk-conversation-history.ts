@@ -23,6 +23,8 @@ export interface ConversationHistoryMessage {
   text: string;
   createdAt?: number;
   artifact?: FrontDeskConversationArtifact;
+  /** Inert references from durable intake routing, never execution authority. */
+  requestRefs?: string[];
 }
 
 export interface ConversationHistory {
@@ -61,6 +63,22 @@ export function parseConversationHistory(value: unknown): ConversationHistory | 
       item.text.length > CONVERSATION_MAX_REPLY
     )
       return undefined;
+    let requestRefs: string[] | undefined;
+    if (item.requestRefs !== undefined) {
+      if (
+        item.role !== 'user' ||
+        !Array.isArray(item.requestRefs) ||
+        item.requestRefs.length > 64 ||
+        item.requestRefs.some(
+          (id) =>
+            typeof id !== 'string' ||
+            !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)
+        ) ||
+        new Set(item.requestRefs).size !== item.requestRefs.length
+      )
+        return undefined;
+      requestRefs = item.requestRefs;
+    }
     let artifact: FrontDeskConversationArtifact | undefined;
     if (item.artifact !== undefined) {
       const candidate = item.artifact as Record<string, unknown>;
@@ -87,6 +105,7 @@ export function parseConversationHistory(value: unknown): ConversationHistory | 
       role: item.role,
       text: item.text,
       ...(artifact ? { artifact } : {}),
+      ...(requestRefs ? { requestRefs } : {}),
       ...(typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
         ? { createdAt: item.createdAt }
         : {}),

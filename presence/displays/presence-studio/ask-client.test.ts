@@ -144,7 +144,11 @@ function harness(
   const scopedUrl = (path: string) => {
     const url = new URL(path, location.href);
     url.searchParams.set('tenant', 'alpha');
-    return url.origin === location.origin ? url.pathname + url.search : url.href;
+    for (const key of ['organizationId', 'projectId']) {
+      const value = new URLSearchParams(location.search).get(key);
+      if (value) url.searchParams.set(key, value);
+    }
+    return url.origin === location.origin ? url.pathname + url.search + url.hash : url.href;
   };
   const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
   const window = {
@@ -2417,4 +2421,199 @@ describe('Home submission draft and retry preservation', () => {
     expect(h.elements.get('ask-startup-retry')!.hidden).toBe(false);
     expect(h.window.history.replaceState).not.toHaveBeenCalled();
   });
+});
+
+describe('Ask request navigation evidence', () => {
+  const a = '11111111-1111-4111-8111-111111111111';
+  const b = '22222222-2222-4222-8222-222222222222';
+  it('does not send greetings to nonexistent progress', async () => {
+    const h = harness({
+      history: { messages: [{ id: a + '-user', role: 'user', text: 'Hello' }] },
+    });
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).not.toContain('/progress?request=');
+  });
+  it('restores a reference to the retained original request, not the followup ID', async () => {
+    const h = harness({
+      history: {
+        messages: [
+          { id: a + '-user', role: 'user', text: 'Create A' },
+          {
+            id: b + '-user',
+            role: 'user',
+            text: 'How is A?',
+            navigation: [{ kind: 'request', id: a }],
+          },
+        ],
+      },
+    });
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).toContain('/ask?request=' + a + '&amp;tenant=alpha');
+    expect(h.elements.get('turns')!.innerHTML).not.toContain('/progress?request=' + b);
+  });
+  it('renders positive session navigation with narrowed scope and an exact fragment', async () => {
+    const h = harness({
+      query: '?tenant=alpha&organizationId=org-a&projectId=proj-a',
+      history: {
+        messages: [
+          {
+            id: a + '-user',
+            role: 'user',
+            text: 'Work',
+            navigation: [{ kind: 'progress', id: 'session-a' }],
+          },
+        ],
+      },
+    });
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).toContain(
+      '/progress?tenant=alpha&amp;organizationId=org-a&amp;projectId=proj-a#session-a'
+    );
+  });
+  it('uses POST navigation for a new followup and keeps restored history equivalent', async () => {
+    const h = harness({
+      history: { messages: [{ id: a + '-user', role: 'user', text: 'Create A' }] },
+      post: async (body) =>
+        response({
+          ok: true,
+          reply: 'Recorded status',
+          request_id: body.request_id,
+          navigation: [{ kind: 'request', id: a }],
+        }),
+    });
+    await flush();
+    h.input.value = 'How is A?';
+    h.form.fire('submit');
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).toContain('/ask?request=' + a + '&amp;tenant=alpha');
+    expect(h.elements.get('turns')!.innerHTML).not.toContain('/progress?request=');
+  });
+  it.each(
+    [
+      [{ kind: 'request', id: b }],
+      [{ kind: 'request', id: '33333333-3333-4333-8333-333333333333' }],
+      [{ kind: 'progress', id: '../escape' }],
+      [{ kind: 'progress', id: 'https://outside.test' }],
+      [{ kind: 'request', id: a, href: 'https://outside.test' }],
+      [{ kind: 'execute', id: a }],
+      Array.from({ length: 65 }, () => ({ kind: 'request', id: a })),
+    ].map((navigation) => ({ navigation }))
+  )('ignores self, missing and malformed navigation %j', async ({ navigation }) => {
+    const h = harness({
+      history: {
+        messages: [
+          { id: a + '-user', role: 'user', text: 'Create A' },
+          { id: b + '-user', role: 'user', text: 'Followup', navigation },
+        ],
+      },
+    });
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).not.toContain('<a href=');
+  });
+  it('distinguishes multiple retained original requests and never selects only the first', async () => {
+    const c = '33333333-3333-4333-8333-333333333333';
+    const h = harness({
+      history: {
+        messages: [
+          { id: a + '-user', role: 'user', text: 'Create A' },
+          { id: b + '-user', role: 'user', text: 'Create B' },
+          {
+            id: c + '-user',
+            role: 'user',
+            text: 'Which?',
+            navigation: [
+              { kind: 'request', id: a },
+              { kind: 'request', id: b },
+            ],
+          },
+        ],
+      },
+    });
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).toContain('/ask?request=' + a);
+    expect(h.elements.get('turns')!.innerHTML).toContain('/ask?request=' + b);
+    expect(h.elements.get('turns')!.innerHTML).toContain(
+      'front_desk:ask_original_request: Create B'
+    );
+  });
+
+  it.each(['scope', 'blocked-shell'])(
+    'does not rebind a late POST link after %s changes',
+    async (change) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        history: { messages: [{ id: a + '-user', role: 'user', text: 'Create A' }] },
+        post: () => pending.promise,
+      });
+      await flush();
+      h.input.value = 'How is A?';
+      h.form.fire('submit');
+      await flush();
+      if (change === 'scope') {
+        h.window.location.search = '?tenant=alpha&projectId=another';
+        h.window.location.href = 'http://localhost/ask' + h.window.location.search;
+      } else {
+        h.shell('blocked', 'Scope changed');
+        h.shell('ready');
+      }
+      pending.resolve(
+        response({
+          ok: true,
+          reply: 'Old scope response',
+          navigation: [
+            { kind: 'request', id: a },
+            { kind: 'progress', id: 'session-a' },
+          ],
+        })
+      );
+      await flush();
+      expect(h.elements.get('turns')!.innerHTML).not.toContain('<a href=');
+    }
+  );
+  it('keeps pending request identity while displaying inert navigation', async () => {
+    const key = 'kyberion.ask.draft.' + session + '.request';
+    const raw = JSON.stringify({ id: b, text: 'How is A?', createdAt: 1 });
+    const storage = new Map([[key, raw]]);
+    const h = harness({
+      storage,
+      history: {
+        pending: 1,
+        messages: [
+          { id: a + '-user', role: 'user', text: 'Create A' },
+          {
+            id: b + '-user',
+            role: 'user',
+            text: 'How is A?',
+            navigation: [{ kind: 'request', id: a }],
+          },
+        ],
+      },
+    });
+    await flush();
+    expect(storage.get(key)).toBe(raw);
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.elements.get('turns')!.innerHTML).toContain('/ask?request=' + a);
+  });
+  it.each(['popstate', 'pagehide', 'blocked-shell'])(
+    'immediately removes already-rendered links on %s',
+    async (event) => {
+      const h = harness({
+        history: {
+          messages: [
+            {
+              id: a + '-user',
+              role: 'user',
+              text: 'Create A',
+              navigation: [{ kind: 'progress', id: 'session-a' }],
+            },
+          ],
+        },
+      });
+      await flush();
+      expect(h.elements.get('turns')!.innerHTML).toContain('<a href=');
+      if (event === 'blocked-shell') h.shell('blocked', 'Scope changed');
+      else h.browserEvent(event);
+      expect(h.elements.get('turns')!.innerHTML).not.toContain('<a href=');
+    }
+  );
 });
