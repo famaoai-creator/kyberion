@@ -149,7 +149,7 @@ function serveFirstRun(response: Response | Promise<Response>) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) =>
-      init?.method === 'POST' ? response : json({ state: 'unclaimed' })
+      init?.method === 'POST' ? response : json({ ok: true, state: 'unclaimed' })
     )
   );
 }

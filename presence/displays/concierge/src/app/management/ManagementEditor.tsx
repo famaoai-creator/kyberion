@@ -30,6 +30,10 @@ export function ManagementEditor({
   cancel: () => void;
 }) {
   const { t } = useConciergeI18n();
+  const nameInput = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (!pending && !verifying) nameInput.current?.focus();
+  }, [draft.operation, pending, verifying]);
   const organization = draft.operation.startsWith('organization');
   const description = managementDescription(draft.operation, draft.description, data);
   return (
@@ -42,6 +46,7 @@ export function ManagementEditor({
           <label>
             {t('management.name')}
             <input
+              ref={nameInput}
               required
               disabled={verifying}
               maxLength={160}

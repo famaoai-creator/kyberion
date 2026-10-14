@@ -24,7 +24,10 @@ function codeFromHash(hash: string): string {
 
 export default function FirstRunSetupPage() {
   const { locale } = useConciergeI18n();
-  const [state, setState] = React.useState<'loading' | 'unclaimed' | 'claimed'>('loading');
+  const [state, setState] = React.useState<'loading' | 'unavailable' | 'unclaimed' | 'claimed'>(
+    'loading'
+  );
+  const [statusAttempt, setStatusAttempt] = React.useState(0);
   const [code, setCode] = React.useState('');
   const [tenantSlug, setTenantSlug] = React.useState('');
   const [tenantName, setTenantName] = React.useState('');
@@ -42,16 +45,32 @@ export default function FirstRunSetupPage() {
       setCode(fromHash);
       window.history.replaceState(null, '', '/setup/first-run');
     }
+  }, []);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setState('loading');
     void (async () => {
       try {
-        const response = await fetch('/api/setup/first-run', { cache: 'no-store' });
+        const response = await fetch('/api/setup/first-run', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const data = await response.json().catch(() => null);
-        setState(data?.state === 'unclaimed' ? 'unclaimed' : 'claimed');
+        if (controller.signal.aborted) return;
+        setState(
+          response.ok &&
+            data?.ok === true &&
+            (data.state === 'unclaimed' || data.state === 'claimed')
+            ? data.state
+            : 'unavailable'
+        );
       } catch {
-        setState('claimed');
+        if (!controller.signal.aborted) setState('unavailable');
       }
     })();
-  }, []);
+    return () => controller.abort();
+  }, [statusAttempt]);
 
   const submit = async () => {
     const attempt = requests.current.begin();
@@ -140,7 +159,25 @@ export default function FirstRunSetupPage() {
   return (
     <section className="pane" aria-label={frontDeskText('first_run_title', locale)}>
       <h2>{frontDeskText('first_run_title', locale)}</h2>
-      {state === 'claimed' ? (
+      {state === 'loading' ? (
+        <p className="notice" role="status">
+          {frontDeskText('first_run_loading', locale)}
+        </p>
+      ) : state === 'unavailable' ? (
+        <>
+          <p className="notice error" role="alert">
+            {frontDeskText('first_run_unavailable', locale)}
+          </p>
+          <div className="button-row">
+            <button
+              className="action-button"
+              onClick={() => setStatusAttempt((value) => value + 1)}
+            >
+              {frontDeskText('first_run_retry', locale)}
+            </button>
+          </div>
+        </>
+      ) : state === 'claimed' ? (
         <>
           <p className="notice">{frontDeskText('first_run_claimed', locale)}</p>
           <div className="button-row">
