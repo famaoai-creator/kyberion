@@ -26493,6 +26493,26 @@
         "en": "Recorded work and results",
         "ja": "仕事と成果の記録",
         "qps-ploc": "⟦Řėƈőřḓėḓ ẇőřķ ȧñḓ řėşůŀŧş ŀőřėɱ ïṗ⟧"
+      },
+      "ask_home_draft_preserved": {
+        "en": "Your earlier draft is still in the input box.",
+        "ja": "前の書きかけは入力欄に残しています。",
+        "qps-ploc": "⟦Your earlier draft remains in the input box.⟧"
+      },
+      "ask_pending_send_blocked": {
+        "en": "An earlier request still has an unconfirmed result. This new text has not been sent. Review the earlier request or reload its history first.",
+        "ja": "前の依頼の送信結果が未確認のため、新しい内容は送信していません。前の依頼を確認するか、履歴を読み直してください。",
+        "qps-ploc": "⟦An earlier request is unconfirmed. The new text was not sent.⟧"
+      },
+      "ask_pending_review_description": {
+        "en": "A submitted request still needs confirmation. You can review its text without sending it again.",
+        "ja": "送信結果が未確認の依頼があります。再送せずに、送信した内容を入力欄で確認できます。",
+        "qps-ploc": "⟦Review the submitted request without resending.⟧"
+      },
+      "ask_pending_review": {
+        "en": "Review submitted text",
+        "ja": "送信した内容を確認",
+        "qps-ploc": "⟦Review submitted text⟧"
       }
     },
     "operator": {
