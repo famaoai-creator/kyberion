@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [video, narrated, scratch-first, pipeline, orchestration]
 owner: ecosystem_architect
-last_updated: 2026-10-04
+last_updated: 2026-10-14
 ---
 
 # Narrated Video Production Playbook
@@ -55,6 +55,15 @@ Keep two layers distinct inside the shared coordination flow:
 Use `narrated-video-preference-profile` to store the reusable theme, the first questions Kyberion should ask, and the publish policy.
 
 Scratch prototypes may invent theme temporarily; on promote, lock the accepted theme into the preference profile or the pipeline `design_system` / storyboard.
+
+## Generated footage
+
+When scenes use generated video, follow the
+[Generative Video Production Playbook](generative-video-production-playbook.md)
+before submitting footage: plan retake spend, accept source-image revisions, and
+record source → job → selected take → scene → render references. Use its genre
+criteria and complete playback/listening review alongside artifact validation.
+These production checkpoints preserve the publication approval boundary.
 
 ## Preflight
 
