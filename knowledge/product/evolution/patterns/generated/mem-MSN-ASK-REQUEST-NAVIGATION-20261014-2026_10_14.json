@@ -1,0 +1,27 @@
+{
+  "record_id": "mem-MSN-ASK-REQUEST-NAVIGATION-20261014-2026_10_14",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Navigate from conversation turns using durable references and positive scoped evidence",
+  "summary": "A conversation message ID is not evidence of tracked work. Build read-only navigation from durable request routing and positively matched scoped execution records, and retire rendered links when scope changes.",
+  "candidate_id": "mem-MSN-ASK-REQUEST-NAVIGATION-20261014-2026_10_14",
+  "evidence_refs": [
+    "active/missions/public/MSN-ASK-REQUEST-NAVIGATION-20261014/evidence/implementation-report.md",
+    "active/missions/public/MSN-ASK-REQUEST-NAVIGATION-20261014/evidence/test-report.md",
+    "active/missions/public/MSN-ASK-REQUEST-NAVIGATION-20261014/evidence/browser-qa.json",
+    "active/missions/public/MSN-ASK-REQUEST-NAVIGATION-20261014/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-14T12:12:25.923Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-ASK-REQUEST-NAVIGATION-20261014"
+  ],
+  "reusable_steps": [
+    "A conversation message ID is not evidence of tracked work",
+    "Build read-only navigation from durable request routing and positively matched scoped execution records, and retire rendered links when scope changes"
+  ],
+  "expected_outcome": "## When to apply\nUse this pattern when a conversational interface offers links from user turns to earlier requests or execution detail.\n\n## Procedure\n1. Project inert original-request references only from durable intake routing in the authorized conversation partition. A status question or follow-up has its own message ID but may target an earlier request. Never infer a destination from model prose or response shape.\n2. Build a single permission-filtered execution-session map for each response. An explicit correlation match may provide an exact detail link even for legacy conversation turns without intake routing. Missing matches or read failures establish no execution outcome.\n3. Without an execution match, link only to a different original request whose user message survives the final returned-history slice, including appended execution reports. Suppress self-links and unavailable targets; preserve ambiguous retained candidates rather than choosing one.\n4. Keep navigation display-only. Validate bounded metadata and construct local URLs through the existing scope helper. The destination must recheck authorization and current availability. Navigation never approves, retries or marks work complete.\n5. Bind live and restored links to the current scope snapshot and shell epoch. On scope retirement, remove already-rendered links immediately, not only on the next eventual render. Keep transport retry identity untouched.\n\n## Verification\nTest greetings, direct replies, status/follow-up targets, legacy positive correlations, multiple candidates, final history truncation, scope mismatch and stale responses, optional source failure, malformed metadata, immediate DOM retirement and pending identity preservation. Reproduce with the actual renderer and label synthetic transport separately from real provider execution.",
+  "source_branch": "fix/ask-request-navigation-20261014",
+  "source_commit": "f502ccbe99cdced97de9112cacb38b43c8893b72"
+}
