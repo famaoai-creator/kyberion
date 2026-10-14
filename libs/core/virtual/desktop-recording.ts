@@ -600,10 +600,13 @@ export interface DesktopObservationReadiness {
  * result is deliberately descriptive: unavailable sources are surfaced with
  * a reason instead of silently disappearing from a recording.
  */
+export type DesktopObservationHostProbe = Pick<
+  MacOSAutomationProbe,
+  'platform' | 'available' | 'permissions'
+> & { sourceAvailability?: Partial<Record<DesktopObservationSource['id'], boolean>> };
+
 export function assessDesktopObservationReadiness(
-  probe: Pick<MacOSAutomationProbe, 'platform' | 'available' | 'permissions'> & {
-    sourceAvailability?: Partial<Record<DesktopObservationSource['id'], boolean>>;
-  }
+  probe: DesktopObservationHostProbe
 ): DesktopObservationReadiness[] {
   return DESKTOP_OBSERVATION_SOURCES.map((source) => {
     if (source.permission === 'none') {
@@ -630,11 +633,12 @@ export function assessDesktopObservationReadiness(
         reason: `platform_observation_probe_unsupported:${probe.platform}`,
       };
     }
-    if (!probe.available) {
+    if (Object.prototype.hasOwnProperty.call(probe.sourceAvailability ?? {}, source.id)) {
+      const available = probe.sourceAvailability?.[source.id] === true;
       return {
         source_id: source.id,
-        available: false,
-        reason: 'automation_bridge_unavailable',
+        available,
+        reason: available ? 'macos_observation_probe_succeeded' : 'macos_observation_unavailable',
       };
     }
     const permission = probe.permissions[source.permission];
@@ -646,6 +650,16 @@ export function assessDesktopObservationReadiness(
           reason: `${source.permission}_permission_${permission}`,
         };
   });
+}
+
+/** The baseline uses this shared report builder so per-source results are retained. */
+export function buildDesktopObservationReport<T extends DesktopObservationHostProbe>(probe: T) {
+  return {
+    registry: listDesktopObservationSources(),
+    readiness: assessDesktopObservationReadiness(probe),
+    bridge: probe,
+    data_tier_note: 'observation_tier is separate from personal/confidential/public data tier',
+  };
 }
 
 /** Default host sampler backed only by existing OS observation primitives. */

@@ -1,4 +1,4 @@
-import { safeExecResult } from './secure-io.js';
+import { probeMacOSNativeAutomation } from './macos-native-automation.js';
 import { activateApplication } from './apple-event-bridge.js';
 import { listKnownAppCapabilities, type KnownAppCapability } from './virtual/os-app-adapters.js';
 
@@ -18,6 +18,9 @@ export interface MacOSAutomationProbe {
   available: boolean;
   permissions: MacOSAutomationPermissions;
   known_applications: KnownAppCapability[];
+  sourceAvailability?: Partial<
+    Record<'active_window' | 'browser_tabs' | 'focused_input' | 'screen_frame', boolean>
+  >;
   reason?: string;
 }
 
@@ -43,14 +46,6 @@ function isDarwin(): boolean {
   return process.platform === 'darwin';
 }
 
-function buildProbeReason(result: ReturnType<typeof safeExecResult>): string {
-  const detail =
-    result.stderr.trim() ||
-    result.error?.message ||
-    `osascript exited with status ${result.status}`;
-  return `macos_permission_probe_failed: ${detail}`;
-}
-
 function probe(): MacOSAutomationProbe {
   const knownApplications = listKnownAppCapabilities();
   if (!isDarwin()) {
@@ -64,40 +59,30 @@ function probe(): MacOSAutomationProbe {
     };
   }
 
-  const result = safeExecResult(
-    'osascript',
-    [
-      '-e',
-      'tell application "System Events" to get name of first application process whose frontmost is true',
-    ],
-    { timeoutMs: 2000, maxOutputMB: 1 }
-  );
-  if (result.status === 0) {
-    return {
-      bridge_id: MACOS_AUTOMATION_BRIDGE_ID,
-      platform: process.platform,
-      available: true,
-      permissions: {
-        automation: 'granted',
-        accessibility: 'granted',
-        screen_recording: 'unknown',
-      },
-      known_applications: knownApplications,
-      reason: 'screen_recording_probe_not_attempted',
-    };
-  }
-
+  const native = probeMacOSNativeAutomation();
+  const uiAvailable = native.available && native.accessibility === 'granted';
+  const permissions: MacOSAutomationPermissions = {
+    automation: native.automation,
+    accessibility: native.accessibility,
+    screen_recording: native.screen_recording,
+  };
+  const unavailable = Object.entries(permissions)
+    .filter(([, status]) => status !== 'granted')
+    .map(([permission, status]) => `${permission}_permission_${status}`);
+  if (native.reason) unavailable.unshift(native.reason);
   return {
     bridge_id: MACOS_AUTOMATION_BRIDGE_ID,
     platform: process.platform,
-    available: false,
-    permissions: {
-      automation: 'denied',
-      accessibility: 'denied',
-      screen_recording: 'unknown',
-    },
+    available: uiAvailable,
+    permissions,
     known_applications: knownApplications,
-    reason: buildProbeReason(result),
+    sourceAvailability: {
+      active_window: uiAvailable,
+      focused_input: uiAvailable,
+      browser_tabs: native.available && native.browser_automation === 'granted',
+      screen_frame: native.available && native.screen_recording === 'granted',
+    },
+    ...(unavailable.length ? { reason: unavailable.join('; ') } : {}),
   };
 }
 
