@@ -525,6 +525,10 @@ export const PROGRESS_VOCABULARY_KEYS = [
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
 // intent-resolution rendering).
 export const ASK_VOCABULARY_KEYS = [
+  'front_desk:ask_home_draft_preserved',
+  'front_desk:ask_pending_send_blocked',
+  'front_desk:ask_pending_review_description',
+  'front_desk:ask_pending_review',
   'front_desk:ask_keyboard_hint',
   'front_desk:ask_draft_too_long',
   'front_desk:ask_correction_loading',
