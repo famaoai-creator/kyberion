@@ -12,6 +12,20 @@ export interface ConversationRequestScope {
   organizationId?: string;
   projectId?: string;
 }
+
+/** Management uses snake-case URLs; conversation transport uses camel-case fields. */
+export function conversationScopeFromQuery(
+  sessionId: string,
+  tenant: string | null,
+  query: URLSearchParams
+): ConversationRequestScope {
+  return {
+    sessionId,
+    tenant: tenant || undefined,
+    organizationId: query.get('organization_id') || query.get('organizationId') || undefined,
+    projectId: query.get('project_id') || query.get('projectId') || undefined,
+  };
+}
 export interface PendingConversationRequest {
   id: string;
   text: string;
