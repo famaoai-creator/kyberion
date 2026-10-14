@@ -169,13 +169,27 @@ function mount(strict = false, initial = summary()) {
     summaryFailed = true;
     await act(() => watch.refresh(new AbortController().signal));
   };
+  const recoverSummary = () => {
+    summaryFailed = false;
+  };
   const tab = (id: string) =>
     act(() => {
       const button = container.querySelector('[data-tab-id="' + id + '"]');
       if (!button) throw Error('Missing tab ' + id);
       fireEvent(button, 'click');
     });
-  return { container, requests, card, control, click, update, render, failSummary, tab };
+  return {
+    container,
+    requests,
+    card,
+    control,
+    click,
+    update,
+    render,
+    failSummary,
+    recoverSummary,
+    tab,
+  };
 }
 
 describe('outcome preview request ownership in the real page', () => {
@@ -416,13 +430,50 @@ it('drops a preview when a failed summary hides the queue, including after recov
   await flush();
   m.click('A');
   await m.failSummary();
-  expect(m.container.textContent).toContain('home.load_error');
+  expect(m.container.textContent).toContain('home.load_unavailable');
   expect(m.requests[0].signal?.aborted).toBe(true);
   m.requests[0].resolve(preview('A'));
   await flush();
   m.update(summary());
   expect(m.container.textContent).not.toContain('content-A');
   expect(m.control('A').textContent).toBe('action_open');
+});
+it('recovers the decision queue through a read-only retry without stale preview actions', async () => {
+  const m = mount();
+  await flush();
+  await m.failSummary();
+  expect(m.card('A')).toBeNull();
+  const retry = m.container
+    .querySelectorAll('button')
+    .find((button) => button.textContent === 'home.load_retry');
+  expect(retry).toBeDefined();
+  m.recoverSummary();
+  await act(async () => fireEvent(retry!, 'click'));
+  await flush();
+  expect(m.card('A')).not.toBeNull();
+  expect(m.control('A').textContent).toBe('action_open');
+  expect(m.container.textContent).not.toContain('home.load_unavailable');
+});
+it('offers an explicit ask action when no decision is waiting', async () => {
+  const empty = summary();
+  empty.outcome_feed = [];
+  const m = mount(false, empty);
+  await flush();
+  const opened = vi.fn();
+  const previous = Object.getOwnPropertyDescriptor(window, 'dispatchEvent');
+  Object.defineProperty(window, 'dispatchEvent', { configurable: true, value: opened });
+  try {
+    const ask = m.container
+      .querySelectorAll('button')
+      .find((button) => button.textContent === 'home.ask_start');
+    expect(ask).toBeDefined();
+    act(() => fireEvent(ask!, 'click'));
+    expect(opened).toHaveBeenCalledOnce();
+    expect(opened.mock.calls[0][0].type).toBe('concierge:open-dock');
+  } finally {
+    if (previous) Object.defineProperty(window, 'dispatchEvent', previous);
+    else Reflect.deleteProperty(window, 'dispatchEvent');
+  }
 });
 it('drops data when authentication changes during response-body consumption', async () => {
   token = 'initial';
