@@ -739,7 +739,8 @@ export async function runRealtimeVoiceConversationLoop(
   }
   if (avatarFollow && getRegisteredEnvText('KYBERION_TTS_COMMAND')) {
     print(
-      '⚠️ --avatar-follow plays through voice-hub; KYBERION_TTS_COMMAND streaming is bypassed.'
+      '⚠️ --avatar-follow + streaming TTS: audio plays locally (not via voice-hub); ' +
+        'the avatar tracks the presence speaking state instead.'
     );
   }
   const reflectLoopState = avatarFollow
@@ -754,7 +755,7 @@ export async function runRealtimeVoiceConversationLoop(
         });
       }
     : undefined;
-  if (playbackEnabled && !avatarFollow) {
+  if (playbackEnabled) {
     const installed = installShellStreamingTtsBridgeFromEnv();
     if (installed.installed) {
       const probe = probePcmAudioStreaming();
@@ -764,6 +765,16 @@ export async function runRealtimeVoiceConversationLoop(
         );
       }
       streamingTts = getStreamingTtsBridge('shell');
+      // A misconfigured command fails every turn *silently* (empty PCM
+      // stream → playback "completes" instantly). Smoke it once at startup:
+      // feed one line and require some PCM bytes back within 15s.
+      const smoke = await smokeTestStreamingTts(streamingTts, session.profile_id);
+      if (!smoke.ok) {
+        throw new Error(
+          `KYBERION_TTS_COMMAND produced no PCM audio: ${smoke.reason}. ` +
+            'Unset it to fall back to governed artifact synthesis.'
+        );
+      }
       print('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
     }
   }
@@ -983,6 +994,36 @@ export async function runRealtimeVoiceConversationLoop(
   } finally {
     unsubscribeMediaEvents?.();
     await warmClient?.dispose();
+  }
+}
+
+/**
+ * Prove the configured streaming-TTS bridge actually emits PCM: push a short
+ * utterance and require at least one audio chunk back. Without this a broken
+ * KYBERION_TTS_COMMAND turns every reply into instant silence.
+ */
+async function smokeTestStreamingTts(
+  bridge: StreamingTextToSpeechBridge,
+  voiceProfileId: string,
+  timeoutMs = 15_000
+): Promise<{ ok: boolean; reason?: string }> {
+  async function* text(): AsyncGenerator<string> {
+    yield 'テスト。';
+  }
+  try {
+    const iterator = bridge.synthesizeStream(text(), voiceProfileId)[Symbol.asyncIterator]();
+    const timedOut = Symbol('timeout');
+    const first = await Promise.race([
+      iterator.next(),
+      new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), timeoutMs)),
+    ]);
+    void iterator.return?.();
+    if (first === timedOut) return { ok: false, reason: `no PCM within ${timeoutMs}ms` };
+    if (first.done) return { ok: false, reason: 'stream closed without audio chunks' };
+    if (!first.value.payload.length) return { ok: false, reason: 'empty first audio chunk' };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
 }
 
