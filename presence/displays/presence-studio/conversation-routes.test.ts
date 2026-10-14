@@ -1,6 +1,10 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type express from 'express';
-const fixtures = vi.hoisted(() => ({ files: new Map<string, unknown>(), run: vi.fn() }));
+const fixtures = vi.hoisted(() => ({
+  files: new Map<string, unknown>(),
+  run: vi.fn(),
+  failWrites: false,
+}));
 vi.mock('@agent/core/surface/channel-surface', () => ({
   runSurfaceMessageConversation: fixtures.run,
 }));
@@ -12,8 +16,10 @@ vi.mock('@agent/core/lock-utils', () => ({
 }));
 vi.mock('@agent/core/workforce/artifact-store', () => ({
   readGovernedArtifactJson: (path: string) => structuredClone(fixtures.files.get(path) ?? null),
-  writeGovernedArtifactJson: (_role: string, path: string, value: unknown) =>
-    fixtures.files.set(path, structuredClone(value)),
+  writeGovernedArtifactJson: (_role: string, path: string, value: unknown) => {
+    if (fixtures.failWrites) throw new Error('synthetic persistence failure');
+    return fixtures.files.set(path, structuredClone(value));
+  },
 }));
 vi.mock('@agent/core/surface/surface-url', () => ({
   resolveSurfaceBrowserUrl: () => 'https://desk.example.test',
@@ -69,6 +75,7 @@ async function request(method = 'GET', body: unknown = {}, tenant?: string, remo
 }
 beforeEach(() => {
   fixtures.files.clear();
+  fixtures.failWrites = false;
   fixtures.run.mockReset();
   vi.stubEnv('KYBERION_TENANT', 'alpha-team');
   fixtures.run.mockResolvedValue({
@@ -337,6 +344,78 @@ describe('Presence explicit receipt revision boundary', () => {
       tenant: 'other',
     });
     expect(denied.statusCode).toBe(403);
+    expect(fixtures.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('contextual next-action provenance', () => {
+  const contract = {
+    request_id: 'ir_not_durable',
+    normalized_intent: 'Discuss packing',
+    missing_inputs: ['destination'],
+    resolution_shape: 'direct_answer',
+    outcome_kind: 'answer',
+    authority_level: 'human_clarification_required',
+    next_action: {
+      kind: 'provide_input',
+      label: 'What is the destination?',
+      consequence: 'Helps tailor suggestions.',
+    },
+    rationale: 'synthetic',
+  };
+  const conversation = {
+    text: 'Tell me the destination.',
+    delegationResults: [],
+    approvalRequests: [],
+    intentResolution: contract,
+  };
+  async function input() {
+    const history = await request();
+    return {
+      text: 'Let us discuss a packing list',
+      conversation_id: history.body.sessionId,
+      request_id: '22222222-2222-4222-8222-222222222222',
+      tenant: 'alpha-team',
+    };
+  }
+  it('binds projected metadata to the enclosing durable request and leaves replay/history inert', async () => {
+    fixtures.run.mockResolvedValue(conversation);
+    const body = await input();
+    const live = await request('POST', body);
+    expect(live.body).toMatchObject({
+      request_id: body.request_id,
+      historySaved: true,
+      next_actions: [
+        {
+          id: 'draft_input',
+          label: contract.next_action.label,
+          consequence: contract.next_action.consequence,
+          missing_inputs: ['destination'],
+        },
+      ],
+    });
+    expect(live.body.intent_resolution).toMatchObject({ request_id: 'ir_not_durable' });
+    const replay = await request('POST', body);
+    expect(replay.body.replayed).toBe(true);
+    expect(replay.body.next_actions).toBeUndefined();
+    const history = await request();
+    expect(JSON.stringify(history.body)).not.toContain('next_actions');
+    expect(fixtures.run).toHaveBeenCalledTimes(1);
+  });
+  it('does not publish actions when the reply could not be durably saved', async () => {
+    const body = await input();
+    fixtures.run.mockImplementation(async () => {
+      fixtures.failWrites = true;
+      return conversation;
+    });
+    const result = await request('POST', body);
+    expect(result.body).toMatchObject({ ok: true, historySaved: false });
+    expect(result.body.next_actions).toBeUndefined();
+  });
+  it('keeps unknown origin fields outside the existing POST schema', async () => {
+    const body = await input();
+    const result = await request('POST', { ...body, source_request_id: body.request_id });
+    expect(result.statusCode).toBe(400);
     expect(fixtures.run).not.toHaveBeenCalled();
   });
 });

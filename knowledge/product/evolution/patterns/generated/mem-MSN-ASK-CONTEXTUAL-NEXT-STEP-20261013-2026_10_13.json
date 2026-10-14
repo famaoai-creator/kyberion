@@ -1,0 +1,27 @@
+{
+  "record_id": "mem-MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013-2026_10_13",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bind conversational shortcuts to a current request and prepare explicit drafts",
+  "summary": "A conversational next-step label is not an authorization or a request payload. Bind draft-only actions to the latest durable live response and preserve existing user text.",
+  "candidate_id": "mem-MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013-2026_10_13",
+  "evidence_refs": [
+    "active/missions/public/MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013/evidence/implementation-report.md",
+    "active/missions/public/MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013/evidence/test-report.md",
+    "active/missions/public/MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013/evidence/browser-reconstructed-diagnostic.md",
+    "active/missions/public/MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-13T20:23:45.739Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-ASK-CONTEXTUAL-NEXT-STEP-20261013"
+  ],
+  "reusable_steps": [
+    "A conversational next-step label is not an authorization or a request payload",
+    "Bind draft-only actions to the latest durable live response and preserve existing user text"
+  ],
+  "expected_outcome": "## When to apply\nUse this pattern when a conversational surface offers follow-up controls beside asynchronous or historical responses.\n\n## Procedure\n1. Project a closed action contract only when the recorded authority and next-action kind agree. Bound and validate the projected guidance; do not turn arbitrary labels into commands.\n2. Bind the action to the enclosing durable request ID, session, initiating user text and latest live response. Require successful history persistence. Replayed, restored, superseded, unsaved and malformed responses remain inert.\n3. Recheck current request, tenant, locale and shell readiness at click time and again after a deferred draft-replacement decision. A shell interruption must retire old actions even if readiness later returns.\n4. Prepare editable text containing an explicitly reference-only excerpt of the original request, recorded guidance and missing details. Keep the new reply distinct. Preparing a draft must not send, approve, cancel, resume or execute work.\n5. Preserve existing user text with a visible Keep or Use choice. Make accepted actions one-shot and escape every displayed field, including long guidance.\n\n## Verification\nTest reordered responses, stale scopes, shell epochs, persistence failure, malformed metadata, replay/history restoration, repeated clicks and deferred replacement. Pass the actual generated draft through the existing pure request classifier so quoted approval-like guidance cannot silently become control intent. Verify visual wrapping and draft choices with the actual renderer using an explicitly synthetic GET-only fixture, and distinguish that evidence from real authenticated intake/provider execution.\n\n## Evidence discipline\nAfter reconstruction or workspace loss, old results are historical. Re-run relevant tests and builds against the new bytes before making readiness claims; preserve incomplete broad-suite results and report their limits.",
+  "source_branch": "fix/ask-contextual-next-step-20261013",
+  "source_commit": "8efc013cda7de8b7be40f1b177bca4f3216d46f5"
+}
