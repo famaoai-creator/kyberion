@@ -199,7 +199,11 @@
     vt: vt,
   });
   var fetchReadJson = readRecovery.fetchJson;
-  var restoreConversation = readRecovery.restoreConversation;
+  function restoreConversation(restoreDraft) {
+    if (state.historyReadPending || state.sending) return Promise.resolve(false);
+    if (nextActions) nextActions.retire();
+    return readRecovery.restoreConversation(restoreDraft);
+  }
   var hasBootVocabulary = readRecovery.hasBootVocabulary;
   var refreshRecent = readRecovery.refreshRecent;
   var renderStartup = readRecovery.renderStartup;
@@ -212,6 +216,18 @@
       scopedUrl: scopedUrl,
       proposeDraft: proposeDraft,
       vt: vt,
+    });
+
+  var nextActions =
+    window.KyberionAskNextActions &&
+    window.KyberionAskNextActions.create({
+      state: state,
+      vt: vt,
+      scopedUrl: scopedUrl,
+      escapeHtml: escapeHtml,
+      proposeDraft: proposeDraft,
+      cancelDraftChoice: cancelDraftChoice,
+      renderTurns: renderTurns,
     });
 
   var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
@@ -436,12 +452,6 @@
       .join('');
   }
 
-  function quickReplyLabel(action) {
-    if (action.id === 'proceed') return vt(state.vocab, 'front_desk:ask_proceed');
-    if (action.id === 'more_detail') return vt(state.vocab, 'front_desk:ask_more_detail');
-    return action.label;
-  }
-
   function selectedRequest() {
     try {
       return new URLSearchParams(window.location.search).get('request') || '';
@@ -480,24 +490,7 @@
       turn.role === 'companion' && turn.shape && turn.shape !== 'reply'
         ? '<span class="kb-badge ask-turn-shape">' + escapeHtml(shapeLabel) + '</span>'
         : '';
-    var actionsHtml = '';
-    if (turn.role === 'companion' && Array.isArray(turn.next_actions) && turn.next_actions.length) {
-      actionsHtml =
-        '<div class="ask-turn-next-actions">' +
-        turn.next_actions
-          .map(function (action) {
-            var label = quickReplyLabel(action);
-            return (
-              '<button type="button" class="kb-btn kb-btn--secondary ask-quick-reply" data-quick-reply="' +
-              escapeHtml(label) +
-              '">' +
-              escapeHtml(label) +
-              '</button>'
-            );
-          })
-          .join('') +
-        '</div>';
-    }
+    var actionsHtml = nextActions ? nextActions.render(turn) : '';
     return (
       '<li class="ask-turn ' +
       roleClass +
@@ -524,14 +517,6 @@
     if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }
 
-  function wireQuickReplies() {
-    document.querySelectorAll('[data-quick-reply]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        sendText(button.getAttribute('data-quick-reply'));
-      });
-    });
-  }
-
   function renderTurns() {
     var dateEl = document.getElementById('date-separator');
     if (dateEl) dateEl.textContent = vt(state.vocab, 'front_desk:ask_today');
@@ -549,7 +534,7 @@
     }
     emptyEl.classList.add('hidden');
     listEl.innerHTML = state.turns.map(turnHtml).join('');
-    wireQuickReplies();
+    if (nextActions) nextActions.wire();
     if (selectedRequest() && state.focusedRequest !== selectedRequest()) focusSelectedRequest();
     else scrollConversationToBottom();
   }
@@ -997,6 +982,7 @@
   function proposeDraft(text, isCurrent, onAccepted) {
     var input = document.getElementById('ask-input');
     if (!input || !text || state.historyState !== 'ready' || !state.storageVerified) return false;
+    if (isCurrent && !isCurrent()) return false;
     if (input.value.trim() && input.value !== text) {
       state.proposedDraft = {
         text: text,
@@ -1167,6 +1153,7 @@
     }
     state.pendingRequest = request;
     state.sending = true;
+    var actionAttempt = nextActions ? nextActions.begin() : null;
     state.errorKey = null;
     saveDraft();
     render();
@@ -1229,16 +1216,17 @@
         state.turns = state.turns.filter(function (turn) {
           return turn.id !== request.id + '-secretary';
         });
-        pushTurn({
+        var replyTurn = {
           id: request.id + '-secretary',
           role: 'companion',
           text: body.reply,
           shape: body.shape,
-          next_actions: body.replayed ? undefined : body.next_actions,
           intent_resolution: body.replayed ? undefined : body.intent_resolution,
           intent_label: body.intent_label,
           intent_label_source: body.intent_label_source,
-        });
+        };
+        pushTurn(replyTurn);
+        if (nextActions) nextActions.bind(body, request, replyTurn, actionAttempt);
         state.pendingRequest = null;
         try {
           window.sessionStorage.removeItem(draftKey() + '.request');
@@ -1511,6 +1499,7 @@
     var retryStartup = document.getElementById('ask-startup-retry');
     if (retryStartup) retryStartup.addEventListener('click', loadStartup);
     readRecovery.observeShell();
+    if (nextActions) nextActions.mount();
     renderStartup();
     loadStartup();
   }
