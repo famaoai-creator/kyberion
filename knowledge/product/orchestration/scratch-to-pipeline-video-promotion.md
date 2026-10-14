@@ -6,7 +6,7 @@ authority: reference
 phase: [execution, review]
 tags: [video, scratch-first, pipeline, promotion, narrated]
 owner: ecosystem_architect
-last_updated: 2026-09-13
+last_updated: 2026-10-14
 ---
 
 # Scratch-to-Pipeline Video Promotion
@@ -41,6 +41,15 @@ From the accepted scratch source (for example `scripts/kyberion_intro_scratch.ts
 | Palette / type / layout | `design_system` / preference profile theme                         |
 | Duration per beat       | storyboard `duration_sec` + voice artifact timing                  |
 | Final scratch MP4 path  | evidence reference only (do not commit binary to git)              |
+
+## Generated-footage evidence
+
+For generated footage, also carry the
+[scene sheet](generative-video-production-playbook.md#reusable-scene-sheet):
+accepted reference-image revisions, generation job and selected-take references,
+per-scene audio/action cues, genre-specific review decisions, and remaining spend
+limits. A changed reference image invalidates dependent take/review selections;
+keep unaffected scenes. Do not promote only a final MP4 and lose its provenance.
 
 ## Promote steps
 

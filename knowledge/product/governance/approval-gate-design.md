@@ -189,7 +189,7 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `marketing_publication`、`held_action_apply`（held action は取り消され、依存する held action も取り消される。
     drain は他の held action を続ける）、`agent_prompt_approval`、`system_actuator_computer`、
     `approval_actuator_request_review`
-  - script: `audit_mirror_reconcile`、`entity_governance_cleanup`、`mission_alignment_gate`、
+  - script: `audit_mirror_reconcile`、`entity_governance_cleanup`、`mission_alignment_gate`、`video_production`（動画の原型画像・全編視聴の採用確認）、
     `organization_decision`、`org_security_policy_write`（`scripts/org.ts`）、`personal_workbench`
   - service recording: `service_recording_review`（`scripts/service_recording.ts` の review が承認を
     recording に書く前）、`service_recording_promotion`（promotion が review の承認を確かめる。

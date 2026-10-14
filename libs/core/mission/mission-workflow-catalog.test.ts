@@ -5,6 +5,56 @@ import {
 } from './mission-workflow-catalog.js';
 
 describe('mission-workflow-catalog', () => {
+  it('requires current image acceptance before generation and playback before promotion', () => {
+    const workflow = resolveMissionWorkflowDesign({
+      missionClass: 'content_and_media',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      intentId: 'video-production',
+    });
+    expect(workflow.workflow_id).toBe('video-production');
+    const phases = workflow.phase_specs ?? [];
+    const ids = phases.map((phase) => phase.id);
+    expect(ids.indexOf('prototype_assets')).toBeLessThan(ids.indexOf('prototype_acceptance'));
+    expect(ids.indexOf('prototype_acceptance')).toBeLessThan(ids.indexOf('asset_generation'));
+    expect(ids.indexOf('repair')).toBeLessThan(ids.indexOf('playback_review'));
+    expect(ids.indexOf('playback_review')).toBeLessThan(ids.indexOf('promotion'));
+    for (const [id, stage] of [
+      ['asset_generation', 'generation'],
+      ['promotion', 'final'],
+      ['publish', 'final'],
+    ]) {
+      const phase = phases.find((item) => item.id === id);
+      expect(phase?.entry_gate?.checks).toContainEqual({
+        kind: 'command_succeeds',
+        params: {
+          command: 'node',
+          args: [
+            '--import',
+            '{REPO_ROOT}/scripts/ts-loader.mjs',
+            '{REPO_ROOT}/scripts/check_video_production_evidence.ts',
+            '--mission',
+            '{MISSION_ID}',
+            '--stage',
+            stage,
+          ],
+          cwd: '{REPO_ROOT}',
+        },
+      });
+    }
+    expect(phases.find((phase) => phase.id === 'repair')?.exit_gate?.checks).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'llm_review' })])
+    );
+    expect(phases.find((phase) => phase.id === 'publish')?.exit_gate?.checks).toEqual(
+      expect.arrayContaining([{ kind: 'human_override' }])
+    );
+    expect(
+      phases.find((phase) => phase.id === 'repair')?.default_tasks?.[0]?.description
+    ).toContain('max_repair_rounds,3');
+  });
+
   it('selects stage-gated workflow for high-stakes mission shapes', () => {
     const workflow = resolveMissionWorkflowDesign({
       missionClass: 'operations_and_release',
