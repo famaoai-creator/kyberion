@@ -7,6 +7,7 @@ import {
 describe('resolveOsAutomationPlatform', () => {
   it('selects explicit platform adapters', () => {
     expect(resolveOsAutomationPlatform('darwin').setWindowState).toBeTypeOf('function');
+    expect(resolveOsAutomationPlatform('darwin').isUIAutomationAvailable).toBeTypeOf('function');
     expect(resolveOsAutomationPlatform('win32').launchApplication).toBeTypeOf('function');
   });
 

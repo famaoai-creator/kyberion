@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDesktopObservationReadiness,
+  buildDesktopObservationReport,
   buildDesktopRecording,
   computeDesktopRecordingHash,
   DesktopDemonstrationRecorder,
@@ -132,6 +133,84 @@ describe('desktop recording and distillation', () => {
       available: false,
       reason: 'windows_observation_unavailable',
     });
+  });
+
+  it('keeps macOS screen capture available when AX input is denied', () => {
+    const readiness = assessDesktopObservationReadiness({
+      platform: 'darwin',
+      available: false,
+      permissions: { automation: 'unknown', accessibility: 'denied', screen_recording: 'granted' },
+      sourceAvailability: {
+        active_window: false,
+        focused_input: false,
+        browser_tabs: false,
+        screen_frame: true,
+      },
+    });
+    expect(readiness.find((entry) => entry.source_id === 'screen_frame')).toMatchObject({
+      available: true,
+      reason: 'macos_observation_probe_succeeded',
+    });
+    expect(readiness.find((entry) => entry.source_id === 'active_window')).toMatchObject({
+      available: false,
+    });
+    expect(readiness.find((entry) => entry.source_id === 'clipboard')).toMatchObject({
+      available: true,
+    });
+  });
+
+  it('checks each macOS permission even when the aggregate bridge is unavailable', () => {
+    const readiness = assessDesktopObservationReadiness({
+      platform: 'darwin',
+      available: false,
+      permissions: { automation: 'denied', accessibility: 'granted', screen_recording: 'unknown' },
+    });
+    expect(readiness.find((entry) => entry.source_id === 'focused_input')).toMatchObject({
+      available: true,
+      reason: 'permission_granted',
+    });
+    expect(readiness.find((entry) => entry.source_id === 'screen_frame')).toMatchObject({
+      available: false,
+      reason: 'screen_recording_permission_unknown',
+    });
+  });
+
+  it('honors an explicit failed macOS source probe despite a generic grant', () => {
+    const readiness = assessDesktopObservationReadiness({
+      platform: 'darwin',
+      available: true,
+      permissions: { automation: 'granted', accessibility: 'granted', screen_recording: 'granted' },
+      sourceAvailability: { browser_tabs: false },
+    });
+    expect(readiness.find((entry) => entry.source_id === 'browser_tabs')).toMatchObject({
+      available: false,
+    });
+  });
+
+  it('forwards native macOS source availability through the baseline report builder', () => {
+    const probe = {
+      platform: 'darwin' as const,
+      bridge_id: 'macos-automation-bridge',
+      available: false,
+      permissions: {
+        automation: 'unknown' as const,
+        accessibility: 'denied' as const,
+        screen_recording: 'granted' as const,
+      },
+      sourceAvailability: {
+        active_window: false,
+        focused_input: false,
+        browser_tabs: false,
+        screen_frame: true,
+      },
+    };
+    const report = buildDesktopObservationReport(probe);
+    expect(report.bridge).toBe(probe);
+    expect(report.readiness.find((entry) => entry.source_id === 'screen_frame')?.available).toBe(
+      true
+    );
+    expect(report.registry).toEqual(listDesktopObservationSources());
+    expect(report.data_tier_note).toContain('separate');
   });
 
   it('records human observations with semantic target evidence and no clipboard body', () => {
