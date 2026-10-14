@@ -69,6 +69,9 @@ import {
   listDesktopObservationSources,
 } from '@agent/core/virtual/desktop-recording';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
+import { isUIAutomationAvailable } from '@agent/core/virtual/os-automation';
+import { listKnownAppCapabilities } from '@agent/core/virtual/os-app-adapters';
+import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import {
@@ -110,9 +113,16 @@ export function readAuditLedgerFreshness(
   nowMs = Date.now()
 ): AuditLedgerFreshness {
   try {
-    const safeAuditDir = assertSafeRepositoryPath(auditDir, { allowMissingLeaf: true });
+    const safeAuditDir = assertSafeRepositoryPath(auditDir, {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(safeAuditDir) || !safeLstat(safeAuditDir).isDirectory()) {
-      return { fresh: false, last_entry_ms: null, age_ms: null, reason: 'missing' };
+      return {
+        fresh: false,
+        last_entry_ms: null,
+        age_ms: null,
+        reason: 'missing',
+      };
     }
     const files = safeReaddir(safeAuditDir)
       .filter((entry) => /^audit-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(entry))
@@ -192,7 +202,10 @@ export interface SchedulerHealthCheck {
 export interface SchedulerHealthReport {
   enabled_schedule_count: number;
   scheduler_alive: SchedulerHealthCheck;
-  schedules_firing: SchedulerHealthCheck & { due_in_window: number; last_run_in_window: number };
+  schedules_firing: SchedulerHealthCheck & {
+    due_in_window: number;
+    last_run_in_window: number;
+  };
   healthy: boolean;
 }
 
@@ -271,7 +284,12 @@ export function evaluateSchedulerHealth(input: {
     return {
       enabled_schedule_count: 0,
       scheduler_alive: { ok: true, reason },
-      schedules_firing: { ok: true, reason, due_in_window: 0, last_run_in_window: 0 },
+      schedules_firing: {
+        ok: true,
+        reason,
+        due_in_window: 0,
+        last_run_in_window: 0,
+      },
       healthy: true,
     };
   }
@@ -704,7 +722,10 @@ function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
   return resolveProviderCapabilitiesSnapshot({
     probingEnabled: getRegisteredEnvText(PROVIDER_CAPABILITY_PROBE_ENV) !== '0',
     peek: () => peekProviderCapabilityRegistry(),
-    load: () => loadProviderCapabilityRegistry({ maxAgeMs: DEFAULT_PROVIDER_CAPABILITY_TTL_MS }),
+    load: () =>
+      loadProviderCapabilityRegistry({
+        maxAgeMs: DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
+      }),
   });
 }
 
@@ -715,7 +736,11 @@ export async function runBaselineCheck() {
   // never fires, so session start submits a detached dry-run maintenance job
   // when the last completed run is stale. Failure-tolerant — maintenance must
   // never block the baseline check.
-  let janitorMaintenance = { submitted: false, pending: false, reason: null as string | null };
+  let janitorMaintenance = {
+    submitted: false,
+    pending: false,
+    reason: null as string | null,
+  };
   try {
     janitorMaintenance = maybeSubmitJanitorMaintenanceJob();
     if (janitorMaintenance.submitted) {
@@ -804,10 +829,55 @@ export async function runBaselineCheck() {
   // is observational and intentionally does not change baseline health: a
   // non-macOS host can still use the permission-free clipboard source while
   // reporting the unavailable accessibility/frame sources explicitly.
-  const desktopObservationProbe = macosAutomationBridge.probe();
+  let desktopObservationProbe: Omit<ReturnType<typeof macosAutomationBridge.probe>, 'bridge_id'> & {
+    bridge_id: string;
+  } = macosAutomationBridge.probe();
+  let desktopObservationAvailability:
+    | Partial<Record<'active_window' | 'browser_tabs' | 'focused_input' | 'screen_frame', boolean>>
+    | undefined;
+  if (process.platform === 'win32') {
+    // Windows has native UI Automation, Chrome UIA tab enumeration, and a
+    // platform screen-capture seam. Probe each source separately so an empty
+    // current focused control or missing capture backend is not confused with
+    // adapter availability. These readiness values describe source access,
+    // not whether each source currently has data to return.
+    const screen = await createScreenCaptureBridge().probe();
+    const applications = listKnownAppCapabilities();
+    const uiAutomationAvailable = isUIAutomationAvailable();
+    const chromeTabAdapterAvailable = applications.some(
+      (application) =>
+        application.application === 'Google Chrome' &&
+        application.capabilities.includes('list_tabs')
+    );
+    desktopObservationProbe = {
+      bridge_id: 'windows-os-automation-bridge',
+      platform: 'win32',
+      available: uiAutomationAvailable,
+      permissions: {
+        automation: uiAutomationAvailable ? 'granted' : 'denied',
+        accessibility: uiAutomationAvailable ? 'granted' : 'denied',
+        screen_recording: screen.available && screen.backend !== 'stub' ? 'granted' : 'denied',
+      },
+      known_applications: applications,
+      ...(uiAutomationAvailable ? {} : { reason: 'windows_ui_automation_unavailable' }),
+    };
+    desktopObservationAvailability = {
+      active_window: uiAutomationAvailable,
+      browser_tabs: uiAutomationAvailable && chromeTabAdapterAvailable,
+      // UIA access is available when the desktop tree is queryable; whether
+      // a particular control currently has focus is a separate runtime state.
+      focused_input: uiAutomationAvailable,
+      screen_frame: screen.available && screen.backend !== 'stub',
+    };
+  }
   const desktopObservation = {
     registry: listDesktopObservationSources(),
-    readiness: assessDesktopObservationReadiness(desktopObservationProbe),
+    readiness: assessDesktopObservationReadiness({
+      ...desktopObservationProbe,
+      ...(desktopObservationAvailability
+        ? { sourceAvailability: desktopObservationAvailability }
+        : {}),
+    }),
     bridge: desktopObservationProbe,
     data_tier_note: 'observation_tier is separate from personal/confidential/public data tier',
   };
@@ -890,7 +960,9 @@ export async function runBaselineCheck() {
         await import('@agent/core/knowledge/learning-signal-adapter');
       const { builtinLearningSignalSources } =
         await import('@agent/core/knowledge/learning-signal-sources');
-      const harvest = harvestLearningSignals({ sources: builtinLearningSignalSources() });
+      const harvest = harvestLearningSignals({
+        sources: builtinLearningSignalSources(),
+      });
       const failed = harvest.sources
         .filter((source) => source.error)
         .map((source) => source.source);
