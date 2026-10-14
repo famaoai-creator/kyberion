@@ -201,6 +201,7 @@
     cancelDraftChoice: cancelDraftChoice,
     scopedUrl: scopedUrl,
     renderRecent: renderRecent,
+    escapeHtml: escapeHtml,
     vt: vt,
   });
   var fetchReadJson = readRecovery.fetchJson;
@@ -506,13 +507,7 @@
       '</div>' +
       shapeHtml +
       actionsHtml +
-      (turn.role === 'user' && typeof turn.id === 'string' && /^[a-f0-9-]{36}-user$/.test(turn.id)
-        ? '<a href="' +
-          escapeHtml(scopedUrl('/progress?request=' + encodeURIComponent(turn.id.slice(0, -5)))) +
-          '">' +
-          escapeHtml(vt(state.vocab, 'front_desk:nav_progress')) +
-          '</a>'
-        : '') +
+      readRecovery.renderNavigation(turn) +
       '</li>'
     );
   }
@@ -1137,6 +1132,7 @@
     var ownsComposer = Boolean(composer && composer.value.trim() === trimmed);
     var draftRevision = state.draftRevision;
     var sentScope = readRecovery.scopeSnapshot();
+    var sentEpoch = state.draftScopeEpoch;
     state.pendingRequest = request;
     state.sending = true;
     var actionAttempt = nextActions ? nextActions.begin() : null;
@@ -1199,6 +1195,7 @@
             text: trimmed,
             createdAt: request.createdAt,
           });
+        readRecovery.bindNavigation(request.id, body.navigation, sentScope, sentEpoch);
         state.turns = state.turns.filter(function (turn) {
           return turn.id !== request.id + '-secretary';
         });

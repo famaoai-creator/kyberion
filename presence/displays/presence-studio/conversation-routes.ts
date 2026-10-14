@@ -3,6 +3,11 @@
 import type express from 'express';
 import { parseFrontDeskArtifactRevisionInput } from '@agent/core/surface/front-desk-execution-contract';
 import { randomUUID } from 'node:crypto';
+import { listTaskSessions } from '@agent/core/task/task-session';
+import {
+  projectConversationNavigation,
+  type NavigationSession,
+} from './conversation-navigation.js';
 import { t } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -37,6 +42,8 @@ import {
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
   narrowPresenceStudioTenant,
+  narrowPresenceStudioScope,
+  presenceStudioRecordInScope,
   toFrontDeskViewerScope,
   presenceStudioConversationSchema,
 } from './security.js';
@@ -58,6 +65,24 @@ function viewerFor(
     ),
     { tenant, organizationId, projectId }
   );
+}
+
+function historyWithNavigation(
+  req: express.Request,
+  viewer: ReturnType<typeof viewerFor>,
+  selection: { tenant?: string; organizationId?: string; projectId?: string }
+) {
+  const history = readConversationHistory(viewer, { readOnly: true });
+  let sessions: NavigationSession[] = [];
+  try {
+    const scoped = narrowPresenceStudioScope(resolvePresenceStudioViewerContext(req), selection);
+    sessions = listTaskSessions('presence').filter((session) =>
+      presenceStudioRecordInScope(scoped, session)
+    );
+  } catch {
+    // Optional navigation evidence must never break history or imply no work started.
+  }
+  return projectConversationNavigation(history, sessions);
 }
 
 function setupHref(): string {
@@ -93,7 +118,12 @@ export function registerConversationRoutes(app: express.Express): void {
       );
       return res.json({
         ok: true,
-        ...readConversationHistory(viewer, { readOnly: true }),
+        ...historyWithNavigation(req, viewer, {
+          tenant,
+          organizationId:
+            typeof req.query.organizationId === 'string' ? req.query.organizationId : undefined,
+          projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+        }),
         next_action: { kind: 'inspect_setup', href: setupHref() },
       });
     } catch (error) {
@@ -160,6 +190,19 @@ export function registerConversationRoutes(app: express.Express): void {
         .json({ ok: false, error: 'conversation_scope_changed', retry_safe: true });
     }
     const requestId = parsed.data.request_id ?? randomUUID();
+    const navigation = () => {
+      try {
+        return (
+          historyWithNavigation(req, viewer, {
+            tenant,
+            organizationId: parsed.data.organizationId,
+            projectId: parsed.data.projectId,
+          }).messages.find((message) => message.id === requestId + '-user')?.navigation ?? []
+        );
+      } catch {
+        return [];
+      }
+    };
     let turn: ReturnType<typeof reserveConversationTurn>;
     try {
       turn = reserveConversationTurn(
@@ -203,6 +246,7 @@ export function registerConversationRoutes(app: express.Express): void {
           shape: 'reply',
           mode: 'history',
           replayed: true,
+          navigation: navigation(),
           request_id: requestId,
           session_id: ref.sessionId,
         });
@@ -223,6 +267,7 @@ export function registerConversationRoutes(app: express.Express): void {
         ok: true,
         reply: turn.routing.reply,
         mode: 'intake',
+        navigation: navigation(),
         shape:
           turn.routing.kind === 'clarification'
             ? 'clarification'
@@ -297,14 +342,7 @@ export function registerConversationRoutes(app: express.Express): void {
         request_id: requestId,
         session_id: ref.sessionId,
         historySaved,
-        progress_href:
-          '/progress?request=' +
-          encodeURIComponent(requestId) +
-          (tenant ? '&tenant=' + encodeURIComponent(tenant) : '') +
-          (parsed.data.organizationId
-            ? '&organizationId=' + encodeURIComponent(parsed.data.organizationId)
-            : '') +
-          (parsed.data.projectId ? '&projectId=' + encodeURIComponent(parsed.data.projectId) : ''),
+        navigation: navigation(),
       });
     } catch (error) {
       if (error instanceof SurfaceConversationAdmissionError) {
