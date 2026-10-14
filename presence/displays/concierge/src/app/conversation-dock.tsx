@@ -17,6 +17,7 @@ import {
   sameArtifactRevision,
   sameConversationRequestScope,
   prepareConversationRequest,
+  conversationScopeFromQuery,
   parsePendingConversationRequest,
   type ConversationRequestScope,
   type PendingConversationRequest,
@@ -104,12 +105,7 @@ function newMessageId(): string {
 
 function currentRequestScope(sessionId: string, tenant: string | null): ConversationRequestScope {
   const query = new URL(window.location.href).searchParams;
-  return {
-    sessionId,
-    tenant: tenant || undefined,
-    organizationId: query.get('organizationId') || undefined,
-    projectId: query.get('projectId') || undefined,
-  };
+  return conversationScopeFromQuery(sessionId, tenant, query);
 }
 
 export function ConversationDock(props: { progressHref?: string } = {}) {
@@ -151,6 +147,11 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
   const sessionIdRef = React.useRef<string | null>(null);
   const restoredScope = React.useRef<ConversationRequestScope | null>(null);
   const logRef = React.useRef<HTMLDivElement | null>(null);
+  const draftInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (open && historyState === 'ready') draftInputRef.current?.focus();
+  }, [open, historyState]);
 
   // A fresh history read owns all visible state. Retained storage is inert until
   // the server verifies the same session and scope; recovery never replays a POST.
@@ -215,7 +216,16 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
     setHistoryState('loading');
     void (async () => {
       try {
-        const response = await fetch(withSelectedTenant('/api/message', tenant), {
+        const historyUrl = new URL(
+          withSelectedTenant('/api/message', tenant),
+          window.location.href
+        );
+        const requestScope = currentRequestScope('', tenant);
+        for (const key of ['organizationId', 'projectId'] as const) {
+          historyUrl.searchParams.delete(key);
+          if (requestScope[key]) historyUrl.searchParams.set(key, requestScope[key]);
+        }
+        const response = await fetch(historyUrl.pathname + historyUrl.search, {
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -1092,6 +1102,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           </button>
         ) : null}
         <input
+          ref={draftInputRef}
           type="text"
           value={historyState === 'ready' ? draft : ''}
           placeholder={t('dock.placeholder')}
