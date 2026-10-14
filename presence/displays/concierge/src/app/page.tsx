@@ -233,6 +233,7 @@ function DecideCardFrame({
 export default function ConciergePage() {
   const { locale, t } = useConciergeI18n();
   const [summary, setSummary] = React.useState<ConciergeSummary | null>(null);
+  const [retrying, setRetrying] = React.useState(false);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -644,7 +645,23 @@ export default function ConciergePage() {
   );
 
   if (loadError) {
-    return <Callout tone="danger" title={t('home.load_error', { error: loadError })} />;
+    return (
+      <div role="alert">
+        <Callout tone="danger" title={t('home.load_unavailable')} />
+        <Button
+          label={t(retrying ? 'home.loading' : 'home.load_retry')}
+          disabled={retrying}
+          onClick={async () => {
+            setRetrying(true);
+            try {
+              await refresh();
+            } finally {
+              setRetrying(false);
+            }
+          }}
+        />
+      </div>
+    );
   }
   if (!summary) {
     // UI-06: a skeleton of the next-action card and the queue, never a bare
@@ -1096,11 +1113,18 @@ export default function ConciergePage() {
               primary={{ label: t('decide.next_review'), href: `#decide-${nextEntry.id}` }}
             />
           ) : (
-            <NextAction
-              state="empty"
-              title={frontDeskText('decide_empty', locale)}
-              reason={t('decide.next_empty_reason')}
-            />
+            <>
+              <NextAction
+                state="empty"
+                title={frontDeskText('decide_empty', locale)}
+                reason={t('decide.next_empty_reason')}
+              />
+              <Button
+                label={t('home.ask_start')}
+                variant="primary"
+                onClick={() => window.dispatchEvent(new Event('concierge:open-dock'))}
+              />
+            </>
           )}
 
           {/* With nothing queued or set aside, the next-action empty state says

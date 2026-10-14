@@ -272,6 +272,29 @@ function stubConversation(
 }
 
 describe('mounted receipt revision controls', () => {
+  it('keeps management hierarchy identical in history and submitted work and focuses the composer', async () => {
+    fixtures.pathname = '/management';
+    fixtures.search =
+      'tenant=acme&organization_id=org-a&organizationId=org-b&project_id=project-a&projectId=project-b';
+    dom.window.location = new URL('http://localhost/management?' + fixtures.search);
+    const posts = stubConversation(
+      async () => response({ reply: 'Queued', mode: 'intake', shape: 'status_summary' }),
+      []
+    );
+    const m = mount();
+    m.open();
+    await flush();
+    const historyCall = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method !== 'POST');
+    const historyQuery = new URL(String(historyCall?.[0]), 'http://localhost').searchParams;
+    expect(historyQuery.get('organizationId')).toBe('org-a');
+    expect(historyQuery.get('projectId')).toBe('project-a');
+    expect(historyQuery.has('organization_id')).toBe(false);
+    expect(dom.document.activeElement).toBe(m.input());
+    m.type('Prepare a launch plan');
+    m.submitDraft();
+    await flush();
+    expect(JSON.parse(posts[0])).toMatchObject(scope);
+  });
   it('offers explicit formats, clears Cancel and Close, and never enables prose-only artifacts', async () => {
     const posts = stubConversation(async () =>
       response({ reply: 'Queued', mode: 'intake', shape: 'status_summary' })
