@@ -9,8 +9,8 @@
 #   KYBERION_TTS_COMMAND=<repo>/libs/actuators/voice-actuator/scripts/piper_plus_pcm_stream.sh
 #   KYBERION_TTS_SAMPLE_RATE_HZ=24000
 #
-# Env (defaults resolve this repo's managed runtime/cache layout; the bridge
-# spawns with a sanitised env, so do not rely on exports reaching here):
+# Env (the shell bridge forwards the KYBERION_PIPER_* names through the
+# sanitised child env; defaults resolve this repo's managed runtime/cache):
 #   KYBERION_PIPER_BIN       piper-plus executable
 #   KYBERION_PIPER_MODEL     .onnx model path
 #   KYBERION_PIPER_RATE      model's native sample rate (default: 22050)
