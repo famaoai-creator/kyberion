@@ -778,8 +778,18 @@ export async function runRealtimeVoiceConversationLoop(
       // A misconfigured command fails every turn *silently* (empty PCM
       // stream → playback "completes" instantly). Smoke it once at startup:
       // feed one line and require some PCM bytes back within 15s.
-      const smoke = await smokeTestStreamingTts(streamingTts, session.profile_id);
+      // Persistent workers pay the model load on the first call — a 1.7B
+      // clone needs ~10s cold, so give the smoke room beyond the 15s default.
+      const persistent = ['1', 'true', 'yes', 'on'].includes(
+        (getRegisteredEnvText('KYBERION_TTS_PERSISTENT') ?? '').trim().toLowerCase()
+      );
+      const smoke = await smokeTestStreamingTts(
+        streamingTts,
+        session.profile_id,
+        persistent ? 60_000 : 15_000
+      );
       if (!smoke.ok) {
+        streamingTts.dispose?.();
         throw new Error(
           `KYBERION_TTS_COMMAND produced no PCM audio: ${smoke.reason}. ` +
             'Unset it to fall back to governed artifact synthesis.'
@@ -1003,6 +1013,7 @@ export async function runRealtimeVoiceConversationLoop(
     }
   } finally {
     unsubscribeMediaEvents?.();
+    streamingTts?.dispose?.();
     await warmClient?.dispose();
   }
 }
@@ -1018,6 +1029,7 @@ async function smokeTestStreamingTts(
   timeoutMs = 15_000
 ): Promise<{ ok: boolean; reason?: string }> {
   async function* text(): AsyncGenerator<string> {
+    // i18n-exempt: JA voice demo script output
     yield 'テスト。';
   }
   try {
