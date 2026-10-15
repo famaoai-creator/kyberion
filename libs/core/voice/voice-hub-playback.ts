@@ -51,7 +51,12 @@ async function postVoiceHub(
 export function createVoiceHubSegmentPlayback(
   options: VoiceHubPlaybackOptions = {}
 ): (audioPath: string, segmentIndex: number) => PlaybackHandle {
-  const baseUrl = (options.baseUrl || resolveSurfaceUrl('voice-hub')).replace(/\/+$/, '');
+  // Strip trailing slashes without a regex — CodeQL flags `replace(/\/+$/, '')`
+  // on caller-controlled input as polynomial-on-uncontrolled-data.
+  let baseUrl = options.baseUrl || resolveSurfaceUrl('voice-hub');
+  while (baseUrl.endsWith('/')) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
   const timeoutMs = options.timeoutMs ?? 120_000;
   return (audioPath: string) => {
     let interrupted = false;
