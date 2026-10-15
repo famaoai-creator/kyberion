@@ -344,3 +344,16 @@ it('loads draft actions before Ask and bounds multiline context', () => {
   expect(button).toContain('white-space: normal');
   expect(button).toContain('overflow-wrap: anywhere');
 });
+
+describe('Progress correction helper delivery', () => {
+  it('loads the correction helper before Progress and serves localized scope copy', () => {
+    for (const locale of ['en', 'ja'] as const) {
+      const html = renderFrontDeskPageTemplate(readStatic('progress.html'), locale, readStatic);
+      expect(html.indexOf('src="/progress-correction.js"')).toBeGreaterThan(-1);
+      expect(html.indexOf('src="/progress-correction.js"')).toBeLessThan(
+        html.indexOf('src="/progress.js"')
+      );
+    }
+    expect(readStatic('progress-correction.js')).toContain('window.KyberionProgressCorrection');
+  });
+});

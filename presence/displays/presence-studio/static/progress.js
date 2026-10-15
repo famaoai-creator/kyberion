@@ -218,6 +218,7 @@
     detailSequence: 0,
     loadSequence: 0,
     verdictGeneration: 1,
+    rowGeneration: 0,
     verdictStorageKey: null,
     verdictStorageVerified: false,
     pendingVerdicts: Object.create(null),
@@ -361,6 +362,19 @@
   }
 
   function renderDeliveredRow(item, vocab) {
+    var generation = state.rowGeneration;
+    var scope = state.verdictStorageKey;
+    function current() {
+      return (
+        state.loaded &&
+        item.can_verdict &&
+        item.entry_id &&
+        generation === state.rowGeneration &&
+        scope === state.verdictStorageKey &&
+        !state.pendingVerdicts[item.entry_id] &&
+        !state.uncertainVerdicts[item.entry_id]
+      );
+    }
     var selected = item.id === state.selectedId;
     var li = document.createElement('li');
     var row = document.createElement('div');
@@ -379,6 +393,12 @@
     }
     if (item.can_verdict && item.entry_id) {
       actionsHtml +=
+        '<p>' +
+        escapeHtml(vt(vocab, 'progress_delivery_verdict_scope')) +
+        '</p>' +
+        (!window.KyberionProgressCorrection
+          ? '<p role="status">' + escapeHtml(vt(vocab, 'progress_correction_unavailable')) + '</p>'
+          : '') +
         '<button type="button" class="kb-btn kb-btn--primary progress-row-action" data-action="receive">' +
         escapeHtml(vt(vocab, 'action_receive')) +
         '</button>' +
@@ -422,79 +442,50 @@
       });
     }
     row.querySelectorAll('button').forEach(function (button) {
+      button.setAttribute('data-entry-id', item.entry_id || '');
       button.disabled =
         !state.verdictStorageKey ||
         !state.verdictStorageVerified ||
-        Boolean(state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]);
+        Boolean(state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]) ||
+        (button.getAttribute('data-action') === 'receive' &&
+          Boolean(state.correctionDrafts[item.entry_id])) ||
+        (button.getAttribute('data-action') === 'revise' && !window.KyberionProgressCorrection);
+      if (!window.KyberionProgressCorrection && button.getAttribute('data-action') === 'revise')
+        button.setAttribute('title', vt(vocab, 'progress_correction_unavailable'));
     });
     var receiveButton = row.querySelector('[data-action="receive"]');
     if (receiveButton && item.entry_id) {
       receiveButton.addEventListener('click', function (event) {
         event.stopPropagation();
-        submitVerdict(item, 'accepted', undefined, row);
+        if (current() && !state.correctionDrafts[item.entry_id])
+          submitVerdict(item, 'accepted', undefined, row);
       });
     }
     var reviseButton = row.querySelector('[data-action="revise"]');
     if (reviseButton && item.entry_id) {
       reviseButton.addEventListener('click', function (event) {
         event.stopPropagation();
-        if (row.querySelector('.progress-revise-form')) return;
-        state.correctionDrafts[item.entry_id] = { text: '' };
-        renderCorrectionForm(row, item, vocab);
-        var note = row.querySelector('.progress-revise-note');
-        if (note && note.focus) note.focus();
+        renderCorrectionForm(row, item, vocab, current, true);
       });
     }
 
-    renderCorrectionForm(row, item, vocab);
+    renderCorrectionForm(row, item, vocab, current);
     li.appendChild(row);
     return li;
   }
 
-  function renderCorrectionForm(row, item, vocab) {
-    var draft = state.correctionDrafts[item.entry_id];
-    if (!draft || !state.verdictStorageKey || row.querySelector('.progress-revise-form')) return;
-    var locked = Boolean(
-      state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]
-    );
-    var form = document.createElement('div');
-    form.className = 'progress-revise-form';
-    var textarea = document.createElement('textarea');
-    textarea.className = 'kb-input kb-textarea progress-revise-note';
-    textarea.setAttribute('aria-label', vt(vocab, 'action_revise'));
-    textarea.value = draft.text;
-    textarea.maxLength = 4000;
-    textarea.disabled = locked;
-    textarea.addEventListener('input', function () {
-      if (!locked && state.correctionDrafts[item.entry_id] === draft) draft.text = textarea.value;
+  function renderCorrectionForm(row, item, vocab, current, open) {
+    if (!window.KyberionProgressCorrection) return;
+    window.KyberionProgressCorrection[open ? 'open' : 'render']({
+      state: state,
+      row: row,
+      item: item,
+      vocab: vocab,
+      current: current,
+      vt: vt,
+      submitVerdict: submitVerdict,
+      renderList: renderList,
     });
-    var note = document.createElement('p');
-    note.textContent = vt(vocab, 'progress_correction_draft_note');
-    var submit = document.createElement('button');
-    submit.type = 'button';
-    submit.className = 'kb-btn kb-btn--primary progress-row-action';
-    submit.textContent = vt(vocab, 'progress_correction_save');
-    submit.disabled = locked || !state.verdictStorageVerified;
-    submit.addEventListener('click', function (event) {
-      event.stopPropagation();
-      submitVerdict(item, 'rejected', textarea.value.trim() || undefined, row);
-    });
-    var discard = document.createElement('button');
-    discard.type = 'button';
-    discard.className = 'kb-btn kb-btn--secondary progress-row-action';
-    discard.setAttribute('data-action', 'discard-correction');
-    discard.textContent = vt(vocab, 'progress_correction_discard');
-    discard.disabled = locked;
-    discard.addEventListener('click', function (event) {
-      event.stopPropagation();
-      delete state.correctionDrafts[item.entry_id];
-      renderList();
-    });
-    form.appendChild(textarea);
-    form.appendChild(note);
-    form.appendChild(submit);
-    form.appendChild(discard);
-    row.appendChild(form);
   }
 
   function correctionRecorded(item) {
@@ -572,6 +563,20 @@
   }
 
   function renderList() {
+    state.rowGeneration += 1;
+    Object.keys(state.correctionDrafts).forEach(function (entryId) {
+      var draft = state.correctionDrafts[entryId];
+      var siblings = (state.payload.delivered || []).filter(function (item) {
+        return item.entry_id === entryId && item.can_verdict;
+      });
+      if (
+        !siblings.some(function (item) {
+          return item.id === draft.editorId;
+        }) &&
+        siblings.length
+      )
+        draft.editorId = siblings[0].id;
+    });
     renderLeave();
     var vocab = state.vocab;
     var listEl = document.getElementById('progress-list');
@@ -896,6 +901,7 @@
     var submittedDraft = state.correctionDrafts[item.entry_id];
     var textarea = row.querySelector('.progress-revise-note');
     if (textarea) textarea.disabled = true;
+    renderList();
     postVerdict(item.entry_id, status, note)
       .then(function (result) {
         if (writeScopeKey !== state.verdictStorageKey) return;
