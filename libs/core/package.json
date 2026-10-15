@@ -6416,6 +6416,10 @@
       "types": "./dist/voice/voice-generation-runtime.d.ts",
       "default": "./dist/voice/voice-generation-runtime.js"
     },
+    "./voice/voice-hub-playback": {
+      "types": "./dist/voice/voice-hub-playback.d.ts",
+      "default": "./dist/voice/voice-hub-playback.js"
+    },
     "./voice/voice-path-policy": {
       "types": "./dist/voice/voice-path-policy.d.ts",
       "default": "./dist/voice/voice-path-policy.js"

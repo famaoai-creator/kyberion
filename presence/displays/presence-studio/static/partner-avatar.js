@@ -145,11 +145,24 @@ export function mountPartnerAvatar(container, options = {}) {
   let messages = null;
 
   const effectiveState = () => (playerSpeaking ? 'speaking' : baseState);
+  let statusMouth = false;
   const apply = () => {
     if (!controller) return;
-    controller.setState(effectiveState());
+    const next = effectiveState();
+    controller.setState(next);
     controller.setExpression(expression);
-    container.setAttribute('data-avatar-state', effectiveState() || 'idle');
+    container.setAttribute('data-avatar-state', next || 'idle');
+    // Host playback already drives a synthetic mouth via followHost; when a
+    // surface reports 'speaking' without any player audio (e.g. the realtime
+    // loop's local streaming playback), keep the mouth moving off status alone.
+    const wantsStatusMouth = next === 'speaking' && player.state !== 'speaking';
+    if (wantsStatusMouth && !statusMouth) {
+      statusMouth = true;
+      controller.startSynthetic();
+    } else if (!wantsStatusMouth && statusMouth) {
+      statusMouth = false;
+      controller.stopSynthetic();
+    }
   };
 
   const player = createSpeechPlayer({

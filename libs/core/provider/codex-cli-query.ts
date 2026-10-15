@@ -421,6 +421,7 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
   const codexProfile = resolveCodexProfileName(env);
+  const cwd = envText(env, 'KYBERION_CODEX_CLI_CWD')?.trim();
 
   logger.debug(
     `[codex-cli] query helper ready (bin=${bin ?? '<deferred>'}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
@@ -435,6 +436,7 @@ export function buildCodexCliQueryOptionsFromEnv(
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
     ...(codexProfile ? { codexProfile } : {}),
+    ...(cwd ? { cwd } : {}),
   };
 }
 

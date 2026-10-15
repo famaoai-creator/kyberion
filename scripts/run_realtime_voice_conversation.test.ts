@@ -54,6 +54,26 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(parsed.vadBackend).toBeUndefined();
   });
 
+  it('parses avatar-follow and tts-engine flags', () => {
+    const parsed = parseRealtimeVoiceConversationCli({
+      'session-id': 'rtc-avatar',
+      interactive: true,
+      'avatar-follow': true,
+      'tts-engine': 'kokoro',
+      mission: 'MSN-CLI-TEST-AVATAR',
+    });
+    expect(parsed.avatarFollow).toBe(true);
+    expect(parsed.ttsEngine).toBe('kokoro');
+
+    const defaults = parseRealtimeVoiceConversationCli({
+      'session-id': 'rtc-avatar',
+      interactive: true,
+      mission: 'MSN-CLI-TEST-AVATAR',
+    });
+    expect(defaults.avatarFollow).toBe(false);
+    expect(defaults.ttsEngine).toBeUndefined();
+  });
+
   it('parses turn-taking flags and resolves the default barge-in mode', () => {
     const base = {
       'session-id': 'rtc-tt',
