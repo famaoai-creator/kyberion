@@ -3141,6 +3141,38 @@
       "documented": true
     },
     {
+      "name": "KYBERION_PIPER_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "piper-plus executable used by piper_plus_pcm_stream.sh; defaults to the managed piper-plus runtime binary.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_PIPER_MODEL",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "ONNX model path used by piper_plus_pcm_stream.sh; defaults to the managed tsukuyomi-chan model.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_PIPER_OUT_RATE",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "PCM sample rate emitted by piper_plus_pcm_stream.sh — 16000|24000|48000, matching KYBERION_TTS_SAMPLE_RATE_HZ.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_PIPER_RATE",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Native sample rate of the piper model (default 22050) used for resampling in piper_plus_pcm_stream.sh.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_PLUGIN_HOST_POLL_MS",
       "category": "tuning",
       "type": "number",
@@ -3313,6 +3345,46 @@
       "description": "Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).",
       "documented": true,
       "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_QWEN3_MEMORY_LIMIT_GB",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "MLX memory limit (GiB) for the Qwen3 framed streaming worker; defaults to 8 for the 1.7B Base model.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_QWEN3_MODEL_ID",
+      "category": "tuning",
+      "type": "string",
+      "required": false,
+      "description": "Hugging Face model id for the Qwen3 framed streaming worker; defaults to mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit (ICL clone).",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_QWEN3_PYTHON",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Managed python used by qwen3_clone_framed_stream.sh; defaults to the mlx-audio tool runtime interpreter.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_QWEN3_REF_AUDIO",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Reference WAV for the Qwen3 ICL clone streaming worker; defaults to the KYBERION_VOICE_PROFILE_ID first sample_ref.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_QWEN3_REF_TEXT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Transcript file for the Qwen3 ICL clone reference; defaults to the ref audio .transcript.txt sidecar.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_ALLOW_SHELL_TOOL",
@@ -4333,6 +4405,14 @@
       "type": "string",
       "required": false,
       "description": "Optional streaming text-to-speech executable for realtime voice and meeting flows; it reads newline-delimited UTF-8 text and emits PCM audio through the governed bridge.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_TTS_PERSISTENT",
+      "category": "tuning",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 1 to keep the KYBERION_TTS_COMMAND worker process resident across turns. The command must emit length-prefixed frames (uint32be + payload, zero-length end-of-request per input line) such as qwen3_tts_stream_bridge.py --stream-framed. Use for engines whose model load dominates per-call cost.",
       "documented": true
     },
     {

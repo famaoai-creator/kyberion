@@ -48,6 +48,12 @@ export interface StreamingTextToSpeechBridge {
     text: AsyncIterable<string>,
     voice_profile_id: string
   ): AsyncIterable<AudioChunk>;
+  /**
+   * Release bridge-owned resources — e.g. a resident TTS worker process.
+   * Optional: bridges that spawn per call need no cleanup. Callers that hold
+   * a persistent bridge (realtime voice loop) should dispose on shutdown.
+   */
+  dispose?(): void;
 }
 
 /* ------------------------------------------------------------------ *
