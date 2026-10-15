@@ -466,6 +466,8 @@ export const PROGRESS_VOCABULARY_KEYS = [
   'front_desk:progress_leave_discard',
   'front_desk:progress_leave_anyway',
   'front_desk:progress_leave_unavailable',
+  'front_desk:progress_delivery_verdict_scope',
+  'front_desk:progress_correction_unavailable',
   'front_desk:progress_correction_draft_note',
   'front_desk:progress_correction_save',
   'front_desk:progress_correction_discard',
