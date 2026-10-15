@@ -26300,9 +26300,9 @@
         "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
       },
       "progress_correction_draft_note": {
-        "en": "Draft kept while this page is open. Leaving or reloading can clear unsaved text.",
-        "ja": "この画面を開いている間は下書きを保持します。画面の移動や再読み込みで未保存の内容が消えることがあります。",
-        "qps-ploc": "⟦Ḓřȧƒŧ ķėṗŧ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Ŀėȧṽïñɠ őř řėŀőȧḓïñɠ ƈȧñ ƈŀėȧř ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+        "en": "One correction draft is shared by files in this delivery while this page is open. Leaving or reloading can clear unsaved text.",
+        "ja": "この納品のファイル間で、一つの修正下書きを共有します。画面の移動や再読み込みで未保存の内容が消えることがあります。",
+        "qps-ploc": "⟦Őñė ƈőřřėƈŧïőñ ḓřȧƒŧ ïş şħȧřėḓ ƀẏ ƒïŀėş ïñ ŧħïş ḓėŀïṽėřẏ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Ŀėȧṽïñɠ őř řėŀőȧḓïñɠ ƈȧñ ƈŀėȧř ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       },
       "progress_correction_save": {
         "en": "Save correction feedback",
@@ -26548,6 +26548,16 @@
         "en": "Review submitted text",
         "ja": "送信した内容を確認",
         "qps-ploc": "⟦Řėṽïėẇ şůƀɱïŧŧėḓ ŧėẋŧ ŀőřėɱ ⟧"
+      },
+      "progress_delivery_verdict_scope": {
+        "en": "Receiving or recording feedback applies to the whole delivery. Discard its correction draft before receiving it.",
+        "ja": "受け取り・修正コメントは、この納品全体に適用されます。受け取る場合は、先に修正の下書きを破棄してください。",
+        "qps-ploc": "⟦Řėƈėïṽïñɠ őř řėƈőřḓïñɠ ƒėėḓƀȧƈķ ȧṗṗŀïėş ŧő ŧħė ẇħőŀė ḓėŀïṽėřẏ. Ḓïşƈȧřḓ ïŧş ƈőřřėƈŧïőñ ḓřȧƒŧ ƀėƒőřė řėƈėïṽïñɠ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "progress_correction_unavailable": {
+        "en": "Correction editor unavailable. Reload this page before entering feedback.",
+        "ja": "修正欄を読み込めませんでした。ページを再読み込みしてから、コメントを入力してください。",
+        "qps-ploc": "⟦Ƈőřřėƈŧïőñ ėḓïŧőř ůñȧṽȧïŀȧƀŀė. Řėŀőȧḓ ŧħïş ṗȧɠė ƀėƒőřė ėñŧėřïñɠ ƒėėḓƀȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "operator": {
