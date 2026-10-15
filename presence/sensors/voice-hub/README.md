@@ -51,6 +51,17 @@ export VOICE_HUB_STT_PREFERENCE=server,whisper_cpp,native_speech
   - Returns available microphone devices
 - `POST /api/listen-once`
   - Runs one capture -> transcription -> reply cycle
+- `POST /api/speech/play`
+  - Plays an existing repo-scoped audio artifact on the host speakers.
+    Blocks until playback finishes or `/api/stop-speaking` interrupts it.
+    While playing, `GET /api/speech/state` reports `speaking` so surfaces
+    (the presence-studio talking avatar) can track the loop's turns.
+    Used by `run_realtime_voice_conversation --interactive --avatar-follow`.
+- `POST /api/speech/state`
+  - Marks speech state for callers that produce audio without a host
+    process — e.g. the realtime loop's local streaming playback
+    (`KYBERION_TTS_COMMAND` → ffplay). Body: `{status, text?, estimated_ms?}`;
+    real playback wins over marks and marks expire on a bounded `until`.
 
 Example:
 

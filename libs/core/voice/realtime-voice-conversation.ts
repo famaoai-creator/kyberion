@@ -88,6 +88,8 @@ export interface RealtimeVoiceConversationTurnInput {
   reasoningModelTier?: 'fast' | 'standard' | 'deep';
   /** Optional provider-supported effort hint for latency-sensitive replies. */
   reasoningEffort?: 'low' | 'medium' | 'high';
+  /** Per-turn TTS engine override; see RealtimeVoiceSynthesisInput.engineId. */
+  ttsEngineId?: string;
 }
 
 export interface RealtimeVoiceConversationTurnResult {
@@ -291,7 +293,16 @@ function buildRealtimeVoiceReplyPrompt(
   session: RealtimeVoiceConversationSession,
   userText: string
 ): string {
-  return `Respond to the user's spoken message in ${session.language}. Return only the natural spoken reply; do not explain your process.\n\n${buildConversationContext(session, userText)}`;
+  // CLI-agent backends run with repo/agent harness context and tend to
+  // answer with lifecycle boilerplate ("session closed", checklists)
+  // unless the spoken-reply contract is spelled out this explicitly.
+  return (
+    `You are a voice assistant speaking to a person through a microphone and speaker. ` +
+    `Respond to the user's spoken message in ${session.language}. ` +
+    `Return only the natural spoken reply — one short utterance a person would say out loud. ` +
+    `Never mention sessions, checkpoints, reviews, missions, code, files, or tasks; ` +
+    `do not explain your process.\n\n${buildConversationContext(session, userText)}`
+  );
 }
 
 function sentenceEndAt(text: string, start: number): number {
@@ -350,6 +361,12 @@ export interface RealtimeVoiceSynthesisInput {
   personalVoiceMode: 'allow_fallback' | 'require_personal_voice';
   /** Extra request-id suffix (e.g. `turn3-seg0`) for traceable artifacts. */
   requestTag?: string;
+  /**
+   * Per-call engine override (e.g. a low-latency engine for live turns).
+   * Overrides the profile's `default_engine_id`; incompatible with
+   * `require_personal_voice` unless it names that same engine.
+   */
+  engineId?: string;
 }
 
 export interface RealtimeVoiceReplyOptions {
@@ -400,8 +417,20 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
     randomUUID().slice(0, 8),
   ].join('-');
   const profile = assertRealtimeVoiceProfileReady(input.profileId, input.personalVoiceMode);
+  const engineId = input.engineId?.trim() || profile.default_engine_id;
+  if (
+    input.engineId?.trim() &&
+    input.personalVoiceMode === 'require_personal_voice' &&
+    engineId !== profile.default_engine_id
+  ) {
+    throw new Error(
+      `--tts-engine '${engineId}' conflicts with personal_voice_mode require_personal_voice ` +
+        `(profile ${profile.profile_id} uses ${profile.default_engine_id}). ` +
+        'Pass --personal-voice-mode allow_fallback to override the engine.'
+    );
+  }
   const policy = getVoiceRuntimePolicy();
-  const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
+  const engine = resolveVoiceEngineForPlatform(engineId);
   const format = resolveVoiceArtifactFormat(
     engine.supports.artifact_formats,
     policy.delivery.default_format
@@ -419,7 +448,7 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
       text: input.text,
       profile_ref: { profile_id: input.profileId },
       engine: {
-        engine_id: profile.default_engine_id,
+        engine_id: engineId,
       },
       rendering: {
         language: input.language,
@@ -452,7 +481,7 @@ export function createRealtimeFirstPhraseCache(
 function firstPhraseCacheKey(input: RealtimeVoiceSynthesisInput): FirstPhraseCacheKey {
   const profile = getVoiceProfileRecord(input.profileId);
   return {
-    engine: profile.default_engine_id,
+    engine: input.engineId?.trim() || profile.default_engine_id,
     voiceId: input.profileId,
     // Any profile edit (engine, samples, effects) changes the revision, so stale audio misses.
     voiceRevision: fingerprintVoiceSettings({ ...profile }),
@@ -508,6 +537,7 @@ async function synthesizeAssistantVoice(input: {
   text: string;
   deliveryMode: 'artifact' | 'artifact_and_playback';
   personalVoiceMode: 'allow_fallback' | 'require_personal_voice';
+  engineId?: string;
 }): Promise<Record<string, unknown>> {
   const { payload } = buildRealtimeVoiceGenerationPayload(input);
   return defaultVoiceActuatorExecutor(payload);
@@ -710,6 +740,7 @@ export async function runRealtimeVoiceConversationTurn(
       text: assistantText,
       deliveryMode,
       personalVoiceMode: input.personalVoiceMode || 'require_personal_voice',
+      ...(input.ttsEngineId ? { engineId: input.ttsEngineId } : {}),
     });
     const artifacts = Array.isArray(voiceGenerationResult.artifact_refs)
       ? (voiceGenerationResult.artifact_refs as string[])
