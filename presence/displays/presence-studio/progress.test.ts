@@ -453,3 +453,24 @@ it.each([false, undefined])(
     expect(payload.active[0].task_state).toBe('collecting_requirements');
   }
 );
+
+describe('delivery-wide artifact membership', () => {
+  it('preserves separate artifact IDs sharing one authoritative inbox verdict target', () => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      taskSessions: [],
+      mirrorHref: MIRROR_HREF,
+      artifacts: ['pdf', 'slides'].map((id) => ({
+        id,
+        title: id,
+        kind: id,
+        entry_id: 'delivery',
+        inbox_status: 'read' as const,
+      })),
+    });
+    expect(payload.delivered.map((item) => [item.id, item.entry_id, item.can_verdict])).toEqual([
+      ['pdf', 'delivery', true],
+      ['slides', 'delivery', true],
+    ]);
+  });
+});
