@@ -1,0 +1,27 @@
+{
+  "record_id": "mem-MSN-ASK-RETRY-UNCERTAINTY-20261016-2026_10_16",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Keep server pending aggregates separate from local retry uncertainty",
+  "summary": "A local transport failure must not inflate an aggregate owned by server history; preserve retry identity and local errors separately.",
+  "candidate_id": "mem-MSN-ASK-RETRY-UNCERTAINTY-20261016-2026_10_16",
+  "evidence_refs": [
+    "active/missions/public/MSN-ASK-RETRY-UNCERTAINTY-20261016/evidence/design-spec.json",
+    "active/missions/public/MSN-ASK-RETRY-UNCERTAINTY-20261016/evidence/implementation-report.md",
+    "active/missions/public/MSN-ASK-RETRY-UNCERTAINTY-20261016/evidence/test-report.md",
+    "active/missions/public/MSN-ASK-RETRY-UNCERTAINTY-20261016/evidence/browser-qa.md",
+    "active/missions/public/MSN-ASK-RETRY-UNCERTAINTY-20261016/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-16T22:20:19.483Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-ASK-RETRY-UNCERTAINTY-20261016"
+  ],
+  "reusable_steps": [
+    "A local transport failure must not inflate an aggregate owned by server history; preserve retry identity and local errors separately"
+  ],
+  "expected_outcome": "# Separate aggregate evidence from local uncertainty\n\nA conversation history pending count summarizes server-owned turns. A browser transport failure does not establish that a new pending turn exists, whether it is already counted, or whether another pending request is unrelated. Do not increment, clear, or decrement that aggregate from a local POST outcome.\n\nKeep local uncertainty in the request error and durable request identity. An explicit retry reuses the same ID and timestamp, and completion clears only matching current request state. A saved fresh response may expose its existing next action after local uncertainty resolves; replayed replies stay display-only. Preserve aggregate warnings from server history until a new scoped read supplies fresh evidence.\n\nRegression coverage should include uncertain transport and typed responses, repeated retries, restored identities, different-text blocked submissions, aggregate counts zero and nonzero, newer composer edits, and scope or navigation changes before completion. Test the actual rendered warning and action eligibility, not just the presence of a successful reply.",
+  "source_branch": "fix/ask-retry-uncertainty-20261016",
+  "source_commit": "966ec2ee1dbc67742c5ebc50d026ace39dd09eca"
+}
