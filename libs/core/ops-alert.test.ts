@@ -23,6 +23,7 @@ import {
   acknowledgeOpsAlerts,
   parseOpsAlertLog,
   readOpsAlertLogRecords,
+  readOpsAlertLogRecordsIncludingSegments,
   redeliverUndeliveredOpsAlerts,
   resolveOpsAlertChannelStatus,
   selectOutstandingUndeliveredOpsAlerts,
@@ -99,6 +100,32 @@ describe('ops-alert', () => {
       .trim()
       .split('\n');
     expect(lines).toHaveLength(3); // two ops_alert records + one retryable undelivered envelope
+  });
+
+  it('picks up undelivered envelopes parked in rotated segments', () => {
+    safeRmSync(pathResolver.sharedTmp('ops-alert-test'), { recursive: true, force: true });
+    const segmentPath = pathResolver.sharedTmp('ops-alert-test/alerts-20261015-190000.jsonl');
+    // An undelivered envelope that rotated out of the live file.
+    safeWriteFile(
+      segmentPath,
+      JSON.stringify({
+        ts: '2026-07-03T23:00:00.000Z',
+        kind: 'operator_notification_undelivered',
+        event: 'ops_alert',
+        title: 'rotated-away alert',
+        reason: 'webhook_failed',
+        correlation_id: 'alert-seg-1',
+        alert_id: 'alert-seg-1',
+        severity: 'critical',
+        context: {},
+        recommendation: 'check',
+        options: [],
+      }) + '\n'
+    );
+
+    const records = readOpsAlertLogRecordsIncludingSegments(ALERT_TEST_LOG);
+    const outstanding = selectOutstandingUndeliveredOpsAlerts(records);
+    expect(outstanding.some((r) => r.raw.correlation_id === 'alert-seg-1')).toBe(true);
   });
 
   it('queues an undelivered ops alert for later redelivery', () => {
