@@ -46,8 +46,27 @@
         },
         "action": {
           "type": "string",
-          "description": "What the janitor does when the TTL elapses. delete = remove the file; archive = move it to the archive tree (reserved for AL-03+; current enforcement only implements delete); review_required = no automatic deletion ever — the directory is declared (never reported uncovered) and surfaced in the janitor report for a human retention decision (AL-04).",
-          "enum": ["delete", "archive", "review_required"]
+          "description": "What the janitor does when the entry's condition is met. delete = remove the expired file; archive = move the expired file to active/archive/<repo-relative-path> (implemented; never auto-deleted afterwards); review_required = no automatic deletion ever — the directory is declared (never reported uncovered) and surfaced in the janitor report for a human retention decision (AL-04); rotate = file-level action for append-only .jsonl ledgers — rename the live file to a <name>-<YYYYMMDD-HHmmss>.jsonl segment once it exceeds rotate_min_bytes, then expire segments by ttl_days via segment_action; compact = file-level action for versioned keyed .jsonl stores — fold to the last record per compact_key once the file exceeds compact_min_bytes and archive the pre-compaction file.",
+          "enum": ["delete", "archive", "review_required", "rotate", "compact"]
+        },
+        "rotate_min_bytes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "rotate action: live-file size in bytes that triggers rotation (default 8 MiB)."
+        },
+        "segment_action": {
+          "type": "string",
+          "enum": ["delete", "archive"],
+          "description": "rotate action: how expired rotated segments are disposed. Default delete; archive moves segments under active/archive/ for evidence-class ledgers."
+        },
+        "compact_key": {
+          "type": "string",
+          "description": "compact action: record field identifying the keyed entity (e.g. item_id). Required for action=compact."
+        },
+        "compact_min_bytes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "compact action: live-file size in bytes that triggers compaction (default 4 MiB)."
         },
         "audit": {
           "type": "boolean",

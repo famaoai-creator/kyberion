@@ -14,6 +14,7 @@ import {
   safeWriteFile,
   safeMkdir,
   safeMoveSync,
+  safePublishExclusiveFileSync,
   safeRmSync,
 } from './secure-io.js';
 import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
@@ -45,6 +46,7 @@ import {
   coveredEventStoreDirs,
   catalogStatusRules,
   statusRulePatternToRegex,
+  appendOnlyStoreEntries,
   EVENT_STORE_PREFIXES,
   BUILTIN_RETENTION_DEFAULTS,
   RETENTION_CATALOG_REPO_PATH,
@@ -122,6 +124,8 @@ export interface ScanTmpResult {
   deleted: string[];
   /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
   softDeleted: string[];
+  /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
+  archived: string[];
 }
 
 export interface RotateLogsOptions {
@@ -136,6 +140,8 @@ export interface RotateLogsResult {
   rotated: string[];
   /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
   softDeleted: string[];
+  /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
+  archived: string[];
 }
 
 export interface ScanDataVaultOptions {
@@ -152,6 +158,8 @@ export interface ScanRuntimeResult {
   deleted: string[];
   /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
   softDeleted: string[];
+  /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
+  archived: string[];
 }
 
 /** AL-04 trash sweep result — see `sweepTrash`. */
@@ -208,6 +216,19 @@ export interface JanitorReport {
   /** WI-16: files expired / deleted this run by a catalog `status_rules` entry. */
   expiredStatusRules: number;
   deletedStatusRules: number;
+  /**
+   * MSN-LOG-STORE-HARDENING-20261016: append-only `.jsonl` store maintenance —
+   * live files rotated to `<stem>-YYYYMMDD-HHmmss.jsonl` segments, keyed
+   * stores folded by `compact_key`, and aged segments expired/archived.
+   */
+  appendOnlyStores: {
+    rotated: string[];
+    compacted: string[];
+    segmentsExpired: string[];
+    segmentsArchived: string[];
+  };
+  /** Total expired files moved to `active/archive/` across all sweeps (archive action). */
+  archived: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
   /**
@@ -273,6 +294,34 @@ export function repoRelativePosix(absolutePath: string): string {
 
 /** AL-04: soft-delete grace floor — see the catalog's `active/archive/.trash` entry. */
 export const TRASH_REPO_SUBPATH = 'active/archive/.trash';
+
+/**
+ * MSN-LOG-STORE-HARDENING-20261016: archive floor for `action: 'archive'`
+ * expiry — files land at `active/archive/<original-repo-relative-path>`.
+ * `active/archive` is `review_required`, so archived evidence is never
+ * auto-deleted.
+ */
+export const ARCHIVE_REPO_SUBPATH = 'active/archive';
+
+/** Pre-compaction copies of keyed JSONL stores land under this archive subtree. */
+export const COMPACTION_ARCHIVE_REPO_SUBPATH = 'active/archive/jsonl-compaction';
+
+/**
+ * `action: 'rotate'` defaults: an append-only file is rotated once it
+ * exceeds this size (mtime can never age while it is appended, so size —
+ * not age — is the trigger).
+ */
+export const DEFAULT_ROTATE_MIN_BYTES = 8 * 1024 * 1024;
+
+/**
+ * `action: 'compact'` default size trigger. Below this a versioned keyed
+ * store is cheap enough to read whole; past it the per-read O(file) parse
+ * cost justifies folding to latest-per-key.
+ */
+export const DEFAULT_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
+
+/** Rotated segments are named `<stem>-YYYYMMDD-HHmmss.jsonl`. */
+export const ROTATED_SEGMENT_SUFFIX_PATTERN = /-\d{8}-\d{6}\.jsonl$/;
 
 /** Grace applied to trashed files whose original path no longer has a covering catalog entry. */
 export const DEFAULT_TRASH_GRACE_DAYS = 30;
@@ -424,9 +473,19 @@ export function restoreFromTrash(originalRepoRelativePath: string): {
   return { restored: true, path: restoredPath };
 }
 
+/** Files whose expiry moved them into `active/archive/` rather than unlinking. */
+interface ExpiryOutcome {
+  deleted: string[];
+  softDeleted: string[];
+  archived: string[];
+}
+
 /**
  * AL-04: apply a catalog entry's expiry action to one expired file.
  *
+ *  - `action: 'archive'` → move to `active/archive/<original-repo-relative-path>`
+ *    (structure preserved); the archive tree itself is `review_required`,
+ *    so archived evidence is never auto-deleted. Always audited.
  *  - `soft_delete_days` declared → move to
  *    `active/archive/.trash/<original-repo-relative-path>` (structure
  *    preserved) so the trash sweep can purge it after the grace period.
@@ -437,13 +496,20 @@ export function restoreFromTrash(originalRepoRelativePath: string): {
 function expireFilePerPolicy(
   filePath: string,
   entry: RetentionCatalogEntry | null,
-  outcome: { deleted: string[]; softDeleted: string[] },
+  outcome: ExpiryOutcome,
   /** WI-16: extra audit fields (e.g. status-rule id/status) merged into the audit record when written. */
   auditExtra?: Record<string, unknown>
 ): void {
   const repoRel = repoRelativePosix(filePath);
-  const softDelete = entry?.soft_delete_days !== undefined;
-  if (softDelete) {
+  const archive = entry?.action === 'archive';
+  const softDelete = !archive && entry?.soft_delete_days !== undefined;
+  if (archive) {
+    const archivePath = nodePath.join(rootDir(), ARCHIVE_REPO_SUBPATH, repoRel);
+    safeMkdir(nodePath.dirname(archivePath), { recursive: true });
+    safeMoveSync(filePath, archivePath);
+    outcome.archived.push(filePath);
+    logger.info(`[JANITOR] archived: ${filePath} -> ${archivePath}`);
+  } else if (softDelete) {
     softDeleteToTrash(filePath);
     outcome.softDeleted.push(filePath);
     logger.info(`[JANITOR] soft-deleted (trash): ${filePath}`);
@@ -452,10 +518,15 @@ function expireFilePerPolicy(
     outcome.deleted.push(filePath);
     logger.info(`[JANITOR] deleted: ${filePath}`);
   }
-  if (entry?.audit || softDelete || auditExtra) {
+  if (entry?.audit || softDelete || archive || auditExtra) {
     appendRetentionAudit({
-      event: softDelete ? 'RETENTION_SOFT_DELETE' : 'RETENTION_DELETE',
+      event: archive
+        ? 'RETENTION_ARCHIVE'
+        : softDelete
+          ? 'RETENTION_SOFT_DELETE'
+          : 'RETENTION_DELETE',
       path: repoRel,
+      ...(archive ? { archive_path: `${ARCHIVE_REPO_SUBPATH}/${repoRel}` } : {}),
       ...(softDelete
         ? {
             trash_path: `${TRASH_REPO_SUBPATH}/${repoRel}`,
@@ -480,7 +551,7 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const dir = sharedTmp();
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = collectFiles(dir);
   for (const filePath of files) {
@@ -537,30 +608,47 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
     }
   }
 
-  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const entry = retentionEntryForExactPath(catalog, 'active/shared/logs');
-  const retentionDays =
+  const fallbackRetentionDays =
     opts.retentionDays ??
     retentionTtlDaysForPath(catalog, 'active/shared/logs') ??
     DEFAULT_LOG_RETENTION_DAYS;
-  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
   const logsDir = shared('logs');
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = collectFiles(logsDir);
   for (const filePath of files) {
     try {
+      // Per-file longest-prefix resolution (same contract as the event-store
+      // sweep): a nested entry like `logs/audit` (archive@90d) governs its own
+      // subtree instead of the logs-root delete TTL. Entries without a
+      // ttl_days — and `review_required` / file-level `rotate`/`compact`
+      // entries — never expire a file from this sweep.
+      const fileEntry = retentionEntryForPath(catalog, repoRelativePosix(filePath)) ?? entry;
+      if (!fileEntry || (fileEntry.action !== 'delete' && fileEntry.action !== 'archive')) continue;
+      // The fallback (catalog `logs` TTL, else the built-in 30d) applies only
+      // to files still governed by the logs root entry itself; a nested
+      // note-only entry without ttl_days means "no expiry declared".
+      const ttlDays =
+        fileEntry.ttl_days ?? (fileEntry === entry ? fallbackRetentionDays : undefined);
+      if (ttlDays === undefined) continue;
       const stat = safeStat(filePath);
-      if (now - stat.mtimeMs > retentionMs) {
+      if (now - stat.mtimeMs > ttlDays * RETENTION_DAY_MS) {
         expired.push(filePath);
         if (!opts.dryRun) {
-          expireFilePerPolicy(filePath, entry, outcome);
+          expireFilePerPolicy(filePath, fileEntry, outcome);
         }
       }
     } catch {
@@ -568,7 +656,12 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
     }
   }
 
-  return { expired, rotated: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    rotated: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
@@ -603,7 +696,7 @@ export function scanRuntime(opts: {
 }): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const rules = runtimeRetentionRules(opts.catalog ?? loadRetentionCatalog());
   for (const rule of rules) {
@@ -623,7 +716,12 @@ export function scanRuntime(opts: {
     }
   }
 
-  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 /**
@@ -666,7 +764,7 @@ function sweepRepoRootedRules(
 ): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
   for (const rule of rules) {
     const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
     for (const filePath of collectFiles(dir)) {
@@ -710,7 +808,12 @@ function sweepRepoRootedRules(
     }
   }
 
-  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 /**
@@ -778,7 +881,7 @@ function sweepStatusRulesInContext(opts: {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   for (const { entry, rule } of catalogStatusRules(catalog)) {
     const entryDir = nodePath.join(rootDir(), ...entry.path.split('/'));
@@ -819,7 +922,12 @@ function sweepStatusRulesInContext(opts: {
     }
   }
 
-  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 export interface SweepSupervisorEventFilesOptions {
@@ -854,7 +962,7 @@ export function sweepSupervisorEventFiles(
   const retentionMs = retentionDays * RETENTION_DAY_MS;
   const now = Date.now();
   const expired: string[] = [];
-  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = listSupervisorEventFiles({
     includeLegacy: false,
@@ -876,7 +984,12 @@ export function sweepSupervisorEventFiles(
     }
   }
 
-  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+  };
 }
 
 /**
@@ -913,6 +1026,312 @@ export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): s
     }
   }
   return uncovered.sort();
+}
+
+/**
+ * MSN-LOG-STORE-HARDENING-20261016: maintenance pass for append-only
+ * `.jsonl` stores declared `action: 'rotate' | 'compact'` in the catalog.
+ *
+ * Directory mtime TTL can never expire a file that is appended to daily —
+ * the file's own mtime is always fresh, so these stores grew without bound
+ * in silence (observed: a 31MB `items.jsonl` of 853 versioned lines for 101
+ * live items; every coordination read parses the whole file). These stores
+ * therefore need file-level maintenance, not expiry:
+ *
+ *  - `rotate`: when the live file exceeds `rotate_min_bytes` (default
+ *    {@link DEFAULT_ROTATE_MIN_BYTES}) it is renamed to a
+ *    `<stem>-YYYYMMDD-HHmmss.jsonl` sibling. Writers reopen the canonical
+ *    path per append, so appends continue uninterrupted. Segments past
+ *    `ttl_days` are expired through {@link expireFilePerPolicy} with the
+ *    entry's `segment_action` (default `delete`, `archive` for
+ *    evidence-class ledgers).
+ *  - `compact`: when the file exceeds `compact_min_bytes` (default
+ *    {@link DEFAULT_COMPACT_MIN_BYTES}) it is folded to the last record per
+ *    `compact_key` (order of last appearance preserved; keyless records are
+ *    kept verbatim). The pre-compaction file is first copied under
+ *    `active/archive/jsonl-compaction/<repo-rel>.<stamp>.jsonl`, then the
+ *    live file is rewritten through safeWriteFile's atomic temp+rename.
+ *
+ * Every mutation emits a RETENTION_ROTATE / RETENTION_COMPACT / segment
+ * expiry record to the retention audit log. Nothing here deletes the live
+ * file itself.
+ */
+export interface SweepAppendOnlyStoresResult {
+  rotated: string[];
+  compacted: string[];
+  segmentsExpired: string[];
+  segmentsDeleted: string[];
+  segmentsArchived: string[];
+  errors: string[];
+}
+
+function rotatedSegmentPath(liveFilePath: string, now: Date): string {
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  // Second-granularity stamps can collide when a busy log rotates twice in one
+  // second (or a retry follows a partial failure); disambiguate deterministically.
+  for (let i = 0; ; i++) {
+    const candidate = liveFilePath.replace(/\.jsonl$/, `-${stamp}${i > 0 ? `-${i}` : ''}.jsonl`);
+    if (!safeExistsSync(candidate)) return candidate;
+  }
+}
+
+function rotatedSegmentStem(liveFilePath: string): string {
+  return nodePath.basename(liveFilePath).replace(/\.jsonl$/, '');
+}
+
+function foldRecordsByKey(
+  records: Array<Record<string, unknown>>,
+  keyField: string
+): Array<Record<string, unknown>> {
+  const lastIndex = new Map<string, number>();
+  records.forEach((record, i) => {
+    const key = record?.[keyField];
+    if (typeof key === 'string' || typeof key === 'number') {
+      lastIndex.set(String(key), i);
+    }
+  });
+  return records.filter((record, i) => {
+    const key = record?.[keyField];
+    if (typeof key !== 'string' && typeof key !== 'number') return true;
+    return lastIndex.get(String(key)) === i;
+  });
+}
+
+/**
+ * Race-safe compaction of a live append-only store. A naive read→fold→rename
+ * loses records appended between the snapshot and the rename, so instead:
+ *
+ *  1. The live file is atomically moved aside to a `.compacting-<pid>-<n>`
+ *     staging sibling — appends already in flight land on the moved inode
+ *     (captured when we read it), appends after the move create a fresh live
+ *     file (captured in the merge loop).
+ *  2. Fresh live files are repeatedly moved aside and their records merged,
+ *     until no live file exists at the publish moment.
+ *  3. The folded output is published with safePublishExclusiveFileSync —
+ *     EEXIST means a writer recreated the file in the gap, so we merge it and
+ *     retry instead of overwriting.
+ *  4. The union of all raw records (pre-fold) is archived to
+ *     `active/archive/jsonl-compaction/<repo-rel>.<stamp>.jsonl`; staging
+ *     siblings are removed only after the live file is restored.
+ *
+ * Residual risk: a writer holding a long-lived open fd could append to a
+ * staging inode after its last read. The repo's appenders reopen the path per
+ * record (appendJsonLine), so the window is nil in practice; if the merge loop
+ * cannot converge in COMPACT_MAX_PARK_ATTEMPTS rounds, the raw union is
+ * restored uncompressed — nothing is ever dropped.
+ */
+const COMPACT_MAX_PARK_ATTEMPTS = 5;
+
+function compactAppendOnlyFile(
+  livePath: string,
+  entry: RetentionCatalogEntry,
+  keyField: string,
+  now: Date
+): void {
+  const stagingPaths: string[] = [];
+  const allRecords: Array<Record<string, unknown>> = [];
+  let mergedCopies = 0;
+
+  const park = (src: string, tag: string): void => {
+    const staging = `${src}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
+    safeMoveSync(src, staging);
+    stagingPaths.push(staging);
+    allRecords.push(...readJsonLines<Record<string, unknown>>(staging));
+  };
+
+  const serialize = (records: Array<Record<string, unknown>>): string =>
+    records.map((r) => JSON.stringify(r)).join('\n') + '\n';
+
+  try {
+    park(livePath, 'initial');
+    let kept = foldRecordsByKey(allRecords, keyField);
+    const rawContent = () => serialize(allRecords);
+
+    // Exclusive publish: a recreated live file means another append landed —
+    // park it, merge its records into the fold, and retry. Converges when no
+    // live file exists at the publish instant.
+    let published = false;
+    for (let i = 0; i <= COMPACT_MAX_PARK_ATTEMPTS; i++) {
+      if (!safeExistsSync(livePath)) {
+        try {
+          safePublishExclusiveFileSync(livePath, serialize(kept));
+          published = true;
+          break;
+        } catch {
+          // lost the race — a writer recreated the file; merge it below
+        }
+      }
+      if (i >= COMPACT_MAX_PARK_ATTEMPTS) break;
+      park(livePath, `merge-${i}`);
+      mergedCopies++;
+      kept = foldRecordsByKey(allRecords, keyField);
+    }
+
+    if (!published) {
+      // Writers out-paced the merge loop — restore the raw union uncompressed.
+      // Park any live file that still exists so its records are not lost.
+      if (safeExistsSync(livePath)) {
+        park(livePath, 'restore-merge');
+        mergedCopies++;
+      }
+      safeWriteFile(livePath, rawContent());
+      logger.warn(
+        `[JANITOR] compact merge did not converge for ${livePath} — restored raw records`
+      );
+    }
+
+    // Archive the pre-compaction union (full fidelity) then clean staging.
+    // The stamp carries pid so two compactions of the same store within one
+    // second cannot collide on the archive destination.
+    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
+    const archivePath = nodePath.join(
+      rootDir(),
+      COMPACTION_ARCHIVE_REPO_SUBPATH,
+      `${entry.path.replace(/\.jsonl$/, '')}.${stamp}Z-${process.pid}.jsonl`
+    );
+    safeMkdir(nodePath.dirname(archivePath), { recursive: true });
+    safeWriteFile(archivePath, rawContent());
+    appendRetentionAudit({
+      event: 'RETENTION_COMPACT_ARCHIVE',
+      path: repoRelativePosix(livePath),
+      archive_path: repoRelativePosix(archivePath),
+      compact_key: keyField,
+      before_lines: allRecords.length,
+      after_lines: published ? kept.length : allRecords.length,
+      merged_during_compaction: mergedCopies,
+      policy_path: entry.path,
+      artifact_class: entry.artifact_class,
+      policy_ref: RETENTION_CATALOG_REPO_PATH,
+      reason: 'pre-compaction archive (storage janitor)',
+    });
+    logger.info(
+      `[JANITOR] compacted: ${livePath} (${allRecords.length} -> ${published ? kept.length : allRecords.length} records; union archived, ${mergedCopies} live merge(s))`
+    );
+  } finally {
+    for (const staging of stagingPaths) {
+      try {
+        safeUnlinkSync(staging);
+      } catch {
+        // best-effort cleanup
+      }
+    }
+  }
+}
+
+export function sweepAppendOnlyStores(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+  now?: Date;
+}): SweepAppendOnlyStoresResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const now = opts.now ?? new Date();
+  const nowMs = now.getTime();
+  const result: SweepAppendOnlyStoresResult = {
+    rotated: [],
+    compacted: [],
+    segmentsExpired: [],
+    segmentsDeleted: [],
+    segmentsArchived: [],
+    errors: [],
+  };
+
+  for (const entry of appendOnlyStoreEntries(catalog)) {
+    const livePath = nodePath.join(rootDir(), entry.path);
+    try {
+      if (entry.action === 'rotate') {
+        // Expire aged segments first — they age by mtime even when the live
+        // file never does.
+        if (entry.ttl_days !== undefined) {
+          const stem = rotatedSegmentStem(livePath);
+          const dir = nodePath.dirname(livePath);
+          const segmentOutcome: ExpiryOutcome = {
+            deleted: [],
+            softDeleted: [],
+            archived: [],
+          };
+          const segmentEntry: RetentionCatalogEntry = {
+            ...entry,
+            action: entry.segment_action ?? 'delete',
+          };
+          for (const name of safeReaddir(dir)) {
+            if (!name.startsWith(`${stem}-`)) continue;
+            const suffix = name.slice(stem.length + 1);
+            if (!/^\d{8}-\d{6}(-\d+)?\.jsonl$/.test(suffix)) continue;
+            const segmentPath = nodePath.join(dir, name);
+            try {
+              const stat = safeStat(segmentPath);
+              if (nowMs - stat.mtimeMs > entry.ttl_days * RETENTION_DAY_MS) {
+                result.segmentsExpired.push(segmentPath);
+                if (!opts.dryRun) {
+                  expireFilePerPolicy(segmentPath, segmentEntry, segmentOutcome);
+                }
+              }
+            } catch {
+              // skip
+            }
+          }
+          result.segmentsDeleted.push(...segmentOutcome.deleted);
+          result.segmentsArchived.push(...segmentOutcome.archived);
+        }
+
+        if (!safeExistsSync(livePath)) continue;
+        const stat = safeStat(livePath);
+        const threshold = entry.rotate_min_bytes ?? DEFAULT_ROTATE_MIN_BYTES;
+        if (stat.size > 0 && stat.size >= threshold) {
+          const segmentPath = rotatedSegmentPath(livePath, now);
+          result.rotated.push(livePath);
+          if (!opts.dryRun) {
+            safeMoveSync(livePath, segmentPath);
+            appendRetentionAudit({
+              event: 'RETENTION_ROTATE',
+              path: repoRelativePosix(livePath),
+              segment_path: repoRelativePosix(segmentPath),
+              size_bytes: stat.size,
+              policy_path: entry.path,
+              artifact_class: entry.artifact_class,
+              policy_ref: RETENTION_CATALOG_REPO_PATH,
+              reason: 'append-only file exceeded rotate_min_bytes (storage janitor)',
+            });
+            logger.info(`[JANITOR] rotated: ${livePath} -> ${segmentPath}`);
+          }
+        }
+      } else if (entry.action === 'compact') {
+        const keyField = entry.compact_key as string; // validated at catalog load
+        if (!safeExistsSync(livePath)) continue;
+        const stat = safeStat(livePath);
+        const threshold = entry.compact_min_bytes ?? DEFAULT_COMPACT_MIN_BYTES;
+        if (stat.size < threshold) continue;
+
+        const firstPass = readJsonLines<Record<string, unknown>>(livePath);
+        const keyCount = new Set(
+          firstPass
+            .map((r) => r?.[keyField])
+            .filter((k) => typeof k === 'string' || typeof k === 'number')
+        ).size;
+        if (keyCount === firstPass.length) continue; // nothing to fold
+
+        result.compacted.push(livePath);
+        if (!opts.dryRun) {
+          compactAppendOnlyFile(livePath, entry, keyField, now);
+          appendRetentionAudit({
+            event: 'RETENTION_COMPACT',
+            path: repoRelativePosix(livePath),
+            compact_key: keyField,
+            size_before_bytes: stat.size,
+            policy_path: entry.path,
+            artifact_class: entry.artifact_class,
+            policy_ref: RETENTION_CATALOG_REPO_PATH,
+            reason: 'versioned keyed store exceeded compact_min_bytes (storage janitor)',
+          });
+        }
+      }
+    } catch (err) {
+      // One bad entry must not abort the pass — report and continue.
+      result.errors.push(`${entry.path}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -1216,14 +1635,14 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     };
   }
 
-  let tmpResult: ScanTmpResult = { expired: [], deleted: [], softDeleted: [] };
+  let tmpResult: ScanTmpResult = { expired: [], deleted: [], softDeleted: [], archived: [] };
   try {
     tmpResult = scanTmp({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`tmp: ${err?.message ?? String(err)}`);
   }
 
-  let logResult: RotateLogsResult = { expired: [], rotated: [], softDeleted: [] };
+  let logResult: RotateLogsResult = { expired: [], rotated: [], softDeleted: [], archived: [] };
   try {
     logResult = rotateLogs({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
@@ -1237,39 +1656,79 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);
   }
 
-  let runtimeResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  let runtimeResult: ScanRuntimeResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
     runtimeResult = scanRuntime({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
 
-  let eventStoreResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  let eventStoreResult: ScanRuntimeResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
     eventStoreResult = scanEventStores({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`event-stores: ${err?.message ?? String(err)}`);
   }
 
-  let storageFloorResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  let storageFloorResult: ScanRuntimeResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
     storageFloorResult = scanStorageFloors({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`storage-floors: ${err?.message ?? String(err)}`);
   }
 
-  let supervisorEventsResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  let supervisorEventsResult: ScanRuntimeResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
     supervisorEventsResult = sweepSupervisorEventFiles({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`supervisor-events: ${err?.message ?? String(err)}`);
   }
 
-  let statusRulesResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  let statusRulesResult: ScanRuntimeResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
     statusRulesResult = sweepStatusRules({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`status-rules: ${err?.message ?? String(err)}`);
+  }
+
+  let appendOnlyResult: SweepAppendOnlyStoresResult = {
+    rotated: [],
+    compacted: [],
+    segmentsExpired: [],
+    segmentsDeleted: [],
+    segmentsArchived: [],
+    errors: [],
+  };
+  try {
+    appendOnlyResult = sweepAppendOnlyStores({ dryRun: opts.dryRun, catalog });
+    errors.push(...appendOnlyResult.errors.map((error) => `append-only-stores: ${error}`));
+  } catch (err: any) {
+    errors.push(`append-only-stores: ${err?.message ?? String(err)}`);
   }
 
   let trashResult: SweepTrashResult = { expired: [], purged: [] };
@@ -1374,6 +1833,21 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedSupervisorEvents: supervisorEventsResult.deleted.length,
     expiredStatusRules: statusRulesResult.expired.length,
     deletedStatusRules: statusRulesResult.deleted.length,
+    appendOnlyStores: {
+      rotated: appendOnlyResult.rotated.map(repoRelativePosix),
+      compacted: appendOnlyResult.compacted.map(repoRelativePosix),
+      segmentsExpired: appendOnlyResult.segmentsExpired.map(repoRelativePosix),
+      segmentsArchived: appendOnlyResult.segmentsArchived.map(repoRelativePosix),
+    },
+    archived:
+      tmpResult.archived.length +
+      logResult.archived.length +
+      runtimeResult.archived.length +
+      eventStoreResult.archived.length +
+      storageFloorResult.archived.length +
+      supervisorEventsResult.archived.length +
+      statusRulesResult.archived.length +
+      appendOnlyResult.segmentsArchived.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
     supersededArtifactOwnershipRows: ownershipCompaction.removed_rows,
