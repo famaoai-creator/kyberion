@@ -1523,6 +1523,169 @@ describe('Ask current contextual draft actions', () => {
     h.form.fire('submit');
     await flush();
   }
+  it.each(['network', 'uncertain'] as const)(
+    'settles local retry uncertainty after a %s failure without phantom pending state',
+    async (failure) => {
+      let attempt = 0;
+      const h = harness({
+        post: async (request) => {
+          if (++attempt === 1) {
+            if (failure === 'network') throw new Error('Connection lost');
+            return response({ ok: false, retry_safe: false, mode: 'unavailable' }, 503);
+          }
+          return response(
+            failure === 'network' ? reply(request) : { ...reply(request), replayed: true }
+          );
+        },
+      });
+      await send(h);
+      const first = JSON.parse(posts(h)[0][1]!.body!);
+      const requestKey = 'kyberion.ask.draft.' + session + '.request';
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.pending');
+      expect(h.storage.has(requestKey)).toBe(true);
+      expect(h.actions()).toHaveLength(0);
+      h.input.value = 'A different request';
+      h.input.fire('input');
+      h.form.fire('submit');
+      await flush();
+      expect(posts(h)).toHaveLength(1);
+      h.input.value = first.text;
+      h.input.fire('input');
+      h.form.fire('submit');
+      await flush();
+      expect(posts(h)).toHaveLength(2);
+      expect(JSON.parse(posts(h)[1][1]!.body!)).toMatchObject({
+        request_id: first.request_id,
+        request_created_at: first.request_created_at,
+      });
+      expect(h.storage.has(requestKey)).toBe(false);
+      expect(h.elements.get('conversation-status')!.innerHTML).toBe('');
+      expect(h.actions()).toHaveLength(failure === 'network' ? 1 : 0);
+      if (failure === 'network') {
+        h.actions()[0].fire('click');
+        expect(h.input.value).toContain(action().label);
+      }
+      expect(posts(h)).toHaveLength(2);
+    }
+  );
+
+  it.each([0, 1, 2])(
+    'keeps server-reported pending=%s unchanged through repeated failure and successful replay',
+    async (pending) => {
+      let attempt = 0;
+      const h = harness({
+        history: { pending },
+        post: async (request) => {
+          if (++attempt < 3) throw new Error('Connection lost');
+          return response({ ...reply(request), replayed: true });
+        },
+      });
+      await send(h);
+      h.form.fire('submit');
+      await flush();
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.pending');
+      h.form.fire('submit');
+      await flush();
+      expect(posts(h)).toHaveLength(3);
+      expect(new Set(posts(h).map(([, init]) => JSON.parse(init!.body!).request_id)).size).toBe(1);
+      expect(
+        h.elements.get('conversation-status')!.innerHTML.includes('dock.history.pending')
+      ).toBe(pending > 0);
+      expect(h.actions()).toHaveLength(0);
+    }
+  );
+
+  it('settles a failed retry restored after reload without replacing its durable identity', async () => {
+    const saved = {
+      id: '11111111-1111-4111-8111-111111111111',
+      text: 'Saved request',
+      createdAt: 123,
+    };
+    const key = 'kyberion.ask.draft.' + session;
+    let attempt = 0;
+    const h = harness({
+      storage: new Map([
+        [key, saved.text],
+        [key + '.request', JSON.stringify(saved)],
+      ]),
+      post: async (request) => {
+        if (++attempt === 1) throw new Error('Connection lost');
+        return response({ ...reply(request), replayed: true });
+      },
+    });
+    await flush();
+    expect(posts(h)).toHaveLength(0);
+    h.form.fire('submit');
+    await flush();
+    expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.pending');
+    h.form.fire('submit');
+    await flush();
+    expect(posts(h)).toHaveLength(2);
+    for (const [, init] of posts(h))
+      expect(JSON.parse(init!.body!)).toMatchObject({
+        text: saved.text,
+        request_id: saved.id,
+        request_created_at: saved.createdAt,
+      });
+    expect(h.storage.has(key + '.request')).toBe(false);
+    expect(h.elements.get('conversation-status')!.innerHTML).toBe('');
+    expect(h.actions()).toHaveLength(0);
+  });
+
+  it('settles retry uncertainty while retaining a newer composer edit', async () => {
+    const completion = deferred<ReturnType<typeof response>>();
+    let attempt = 0;
+    let retried!: Record<string, unknown>;
+    const h = harness({
+      post: async (request) => {
+        if (++attempt === 1) throw new Error('Connection lost');
+        retried = request;
+        return completion.promise;
+      },
+    });
+    await send(h);
+    h.form.fire('submit');
+    await flush();
+    h.input.value = 'A newer draft';
+    h.input.fire('input');
+    completion.resolve(response(reply(retried)));
+    await flush();
+    expect(h.input.value).toBe('A newer draft');
+    expect(h.storage.get('kyberion.ask.draft.' + session)).toBe('A newer draft');
+    expect(h.elements.get('conversation-status')!.innerHTML).toBe('');
+    expect(posts(h)).toHaveLength(2);
+  });
+
+  it.each(['scope', 'popstate', 'pagehide'] as const)(
+    'retains the durable retry identity and suppresses actions after %s changes during retry',
+    async (change) => {
+      const completion = deferred<ReturnType<typeof response>>();
+      let attempt = 0;
+      let retried!: Record<string, unknown>;
+      const h = harness({
+        post: async (request) => {
+          if (++attempt === 1) throw new Error('Connection lost');
+          retried = request;
+          return completion.promise;
+        },
+      });
+      await send(h);
+      const key = 'kyberion.ask.draft.' + session + '.request';
+      const saved = h.storage.get(key);
+      h.form.fire('submit');
+      await flush();
+      if (change === 'scope') {
+        h.window.location.search = '?tenant=alpha&projectId=other';
+        h.window.location.href = 'http://localhost/ask' + h.window.location.search;
+      } else h.browserEvent(change);
+      completion.resolve(response(reply(retried)));
+      await flush();
+      expect(h.storage.get(key)).toBe(saved);
+      expect(h.actions()).toHaveLength(0);
+      expect(posts(h)).toHaveLength(2);
+    }
+  );
+
   it.each([false, true])(
     'prepares a current contextual draft (%s), then uses ordinary explicit Send',
     async (review) => {
