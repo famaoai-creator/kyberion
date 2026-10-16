@@ -19,6 +19,7 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
   );
   const state = {
     historyState: 'ready',
+    sending: false,
     storageVerified: true,
     conversationId: 'concierge-' + 'a'.repeat(64),
     vocab: {},
@@ -32,7 +33,12 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
     state: typeof state;
     fetchJson: (url: string) => Promise<unknown>;
     scopedUrl: (path: string) => string;
-    proposeDraft: (text: string, current: () => boolean, accepted: () => void) => boolean;
+    proposeDraft: (
+      text: string,
+      current: () => boolean,
+      accepted: () => void,
+      dismissed: () => void
+    ) => boolean;
     vt: (vocabulary: unknown, key: string) => string;
   };
   const window = {
@@ -40,7 +46,15 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
     FrontDeskRail: { ready },
     KyberionAskCorrection: undefined as
       undefined | { create: (options: CorrectionOptions) => CorrectionHelper },
-    history: { state: null, replaceState: vi.fn() },
+    history: {
+      state: null,
+      replaceState: vi.fn((_state: unknown, _title: string, url: string) => {
+        const next = new URL(url, 'http://localhost');
+        location.pathname = next.pathname;
+        location.search = next.search;
+        location.hash = next.hash;
+      }),
+    },
     addEventListener: (key: string, callback: () => void) => {
       listeners[key] = callback;
     },
@@ -62,10 +76,12 @@ function harness(query = '?correction=entry-1&artifact=artifact-1&tenant=alpha')
   const fetchJson = vi.fn().mockResolvedValue(payload);
   let scope = 'alpha';
   const scopedUrl = (path: string) => path + (path.includes('?') ? '&' : '?') + 'tenant=' + scope;
-  const proposeDraft = vi.fn((_text: string, _current: () => boolean, accepted: () => void) => {
-    accepted();
-    return true;
-  });
+  const proposeDraft = vi.fn(
+    (_text: string, _current: () => boolean, accepted: () => void, _dismissed: () => void) => {
+      accepted();
+      return true;
+    }
+  );
   runInNewContext(
     String(
       safeReadFile('presence/displays/presence-studio/static/ask-correction.js', {
@@ -226,6 +242,62 @@ describe('Ask recorded correction handoff (read-only client)', () => {
     expect(h.proposeDraft.mock.calls[0][1]()).toBe(false);
     h.proposeDraft.mock.calls[0][2]();
     expect(h.window.history.replaceState).not.toHaveBeenCalled();
+  });
+  it('settles a dismissed correction once, preserves unrelated parameters, and allows a future explicit handoff', async () => {
+    const h = harness(
+      '?correction=entry-1&artifact=artifact-1&tenant=alpha&view=compact&ask=unsafe&send=1&mic=1'
+    );
+    h.proposeDraft.mockImplementation(() => true);
+    await h.helper.apply();
+    const dismissed = h.proposeDraft.mock.calls[0][3];
+    dismissed();
+    dismissed();
+    expect(h.window.history.replaceState).toHaveBeenCalledTimes(1);
+    expect(h.window.location.search).toBe('?tenant=alpha&view=compact');
+    expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+    expect(h.state.pendingRequest).toEqual({ id: 'pending' });
+    await h.helper.apply();
+    expect(h.fetchJson).toHaveBeenCalledTimes(1);
+    h.window.location.search = '?correction=entry-2&artifact=artifact-2&tenant=alpha';
+    h.payload.body.context.entry_id = 'entry-2';
+    h.payload.body.context.artifact_id = 'artifact-2';
+    await h.helper.apply();
+    expect(h.proposeDraft).toHaveBeenCalledTimes(2);
+    dismissed();
+    expect(h.window.location.search).toContain('entry-2');
+    expect(h.elements.get('ask-correction-status')!.hidden).toBe(false);
+    h.proposeDraft.mock.calls[1][2]();
+    expect(h.window.location.search).toBe('?tenant=alpha');
+  });
+  it('never consumes a stale dismissal after navigation, scope, shell, readiness or active sending changes', async () => {
+    for (const change of [
+      'url',
+      'scope',
+      'history',
+      'shell',
+      'unready',
+      'storage',
+      'sending',
+      'popstate',
+      'pagehide',
+    ]) {
+      const h = harness();
+      h.proposeDraft.mockImplementation(() => true);
+      await h.helper.apply();
+      if (change === 'url') h.window.location.search = '?correction=new&artifact=new&tenant=alpha';
+      if (change === 'scope') h.scope('beta');
+      if (change === 'history') h.state.conversationId = 'another-viewer';
+      if (change === 'shell') h.window.FrontDeskRail.ready = Promise.resolve();
+      if (change === 'unready') h.state.historyState = 'failed';
+      if (change === 'storage') h.state.storageVerified = false;
+      if (change === 'sending') h.state.sending = true;
+      if (change === 'popstate' || change === 'pagehide') h.listeners[change]();
+      const queryBefore = h.window.location.search;
+      h.proposeDraft.mock.calls[0][3]();
+      expect(h.window.history.replaceState).not.toHaveBeenCalled();
+      expect(h.window.location.search).toBe(queryBefore);
+      expect(h.state.pendingRequest).toEqual({ id: 'pending' });
+    }
   });
   it('blocks unsafe prefill even if the correction helper is unavailable', () => {
     const source = safeReadFile('presence/displays/presence-studio/static/ask.js', {
