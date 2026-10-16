@@ -215,6 +215,7 @@
 
 ## 📁 product/governance
 - [Adapter-First Extension Policy](./product/governance/adapter-first-extension-policy.md) (public | Unknown)
+- [Append-only JSONL store lifecycle: rotate, compact, archive](./product/governance/append-only-store-lifecycle.md) (public | Unknown)
 - [Approval Gate Design: Store First, Surface as Renderer](./product/governance/approval-gate-design.md) (public | Unknown)
 - [Audio Route Resource Lifecycle and Configuration Abstraction](./product/governance/audio-route-resource-lifecycle.md) (public | ecosystem_architect)
 - [Audit ledger recovery and canonical location](./product/governance/audit-ledger-recovery.md) (public | Unknown)
