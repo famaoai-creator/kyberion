@@ -26314,6 +26314,16 @@
         "ja": "下書きを破棄",
         "qps-ploc": "⟦Ḓïşƈȧřḓ ḓřȧƒŧ ŀőřė⟧"
       },
+      "progress_correction_local_text": {
+        "en": "Local correction text (save unconfirmed)",
+        "ja": "手元の修正文（保存未確認）",
+        "qps-ploc": "⟦Ŀőƈȧŀ ƈőřřėƈŧïőñ ŧėẋŧ (şȧṽė ůñƈőñƒïřɱėḓ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "progress_correction_recovery_note": {
+        "en": "The recorded result above does not confirm this exact text was saved. This local text remains only on this page; copy it before leaving. Preparing a correction request uses recorded feedback, not this text.",
+        "ja": "上の記録済み結果だけでは、この文章が保存されたかは確認できません。手元の文章はこの画面にだけ残っています。移動する前にコピーしてください。修正依頼の準備には、この文章ではなく記録済みのコメントが使われます。",
+        "qps-ploc": "⟦Ŧħė řėƈőřḓėḓ řėşůŀŧ ȧƀőṽė ḓőėş ñőŧ ƈőñƒïřɱ ŧħïş ėẋȧƈŧ ŧėẋŧ ẇȧş şȧṽėḓ. Ŧħïş ŀőƈȧŀ ŧėẋŧ řėɱȧïñş őñŀẏ őñ ŧħïş ṗȧɠė; ƈőṗẏ ïŧ ƀėƒőřė ŀėȧṽïñɠ. Ṗřėṗȧřïñɠ ȧ ƈőřřėƈŧïőñ řėɋůėşŧ ůşėş řėƈőřḓėḓ ƒėėḓƀȧƈķ, ñőŧ ŧħïş ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "progress_correction_recorded": {
         "en": "Correction feedback recorded. You can review it before sending a new request.",
         "ja": "修正コメントを記録しました。内容を確認して、次の依頼を送れます。",
@@ -26385,9 +26395,9 @@
         "qps-ploc": "⟦Ŀėȧṽė ŧħïş ṗȧɠė? ŀőřėɱ⟧"
       },
       "progress_leave_draft": {
-        "en": "Your correction draft has not been recorded. Leaving this page discards it.",
-        "ja": "修正コメントの下書きは記録されていません。移動すると下書きは破棄されます。",
-        "qps-ploc": "⟦Ẏőůř ƈőřřėƈŧïőñ ḓřȧƒŧ ħȧş ñőŧ ƀėėñ řėƈőřḓėḓ. Ŀėȧṽïñɠ ŧħïş ṗȧɠė ḓïşƈȧřḓş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Leaving discards the correction text kept on this page. Copy any text you want to keep before leaving.",
+        "ja": "移動すると、この画面に残っている修正文は破棄されます。残したい文章は、移動する前にコピーしてください。",
+        "qps-ploc": "⟦Ŀėȧṽïñɠ ḓïşƈȧřḓş ŧħė ƈőřřėƈŧïőñ ŧėẋŧ ķėṗŧ őñ ŧħïş ṗȧɠė. Ƈőṗẏ ȧñẏ ŧėẋŧ ẏőů ẇȧñŧ ŧő ķėėṗ ƀėƒőřė ŀėȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
       },
       "progress_leave_pending": {
         "en": "A decision is still being recorded. Leaving may not cancel it and discards any draft text on this page. Check Progress when you return before trying again.",

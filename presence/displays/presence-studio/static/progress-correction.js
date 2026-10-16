@@ -11,10 +11,11 @@
       vt = options.vt,
       submitVerdict = options.submitVerdict,
       renderList = options.renderList;
+    var recovered = options.recovered === true;
     var draft = state.correctionDrafts[item.entry_id];
     if (
       !draft ||
-      !item.can_verdict ||
+      (!item.can_verdict && !recovered) ||
       !item.entry_id ||
       draft.editorId !== item.id ||
       !state.verdictStorageKey ||
@@ -36,15 +37,22 @@
     var textarea = document.createElement('textarea');
     textarea.className = 'kb-input kb-textarea progress-revise-note';
     textarea.setAttribute('data-entry-id', item.entry_id);
-    textarea.setAttribute('aria-label', vt(vocab, 'action_revise'));
+    textarea.setAttribute(
+      'aria-label',
+      vt(vocab, recovered ? 'progress_correction_local_text' : 'action_revise')
+    );
     textarea.value = draft.text;
     textarea.maxLength = 4000;
-    textarea.disabled = locked;
+    textarea.readOnly = recovered;
+    textarea.disabled = locked && !recovered;
     textarea.addEventListener('input', function () {
-      if (current()) draft.text = textarea.value;
+      if (!recovered && current()) draft.text = textarea.value;
     });
     var note = document.createElement('p');
-    note.textContent = vt(vocab, 'progress_correction_draft_note');
+    note.textContent = vt(
+      vocab,
+      recovered ? 'progress_correction_recovery_note' : 'progress_correction_draft_note'
+    );
     var submit = document.createElement('button');
     submit.type = 'button';
     submit.className = 'kb-btn kb-btn--primary progress-row-action';
@@ -66,9 +74,14 @@
       delete state.correctionDrafts[item.entry_id];
       renderList();
     });
+    if (recovered) {
+      var heading = document.createElement('p');
+      heading.textContent = vt(vocab, 'progress_correction_local_text');
+      form.appendChild(heading);
+    }
     form.appendChild(textarea);
     form.appendChild(note);
-    form.appendChild(submit);
+    if (!recovered) form.appendChild(submit);
     form.appendChild(discard);
     row.appendChild(form);
   }
@@ -104,5 +117,59 @@
       });
   }
 
-  window.KyberionProgressCorrection = { render: render, open: open };
+  function terminal(item) {
+    return (
+      item.kind === 'artifact' &&
+      item.entry_id &&
+      ['accepted', 'rejected', 'changes_requested'].indexOf(item.status) >= 0
+    );
+  }
+
+  function reconcileOwners(state) {
+    Object.keys(state.correctionDrafts).forEach(function (entryId) {
+      var draft = state.correctionDrafts[entryId];
+      var siblings = (state.payload.delivered || [])
+        .filter(function (item) {
+          return item.entry_id === entryId && item.can_verdict;
+        })
+        .concat(
+          (state.payload.done || []).filter(function (item) {
+            return item.entry_id === entryId && terminal(item);
+          })
+        );
+      if (
+        !siblings.some(function (item) {
+          return item.id === draft.editorId;
+        }) &&
+        siblings.length
+      )
+        draft.editorId = siblings[0].id;
+    });
+  }
+
+  function history(options) {
+    var state = options.state,
+      item = options.item;
+    if (!state.loaded || !state.verdictStorageKey || !terminal(item)) return;
+    var generation = state.rowGeneration,
+      scope = state.verdictStorageKey;
+    options.current = function () {
+      return (
+        state.loaded &&
+        generation === state.rowGeneration &&
+        scope === state.verdictStorageKey &&
+        !state.pendingVerdicts[item.entry_id] &&
+        !state.uncertainVerdicts[item.entry_id]
+      );
+    };
+    options.recovered = true;
+    render(options);
+  }
+
+  window.KyberionProgressCorrection = {
+    render: render,
+    open: open,
+    history: history,
+    reconcileOwners: reconcileOwners,
+  };
 })();

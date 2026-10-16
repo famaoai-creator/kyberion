@@ -21,6 +21,7 @@ class Element {
   listeners: Record<string, Array<(event: MockEvent) => void>> = {};
   hidden = false;
   disabled = false;
+  readOnly = false;
   className = '';
   textContent = '';
   value = '';
@@ -115,7 +116,7 @@ const texts: Record<string, string> = {
 
   'front_desk:progress_leave_title': 'Leave this page?',
   'front_desk:progress_leave_draft':
-    'Your correction draft has not been recorded. Leaving this page discards it.',
+    'Leaving discards the correction text kept on this page. Copy any text you want to keep before leaving.',
   'front_desk:progress_leave_pending':
     'A decision is still being recorded. Leaving does not cancel it and discards any draft text on this page. Check Progress when you return before trying again.',
   'front_desk:progress_leave_uncertain':
@@ -126,6 +127,9 @@ const texts: Record<string, string> = {
   'front_desk:progress_leave_anyway': 'Leave anyway',
   'front_desk:progress_leave_unavailable':
     'The leave confirmation could not be displayed. Your draft is unchanged. Try the navigation again.',
+  'front_desk:progress_correction_local_text': 'Local correction text (save unconfirmed)',
+  'front_desk:progress_correction_recovery_note':
+    'The recorded result does not confirm this exact text was saved. Copy before leaving; Prepare uses recorded feedback.',
   'front_desk:progress_correction_recorded': 'Correction feedback recorded',
   'front_desk:progress_correction_prepare': 'Prepare correction request',
   'front_desk:progress_history': 'History',
@@ -2468,4 +2472,321 @@ describe('Progress shared-delivery correction drafts', () => {
     expect(rowAt(h).querySelector('.progress-revise-form')).toBeNull();
     expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(0);
   });
+});
+
+describe('Progress terminal correction recovery', () => {
+  it.each(['accepted', 'rejected', 'changes_requested'])(
+    'keeps exact local text selectable after a lost response and recorded %s outcome',
+    async (status) => {
+      const payload = correctionPayload();
+      const write = deferred<MockResponse>();
+      const h = harness({
+        hash: '#alpha',
+        fetcher: dataFetcher(payload, (_path, input) =>
+          input?.method === 'POST' ? write.promise : undefined
+        ),
+      });
+      await h.window.KyberionProgress.mount();
+      const text = '  My local correction\n<not HTML> & exact  ';
+      editCorrection(h, text);
+      const oldForm = rowAt(h).querySelector('.progress-revise-form')!;
+      oldForm.children.find((el) => el.tag === 'button')!.fire();
+      write.reject(new Error('lost response'));
+      await flush();
+      payload.done = [
+        {
+          id: 'alpha',
+          title: 'Alpha',
+          kind: 'artifact',
+          status,
+          entry_id: 'inbox-alpha',
+          note: 'Different feedback from another tab',
+        },
+      ];
+      payload.delivered = payload.delivered.slice(1);
+      h.refresh.fire();
+      await flush();
+      const recovered = rowAt(h).querySelector('.progress-revise-note');
+      expect(recovered?.value).toBe(text);
+      expect(recovered?.readOnly).toBe(true);
+      expect(recovered?.disabled).toBe(false);
+      const form = rowAt(h).querySelector('.progress-revise-form')!;
+      expect(form.children.filter((el) => el.tag === 'button')).toHaveLength(1);
+      expect(form.querySelector('[data-action="discard-correction"]')?.disabled).toBe(false);
+      expect(rowAt(h).innerHTML.includes('correction=inbox-alpha')).toBe(status !== 'accepted');
+      expect(rowAt(h).innerHTML).not.toContain(text);
+      oldForm.children.find((el) => el.tag === 'button')!.fire();
+      expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+    }
+  );
+});
+
+describe('Progress recovered correction boundaries', () => {
+  async function setup(
+    text = 'Local exact\ntext',
+    status = 'rejected',
+    serverText = 'Other tab text'
+  ) {
+    const payload = correctionPayload();
+    const write = deferred<MockResponse>();
+    const h = harness({
+      search: '?tenant=alpha',
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? write.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, text);
+    const original = rowAt(h).querySelector('.progress-revise-form')!;
+    original.children.find((el) => el.tag === 'button')!.fire();
+    write.reject(new Error('lost response'));
+    await flush();
+    payload.done = [
+      {
+        id: 'alpha',
+        title: 'Alpha',
+        kind: 'artifact',
+        status,
+        entry_id: 'inbox-alpha',
+        note: serverText,
+      },
+    ];
+    payload.delivered = payload.delivered.slice(1);
+    h.refresh.fire();
+    await flush();
+    return { h, payload, original };
+  }
+
+  it.each(['', 'Same text'])(
+    'does not infer a saved note from matching or empty text %j',
+    async (text) => {
+      const { h } = await setup(text, 'rejected', text);
+      const form = rowAt(h).querySelector('.progress-revise-form')!;
+      expect(form.querySelector('.progress-revise-note')?.value).toBe(text);
+      expect(form.children.map((el) => el.textContent).join(' ')).toContain('save unconfirmed');
+      expect(form.children.map((el) => el.textContent).join(' ')).toContain('does not confirm');
+      expect(form.children.map((el) => el.textContent).join(' ')).toContain('recorded feedback');
+      expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+    }
+  );
+
+  it('preserves one owner across terminal siblings and moves only when the owner disappears', async () => {
+    const { h, payload } = await setup();
+    payload.done.push({
+      id: 'sibling',
+      title: 'Sibling',
+      kind: 'artifact',
+      status: 'rejected',
+      entry_id: 'inbox-alpha',
+    });
+    h.refresh.fire();
+    await flush();
+    expect(h.elements['progress-list'].querySelectorAll('.progress-revise-note')).toHaveLength(1);
+    const staleDiscard = rowAt(h).querySelector('[data-action="discard-correction"]')!;
+    payload.done = payload.done.slice(1);
+    h.refresh.fire();
+    await flush();
+    h.elements['filter-done'].fire();
+    await flush();
+    staleDiscard.fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Local exact\ntext');
+    expect(h.elements['progress-list'].querySelectorAll('.progress-revise-note')).toHaveLength(1);
+    expect(rowAt(h).innerHTML).toContain('artifact=sibling');
+  });
+
+  it('retains recovery text across filters and Back/Forward without persisting content', async () => {
+    const { h } = await setup();
+    h.elements['filter-delivered'].fire();
+    await flush();
+    h.elements['filter-done'].fire();
+    await flush();
+    h.window.location.href = '/progress?tenant=alpha&filter=delivered';
+    h.listeners.popstate();
+    h.window.location.href = '/progress?tenant=alpha&filter=done#alpha';
+    h.listeners.popstate();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Local exact\ntext');
+    const saved = h.window.sessionStorage.getItem('front-desk.progress.uncertain.principal-alpha');
+    expect(saved ?? '').not.toContain('Local exact');
+    const catalog = JSON.parse(
+      safeReadFile('knowledge/product/orchestration/user-facing-vocabulary.json', {}).toString()
+    );
+    expect(catalog.domains.front_desk.progress_leave_draft.en).toBe(
+      texts['front_desk:progress_leave_draft']
+    );
+    const proceed = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    expect(proceed).not.toHaveBeenCalled();
+    h.renders.at(-1)!.options!.onAction!({ id: 'progress.leave.cancel' });
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Local exact\ntext');
+  });
+
+  it('discards only one captured entry and invalidates detached input and discard controls', async () => {
+    const { h, payload, original } = await setup();
+    h.elements['filter-delivered'].fire();
+    await flush();
+    editCorrection(h, 'Independent beta');
+    h.elements['filter-done'].fire();
+    await flush();
+    const staleDiscard = rowAt(h).querySelector('[data-action="discard-correction"]')!;
+    h.refresh.fire();
+    await flush();
+    staleDiscard.fire();
+    const oldInput = original.querySelector('.progress-revise-note')!;
+    oldInput.value = 'Detached overwrite';
+    oldInput.fire('input');
+    const recovered = rowAt(h).querySelector('.progress-revise-note')!;
+    recovered.value = 'Programmatic overwrite';
+    recovered.fire('input');
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Local exact\ntext');
+    rowAt(h).querySelector('[data-action="discard-correction"]')!.fire();
+    expect(rowAt(h).querySelector('.progress-revise-note')).toBeNull();
+    h.elements['filter-delivered'].fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Independent beta');
+    expect(payload.done[0].status).toBe('rejected');
+    expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('releases the leave guard after explicit local discard without changing server outcome', async () => {
+    const { h } = await setup();
+    const discard = rowAt(h).querySelector('[data-action="discard-correction"]')!;
+    discard.fire();
+    discard.fire();
+    const proceed = vi.fn();
+    h.window.FrontDeskPageLeave.requestLeave(proceed);
+    expect(proceed).toHaveBeenCalledTimes(1);
+    expect(rowAt(h).innerHTML).toContain('Correction feedback recorded');
+    expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+  });
+
+  it.each(['accepted', 'rejected'])(
+    'does not route recovery text clicks or keyboard input through the %s row',
+    async (status) => {
+      const { h } = await setup('Text', status);
+      const row = rowAt(h);
+      const target = {
+        closest: (selector: string) => (selector === '.progress-revise-form' ? true : null),
+      };
+      const preventDefault = vi.fn();
+      const before = h.window.history.pushState.mock.calls.length;
+      row.fire('click', { target });
+      row.fire('keydown', { target, key: ' ', preventDefault });
+      row.fire('keydown', { target, key: 'Enter', preventDefault });
+      await flush();
+      expect(h.window.history.pushState.mock.calls.length).toBe(before);
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(rowAt(h)).toBe(row);
+    }
+  );
+
+  it.each(['missing-scope', 'changed-scope', 'absent-entry', 'nonterminal', 'task-session'])(
+    'hides local text for %s and prevents old controls from acting',
+    async (condition) => {
+      const { h, payload } = await setup();
+      const discard = rowAt(h).querySelector('[data-action="discard-correction"]')!;
+      if (condition === 'missing-scope') payload.viewer_scope_id = undefined;
+      if (condition === 'changed-scope') payload.viewer_scope_id = 'principal-other';
+      if (condition === 'absent-entry') payload.done[0].entry_id = 'unrelated';
+      if (condition === 'nonterminal') payload.done[0].status = 'read';
+      if (condition === 'task-session') payload.done[0].kind = 'task_session';
+      h.refresh.fire();
+      await flush();
+      discard.fire();
+      expect(h.elements['progress-list'].querySelectorAll('.progress-revise-note')).toHaveLength(0);
+      payload.viewer_scope_id = 'principal-alpha';
+      payload.done[0].entry_id = 'inbox-alpha';
+      payload.done[0].status = 'rejected';
+      payload.done[0].kind = 'artifact';
+      h.refresh.fire();
+      await flush();
+      expect(!!rowAt(h).querySelector('.progress-revise-note')).toBe(!condition.includes('scope'));
+    }
+  );
+
+  it('keeps terminal recovery read-only and discard locked until a later read confirms the lost POST', async () => {
+    const payload = correctionPayload();
+    const write = deferred<MockResponse>();
+    const h = harness({
+      hash: '#alpha',
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? write.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    editCorrection(h, 'Pending text');
+    rowAt(h)
+      .querySelector('.progress-revise-form')!
+      .children.find((el) => el.tag === 'button')!
+      .fire();
+    payload.done = [
+      {
+        id: 'alpha',
+        title: 'Alpha',
+        kind: 'artifact',
+        status: 'rejected',
+        entry_id: 'inbox-alpha',
+      },
+    ];
+    payload.delivered = payload.delivered.slice(1);
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.readOnly).toBe(true);
+    expect(rowAt(h).querySelector('.progress-revise-note')?.disabled).toBe(false);
+    const lockedDiscard = rowAt(h).querySelector('[data-action="discard-correction"]')!;
+    expect(lockedDiscard.disabled).toBe(true);
+    write.reject(new Error('response lost after early terminal read'));
+    await flush();
+    lockedDiscard.fire();
+    h.refresh.fire();
+    await flush();
+    expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe('Pending text');
+    expect(rowAt(h).querySelector('[data-action="discard-correction"]')?.disabled).toBe(false);
+    expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
+  });
+});
+
+it('keeps recovered text locked when a terminal GET began before the POST became uncertain', async () => {
+  const payload = correctionPayload(),
+    write = deferred<MockResponse>(),
+    stale = deferred<MockResponse>();
+  let holdRead = false;
+  const h = harness({
+    hash: '#alpha',
+    fetcher: dataFetcher(payload, (path, input) => {
+      if (input?.method === 'POST') return write.promise;
+      if (path === '/api/progress' && holdRead) return stale.promise;
+      return undefined;
+    }),
+  });
+  await h.window.KyberionProgress.mount();
+  editCorrection(h, 'Preserve through older terminal read');
+  rowAt(h)
+    .querySelector('.progress-revise-form')!
+    .children.find((el) => el.tag === 'button')!
+    .fire();
+  holdRead = true;
+  h.refresh.fire();
+  await flush();
+  write.reject(new Error('write uncertain after read began'));
+  await flush();
+  payload.done = [
+    { id: 'alpha', title: 'Alpha', kind: 'artifact', status: 'rejected', entry_id: 'inbox-alpha' },
+  ];
+  payload.delivered = payload.delivered.slice(1);
+  stale.resolve(response(payload));
+  await flush();
+  expect(rowAt(h).querySelector('.progress-revise-note')?.value).toBe(
+    'Preserve through older terminal read'
+  );
+  expect(rowAt(h).querySelector('[data-action="discard-correction"]')?.disabled).toBe(true);
+  expect(h.noticeText.textContent).toContain('uncertain');
+  holdRead = false;
+  h.refresh.fire();
+  await flush();
+  expect(rowAt(h).querySelector('[data-action="discard-correction"]')?.disabled).toBe(false);
+  expect(h.fetch.mock.calls.filter(([, input]) => input?.method === 'POST')).toHaveLength(1);
 });

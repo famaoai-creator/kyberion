@@ -476,7 +476,7 @@
 
   function renderCorrectionForm(row, item, vocab, current, open) {
     if (!window.KyberionProgressCorrection) return;
-    window.KyberionProgressCorrection[open ? 'open' : 'render']({
+    window.KyberionProgressCorrection[open === 'history' ? 'history' : open ? 'open' : 'render']({
       state: state,
       row: row,
       item: item,
@@ -549,34 +549,27 @@
             '</a>'
           : '');
     row.addEventListener('keydown', function (event) {
-      if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('[href]')) {
+      if (
+        (event.key === 'Enter' || event.key === ' ') &&
+        !event.target.closest('[href]') &&
+        !event.target.closest('.progress-revise-form')
+      ) {
         event.preventDefault();
         selectItem(item.id, item.title);
       }
     });
     row.addEventListener('click', function (event) {
-      if (event.target.closest('[href]')) return;
+      if (event.target.closest('[href]') || event.target.closest('.progress-revise-form')) return;
       selectItem(item.id, item.title);
     });
+    renderCorrectionForm(row, item, state.vocab, null, 'history');
     li.appendChild(row);
     return li;
   }
 
   function renderList() {
     state.rowGeneration += 1;
-    Object.keys(state.correctionDrafts).forEach(function (entryId) {
-      var draft = state.correctionDrafts[entryId];
-      var siblings = (state.payload.delivered || []).filter(function (item) {
-        return item.entry_id === entryId && item.can_verdict;
-      });
-      if (
-        !siblings.some(function (item) {
-          return item.id === draft.editorId;
-        }) &&
-        siblings.length
-      )
-        draft.editorId = siblings[0].id;
-    });
+    if (window.KyberionProgressCorrection) window.KyberionProgressCorrection.reconcileOwners(state);
     renderLeave();
     var vocab = state.vocab;
     var listEl = document.getElementById('progress-list');
@@ -1386,10 +1379,7 @@
             choices: [
               {
                 id: 'stay',
-                label: vt(
-                  state.vocab,
-                  phase === 'draft' ? 'progress_leave_stay' : 'progress_leave_stay_page'
-                ),
+                label: vt(state.vocab, 'progress_leave_stay_page'),
                 variant: 'primary',
               },
               {
