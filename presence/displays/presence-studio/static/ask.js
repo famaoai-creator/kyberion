@@ -958,9 +958,10 @@
     }
   }
 
-  function cancelDraftChoice(focus) {
+  function cancelDraftChoice(focus, accepted) {
     var proposal = state.proposedDraft;
     state.proposedDraft = null;
+    if (proposal && !accepted && proposal.onDismissed) proposal.onDismissed();
     renderDraftChoice();
     var input = document.getElementById('ask-input');
     if (focus && input) {
@@ -970,26 +971,29 @@
     }
   }
 
-  function editDraft(text) {
+  function editDraft(text, accepted) {
     var input = document.getElementById('ask-input');
     if (!input) return;
     state.draftEdited = true;
     state.draftRevision += 1;
     state.homeDraftPreserved = false;
-    cancelDraftChoice(false);
+    cancelDraftChoice(false, accepted);
     input.value = text;
     saveDraft();
   }
 
-  function proposeDraft(text, isCurrent, onAccepted) {
+  function proposeDraft(text, isCurrent, onAccepted, onDismissed) {
     var input = document.getElementById('ask-input');
     if (!input || !text || state.historyState !== 'ready' || !state.storageVerified) return false;
+    if (isCurrent && !isCurrent()) return false;
+    cancelDraftChoice(false);
     if (isCurrent && !isCurrent()) return false;
     if (input.value.trim() && input.value !== text) {
       state.proposedDraft = {
         text: text,
         isCurrent: isCurrent,
         onAccepted: onAccepted,
+        onDismissed: onDismissed,
         start: input.selectionStart,
         end: input.selectionEnd,
         direction: input.selectionDirection,
@@ -1031,7 +1035,7 @@
           return;
         }
         var accepted = state.proposedDraft.onAccepted;
-        editDraft(state.proposedDraft.text);
+        editDraft(state.proposedDraft.text, true);
         if (accepted) accepted();
         if (input) input.focus();
       });

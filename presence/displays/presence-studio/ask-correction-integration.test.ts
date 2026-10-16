@@ -169,7 +169,16 @@ function harness(
         }
       : undefined,
     crypto: { randomUUID },
-    history: { state: null, replaceState: vi.fn() },
+    history: {
+      state: null,
+      replaceState: vi.fn((_state: unknown, _title: string, url: string) => {
+        const next = new URL(url, location.href);
+        location.href = next.href;
+        location.pathname = next.pathname;
+        location.search = next.search;
+        location.hash = next.hash;
+      }),
+    },
     sessionStorage: {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => storage.set(key, value),
@@ -184,6 +193,8 @@ function harness(
       },
     },
     KyberionAsk: undefined as undefined | { mount: () => void },
+    testProposeDraft: undefined as
+      undefined | ((text: string, current: () => boolean, accepted: () => void) => boolean),
   };
   const texts =
     options.texts ??
@@ -250,10 +261,14 @@ function harness(
         ];
   runInNewContext(
     scripts
-      .map((name) =>
-        safeReadFile('presence/displays/presence-studio/static/' + name, {
-          encoding: 'utf8',
-        })
+      .map(
+        (name) =>
+          safeReadFile('presence/displays/presence-studio/static/' + name, {
+            encoding: 'utf8',
+          }) +
+          (name === 'ask-correction.js'
+            ? ';(function () { var create = window.KyberionAskCorrection.create; window.KyberionAskCorrection.create = function (options) { window.testProposeDraft = options.proposeDraft; return create(options); }; })();'
+            : '')
       )
       .join('\n'),
     {
@@ -386,7 +401,102 @@ describe('Ask correction integration with real draft ownership and startup', () 
       expect(h.elements.get('draft-choice')!.hidden).toBe(true);
       expect(storage.get('kyberion.ask.draft.' + session + '.request')).toBe(request);
       expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
-      expect(h.window.history.replaceState.mock.calls).toHaveLength(choice === 'replace' ? 1 : 0);
+      expect(h.window.history.replaceState.mock.calls).toHaveLength(1);
+      if (choice !== 'replace') expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+    }
+  });
+  it('does not revive dismissed feedback after keeping, manually sending and reloading a draft', async () => {
+    for (const choice of ['keep', 'escape']) {
+      const storage = new Map([['kyberion.ask.draft.' + session, 'My pitch draft']]);
+      const h = harness({
+        query: query + '&projectId=pitch&view=compact',
+        hash: '#review',
+        storage,
+      });
+      await flush();
+      expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+      if (choice === 'keep') h.elements.get('draft-keep')!.fire('click');
+      else h.elements.get('draft-choice')!.fire('keydown', { key: 'Escape' });
+      expect(h.input.value).toBe('My pitch draft');
+      expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+      expect(h.window.location.search).toBe('?tenant=alpha&projectId=pitch&view=compact');
+      expect(h.window.location.hash).toBe('#review');
+      h.form.fire('submit');
+      await flush();
+      expect(h.input.value).toBe('');
+      expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+      const reload = harness({
+        query: h.window.location.search,
+        hash: h.window.location.hash,
+        storage,
+      });
+      await flush();
+      expect(reload.input.value).toBe('');
+      expect(reload.elements.get('ask-correction-status')!.hidden).toBe(true);
+      expect(
+        reload.fetch.mock.calls.filter(([url]) => url.includes('correction-context'))
+      ).toHaveLength(0);
+      expect(reload.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+      const explicit = harness({ query, storage });
+      await flush();
+      expect(explicit.input.value).toContain('Exact saved comment');
+      expect(explicit.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(
+        0
+      );
+    }
+  });
+  it('settles a correction proposal when the operator edits or sends the existing draft', async () => {
+    for (const action of ['edit', 'send']) {
+      const storage = new Map([['kyberion.ask.draft.' + session, 'My pitch draft']]);
+      const h = harness({ query, storage });
+      await flush();
+      if (action === 'edit') {
+        h.input.value = 'Revised pitch draft';
+        h.input.fire('input');
+      } else h.form.fire('submit');
+      await flush();
+      expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+      expect(h.window.location.search).toBe('?tenant=alpha');
+      expect(h.input.value).toBe(action === 'edit' ? 'Revised pitch draft' : '');
+      expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(
+        action === 'send' ? 1 : 0
+      );
+    }
+  });
+  it('retires the correction proposal when a chip replaces it without sending', async () => {
+    const storage = new Map([['kyberion.ask.draft.' + session, 'My pitch draft']]);
+    const h = harness({ query, storage });
+    await flush();
+    h.chips.get('email')!.fire('click');
+    expect(h.window.location.search).toBe('?tenant=alpha');
+    expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+    expect(h.elements.get('draft-choice')!.hidden).toBe(false);
+    expect(h.elements.get('draft-choice-preview')!.textContent).toBe('front_desk:chip_email');
+    h.elements.get('draft-replace')!.fire('click');
+    expect(h.input.value).toBe('front_desk:chip_email');
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+  });
+  it('rejects an incoming proposal made stale by retiring the previous correction', async () => {
+    for (const composer of ['My pitch draft', '']) {
+      const storage = new Map([['kyberion.ask.draft.' + session, 'My pitch draft']]);
+      const h = harness({ query, storage });
+      await flush();
+      const identity = h.window.location.search;
+      h.input.value = composer;
+      const accepted = vi.fn();
+      const proposed = h.window.testProposeDraft!(
+        'Stale next action',
+        () => h.window.location.search === identity,
+        accepted
+      );
+      expect(proposed).toBe(false);
+      expect(h.window.location.search).toBe('?tenant=alpha');
+      expect(h.elements.get('draft-choice')!.hidden).toBe(true);
+      expect(h.elements.get('ask-correction-status')!.hidden).toBe(true);
+      expect(h.input.value).toBe(composer);
+      expect(storage.get('kyberion.ask.draft.' + session)).toBe('My pitch draft');
+      expect(accepted).not.toHaveBeenCalled();
+      expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
     }
   });
   it('preserves a maximum note, blocks oversized sends, and clears warning after shortening', async () => {

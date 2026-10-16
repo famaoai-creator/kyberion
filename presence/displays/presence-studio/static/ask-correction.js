@@ -95,6 +95,11 @@
           window.location.pathname + (query ? '?' + query : '') + window.location.hash
         );
       }
+      function dismissed() {
+        if (!current()) return;
+        accepted();
+        invalidate();
+      }
       pending = true;
       phase = 'loading';
       render();
@@ -147,7 +152,7 @@
             label('note') +
             ':\n' +
             context.note;
-          if (!options.proposeDraft(draft, current, accepted)) return false;
+          if (!options.proposeDraft(draft, current, accepted, dismissed)) return false;
           prepared = identity;
           phase = 'prepared';
           return true;
