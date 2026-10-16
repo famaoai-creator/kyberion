@@ -1,6 +1,7 @@
 import { parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExec, safeExistsSync } from './secure-io.js';
+import { safeExec, safeExistsSync, safeReaddir } from './secure-io.js';
+import * as nodePath from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import {
@@ -377,6 +378,36 @@ export function readOpsAlertLogRecords(alertLogPath?: string): ParsedOpsAlertRec
   return records;
 }
 
+/** Rotated ops-alert segments written by the janitor's `rotate` action. */
+const OPS_ALERT_SEGMENT_SUFFIX = /^\d{8}-\d{6}(-\d+)?\.jsonl$/;
+
+/**
+ * Read the live alert log plus its rotated `<stem>-YYYYMMDD-HHmmss[-N].jsonl`
+ * siblings, oldest-first. `ops:alerts --redeliver` uses this so undelivered
+ * envelopes parked in a rotated segment are not silently abandoned — the live
+ * file alone cannot prove a notification was never delivered.
+ */
+export function readOpsAlertLogRecordsIncludingSegments(
+  alertLogPath?: string
+): ParsedOpsAlertRecord[] {
+  const primary = resolveOpsAlertLogPath(alertLogPath ?? defaultAlertLogPath());
+  const dir = nodePath.dirname(primary);
+  const stem = nodePath.basename(primary).replace(/\.jsonl$/, '');
+  const records: ParsedOpsAlertRecord[] = [];
+  try {
+    for (const name of [...safeReaddir(dir)].sort()) {
+      if (!name.startsWith(`${stem}-`)) continue;
+      const suffix = name.slice(stem.length + 1);
+      if (!OPS_ALERT_SEGMENT_SUFFIX.test(suffix)) continue;
+      records.push(...readOpsAlertLogRecords(nodePath.join(dir, name)));
+    }
+  } catch {
+    // missing dir → live file only
+  }
+  records.push(...readOpsAlertLogRecords(primary));
+  return records;
+}
+
 interface UndeliveredClassification {
   outstanding: ParsedOpsAlertRecord[];
   redelivered: ParsedOpsAlertRecord[];
@@ -553,7 +584,7 @@ export function acknowledgeOpsAlerts(
   }
   const alertLogPath = options.alertLogPath ?? defaultAlertLogPath();
   const outstanding = selectOutstandingUndeliveredOpsAlerts(
-    readOpsAlertLogRecords(alertLogPath)
+    readOpsAlertLogRecordsIncludingSegments(alertLogPath)
   ).filter((record) => record.timestampMs !== null && record.timestampMs <= beforeMs);
   const recordedPath = appendOpsAlertLogRecord(alertLogPath, {
     ts: now.toISOString(),
@@ -604,7 +635,9 @@ export function redeliverUndeliveredOpsAlerts(
       `redeliverUndeliveredOpsAlerts: no delivery channel configured — set ${OPS_ALERT_WEBHOOK_ENV} before running --redeliver`
     );
   }
-  const outstanding = selectOutstandingUndeliveredOpsAlerts(readOpsAlertLogRecords(alertLogPath));
+  const outstanding = selectOutstandingUndeliveredOpsAlerts(
+    readOpsAlertLogRecordsIncludingSegments(alertLogPath)
+  );
   const batch =
     typeof options.limit === 'number' && options.limit >= 0
       ? outstanding.slice(0, options.limit)
