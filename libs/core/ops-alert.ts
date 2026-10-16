@@ -1,4 +1,9 @@
-import { parseSafeJsonInput, readJsonLines } from './foundation/json.js';
+import {
+  parseSafeJsonInput,
+  readJsonLines,
+  loadJsonIfPresent,
+  writeJson,
+} from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExec, safeExistsSync, safeReaddir } from './secure-io.js';
 import * as nodePath from 'node:path';
@@ -46,10 +51,53 @@ export interface OpsAlertOptions {
   alertLogPath?: string;
   webhookUrl?: string;
   minIntervalMs?: number;
+  /** Dedupe state file override (tests). Defaults to a sibling of the alert log. */
+  dedupeStatePath?: string;
 }
 
 const DEFAULT_MIN_INTERVAL_MS = 10 * 60 * 1000;
 const lastSentAt = new Map<string, number>();
+
+/**
+ * MSN-LOG-STORE-HARDENING-20261016: dedupe state persisted across processes.
+ * `lastSentAt` used to be process-local only, so short-lived watchdog and
+ * scheduler invocations always started with an empty map and suppression
+ * never fired — observed: 93% of ops-alerts.jsonl were the same unsuppressed
+ * daemon-heartbeat critical at ~5min cadence. The state file is the shared
+ * source of truth; the in-memory map is a fallback for the case the state
+ * file cannot be written.
+ */
+export const OPS_ALERT_DEDUPE_STATE_FILENAME = 'ops-alerts.dedupe.json';
+const DEDUPE_STATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Dedupe state lives next to the alert log: `ops-alerts.dedupe.json`. */
+function dedupeStatePathFor(alertLogPath: string): string {
+  return alertLogPath.replace(/\.jsonl$/, '.dedupe.json');
+}
+
+/** Load `key -> last-sent epochMs`, pruning entries older than 30 days. */
+function loadDedupeState(filePath: string, nowMs: number): Map<string, number> {
+  const state = new Map<string, number>();
+  const raw = loadJsonIfPresent<Record<string, unknown>>(filePath);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return state;
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    if (nowMs - value > DEDUPE_STATE_MAX_AGE_MS) continue;
+    state.set(key, value);
+  }
+  return state;
+}
+
+/** Best-effort persist — dedupe persistence must never break alerting. */
+function persistDedupeState(filePath: string, state: Map<string, number>): void {
+  try {
+    writeJson(filePath, Object.fromEntries(state));
+  } catch (err) {
+    logger.debug(
+      `[ops-alert] failed to persist dedupe state: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
 
 /** Env var carrying the webhook URL used for actual alert delivery. */
 export const OPS_ALERT_WEBHOOK_ENV = 'KYBERION_OPS_ALERT_WEBHOOK_URL';
@@ -141,10 +189,15 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   const timestamp = now.toISOString();
   const key = input.dedupe_key ?? `${input.severity}:${input.title}`;
   const minIntervalMs = options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
-  const prior = lastSentAt.get(key);
+  const alertLogPath = options.alertLogPath ?? defaultAlertLogPath();
+  // File state wins over the process-local map: it carries sends made by
+  // other (short-lived) processes, while the map covers a state file that
+  // could not be written.
+  const dedupeStatePath = options.dedupeStatePath ?? dedupeStatePathFor(alertLogPath);
+  const dedupeState = loadDedupeState(dedupeStatePath, now.getTime());
+  const prior = dedupeState.get(key) ?? lastSentAt.get(key);
   const suppressed = prior !== undefined && now.getTime() - prior < minIntervalMs;
   const id = `${timestamp.replace(/[:.]/g, '-')}-${key.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-  const alertLogPath = options.alertLogPath ?? defaultAlertLogPath();
   const record = {
     id,
     timestamp,
@@ -165,6 +218,8 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     };
   }
   lastSentAt.set(key, now.getTime());
+  dedupeState.set(key, now.getTime());
+  persistDedupeState(dedupeStatePath, dedupeState);
 
   const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   if (!webhookUrl) {

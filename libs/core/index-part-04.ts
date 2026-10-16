@@ -170,10 +170,15 @@ export {
   scanEventStores,
   scanStorageFloors,
   listUncoveredEventStoreDirs,
+  sweepAppendOnlyStores,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
   DEFAULT_TRASH_GRACE_DAYS,
+  DEFAULT_ROTATE_MIN_BYTES,
+  DEFAULT_COMPACT_MIN_BYTES,
   TRASH_REPO_SUBPATH,
+  ARCHIVE_REPO_SUBPATH,
+  COMPACTION_ARCHIVE_REPO_SUBPATH,
 } from './storage-janitor.js';
 
 export type {
@@ -185,6 +190,7 @@ export type {
   SweepTrashResult,
   SweepDelegationChildrenOptions,
   SweepDelegationChildrenResult,
+  SweepAppendOnlyStoresResult,
 } from './storage-janitor.js';
 
 // Scope-linked GC & offboarding (AL-04)

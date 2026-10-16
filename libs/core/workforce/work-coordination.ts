@@ -338,10 +338,28 @@ function appendWorkItemAttemptEvent(
   });
 }
 
+/**
+ * MSN-LOG-STORE-HARDENING-20261016: cap the per-item attempts array carried
+ * by every versioned snapshot. Each item version embedded its FULL attempt
+ * history (observed: 16 attempts ≈ 239KB in one record), so every status
+ * change re-wrote all prior attempts — the store grew quadratically and the
+ * largest line reached ~240KB. Only the tail is retained; the complete
+ * attempt history stays in `observability/work-coordination/events.jsonl`
+ * via appendWorkItemAttemptEvent.
+ */
+export const MAX_RETAINED_ITEM_ATTEMPTS = 10;
+
+function boundItemAttempts(item: WorkItem): WorkItem {
+  const attempts = item.attempts;
+  if (!attempts || attempts.length <= MAX_RETAINED_ITEM_ATTEMPTS) return item;
+  return { ...item, attempts: attempts.slice(-MAX_RETAINED_ITEM_ATTEMPTS) };
+}
+
 function appendItemSnapshot(item: WorkItem): WorkItem {
-  validateWorkItem(item);
-  appendJsonl(itemsPath(), item);
-  return item;
+  const bounded = boundItemAttempts(item);
+  validateWorkItem(bounded);
+  appendJsonl(itemsPath(), bounded);
+  return bounded;
 }
 
 function appendLeaseSnapshot(lease: WorkLease): WorkLease {
