@@ -60,8 +60,32 @@ export const RETENTION_ACTIONS = [
    * exception (see `RetentionStatusRule`).
    */
   'review_required',
+  /**
+   * MSN-LOG-STORE-HARDENING-20261016: file-level action for append-only
+   * event ledgers (`<name>.jsonl`). Directory mtime TTL can never expire a
+   * file that is appended to daily — the janitor instead renames the live
+   * file to a `<name>-<YYYYMMDD-HHmmss>.jsonl` sibling once it exceeds
+   * `rotate_min_bytes`; writers reopen the canonical path so appends
+   * continue uninterrupted. Rotated segments are expired by `ttl_days`
+   * through the same audited path as directory entries, with
+   * `segment_action` choosing delete (default) or archive.
+   */
+  'rotate',
+  /**
+   * MSN-LOG-STORE-HARDENING-20261016: file-level action for versioned keyed
+   * stores (append a full record per update; latest record per key wins).
+   * Once the file exceeds `compact_min_bytes` the janitor folds it to the
+   * last record per `compact_key`, archives the pre-compaction file under
+   * `active/archive/jsonl-compaction/`, and atomically rewrites the live
+   * file. Requires `compact_key`.
+   */
+  'compact',
 ] as const;
 export type RetentionAction = (typeof RETENTION_ACTIONS)[number];
+
+/** How a `rotate` entry disposes of its rotated segments once `ttl_days` elapses. */
+export const RETENTION_SEGMENT_ACTIONS = ['delete', 'archive'] as const;
+export type RetentionSegmentAction = (typeof RETENTION_SEGMENT_ACTIONS)[number];
 
 /**
  * AL-04: shared audit JSONL (under `active/shared/logs/audit/`) for retention
@@ -142,6 +166,24 @@ export interface RetentionCatalogEntry {
   note?: string;
   /** WI-16: per-file status-aware expiry rules nested under this directory. */
   status_rules?: RetentionStatusRule[];
+  /**
+   * `action: 'rotate'`: live-file size in bytes that triggers rotation.
+   * Default DEFAULT_ROTATE_MIN_BYTES in storage-janitor.
+   */
+  rotate_min_bytes?: number;
+  /**
+   * `action: 'rotate'`: how expired rotated segments are disposed.
+   * Default 'delete'; use 'archive' for evidence-class ledgers so segments
+   * move under `active/archive/` instead of being unlinked.
+   */
+  segment_action?: RetentionSegmentAction;
+  /** `action: 'compact'`: record field that identifies the keyed entity. Required. */
+  compact_key?: string;
+  /**
+   * `action: 'compact'`: live-file size in bytes that triggers compaction.
+   * Default DEFAULT_COMPACT_MIN_BYTES in storage-janitor.
+   */
+  compact_min_bytes?: number;
 }
 
 export interface LoadedRetentionCatalog {
@@ -319,6 +361,44 @@ function validateEntry(raw: unknown, index: number): string | null {
   }
   if (entry.note !== undefined && typeof entry.note !== 'string') {
     return `entries[${index}] (${String(entry.path)}): "note" must be a string`;
+  }
+  if (entry.rotate_min_bytes !== undefined) {
+    if (
+      typeof entry.rotate_min_bytes !== 'number' ||
+      !Number.isFinite(entry.rotate_min_bytes) ||
+      entry.rotate_min_bytes <= 0
+    ) {
+      return `entries[${index}] (${String(entry.path)}): "rotate_min_bytes" must be a positive number`;
+    }
+  }
+  if (
+    entry.segment_action !== undefined &&
+    !RETENTION_SEGMENT_ACTIONS.includes(entry.segment_action as RetentionSegmentAction)
+  ) {
+    return `entries[${index}] (${String(entry.path)}): invalid "segment_action" ${JSON.stringify(entry.segment_action)}`;
+  }
+  if (entry.compact_key !== undefined) {
+    if (typeof entry.compact_key !== 'string' || entry.compact_key.trim() === '') {
+      return `entries[${index}] (${String(entry.path)}): "compact_key" must be a non-empty string`;
+    }
+  }
+  if (entry.compact_min_bytes !== undefined) {
+    if (
+      typeof entry.compact_min_bytes !== 'number' ||
+      !Number.isFinite(entry.compact_min_bytes) ||
+      entry.compact_min_bytes <= 0
+    ) {
+      return `entries[${index}] (${String(entry.path)}): "compact_min_bytes" must be a positive number`;
+    }
+  }
+  if (entry.action === 'compact' && entry.compact_key === undefined) {
+    return `entries[${index}] (${String(entry.path)}): action "compact" requires "compact_key"`;
+  }
+  if (
+    (entry.action === 'rotate' || entry.action === 'compact') &&
+    !String(entry.path).endsWith('.jsonl')
+  ) {
+    return `entries[${index}] (${String(entry.path)}): action "${String(entry.action)}" requires a .jsonl file path`;
   }
   if (entry.status_rules !== undefined) {
     if (!Array.isArray(entry.status_rules)) {
@@ -592,6 +672,17 @@ export function catalogStatusRules(
     }
   }
   return flattened;
+}
+
+/**
+ * MSN-LOG-STORE-HARDENING-20261016: catalog entries whose `path` names a
+ * single append-only `.jsonl` file governed by `rotate` or `compact`
+ * instead of a directory TTL — a single file's mtime never ages while it
+ * is appended, so it needs a maintenance action rather than an expiry
+ * sweep. Returns the entry list for the janitor's append-only pass.
+ */
+export function appendOnlyStoreEntries(catalog: LoadedRetentionCatalog): RetentionCatalogEntry[] {
+  return catalog.entries.filter((e) => e.action === 'rotate' || e.action === 'compact');
 }
 
 /**

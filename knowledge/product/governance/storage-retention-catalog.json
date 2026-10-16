@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records. G01/G02/G14 (ops-runtime-retention) declare the top-level ledgers and state files that sit directly in active/shared/runtime/ (dot-*.jsonl, mission_queue.jsonl, reasoning-failover-events.jsonl, …) and the remaining runtime subdirectories; listUncoveredRuntimeEntries now reports undeclared top-level files too (janitor report field uncoveredRuntimeFiles), and the runtime-store-retention check gate (scripts/check_runtime_store_retention.ts) fails when source references an active/shared/runtime/<name> store with no entry here. Top-level file entries carry no ttl_days: the janitor's mtime TTL walks directories and an append-only ledger's mtime never ages, so such files are either self-bounded (the note says how) or review_required.",
   "entries": [
     {
@@ -532,8 +532,9 @@
     {
       "path": "active/shared/runtime/reasoning-failover-events.jsonl",
       "artifact_class": "log",
-      "action": "review_required",
-      "note": "G01: append-only reasoning backend switch log (libs/core/reasoning/reasoning-failover.ts appendReasoningFailoverEvent). Diagnostic only — no hot-path reader; the latest switch lives in runtime/state/reasoning-failover.json. Grows with failovers only; operator trims or archives."
+      "action": "rotate",
+      "note": "G01: append-only reasoning backend switch log (libs/core/reasoning/reasoning-failover.ts appendReasoningFailoverEvent). Diagnostic only — no hot-path reader; the latest switch lives in runtime/state/reasoning-failover.json. Grows with failovers only; operator trims or archives. | Rotated when oversized; segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+      "ttl_days": 30
     },
     {
       "path": "active/shared/runtime/mission_queue.jsonl",
@@ -999,6 +1000,89 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "note": "Tenant-partitioned Web organization/project idempotency receipts and pending completion-audit evidence. Deleting a receipt can permit replay of an already committed mutation; never auto-delete. Review only after reconciling its entity and audit record."
+    },
+    {
+      "path": "active/shared/logs/audit",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "archive",
+      "audit": true,
+      "note": "Compliance audit stream (hash-chained daily audit-*.jsonl + storage-retention.jsonl). Previously inherited the logs-root 30d delete — audit evidence must not be unlinked; expired files move to active/archive/ (review_required there, never auto-deleted). rotateLogs resolves the longest-prefix entry per file, so this entry overrides the logs root for audit/ only."
+    },
+    {
+      "path": "active/shared/runtime/work-coordination/items.jsonl",
+      "artifact_class": "state",
+      "action": "compact",
+      "compact_key": "item_id",
+      "compact_min_bytes": 2097152,
+      "audit": true,
+      "note": "Versioned WorkItem store — every update appends a full record, so the file grows O(items x versions); observed 31MB/853 lines for 101 items with 240KB lines from embedded attempt history. Compaction folds to latest-per-item_id and archives the pre-compaction file under active/archive/jsonl-compaction/. The parent dir stays review_required (leases/boards untouched)."
+    },
+    {
+      "path": "active/shared/runtime/work-coordination/leases.jsonl",
+      "artifact_class": "state",
+      "action": "compact",
+      "compact_key": "lease_id",
+      "compact_min_bytes": 1048576,
+      "audit": true,
+      "note": "Versioned WorkLease store — same append-per-update pattern as items.jsonl; folded by lease_id. Active leases are always the latest record per id, so folding never drops a live lease."
+    },
+    {
+      "path": "active/shared/observability/delegations.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "audit": true,
+      "note": "Append-only delegation index log (delegated-task-observability.ts). Canonical delegation state lives in per-delegation .json records under observability/delegations/, so rotating the index is safe; segments expire under the observability 90d sweep."
+    },
+    {
+      "path": "active/shared/observability/ops-alerts.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "audit": true,
+      "note": "Ops alert event log. Rotated when it exceeds rotate_min_bytes; segments expire under the observability 90d sweep. Caveat: 'ops:alerts --redeliver' reads the live file, so undelivered envelopes land in the segment — extend redeliver to scan segments if that path matters."
+    },
+    {
+      "path": "active/shared/observability/work-coordination/events.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "audit": true,
+      "note": "Coordination event feed (audit trail; authoritative state is items.jsonl/leases.jsonl). Segments expire under the observability 90d sweep."
+    },
+    {
+      "path": "active/shared/observability/mission-control/agent-runtime-events.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "note": "Live agent-runtime event stream sibling of the dated supervisor-events family (which has its own 14d sweep). Segments expire under the mission-control 90d entry."
+    },
+    {
+      "path": "active/shared/runtime/browser-observations",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "Browser observation captures. Evidence class — human retention decision; surfaced uncovered in the 2026-10-15 janitor report."
+    },
+    {
+      "path": "active/shared/runtime/presentation-preferences",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Presentation preference state. Surfaced uncovered in the 2026-10-15 janitor report; load-bearing, no auto action."
+    },
+    {
+      "path": "active/shared/runtime/soak-evidence",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "Soak-test evidence captures. Surfaced uncovered in the 2026-10-15 janitor report; human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/outside.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Small self-rewritten state file (surfaced uncovered in the 2026-10-15 janitor report). JSON, not append-only — bounded by state size."
+    },
+    {
+      "path": "active/shared/runtime/provider-health.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Provider health snapshot, rewritten in place — self-bounded. Surfaced uncovered in the 2026-10-15 janitor report."
     }
   ]
 }

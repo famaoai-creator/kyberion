@@ -1204,3 +1204,25 @@ bounded pending pressure, new-process restart and competing process claims,
 stale offers, pre/post-dispatch failure, partial wake-tool effects, terminal
 receipt correlation, tenant/full-scope isolation and fail-closed state/source loss.
 Never invoke real providers, notifications or resident daemons for these fixtures.
+
+## §15 Append-only JSONL stores
+
+**Rule.** A `.jsonl` file that only ever grows by appending is never expired by the
+janitor's mtime TTL — the append keeps its mtime fresh forever. Every such store
+needs one of three declared lifecycle actions in the retention catalog, or an
+explicit `review_required` note naming what bounds it.
+
+**Procedure:**
+
+1. Pick `rotate` (pure event/log files), `compact` (versioned keyed state, requires
+   `compact_key`), or `archive` (compliance evidence that must never be unlinked —
+   expired files move to `active/archive/<repo-rel>`). See
+   [append-only-store-lifecycle](./append-only-store-lifecycle.md) for the decision
+   table and reader contract.
+2. Never embed unbounded history inside a versioned record — cap arrays like
+   `WorkItem.attempts` at write time and keep the full history in the event feed.
+3. After changing a store's shape, run the janitor dry-run and check the
+   `Append-Only Stores` section of `storage-janitor-report.md`.
+
+**Gate:** `pnpm check -- --only runtime-store-retention`; janitor report
+`uncoveredRuntimeFiles` must stay empty for declared stores.

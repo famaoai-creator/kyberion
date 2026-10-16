@@ -569,4 +569,32 @@ describe('work coordination', () => {
       ).toBe(true);
     });
   });
+
+  it('bounds the embedded attempts array so versioned snapshots stay small', () => {
+    // MSN-LOG-STORE-HARDENING-20261016: each versioned snapshot used to embed
+    // the FULL attempt history (observed: 16 attempts ~= 239KB per record).
+    // The store caps retention at MAX_RETAINED_ITEM_ATTEMPTS; the complete
+    // history stays in the coordination event feed.
+    const item = createWorkItem({
+      title: 'attempt-cap',
+      description: 'attempts capped per snapshot',
+    });
+    for (let round = 0; round < 12; round++) {
+      const claimed = claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: 'peer-a',
+        purpose: 'work',
+      });
+      releaseWorkItem({
+        itemId: item.item_id,
+        leaseId: claimed.lease.lease_id,
+        actorPeerId: 'peer-a',
+        nextStatus: 'ready',
+      });
+    }
+    const finalItem = getWorkItem(item.item_id);
+    expect(finalItem?.attempts?.length).toBeLessThanOrEqual(10);
+    // The most recent attempt is retained (tail slice).
+    expect(finalItem?.attempts?.at(-1)?.status).toBe('released');
+  });
 });
