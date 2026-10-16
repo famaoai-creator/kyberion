@@ -128,6 +128,55 @@ describe('ops-alert', () => {
     expect(outstanding.some((r) => r.raw.correlation_id === 'alert-seg-1')).toBe(true);
   });
 
+  it('suppresses alerts whose dedupe state was persisted by another process', () => {
+    safeRmSync(pathResolver.sharedTmp('ops-alert-test'), { recursive: true, force: true });
+    const dedupePath = pathResolver.sharedTmp('ops-alert-test/alerts.dedupe.json');
+    // Another (short-lived watchdog) process sent this alert moments ago.
+    safeWriteFile(
+      dedupePath,
+      JSON.stringify({ 'daemon-watchdog:chronos:stale': Date.parse('2026-07-04T00:04:00.000Z') })
+    );
+
+    const receipt = sendOpsAlert(
+      {
+        severity: 'critical',
+        title: 'Daemon heartbeat watchdog detected unhealthy daemon(s)',
+        context: { daemon_id: 'chronos-daemon' },
+        recommendation: 'Restart daemon.',
+        dedupe_key: 'daemon-watchdog:chronos:stale',
+      },
+      {
+        alertLogPath: ALERT_TEST_LOG,
+        dedupeStatePath: dedupePath,
+        now: new Date('2026-07-04T00:05:00.000Z'),
+      }
+    );
+    expect(receipt.suppressed).toBe(true);
+  });
+
+  it('persists dedupe state so a fresh process suppresses repeats', () => {
+    safeRmSync(pathResolver.sharedTmp('ops-alert-test'), { recursive: true, force: true });
+    const dedupePath = pathResolver.sharedTmp('ops-alert-test/alerts.dedupe.json');
+    sendOpsAlert(
+      {
+        severity: 'critical',
+        title: 'Daemon stale',
+        context: { daemon_id: 'generation-schedule-daemon' },
+        recommendation: 'Restart daemon.',
+        dedupe_key: 'daemon-watchdog:gensched:stale',
+      },
+      {
+        alertLogPath: ALERT_TEST_LOG,
+        dedupeStatePath: dedupePath,
+        now: new Date('2026-07-04T00:00:00.000Z'),
+      }
+    );
+    const persisted = JSON.parse(String(safeReadFile(dedupePath, { encoding: 'utf8' })));
+    expect(persisted['daemon-watchdog:gensched:stale']).toBe(
+      Date.parse('2026-07-04T00:00:00.000Z')
+    );
+  });
+
   it('queues an undelivered ops alert for later redelivery', () => {
     safeRmSync(pathResolver.sharedTmp('ops-alert-test'), { recursive: true, force: true });
     sendOpsAlert(

@@ -46,11 +46,23 @@ describe('event store retention (EV-06)', () => {
   });
 
   it('observability 直下のファイルは残余ルールに帰属する', () => {
-    // ops-alerts.jsonl is a file, and the catalog models directories — so it
-    // must resolve through the parent rather than needing its own entry.
-    const entry = retentionEntryForPath(catalog, 'active/shared/observability/ops-alerts.jsonl');
+    // A file directly under observability/ with no file-level entry resolves
+    // through the parent residual rule. (ops-alerts.jsonl itself now carries
+    // its own `rotate` entry — catalog v1.10.0 file-level actions.)
+    const entry = retentionEntryForPath(
+      catalog,
+      'active/shared/observability/z-residual-probe.jsonl'
+    );
     expect(entry?.path).toBe('active/shared/observability');
     expect(entry?.audit).toBe(true);
+  });
+
+  it('ファイルレベルの rotate エントリは残余ルールより優先される', () => {
+    // The rotate entry on ops-alerts.jsonl must win over the observability
+    // residual rule — otherwise the append-only sweep never sees it.
+    const entry = retentionEntryForPath(catalog, 'active/shared/observability/ops-alerts.jsonl');
+    expect(entry?.path).toBe('active/shared/observability/ops-alerts.jsonl');
+    expect(entry?.action).toBe('rotate');
   });
 
   it('監査対象のイベントストアには audit フラグが立っている', () => {

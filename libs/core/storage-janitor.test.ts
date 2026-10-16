@@ -32,6 +32,14 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(dest), { recursive: true });
       actual.renameSync(src, dest);
     },
+    safeCopyFileSync: (src: string, dest: string) => {
+      actual.mkdirSync(path.dirname(dest), { recursive: true });
+      actual.copyFileSync(src, dest);
+    },
+    safePublishExclusiveFileSync: (p: string, data: string) => {
+      actual.mkdirSync(path.dirname(p), { recursive: true });
+      actual.writeFileSync(p, data, { flag: 'wx' });
+    },
   };
 });
 
@@ -129,6 +137,7 @@ import {
   sweepWorkspaces,
   sweepEmptyMissionDirs,
   sweepTrash,
+  sweepAppendOnlyStores,
   restoreFromTrash,
   listReviewRequiredDirs,
   runJanitor,
@@ -154,6 +163,7 @@ import {
   RETENTION_CATALOG_REPO_PATH,
   RETENTION_DAY_MS,
   STORAGE_RETENTION_AUDIT_FILENAME,
+  loadRetentionCatalog,
 } from './storage-retention-catalog.js';
 
 function writeFile(filePath: string, content = 'x'): void {
@@ -179,6 +189,11 @@ function testRootDir(): string {
  */
 function catalogFilePath(): string {
   return path.join(testRootDir(), ...RETENTION_CATALOG_REPO_PATH.split('/'));
+}
+
+/** Absolute path where an `archive`-action expiry lands a repo-relative file. */
+function archiveFileOf(repoRelative: string): string {
+  return path.join(testRootDir(), 'active/archive', ...repoRelative.split('/'));
 }
 
 /** AL-04: absolute path of a repo-relative path inside the trash tree. */
@@ -1747,6 +1762,284 @@ describe('storage-janitor', () => {
       expect(result.candidates).toHaveLength(0);
       expect(result.removed).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
+    });
+  });
+
+  /** MSN-LOG-STORE-HARDENING-20261016: append-only store maintenance (rotate/compact/archive). */
+  describe('sweepAppendOnlyStores', () => {
+    function observabilityDir(): string {
+      return path.join(path.dirname(tmpDir), 'observability');
+    }
+    function runtimeFile(rel: string): string {
+      return path.join(testRootDir(), 'active/shared/runtime', rel);
+    }
+
+    const appendOnlyCatalog = {
+      version: '1.10.0',
+      entries: [
+        {
+          path: 'active/shared/observability/metrics.jsonl',
+          artifact_class: 'log',
+          action: 'rotate',
+          rotate_min_bytes: 128,
+          ttl_days: 30,
+          audit: true,
+        },
+        {
+          path: 'active/shared/runtime/work-coordination/items.jsonl',
+          artifact_class: 'state',
+          action: 'compact',
+          compact_key: 'item_id',
+          compact_min_bytes: 64,
+          audit: true,
+        },
+      ],
+    };
+
+    it('rotates an oversized append-only file to a timestamped segment and audits it', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = path.join(observabilityDir(), 'metrics.jsonl');
+      writeFile(live, 'x'.repeat(200));
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.rotated).toContain(live);
+      expect(result.errors).toHaveLength(0);
+      expect(fs.existsSync(live)).toBe(false);
+      const segments = fs
+        .readdirSync(observabilityDir())
+        .filter((n) => /^metrics-\d{8}-\d{6}\.jsonl$/.test(n));
+      expect(segments).toHaveLength(1);
+      const audit = readRetentionAudit();
+      expect(
+        audit.some((r) => r.event === 'RETENTION_ROTATE' && r.path.endsWith('metrics.jsonl'))
+      ).toBe(true);
+    });
+
+    it('leaves an append-only file under the rotate threshold untouched', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = path.join(observabilityDir(), 'metrics.jsonl');
+      writeFile(live, 'small');
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.rotated).toHaveLength(0);
+      expect(fs.readFileSync(live, 'utf8')).toBe('small');
+    });
+
+    it('dry-run reports the rotation without mutating the file', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = path.join(observabilityDir(), 'metrics.jsonl');
+      writeFile(live, 'x'.repeat(200));
+
+      const result = sweepAppendOnlyStores({ dryRun: true });
+      expect(result.rotated).toContain(live);
+      expect(fs.existsSync(live)).toBe(true);
+      expect(fs.readdirSync(observabilityDir()).filter((n) => n.includes('-20'))).toHaveLength(0);
+    });
+
+    it('expires rotated segments older than the entry ttl_days', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const dir = observabilityDir();
+      const oldSegment = path.join(dir, 'metrics-20200101-000000.jsonl');
+      const freshSegment = path.join(dir, 'metrics-29990101-000000.jsonl');
+      writeFile(oldSegment);
+      writeFile(freshSegment);
+      setMtime(oldSegment, 31 * RETENTION_DAY_MS);
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.segmentsExpired).toContain(oldSegment);
+      expect(result.segmentsExpired).not.toContain(freshSegment);
+      expect(fs.existsSync(oldSegment)).toBe(false);
+      expect(fs.existsSync(freshSegment)).toBe(true);
+    });
+
+    it('archives expired segments instead of deleting when segment_action is archive', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/observability/audit-feed.jsonl',
+            artifact_class: 'evidence',
+            action: 'rotate',
+            rotate_min_bytes: 128,
+            ttl_days: 30,
+            segment_action: 'archive',
+          },
+        ],
+      });
+      const dir = observabilityDir();
+      const oldSegment = path.join(dir, 'audit-feed-20200101-000000.jsonl');
+      writeFile(oldSegment, 'evidence');
+      setMtime(oldSegment, 31 * RETENTION_DAY_MS);
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.segmentsArchived).toContain(oldSegment);
+      expect(fs.existsSync(oldSegment)).toBe(false);
+      const archivedCopy = archiveFileOf(
+        'active/shared/observability/audit-feed-20200101-000000.jsonl'
+      );
+      expect(fs.existsSync(archivedCopy)).toBe(true);
+      expect(fs.readFileSync(archivedCopy, 'utf8')).toBe('evidence');
+      const audit = readRetentionAudit();
+      expect(audit.some((r) => r.event === 'RETENTION_ARCHIVE')).toBe(true);
+    });
+
+    it('compacts a versioned keyed store to the last record per key and archives the original', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const lines = [
+        { item_id: 'a', version: 1, status: 'ready', pad: 'x'.repeat(40) },
+        { item_id: 'b', version: 1, status: 'ready', pad: 'y'.repeat(40) },
+        { item_id: 'a', version: 2, status: 'done', pad: 'z'.repeat(40) },
+      ];
+      writeFile(live, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.compacted).toContain(live);
+      const kept = fs
+        .readFileSync(live, 'utf8')
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l));
+      expect(kept).toHaveLength(2);
+      expect(kept.map((k) => k.item_id)).toEqual(['b', 'a']); // order of last appearance
+      expect(kept.find((k) => k.item_id === 'a')?.version).toBe(2);
+      // pre-compaction file archived under active/archive/jsonl-compaction/
+      const compactionArchive = path.join(
+        testRootDir(),
+        'active/archive/jsonl-compaction/active/shared/runtime/work-coordination'
+      );
+      const copies = fs.readdirSync(compactionArchive).filter((n) => n.startsWith('items.'));
+      expect(copies).toHaveLength(1);
+      expect(
+        fs.readFileSync(path.join(compactionArchive, copies[0]!), 'utf8').trim().split('\n')
+      ).toHaveLength(3);
+      const audit = readRetentionAudit();
+      const rec = audit.find((r) => r.event === 'RETENTION_COMPACT_ARCHIVE');
+      expect(rec?.before_lines).toBe(3);
+      expect(rec?.after_lines).toBe(2);
+    });
+
+    it('keeps records lacking the compact_key verbatim', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const lines = [
+        { item_id: 'a', version: 1, pad: 'x'.repeat(40) },
+        { note: 'keyless header record', pad: 'y'.repeat(40) },
+        { item_id: 'a', version: 2, pad: 'z'.repeat(40) },
+      ];
+      writeFile(live, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      const kept = fs
+        .readFileSync(live, 'utf8')
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l));
+      expect(result.compacted).toContain(live);
+      expect(kept.some((k) => k.note === 'keyless header record')).toBe(true);
+    });
+
+    it('skips compaction when the file is under compact_min_bytes', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      writeFile(live, JSON.stringify({ item_id: 'a', version: 1 }) + '\n');
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.compacted).toHaveLength(0);
+    });
+
+    it('rejects a compact entry without compact_key at catalog load (fail-safe fallback)', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/bad.jsonl',
+            artifact_class: 'state',
+            action: 'compact',
+          },
+        ],
+      });
+      const catalog = loadRetentionCatalog();
+      expect(catalog.source).toBe('builtin-defaults');
+      expect(catalog.warnings.length).toBeGreaterThan(0);
+      const r = sweepAppendOnlyStores({ dryRun: false, catalog });
+      expect(r.rotated).toHaveLength(0);
+      expect(r.compacted).toHaveLength(0);
+    });
+  });
+
+  /** MSN-LOG-STORE-HARDENING-20261016: archive action on the audit stream. */
+  describe('archive action (logs/audit)', () => {
+    it('moves expired audit files to active/archive/ instead of deleting them', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs',
+            artifact_class: 'log',
+            ttl_days: 30,
+            action: 'delete',
+          },
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 60,
+            action: 'archive',
+            audit: true,
+          },
+        ],
+      });
+      const auditDir = path.join(logsDir, 'audit');
+      const oldAudit = path.join(auditDir, 'audit-2026-01-01.jsonl');
+      const oldTrace = path.join(logsDir, 'traces', 'traces-2026-01-01.jsonl');
+      writeFile(oldAudit, 'audit-record');
+      writeFile(oldTrace, 'trace-record');
+      // 45d old: past the logs-root 30d TTL, within the audit 90d... use 65d to exceed audit TTL too.
+      setMtime(oldAudit, 65 * RETENTION_DAY_MS);
+      setMtime(oldTrace, 65 * RETENTION_DAY_MS);
+
+      const result = rotateLogs({ dryRun: false });
+      // audit file: archived, not deleted
+      expect(result.archived).toContain(oldAudit);
+      expect(result.rotated).not.toContain(oldAudit);
+      expect(fs.existsSync(oldAudit)).toBe(false);
+      const archivedCopy = archiveFileOf('active/shared/logs/audit/audit-2026-01-01.jsonl');
+      expect(fs.existsSync(archivedCopy)).toBe(true);
+      expect(fs.readFileSync(archivedCopy, 'utf8')).toBe('audit-record');
+      // non-audit log file: still deleted under the logs-root entry
+      expect(result.rotated).toContain(oldTrace);
+      expect(fs.existsSync(oldTrace)).toBe(false);
+      const audit = readRetentionAudit();
+      expect(
+        audit.some((r) => r.event === 'RETENTION_ARCHIVE' && r.path.includes('audit-2026-01-01'))
+      ).toBe(true);
+    });
+
+    it('keeps audit files younger than the audit TTL even when past the logs TTL', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs',
+            artifact_class: 'log',
+            ttl_days: 30,
+            action: 'delete',
+          },
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 90,
+            action: 'archive',
+          },
+        ],
+      });
+      const oldAudit = path.join(logsDir, 'audit', 'audit-2026-09-01.jsonl');
+      writeFile(oldAudit);
+      setMtime(oldAudit, 45 * RETENTION_DAY_MS); // >30d but <90d
+
+      const result = rotateLogs({ dryRun: false });
+      expect(result.expired).not.toContain(oldAudit);
+      expect(fs.existsSync(oldAudit)).toBe(true);
     });
   });
 });
