@@ -3195,6 +3195,30 @@
       "native_help": true
     },
     {
+      "id": "script.scheduler.start",
+      "module": "scripts/install_chronos_launchd.ts",
+      "args": ["--start"],
+      "command": "scheduler start",
+      "noun": "scheduler",
+      "verb": "start",
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_start",
+      "group": "operate",
+      "native_help": true
+    },
+    {
+      "id": "script.scheduler.stop",
+      "module": "scripts/install_chronos_launchd.ts",
+      "args": ["--stop"],
+      "command": "scheduler stop",
+      "noun": "scheduler",
+      "verb": "stop",
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_stop",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.scheduler.restart",
       "module": "scripts/install_chronos_launchd.ts",
       "args": ["--restart"],

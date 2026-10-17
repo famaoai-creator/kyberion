@@ -606,7 +606,10 @@ export type DesktopObservationHostProbe = Pick<
 > & { sourceAvailability?: Partial<Record<DesktopObservationSource['id'], boolean>> };
 
 export function assessDesktopObservationReadiness(
-  probe: DesktopObservationHostProbe
+  probe: DesktopObservationHostProbe,
+  sourceReadiness: Partial<
+    Record<DesktopObservationSource['id'], { available: boolean; reason: string }>
+  > = {}
 ): DesktopObservationReadiness[] {
   return DESKTOP_OBSERVATION_SOURCES.map((source) => {
     if (source.permission === 'none') {
@@ -616,6 +619,8 @@ export function assessDesktopObservationReadiness(
         reason: 'permission_not_required',
       };
     }
+    const platformReadiness = sourceReadiness[source.id];
+    if (platformReadiness) return { source_id: source.id, ...platformReadiness };
     if (probe.platform === 'win32') {
       const available = probe.sourceAvailability?.[source.id] === true;
       return {
@@ -653,10 +658,15 @@ export function assessDesktopObservationReadiness(
 }
 
 /** The baseline uses this shared report builder so per-source results are retained. */
-export function buildDesktopObservationReport<T extends DesktopObservationHostProbe>(probe: T) {
+export function buildDesktopObservationReport<T extends DesktopObservationHostProbe>(
+  probe: T,
+  sourceReadiness: Partial<
+    Record<DesktopObservationSource['id'], { available: boolean; reason: string }>
+  > = {}
+) {
   return {
     registry: listDesktopObservationSources(),
-    readiness: assessDesktopObservationReadiness(probe),
+    readiness: assessDesktopObservationReadiness(probe, sourceReadiness),
     bridge: probe,
     data_tier_note: 'observation_tier is separate from personal/confidential/public data tier',
   };
