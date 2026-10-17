@@ -72,6 +72,7 @@
 - [Decision-Support Design Rationale](./product/architecture/decision-support-design-rationale.md) (public | famao)
 - [Default-disabled HTTP MCP human request resource server](./product/architecture/mcp-http-human-requests.md) (public | Unknown)
 - [Discussion Room — facilitated multi-agent discussion](./product/architecture/discussion-room.md) (public | Ecosystem Architect)
+- [Dot-Initiated Workflow — observation → claim → execution → learning](./product/architecture/dot-initiated-workflow.md) (public | Unknown)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
 - [Existing front-desk navigation](./product/architecture/front-desk-navigation.md) (public | Unknown)
