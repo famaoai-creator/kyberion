@@ -48,7 +48,13 @@
   "authority": {
     "authority_role": "organization_operator",
     "allowed_work_shapes": ["direct_reply", "pipeline", "mission"],
-    "max_concurrent_delegations": 1
+    "max_concurrent_delegations": 1,
+    "allowed_pipelines": [
+      "pipelines/ops-health-probe.json",
+      "pipelines/knowledge-hygiene-probe.json",
+      "pipelines/storage-janitor.json",
+      "pipelines/baseline-check.json"
+    ]
   },
   "decisions": {
     "default_decision": "notify",
@@ -74,8 +80,14 @@
   },
   "operations_cadence": {
     "tick_every_minutes": 15,
-    "standup": { "cron": "45 8 * * 1-5", "timezone": "Asia/Tokyo" },
-    "retro": { "cron": "0 17 * * 5", "timezone": "Asia/Tokyo" }
+    "standup": {
+      "cron": "45 8 * * 1-5",
+      "timezone": "Asia/Tokyo"
+    },
+    "retro": {
+      "cron": "0 17 * * 5",
+      "timezone": "Asia/Tokyo"
+    }
   },
   "runtime": {
     "heartbeat_id": "dot-org-operations",
