@@ -199,16 +199,18 @@ The generated `source-test-scenarios.json` may be run after review. Tests with a
 
 Routine cron-driven maintenance. Schedules are registered with chronos.
 
-| Pipeline               | Description                                                                                                                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `backup-daily`         | Creates an encrypted daily Kyberion state snapshot. Schedule: `15 3 * * *`.                                                                                                                                                     |
-| `backup-restore-drill` | Monthly restore drill for OP-02. Restores the latest backup archive into a disposable target and reports whether the archive can be decrypted and extracted. Schedule: `45 3 1 * *`.                                            |
-| `ops-health-probe`     | Daily anomaly detection (store overgrowth, alert dominance, uncovered stores) filing deduplicated WorkItems — autonomous improvement loop stage 1+2. Schedule: `45 4 * * *`.                                                    |
-| `storage-janitor`      | Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage-janitor.ts. Schedule: `30 4 * * *`.                                                           |
-| `volatile-gc`          | Volatile Knowledge Layer GC — single working-memory:run-gc op that scans all *.volatile.json sidecars, expires ttl/session faces, rolls over daily TODO items, and writes a summary to active/shared/... Schedule: `0 4 * * *`. |
-| `volatile-index`       | Volatile Knowledge Layer — regenerates active/INDEX.volatile.{md,json} by scanning all *.volatile.json sidecars. Schedule: `0 5 * * *`.                                                                                         |
-| `daily-routine`        | Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md. Schedule: `0 6 * * *`.                                                                                  |
-| `weekly-review`        | Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/. Schedule: `0 7 * * 1`.                                       |
+| Pipeline               | Description                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `backup-daily`         | Creates an encrypted daily Kyberion state snapshot. Schedule: `15 3 * * *`.                                                                                                          |
+| `backup-restore-drill` | Monthly restore drill for OP-02. Restores the latest backup archive into a disposable target and reports whether the archive can be decrypted and extracted. Schedule: `45 3 1 * *`. |
+| `ops-health-probe`     | Daily anomaly detection (store overgrowth, alert dominance, uncovered stores) filing deduplicated WorkItems — autonomous improvement loop stage 1+2. Schedule: `45 4 * * *`.         |
+
+- `knowledge-hygiene-probe.json` — daily autonomous knowledge-hygiene sweep (duplicate/stale/conflicting promotion candidates → findings + org-operations WorkItems)
+  | `storage-janitor` | Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage-janitor.ts. Schedule: `30 4 * * *`. |
+  | `volatile-gc` | Volatile Knowledge Layer GC — single working-memory:run-gc op that scans all *.volatile.json sidecars, expires ttl/session faces, rolls over daily TODO items, and writes a summary to active/shared/... Schedule: `0 4 * * *`. |
+  | `volatile-index` | Volatile Knowledge Layer — regenerates active/INDEX.volatile.{md,json} by scanning all *.volatile.json sidecars. Schedule: `0 5 * * *`. |
+  | `daily-routine` | Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md. Schedule: `0 6 * * *`. |
+  | `weekly-review` | Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/. Schedule: `0 7 * * 1`. |
 
 ### Meeting & Voice
 

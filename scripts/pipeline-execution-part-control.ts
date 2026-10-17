@@ -607,6 +607,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOpsHealthProbe(step, params, ctx);
   },
+  'core:run_knowledge_hygiene_probe': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineKnowledgeHygieneProbe(step, params, ctx);
+  },
   'core:run_ui_ux_governance': async (dctx) => {
     const { step, params, ctx } = dctx;
 
