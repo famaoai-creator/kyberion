@@ -1,6 +1,6 @@
 {
   "actuator_id": "data-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Offline deterministic tabular data ops over local JSON/CSV files (query, filter, join, aggregate)",
   "contract_schema": "knowledge/product/schemas/data-action.schema.json",
   "resilience_tier": "none",

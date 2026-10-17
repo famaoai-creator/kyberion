@@ -1,6 +1,6 @@
 {
   "actuator_id": "build-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop",
   "contract_schema": "knowledge/product/schemas/build-pipeline.schema.json",
   "resilience_tier": "fail_fast",

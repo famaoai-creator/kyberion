@@ -3386,7 +3386,37 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "authenticate_selector": {
+                "type": "string"
+              },
+              "clear_session": {
+                "type": "boolean"
+              },
               "export_as": {
+                "type": "string"
+              },
+              "navigate": {
+                "type": "boolean"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "username_selector": {
+                "type": "string"
+              },
+              "wait_ms": {
+                "type": "number"
+              },
+              "waitUntil": {
                 "type": "string"
               }
             },
@@ -3554,7 +3584,13 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "credential_id": {
+                "type": "string"
+              },
               "export_as": {
+                "type": "string"
+              },
+              "username": {
                 "type": "string"
               }
             },
@@ -3744,6 +3780,9 @@
             "properties": {
               "export_as": {
                 "type": "string"
+              },
+              "provider": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -3914,7 +3953,66 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "automatic_presence": {
+                "type": "boolean"
+              },
+              "enable_ui": {
+                "type": "boolean"
+              },
               "export_as": {
+                "type": "string"
+              },
+              "has_large_blob": {
+                "type": "boolean"
+              },
+              "has_resident_key": {
+                "type": "boolean"
+              },
+              "has_user_verification": {
+                "type": "boolean"
+              },
+              "navigate": {
+                "type": "boolean"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": ["ctap2", "u2f"]
+              },
+              "provider": {
+                "type": "string"
+              },
+              "register_selector": {
+                "type": "string"
+              },
+              "replace_existing": {
+                "type": "boolean"
+              },
+              "setup_authenticator": {
+                "type": "boolean"
+              },
+              "timeout": {
+                "type": "number"
+              },
+              "transport": {
+                "type": "string",
+                "enum": ["usb", "nfc", "ble", "internal"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "user_verified": {
+                "type": "boolean"
+              },
+              "username": {
+                "type": "string"
+              },
+              "username_selector": {
+                "type": "string"
+              },
+              "wait_ms": {
+                "type": "number"
+              },
+              "waitUntil": {
                 "type": "string"
               }
             },

@@ -1,6 +1,6 @@
 {
   "actuator_id": "scheduler-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads.",
   "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
   "resilience_tier": "adaptive_retry",

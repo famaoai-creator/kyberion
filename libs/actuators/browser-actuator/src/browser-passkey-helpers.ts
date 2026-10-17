@@ -455,6 +455,9 @@ export async function deletePasskey(
 
 async function clearPasskeySiteSession(runtime: BrowserRuntime, page: Page): Promise<void> {
   await runtime.context.clearCookies();
+  // Web storage exists only on http(s) documents; about:blank and friends
+  // throw SecurityError on access.
+  if (!/^https?:/i.test(page.url())) return;
   await page.evaluate(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
