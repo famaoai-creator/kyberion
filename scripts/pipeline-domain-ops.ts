@@ -14,6 +14,7 @@ import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
+import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch_tenant_drift.js';
@@ -333,6 +334,26 @@ export function runInlineHealthDegradationWatch(
 ): Record<string, unknown> {
   const result = runHealthDegradationWatch();
   return exportValue(params, step, { ...result.report, alert_id: result.alert?.id ?? null }, ctx);
+}
+
+export function runInlineKnowledgeHygieneProbe(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const result = runKnowledgeHygieneProbe({
+    fileWorkItems: params.file_work_items === true || params.file_work_items === 'true',
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      findings: result.findings.length,
+      work_items_filed: result.work_items_filed.length,
+      items: result.findings.map((f) => `${f.severity}: ${f.summary}`),
+    },
+    ctx
+  );
 }
 
 export function runInlineOpsHealthProbe(
