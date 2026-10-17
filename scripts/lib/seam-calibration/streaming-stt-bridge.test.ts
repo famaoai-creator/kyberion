@@ -103,4 +103,19 @@ describe('streaming-stt-bridge calibration adapter', () => {
     );
     expect(result).toEqual({ ok: false, error: 'bridge produced no final transcript' });
   });
+
+  it('passes the requested language to the selected bridge for execution', async () => {
+    const bridge = echoBridge('mlx_whisper', 'hello', []);
+    const transcribeStream = vi.fn<StreamingBridge['transcribeStream']>(
+      bridge.transcribeStream.bind(bridge)
+    );
+    registerStreamingSttBridge('mlx_whisper', () => ({ ...bridge, transcribeStream }));
+    const result = await adapter.runTrial(
+      'mlx_whisper',
+      { audio_path: wavPath, language: 'en-US' },
+      { outDir: dir, repeat: 0 }
+    );
+    expect(result.ok).toBe(true);
+    expect(transcribeStream).toHaveBeenCalledWith(expect.anything(), { language: 'en-US' });
+  });
 });

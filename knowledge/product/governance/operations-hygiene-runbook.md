@@ -157,6 +157,16 @@ generation-schedule, bridges.
   arm a kill timer. Always attach an `'error'` listener: an `ENOENT` without one crashes the process.
 - Probes of external CLIs (`--version`, keychain, osascript) are bounded at about 10 s. Report a
   timeout as "unavailable (timed out)", never as a hang.
+- **Streaming completion includes output drain.** A child's `exit` does not mean stdout has
+  reached EOF. STT/TTS adapters finish on `close`, drain queued output on successful completion,
+  and propagate nonzero exits, spawn failures and input-pump errors to the async consumer,
+  including a consumer already waiting for its next chunk. Regression gates:
+  `shell-streaming-stt-bridge.boundary.test.ts` and `shell-streaming-tts-bridge.test.ts` use real
+  subprocesses and delay consumption until the worker exits.
+- **Selection requirements reach execution.** Streaming STT forwards the requested language per
+  transcription through normal, replay, barge-in and calibration paths; shell adapters translate
+  it into the worker environment without mutating process-wide defaults. Gate this with the
+  realtime loop, calibration and shell STT regression tests.
 
 **Surface result receipts.** A zero exit code or a human-readable success marker is not proof of
 completion. Before projecting a child result into a user-facing success or duplicate status,

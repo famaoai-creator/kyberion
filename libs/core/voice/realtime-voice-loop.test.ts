@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   describeRealtimeVoiceLoopEvent,
@@ -189,6 +189,8 @@ describe('realtime voice loop', () => {
   it('uses streaming STT finals when a bridge is provided', { timeout: 60_000 }, async () => {
     const turns: RealtimeVoiceLoopTurnResult[] = [];
     let batchCalls = 0;
+    const stub = new StubStreamingSpeechToTextBridge(2);
+    const transcribeStream = vi.fn(stub.transcribeStream.bind(stub));
 
     const handle = await startRealtimeVoiceLoop({
       recordingDir: testDir,
@@ -196,7 +198,8 @@ describe('realtime voice loop', () => {
       mic: { command: twoUtteranceCommand(), sampleRateHz: 16000, chunkMs: 100 },
       vad: { rmsThreshold: 800, endpointMs: 700 },
       maxTurns: 1,
-      streamingStt: new StubStreamingSpeechToTextBridge(2),
+      language: 'en-US',
+      streamingStt: { bridge_id: 'stub', transcribeStream },
       transcribe: async () => {
         batchCalls += 1;
         return 'batch-fallback';
@@ -214,6 +217,45 @@ describe('realtime voice loop', () => {
     expect(turns[0].stt_mode).toBe('streaming');
     expect(turns[0].user_text).toMatch(/stub-utterance/);
     expect(batchCalls).toBe(0);
+    expect(transcribeStream).toHaveBeenCalledWith(expect.anything(), { language: 'en-US' });
+  });
+
+  it('falls back to batch when streaming STT fails after emitting a final', async () => {
+    const turns: RealtimeVoiceLoopTurnResult[] = [];
+    const transcribe = vi.fn(async () => 'complete batch transcript');
+    const handle = await startRealtimeVoiceLoop({
+      recordingDir: testDir,
+      consent: { requireRecordingConsent: false },
+      mic: { command: twoUtteranceCommand(), sampleRateHz: 16000, chunkMs: 100 },
+      vad: { rmsThreshold: 800, endpointMs: 700 },
+      maxTurns: 1,
+      streamingStt: {
+        bridge_id: 'failed-worker',
+        async *transcribeStream(audio) {
+          for await (const _ of audio) {
+            yield {
+              utterance_id: 'incomplete',
+              is_final: true,
+              text: 'truncated result',
+              emitted_at: '',
+            };
+            throw new Error('STT worker exited with code 7');
+          }
+        },
+      },
+      transcribe,
+      reply: async () => '了解です。',
+      synthesizeSegment: async () => '/tmp/fake.wav',
+      play: () => immediateHandle(),
+      onTurn: (turn) => {
+        turns.push(turn);
+      },
+    });
+    const report = await handle.done;
+    expect(report.turns_completed).toBe(1);
+    expect(transcribe).toHaveBeenCalledTimes(1);
+    expect(turns[0].stt_mode).toBe('batch');
+    expect(turns[0].user_text).toBe('complete batch transcript');
   });
 
   it('keeps capture identities unique when an empty transcript is skipped', async () => {

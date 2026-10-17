@@ -20,6 +20,7 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import { logger } from '../core.js';
 import { buildSafeExecEnv } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
@@ -32,8 +33,9 @@ import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
   type StreamingSttCapabilities,
+  type StreamingSttRequestOptions,
 } from '../voice/streaming-stt-bridge.js';
-import { WHISPER_LANGUAGES } from '../voice/speech-languages.js';
+import { primaryLanguageSubtag, WHISPER_LANGUAGES } from '../voice/speech-languages.js';
 import type { AudioChunk, TranscriptChunk } from '../meeting/meeting-session-types.js';
 
 export interface ShellStreamingSttOptions {
@@ -80,11 +82,18 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
     this.bridge_id = opts.bridge_id;
   }
 
-  async *transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<TranscriptChunk> {
+  async *transcribeStream(
+    audio: AsyncIterable<AudioChunk>,
+    options: StreamingSttRequestOptions = {}
+  ): AsyncIterable<TranscriptChunk> {
     const command = validateShellCommand(this.opts.command);
+    const language = primaryLanguageSubtag(options.language);
     const proc: ChildProcessWithoutNullStreams = spawn(command, [...(this.opts.args ?? [])], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildSafeExecEnv(this.opts.env),
+      env: buildSafeExecEnv({
+        ...this.opts.env,
+        ...(language ? { KYBERION_STT_LANGUAGE: language } : {}),
+      }),
     });
     let stderrTail = '';
     proc.stderr.on('data', (buf) => {
@@ -93,44 +102,60 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
     });
 
     const queue: TranscriptChunk[] = [];
-    const resolvers: Array<(c: TranscriptChunk | null) => void> = [];
+    let notify: (() => void) | undefined;
     let stdoutBuffer = '';
+    const decoder = new StringDecoder('utf8');
     let drained = false;
+    let failure: Error | undefined;
+    const wake = () => {
+      notify?.();
+      notify = undefined;
+    };
+    const fail = (error: unknown) => {
+      failure ??= error instanceof Error ? error : new Error(String(error));
+      drained = true;
+      wake();
+      terminateProcess(proc);
+    };
+    const enqueueLine = (line: string) => {
+      if (!line.trim()) return;
+      try {
+        const chunk = parseShellStreamingSttTranscript(line.trim());
+        if (chunk) queue.push(chunk);
+        wake();
+      } catch (err: unknown) {
+        logger.warn(
+          `[shell-stt] non-JSON stdout: ${err instanceof Error ? err.message : String(err)}; line="${line.slice(0, 200)}"`
+        );
+      }
+    };
 
     proc.stdout.on('data', (buf) => {
-      stdoutBuffer += buf.toString('utf8');
+      stdoutBuffer += decoder.write(buf);
       let nl: number;
       while ((nl = stdoutBuffer.indexOf('\n')) >= 0) {
         const line = stdoutBuffer.slice(0, nl).trim();
         stdoutBuffer = stdoutBuffer.slice(nl + 1);
-        if (!line) continue;
-        try {
-          const chunk = parseShellStreamingSttTranscript(line);
-          if (!chunk) continue;
-          if (resolvers.length) resolvers.shift()!(chunk);
-          else queue.push(chunk);
-        } catch (err: any) {
-          logger.warn(
-            `[shell-stt] non-JSON stdout: ${err?.message ?? err}; line="${line.slice(0, 200)}"`
-          );
-        }
+        enqueueLine(line);
       }
     });
     const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
+      stdoutBuffer += decoder.end();
+      enqueueLine(stdoutBuffer);
+      stdoutBuffer = '';
       if (code !== 0) {
-        logger.warn(
-          `[shell-stt] command "${command}" exited code=${String(code)} signal=${String(signal)} stderr_tail=${stderrTail.slice(-256)}`
+        failure ??= new Error(
+          `shell STT exited with code ${String(code)} signal=${String(signal)} stderr_tail=${stderrTail.slice(-256)}`
         );
       }
       drained = true;
-      while (resolvers.length) resolvers.shift()!(null);
+      wake();
     };
-    proc.on('exit', finish);
-    proc.on('error', (error) => {
-      drained = true;
-      while (resolvers.length) resolvers.shift()!(null);
-      logger.warn(`[shell-stt] command failed: ${error.message}`);
-    });
+    // close follows stdout EOF; exit alone can precede the last transcript bytes.
+    proc.on('close', finish);
+    proc.on('error', fail);
+    proc.stdout.on('error', fail);
+    proc.stdin.on('error', fail);
 
     // Pump audio into stdin in the background.
     void (async () => {
@@ -142,23 +167,24 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
       } finally {
         proc.stdin.end();
       }
-    })();
+    })().catch(fail);
 
     // Yield transcript chunks as they arrive.
     try {
-      while (!drained) {
+      for (;;) {
         if (queue.length) {
           yield queue.shift()!;
           continue;
         }
-        const next = await new Promise<TranscriptChunk | null>((resolve) => {
-          resolvers.push(resolve);
+        if (failure) throw failure;
+        if (drained) return;
+        await new Promise<void>((resolve) => {
+          notify = resolve;
         });
-        if (next === null) return;
-        yield next;
       }
     } finally {
-      if (!drained) terminateProcess(proc);
+      drained = true;
+      terminateProcess(proc);
     }
   }
 }

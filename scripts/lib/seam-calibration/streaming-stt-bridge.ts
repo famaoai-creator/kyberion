@@ -145,7 +145,8 @@ export const streamingSttBridgeCalibrationAdapter: SeamCalibrationAdapter<Stream
       const bridge = getStreamingSttBridge(providerId);
       const finals: string[] = [];
       for await (const chunk of bridge.transcribeStream(
-        toAsync(pcmChunks(decoded, input.chunk_ms ?? 100))
+        toAsync(pcmChunks(decoded, input.chunk_ms ?? 100)),
+        { language: input.language }
       )) {
         if (chunk.is_final && chunk.text.trim()) finals.push(chunk.text.trim());
       }
