@@ -7551,6 +7551,10 @@
     "./governance/autonomy-action-state": {
       "types": "./dist/governance/autonomy-action-state.d.ts",
       "default": "./dist/governance/autonomy-action-state.js"
+    },
+    "./knowledge/knowledge-hygiene-probe": {
+      "types": "./dist/knowledge/knowledge-hygiene-probe.d.ts",
+      "default": "./dist/knowledge/knowledge-hygiene-probe.js"
     }
   },
   "dependencies": {

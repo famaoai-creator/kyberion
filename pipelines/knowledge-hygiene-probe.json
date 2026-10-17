@@ -1,0 +1,40 @@
+{
+  "action": "pipeline",
+  "name": "knowledge-hygiene-probe",
+  "version": "1.0.0",
+  "description": "Daily autonomous knowledge-hygiene sweep — duplicate promotion candidates, 14d-stale queued items, and record conflicts surface as ops-findings + org-operations WorkItems so the knowledge base self-maintains.",
+  "_refs": {
+    "implementation": "libs/core/knowledge/knowledge-hygiene-probe.ts"
+  },
+  "context": {
+    "file_work_items": true
+  },
+  "schedule": {
+    "id": "knowledge-hygiene-probe-daily",
+    "cron": "5 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "probe",
+      "role": "source",
+      "op": "core:run_knowledge_hygiene_probe",
+      "produces": {
+        "channel": "knowledge_hygiene",
+        "type": "Json"
+      },
+      "params": {
+        "file_work_items": "{{file_work_items}}"
+      }
+    },
+    {
+      "id": "log_findings",
+      "op": "system:log",
+      "consumes": "knowledge_hygiene",
+      "params": {
+        "message": "knowledge-hygiene: {{knowledge_hygiene.findings}} finding(s), {{knowledge_hygiene.work_items_filed}} work item(s) filed"
+      }
+    }
+  ]
+}

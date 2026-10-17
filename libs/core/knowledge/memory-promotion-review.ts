@@ -1,3 +1,4 @@
+import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { auditChain } from '../governance/audit-chain.js';
@@ -46,6 +47,7 @@ export interface MemoryPromotionReview {
   candidate_id: string;
   review_status: MemoryPromotionReviewStatus;
   approval_required: boolean;
+  promotion_lane?: string;
   target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
   target_path: string;
   scope_key: string;
@@ -347,7 +349,10 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
     candidate,
     candidate_id: candidate.candidate_id,
     review_status: reviewStatus,
-    approval_required: candidate.ratification_required,
+    approval_required:
+      candidate.ratification_required &&
+      !laneApprovesWithoutSteward(candidate, group.length).approves,
+    promotion_lane: laneApprovesWithoutSteward(candidate, group.length).lane,
     target_kind: kind,
     target_path: targetPath,
     scope_key: scopeKey(candidate),

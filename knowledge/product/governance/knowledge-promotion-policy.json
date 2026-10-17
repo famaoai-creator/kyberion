@@ -1,0 +1,19 @@
+{
+  "$schema": "../schemas/knowledge-promotion-policy.schema.json",
+  "version": "1.0.0",
+  "lanes": {
+    "knowledge_hint": "auto",
+    "pattern": "evidence_gated",
+    "procedure": "evidence_gated",
+    "sop_candidate": "pr_review",
+    "report_template": "pr_review"
+  },
+  "auto_guards": {
+    "require_public_tier": true,
+    "forbidden_content_patterns": ["api[_-]?key", "secret", "token", "password", "credential"],
+    "max_summary_chars": 2000
+  },
+  "evidence_thresholds": {
+    "min_recurrence": 3
+  }
+}
