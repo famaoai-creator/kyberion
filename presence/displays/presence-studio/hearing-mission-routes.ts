@@ -43,14 +43,11 @@ import {
   requirePresenceStudioLocalAdmin,
 } from './security.js';
 import {
-  hearingNamespace,
-  loadHearingRecord,
   assertHearingEditable,
-  reserveHearingHandoff,
-  finishHearingHandoff,
   HearingConflictError,
   assertHearingHandoffReplay,
 } from './hearing-runtime.js';
+import { hearingStorageForViewer } from './hearing-storage-access.js';
 import type { HearingDecidedBy, HearingRecord } from './hearing.js';
 import {
   buildHearingMissionCreateArgs,
@@ -182,13 +179,11 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingMissionSessionId(req);
-      const namespace = hearingNamespace(viewer.tenantSlugs);
+      const storage = hearingStorageForViewer(viewer);
+      const namespace = storage.namespace;
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
 
-      const record = loadHearingRecord(
-        namespace,
-        sessionId
-      ) as HearingRecordWithMissionHandoff | null;
+      const record = storage.load(sessionId) as HearingRecordWithMissionHandoff | null;
       if (!record) {
         throw new HearingMissionRequestError(409, 'Hearing record does not exist yet.');
       }
@@ -272,7 +267,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         tier: 'confidential',
         decidedBy,
       });
-      const reserved = reserveHearingHandoff(namespace, record, 'mission', nowIso());
+      const reserved = storage.reserve(record, 'mission', nowIso());
       effectReserved = true;
       const createResult = safeExecResult(process.execPath, [CONTROLLER_RELATIVE, ...createArgs], {
         env: buildExecutionEnv(process.env, 'mission_controller'),
@@ -333,7 +328,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         approval_request_id: approvalRequestId,
         handed_off_at: nowIso(),
       };
-      finishHearingHandoff(namespace, reserved, patch);
+      storage.finish(reserved, patch);
 
       res.status(200).json({
         ok: true,

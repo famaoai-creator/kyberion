@@ -1919,7 +1919,17 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/hearing-routes.ts#hearingDecisionActor",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/hearing-routes.ts#registerHearingRoutes",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/hearing-storage-access.ts#hearingStorageForViewer",
       "roles": ["ecosystem_architect"],
       "unresolved": []
     },
