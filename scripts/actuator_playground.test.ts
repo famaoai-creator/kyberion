@@ -104,7 +104,7 @@ describe('actuator playground JSON input boundary', () => {
     expect(apply).toMatchObject({
       handler: 'skipped',
       handler_invoked: false,
-      kind: 'apply',
+      kind: 'transform',
     });
   });
 

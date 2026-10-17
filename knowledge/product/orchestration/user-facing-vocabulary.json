@@ -8248,6 +8248,11 @@
         "ja": "Telegram ブリッジを実行",
         "qps-ploc": "⟦Řůñ ŧħė Ŧėŀėɠřȧɱ ƀřïḓɠė ŀőřėɱ ï⟧"
       },
+      "cli_cmd_script_terminal": {
+        "en": "Drive persistent PTY sessions through the terminal daemon",
+        "ja": "永続 PTY セッションをターミナルデーモン経由で操作",
+        "qps-ploc": "⟦Ḓřïṽė ṗėřşïşŧėñŧ ṖŦẎ şėşşïőñş ŧħřőůɠħ ŧħė ŧėřɱïñȧŀ ḓȧėɱőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "cli_cmd_script_chronos_dev": {
         "en": "Run the Chronos UI dev server",
         "ja": "Chronos UI の開発サーバーを実行",

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-12T13:14:28.917Z",
+  "generated_at": "2026-10-17T17:41:31.862Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -53,7 +53,7 @@
     },
     {
       "actuator_id": "build-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": [
         "android_build",
         "android_bundle",
@@ -65,11 +65,11 @@
         "scaffold_app"
       ],
       "contract_schema": "knowledge/product/schemas/build-pipeline.schema.json",
-      "contract_schema_sha256": "afb709a1a661799377ba17dd47278923e886b4c333d9f48c58c6436a6fad09af"
+      "contract_schema_sha256": "ddd203afc64640a96870d97c9a25cef9274b3c4ba04ba9a11e264c8955916b03"
     },
     {
       "actuator_id": "calendar-actuator",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "ops": [
         "create_event",
         "delete_event",
@@ -80,7 +80,7 @@
         "update_event"
       ],
       "contract_schema": "knowledge/product/schemas/calendar-action.schema.json",
-      "contract_schema_sha256": "594cf86cf640687866670925b39d5ec47eabd8b7f75fc69be11d82a26ba4c252"
+      "contract_schema_sha256": "cdc07fbfdc9fcd141216ef541129b5ab2e7265a37368ffe638bb29219596c32f"
     },
     {
       "actuator_id": "code-actuator",
@@ -98,17 +98,17 @@
     },
     {
       "actuator_id": "data-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": ["aggregate", "filter", "join", "query"],
       "contract_schema": "knowledge/product/schemas/data-action.schema.json",
-      "contract_schema_sha256": "49281488f3b88557b79934b52a93db2f6a380d20127b71f0ca321e41de2fd929"
+      "contract_schema_sha256": "434514a7887476ac156a071090a39a8c4111f8f4166ea2cfef780d4322f1da71"
     },
     {
       "actuator_id": "deployment-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": ["deploy_release"],
       "contract_schema": "knowledge/product/schemas/deployment-action.schema.json",
-      "contract_schema_sha256": "f62f3467db3b6a978b2546ce604f631e91821246fef01994939a3757e6572a73"
+      "contract_schema_sha256": "4af8ff40d23e1aaf12da7bfedafb87ba124d821c0eac5dd572585694ddeffd52"
     },
     {
       "actuator_id": "email-actuator",
@@ -155,7 +155,7 @@
     },
     {
       "actuator_id": "media-generation-actuator",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "ops": [
         "capture_focused_window",
         "capture_screen",
@@ -164,14 +164,18 @@
         "generate_music",
         "generate_video",
         "get_generation_job",
+        "lyric_normalize",
+        "mv_compose",
+        "mv_storyboard",
         "pipeline",
         "record_screen",
         "run_workflow",
         "submit_generation",
+        "vocal_align",
         "wait_generation_job"
       ],
       "contract_schema": "knowledge/product/schemas/media-generation-action.schema.json",
-      "contract_schema_sha256": "1eea758a98caa8ce64b13db95f86f91b3e14b68843ca3fc4687bc32cc659cba2"
+      "contract_schema_sha256": "4227559c8766ec749d546c5baffaf7a53b6b4f00eafb8ecc38eb937f047fe7da"
     },
     {
       "actuator_id": "meeting-actuator",
@@ -244,10 +248,10 @@
     },
     {
       "actuator_id": "scheduler-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": ["cancel", "fire", "list", "schedule"],
       "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
-      "contract_schema_sha256": "3d40698a41a05524411ba2126147fa2b71bd2f5b3396efee2816f97f9677624f"
+      "contract_schema_sha256": "31eea99da9003f101ae099c4243f431402d635c7d2ec2f7372d5eb3603cd25bc"
     },
     {
       "actuator_id": "search-actuator",
@@ -322,7 +326,7 @@
     },
     {
       "actuator_id": "vcs-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": [
         "branch",
         "checkout",
@@ -343,7 +347,7 @@
         "worktree"
       ],
       "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
-      "contract_schema_sha256": "a5304515a3c3d3c5cef597ebe1a140ab22d2c715961deef883fb4efb990dea1f"
+      "contract_schema_sha256": "c0639596a199fdcfaf86f5e730dcbdcc85b34720481a4c466cabfa772ca37d69"
     },
     {
       "actuator_id": "video-composition-actuator",
@@ -400,7 +404,7 @@
     },
     {
       "actuator_id": "wisdom-actuator",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -485,11 +489,11 @@
         "yaml_update"
       ],
       "contract_schema": "knowledge/product/schemas/wisdom-action.schema.json",
-      "contract_schema_sha256": "32f42845f04cef60a76abed7ab1e8797107c18bc7f9dca6ecdbd717158f269da"
+      "contract_schema_sha256": "2c79e9c30454bd5a4d4c4ec1d7fa9256f72af7e0b98eaf6b9fe871c36f49efbb"
     },
     {
       "actuator_id": "working-memory-actuator",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "ops": [
         "add-action-item",
         "build-index",
@@ -508,7 +512,7 @@
         "weekly-open"
       ],
       "contract_schema": "knowledge/product/schemas/working-memory-action.schema.json",
-      "contract_schema_sha256": "d9083454951e877768a09b7d80fc42465236f16bc8f92058d949ab8a22e45c47"
+      "contract_schema_sha256": "58a2d9f05f8b9c7a9b42dc1ea47bc67ba1f01784fbf65913cfe2e6e33d870236"
     }
   ]
 }
