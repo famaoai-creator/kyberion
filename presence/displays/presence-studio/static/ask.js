@@ -83,38 +83,6 @@
     });
   }
 
-  // This deadline ends the browser wait, not server execution. Never auto-resend a POST.
-  function fetchConversationJson(options) {
-    return new Promise(function (resolve, reject) {
-      var controller = window.AbortController ? new window.AbortController() : null;
-      var settled = false;
-      function finish(error, result) {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        if (error) reject(error);
-        else resolve(result);
-      }
-      var timer = window.setTimeout(function () {
-        finish(new Error('Conversation result unconfirmed'));
-        if (controller) controller.abort();
-      }, 60000);
-      if (controller) options.signal = controller.signal;
-      Promise.resolve()
-        .then(function () {
-          return fetchJson('/api/conversation', options);
-        })
-        .then(
-          function (result) {
-            finish(null, result);
-          },
-          function (error) {
-            finish(error);
-          }
-        );
-    });
-  }
-
   var ICON_PATHS = {
     mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
     send: '<path d="M4 12l16-8-6 16-2-6z"/>',
@@ -221,6 +189,19 @@
     avatar: null,
   };
 
+  var activeSend = null;
+  var activeStartup = null;
+  function retireStartup() {
+    activeStartup = null;
+    state.startupReadPending = false;
+  }
+  function retireSend() {
+    var previous = activeSend;
+    activeSend = null;
+    state.sending = false;
+    if (previous && previous.cancel) previous.cancel();
+  }
+
   var readRecovery = window.KyberionAskReadRecovery.create({
     state: state,
     fetch: fetch,
@@ -230,6 +211,10 @@
     randomId: randomId,
     saveDraft: saveDraft,
     onHistoryReady: applyUrlPrefill,
+    retireSend: retireSend,
+    retireStartup: retireStartup,
+    restoreConversation: restoreConversation,
+    loadStartup: loadStartup,
     proposeDraft: proposeDraft,
     cancelDraftChoice: cancelDraftChoice,
     scopedUrl: scopedUrl,
@@ -238,6 +223,7 @@
     vt: vt,
   });
   var fetchReadJson = readRecovery.fetchJson;
+  var fetchConversationJson = readRecovery.fetchConversationJson;
   function restoreConversation(restoreDraft) {
     if (state.historyReadPending || state.sending) return Promise.resolve(false);
     if (nextActions) nextActions.retire();
@@ -516,7 +502,7 @@
     }
     state.focusedRequest = request;
     var target = document.getElementById('ask-turn-' + request + '-user');
-    if (match && target) {
+    if (match && target && !state.navigationResumed) {
       if (target.focus) target.focus({ preventScroll: true });
       if (target.scrollIntoView) target.scrollIntoView({ block: 'center' });
     }
@@ -1171,8 +1157,11 @@
     var sentScope = readRecovery.scopeSnapshot();
     var sentEpoch = state.draftScopeEpoch;
     var sentShell = window.FrontDeskRail && window.FrontDeskRail.ready;
+    var attempt = {};
+    activeSend = attempt;
     function currentSend() {
       return (
+        activeSend === attempt &&
         sentScope === readRecovery.scopeSnapshot() &&
         sentShell === (window.FrontDeskRail && window.FrontDeskRail.ready) &&
         state.draftShellReady !== false
@@ -1187,20 +1176,23 @@
     var tenant =
       window.KyberionPrefs && window.KyberionPrefs.tenant ? window.KyberionPrefs.tenant() : null;
     var selectedScope = new URL(window.location.href).searchParams;
-    fetchConversationJson({
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: trimmed,
-        locale: state.locale,
-        conversation_id: state.conversationId,
-        request_id: request.id,
-        request_created_at: request.createdAt,
-        tenant: tenant || undefined,
-        organizationId: selectedScope.get('organizationId') || undefined,
-        projectId: selectedScope.get('projectId') || undefined,
-      }),
-    })
+    fetchConversationJson(
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: trimmed,
+          locale: state.locale,
+          conversation_id: state.conversationId,
+          request_id: request.id,
+          request_created_at: request.createdAt,
+          tenant: tenant || undefined,
+          organizationId: selectedScope.get('organizationId') || undefined,
+          projectId: selectedScope.get('projectId') || undefined,
+        }),
+      },
+      attempt
+    )
       .then(function (result) {
         if (!currentSend()) return;
         var body = result.body || {};
@@ -1277,6 +1269,8 @@
         state.errorKey = 'concierge:dock.history.pending';
       })
       .finally(function () {
+        if (activeSend !== attempt) return;
+        activeSend = null;
         state.sending = false;
         render();
       });
@@ -1564,11 +1558,15 @@
 
   function loadStartup() {
     if (state.vocabularyReady || state.startupReadPending) return;
+    var attempt = {};
+    activeStartup = attempt;
     state.startupReadPending = true;
     renderStartup();
     var ready = window.FrontDeskRail && window.FrontDeskRail.ready;
     function currentShell() {
-      return !window.FrontDeskRail || ready === window.FrontDeskRail.ready;
+      return (
+        activeStartup === attempt && (!window.FrontDeskRail || ready === window.FrontDeskRail.ready)
+      );
     }
     return Promise.resolve(ready)
       .then(function () {
