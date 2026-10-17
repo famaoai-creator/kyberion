@@ -207,6 +207,104 @@ status: active
 - 分類はレビュー前提の初期版であり、組織の解釈（例: meeting を organization と見るか personal と見るか）で
   変わりうる。変更はレジストリの `reason` を更新して行う。
 
+## 8. Fragments 調査 — `pipelines/fragments/` 78 本
+
+fragments は再利用可能な ADF ステップ群で、`core:include`（`params.fragment` / `ref`）から
+`fragments/<name>.json` として展開される。単独ではスケジュールされず、`_` 接頭辞は
+テスト fixture / partial として chronos がスキップする。
+
+### 8.1 まず分かったこと: fragments は「入口なし」を検出できない
+
+| ゲート | fragments の扱い |
+| --- | --- |
+| `orphans`（OW-07） | **対象外**。検査は `^pipelines/[^/]+\.json$` のみで、`fragments/` は見ない |
+| `pipeline-shell-independence` | 走査対象（shell 依存の検査のみ） |
+| `script-integrity` | 走査対象（`dist/scripts/*.js` の死参照検出のみ） |
+| ADF 構造検証 | `libs/core/pipeline/pipeline-fragments-catalog.test.ts` が **8 本だけ** `previewPipeline` で検証 |
+
+つまり「どの pipeline からも include されていない fragment」「参照先が消えた include」は
+**どのゲートでも検出されない**。本節はそれを手作業で洗い出したもの。
+
+### 8.2 配線状況（runnable entry から `core:include` で到達できるか）
+
+| 区分 | 本数 | 意味 |
+| --- | --- | --- |
+| A. include 配線済み | 32 | runnable entry から include で到達可能（= 実運用経路あり） |
+| B. catalog `pipeline_ref` 配線 | 2 | mission catalog が `pipeline_ref` で指定 |
+| C. fixture / template | 3 | `_template`, `_test-run-pipeline-include`, `_test-run-pipeline-include-cycle` |
+| D. 参照はあるが未配線 | 16 | catalog の助言 / catalog テスト / docs / libs からのみ |
+| E. パス参照なし | 25 | 名前のみ言及 9 + どこからも言及なし 16 |
+| **計** | **78** | |
+
+- runnable entry の起点: `pipelines/*.json`、`pipelines/config|browser/*.json`、`templates/**`、
+  `knowledge/product/pipeline-templates/**`、`knowledge/product/governance/pipelines/**`。
+- **A（32）**: `avatar-onboarding`, `avatar-runtime-preflight`, `browser-runtime-preflight`,
+  `browser-session-start`, `browser-session-with-intra-login`, `design_system_demo_protocol`,
+  `google-meet-join-button`, `google-meet-join-self-contained`, `html-web-preview`,
+  `inspect-active-surfaces`, `intra-login`, `live-voice-preflight`, `masterclass_design_protocol`,
+  `media-pptx-roundtrip-pack-fragment`, `meeting-join-router`, `meeting-runtime-preflight`,
+  `microsoft-teams-join-button`, `microsoft-teams-join-self-contained`, `music-video-preflight`,
+  `music-video-validate`, `narrated-report-artifact-validate`, `narrated-report-preflight`,
+  `narrated-video-preflight`, `narrated-video-validate`, `provider-preflight`,
+  `ringi-approve-single`, `runtime-preflight`, `security-audit-preflight`,
+  `ui-voice-browser-preflight`, `voice-clone-speak`, `voice-profile-runtime-preflight`,
+  `voice-runtime-preflight`
+- **B（2）**: `pptx-produce-from-brief`, `security-incident-containment`
+- **D（16）**:
+  - catalog テストで構造検証されるだけ（7）: `browser-research-capture`, `service-reachability-smoke`,
+    `voice-production-pack`, `wisdom-sdlc-pack`, `meeting-participation-pack-fragment`,
+    `system-runtime-diagnostic`, `software-qa-lifecycle`
+  - `shared-tmp-allowlist.json`（tmp 書き込み台帳）にのみ記載（4）: `artifact-packaging`,
+    `emergency-rollback`, `policy-compliance-scan`, `presentation-scaffolding`
+  - mission catalog / scenario-pack が good fragment として言及（2）: `executive-report-patrol`,
+    `governed-voice-narration`
+  - 設計 docs のみ（1）: `standard-sdlc-loop`
+  - docs / libs / 契約テストのみ（2）: `memory-distillation`（HINTS 生成の宣言）、
+    `capability-docs-sync`（`reference-drift-contract.test.ts` の監視対象）
+- **E / 名前のみ言及（9）**: `artifact-preview`, `browser-point-site-hop`, `browser-purchase-checkout`,
+  `browser-travel-search-select`（catalog の散文で「Chain … fragments」）, `comfyui-status-check`,
+  `focused-form-fill`, `gh-issue-list`, `standard-pr-lifecycle`, `voice-read-text`
+- **E / どこからも言及なし＝死蔵候補（16）**: `app-screenshot`, `browser-login-passkey`,
+  `browser-profile-list`, `chrome-tab-triage`, `clipboard-transform`, `comfyui-config-inspect`,
+  `learnpasskeys-demo-flow`, `mission-bootstrap`, `music-video-compose`, `reasoning-audit-and-save`,
+  `screenshot-vision-gate`, `secret-rotation-flow`, `tenant-context-switch`, `test-repair-loop`,
+  `video-analysis-execution`, `vital-health-check`
+
+### 8.3 dangling 参照（参照先ファイルが存在しない）
+
+4 件。いずれも稼働経路ではなく、過去のクリーンアップ記録・提案・テスト文字列:
+
+| 参照名 | 出所 | 性質 |
+| --- | --- | --- |
+| `fragments/comfyui-artifact-ingestion.json` | `IP-04_DEAD_REFERENCE_CLEANUP.ja.md` | 削除済み死参照の記録 |
+| `fragments/executive-report-gen.json` | 同上 | 同上 |
+| `fragments/design-direction.json` | アーカイブ review（2026-07） | 未実装の提案 |
+| `fragments/unknown.json` | `scripts/refactor/adf-input.test.ts` | エラー処理テスト用のダミー文字列 |
+
+### 8.4 衛生観察
+
+- **README が実態に追随していない**: `pipelines/fragments/README.md` は 30 本の `###` 見出しで
+  fragment を解説するが、実際は **78 本**。
+- **命名規約が守られていない**: README は `*-fragment` 接尾辞を推奨するが、従っているのは
+  `*-fragment` の **2 本**のみ。
+- **未配線が半数以上**: 78 本中、A/B の実運用経路があるのは **34 本**、残り 44 本は
+  fixture 3 本を除いても 41 本が未配線（うち 16 本はどこからも言及なし）。
+- `knowledge/product/governance/shared-tmp-allowlist.json` は tmp 書き込みを持つ fragment を
+  **19 本**列挙しており、「維持されている fragment」の目安になる（うち A/B は 7 本、
+  残り 12 本は未配線）。
+
+### 8.5 推奨
+
+1. **fragments を orphan ratchet の対象に含める**（または fragments 専用の「入口なし」レポートを追加）。
+   現状は 41 本の未配線が無検出で残る。
+2. `pipeline-fragments-catalog.test.ts` の検証対象を全 fragment に広げる（ADF 構造 + `previewPipeline`）。
+3. **死蔵候補 16 本をトリアージ**（退役 / 配線 / テストへ格上げ）。
+4. dangling 4 件を記録から消す（IP-04 の残務）。
+5. README を 78 本の実態へ更新し、`*-fragment` 命名規約の適用方針を決める。
+
+> 補足: §7 の audience/placement は runnable pipeline（`pipelines/*.json` 等）の分類であり、
+> fragments は対象外。fragments の向き先は、それを include する pipeline の audience に従う。
+
 ## 付録: 全 118 本
 
 列: `mtime`（最終更新日）、`schedule`（登録状態と最終ステータス）、`最終実行`、
