@@ -78,6 +78,15 @@ export interface HearingRecord {
   requirements: HearingRequirement[];
   canvas_versions: string[];
   updated_at: string;
+  /** Missing revisions are legacy zero; timestamps are never a concurrency fence. */
+  record_revision?: number;
+  requirements_revision?: number;
+  handoff_pending?: {
+    token: string;
+    kind: 'mission' | 'inventory';
+    requirements_revision: number;
+    started_at: string;
+  };
   decided_by?: HearingDecidedBy;
   decided_at?: string;
   canvas_generation?: HearingCanvasGenerationState;
@@ -174,8 +183,10 @@ export function applyHearingTurn(
     record.requirements.find((item) => !item.answer);
   if (!target) return { ...record, updated_at: now };
 
-  return {
+  const changed = target.answer !== text;
+  const next: HearingRecord = {
     ...record,
+    requirements_revision: hearingRevision(record.requirements_revision) + (changed ? 1 : 0),
     requirements: record.requirements.map((item) =>
       item.id === target.id
         ? { ...item, answer: text, confidence: 0.5, source_turn: turn.request_id }
@@ -183,6 +194,27 @@ export function applyHearingTurn(
     ),
     updated_at: now,
   };
+  if (changed) {
+    delete next.decided_at;
+    delete next.decided_by;
+  }
+  return next;
+}
+
+export function hearingRevision(value: number | undefined): number {
+  if (value === undefined) return 0;
+  if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) {
+    throw new Error('[HEARING_REVISION_INVALID] stored revision is invalid');
+  }
+  return value;
+}
+
+/** Semantic requirements, excluding provenance and presentation-only metadata. */
+export function hearingRequirementsKey(record: HearingRecord): string {
+  return JSON.stringify([
+    record.scenario,
+    record.requirements.map((item) => [item.id, item.label_key, item.answer ?? '']),
+  ]);
 }
 
 export function hearingCoverage(record: HearingRecord): { complete: number; total: number } {

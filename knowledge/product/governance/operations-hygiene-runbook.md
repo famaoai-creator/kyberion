@@ -131,6 +131,15 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
 
+### Hearing writer consistency
+
+- Every hearing writer uses `updateHearingRecord` with the same namespace/session inter-process lock. Never lock only the final save of an older snapshot. Async preparation runs outside the lock; reload and compare the relevant revision before writing.
+- `record_revision` fences replacements; `requirements_revision` tracks semantic requirements, excluding canvas and source-turn metadata. Changed answers invalidate the human decision. Missing legacy revisions mean zero; malformed revisions fail closed. Canvas version allocation and HTML publication share the record lock, skip orphan versions, and never overwrite an existing version.
+- Complete or partial handoff markers prevent requirement edits. Before an external effect, validate the decision again and persist a short-lock reservation; never start if that write fails. After effects start, failures retain the reservation. Never clear it based on elapsed time or claim that a failed response proves no effect occurred. Inspect existing mission/inventory outcomes instead of starting the same work again.
+- The current hearing store remains legacy `sharedTmp('hearing')`, covered by the 24-hour tmp policy. Reservations protect only while that record survives. They are neither durable receipts nor protection across deletion/recreation. No storage migration or automatic recovery is part of this change.
+- All writer processes must use this protocol and share filesystem/PID namespaces. Stop old writer processes before starting upgraded writers; a mixed-version rolling deployment is not supported. A code rollback does not migrate data, but old code ignores the protections: quiesce writers and inspect outstanding reservations before rollback. Do not erase fields to make a retry possible.
+- Regression gates: `hearing-write-consistency.test.ts` exercises deferred races, legacy inputs, scope isolation and write-failure injection; `hearing-process-consistency.test.ts` runs two real child writers. The hearing client suites verify bounded conflict messages without clearing pending/unknown guards.
+
 ## §3 Daemons and child processes
 
 **Daemon contract.** This applies to every long-running loop: scheduler, supervisor,

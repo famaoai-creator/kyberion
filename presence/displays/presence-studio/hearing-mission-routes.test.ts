@@ -309,7 +309,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(safeExecResult).not.toHaveBeenCalled();
   });
 
-  it('fails when the controller reports success but the mission never lands on disk', () => {
+  it('retains an unresolved reservation when controller success cannot be verified, without retrying effects', () => {
     vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
     vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
     vi.mocked(findMissionPath).mockReturnValue(null);
@@ -320,9 +320,17 @@ describe('POST /api/hearing/:session/handoff', () => {
 
     const res = fakeResponse();
     handoff(fakeRequest({ params: { session: sessionId } }), res);
-    expect(res.statusCode).toBe(502);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
     const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithMissionHandoff;
     expect(persisted.mission_id).toBeUndefined();
+    expect(persisted.handoff_pending?.kind).toBe('mission');
+    expect(safeExecResult).toHaveBeenCalledTimes(1);
+    const retry = fakeResponse();
+    handoff(fakeRequest({ params: { session: sessionId } }), retry);
+    expect(retry.statusCode).toBe(409);
+    expect(retry.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
+    expect(safeExecResult).toHaveBeenCalledTimes(1);
   });
 
   it('runs the controller child as mission_controller, delegated under SYSTEM_ROLE (DR-01)', () => {

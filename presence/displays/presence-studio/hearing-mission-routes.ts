@@ -42,7 +42,15 @@ import {
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
 } from './security.js';
-import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
+import {
+  hearingNamespace,
+  loadHearingRecord,
+  assertHearingEditable,
+  reserveHearingHandoff,
+  finishHearingHandoff,
+  HearingConflictError,
+  assertHearingHandoffReplay,
+} from './hearing-runtime.js';
 import type { HearingDecidedBy, HearingRecord } from './hearing.js';
 import {
   buildHearingMissionCreateArgs,
@@ -86,18 +94,23 @@ function hearingMissionSessionId(req: Request): string {
 
 function hearingMissionResponseError(req: Request, res: Response, error: unknown): void {
   const status =
-    error instanceof HearingMissionRequestError
-      ? error.status
-      : error instanceof PresenceStudioViewerError
+    error instanceof HearingConflictError
+      ? 409
+      : error instanceof HearingMissionRequestError
         ? error.status
-        : 500;
+        : error instanceof PresenceStudioViewerError
+          ? error.status
+          : 500;
   logger.warn(
     presenceStudioData.presenceStudioAuditLine(req, 'hearing.handoff.reject', {
       status,
       error: error instanceof Error ? error.message : String(error),
     })
   );
-  res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  res.status(status).json({
+    ...presenceStudioData.presenceStudioWireError(error, status),
+    ...(error instanceof HearingConflictError ? { hearing_conflict: error.conflict } : {}),
+  });
 }
 
 function assertGovernedScriptBuilt(scriptPath: string, label: string): void {
@@ -164,6 +177,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
   // who actually decided on the hearing card — the one and only human
   // decision this handoff carries forward (FD-10 principle 4).
   app.post('/api/hearing/:session/handoff', (req, res) => {
+    let effectReserved = false;
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
@@ -211,6 +225,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
 
       // Idempotent: a session already handed off returns the same ids
       // instead of minting a second mission or a second approval request.
+      assertHearingHandoffReplay(record, 'mission');
       if (record.mission_id && record.approval_request_id) {
         res.status(200).json({
           ok: true,
@@ -220,6 +235,8 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         });
         return;
       }
+
+      assertHearingEditable(record);
 
       if (!record.decided_by || !record.decided_at) {
         throw new HearingMissionRequestError(
@@ -245,6 +262,8 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       const rootDir = pathResolver.rootDir();
       const controllerPath = pathResolver.rootResolve(CONTROLLER_RELATIVE);
       assertGovernedScriptBuilt(controllerPath, 'mission controller');
+      const alignmentPath = pathResolver.rootResolve(ALIGNMENT_REQUEST_RELATIVE);
+      assertGovernedScriptBuilt(alignmentPath, 'mission alignment request');
 
       const createArgs = buildHearingMissionCreateArgs({
         missionId,
@@ -253,6 +272,8 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         tier: 'confidential',
         decidedBy,
       });
+      const reserved = reserveHearingHandoff(namespace, record, 'mission', nowIso());
+      effectReserved = true;
       const createResult = safeExecResult(process.execPath, [CONTROLLER_RELATIVE, ...createArgs], {
         env: buildExecutionEnv(process.env, 'mission_controller'),
         cwd: rootDir,
@@ -294,8 +315,6 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         safeWriteFile(briefPath, `${JSON.stringify(brief, null, 2)}\n`, { encoding: 'utf8' });
       });
 
-      const alignmentPath = pathResolver.rootResolve(ALIGNMENT_REQUEST_RELATIVE);
-      assertGovernedScriptBuilt(alignmentPath, 'mission alignment request');
       const alignmentResult = safeExecResult(
         process.execPath,
         [ALIGNMENT_REQUEST_RELATIVE, '--mission', missionId, '--json'],
@@ -309,13 +328,12 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         );
       }
 
-      const updated: HearingRecordWithMissionHandoff = {
-        ...record,
+      const patch: Partial<HearingRecordWithMissionHandoff> = {
         mission_id: missionId,
         approval_request_id: approvalRequestId,
         handed_off_at: nowIso(),
       };
-      saveHearingRecord(namespace, updated);
+      finishHearingHandoff(namespace, reserved, patch);
 
       res.status(200).json({
         ok: true,
@@ -324,7 +342,18 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         next_action: buildDecideNextAction(locale),
       });
     } catch (error) {
-      hearingMissionResponseError(req, res, error);
+      if (effectReserved) {
+        logger.warn(
+          presenceStudioData.presenceStudioAuditLine(req, 'hearing.handoff.unresolved', {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
+      hearingMissionResponseError(
+        req,
+        res,
+        effectReserved ? new HearingConflictError('handoff_unresolved') : error
+      );
     }
   });
 }

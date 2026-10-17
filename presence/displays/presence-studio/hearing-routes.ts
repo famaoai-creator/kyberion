@@ -39,6 +39,8 @@ import {
 } from './security.js';
 import {
   applyHearingTurn,
+  hearingRevision,
+  hearingRequirementsKey,
   createHearingRecord,
   validateHearingScenario,
   type HearingDecidedBy,
@@ -52,7 +54,13 @@ import {
   loadHearingCanvasVersion,
   renderHearingCanvas,
   saveHearingCanvasVersion,
-  saveHearingRecord,
+  updateHearingRecord,
+  assertHearingSnapshot,
+  assertHearingEditable,
+  assertHearingHandoffReplay,
+  reserveHearingHandoff,
+  finishHearingHandoff,
+  HearingConflictError,
 } from './hearing-runtime.js';
 import { generateHearingCanvas } from './hearing-canvas.js';
 import {
@@ -192,20 +200,25 @@ function withResolvedLabels(
 
 function hearingResponseError(req: Request, res: Response, error: unknown): void {
   const status =
-    error instanceof HearingRequestError
-      ? error.status
-      : error instanceof PresenceStudioViewerError
+    error instanceof HearingConflictError
+      ? 409
+      : error instanceof HearingRequestError
         ? error.status
-        : error instanceof WorkInventoryStoreError
-          ? 409
-          : 500;
+        : error instanceof PresenceStudioViewerError
+          ? error.status
+          : error instanceof WorkInventoryStoreError
+            ? 409
+            : 500;
   logger.warn(
     presenceStudioData.presenceStudioAuditLine(req, 'hearing.reject', {
       status,
       error: error instanceof Error ? error.message : String(error),
     })
   );
-  res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  res.status(status).json({
+    ...presenceStudioData.presenceStudioWireError(error, status),
+    ...(error instanceof HearingConflictError ? { hearing_conflict: error.conflict } : {}),
+  });
 }
 
 /** FD-10 (plan §2.5 principle 4): the deciding member's role comes from
@@ -253,22 +266,28 @@ function tenantSlugForHearingDesign(viewer: PresenceStudioViewerContext): string
 function runHearingCanvasGeneration(key: string, job: HearingCanvasGenerationJob): void {
   generateHearingCanvas(job.record, { locale: job.locale, tenantSlug: job.tenantSlug })
     .then((result) => {
-      // The latest answer wins: only apply this result if the persisted
-      // record is still the exact snapshot this generation started from —
-      // a newer answer's `updated_at` means this result is stale.
-      const persisted = loadHearingRecord(job.namespace, job.record.session_id);
-      if (!persisted || persisted.updated_at !== job.record.updated_at) return;
-      if (result.source === 'generated') {
-        const version = saveHearingCanvasVersion(job.namespace, persisted, result.html);
-        saveHearingRecord(job.namespace, {
-          ...persisted,
-          canvas_versions: [...persisted.canvas_versions, version],
-          canvas_generation: 'generated',
-          canvas_version_sources: { ...persisted.canvas_version_sources, [version]: 'generated' },
-        });
-      } else {
-        saveHearingRecord(job.namespace, { ...persisted, canvas_generation: 'template' });
-      }
+      // Fence requirement inputs under the shared lock; preserve newer decisions/canvas metadata.
+      updateHearingRecord(job.namespace, job.record.session_id, (persisted) => {
+        if (
+          !persisted ||
+          hearingRevision(persisted.requirements_revision) !==
+            hearingRevision(job.record.requirements_revision) ||
+          hearingRequirementsKey(persisted) !== hearingRequirementsKey(job.record)
+        ) {
+          throw new HearingConflictError('stale_snapshot');
+        }
+        assertHearingEditable(persisted);
+        if (result.source === 'generated') {
+          const version = saveHearingCanvasVersion(job.namespace, persisted, result.html);
+          return {
+            ...persisted,
+            canvas_versions: [...persisted.canvas_versions, version],
+            canvas_generation: 'generated',
+            canvas_version_sources: { ...persisted.canvas_version_sources, [version]: 'generated' },
+          };
+        }
+        return { ...persisted, canvas_generation: 'template' };
+      });
     })
     .catch((error) => {
       logger.warn(
@@ -387,6 +406,7 @@ export function registerHearingRoutes(app: express.Express): void {
       if (!text) throw new HearingRequestError('Hearing answer text is required.');
       const namespace = hearingNamespace(viewer.tenantSlugs);
       const existing = loadHearingRecord(namespace, sessionId);
+      assertHearingEditable(existing);
       // WI-08: `scenario_id` (resolved against `hearing-scenarios.json`) is
       // preferred; the legacy inline `scenario` object stays supported for
       // backward compatibility, but only when no `scenario_id` was sent.
@@ -427,26 +447,21 @@ export function registerHearingRoutes(app: express.Express): void {
         scenarioDef?.canvas === 'work_inventory_table'
           ? await renderWorkInventoryCanvasHtml(next, locale)
           : renderHearingCanvas(next, locale);
-      const canvasVersion = saveHearingCanvasVersion(namespace, next, canvasHtml);
-      // WI-08: `work_inventory_table` has no async follow-up (no reasoning
-      // backend call), so its canvas is `'template'`-final immediately —
-      // never left stuck at `'pending'` the way `web_app_preview` briefly is
-      // while `scheduleHearingCanvasGeneration` runs.
-      const canvasGeneration =
-        scenarioDef?.canvas === 'work_inventory_table' ? 'template' : 'pending';
-      const versioned: HearingRecord = {
-        ...next,
-        canvas_versions: [...next.canvas_versions, canvasVersion],
-        canvas_generation: canvasGeneration,
-        canvas_version_sources: {
-          ...next.canvas_version_sources,
-          [canvasVersion]: 'template',
-        },
-      };
-      saveHearingRecord(namespace, versioned);
+      const versioned = updateHearingRecord(namespace, sessionId, (current) => {
+        assertHearingEditable(current);
+        assertHearingSnapshot(current, existing);
+        const canvasVersion = saveHearingCanvasVersion(namespace, next, canvasHtml);
+        return {
+          ...next,
+          canvas_versions: [...next.canvas_versions, canvasVersion],
+          canvas_generation:
+            scenarioDef?.canvas === 'work_inventory_table' ? 'template' : 'pending',
+          canvas_version_sources: { ...next.canvas_version_sources, [canvasVersion]: 'template' },
+        };
+      });
       res.status(200).json({
         ok: true,
-        record: withResolvedLabels(versioned, locale),
+        record: withResolvedLabels(withoutHearingCompletionFields(versioned), locale),
         canvas_url: hearingCanvasUrl(sessionId, versioned),
       });
       // WI-08: `work_inventory_table` never calls a reasoning backend for its
@@ -515,17 +530,15 @@ export function registerHearingRoutes(app: express.Express): void {
         ...(actor.display_name ? { display_name: actor.display_name } : {}),
         role,
       };
-      const decided = {
-        ...record,
-        decided_by: decidedBy,
-        decided_at: nowIso(),
-        updated_at: nowIso(),
-      };
-      saveHearingRecord(namespace, decided);
+      const decided = updateHearingRecord(namespace, sessionId, (current) => {
+        assertHearingEditable(current);
+        assertHearingSnapshot(current, record);
+        return { ...record, decided_by: decidedBy, decided_at: nowIso(), updated_at: nowIso() };
+      });
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       return res.json({
         ok: true,
-        record: withResolvedLabels(decided, locale),
+        record: withResolvedLabels(withoutHearingCompletionFields(decided), locale),
         next_action: {
           kind: 'alignment_review',
           label_key: 'front_desk:hearing_next_alignment',
@@ -547,6 +560,7 @@ export function registerHearingRoutes(app: express.Express): void {
   // `/handoff` route in `hearing-mission-routes.ts` carries the matching
   // refusal for `handoff: 'work_inventory'` scenarios.
   app.post('/api/hearing/:session/inventory', async (req, res) => {
+    let effectReserved = false;
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
@@ -569,6 +583,7 @@ export function registerHearingRoutes(app: express.Express): void {
 
       // Idempotent: a session already saved returns the same entry instead
       // of writing a second one.
+      assertHearingHandoffReplay(record, 'inventory');
       if (record.work_inventory_entry_id) {
         res.status(200).json({
           ok: true,
@@ -579,6 +594,8 @@ export function registerHearingRoutes(app: express.Express): void {
         });
         return;
       }
+
+      assertHearingEditable(record);
 
       const incomplete = record.requirements.filter((item) => !item.answer?.trim());
       if (incomplete.length > 0) {
@@ -595,6 +612,8 @@ export function registerHearingRoutes(app: express.Express): void {
       const scope = workInventoryScopeForHandoff(viewer);
       const input = buildWorkInventoryDecompositionInput(record, { scope });
       const result = await proposeWorkDecomposition(input, { useModel: true });
+      const reserved = reserveHearingHandoff(namespace, record, 'inventory', nowIso());
+      effectReserved = true;
       // Writing a `knowledge/confidential/<tenant>/work-inventory/` entry is
       // a governed confidential-tier write, not a plain surface-runtime one
       // — elevate only for this write, the same pattern `training-routes.ts`
@@ -619,14 +638,13 @@ export function registerHearingRoutes(app: express.Express): void {
         )
       );
 
-      const updated: HearingRecordWithInventoryFields = {
-        ...record,
+      const patch: Partial<HearingRecordWithInventoryFields> = {
         work_inventory_entry_id: entry.entry_id,
         work_inventory_scope: entry.scope,
         work_inventory_steps: entry.steps.length,
         updated_at: nowIso(),
       };
-      saveHearingRecord(namespace, updated);
+      finishHearingHandoff(namespace, reserved, patch);
 
       logger.info(
         presenceStudioData.presenceStudioAuditLine(req, 'hearing.inventory.create', {
@@ -643,7 +661,18 @@ export function registerHearingRoutes(app: express.Express): void {
         next: buildWorkInventoryNextAction(locale),
       });
     } catch (error) {
-      hearingResponseError(req, res, error);
+      if (effectReserved) {
+        logger.warn(
+          presenceStudioData.presenceStudioAuditLine(req, 'hearing.inventory.unresolved', {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
+      hearingResponseError(
+        req,
+        res,
+        effectReserved ? new HearingConflictError('handoff_unresolved') : error
+      );
     }
   });
 }

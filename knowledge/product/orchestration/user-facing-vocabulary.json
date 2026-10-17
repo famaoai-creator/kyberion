@@ -26604,6 +26604,21 @@
         "ja": "修正欄を読み込めませんでした。ページを再読み込みしてから、コメントを入力してください。",
         "qps-ploc": "⟦Ƈőřřėƈŧïőñ ėḓïŧőř ůñȧṽȧïŀȧƀŀė. Řėŀőȧḓ ŧħïş ṗȧɠė ƀėƒőřė ėñŧėřïñɠ ƒėėḓƀȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
+      "hearing_conflict_stale_snapshot": {
+        "en": "This hearing changed during the request. Check its latest state before continuing.",
+        "ja": "処理中にヒアリングが更新されました。続ける前に最新の状態を確認してください。",
+        "qps-ploc": "⟦Ŧħïş ħėȧřïñɠ ƈħȧñɠėḓ ḓůřïñɠ ŧħė řėɋůėşŧ. Ƈħėƈķ ïŧş ŀȧŧėşŧ şŧȧŧė ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "hearing_conflict_completion_locked": {
+        "en": "Handoff information has been recorded for this hearing, so it cannot be changed. Check the existing state.",
+        "ja": "このヒアリングには引き継ぎ情報が記録されているため変更できません。既存の状態を確認してください。",
+        "qps-ploc": "⟦Ħȧñḓőƒƒ ïñƒőřɱȧŧïőñ ħȧş ƀėėñ řėƈőřḓėḓ ƒőř ŧħïş ħėȧřïñɠ, şő ïŧ ƈȧññőŧ ƀė ƈħȧñɠėḓ. Ƈħėƈķ ŧħė ėẋïşŧïñɠ şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "hearing_conflict_handoff_unresolved": {
+        "en": "A result may already have been created. Do not submit again, including in a new hearing. Check the existing result or continue in ordinary conversation.",
+        "ja": "成果が既に作成されている可能性があります。新しいヒアリングも含めて再送せず、既存の成果を確認するか通常の会話を続けてください。",
+        "qps-ploc": "⟦Ȧ řėşůŀŧ ɱȧẏ ȧŀřėȧḓẏ ħȧṽė ƀėėñ ƈřėȧŧėḓ. Ḓő ñőŧ şůƀɱïŧ ȧɠȧïñ, ïñƈŀůḓïñɠ ïñ ȧ ñėẇ ħėȧřïñɠ. Ƈħėƈķ ŧħė ėẋïşŧïñɠ řėşůŀŧ őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
       "hearing_decision_pending": {
         "en": "Confirming this hearing. Please wait; do not submit it again.",
         "ja": "ヒアリングを確定しています。再送せずにお待ちください。",

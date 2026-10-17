@@ -416,3 +416,51 @@ it('fails closed on an empty persisted marker across every hearing mutation', as
   expect(h.elements.get('ask-send')!.disabled).toBe(true);
   expect(storage.get(KEY)).toBe('');
 });
+
+it.each(['stale_snapshot', 'completion_locked', 'handoff_unresolved'])(
+  'explains %s without releasing the decision guard, even after a successful GET',
+  async (code) => {
+    const h = setup(async () => response({ ok: false, hearing_conflict: code }, 409));
+    await flush();
+    click(h);
+    await flush();
+    expect(h.elements.get('hearing-decision-text')!.textContent).toContain(
+      'front_desk:hearing_conflict_' + code
+    );
+    expect(h.elements.get('hearing-decision-text')!.textContent).toContain(
+      'front_desk:hearing_decision_unknown'
+    );
+    expect(h.storage.has(KEY)).toBe(true);
+    click(h);
+    await flush();
+    expect(posts(h)).toHaveLength(1);
+    const restored = setup(undefined, h.storage);
+    await flush();
+    expect(restored.elements.get('ask-send')!.disabled).toBe(true);
+    expect(h.storage.has(KEY)).toBe(true);
+    expect(ASK_VOCABULARY_KEYS).toContain('front_desk:hearing_conflict_' + code);
+  }
+);
+it('does not publish an unrecognized conflict payload', async () => {
+  const h = setup(async () => response({ ok: false, hearing_conflict: '<private payload>' }, 409));
+  await flush();
+  click(h);
+  await flush();
+  expect(h.elements.get('hearing-decision-text')!.textContent).toBe(
+    'front_desk:hearing_decision_unknown'
+  );
+  expect(h.storage.has(KEY)).toBe(true);
+});
+
+it('does not publish a retired conflict after navigation', async () => {
+  const d = deferred<ReturnType<typeof response>>();
+  const h = setup(() => d.promise);
+  await flush();
+  click(h);
+  await flush();
+  h.browserEvent('pagehide');
+  d.resolve(response({ ok: false, hearing_conflict: 'stale_snapshot' }, 409));
+  await flush();
+  expect(h.elements.get('hearing-decision-text')!.textContent).not.toContain('hearing_conflict');
+  expect(h.storage.has(KEY)).toBe(true);
+});

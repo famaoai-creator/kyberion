@@ -14,6 +14,19 @@
     var hidden = false;
     var mounted = false;
     var completionReadPaused = false;
+    var conflict = null;
+    // Only bounded server conflict codes become user-facing copy, never raw errors.
+    function conflictCode(result) {
+      var code =
+        result &&
+        !result.ok &&
+        result.status === 409 &&
+        result.body &&
+        result.body.hearing_conflict;
+      return ['stale_snapshot', 'completion_locked', 'handoff_unresolved'].indexOf(code) !== -1
+        ? code
+        : null;
+    }
 
     function key() {
       // The backend hearing record is session-owned, even when the UI scope changes.
@@ -125,6 +138,17 @@
       }
       var text = document.getElementById('hearing-sync-text');
       if (locked) label(text, phase);
+      if (
+        locked &&
+        !busy &&
+        phase === 'unconfirmed' &&
+        conflict &&
+        conflict.snapshot === snapshot() &&
+        conflict.pending === identity(pending)
+      ) {
+        var reason = options.vt(state.vocab, 'front_desk:hearing_conflict_' + conflict.code);
+        if (text && reason) text.textContent += ' ' + reason;
+      }
       var retry = document.getElementById('hearing-sync-retry');
       if (retry) {
         retry.hidden = !locked || phase === 'scope' || phase === 'storage';
@@ -220,6 +244,7 @@
         if (window.sessionStorage.getItem(key()) !== null)
           throw new Error('Confirmed hearing correlation was not cleared');
         pending = null;
+        conflict = null;
         storageFailed = false;
         return true;
       } catch (err) {
@@ -326,6 +351,7 @@
           publish();
           return Promise.resolve(false);
         }
+        conflict = null;
         pending = {
           requestId: options.randomId(),
           conversationId: state.conversationId,
@@ -374,6 +400,9 @@
           controller
         )
           .then(function (result) {
+            var code = conflictCode(result);
+            if (code && current(attempt) && identity(pending) === attempt.pending)
+              conflict = { code: code, snapshot: attempt.snapshot, pending: attempt.pending };
             return accept(attempt, result);
           })
           .catch(function () {
