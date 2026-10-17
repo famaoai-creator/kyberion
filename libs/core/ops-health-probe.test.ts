@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { runOpsHealthProbe, OPS_FINDINGS_PATH, OPS_ALERTS_PATH } from './ops-health-probe.js';
 
 const TEST_ROOT = 'active/shared/tmp/ops-health-probe-tests';
@@ -36,7 +35,7 @@ describe('ops-health-probe', () => {
     const dominance = res.findings.filter((f) => f.kind === 'alert_dominance');
     expect(dominance.length).toBe(1);
     expect(dominance[0]!.evidence.dedupe_key).toBe('watchdog:chronos:stale');
-    expect(fs.existsSync(path.join(pathResolver.rootDir(), TEST_ROOT, OPS_FINDINGS_PATH))).toBe(
+    expect(safeExistsSync(path.join(pathResolver.rootDir(), TEST_ROOT, OPS_FINDINGS_PATH))).toBe(
       true
     );
   });
