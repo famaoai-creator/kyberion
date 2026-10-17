@@ -23,6 +23,12 @@ import {
 } from '@agent/core/governance/approval-decision-routing';
 import { listActiveDotHeartbeatSpecs, type DotHeartbeatSpec } from '@agent/core/dot/dot-runtime';
 import { logger } from '@agent/core/core';
+import { DAEMON_SPECS } from '@agent/core/daemon/specs';
+import { resolveDaemonManager } from '@agent/core/daemon/service-manager';
+import { safeExecResult } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import * as nodePath from 'node:path';
+import * as os from 'node:os';
 
 /**
  * EV-05: every long-lived daemon that fires work must be listed here.
@@ -61,6 +67,9 @@ export interface DaemonRecoveryOutcome {
    * `KYBERION_AUTONOMY_DECISION_ROUTING=1`); reused while one is pending.
    */
   decision_request_id?: string;
+  /** Gate said `auto` and policy allowed — restart plan was executed. */
+  auto_executed?: boolean;
+  auto_error?: string;
 }
 
 function routeDaemonRecoveryDecision(
@@ -297,11 +306,54 @@ export async function requestDaemonRecovery(
         evaluated && requiresOperator && isAutonomyDecisionRoutingEnabled()
           ? routeDaemonRecoveryDecision(status, evaluated)
           : undefined;
+      // Gate said `auto` AND policy allowed: act on the governed receipt —
+      // execute the service-manager restart plan through the governed exec
+      // seam. This is stage 5 of the autonomous loop (was previously just
+      // 'auto-eligible' with no executor).
+      let autoExecuted: boolean | undefined;
+      let autoExecError: string | undefined;
+      if (!requiresOperator) {
+        const spec = DAEMON_SPECS[status.daemon_id.replace(/-daemon$/, '')];
+        const manager = resolveDaemonManager();
+        if (spec?.id === 'daemon-watchdog') {
+          // kickstart -k would SIGTERM this very run before it could relaunch;
+          // a stale watchdog is an operator problem, not a self-heal target.
+          autoExecuted = false;
+          autoExecError = 'self-restart refused — watchdog cannot kickstart its own unit mid-run';
+        } else if (spec && manager) {
+          const plan = manager.planRestart(spec, {
+            nodePath: process.execPath,
+            repoRoot: pathResolver.rootDir(),
+            homeDir: os.homedir(),
+            uid: String(process.getuid?.() ?? 0),
+            stagingDir: nodePath.join(pathResolver.sharedTmp(), 'daemon-staging'),
+          });
+          let ok = true;
+          for (const cmd of plan.commands) {
+            const r = safeExecResult(cmd.run[0]!, cmd.run.slice(1), { timeoutMs: 30_000 });
+            if (r.status !== 0 && !cmd.tolerateFailure) {
+              ok = false;
+              autoExecError = `${cmd.describe ?? cmd.run.join(' ')}: exit ${r.status} ${String(r.stderr).slice(0, 200)}`;
+              break;
+            }
+          }
+          autoExecuted = ok;
+          logger.info(
+            `[daemon-watchdog] auto-restart ${status.daemon_id}: ${ok ? 'executed' : `failed — ${autoExecError}`}`
+          );
+        } else {
+          autoExecuted = false;
+          autoExecError = `no service spec for ${status.daemon_id} on ${process.platform}`;
+        }
+      }
       outcomes.push({
         daemon_id: status.daemon_id,
         decision: evaluated?.decision ?? 'approve',
         trigger_status: receipt.status,
         requires_operator: requiresOperator,
+        ...(autoExecuted !== undefined
+          ? { auto_executed: autoExecuted, ...(autoExecError ? { auto_error: autoExecError } : {}) }
+          : {}),
         ...(reason ? { reason } : {}),
         ...(decisionRequestId ? { decision_request_id: decisionRequestId } : {}),
       });
@@ -329,7 +381,9 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
   for (const recovery of report.recovery ?? []) {
     lines.push(
       `Recovery ${recovery.daemon_id}: gate=${recovery.decision}; trigger=${recovery.trigger_status}; ${
-        recovery.requires_operator ? 'awaiting operator' : 'auto-eligible'
+        recovery.requires_operator
+          ? 'awaiting operator'
+          : `auto${recovery.auto_executed === true ? ' executed' : recovery.auto_executed === false ? ` exec-failed (${recovery.auto_error ?? '?'})` : '-eligible'}`
       }${recovery.decision_request_id ? `; decision=${recovery.decision_request_id}` : ''}${
         recovery.reason ? `; reason=${recovery.reason}` : ''
       }`

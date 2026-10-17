@@ -193,6 +193,17 @@ export type {
   SweepAppendOnlyStoresResult,
 } from './storage-janitor.js';
 
+// Autonomous ops loop stage 1+2: anomaly probe -> findings + work items.
+export {
+  runOpsHealthProbe,
+  probeStoreOvergrowth,
+  probeAlertDominance,
+  probeUncoveredStores,
+  OPS_FINDINGS_PATH,
+  OPS_ALERTS_PATH,
+} from './ops-health-probe.js';
+export type { OpsFinding, OpsHealthProbeDeps, OpsHealthProbeResult } from './ops-health-probe.js';
+
 // Scope-linked GC & offboarding (AL-04)
 
 export {

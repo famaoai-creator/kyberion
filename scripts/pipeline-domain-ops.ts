@@ -14,6 +14,7 @@ import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
+import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch_tenant_drift.js';
 import { runDecisionDigest } from './approval_inbox.js';
@@ -332,6 +333,27 @@ export function runInlineHealthDegradationWatch(
 ): Record<string, unknown> {
   const result = runHealthDegradationWatch();
   return exportValue(params, step, { ...result.report, alert_id: result.alert?.id ?? null }, ctx);
+}
+
+export function runInlineOpsHealthProbe(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const result = runOpsHealthProbe({
+    fileWorkItems: params.file_work_items === true || params.file_work_items === 'true',
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      findings: result.findings.length,
+      findings_path: result.findings_path,
+      work_items_filed: result.work_items_filed.length,
+      items: result.findings.map((f) => `${f.severity}: ${f.summary}`),
+    },
+    ctx
+  );
 }
 
 export function runInlineUiUxGovernanceAudit(
