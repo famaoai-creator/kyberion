@@ -72,7 +72,30 @@ export interface HearingDecidedBy {
  * not as `template`). */
 export type HearingCanvasGenerationState = 'pending' | 'generated' | 'template';
 
+export interface HearingDecisionOperation {
+  version: 1;
+  operation_id: string;
+  scenario_id: string;
+  requirements_revision: number;
+}
+export interface HearingDecisionIdentity {
+  principal_id: string;
+  scope_key: string;
+  member_id: string;
+  source: 'loopback' | 'token';
+}
+export interface HearingDecisionReceipt {
+  operation: HearingDecisionOperation;
+  identity: HearingDecisionIdentity;
+  namespace: string;
+  session_id: string;
+  record_revision: number;
+  decided_at: string;
+}
 export interface HearingRecord {
+  /** Internal receipts are exposed only through exact authenticated lookup. */
+  decision_receipts?: HearingDecisionReceipt[];
+  current_decision_operation_id?: string;
   session_id: string;
   scenario: string;
   requirements: HearingRequirement[];

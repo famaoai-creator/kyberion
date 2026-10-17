@@ -63,7 +63,9 @@
       "active/shared/runtime/usage-ledger/personal/",
       "active/shared/runtime/usage-ledger/confidential/",
       "active/shared/runtime/execution-metrics/personal/",
-      "active/shared/runtime/execution-metrics/confidential/"
+      "active/shared/runtime/execution-metrics/confidential/",
+      "active/shared/runtime/hearing/personal/",
+      "active/shared/runtime/hearing/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
