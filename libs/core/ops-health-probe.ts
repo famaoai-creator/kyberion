@@ -26,6 +26,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeStat } from '.
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { createWorkItemIfAbsent } from './workforce/work-coordination.js';
+import { appendDotInboxEntry } from './dot/dot-inbox.js';
 import { loadRetentionCatalog } from './storage-retention-catalog.js';
 import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
 
@@ -214,10 +215,39 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
         });
         workItemsFiled.push(finding.finding_id);
       } catch (error) {
-        logger.warn(
-          `[OPS-PROBE] work item filing failed for ${finding.finding_id} | next: finding still recorded in ${OPS_FINDINGS_PATH} | evidence: ${error instanceof Error ? error.message : String(error)}`
+        // A deduped re-file is not a failure — the item exists and the dot
+        // still deserves a wake for it (e.g. filed before wakes existed).
+        const isConflict = /identity conflict/.test(
+          error instanceof Error ? error.message : String(error)
         );
+        if (isConflict) workItemsFiled.push(finding.finding_id);
+        else
+          logger.warn(
+            `[OPS-PROBE] work item filing failed for ${finding.finding_id} | next: finding still recorded in ${OPS_FINDINGS_PATH} | evidence: ${error instanceof Error ? error.message : String(error)}`
+          );
       }
+    }
+  }
+  // Ring the doorbell: one coalesced inbox wake tells the ops dot a new batch
+  // of findings exists. The idempotency key scopes the wake to this probe run —
+  // replays of the same findings cannot stack wakes, and a fresh batch mints a
+  // fresh key so a consumed wake never suppresses new work.
+  if (deps.fileWorkItems && workItemsFiled.length > 0) {
+    try {
+      appendDotInboxEntry(
+        {
+          channel: 'inbox',
+          dot_id: OPS_WORK_ITEM_DOT_ID,
+          source: 'ops-health-probe',
+          idempotency_key: `ops-probe:${createHash('sha256').update(workItemsFiled.slice().sort().join(',')).digest('hex').slice(0, 16)}`,
+          text: `${workItemsFiled.length} ops-health finding(s) filed — check addressed WorkItems`,
+        },
+        { rootDir: deps.rootDir }
+      );
+    } catch (error) {
+      logger.warn(
+        `[OPS-PROBE] wake append failed — WorkItems filed but dot not notified | next: dot claims on its next trigger | evidence: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   logger.info(
