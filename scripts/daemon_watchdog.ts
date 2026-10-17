@@ -230,7 +230,7 @@ export async function checkDaemonHeartbeatsWithRecovery(
     // Escalated mission proposals: each blocked mission-shaped WorkItem gets a
     // gate verdict recorded — evidence accrues toward notify->auto promotion
     // before any auto-start is ever attempted.
-    sweepMissionStartCandidates(sweepDeps);
+    void sweepMissionStartCandidates(sweepDeps);
   } catch {
     /* sweep failures must never mask a watchdog verdict */
   }
@@ -471,7 +471,7 @@ if (
  * autonomy ledger — the notify-soak evidence that eventually justifies
  * auto-start for in-mandate work. Records only; never starts a mission.
  */
-function sweepMissionStartCandidates(deps: { rootDir?: string }): void {
+async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
   const items = listWorkItems({ status: ['blocked'] });
   for (const item of items) {
     if (item.metadata?.requested_work_shape !== 'mission') continue;
@@ -488,6 +488,50 @@ function sweepMissionStartCandidates(deps: { rootDir?: string }): void {
         },
         deps
       );
+      // Auto-fire: only when the gate itself allows (auto tier, shadow lifted by
+      // evidence promotion). mission_start never reaches here today — the
+      // unknown action fail-closes to approve — so only in-mandate proposals
+      // can auto-start, and only after the ledger's clean-soak promotion.
+      if (verdict.allowed && verdict.decision === 'auto') {
+        try {
+          const missionId =
+            typeof item.metadata?.mission_id === 'string'
+              ? item.metadata.mission_id
+              : item.item_id.replace(/[^a-zA-Z0-9-]/g, '-').toUpperCase();
+          const { main: missionMain } = await import('./mission_controller.js');
+          const argv = [
+            'start',
+            missionId,
+            '--tier',
+            'confidential',
+            '--persona',
+            'worker',
+            '--tenant',
+            item.context?.tenant_slug ?? 'default',
+          ];
+          await missionMain(argv);
+          recordAutonomyExecution(
+            {
+              action_id: verdict.actionId,
+              ok: true,
+              error: `mission started: ${missionId}`,
+            },
+            deps
+          );
+          logger.info(
+            `[WATCHDOG] auto-started mission ${missionId} from ${item.item_id} | next: mission follows normal controller lifecycle | evidence: ${item.item_id}`
+          );
+        } catch (error) {
+          recordAutonomyExecution(
+            {
+              action_id: verdict.actionId,
+              ok: false,
+              error: `auto-start failed: ${error instanceof Error ? error.message : String(error)}`,
+            },
+            deps
+          );
+        }
+      }
     } catch (error) {
       logger.warn(
         `[WATCHDOG] mission-start sweep failed for ${item.item_id} — verdict not recorded | next: inspect gate/policy | evidence: ${error instanceof Error ? error.message : String(error)}`
