@@ -227,9 +227,9 @@ function harness(
       return button;
     });
   };
-  const eventListeners: Record<string, Array<() => void>> = {};
+  const eventListeners: Record<string, Array<(detail?: { persisted?: boolean }) => void>> = {};
   const browser = window as typeof window & {
-    addEventListener: (event: string, listener: () => void) => void;
+    addEventListener: (event: string, listener: (detail?: { persisted?: boolean }) => void) => void;
   };
   browser.addEventListener = (event, listener) => {
     (eventListeners[event] ??= []).push(listener);
@@ -278,7 +278,8 @@ function harness(
   return {
     elements,
     actions: () => actionButtons,
-    browserEvent: (event: string) => eventListeners[event]?.forEach((listener) => listener()),
+    browserEvent: (event: string, detail?: { persisted?: boolean }) =>
+      eventListeners[event]?.forEach((listener) => listener(detail)),
     shell: (phase: string, message = '') =>
       shellListeners.forEach((listener) => listener({ phase, message })),
     chips,
@@ -2986,4 +2987,449 @@ describe('Ask bounded conversation response wait', () => {
       }
     }
   );
+});
+
+describe('Ask persisted navigation recovery', () => {
+  const requestKey = 'kyberion.ask.draft.' + session + '.request';
+  const posts = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+  const reads = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(
+      ([url, init]) => url.startsWith('/api/conversation') && !init?.method
+    );
+  async function submit(h: ReturnType<typeof harness>, text = 'Return safely') {
+    await flush();
+    h.input.value = text;
+    h.input.fire('input');
+    h.form.fire('submit');
+    await flush();
+  }
+  async function resume(h: ReturnType<typeof harness>) {
+    h.browserEvent('pageshow', { persisted: true });
+    h.browserEvent('popstate');
+    await vi.advanceTimersByTimeAsync(0);
+    await flush();
+  }
+  it.each(['pending', 'complete'] as const)(
+    'rechecks %s history after returning before POST settles',
+    async (outcome) => {
+      vi.useFakeTimers();
+      try {
+        const transport = deferred<ReturnType<typeof response>>();
+        let history: Record<string, unknown> = {
+          ok: true,
+          sessionId: session,
+          messages: [],
+          pending: 0,
+        };
+        const h = harness({
+          post: async () => transport.promise,
+          conversation: async () => response(history),
+        });
+        await submit(h);
+        const saved = h.storage.get(requestKey)!;
+        const request = JSON.parse(saved);
+        h.input.value = 'A newer edited draft';
+        h.input.fire('input');
+        h.input.setSelectionRange(2, 7, 'backward');
+        history = {
+          ok: true,
+          sessionId: session,
+          pending: outcome === 'pending' ? 1 : 0,
+          messages:
+            outcome === 'pending'
+              ? []
+              : [
+                  { id: request.id + '-user', role: 'user', text: request.text },
+                  {
+                    id: request.id + '-secretary',
+                    role: 'secretary',
+                    text: 'Confirmed result',
+                    next_actions: [{ label: 'Execute' }],
+                  },
+                ],
+        };
+        h.browserEvent('pagehide', { persisted: true });
+        await resume(h);
+        expect(reads(h)).toHaveLength(2);
+        expect(posts(h)).toHaveLength(1);
+        expect(h.input.value).toBe('A newer edited draft');
+        expect([h.input.selectionStart, h.input.selectionEnd, h.input.selectionDirection]).toEqual([
+          2,
+          7,
+          'backward',
+        ]);
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        if (outcome === 'complete') {
+          expect(h.elements.get('turns')!.innerHTML).toContain('Confirmed result');
+          expect(h.storage.has(requestKey)).toBe(false);
+        } else {
+          expect(h.storage.get(requestKey)).toBe(saved);
+          expect(h.elements.get('pending-request-recovery')!.hidden).toBe(false);
+          expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+        }
+        transport.resolve(response({ ok: true, reply: 'Retired response' }));
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Retired response');
+        expect(h.actions()).toHaveLength(0);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it('keeps an explicit history retry when the local request is still unconfirmed but server pending is zero', async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness({ post: async () => new Promise(() => {}) });
+      await submit(h);
+      const saved = h.storage.get(requestKey);
+      h.browserEvent('pagehide');
+      await resume(h);
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.pending');
+      expect(h.elements.get('pending-request-recovery')!.hidden).toBe(false);
+      expect(h.storage.get(requestKey)).toBe(saved);
+      expect(posts(h)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('does not replay URL handoff when an old initial GET resolves in the pageshow scheduling gap', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const h = harness({
+        query: '?tenant=alpha&ask=Do+not+send&send=1',
+        conversation: async () =>
+          ++count === 1
+            ? old.promise
+            : response({ ok: true, sessionId: session, messages: [], pending: 0 }),
+      });
+      await flush();
+      h.browserEvent('pagehide');
+      h.browserEvent('pageshow', { persisted: true });
+      old.resolve(response({ ok: true, sessionId: session, messages: [], pending: 0 }));
+      await flush();
+      expect(posts(h)).toHaveLength(0);
+      h.browserEvent('popstate');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads(h)).toHaveLength(2);
+      expect(posts(h)).toHaveLength(0);
+      expect(h.input.value).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('retires auto-prefill through failed history recovery and an explicit later retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const h = harness({
+        query: '?tenant=alpha&ask=Do+not+send&send=1',
+        conversation: async () => {
+          count++;
+          if (count === 1) return old.promise;
+          if (count === 2) return response({}, 503);
+          return response({ ok: true, sessionId: session, messages: [], pending: 0 });
+        },
+      });
+      await flush();
+      h.browserEvent('pagehide');
+      await resume(h);
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.failed');
+      h.elements.get('conversation-reload')!.fire('click');
+      await flush();
+      expect(reads(h)).toHaveLength(3);
+      expect(posts(h)).toHaveLength(0);
+      expect(h.input.value).toBe('');
+      old.resolve(response({ ok: true, sessionId: session, messages: [], pending: 0 }));
+      await flush();
+      expect(posts(h)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('preserves the current composer when vocabulary startup completes after a cached return', async () => {
+    vi.useFakeTimers();
+    try {
+      const vocabulary = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        query: '?tenant=alpha&ask=Do+not+send&send=1',
+        vocabulary: vocabulary.promise,
+      });
+      await flush();
+      h.input.value = 'Browser-restored text';
+      h.input.setSelectionRange(1, 5, 'backward');
+      h.browserEvent('pagehide');
+      await resume(h);
+      vocabulary.resolve(response({ ok: true, texts: vocabularyTexts() }));
+      await flush();
+      expect(reads(h)).toHaveLength(1);
+      expect(posts(h)).toHaveLength(0);
+      expect(h.input.value).toBe('Browser-restored text');
+      expect(h.input.selectionEnd).toBe(5);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('ignores ordinary pageshow and coalesces repeated cached pageshow in one navigation cycle', async () => {
+    vi.useFakeTimers();
+    try {
+      const next = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const h = harness({
+        conversation: async () =>
+          ++count === 1
+            ? response({ ok: true, sessionId: session, messages: [], pending: 0 })
+            : next.promise,
+      });
+      await flush();
+      h.browserEvent('pageshow', { persisted: false });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads(h)).toHaveLength(1);
+      h.browserEvent('pagehide');
+      h.browserEvent('pageshow', { persisted: true });
+      h.browserEvent('pageshow', { persisted: true });
+      h.browserEvent('popstate');
+      await vi.advanceTimersByTimeAsync(0);
+      h.browserEvent('pageshow', { persisted: true });
+      await flush();
+      expect(reads(h)).toHaveLength(2);
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+      next.resolve(response({ ok: true, sessionId: session, messages: [], pending: 0 }));
+      await flush();
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(posts(h)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('cancels a queued recovery when another pagehide supersedes it', async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness();
+      await flush();
+      h.browserEvent('pagehide');
+      h.browserEvent('pageshow', { persisted: true });
+      h.browserEvent('pagehide');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads(h)).toHaveLength(1);
+      await resume(h);
+      expect(reads(h)).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it.each(['scope', 'pagehide', 'shell', 'rail'] as const)(
+    'rejects restored history superseded by %s',
+    async (change) => {
+      vi.useFakeTimers();
+      try {
+        const pending = deferred<ReturnType<typeof response>>();
+        let count = 0;
+        const h = harness({
+          conversation: async () =>
+            ++count === 1
+              ? response({ ok: true, sessionId: session, messages: [], pending: 0 })
+              : pending.promise,
+        });
+        await flush();
+        h.input.value = 'Keep my draft';
+        h.input.fire('input');
+        h.browserEvent('pagehide');
+        await resume(h);
+        if (change === 'scope') h.window.location.search = '?tenant=other&projectId=other';
+        else if (change === 'pagehide') h.browserEvent('pagehide');
+        else if (change === 'shell') h.shell('blocked', 'Scope blocked');
+        else h.window.FrontDeskRail.ready = Promise.resolve();
+        pending.resolve(
+          response({
+            ok: true,
+            sessionId: session,
+            messages: [{ id: 'old', role: 'secretary', text: 'Stale private result' }],
+          })
+        );
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Stale private result');
+        expect(h.input.value).toBe('Keep my draft');
+        expect(posts(h)).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it('waits for current shell readiness and never starts a GET for a superseded scope', async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness();
+      await flush();
+      const ready = deferred<void>();
+      h.window.FrontDeskRail.ready = ready.promise;
+      h.shell('loading');
+      h.browserEvent('pagehide');
+      await resume(h);
+      expect(reads(h)).toHaveLength(1);
+      h.window.location.search = '?tenant=other';
+      h.shell('ready');
+      ready.resolve();
+      await flush();
+      expect(reads(h)).toHaveLength(1);
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+      expect(posts(h)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it.each(['before', 'after'] as const)(
+    'recovers %s the POST deadline and keeps an explicit retry owned by its new attempt',
+    async (timing) => {
+      vi.useFakeTimers();
+      try {
+        const old = deferred<ReturnType<typeof response>>();
+        const next = deferred<ReturnType<typeof response>>();
+        let count = 0;
+        const h = harness({ post: async () => (++count === 1 ? old.promise : next.promise) });
+        await submit(h);
+        const saved = h.storage.get(requestKey);
+        if (timing === 'after') await vi.advanceTimersByTimeAsync(60000);
+        h.browserEvent('pagehide');
+        await resume(h);
+        h.form.fire('submit');
+        await flush();
+        expect(posts(h)).toHaveLength(2);
+        expect(JSON.parse(posts(h)[1][1]!.body!)).toEqual(JSON.parse(posts(h)[0][1]!.body!));
+        old.resolve(response({ ok: true, reply: 'Retired old response' }));
+        await flush();
+        expect(h.elements.get('ask-send')!.disabled).toBe(true);
+        expect(h.storage.get(requestKey)).toBe(saved);
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Retired old response');
+        next.resolve(response({ ok: true, reply: 'Current explicit response' }));
+        await flush();
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        expect(h.elements.get('turns')!.innerHTML).toContain('Current explicit response');
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it('bounds a stalled restored history read and retains the pending request for manual recovery', async () => {
+    vi.useFakeTimers();
+    try {
+      let count = 0;
+      const h = harness({
+        post: async () => new Promise(() => {}),
+        conversation: async () =>
+          ++count === 1
+            ? response({ ok: true, sessionId: session, messages: [], pending: 0 })
+            : new Promise(() => {}),
+      });
+      await submit(h);
+      const saved = h.storage.get(requestKey);
+      h.browserEvent('pagehide');
+      await resume(h);
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.failed');
+      expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+      expect(h.storage.get(requestKey)).toBe(saved);
+      expect(posts(h)).toHaveLength(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not move composer focus to a selected request restored after navigation', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const request = '11111111-1111-4111-8111-111111111111';
+      const h = harness({
+        query: '?tenant=alpha&request=' + request,
+        conversation: async () =>
+          ++count === 1
+            ? old.promise
+            : response({
+                ok: true,
+                sessionId: session,
+                messages: [{ id: request + '-user', role: 'user', text: 'Selected request' }],
+                pending: 0,
+              }),
+      });
+      const target = new Element();
+      h.elements.set('ask-turn-' + request + '-user', target);
+      await flush();
+      h.input.value = '';
+      h.input.setSelectionRange(0, 0, 'none');
+      h.browserEvent('pagehide');
+      await resume(h);
+      expect(h.elements.get('turns')!.innerHTML).toContain('Selected request');
+      expect(target.focus).not.toHaveBeenCalled();
+      expect(target.scrollIntoView).not.toHaveBeenCalled();
+      expect(h.input.value).toBe('');
+      old.resolve(response({ ok: true, sessionId: session, messages: [], pending: 0 }));
+      await flush();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('restarts retired vocabulary startup under the new shell and ignores its late completion', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      const current = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const h = harness({
+        query: '?tenant=alpha&ask=Do+not+send&send=1',
+        vocabularyRead: async () => (++count === 1 ? old.promise : current.promise),
+      });
+      await flush();
+      h.browserEvent('pagehide');
+      h.window.FrontDeskRail.ready = Promise.resolve();
+      await resume(h);
+      expect(count).toBe(2);
+      old.resolve(response({ ok: true, texts: vocabularyTexts() }));
+      await flush();
+      expect(reads(h)).toHaveLength(0);
+      expect(h.elements.get('ask-send')!.disabled).toBe(true);
+      current.resolve(response({ ok: true, texts: vocabularyTexts() }));
+      await flush();
+      expect(reads(h)).toHaveLength(1);
+      expect(posts(h)).toHaveLength(0);
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores vocabulary completing between pageshow and popstate before starting current history', async () => {
+    vi.useFakeTimers();
+    try {
+      const old = deferred<ReturnType<typeof response>>();
+      let count = 0;
+      const h = harness({
+        query: '?tenant=alpha&ask=Do+not+send&send=1',
+        vocabularyRead: async () =>
+          ++count === 1 ? old.promise : response({ ok: true, texts: vocabularyTexts() }),
+      });
+      await flush();
+      h.browserEvent('pagehide');
+      h.browserEvent('pageshow', { persisted: true });
+      old.resolve(response({ ok: true, texts: vocabularyTexts() }));
+      await flush();
+      expect(reads(h)).toHaveLength(0);
+      h.browserEvent('popstate');
+      await vi.advanceTimersByTimeAsync(0);
+      await flush();
+      expect(count).toBe(2);
+      expect(reads(h)).toHaveLength(1);
+      expect(posts(h)).toHaveLength(0);
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
