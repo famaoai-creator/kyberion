@@ -325,6 +325,25 @@ export function normalizeReasoningRole(
   throw new Error(`Unknown reasoning role "${value}". Allowed roles: ${roles.join(', ')}`);
 }
 
+/**
+ * True when `value` names a reasoning role defined by the active policy.
+ *
+ * Personas and reasoning roles are different vocabularies: an authority persona
+ * such as `worker`/`sovereign` is not a reasoning role, and the unresolved
+ * sentinel persona `unknown` is not one either. Callers that only have a
+ * persona must test it here before using it as a role, otherwise the step is
+ * rejected by {@link normalizeReasoningRole} instead of falling back to
+ * `default`.
+ */
+export function isReasoningRole(value?: string, policy?: ReasoningRoutePolicy): boolean {
+  if (!value) return false;
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  return Object.keys((policy ?? loadReasoningRoutePolicy()).roles).includes(normalized);
+}
+
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
 }
@@ -1196,8 +1215,13 @@ export function resolveStepReasoningRoute(input: {
     );
   }
   const profile = profileForBinding(policy, binding || {});
+  // A persona is only used as the reasoning role when the policy actually
+  // defines that role. Other personas (the `unknown` sentinel, or authority
+  // personas such as `worker`) fall back to `default` instead of failing the
+  // step with `Unknown reasoning role`.
+  const role = input.persona && isReasoningRole(input.persona, policy) ? input.persona : 'default';
   const route = resolveReasoningRoute({
-    role: input.persona || 'default',
+    role,
     ...(profile ? { requestedProfile: profile } : {}),
     ...(binding?.mode ? { requestedMode: binding.mode as ReasoningBackendMode } : {}),
     ...(binding?.model ? { requestedModel: binding.model } : {}),

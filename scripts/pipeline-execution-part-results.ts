@@ -383,7 +383,13 @@ export async function main(args?: string[], print: Print = () => undefined) {
   if (identity.role && !getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', identity.role);
   }
-  if (identity.persona && !getRegisteredEnvText('KYBERION_PERSONA')) {
+  // `unknown` is the sentinel for "no persona resolved"; publishing it as an
+  // identity would corrupt every consumer that treats a set persona as real.
+  if (
+    identity.persona &&
+    identity.persona !== 'unknown' &&
+    !getRegisteredEnvText('KYBERION_PERSONA')
+  ) {
     setRegisteredEnv('KYBERION_PERSONA', identity.persona);
   }
 
