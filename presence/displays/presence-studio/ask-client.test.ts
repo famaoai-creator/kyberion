@@ -50,10 +50,12 @@ class Element {
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 const vocabularyTexts = () =>
   new Proxy({} as Record<string, string>, {
@@ -2777,6 +2779,211 @@ describe('Ask request navigation evidence', () => {
       if (event === 'blocked-shell') h.shell('blocked', 'Scope changed');
       else h.browserEvent(event);
       expect(h.elements.get('turns')!.innerHTML).not.toContain('<a href=');
+    }
+  );
+});
+
+describe('Ask bounded conversation response wait', () => {
+  const postCalls = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+  const requestKey = 'kyberion.ask.draft.' + session + '.request';
+  const draftKey = 'kyberion.ask.draft.' + session;
+  async function submit(h: ReturnType<typeof harness>, text = 'Bounded request') {
+    await flush();
+    h.input.value = text;
+    h.input.fire('input');
+    h.form.fire('submit');
+    await flush();
+  }
+  it.each([
+    ['headers', 'resolve'],
+    ['body', 'resolve'],
+    ['headers', 'reject'],
+    ['body', 'reject'],
+  ] as const)(
+    'bounds stalled %s and ignores its late %s while an explicit same-ID retry runs',
+    async (stall, outcome) => {
+      vi.useFakeTimers();
+      try {
+        const old = deferred<ReturnType<typeof response>>();
+        const body = deferred<unknown>();
+        const retry = deferred<ReturnType<typeof response>>();
+        let attempt = 0;
+        const h = harness({
+          post: async () => {
+            if (++attempt > 1) return retry.promise;
+            return stall === 'headers'
+              ? old.promise
+              : { ...response({}), json: () => body.promise };
+          },
+        });
+        await submit(h);
+        const saved = h.storage.get(requestKey);
+        const first = JSON.parse(postCalls(h)[0][1]!.body!);
+        h.form.fire('submit');
+        await vi.advanceTimersByTimeAsync(59_999);
+        expect(postCalls(h)).toHaveLength(1);
+        expect(h.elements.get('ask-send')!.disabled).toBe(true);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+        expect(h.elements.get('conversation-status')!.innerHTML).toContain('dock.history.pending');
+        expect(h.input.value).toBe('Bounded request');
+        expect(h.storage.get(requestKey)).toBe(saved);
+        const init = postCalls(h)[0][1] as { signal?: AbortSignal };
+        expect(init.signal?.aborted).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+        h.form.fire('submit');
+        await flush();
+        expect(JSON.parse(postCalls(h)[1][1]!.body!)).toEqual(first);
+        if (outcome === 'reject') {
+          if (stall === 'headers') old.reject(new Error('Late header failure'));
+          else body.reject(new Error('Late body failure'));
+        } else {
+          old.resolve(response({ ok: true, reply: 'Late old response' }));
+          body.resolve({ ok: true, reply: 'Late old response' });
+        }
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Late old response');
+        expect(h.elements.get('ask-send')!.disabled).toBe(true);
+        expect(h.storage.get(requestKey)).toBe(saved);
+        retry.resolve(response({ ok: true, reply: 'Verified replay', replayed: true }));
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).toContain('Verified replay');
+        expect(h.elements.get('conversation-status')!.innerHTML).toBe('');
+        expect(h.storage.has(requestKey)).toBe(false);
+        expect(postCalls(h)).toHaveLength(2);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it.each([0, 1, 2])(
+    'preserves server pending=%s and newer text without AbortController',
+    async (pending) => {
+      vi.useFakeTimers();
+      try {
+        const old = deferred<ReturnType<typeof response>>();
+        const h = harness({ history: { pending }, post: async () => old.promise });
+        Reflect.deleteProperty(h.window, 'AbortController');
+        await submit(h);
+        const saved = h.storage.get(requestKey);
+        h.input.value = 'A newer unsent edit';
+        h.input.fire('input');
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(h.elements.get('ask-send')!.disabled).toBe(false);
+        expect(h.elements.get('conversation-reload')!.disabled).toBe(false);
+        expect(h.storage.get(requestKey)).toBe(saved);
+        expect(h.storage.get(draftKey)).toBe('A newer unsent edit');
+        h.form.fire('submit');
+        await flush();
+        expect(postCalls(h)).toHaveLength(1);
+        h.elements.get('conversation-reload')!.fire('click');
+        await flush();
+        expect(
+          h.elements.get('conversation-status')!.innerHTML.includes('dock.history.pending')
+        ).toBe(pending > 0);
+        expect(h.storage.get(requestKey)).toBe(saved);
+        old.resolve(response({ ok: true, reply: 'Late hidden reply' }));
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Late hidden reply');
+        expect(h.input.value).toBe('A newer unsent edit');
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it('recovers a completed timed-out request through explicit history without another POST', async () => {
+    vi.useFakeTimers();
+    try {
+      let completed = false;
+      let request: Record<string, unknown> = {};
+      const h = harness({
+        post: async (body) => {
+          request = body;
+          return new Promise(() => {});
+        },
+        conversation: async () =>
+          response({
+            ok: true,
+            sessionId: session,
+            pending: completed ? 0 : 1,
+            messages: completed
+              ? [
+                  { id: request.request_id + '-user', role: 'user', text: request.text },
+                  {
+                    id: request.request_id + '-secretary',
+                    role: 'secretary',
+                    text: 'Saved completion',
+                  },
+                ]
+              : [],
+          }),
+      });
+      await submit(h);
+      h.input.value = 'Keep this new draft';
+      h.input.fire('input');
+      await vi.advanceTimersByTimeAsync(60_000);
+      completed = true;
+      h.elements.get('conversation-reload')!.fire('click');
+      await flush();
+      expect(h.elements.get('turns')!.innerHTML).toContain('Saved completion');
+      expect(h.storage.has(requestKey)).toBe(false);
+      expect(h.input.value).toBe('Keep this new draft');
+      expect(h.elements.get('conversation-status')!.innerHTML).toBe('');
+      expect(postCalls(h)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it.each(['success', 'failure'] as const)(
+    'clears the deadline after a prompt %s',
+    async (outcome) => {
+      vi.useFakeTimers();
+      try {
+        const h = harness({
+          post: async () => {
+            if (outcome === 'failure') throw new Error('Lost connection');
+            return response({ ok: true, reply: 'Prompt response' });
+          },
+        });
+        await submit(h);
+        const status = h.elements.get('conversation-status')!.innerHTML;
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(h.elements.get('conversation-status')!.innerHTML).toBe(status);
+        expect(postCalls(h)).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+  it.each(['scope', 'popstate', 'pagehide', 'shell'] as const)(
+    'does not let a retired %s attempt publish its response or clear its saved identity',
+    async (change) => {
+      vi.useFakeTimers();
+      try {
+        const done = deferred<ReturnType<typeof response>>();
+        const h = harness({ post: async () => done.promise });
+        await submit(h);
+        const saved = h.storage.get(requestKey);
+        if (change === 'scope') {
+          h.window.location.search = '?tenant=alpha&projectId=other';
+          h.window.location.href = 'http://localhost/ask' + h.window.location.search;
+        } else if (change === 'shell') h.shell('blocked', 'Scope unavailable');
+        else h.browserEvent(change);
+        done.resolve(response({ ok: true, reply: 'Retired response' }));
+        await flush();
+        expect(h.elements.get('turns')!.innerHTML).not.toContain('Retired response');
+        expect(h.storage.get(requestKey)).toBe(saved);
+        expect(h.input.value).toBe('Bounded request');
+        expect(h.actions()).toHaveLength(0);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     }
   );
 });

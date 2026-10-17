@@ -83,6 +83,38 @@
     });
   }
 
+  // This deadline ends the browser wait, not server execution. Never auto-resend a POST.
+  function fetchConversationJson(options) {
+    return new Promise(function (resolve, reject) {
+      var controller = window.AbortController ? new window.AbortController() : null;
+      var settled = false;
+      function finish(error, result) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        if (error) reject(error);
+        else resolve(result);
+      }
+      var timer = window.setTimeout(function () {
+        finish(new Error('Conversation result unconfirmed'));
+        if (controller) controller.abort();
+      }, 60000);
+      if (controller) options.signal = controller.signal;
+      Promise.resolve()
+        .then(function () {
+          return fetchJson('/api/conversation', options);
+        })
+        .then(
+          function (result) {
+            finish(null, result);
+          },
+          function (error) {
+            finish(error);
+          }
+        );
+    });
+  }
+
   var ICON_PATHS = {
     mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
     send: '<path d="M4 12l16-8-6 16-2-6z"/>',
@@ -1138,6 +1170,14 @@
     var draftRevision = state.draftRevision;
     var sentScope = readRecovery.scopeSnapshot();
     var sentEpoch = state.draftScopeEpoch;
+    var sentShell = window.FrontDeskRail && window.FrontDeskRail.ready;
+    function currentSend() {
+      return (
+        sentScope === readRecovery.scopeSnapshot() &&
+        sentShell === (window.FrontDeskRail && window.FrontDeskRail.ready) &&
+        state.draftShellReady !== false
+      );
+    }
     state.pendingRequest = request;
     state.sending = true;
     var actionAttempt = nextActions ? nextActions.begin() : null;
@@ -1147,7 +1187,7 @@
     var tenant =
       window.KyberionPrefs && window.KyberionPrefs.tenant ? window.KyberionPrefs.tenant() : null;
     var selectedScope = new URL(window.location.href).searchParams;
-    fetchJson('/api/conversation', {
+    fetchConversationJson({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1162,6 +1202,7 @@
       }),
     })
       .then(function (result) {
+        if (!currentSend()) return;
         var body = result.body || {};
         if (
           !result.ok ||
@@ -1232,6 +1273,7 @@
           return updateHearing(trimmed, body.intent_resolution).catch(function () {});
       })
       .catch(function () {
+        if (!currentSend()) return;
         state.errorKey = 'concierge:dock.history.pending';
       })
       .finally(function () {
