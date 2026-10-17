@@ -370,6 +370,65 @@ describe('dot-executor supervisor step', () => {
     }
   );
 
+  it.each([toolBackend])(
+    'runs an advisory task_session through goalTurn when marked advisory ($name)',
+    async (backend) => {
+      const goalDriver = vi.fn(async () => ({
+        goalId: 'g',
+        finalState: 'complete',
+        goal: {},
+        turnsRun: 2,
+        rewindCount: 0,
+        persisted: null,
+        finalReport: 'advisory analysis complete',
+      }));
+      const target = {
+        item_id: 'advisory-ts',
+        title: 'Advise on alert dominance',
+        description: 'Analyze and advise',
+        status: 'ready',
+        version: 1,
+        created_at: '2026-10-04T09:00:00Z',
+        metadata: {
+          dot_id: 'step-dot',
+          action_ref: 'dact-advisory',
+          requested_work_shape: 'task_session',
+          task_session_mode: 'advisory',
+        },
+      } as unknown as WorkItem;
+      const rows = await runDotExecutorStep(
+        new Date('2026-10-04T10:00:00Z'),
+        [
+          {
+            path: 'dots/step-dot.json',
+            charter: {
+              ...CHARTER,
+              authority: {
+                ...CHARTER.authority,
+                allowed_work_shapes: ['task_session', 'pipeline'],
+              },
+            },
+          },
+        ],
+        {
+          rootDir: 'active/shared/tmp/dot-executor-step-tests',
+          backend,
+          goalDriver: goalDriver as never,
+          listItems: () => [target],
+          claim: () => ({ item: target, lease: { lease_id: 'l1' } as never }),
+          release: vi.fn(() => ({ item: target, lease: {} as never })),
+          throttle: () => 'normal',
+          tokenCapReached: () => false,
+          reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+          appendInbox: vi.fn(),
+          audit: () => {},
+        }
+      );
+      expect(goalDriver).toHaveBeenCalled();
+      expect(rows).toMatchObject([{ work_item_id: 'advisory-ts', status: 'done' }]);
+    }
+  );
+
   it('preserves a legitimate advisory direct reply through the real adapter', async () => {
     const goalDriver = vi.fn(async () => ({
       goalId: 'g',
