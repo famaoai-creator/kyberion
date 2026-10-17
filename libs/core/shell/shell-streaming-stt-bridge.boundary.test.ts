@@ -1,7 +1,121 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { parseShellStreamingSttTranscript } from './shell-streaming-stt-bridge.js';
+import {
+  parseShellStreamingSttTranscript,
+  ShellStreamingSpeechToTextBridge,
+} from './shell-streaming-stt-bridge.js';
+import type { AudioChunk } from '../meeting/meeting-session-types.js';
+
+async function* noAudio(): AsyncIterable<AudioChunk> {}
+
+function shellBridge(script: string, env?: Record<string, string>) {
+  return new ShellStreamingSpeechToTextBridge({
+    bridge_id: 'test-shell',
+    command: process.execPath,
+    args: ['-e', script],
+    env,
+  });
+}
+
+async function waitForExit(pid: number) {
+  await expect
+    .poll(
+      () => {
+        try {
+          process.kill(pid, 0);
+          return false;
+        } catch {
+          return true;
+        }
+      },
+      { timeout: 5000 }
+    )
+    .toBe(true);
+}
+
+async function transcripts(stream: AsyncIterable<{ text: string }>) {
+  const result: string[] = [];
+  for await (const chunk of stream) result.push(chunk.text);
+  return result;
+}
+
+describe('shell streaming STT subprocess lifecycle', () => {
+  it('drains queued transcripts and a final line without a newline after the child closes', async () => {
+    const bridge = shellBridge(`
+      process.stdin.resume();
+      process.stdin.on('end', () => {
+        const lines = [String(process.pid), 'second', 'last'].map(text => JSON.stringify({text}));
+        process.stdout.write(lines.join('\\n'));
+      });
+    `);
+    const stream = bridge.transcribeStream(noAudio())[Symbol.asyncIterator]();
+    try {
+      const first = await stream.next();
+      await waitForExit(Number(first.value!.text));
+      expect((await stream.next()).value?.text).toBe('second');
+      expect((await stream.next()).value?.text).toBe('last');
+      expect((await stream.next()).done).toBe(true);
+    } finally {
+      await stream.return?.();
+    }
+  });
+
+  it('rejects a nonzero exit while waiting for a transcript', async () => {
+    await expect(
+      transcripts(shellBridge('process.exit(7)').transcribeStream(noAudio()))
+    ).rejects.toThrow(/shell STT exited with code 7/);
+  });
+
+  it('reports a nonzero exit even after yielding transcripts to a slow consumer', async () => {
+    const stream = shellBridge(`
+      process.stdin.resume();
+      process.stdin.on('end', () => {
+        process.stdout.write(JSON.stringify({text:String(process.pid)})+'\\n', () => process.exit(7));
+      });
+    `)
+      .transcribeStream(noAudio())
+      [Symbol.asyncIterator]();
+    try {
+      const first = await stream.next();
+      await waitForExit(Number(first.value!.text));
+      await expect(stream.next()).rejects.toThrow(/shell STT exited with code 7/);
+    } finally {
+      await stream.return?.();
+    }
+  });
+
+  it('rejects a spawn failure', async () => {
+    const bridge = new ShellStreamingSpeechToTextBridge({
+      bridge_id: 'missing',
+      command: '/nonexistent/kyberion-stt-worker',
+    });
+    await expect(transcripts(bridge.transcribeStream(noAudio()))).rejects.toThrow(/ENOENT/);
+  });
+
+  it('propagates an audio input failure without an unhandled rejection', async () => {
+    async function* brokenAudio(): AsyncIterable<AudioChunk> {
+      throw new Error('audio input failed');
+    }
+    await expect(
+      transcripts(shellBridge('process.stdin.resume()').transcribeStream(brokenAudio()))
+    ).rejects.toThrow('audio input failed');
+  });
+
+  it('forwards the requested language per call and preserves the configured default', async () => {
+    const bridge = shellBridge(
+      `
+      process.stdin.resume();
+      process.stdin.on('end', () => process.stdout.write(JSON.stringify({text:process.env.KYBERION_STT_LANGUAGE})+'\\n'));
+    `,
+      { KYBERION_STT_LANGUAGE: 'ja' }
+    );
+    expect(await transcripts(bridge.transcribeStream(noAudio(), { language: 'en-US' }))).toEqual([
+      'en',
+    ]);
+    expect(await transcripts(bridge.transcribeStream(noAudio()))).toEqual(['ja']);
+  });
+});
 
 describe('shell streaming STT transcript boundary', () => {
   it('routes Shell streaming STT environment reads through the governed accessor', () => {
