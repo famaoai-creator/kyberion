@@ -30,10 +30,18 @@ import {
   WHISPER_LANGUAGES,
 } from './speech-languages.js';
 
+export interface StreamingSttRequestOptions {
+  /** BCP-47 language requested for this transcription. */
+  language?: string;
+}
+
 export interface StreamingSpeechToTextBridge {
   readonly bridge_id: string;
   /** Stream transcript chunks as audio arrives. Both partials + finals. */
-  transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<TranscriptChunk>;
+  transcribeStream(
+    audio: AsyncIterable<AudioChunk>,
+    options?: StreamingSttRequestOptions
+  ): AsyncIterable<TranscriptChunk>;
 }
 
 /* ------------------------------------------------------------------ *
