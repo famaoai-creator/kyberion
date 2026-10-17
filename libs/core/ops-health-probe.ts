@@ -104,7 +104,10 @@ export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[]
   const counts = new Map<string, number>();
   let total = 0;
   for (const row of readJsonLines<Record<string, unknown>>(alertPath)) {
-    if (row?.kind !== 'ops_alert') continue;
+    // Alert records carry id/title/severity; `kind` is only present on
+    // meta-records (undelivered-notification / redelivery / ack markers).
+    if (typeof row?.dedupe_key !== 'string' && typeof row?.title !== 'string') continue;
+    if (typeof row?.kind === 'string' && row.kind !== 'ops_alert') continue;
     total++;
     const key =
       typeof row.dedupe_key === 'string' ? row.dedupe_key : `${row.severity}:${row.title}`;

@@ -315,7 +315,12 @@ export async function requestDaemonRecovery(
       if (!requiresOperator) {
         const spec = DAEMON_SPECS[status.daemon_id.replace(/-daemon$/, '')];
         const manager = resolveDaemonManager();
-        if (spec && manager) {
+        if (spec?.id === 'daemon-watchdog') {
+          // kickstart -k would SIGTERM this very run before it could relaunch;
+          // a stale watchdog is an operator problem, not a self-heal target.
+          autoExecuted = false;
+          autoExecError = 'self-restart refused — watchdog cannot kickstart its own unit mid-run';
+        } else if (spec && manager) {
           const plan = manager.planRestart(spec, {
             nodePath: process.execPath,
             repoRoot: pathResolver.rootDir(),
