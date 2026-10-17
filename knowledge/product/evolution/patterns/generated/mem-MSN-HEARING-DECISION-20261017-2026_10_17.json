@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-HEARING-DECISION-20261017-2026_10_17",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Preserve uncertainty until the exact mutation response is verified",
+  "summary": "Guard confirmation before dispatch, persist minimal operation metadata, and keep an ordinary-conversation exit without treating a read as proof.",
+  "candidate_id": "mem-MSN-HEARING-DECISION-20261017-2026_10_17",
+  "evidence_refs": [
+    "active/missions/public/MSN-HEARING-DECISION-20261017/evidence/implementation-report.md",
+    "active/missions/public/MSN-HEARING-DECISION-20261017/evidence/test-report.md",
+    "active/missions/public/MSN-HEARING-DECISION-20261017/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-HEARING-DECISION-20261017/evidence/validated-blobs.json",
+    "active/missions/public/MSN-HEARING-DECISION-20261017/evidence/deferred-server-design.md"
+  ],
+  "created_at": "2026-10-17T13:12:14.354Z",
+  "applicability": ["mission", "mission:MSN-HEARING-DECISION-20261017"],
+  "reusable_steps": [
+    "Guard confirmation before dispatch, persist minimal operation metadata, and keep an ordinary-conversation exit without treating a read as proof"
+  ],
+  "expected_outcome": "For confirmation mutations without server receipts or revisions, a timeout, broken connection, malformed success or server error cannot prove no write occurred. Persist a minimal session-scoped attempt marker before dispatch and block related mutations; fail closed when storage cannot retain it. Distinguish known pre-write refusal from ambiguous outcomes. Only the exact live response with matching session, scope, generation and marker can settle success; retirement, BFCache, reload and replacement markers must prevent stale callbacks from clearing uncertainty. GET timestamps or saved destinations are not proof of this attempt. Keep a scoped ordinary-conversation escape and retain the marker on return. Test double clicks, storage failure, unknown outcomes, explicit rejection, late responses, reload and scope changes. Exact read reconciliation belongs in a separate server design with revision-bound receipts and atomic serialization across every writer; an atomic file rename alone is not compare-and-swap. Verified product commit: https://github.com/famaoai-creator/kyberion/commit/a033bd966d7d19599b9ddcf55be315fca7982b16; all10published blobs matched the tested manifest, including the runbook merge preserving PR1132. Local529tests and PR48 passed, real synthetic browser verified no replay; local full80/81 was blocked only by absent Playwright executable and requires exact-head CI.",
+  "source_branch": "qa/hearing-decision-published",
+  "source_commit": "a033bd966d7d19599b9ddcf55be315fca7982b16"
+}

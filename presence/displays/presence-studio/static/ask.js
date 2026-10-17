@@ -273,10 +273,16 @@
       hearingRecovery: hearingRecovery,
       fetchJson: fetchJson,
       renderHearing: renderHearing,
+      render: render,
+      randomId: randomId,
     });
   function hearingBlocked() {
     return (
-      state.hearingMode && (!hearingRecovery || !hearingCompletion || hearingRecovery.blocked())
+      state.hearingMode &&
+      (!hearingRecovery ||
+        !hearingCompletion ||
+        hearingRecovery.blocked() ||
+        hearingCompletion.blocked())
     );
   }
 
@@ -604,6 +610,7 @@
     renderConversationStatus();
     renderDraftChoice();
     if (hearingRecovery) hearingRecovery.render();
+    if (hearingCompletion) hearingCompletion.renderDecision();
   }
 
   // PA-09: page state -> avatar controller (the avatar overlays `speaking`
@@ -1344,6 +1351,7 @@
       state.hearingMode = false;
     }
     if (hearingRecovery) hearingRecovery.mount();
+    if (hearingCompletion) hearingCompletion.mount();
     if (correction) correction.mount();
     else {
       var correctionRetry = document.getElementById('ask-correction-retry');
