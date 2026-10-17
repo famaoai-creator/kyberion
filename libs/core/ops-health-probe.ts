@@ -26,9 +26,8 @@ import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeStat } from '.
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { createWorkItemIfAbsent } from './workforce/work-coordination.js';
-import { loadRetentionCatalog, appendOnlyStoreEntries } from './storage-retention-catalog.js';
-import { listUncoveredRuntimeFiles } from './storage-runtime-coverage.js';
-import { listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
+import { loadRetentionCatalog } from './storage-retention-catalog.js';
+import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
 
 const logger = createLogger('ops-health-probe');
 
@@ -41,6 +40,8 @@ export const ALERT_DOMINANCE_RATIO = 0.5;
 export const STORE_OVERGROWTH_FACTOR = 2;
 /** Minimum absolute size before an over-threshold store is worth a ticket. */
 export const STORE_MIN_BYTES = 1024 * 1024;
+/** Ungoverned-growth ceiling for review_required / action-less stores — the delegations.jsonl 13MB class. */
+export const REVIEW_REQUIRED_MAX_BYTES = 32 * 1024 * 1024;
 
 export interface OpsFinding {
   /** Stable dedupe identity — same finding class+subject ⇒ same id. */
@@ -73,12 +74,33 @@ function repoFile(rootDir: string | undefined, rel: string): string {
 export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[] {
   const catalog = loadRetentionCatalog();
   const findings: OpsFinding[] = [];
-  for (const entry of appendOnlyStoreEntries(catalog)) {
+  // Cataloged file-level stores: rotate/compact get threshold-multiple checks;
+  // action-less or review_required .jsonl files get the fixed ceiling — their
+  // mechanism can never fire, so silence is what the probe exists to break.
+  const targets = catalog.entries.filter((e) => e.path.endsWith('.jsonl') && !e.path.includes('{'));
+  for (const entry of targets) {
     const filePath = repoFile(deps.rootDir, entry.path);
     if (!safeExistsSync(filePath)) continue;
     const size = safeStat(filePath).size;
-    const threshold = entry.rotate_min_bytes ?? entry.compact_min_bytes ?? Number.POSITIVE_INFINITY;
-    if (!Number.isFinite(threshold)) continue;
+    const threshold =
+      entry.action === 'rotate' || entry.action === 'compact'
+        ? (entry.rotate_min_bytes ?? entry.compact_min_bytes ?? Number.POSITIVE_INFINITY)
+        : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(threshold)) {
+      // No declared action threshold (review_required etc.) — the mechanism
+      // can never fire, so a fixed ceiling is the only bound. Past it the
+      // store needs a lifecycle entry or a manual archive decision.
+      if (size <= REVIEW_REQUIRED_MAX_BYTES) continue;
+      findings.push({
+        finding_id: findingId('store_overgrowth', entry.path),
+        kind: 'store_overgrowth',
+        severity: 'warning',
+        summary: `review_required store ${entry.path} at ${(size / 1e6).toFixed(1)}MB with no self-bounding action — needs a lifecycle decision`,
+        evidence: { path: entry.path, size_bytes: size, action: entry.action },
+        detected_at: (deps.now?.() ?? new Date()).toISOString(),
+      });
+      continue;
+    }
     if (size < threshold * STORE_OVERGROWTH_FACTOR || size < STORE_MIN_BYTES) continue;
     findings.push({
       finding_id: findingId('store_overgrowth', entry.path),
