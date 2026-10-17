@@ -398,7 +398,18 @@ describe('dot-executor supervisor step', () => {
       } as unknown as WorkItem;
       const rows = await runDotExecutorStep(
         new Date('2026-10-04T10:00:00Z'),
-        [{ path: 'dots/step-dot.json', charter: CHARTER }],
+        [
+          {
+            path: 'dots/step-dot.json',
+            charter: {
+              ...CHARTER,
+              authority: {
+                ...CHARTER.authority,
+                allowed_work_shapes: ['task_session', 'pipeline'],
+              },
+            },
+          },
+        ],
         {
           rootDir: 'active/shared/tmp/dot-executor-step-tests',
           backend,
