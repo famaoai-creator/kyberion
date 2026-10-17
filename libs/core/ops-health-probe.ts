@@ -193,17 +193,30 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
   ];
   const findingsPath = repoFile(deps.rootDir, OPS_FINDINGS_PATH);
   safeMkdir(path.dirname(findingsPath), { recursive: true });
+  // Dedupe findings rows by finding_id: the file is append-only and the probe
+  // reruns daily, so the same defect would otherwise produce a new identical
+  // row each run and drown the signal.
+  const seenIds = new Set<string>();
+  for (const row of readJsonLines<Record<string, unknown>>(findingsPath, { onMalformed: 'skip' })) {
+    if (typeof row?.finding_id === 'string') seenIds.add(row.finding_id);
+  }
+  const dedupedFindings = findings.filter((f) => {
+    if (seenIds.has(f.finding_id)) return false;
+    seenIds.add(f.finding_id);
+    return true;
+  });
   const workItemsFiled: string[] = [];
   // Items that exist now — newly filed or a dedup hit. The wake notifies on
   // the union: an item filed before wakes existed still needs a doorbell.
   const workItemsExisting: string[] = [];
-  for (const finding of findings) {
+  for (const finding of dedupedFindings) {
     appendJsonLine(findingsPath, finding);
     if (deps.fileWorkItems) {
       try {
         createWorkItemIfAbsent({
           itemId: finding.finding_id,
           title: `[ops] ${finding.summary.slice(0, 120)}`,
+          status: 'ready',
           description: `Detected by ops-health-probe. Evidence: ${JSON.stringify(finding.evidence)}`,
           labels: ['ops-health', finding.kind, `severity:${finding.severity}`],
           // Address to the ops dot so the item is actually claimed — an
