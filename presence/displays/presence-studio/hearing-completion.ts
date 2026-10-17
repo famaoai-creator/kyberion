@@ -32,6 +32,7 @@ export interface HearingCompletion {
 /** Completion identifiers are projections, never trusted wire fields from storage. */
 export function withoutHearingCompletionFields(record: HearingRecord): HearingRecord {
   const sanitized = { ...record } as StoredHearing;
+  delete sanitized.handoff_pending;
   delete sanitized.mission_id;
   delete sanitized.approval_request_id;
   delete sanitized.handed_off_at;
@@ -77,6 +78,7 @@ export function readHearingCompletion(
   viewer: PresenceStudioViewerContext
 ): HearingCompletion | undefined {
   const stored = record as StoredHearing;
+  if (stored.handoff_pending) return { kind: stored.handoff_pending.kind, status: 'unavailable' };
   const missionMarker = Boolean(
     stored.mission_id || stored.approval_request_id || stored.handed_off_at
   );
