@@ -273,6 +273,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion scheduler`                     | `pnpm scheduler`                    | Run the Chronos scheduler daemon                                                                                      |
 | `pnpm kyberion scheduler install`             |                                     | Install the Chronos launchd agent                                                                                     |
 | `pnpm kyberion scheduler restart`             |                                     | Restart the Chronos daemon via the host service manager                                                               |
+| `pnpm kyberion scheduler start`               |                                     | Start the registered Chronos daemon                                                                                   |
+| `pnpm kyberion scheduler stop`                |                                     | Stop the registered Chronos daemon                                                                                    |
 | `pnpm kyberion scheduler uninstall`           |                                     | Show Chronos launchd uninstall steps                                                                                  |
 | `pnpm kyberion screenshot-annotate server`    |                                     | Start the screenshot annotation pad                                                                                   |
 | `pnpm kyberion seam select`                   |                                     | Inspect, calibrate, and set seam provider selection                                                                   |

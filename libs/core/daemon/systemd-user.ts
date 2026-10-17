@@ -20,12 +20,12 @@ export function systemdUnitStem(spec: DaemonServiceSpec): string {
 }
 
 function logDir(ctx: DaemonRenderContext): string {
-  return path.join(ctx.homeDir, '.local', 'state', 'kyberion');
+  return path.posix.join(ctx.homeDir, '.local', 'state', 'kyberion');
 }
 
 /** Pure unit-file render — string in, string out, no I/O. */
 export function buildSystemdServiceUnit(spec: DaemonServiceSpec, ctx: DaemonRenderContext): string {
-  const daemonScript = path.join(ctx.repoRoot, spec.daemonScript);
+  const daemonScript = path.posix.join(ctx.repoRoot, spec.daemonScript);
   const envLines = Object.entries(ctx.env ?? {})
     .map(([name, value]) => `Environment=${name}=${value}`)
     .join('\n');
@@ -38,11 +38,11 @@ Description=Kyberion daemon: ${spec.id}
 [Service]
 Type=${spec.startIntervalSec ? 'oneshot' : 'simple'}
 WorkingDirectory=${ctx.repoRoot}
-Environment=PATH=${path.dirname(ctx.nodePath)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+Environment=PATH=${path.posix.dirname(ctx.nodePath)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 ${envLines ? `${envLines}\n` : ''}ExecStartPre=/bin/mkdir -p ${logDir(ctx)}
 ExecStart=${ctx.nodePath} ${daemonScript}${(spec.daemonArgs ?? []).map((arg) => ` ${arg}`).join('')}
-${restart}StandardOutput=append:${path.join(logDir(ctx), `${spec.logBaseName}.log`)}
-StandardError=append:${path.join(logDir(ctx), `${spec.logBaseName}.err.log`)}
+${restart}StandardOutput=append:${path.posix.join(logDir(ctx), `${spec.logBaseName}.log`)}
+StandardError=append:${path.posix.join(logDir(ctx), `${spec.logBaseName}.err.log`)}
 
 [Install]
 WantedBy=default.target
@@ -66,7 +66,7 @@ WantedBy=timers.target
 }
 
 export function systemdUnitDir(homeDir: string): string {
-  return path.join(homeDir, '.config', 'systemd', 'user');
+  return path.posix.join(homeDir, '.config', 'systemd', 'user');
 }
 
 /** The unit systemctl acts on: the timer when scheduled, else the service. */
@@ -78,8 +78,8 @@ function activeUnitName(spec: DaemonServiceSpec): string {
 function unitPaths(spec: DaemonServiceSpec, ctx: DaemonRenderContext): string[] {
   const stem = systemdUnitStem(spec);
   const dir = systemdUnitDir(ctx.homeDir);
-  const paths = [path.join(dir, `${stem}.service`)];
-  if (spec.startIntervalSec) paths.push(path.join(dir, `${stem}.timer`));
+  const paths = [path.posix.join(dir, `${stem}.service`)];
+  if (spec.startIntervalSec) paths.push(path.posix.join(dir, `${stem}.timer`));
   return paths;
 }
 
@@ -89,18 +89,18 @@ export const systemdUserManager: DaemonManager = {
   planInstall(spec, ctx) {
     const stem = systemdUnitStem(spec);
     const dir = systemdUnitDir(ctx.homeDir);
-    const stagedService = path.join(ctx.stagingDir, `${stem}.service`);
+    const stagedService = path.posix.join(ctx.stagingDir, `${stem}.service`);
     const unitFiles = [
       {
         stagedPath: stagedService,
-        targetPath: path.join(dir, `${stem}.service`),
+        targetPath: path.posix.join(dir, `${stem}.service`),
         content: buildSystemdServiceUnit(spec, ctx),
       },
     ];
     if (spec.startIntervalSec) {
       unitFiles.push({
-        stagedPath: path.join(ctx.stagingDir, `${stem}.timer`),
-        targetPath: path.join(dir, `${stem}.timer`),
+        stagedPath: path.posix.join(ctx.stagingDir, `${stem}.timer`),
+        targetPath: path.posix.join(dir, `${stem}.timer`),
         content: buildSystemdTimerUnit(spec),
       });
     }
@@ -111,7 +111,7 @@ export const systemdUserManager: DaemonManager = {
         { run: ['mkdir', '-p', dir], describe: 'ensure systemd user unit directory' },
         ...unitFiles.map((file) => ({
           run: ['cp', file.stagedPath, file.targetPath],
-          describe: `install ${path.basename(file.targetPath)}`,
+          describe: `install ${path.posix.basename(file.targetPath)}`,
         })),
         { run: ['systemctl', '--user', 'daemon-reload'], describe: 'reload unit files' },
         {
@@ -141,7 +141,7 @@ export const systemdUserManager: DaemonManager = {
         },
         ...unitPaths(spec, ctx).map((target) => ({
           run: ['rm', '-f', target],
-          describe: `remove ${path.basename(target)}`,
+          describe: `remove ${path.posix.basename(target)}`,
         })),
         { run: ['systemctl', '--user', 'daemon-reload'], describe: 'reload unit files' },
       ],
@@ -150,6 +150,26 @@ export const systemdUserManager: DaemonManager = {
         ...unitPaths(spec, ctx).map((target, i) => `${i + 2}. rm ${target}`),
         `${unitPaths(spec, ctx).length + 2}. systemctl --user daemon-reload`,
       ],
+      verificationHint: spec.verificationHint,
+    };
+  },
+
+  planStart(spec) {
+    const unit = activeUnitName(spec);
+    return {
+      unitFiles: [],
+      commands: [{ run: ['systemctl', '--user', 'start', unit] }],
+      manualSteps: [`systemctl --user start ${unit}`],
+      verificationHint: spec.verificationHint,
+    };
+  },
+
+  planStop(spec) {
+    const unit = activeUnitName(spec);
+    return {
+      unitFiles: [],
+      commands: [{ run: ['systemctl', '--user', 'stop', unit] }],
+      manualSteps: [`systemctl --user stop ${unit}`],
       verificationHint: spec.verificationHint,
     };
   },

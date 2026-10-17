@@ -1,3 +1,4 @@
+import { createAjv } from '../foundation/ajv.js';
 import { logger } from '../core.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -1024,10 +1025,23 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       toolDefinitions: tools,
     });
     const message = response.choices[0].message;
+    const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
     const toolCalls = (message.tool_calls ?? []).map((call) => {
+      const tool = toolsByName.get(call.function.name);
+      if (!tool) {
+        throw new Error(
+          `[OPENAI_TOOL_CALL_UNKNOWN] tool '${call.function.name}' was not provided for this turn`
+        );
+      }
       const parsed = safeJsonParse(call.function.arguments);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         throw new Error(`[OPENAI_TOOL_ARGUMENTS_INVALID] tool '${call.function.name}' arguments`);
+      }
+      const validateInput = createAjv().compile(tool.inputSchema);
+      if (!validateInput(parsed)) {
+        throw new Error(
+          `[OPENAI_TOOL_ARGUMENTS_SCHEMA_INVALID] tool '${call.function.name}' arguments do not match its schema`
+        );
       }
       return {
         name: call.function.name,
@@ -1035,6 +1049,11 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       };
     });
     const text = extractTextContent(message.content);
+    if (toolCalls.length === 0 && !text) {
+      throw new Error(
+        '[OPENAI_TOOL_CALL_MISSING] model returned neither a valid tool call nor text'
+      );
+    }
     return {
       ...(text ? { text } : {}),
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
