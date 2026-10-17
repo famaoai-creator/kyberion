@@ -598,6 +598,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "empty working directory for the tool-less team-channel surface runtime (Team Channel E); holds no artifacts, recreated on demand"
+    },
+    {
+      "file": "scripts/daemon_watchdog.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "planRestart's DaemonRenderContext requires a stagingDir, but restart plans stage no unit files (unitFiles:[]) — the field is contract-only; nothing is written. Tmp floor is the sanctioned scratch root."
     }
   ],
   "pipeline_literals": [

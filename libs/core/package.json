@@ -7543,6 +7543,10 @@
     "./mission/mission-team-selection": {
       "types": "./dist/mission/mission-team-selection.d.ts",
       "default": "./dist/mission/mission-team-selection.js"
+    },
+    "./ops-health-probe": {
+      "types": "./dist/ops-health-probe.d.ts",
+      "default": "./dist/ops-health-probe.js"
     }
   },
   "dependencies": {
