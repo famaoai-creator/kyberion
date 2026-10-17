@@ -52,6 +52,46 @@
       });
     }
 
+    // This deadline ends the browser wait, not server execution. Never auto-resend a POST.
+    function fetchConversationJson(options, attempt) {
+      return new Promise(function (resolve, reject) {
+        var controller = window.AbortController ? new window.AbortController() : null;
+        var settled = false;
+        function finish(error, result) {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          if (error) reject(error);
+          else resolve(result);
+        }
+        var timer = window.setTimeout(function () {
+          finish(new Error('Conversation result unconfirmed'));
+          if (controller) controller.abort();
+        }, 60000);
+        attempt.cancel = function () {
+          finish(new Error('Conversation wait retired'));
+          if (controller) controller.abort();
+        };
+        if (controller) options.signal = controller.signal;
+        Promise.resolve()
+          .then(function () {
+            return fetch('/api/conversation', options).then(function (response) {
+              return response.json().then(function (body) {
+                return { ok: response.ok, status: response.status, body: body };
+              });
+            });
+          })
+          .then(
+            function (result) {
+              finish(null, result);
+            },
+            function (error) {
+              finish(error);
+            }
+          );
+      });
+    }
+
     function bindNavigation(requestId, navigation, scope, epoch) {
       state.turns.forEach(function (turn) {
         if (turn.role === 'user' && turn.id === requestId + '-user') {
@@ -348,7 +388,14 @@
               state.pendingRequest = null;
             }
             state.storageVerified = true;
-            if ((restoreDraft || !state.draftRestored) && input && !state.draftEdited)
+            if (state.navigationResumed && state.pendingRequest)
+              state.errorKey = 'concierge:dock.history.pending';
+            if (
+              !state.navigationResumed &&
+              (restoreDraft || !state.draftRestored) &&
+              input &&
+              !state.draftEdited
+            )
               input.value = savedDraft || input.value;
             state.draftRestored = true;
             // Early edits, including deliberate clearing, outrank delayed restoration.
@@ -361,7 +408,7 @@
           state.historyReadPending = false;
           if (state.storageVerified) state.draftRecoveryScope = draftScopeSnapshot();
           options.render();
-          if (state.storageVerified) options.onHistoryReady();
+          if (state.storageVerified && !state.navigationResumed) options.onHistoryReady();
           return state.storageVerified;
         })
         .catch(function () {
@@ -514,8 +561,57 @@
         options.render();
       }
       if (window.addEventListener) {
+        var hidden = false;
+        var resumeSequence = 0;
+        var resumeTimer = null;
         window.addEventListener('popstate', retireDraftRecovery);
-        window.addEventListener('pagehide', retireDraftRecovery);
+        window.addEventListener('pagehide', function () {
+          hidden = true;
+          resumeSequence += 1;
+          if (resumeTimer !== null) window.clearTimeout(resumeTimer);
+          resumeTimer = null;
+          retireDraftRecovery();
+        });
+        window.addEventListener('pageshow', function (event) {
+          if (!event || !event.persisted || !hidden) return;
+          hidden = false;
+          var sequence = ++resumeSequence;
+          // Retire callbacks synchronously; even a resolved old GET must not prefill/send.
+          historySequence += 1;
+          state.historyReadPending = false;
+          state.historyState = 'loading';
+          state.errorKey = null;
+          state.navigationResumed = true;
+          options.retireSend();
+          options.retireStartup();
+          options.render();
+          // History traversal dispatches popstate and restores form state after pageshow.
+          resumeTimer = window.setTimeout(function () {
+            resumeTimer = null;
+            var shell = window.FrontDeskRail && window.FrontDeskRail.ready;
+            var scope = draftScopeSnapshot(false);
+            Promise.resolve(shell)
+              .then(function () {
+                if (sequence !== resumeSequence) return;
+                if (
+                  !state.draftShellReady ||
+                  scope !== draftScopeSnapshot(false) ||
+                  shell !== (window.FrontDeskRail && window.FrontDeskRail.ready)
+                ) {
+                  state.historyState = 'failed';
+                  options.render();
+                  return;
+                }
+                if (state.vocabularyReady) options.restoreConversation(false);
+                else options.loadStartup();
+              })
+              .catch(function () {
+                if (sequence !== resumeSequence) return;
+                state.historyState = 'failed';
+                options.render();
+              });
+          }, 0);
+        });
       }
       if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
         window.FrontDeskRail.subscribe(function (shell) {
@@ -543,6 +639,7 @@
       observeShell: observeShell,
       renderStartup: renderStartup,
       fetchJson: fetchReadJson,
+      fetchConversationJson: fetchConversationJson,
       hasBootVocabulary: hasBootVocabulary,
       renderRecent: renderRecentRead,
       refreshRecent: refreshRecent,
