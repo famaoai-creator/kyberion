@@ -28,6 +28,7 @@ import { resolveDaemonManager } from '@agent/core/daemon/service-manager';
 import { safeExecResult } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  listAutonomyActionIds,
   recordAutonomyExecution,
   sweepAutonomyActionStates,
 } from '@agent/core/governance/autonomy-action-state';
@@ -223,10 +224,8 @@ export async function checkDaemonHeartbeatsWithRecovery(
   // Evidence-driven autonomy sweep runs every watchdog pass — cheap (ledger
   // tail scan) and keeps promotion/demotion close to the signal source.
   try {
-    sweepAutonomyActionStates(
-      ['daemon_restart'],
-      options.rootDir ? { rootDir: options.rootDir } : {}
-    );
+    const sweepDeps = options.rootDir ? { rootDir: options.rootDir } : {};
+    sweepAutonomyActionStates(listAutonomyActionIds(sweepDeps), sweepDeps);
   } catch {
     /* sweep failures must never mask a watchdog verdict */
   }

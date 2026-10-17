@@ -124,6 +124,18 @@ export function recordAutonomyExecution(
   });
 }
 
+/** Distinct action ids present in the ledger — sweeps must cover every
+ *  recorded action, not a hardcoded subset, or most promotions never fire. */
+export function listAutonomyActionIds(deps: AutonomyStateDeps = {}): string[] {
+  const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
+  if (!safeExistsSync(p)) return [];
+  const ids = new Set<string>();
+  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p)) {
+    if (typeof row?.action_id === 'string' && row.action_id) ids.add(row.action_id);
+  }
+  return [...ids];
+}
+
 export interface AutonomyActionStats {
   decisions: number;
   /** Executed runs that returned ok=true. */
