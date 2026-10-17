@@ -69,6 +69,10 @@ const allowedCoreFsImports = [
   // test's own seam, so the fixtures must bypass it.
   'libs/core/scope-offboarding.test.ts',
   'libs/core/nhi-lifecycle-governance.test.ts',
+  // Vision attachment tests plant a real PNG fixture under active/shared/tmp/
+  // so the governed path/signature validators run against real disk bytes;
+  // raw fs is the honest fixture seam for those test files.
+  'libs/core/opencode-cli-reasoning-backend.test.ts',
   'libs/core/mission/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
