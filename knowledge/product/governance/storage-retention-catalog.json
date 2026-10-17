@@ -551,9 +551,9 @@
     },
     {
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
-      "artifact_class": "state",
-      "action": "review_required",
-      "note": "Trigger-runner idempotency/claim store (libs/core/trigger-runner.ts). Self-bounding: appendRecord compacts it to the latest record per idempotency key once it would exceed maxStoreBytes (default 4 MiB), so no TTL is needed."
+      "artifact_class": "log",
+      "action": "rotate",
+      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys embed daemon+status+minute — every tick mints a NEW key, so latest-per-key compaction never shrinks the file (4.9MB and growing). Minute-scoped keys can never re-match after rotation, so losing rotated history cannot re-deliver. Rotated segments expire under the observability sweep."
     },
     {
       "path": "active/shared/runtime/vuln-ledger.jsonl",
