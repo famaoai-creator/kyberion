@@ -10,7 +10,7 @@
         "structured_output": true,
         "abort": true,
         "session_continuity": false,
-        "input_modalities": ["text"]
+        "input_modalities": ["text", "image"]
       },
       "env_keys": ["OPENCODE_CLI", "OPENCODE_VERSION", "KYBERION_OPENCODE_CLI_BIN"],
       "cost_tier": "free",

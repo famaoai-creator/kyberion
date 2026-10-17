@@ -12,11 +12,11 @@
     "coding": "secondary"
   },
   "cost_band": "low",
-  "latency_band": "medium",
+  "latency_band": "low",
   "structured_output_confidence": "medium",
   "tool_use_confidence": "medium",
   "multilingual_confidence": "medium",
   "reasoning_confidence": "medium",
   "capability_tags": ["agentic_coding", "tool_use", "structured_output"],
-  "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host."
+  "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.3s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) 2026-10-17 later probe: service-side `provider.no-route` \"Model unavailable\" (round-1 4/4 pass earlier the same day) - intermittent free-tier availability; do not use as the sole default. vision probe 2026-10-17: not verifiable at probe time (service-side provider.no-route)."
 }

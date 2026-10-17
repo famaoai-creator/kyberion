@@ -63,6 +63,7 @@
     "libs/core/mission/mission-seal.test.ts",
     "libs/core/mission/mission-tier-scan.test.ts",
     "libs/core/nhi-lifecycle-governance.test.ts",
+    "libs/core/opencode-cli-reasoning-backend.test.ts",
     "libs/core/organization/tenant-design-resolver.test.ts",
     "libs/core/organization/tenant-registry.test.ts",
     "libs/core/output-artifacts.test.ts",

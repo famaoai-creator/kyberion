@@ -39,6 +39,7 @@ import {
   DelegationWallClockExceededError,
 } from './mission/delegation-concurrency.js';
 import * as pathResolver from './path-resolver.js';
+import { safeReadFile, safeStat } from './secure-io.js';
 import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
@@ -48,6 +49,7 @@ import {
 import { schemaHint } from './structured-schema-hint.js';
 import type {
   ReasoningBackend,
+  ReasoningImageAttachment,
   DivergeHypothesisInput,
   HypothesisSketch,
   CritiqueInput,
@@ -67,6 +69,12 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
   ReasoningCallOptions,
+} from './reasoning/reasoning-backend.js';
+import {
+  MAX_REASONING_IMAGES,
+  MAX_REASONING_IMAGE_BYTES,
+  MAX_REASONING_IMAGE_BYTES_TOTAL,
+  validateReasoningImageAttachmentPaths,
 } from './reasoning/reasoning-backend.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -127,7 +135,7 @@ export interface OpencodeCliReasoningBackendOptions {
   timeoutMs?: number;
   /** Additional CLI args. */
   extraArgs?: string[];
-  /** Working directory passed via `--dir`. Defaults to repo root. */
+  /** Working directory for the child process (`cwd`). Defaults to repo root. */
   workspaceDir?: string;
   /** Agent for read-only profiles. Defaults to `plan`. */
   planAgent?: string;
@@ -142,6 +150,8 @@ export interface OpencodeCliAvailability {
 
 export class OpencodeCliReasoningBackend implements ReasoningBackend {
   readonly name = 'opencode-cli';
+  /** The CLI passes attached images via `--file`; vision-relevant models use them. */
+  readonly supportsVision = true;
   private readonly bin: string;
   private readonly model: string;
   private readonly timeoutMs: number;
@@ -235,6 +245,73 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
     );
   }
 
+  /**
+   * Run a prompt with images attached through the CLI's `--file` flag.
+   *
+   * The CLI reads each file from disk, so validation focuses on what the
+   * process boundary guarantees: count, governed paths, size, and a real
+   * file whose magic bytes match the declared media type — a mismatched
+   * attachment otherwise fails inside the model API with no signal about
+   * which file caused it.
+   */
+  async promptWithImages(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    if (images.length === 0) {
+      return this.prompt(prompt, { profile: 'planner' });
+    }
+    if (images.length > MAX_REASONING_IMAGES) {
+      throw new Error(
+        `[VISION_TOO_MANY_IMAGES] ${images.length} images exceeds the ${MAX_REASONING_IMAGES} per-call limit`
+      );
+    }
+    validateReasoningImageAttachmentPaths(images);
+
+    let totalBytes = 0;
+    for (const image of images) {
+      const size = safeStat(image.path).size;
+      if (size > MAX_REASONING_IMAGE_BYTES) {
+        throw new Error(
+          `[VISION_IMAGE_TOO_LARGE] ${image.path} is ${Math.round(size / 1024)}KB, over the ${Math.round(MAX_REASONING_IMAGE_BYTES / 1024)}KB limit`
+        );
+      }
+      totalBytes += size;
+      if (totalBytes > MAX_REASONING_IMAGE_BYTES_TOTAL) {
+        throw new Error(
+          `[VISION_PAYLOAD_TOO_LARGE] image payload exceeds the ${Math.round(MAX_REASONING_IMAGE_BYTES_TOTAL / 1024 / 1024)}MB aggregate limit`
+        );
+      }
+      const raw = safeReadFile(image.path, { encoding: null }) as Buffer;
+      const signature = raw.subarray(0, 12);
+      const validSignature =
+        (image.media_type === 'image/png' &&
+          signature.length >= 8 &&
+          signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+        (image.media_type === 'image/jpeg' && signature[0] === 0xff && signature[1] === 0xd8) ||
+        (image.media_type === 'image/gif' &&
+          signature
+            .subarray(0, 6)
+            .toString('ascii')
+            .match(/^GIF8[79]a$/u) !== null) ||
+        (image.media_type === 'image/webp' &&
+          signature.subarray(0, 4).toString('ascii') === 'RIFF' &&
+          signature.subarray(8, 12).toString('ascii') === 'WEBP');
+      if (!validSignature) {
+        throw new Error(
+          `[VISION_BAD_SIGNATURE] ${image.path} does not match its declared media type ${image.media_type}`
+        );
+      }
+    }
+
+    return this.complete(
+      'You are a focused reasoning sub-agent. The images listed with --file are attached to this message; look at them before answering.',
+      prompt,
+      { profile: 'planner', files: images.map((image) => image.path) }
+    );
+  }
+
   private resolveAgentArgs(profile?: ProviderPermissionProfileName): string[] {
     const effectiveProfile = resolveEffectiveProviderPermissionProfile('opencode', profile);
     if (!effectiveProfile) {
@@ -261,6 +338,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       signal?: AbortSignal;
       model?: string;
       shapeHint?: string;
+      files?: readonly string[];
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
@@ -269,6 +347,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       ? `\n\nRespond with exactly this JSON shape (top-level keys, nesting, and field names must match): ${options.shapeHint.trim()}`
       : '';
     const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}${hint}`.trim();
+    const fileArgs = (options?.files ?? []).flatMap((file) => ['--file', file]);
     const args = [
       'run',
       '--format',
@@ -276,8 +355,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       '--model',
       model,
       ...this.resolveAgentArgs(options?.profile),
-      '--dir',
-      this.workspaceDir,
+      ...fileArgs,
       ...this.extraArgs,
       prompt,
     ];
@@ -305,6 +383,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: spawnEnv.env,
+        cwd: this.workspaceDir,
       })
     );
 
