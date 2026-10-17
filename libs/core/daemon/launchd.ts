@@ -45,15 +45,18 @@ export function buildLaunchdPlist(
   defaults: { label: string; daemonScript: string; logBaseName: string }
 ): string {
   const label = options.label ?? defaults.label;
-  const daemonScript = path.join(options.repoRoot, options.daemonScript ?? defaults.daemonScript);
+  const daemonScript = path.posix.join(
+    options.repoRoot,
+    options.daemonScript ?? defaults.daemonScript
+  );
   const logBaseName = options.logBaseName ?? defaults.logBaseName;
-  const stdoutPath = path.join(options.logDir, `${logBaseName}.log`);
-  const stderrPath = path.join(options.logDir, `${logBaseName}.err.log`);
+  const stdoutPath = path.posix.join(options.logDir, `${logBaseName}.log`);
+  const stderrPath = path.posix.join(options.logDir, `${logBaseName}.err.log`);
   // launchd spawns with PATH=/usr/bin:/bin:/usr/sbin:/sbin; scheduled
   // pipelines shell out to node/pnpm, so extend PATH with the node bin dir
   // and the standard package-manager locations.
   const pathEnv = [
-    path.dirname(options.nodePath),
+    path.posix.dirname(options.nodePath),
     '/opt/homebrew/bin',
     '/usr/local/bin',
     '/usr/bin',
@@ -122,7 +125,7 @@ export function buildLaunchdPlist(
 }
 
 export function launchdUnitPath(spec: DaemonServiceSpec, homeDir: string): string {
-  return path.join(homeDir, 'Library/LaunchAgents', `${spec.label}.plist`);
+  return path.posix.join(homeDir, 'Library/LaunchAgents', `${spec.label}.plist`);
 }
 
 function serviceTarget(spec: DaemonServiceSpec, ctx: DaemonRenderContext): string {
@@ -133,7 +136,7 @@ export const launchdManager: DaemonManager = {
   platform: 'launchd',
 
   planInstall(spec, ctx) {
-    const logDir = path.join(ctx.homeDir, 'Library/Logs');
+    const logDir = path.posix.join(ctx.homeDir, 'Library/Logs');
     const target = launchdUnitPath(spec, ctx.homeDir);
     const plist = buildLaunchdPlist(
       {
@@ -150,14 +153,17 @@ export const launchdManager: DaemonManager = {
       },
       { label: spec.label, daemonScript: spec.daemonScript, logBaseName: spec.logBaseName }
     );
-    const staged = path.join(ctx.stagingDir, `${spec.label}.plist`);
+    const staged = path.posix.join(ctx.stagingDir, `${spec.label}.plist`);
     const domain = `gui/${ctx.uid}`;
     return {
       unitFiles: [{ stagedPath: staged, targetPath: target, content: plist }],
       commands: [
         { run: ['mkdir', '-p', logDir], describe: 'ensure launchd log directory' },
-        { run: ['mkdir', '-p', path.dirname(target)], describe: 'ensure LaunchAgents directory' },
-        { run: ['cp', staged, target], describe: `install ${path.basename(target)}` },
+        {
+          run: ['mkdir', '-p', path.posix.dirname(target)],
+          describe: 'ensure LaunchAgents directory',
+        },
+        { run: ['cp', staged, target], describe: `install ${path.posix.basename(target)}` },
         {
           run: ['launchctl', 'bootout', serviceTarget(spec, ctx)],
           tolerateFailure: true,
@@ -184,9 +190,35 @@ export const launchdManager: DaemonManager = {
           tolerateFailure: true,
           describe: `unload ${spec.label}`,
         },
-        { run: ['rm', '-f', target], describe: `remove ${path.basename(target)}` },
+        { run: ['rm', '-f', target], describe: `remove ${path.posix.basename(target)}` },
       ],
       manualSteps: [`1. launchctl bootout ${serviceTarget(spec, ctx)}`, `2. rm ${target}`],
+      verificationHint: spec.verificationHint,
+    };
+  },
+
+  planStart(spec, ctx) {
+    const target = serviceTarget(spec, ctx);
+    return {
+      unitFiles: [],
+      commands: [
+        {
+          run: ['launchctl', 'bootstrap', `gui/${ctx.uid}`, launchdUnitPath(spec, ctx.homeDir)],
+          tolerateFailure: true,
+        },
+        { run: ['launchctl', 'kickstart', target] },
+      ],
+      manualSteps: [`launchctl kickstart ${target}`],
+      verificationHint: spec.verificationHint,
+    };
+  },
+
+  planStop(spec, ctx) {
+    const target = serviceTarget(spec, ctx);
+    return {
+      unitFiles: [],
+      commands: [{ run: ['launchctl', 'bootout', target], tolerateFailure: true }],
+      manualSteps: [`launchctl bootout ${target}`],
       verificationHint: spec.verificationHint,
     };
   },

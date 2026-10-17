@@ -8148,6 +8148,16 @@
         "ja": "Chronos の launchd アンインストール手順を表示",
         "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
       },
+      "cli_cmd_script_chronos_start": {
+        "en": "Start the registered Chronos daemon",
+        "ja": "????? Chronos ???????",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė řėɠïşŧėřėḓ Ƈħřőñőş ḓȧėɱőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_chronos_stop": {
+        "en": "Stop the registered Chronos daemon",
+        "ja": "????? Chronos ???????",
+        "qps-ploc": "⟦Şŧőṗ ŧħė řėɠïşŧėřėḓ Ƈħřőñőş ḓȧėɱőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
       "cli_cmd_script_chronos_restart": {
         "en": "Restart the Chronos daemon via the host service manager",
         "ja": "ホストのサービスマネージャ経由で Chronos デーモンを再起動",
