@@ -179,6 +179,10 @@ describe('hearing writer consistency across async boundaries', () => {
     vi.useRealTimers();
     if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = previousTenant;
+    safeRmSync(pathResolver.rootResolve('active/shared/runtime/hearing/confidential/' + TENANT), {
+      recursive: true,
+      force: true,
+    });
     safeRmSync(pathResolver.sharedTmp('hearing/' + TENANT), { recursive: true, force: true });
   });
 
@@ -439,6 +443,12 @@ describe('hearing writer consistency across async boundaries', () => {
   it('upgrades an existing revisionless hearing without retaining its stale decision', async () => {
     const session = 'legacy-record-' + randomUUID();
     const legacy = seed(session, 'work_inventory', true);
+    safeRmSync(
+      pathResolver.rootResolve(
+        'active/shared/runtime/hearing/confidential/' + TENANT + '/' + TENANT + '/' + session
+      ),
+      { recursive: true, force: true }
+    );
     delete legacy.record_revision;
     delete legacy.requirements_revision;
     // Deliberate old-format fixture, using the governed I/O boundary.
@@ -463,7 +473,17 @@ describe('hearing writer consistency across async boundaries', () => {
       const session = 'bad-revision-' + randomUUID();
       const record = seed(session, 'work_inventory', true);
       safeWriteFile(
-        pathResolver.sharedTmp('hearing/' + TENANT + '/' + session + '.json'),
+        pathResolver.rootResolve(
+          'active/shared/runtime/hearing/confidential/' +
+            TENANT +
+            '/' +
+            TENANT +
+            '/' +
+            session +
+            '/' +
+            session +
+            '.json'
+        ),
         JSON.stringify({ ...record, record_revision: revision })
       );
       expect(() => loadHearingRecord(TENANT, session)).toThrow('HEARING_REVISION_INVALID');

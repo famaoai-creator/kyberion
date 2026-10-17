@@ -1,7 +1,10 @@
 import * as path from 'node:path';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
+
+export { PARTITIONED_RUNTIME_STATE_ROOTS };
 
 /**
  * Runtime storage layout — one governed place per storage purpose.
@@ -202,6 +205,39 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   resource_usage: 'active/shared/runtime/usage-ledger',
   execution_metrics: 'active/shared/runtime/execution-metrics',
 } as const;
+
+/** Knowledge permission path corresponding to a registered runtime state path. */
+export function partitionedRuntimeStateKnowledgePath(filePath: string): string | undefined {
+  const relative = toPosixRelative(filePath);
+  for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    if (!relative.startsWith(root + '/')) continue;
+    const partition = relative.slice(root.length + 1);
+    if (STORAGE_DATA_TIERS.includes(partition.split('/')[0] as StorageDataTier)) {
+      return 'knowledge/' + partition;
+    }
+  }
+  return undefined;
+}
+
+/** Tier detection stays root-independent, matching storageFloorTierInPath. */
+export function partitionedRuntimeStateTierInPath(filePath: string): StorageDataTier | undefined {
+  const normalized = filePath.replace(/\\/gu, '/');
+  for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
+    const match = normalized.match(
+      new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')
+    );
+    if (match) return match[1] as StorageDataTier;
+  }
+  return undefined;
+}
+
+/** Protected state partitions mirrored in security-policy.json, never shared exemptions. */
+export function protectedRuntimeStatePrefixes(): string[] {
+  return Object.values(PARTITIONED_RUNTIME_STATE_ROOTS).flatMap((root) =>
+    (['personal', 'confidential'] as const).map((tier) => root + '/' + tier + '/')
+  );
+}
 
 /**
  * Inter-process lock id of a metrics ledger file (foundation/lock-utils

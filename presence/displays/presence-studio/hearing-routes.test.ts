@@ -187,6 +187,10 @@ describe('POST /api/hearing/:session/decide', () => {
   afterEach(() => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(
+      pathResolver.rootResolve('active/shared/runtime/hearing/confidential/' + TEST_TENANT),
+      { recursive: true, force: true }
+    );
     safeRmSync(pathResolver.sharedTmp(`hearing/${TEST_TENANT}`), {
       recursive: true,
       force: true,
@@ -281,6 +285,10 @@ describe('POST /api/hearing/:session/answer canvas generation (HT-02)', () => {
   afterEach(() => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(
+      pathResolver.rootResolve('active/shared/runtime/hearing/confidential/' + TEST_TENANT),
+      { recursive: true, force: true }
+    );
     safeRmSync(pathResolver.sharedTmp(`hearing/${TEST_TENANT}`), {
       recursive: true,
       force: true,

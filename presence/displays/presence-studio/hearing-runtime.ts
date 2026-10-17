@@ -3,8 +3,13 @@ import {
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
+  safeMoveSync,
+  safeRmSync,
 } from '@agent/core/secure-io';
 import { withLockSync } from '@agent/core/foundation/lock-utils';
+import { readJson } from '@agent/core/foundation/json';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { humanActor } from '@agent/core/actor';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -15,6 +20,10 @@ import {
   hearingRequirementsKey,
   type HearingRecord,
   type HearingScenario,
+  type HearingDecisionOperation,
+  type HearingDecisionIdentity,
+  type HearingDecisionReceipt,
+  type HearingDecidedBy,
 } from './hearing.js';
 
 const HEARING_ROOT = pathResolver.sharedTmp('hearing');
@@ -27,29 +36,75 @@ function safeSegment(value: string, label: string): string {
   return normalized;
 }
 
-function hearingPath(namespace: string, sessionId: string): string {
-  const tenant = safeSegment(namespace, 'TENANT');
+function hearingDirectory(namespace: string, sessionId: string): string {
   const session = safeSegment(sessionId, 'SESSION');
-  return assertSafeRepositoryPath(`${HEARING_ROOT}/${tenant}/${session}.json`, {
-    allowMissingLeaf: true,
-  });
+  const shared = namespace === 'all' || namespace === 'unscoped';
+  if (!shared && !isValidTenantSlug(namespace))
+    throw new Error('[HEARING_TENANT_INVALID] canonical tenant slug required');
+  const partition = shared ? 'personal/shared' : 'confidential/' + namespace;
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      'active/shared/runtime/hearing/' + partition + '/' + namespace + '/' + session
+    ),
+    { allowMissingLeaf: true }
+  );
 }
-
+function legacyHearingPath(namespace: string, sessionId: string): string {
+  return assertSafeRepositoryPath(
+    HEARING_ROOT +
+      '/' +
+      safeSegment(namespace, 'TENANT') +
+      '/' +
+      safeSegment(sessionId, 'SESSION') +
+      '.json',
+    { allowMissingLeaf: true }
+  );
+}
+function hearingPath(namespace: string, sessionId: string): string {
+  return hearingDirectory(namespace, sessionId) + '/' + safeSegment(sessionId, 'SESSION') + '.json';
+}
+const writeDirectories = new Map<string, string>();
+function writeKey(namespace: string, sessionId: string): string {
+  return namespace + ':' + sessionId;
+}
 function hearingCanvasPath(namespace: string, sessionId: string, version: string): string {
-  const tenant = safeSegment(namespace, 'TENANT');
-  const session = safeSegment(sessionId, 'SESSION');
-  const safeVersion = safeSegment(version, 'CANVAS_VERSION');
-  return assertSafeRepositoryPath(`${HEARING_ROOT}/${tenant}/${session}.${safeVersion}.html`, {
-    allowMissingLeaf: true,
-  });
+  const root =
+    writeDirectories.get(writeKey(namespace, sessionId)) || hearingDirectory(namespace, sessionId);
+  return (
+    root +
+    '/' +
+    safeSegment(sessionId, 'SESSION') +
+    '.' +
+    safeSegment(version, 'CANVAS_VERSION') +
+    '.html'
+  );
+}
+function legacyCanvasPath(namespace: string, sessionId: string, version: string): string {
+  return (
+    HEARING_ROOT +
+    '/' +
+    safeSegment(namespace, 'TENANT') +
+    '/' +
+    safeSegment(sessionId, 'SESSION') +
+    '.' +
+    safeSegment(version, 'CANVAS_VERSION') +
+    '.html'
+  );
 }
 
 export function loadHearingRecord(namespace: string, sessionId: string): HearingRecord | null {
-  const filePath = hearingPath(namespace, sessionId);
-  if (!safeExistsSync(filePath)) return null;
-  const rawValue = safeReadFile(filePath, { encoding: 'utf8' });
-  const raw = typeof rawValue === 'string' ? rawValue : rawValue.toString('utf8');
-  const parsed = JSON.parse(raw) as HearingRecord;
+  const durable = safeExistsSync(hearingDirectory(namespace, sessionId));
+  const filePath = durable
+    ? hearingPath(namespace, sessionId)
+    : legacyHearingPath(namespace, sessionId);
+  if (!safeExistsSync(filePath)) {
+    if (durable)
+      throw new Error(
+        '[HEARING_STORE_UNRESOLVED] canonical record missing; operator review required'
+      );
+    return null;
+  }
+  const parsed = readJson<HearingRecord>(filePath);
   if (
     !parsed ||
     parsed.session_id !== sessionId ||
@@ -82,10 +137,26 @@ export function loadHearingRecord(namespace: string, sessionId: string): Hearing
     }
     hearingRevision(pending.requirements_revision);
   }
+  if (
+    !durable &&
+    (parsed.decision_receipts !== undefined || parsed.current_decision_operation_id !== undefined)
+  )
+    throw new Error('[HEARING_RECEIPT_INVALID] legacy storage cannot prove a durable operation');
+  try {
+    validateDecisionReceipts(parsed, namespace);
+  } catch {
+    throw new Error('[HEARING_RECEIPT_INVALID] malformed durable decision receipt');
+  }
   return parsed;
 }
 
-export type HearingConflict = 'stale_snapshot' | 'completion_locked' | 'handoff_unresolved';
+export type HearingConflict =
+  | 'stale_snapshot'
+  | 'completion_locked'
+  | 'handoff_unresolved'
+  | 'operation_mismatch'
+  | 'migration_required'
+  | 'receipt_capacity';
 
 export class HearingConflictError extends Error {
   readonly status = 409;
@@ -155,7 +226,12 @@ export function assertHearingDecisionSnapshot(
 }
 
 function writeHearingRecord(namespace: string, record: HearingRecord): string {
-  const filePath = hearingPath(namespace, record.session_id);
+  const filePath =
+    (writeDirectories.get(writeKey(namespace, record.session_id)) ||
+      hearingDirectory(namespace, record.session_id)) +
+    '/' +
+    record.session_id +
+    '.json';
   safeWriteFile(filePath, JSON.stringify(record, null, 2) + '\n', { encoding: 'utf8' });
   return filePath;
 }
@@ -166,32 +242,58 @@ function writeHearingRecord(namespace: string, record: HearingRecord): string {
 export function updateHearingRecord(
   namespace: string,
   sessionId: string,
-  update: (current: HearingRecord | null) => HearingRecord
+  update: (current: HearingRecord | null) => HearingRecord,
+  options: { allowLegacyMigration?: boolean } = {}
 ): HearingRecord {
   return withLockSync(
     'hearing:' + safeSegment(namespace, 'TENANT') + ':' + safeSegment(sessionId, 'SESSION'),
     () => {
       const current = loadHearingRecord(namespace, sessionId);
-      const next = update(current);
-      if (
-        !next ||
-        next.session_id !== sessionId ||
-        typeof (next as unknown as { then?: unknown }).then === 'function'
-      ) {
-        throw new Error('[HEARING_UPDATE_INVALID] synchronous record update required');
+      const directory = hearingDirectory(namespace, sessionId);
+      const exists = safeExistsSync(directory);
+      if (!exists && !options.allowLegacyMigration)
+        throw new HearingConflictError('migration_required');
+      const stage = exists ? undefined : directory + '.migration-' + randomUUID();
+      const key = writeKey(namespace, sessionId);
+      writeDirectories.set(key, stage || directory);
+      try {
+        if (stage && current) {
+          for (const version of current.canvas_versions) {
+            const legacy = legacyCanvasPath(namespace, sessionId, version);
+            if (safeExistsSync(legacy))
+              safeWriteFile(hearingCanvasPath(namespace, sessionId, version), safeReadFile(legacy));
+          }
+        }
+        const next = update(current);
+        if (next === current && current) return current;
+        if (
+          !next ||
+          next.session_id !== sessionId ||
+          typeof (next as unknown as { then?: unknown }).then === 'function'
+        ) {
+          throw new Error('[HEARING_UPDATE_INVALID] synchronous record update required');
+        }
+        const changed =
+          !current || hearingRequirementsKey(current) !== hearingRequirementsKey(next);
+        const committed: HearingRecord = {
+          ...next,
+          record_revision: hearingRevision(current?.record_revision) + 1,
+          requirements_revision:
+            hearingRevision(current?.requirements_revision) + (changed ? 1 : 0),
+        };
+        if (current && changed) {
+          delete committed.decided_at;
+          delete committed.decided_by;
+          delete committed.current_decision_operation_id;
+        }
+        validateDecisionReceipts(committed, namespace);
+        writeHearingRecord(namespace, committed);
+        if (stage) safeMoveSync(stage, directory);
+        return committed;
+      } finally {
+        writeDirectories.delete(key);
+        if (stage && safeExistsSync(stage)) safeRmSync(stage, { recursive: true, force: true });
       }
-      const changed = !current || hearingRequirementsKey(current) !== hearingRequirementsKey(next);
-      const committed: HearingRecord = {
-        ...next,
-        record_revision: hearingRevision(current?.record_revision) + 1,
-        requirements_revision: hearingRevision(current?.requirements_revision) + (changed ? 1 : 0),
-      };
-      if (current && changed) {
-        delete committed.decided_at;
-        delete committed.decided_by;
-      }
-      writeHearingRecord(namespace, committed);
-      return committed;
     }
   );
 }
@@ -200,13 +302,18 @@ export function updateHearingRecord(
  * Routes use updateHearingRecord so they can patch the locked latest record instead.
  */
 export function saveHearingRecord(namespace: string, record: HearingRecord): string {
-  updateHearingRecord(namespace, record.session_id, (current) => {
-    if (current) {
-      assertHearingEditable(current);
-      assertHearingSnapshot(current, record);
-    }
-    return record;
-  });
+  updateHearingRecord(
+    namespace,
+    record.session_id,
+    (current) => {
+      if (current) {
+        assertHearingEditable(current);
+        assertHearingSnapshot(current, record);
+      }
+      return record;
+    },
+    { allowLegacyMigration: true }
+  );
   return hearingPath(namespace, record.session_id);
 }
 
@@ -216,6 +323,8 @@ export function saveHearingCanvasVersion(
   record: HearingRecord,
   html: string
 ): string {
+  if (!writeDirectories.has(writeKey(namespace, record.session_id)))
+    throw new Error('[HEARING_CANVAS_WRITE_UNLOCKED] locked update required');
   let index =
     record.canvas_versions.reduce((max, version) => {
       const match = /^v([0-9]+)$/.exec(version);
@@ -236,7 +345,7 @@ export function saveHearingCanvasVersion(
 }
 
 /** Reserve only immediately before the first external effect, after pure/async preparation.
- * Unknown effects keep this reservation. It is not a receipt or protection beyond tmp retention.
+ * Unknown effects retain this durable reservation; it is not proof of the external effect.
  */
 export function reserveHearingHandoff(
   namespace: string,
@@ -244,26 +353,31 @@ export function reserveHearingHandoff(
   kind: 'mission' | 'inventory',
   now: string
 ): HearingRecord {
-  return updateHearingRecord(namespace, expected.session_id, (current) => {
-    assertHearingEditable(current);
-    assertHearingDecisionSnapshot(current, expected);
-    if (
-      !current.decided_at ||
-      !current.decided_by ||
-      current.requirements.some((item) => !item.answer?.trim())
-    ) {
-      throw new HearingConflictError('stale_snapshot');
-    }
-    return {
-      ...current,
-      handoff_pending: {
-        token: randomUUID(),
-        kind,
-        requirements_revision: hearingRevision(current.requirements_revision),
-        started_at: now,
-      },
-    };
-  });
+  return updateHearingRecord(
+    namespace,
+    expected.session_id,
+    (current) => {
+      assertHearingEditable(current);
+      assertHearingDecisionSnapshot(current, expected);
+      if (
+        !current.decided_at ||
+        !current.decided_by ||
+        current.requirements.some((item) => !item.answer?.trim())
+      ) {
+        throw new HearingConflictError('stale_snapshot');
+      }
+      return {
+        ...current,
+        handoff_pending: {
+          token: randomUUID(),
+          kind,
+          requirements_revision: hearingRevision(current.requirements_revision),
+          started_at: now,
+        },
+      };
+    },
+    { allowLegacyMigration: true }
+  );
 }
 
 export function finishHearingHandoff(
@@ -271,19 +385,24 @@ export function finishHearingHandoff(
   reserved: HearingRecord,
   patch: Partial<HearingRecord>
 ): HearingRecord {
-  return updateHearingRecord(namespace, reserved.session_id, (current) => {
-    assertHearingDecisionSnapshot(current, reserved);
-    if (
-      !reserved.handoff_pending ||
-      current.handoff_pending?.token !== reserved.handoff_pending.token ||
-      current.handoff_pending.kind !== reserved.handoff_pending.kind
-    ) {
-      throw new HearingConflictError('handoff_unresolved');
-    }
-    const finished = { ...current, ...patch };
-    delete finished.handoff_pending;
-    return finished;
-  });
+  return updateHearingRecord(
+    namespace,
+    reserved.session_id,
+    (current) => {
+      assertHearingDecisionSnapshot(current, reserved);
+      if (
+        !reserved.handoff_pending ||
+        current.handoff_pending?.token !== reserved.handoff_pending.token ||
+        current.handoff_pending.kind !== reserved.handoff_pending.kind
+      ) {
+        throw new HearingConflictError('handoff_unresolved');
+      }
+      const finished = { ...current, ...patch };
+      delete finished.handoff_pending;
+      return finished;
+    },
+    { allowLegacyMigration: true }
+  );
 }
 
 export function loadHearingCanvasVersion(
@@ -291,7 +410,9 @@ export function loadHearingCanvasVersion(
   sessionId: string,
   version: string
 ): string | null {
-  const filePath = hearingCanvasPath(namespace, sessionId, version);
+  const filePath = safeExistsSync(hearingDirectory(namespace, sessionId))
+    ? hearingCanvasPath(namespace, sessionId, version)
+    : legacyCanvasPath(namespace, sessionId, version);
   if (!safeExistsSync(filePath)) return null;
   const raw = safeReadFile(filePath, { encoding: 'utf8' });
   return typeof raw === 'string' ? raw : raw.toString('utf8');
@@ -299,7 +420,15 @@ export function loadHearingCanvasVersion(
 
 export function hearingNamespace(tenantSlugs: string[] | 'all'): string {
   if (tenantSlugs === 'all') return 'all';
-  return tenantSlugs[0] || 'unscoped';
+  if (tenantSlugs.some((tenant) => tenant === 'all' || tenant === 'unscoped')) {
+    throw new Error('[HEARING_SCOPE_AMBIGUOUS] tenant collides with legacy hearing namespace');
+  }
+  if (tenantSlugs.length > 1) throw new Error('[HEARING_SCOPE_AMBIGUOUS] select one tenant');
+  if (tenantSlugs.length === 0) return 'unscoped';
+  const tenant = tenantSlugs[0];
+  if (!/^[a-z0-9][a-z0-9_-]{0,30}$/.test(tenant))
+    throw new Error('[HEARING_SCOPE_INVALID] invalid tenant');
+  return tenant;
 }
 
 export function defaultHearingRecord(
@@ -343,4 +472,190 @@ export function renderHearingCanvas(record: HearingRecord, locale: SupportedLoca
     locale
   );
   return `<!doctype html><html lang="${escapeHtml(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(pageTitle)}</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#faf9f6;color:#26231d}h1{font-size:22px;margin:0 0 8px}.meta{color:#706b60;font-size:13px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.requirement{padding:14px;border:1px solid #e3ddd1;border-radius:12px;background:#fff}.requirement h2{font-size:14px;margin:0 0 8px}.requirement p{font-size:13px;line-height:1.5;margin:0;color:#706b60}.answered{border-color:#a98a54}.answered p{color:#26231d}</style></head><body><h1>${escapeHtml(heading)}</h1><p class="meta">${escapeHtml(coverage)}</p><main class="grid">${cards}</main></body></html>`;
+}
+
+/** Versioned wire contract. Empty legacy bodies never create or backfill receipt proof. */
+export class HearingOperationError extends Error {
+  readonly status = 400;
+}
+export function parseHearingDecisionOperation(input: unknown): HearingDecisionOperation | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw new HearingOperationError('Decision request must be an object.');
+  const value = input as Record<string, unknown>;
+  const keys = Object.keys(value);
+  if (!keys.length) return null;
+  if (
+    keys.length !== 4 ||
+    keys.some(
+      (key) => !['version', 'operation_id', 'scenario_id', 'requirements_revision'].includes(key)
+    ) ||
+    value.version !== 1 ||
+    typeof value.operation_id !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(value.operation_id) ||
+    typeof value.scenario_id !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(value.scenario_id) ||
+    !Number.isSafeInteger(value.requirements_revision) ||
+    Number(value.requirements_revision) < 0
+  ) {
+    throw new HearingOperationError('Invalid versioned hearing decision operation.');
+  }
+  return {
+    version: 1,
+    operation_id: value.operation_id,
+    scenario_id: value.scenario_id,
+    requirements_revision: Number(value.requirements_revision),
+  };
+}
+function operationKey(operation: HearingDecisionOperation): string {
+  return JSON.stringify([
+    operation.version,
+    operation.operation_id,
+    operation.scenario_id,
+    operation.requirements_revision,
+  ]);
+}
+function identityKey(identity: HearingDecisionIdentity): string {
+  return JSON.stringify([
+    identity.principal_id,
+    identity.member_id,
+    identity.source,
+    identity.scope_key,
+  ]);
+}
+function validateDecisionReceipts(record: HearingRecord, namespace: string): void {
+  if (record.decision_receipts === undefined) {
+    if (record.current_decision_operation_id !== undefined)
+      throw new Error('[HEARING_RECEIPT_INVALID] current operation has no receipt');
+    return;
+  }
+  if (!Array.isArray(record.decision_receipts) || record.decision_receipts.length > 128)
+    throw new Error('[HEARING_RECEIPT_INVALID] invalid receipt collection');
+  const seen = new Set<string>();
+  let previousRevision = 0;
+  for (const receipt of record.decision_receipts) {
+    if (
+      !receipt ||
+      !receipt.identity ||
+      !receipt.operation ||
+      !parseHearingDecisionOperation(receipt.operation) ||
+      typeof receipt.identity.member_id !== 'string' ||
+      !receipt.identity.member_id ||
+      typeof receipt.identity.principal_id !== 'string' ||
+      !receipt.identity.principal_id ||
+      typeof receipt.identity.scope_key !== 'string' ||
+      !receipt.identity.scope_key ||
+      !['loopback', 'token'].includes(receipt.identity.source) ||
+      receipt.namespace !== namespace ||
+      receipt.session_id !== record.session_id ||
+      typeof receipt.decided_at !== 'string' ||
+      !Number.isFinite(Date.parse(receipt.decided_at)) ||
+      !Number.isSafeInteger(receipt.record_revision) ||
+      receipt.record_revision <= previousRevision ||
+      receipt.record_revision > hearingRevision(record.record_revision) ||
+      receipt.operation.requirements_revision > hearingRevision(record.requirements_revision) ||
+      seen.has(receipt.operation.operation_id)
+    )
+      throw new Error('[HEARING_RECEIPT_INVALID] invalid operation binding');
+    seen.add(receipt.operation.operation_id);
+    previousRevision = receipt.record_revision;
+  }
+  if (
+    record.current_decision_operation_id !== undefined &&
+    (record.decision_receipts.at(-1)?.operation.operation_id !==
+      record.current_decision_operation_id ||
+      !record.decision_receipts.some(
+        (receipt) =>
+          receipt.operation.operation_id === record.current_decision_operation_id &&
+          receipt.operation.scenario_id === record.scenario &&
+          receipt.operation.requirements_revision ===
+            hearingRevision(record.requirements_revision) &&
+          humanActor(receipt.identity.member_id).id === record.decided_by?.id &&
+          receipt.decided_at === record.decided_at
+      ))
+  ) {
+    throw new Error('[HEARING_RECEIPT_INVALID] current decision binding mismatch');
+  }
+}
+export function hearingDecisionReceipt(
+  record: HearingRecord | null,
+  namespace: string,
+  operation: HearingDecisionOperation,
+  identity: HearingDecisionIdentity
+): { receipt: HearingDecisionReceipt; status: 'current' | 'superseded' } | null {
+  if (!record) return null;
+  validateDecisionReceipts(record, namespace);
+  const receipt = record.decision_receipts?.find(
+    (item) => item.operation.operation_id === operation.operation_id
+  );
+  if (!receipt) return null;
+  if (
+    operationKey(receipt.operation) !== operationKey(operation) ||
+    identityKey(receipt.identity) !== identityKey(identity)
+  ) {
+    throw new HearingConflictError('operation_mismatch');
+  }
+  return {
+    receipt,
+    status:
+      record.current_decision_operation_id === operation.operation_id ? 'current' : 'superseded',
+  };
+}
+/** Exact operation replay returns before any record mutation, including revision bumps. */
+export function decideHearingRecord(
+  namespace: string,
+  sessionId: string,
+  operation: HearingDecisionOperation | null,
+  identity: HearingDecisionIdentity,
+  decidedBy: HearingDecidedBy,
+  now: string,
+  expectedLegacy?: HearingRecord
+): HearingRecord {
+  return updateHearingRecord(
+    namespace,
+    sessionId,
+    (current) => {
+      if (!current) throw new HearingOperationError('Hearing record does not exist yet.');
+      if (operation && hearingDecisionReceipt(current, namespace, operation, identity))
+        return current;
+      assertHearingEditable(current);
+      if (!operation && expectedLegacy) assertHearingSnapshot(current, expectedLegacy);
+      if (
+        operation &&
+        (operation.scenario_id !== current.scenario ||
+          operation.requirements_revision !== hearingRevision(current.requirements_revision))
+      )
+        throw new HearingConflictError('stale_snapshot');
+      if (
+        !current.requirements.length ||
+        current.requirements.some((item) => !item.answer?.trim())
+      ) {
+        throw new HearingOperationError('Hearing has unanswered requirements.');
+      }
+      const next: HearingRecord = {
+        ...current,
+        decided_by: decidedBy,
+        decided_at: now,
+        updated_at: now,
+      };
+      delete next.current_decision_operation_id;
+      if (operation) {
+        if ((current.decision_receipts?.length || 0) >= 128)
+          throw new HearingConflictError('receipt_capacity');
+        next.current_decision_operation_id = operation.operation_id;
+        next.decision_receipts = [
+          ...(current.decision_receipts || []),
+          {
+            operation,
+            identity,
+            namespace,
+            session_id: sessionId,
+            record_revision: hearingRevision(current.record_revision) + 1,
+            decided_at: now,
+          },
+        ];
+      }
+      return next;
+    },
+    { allowLegacyMigration: true }
+  );
 }
