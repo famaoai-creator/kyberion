@@ -391,6 +391,13 @@
       "note": "System-level intent contract seed/runtime snapshot. Tenant-scoped entries must migrate to active/shared/runtime/tenants/<tenant>; the global snapshot is never TTL-deleted."
     },
     {
+      "path": "active/shared/runtime/autonomy-action-overrides.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "audit": true,
+      "note": "Evidence-derived per-action decision overrides (relaxed_to / demoted_until) written by sweepAutonomyActionStates — runtime state, not policy; the gate fails closed to the base decision when absent or malformed. Never delete while daemons consult it."
+    },
+    {
       "path": "active/shared/runtime/cowork-sync-state.json",
       "artifact_class": "state",
       "action": "review_required",
@@ -1047,6 +1054,13 @@
       "action": "rotate",
       "audit": true,
       "note": "ops-health-probe anomaly findings (autonomous improvement loop stage 1). Append-only; rotated past rotate_min_bytes, segments expire under the observability 90d sweep."
+    },
+    {
+      "path": "active/shared/observability/autonomy-outcomes.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "audit": true,
+      "note": "Autonomy evidence ledger (autonomy-action-state.ts): one row per gate decision with execution outcome — the input to evidence-driven action promotion/demotion. Rotated past rotate_min_bytes; segments expire under the observability 90d sweep."
     },
     {
       "path": "active/shared/observability/work-coordination/events.jsonl",
