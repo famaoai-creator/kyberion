@@ -50,6 +50,21 @@ describe('autonomy-action-state', () => {
     expect(o.decision).toBe('auto');
   });
 
+  it('reaches auto via a veto-free notify soak when nothing ever executes', () => {
+    // tier-1 first: 10 clean decisions → notify
+    seed('daemon_restart', 10);
+    sweepAutonomyActionStates(['daemon_restart'], deps);
+    expect(applyAutonomyOverride('daemon_restart', 'approve', [], deps).decision).toBe('notify');
+    // still not auto — soak not done
+    seed('daemon_restart', 20);
+    sweepAutonomyActionStates(['daemon_restart'], deps);
+    expect(applyAutonomyOverride('daemon_restart', 'approve', [], deps).decision).toBe('notify');
+    // 50 clean decisions at notify tier → auto
+    seed('daemon_restart', 20);
+    sweepAutonomyActionStates(['daemon_restart'], deps);
+    expect(applyAutonomyOverride('daemon_restart', 'approve', [], deps).decision).toBe('auto');
+  });
+
   it('demotes instantly on a single incident and forces approve', () => {
     seed('daemon_restart', 20, { ok: true });
     sweepAutonomyActionStates(['daemon_restart'], deps);
