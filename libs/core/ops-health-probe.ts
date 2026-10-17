@@ -194,6 +194,9 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
   const findingsPath = repoFile(deps.rootDir, OPS_FINDINGS_PATH);
   safeMkdir(path.dirname(findingsPath), { recursive: true });
   const workItemsFiled: string[] = [];
+  // Items that exist now — newly filed or a dedup hit. The wake notifies on
+  // the union: an item filed before wakes existed still needs a doorbell.
+  const workItemsExisting: string[] = [];
   for (const finding of findings) {
     appendJsonLine(findingsPath, finding);
     if (deps.fileWorkItems) {
@@ -214,13 +217,12 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
           rootDir: deps.rootDir,
         });
         workItemsFiled.push(finding.finding_id);
+        workItemsExisting.push(finding.finding_id);
       } catch (error) {
         // A deduped re-file is not a failure — the item exists and the dot
         // still deserves a wake for it (e.g. filed before wakes existed).
-        const isConflict = /identity conflict/.test(
-          error instanceof Error ? error.message : String(error)
-        );
-        if (isConflict) workItemsFiled.push(finding.finding_id);
+        if (/identity conflict/.test(error instanceof Error ? error.message : String(error)))
+          workItemsExisting.push(finding.finding_id);
         else
           logger.warn(
             `[OPS-PROBE] work item filing failed for ${finding.finding_id} | next: finding still recorded in ${OPS_FINDINGS_PATH} | evidence: ${error instanceof Error ? error.message : String(error)}`
@@ -228,19 +230,22 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
       }
     }
   }
-  // Ring the doorbell: one coalesced inbox wake tells the ops dot a new batch
-  // of findings exists. The idempotency key scopes the wake to this probe run —
-  // replays of the same findings cannot stack wakes, and a fresh batch mints a
-  // fresh key so a consumed wake never suppresses new work.
-  if (deps.fileWorkItems && workItemsFiled.length > 0) {
+  // Ring the doorbell: one coalesced inbox wake tells the ops dot a batch of
+  // findings exists. The idempotency key hashes the item set — replays of the
+  // same findings cannot stack wakes, and a new batch mints a fresh key so a
+  // consumed wake never suppresses new work.
+  if (deps.fileWorkItems && workItemsExisting.length > 0) {
     try {
       appendDotInboxEntry(
         {
           channel: 'inbox',
           dot_id: OPS_WORK_ITEM_DOT_ID,
           source: 'ops-health-probe',
-          idempotency_key: `ops-probe:${createHash('sha256').update(workItemsFiled.slice().sort().join(',')).digest('hex').slice(0, 16)}`,
-          text: `${workItemsFiled.length} ops-health finding(s) filed — check addressed WorkItems`,
+          idempotency_key: `ops-probe:${createHash('sha256')
+            .update(workItemsExisting.slice().sort().join(','))
+            .digest('hex')
+            .slice(0, 16)}`,
+          text: `${workItemsExisting.length} ops-health finding(s) filed — check addressed WorkItems`,
         },
         { rootDir: deps.rootDir }
       );
