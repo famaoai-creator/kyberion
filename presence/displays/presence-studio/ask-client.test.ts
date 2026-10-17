@@ -1,295 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runInNewContext } from 'node:vm';
 import { randomUUID } from 'node:crypto';
-import { safeReadFile } from '@agent/core/secure-io';
 import { routeConversationTaskTurn } from '@agent/core';
+import {
+  Element,
+  deferred,
+  vocabularyTexts,
+  session,
+  response,
+  flush,
+  harness,
+} from './ask-client-test-harness.js';
 
-type TestEvent = { preventDefault: () => void; key?: string };
-
-class Element {
-  value = '';
-  private html = '';
-  onHtml?: (value: string) => void;
-  get innerHTML() {
-    return this.html;
-  }
-  set innerHTML(value: string) {
-    this.html = value;
-    this.onHtml?.(value);
-  }
-  textContent = '';
-  disabled = false;
-  hidden = true;
-  selectionStart = 0;
-  selectionEnd = 0;
-  selectionDirection = 'none';
-  setSelectionRange = vi.fn((start: number, end: number, direction: string) => {
-    this.selectionStart = start;
-    this.selectionEnd = end;
-    this.selectionDirection = direction;
-  });
-  focus = vi.fn();
-  scrollIntoView = vi.fn();
-  attributes: Record<string, string> = {};
-  listeners: Record<string, (event: TestEvent) => void> = {};
-  classList = { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() };
-  setAttribute(name: string, value: string) {
-    this.attributes[name] = value;
-  }
-  getAttribute(name: string) {
-    return this.attributes[name] ?? null;
-  }
-  addEventListener(name: string, handler: (event: TestEvent) => void) {
-    this.listeners[name] = handler;
-  }
-  fire(name: string, detail: Partial<TestEvent> = {}) {
-    const event = { preventDefault: vi.fn(), ...detail };
-    this.listeners[name]?.(event);
-    return event;
-  }
-}
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: Error) => void;
-  const promise = new Promise<T>((done, fail) => {
-    resolve = done;
-    reject = fail;
-  });
-  return { promise, resolve, reject };
-}
-const vocabularyTexts = () =>
-  new Proxy({} as Record<string, string>, {
-    get: (_target, key) => String(key),
-  });
-const session = 'concierge-' + 'a'.repeat(64);
-const response = (body: unknown, status = 200) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  json: () => Promise.resolve(body),
-});
-const flush = async () => {
-  for (let i = 0; i < 40; i++) await Promise.resolve();
-};
-function harness(
-  options: {
-    storage?: Map<string, string>;
-    ready?: Promise<unknown>;
-    post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof response>>;
-    history?: Record<string, unknown>;
-    historyStatus?: number;
-    conversation?: () => Promise<ReturnType<typeof response>>;
-    vocabulary?: Promise<ReturnType<typeof response>>;
-    progress?: () => Promise<ReturnType<typeof response>>;
-    vocabularyRead?: () => Promise<ReturnType<typeof response>>;
-    texts?: Record<string, string>;
-    speech?: boolean;
-    recoveryScript?: boolean;
-    nextActionsScript?: boolean;
-    query?: string;
-    hash?: string;
-  } = {}
-) {
-  const elements = new Map(
-    [
-      'ask-mic',
-      'handsfree-toggle',
-      'about-title',
-      'about-empty',
-      'ask-form',
-      'ask-input',
-      'ask-send',
-      'turns',
-      'ask-empty',
-      'conversation-status',
-      'conversation-selection',
-      'conversation-reload',
-      'conversation-legacy',
-      'conversation-legacy-turns',
-      'draft-choice',
-      'draft-choice-preview',
-      'draft-keep',
-      'draft-replace',
-      'draft-storage-warning',
-      'home-draft-preserved',
-      'pending-request-review',
-      'pending-request-recovery',
-      'pending-request-description',
-      'recent-card',
-      'recent-title',
-      'recent-list',
-      'recent-status',
-      'recent-loading',
-      'recent-error',
-      'recent-retry',
-      'ask-startup-status',
-      'ask-startup-loading',
-      'ask-startup-error',
-      'ask-startup-retry',
-    ].map((id) => [id, new Element()])
-  );
-  const chips = new Map(
-    ['email', 'minutes', 'browser', 'webapp', 'unknown'].map((key) => {
-      const chip = new Element();
-      chip.setAttribute('data-chip', key);
-      return [key, chip] as const;
-    })
-  );
-  const storage = options.storage ?? new Map<string, string>();
-  const location = {
-    reload: vi.fn(),
-    href: 'http://localhost/ask' + (options.query ?? '?tenant=alpha') + (options.hash ?? ''),
-    origin: 'http://localhost',
-    pathname: '/ask',
-    search: options.query ?? '?tenant=alpha',
-    hash: options.hash ?? '',
-  };
-  const scopedUrl = (path: string) => {
-    const url = new URL(path, location.href);
-    url.searchParams.set('tenant', 'alpha');
-    for (const key of ['organizationId', 'projectId']) {
-      const value = new URLSearchParams(location.search).get(key);
-      if (value) url.searchParams.set(key, value);
-    }
-    return url.origin === location.origin ? url.pathname + url.search + url.hash : url.href;
-  };
-  const shellListeners: Array<(state: { phase: string; message: string }) => void> = [];
-  const window = {
-    location,
-    setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
-    clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
-    AbortController,
-    SpeechRecognition: options.speech
-      ? class {
-          onstart?: () => void;
-          onerror?: () => void;
-          start() {
-            this.onstart?.();
-            this.onerror?.();
-          }
-          stop() {}
-        }
-      : undefined,
-    crypto: { randomUUID },
-    history: { state: null, replaceState: vi.fn() },
-    sessionStorage: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => storage.set(key, value),
-      removeItem: (key: string) => storage.delete(key),
-    },
-    KyberionPrefs: { locale: () => 'en', tenant: () => 'alpha', scopedUrl },
-    FrontDeskRail: {
-      ready: options.ready ?? Promise.resolve(),
-      subscribe(listener: (state: { phase: string; message: string }) => void) {
-        shellListeners.push(listener);
-        return () => {};
-      },
-    },
-    KyberionAsk: undefined as undefined | { mount: () => void },
-  };
-  const texts =
-    options.texts ??
-    new Proxy({} as Record<string, string>, {
-      get: (_target, key) => String(key),
-    });
-  const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
-    if (init?.method === 'POST')
-      return options.post
-        ? options.post(JSON.parse(init.body!))
-        : response({ ok: true, reply: 'Done', mode: 'orchestrator' });
-    if (url.startsWith('/api/ask-vocabulary'))
-      return options.vocabularyRead
-        ? options.vocabularyRead()
-        : (options.vocabulary ?? response({ ok: true, texts }));
-    if (url.startsWith('/api/progress'))
-      return options.progress ? options.progress() : response({ ok: true, active: [] });
-    if (url.startsWith('/api/conversation'))
-      return options.conversation
-        ? options.conversation()
-        : response(
-            {
-              ok: true,
-              sessionId: session,
-              messages: [],
-              pending: 0,
-              ...options.history,
-            },
-            options.historyStatus ?? 200
-          );
-    throw new Error('unexpected ' + url);
-  });
-  let actionButtons: Element[] = [];
-  elements.get('turns')!.onHtml = (html) => {
-    actionButtons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].map((match) => {
-      const button = new Element();
-      for (const attr of match[1].matchAll(/([\w-]+)="([^"]*)"/g))
-        button.setAttribute(attr[1], attr[2]);
-      button.innerHTML = match[2];
-      return button;
-    });
-  };
-  const eventListeners: Record<string, Array<(detail?: { persisted?: boolean }) => void>> = {};
-  const browser = window as typeof window & {
-    addEventListener: (event: string, listener: (detail?: { persisted?: boolean }) => void) => void;
-  };
-  browser.addEventListener = (event, listener) => {
-    (eventListeners[event] ??= []).push(listener);
-  };
-  const document = {
-    documentElement: { getAttribute: () => 'en' },
-    getElementById: (id: string) => elements.get(id) ?? null,
-    querySelector: (selector: string) => {
-      const key = /^\.ask-chip\[data-chip="([^"]+)"\]$/.exec(selector)?.[1];
-      return key ? (chips.get(key) ?? null) : null;
-    },
-    querySelectorAll: (selector: string) => {
-      if (selector === '.ask-chip') return [...chips.values()];
-      const attribute = /^\[([\w-]+)\]$/.exec(selector)?.[1];
-      return attribute
-        ? actionButtons.filter((button) => button.getAttribute(attribute) !== null)
-        : [];
-    },
-  };
-  elements.get('ask-send')!.disabled = true;
-  const scripts = [
-    ...(options.recoveryScript === false ? [] : ['ask-read-recovery.js']),
-    ...(options.nextActionsScript === false ? [] : ['ask-next-actions.js']),
-    'ask.js',
-  ];
-  runInNewContext(
-    scripts
-      .map((name) =>
-        safeReadFile('presence/displays/presence-studio/static/' + name, {
-          encoding: 'utf8',
-        })
-      )
-      .join('\n'),
-    {
-      window,
-      document,
-      fetch,
-      navigator: {},
-      URL,
-      URLSearchParams,
-      crypto: window.crypto,
-      console,
-    }
-  );
-  window.KyberionAsk?.mount();
-  return {
-    elements,
-    actions: () => actionButtons,
-    browserEvent: (event: string, detail?: { persisted?: boolean }) =>
-      eventListeners[event]?.forEach((listener) => listener(detail)),
-    shell: (phase: string, message = '') =>
-      shellListeners.forEach((listener) => listener({ phase, message })),
-    chips,
-    storage,
-    fetch,
-    window,
-    input: elements.get('ask-input')!,
-    form: elements.get('ask-form')!,
-  };
-}
 describe('Ask durable browser behavior (DOM doubles, no visual claim)', () => {
   it('waits for scope readiness and restores display-only server history', async () => {
     const ready = deferred<void>();
@@ -3428,6 +3149,175 @@ describe('Ask persisted navigation recovery', () => {
       expect(reads(h)).toHaveLength(1);
       expect(posts(h)).toHaveLength(0);
       expect(h.elements.get('ask-send')!.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('hearing synchronization remains separate from saved conversation', () => {
+  it('renders saved replies and preserves the next draft while an additive hearing answer stalls', async () => {
+    const waiting = deferred<ReturnType<typeof response>>();
+    const h = harness({
+      query: '?mode=hearing',
+      hearing: async (_url, init) =>
+        init?.method === 'POST' ? waiting.promise : response({ ok: true, record: null }),
+    });
+    await flush();
+    h.input.value = 'First requirement';
+    h.form.fire('submit');
+    await flush();
+    expect(h.elements.get('turns')!.innerHTML).toContain('Done');
+    h.input.value = 'Keep next answer';
+    h.input.fire('input');
+    h.form.fire('submit');
+    await flush();
+    expect(
+      h.fetch.mock.calls.filter(
+        ([url, init]) => url === '/api/conversation' && init?.method === 'POST'
+      )
+    ).toHaveLength(1);
+    expect(h.input.value).toBe('Keep next answer');
+  });
+});
+
+describe('hearing recovery integration', () => {
+  const record = (id: string, requestId?: string, scenario = 'web_app_build') => ({
+    session_id: id,
+    scenario,
+    requirements: [{ id: 'audience', answer: 'confirmed', source_turn: requestId }],
+    canvas_versions: [],
+    updated_at: '2026-10-17T08:00:00Z',
+    decided_at: '2026-10-17T08:00:00Z',
+  });
+  it('fails closed when the hearing helper is unavailable while normal conversation still works', async () => {
+    const h = harness({ query: '?mode=hearing', hearingScript: false });
+    await flush();
+    h.input.value = 'Do not send';
+    h.form.fire('submit');
+    await flush();
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+    expect(h.elements.get('hearing-sync-continue')!.attributes.href).toBe('/ask?tenant=alpha');
+  });
+  it.each(['web_app_build', 'work_inventory'])(
+    'gates %s finalization while conversation is sending and hearing is uncertain',
+    async (scenario) => {
+      const conversation = deferred<ReturnType<typeof response>>();
+      const hearing = deferred<ReturnType<typeof response>>();
+      const h = harness({
+        query: '?mode=hearing&scenario=' + scenario,
+        post: () => conversation.promise,
+        hearing: async (url, init) =>
+          init?.method === 'POST'
+            ? hearing.promise
+            : response({
+                ok: true,
+                record: record(url.split('/')[3].split('?')[0], undefined, scenario),
+              }),
+      });
+      await flush();
+      h.input.value = 'Requirement';
+      h.form.fire('submit');
+      await flush();
+      h.elements.get('hearing-decide')!.fire('click');
+      h.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      expect(
+        h.fetch.mock.calls.filter(
+          ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
+        )
+      ).toHaveLength(0);
+      conversation.resolve(response({ ok: true, reply: 'Saved', historySaved: false }));
+      await flush();
+      expect(h.elements.get('turns')!.innerHTML).toContain('Saved');
+      expect(h.elements.get('conversation-status')!.innerHTML).toContain('history.unsaved');
+      h.elements.get('hearing-decide')!.fire('click');
+      h.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      expect(
+        h.fetch.mock.calls.filter(
+          ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
+        )
+      ).toHaveLength(1);
+    }
+  );
+  it('restores the hearing lock across reload and clears it only by explicit matching GET without replay', async () => {
+    const stalled = deferred<ReturnType<typeof response>>();
+    let pendingId = '';
+    const h = harness({
+      query: '?mode=hearing',
+      hearing: async (_url, init) => {
+        if (init?.method === 'POST') {
+          pendingId = JSON.parse(init.body!).request_id;
+          return stalled.promise;
+        }
+        return response({ ok: true, record: null });
+      },
+    });
+    await flush();
+    h.input.value = 'Requirement';
+    h.form.fire('submit');
+    await flush();
+    h.input.value = 'Keep next';
+    h.input.fire('input');
+    let matched = false;
+    const restored = harness({
+      query: '?mode=hearing',
+      storage: h.storage,
+      hearing: async (url) =>
+        response({
+          ok: true,
+          record: record(url.split('/')[3].split('?')[0], matched ? pendingId : 'another'),
+        }),
+    });
+    await flush();
+    expect(restored.input.value).toBe('Keep next');
+    expect(restored.elements.get('ask-send')!.disabled).toBe(true);
+    matched = true;
+    restored.elements.get('hearing-sync-retry')!.fire('click');
+    await flush();
+    expect(restored.elements.get('ask-send')!.disabled).toBe(false);
+    expect(restored.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+  });
+  it('refreshes hearing after BFCache conversation restore without replaying the answer', async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = deferred<ReturnType<typeof response>>();
+      let pendingId = '';
+      let matching = false;
+      const h = harness({
+        query: '?mode=hearing',
+        hearing: async (url, init) => {
+          if (init?.method === 'POST') {
+            pendingId = JSON.parse(init.body!).request_id;
+            return stalled.promise;
+          }
+          return response({
+            ok: true,
+            record: matching ? record(url.split('/')[3].split('?')[0], pendingId) : null,
+          });
+        },
+      });
+      await flush();
+      h.input.value = 'Requirement';
+      h.form.fire('submit');
+      await flush();
+      h.input.value = 'After back';
+      h.input.fire('input');
+      matching = true;
+      h.browserEvent('pagehide');
+      h.browserEvent('pageshow', { persisted: true });
+      h.browserEvent('popstate');
+      await vi.advanceTimersByTimeAsync(0);
+      await flush();
+      expect(h.input.value).toBe('After back');
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
+      expect(
+        h.fetch.mock.calls.filter(
+          ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
+        )
+      ).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }
