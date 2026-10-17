@@ -8,18 +8,34 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_image" },
+        "action": {
+          "const": "generate_image"
+        },
         "params": {
           "type": "object",
           "required": ["prompt"],
           "properties": {
-            "prompt": { "type": "string", "minLength": 1 },
-            "await_completion": { "type": "boolean" },
-            "backend_id": { "type": "string" },
-            "target_path": { "type": "string" },
-            "no_style_pack": { "type": "boolean" }
+            "prompt": {
+              "type": "string",
+              "minLength": 1
+            },
+            "await_completion": {
+              "type": "boolean"
+            },
+            "backend_id": {
+              "type": "string"
+            },
+            "target_path": {
+              "type": "string"
+            },
+            "no_style_pack": {
+              "type": "boolean"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -29,7 +45,9 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_image" },
+        "action": {
+          "const": "generate_image"
+        },
         "params": {
           "type": "object",
           "required": ["image_adf"],
@@ -37,10 +55,17 @@
             "image_adf": {
               "$ref": "./image-generation-adf.schema.json"
             },
-            "workflow": { "type": "object" },
-            "workflow_path": { "type": "string" }
+            "workflow": {
+              "type": "object"
+            },
+            "workflow_path": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -50,24 +75,43 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_video" },
+        "action": {
+          "const": "generate_video"
+        },
         "params": {
           "type": "object",
           "anyOf": [
-            { "required": ["video_adf"] },
-            { "required": ["workflow"] },
-            { "required": ["workflow_path"] }
+            {
+              "required": ["video_adf"]
+            },
+            {
+              "required": ["workflow"]
+            },
+            {
+              "required": ["workflow_path"]
+            }
           ],
           "properties": {
             "video_adf": {
               "$ref": "./video-generation-adf.schema.json"
             },
-            "workflow": { "type": "object" },
-            "workflow_path": { "type": "string" },
-            "await_completion": { "type": "boolean" },
-            "backend_id": { "type": "string" }
+            "workflow": {
+              "type": "object"
+            },
+            "workflow_path": {
+              "type": "string"
+            },
+            "await_completion": {
+              "type": "boolean"
+            },
+            "backend_id": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -77,17 +121,37 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_image" },
+        "action": {
+          "const": "generate_image"
+        },
         "params": {
           "type": "object",
-          "anyOf": [{ "required": ["workflow"] }, { "required": ["workflow_path"] }],
+          "anyOf": [
+            {
+              "required": ["workflow"]
+            },
+            {
+              "required": ["workflow_path"]
+            }
+          ],
           "properties": {
-            "workflow": { "type": "object" },
-            "workflow_path": { "type": "string" },
-            "await_completion": { "type": "boolean" },
-            "backend_id": { "type": "string" }
+            "workflow": {
+              "type": "object"
+            },
+            "workflow_path": {
+              "type": "string"
+            },
+            "await_completion": {
+              "type": "boolean"
+            },
+            "backend_id": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -97,20 +161,41 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_music" },
+        "action": {
+          "const": "generate_music"
+        },
         "params": {
           "type": "object",
           "required": ["prompt"],
           "properties": {
-            "prompt": { "type": "string", "minLength": 1 },
-            "duration_sec": { "type": "number", "minimum": 1 },
-            "await_completion": { "type": "boolean" },
-            "backend_id": { "type": "string" },
-            "target_path": { "type": "string" },
-            "output_path": { "type": "string" },
-            "no_style_pack": { "type": "boolean" }
+            "prompt": {
+              "type": "string",
+              "minLength": 1
+            },
+            "duration_sec": {
+              "type": "number",
+              "minimum": 1
+            },
+            "await_completion": {
+              "type": "boolean"
+            },
+            "backend_id": {
+              "type": "string"
+            },
+            "target_path": {
+              "type": "string"
+            },
+            "output_path": {
+              "type": "string"
+            },
+            "no_style_pack": {
+              "type": "boolean"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -120,24 +205,43 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "generate_music" },
+        "action": {
+          "const": "generate_music"
+        },
         "params": {
           "type": "object",
           "anyOf": [
-            { "required": ["music_adf"] },
-            { "required": ["workflow"] },
-            { "required": ["workflow_path"] }
+            {
+              "required": ["music_adf"]
+            },
+            {
+              "required": ["workflow"]
+            },
+            {
+              "required": ["workflow_path"]
+            }
           ],
           "properties": {
             "music_adf": {
               "$ref": "./music-generation-adf.schema.json"
             },
-            "workflow": { "type": "object" },
-            "workflow_path": { "type": "string" },
-            "await_completion": { "type": "boolean" },
-            "backend_id": { "type": "string" }
+            "workflow": {
+              "type": "object"
+            },
+            "workflow_path": {
+              "type": "string"
+            },
+            "await_completion": {
+              "type": "boolean"
+            },
+            "backend_id": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -147,16 +251,34 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "run_workflow" },
+        "action": {
+          "const": "run_workflow"
+        },
         "params": {
           "type": "object",
-          "anyOf": [{ "required": ["workflow"] }, { "required": ["workflow_path"] }],
+          "anyOf": [
+            {
+              "required": ["workflow"]
+            },
+            {
+              "required": ["workflow_path"]
+            }
+          ],
           "properties": {
-            "workflow": { "type": "object" },
-            "workflow_path": { "type": "string" },
-            "backend_id": { "type": "string" }
+            "workflow": {
+              "type": "object"
+            },
+            "workflow_path": {
+              "type": "string"
+            },
+            "backend_id": {
+              "type": "string"
+            }
           },
           "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -166,7 +288,9 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "submit_generation" },
+        "action": {
+          "const": "submit_generation"
+        },
         "params": {
           "type": "object",
           "required": ["action", "params"],
@@ -174,13 +298,27 @@
             "action": {
               "enum": ["generate_image", "generate_video", "generate_music", "run_workflow"]
             },
-            "params": { "type": "object" },
-            "retry_policy": { "type": "object" },
-            "existing_job_id": { "type": "string" },
-            "next_attempt": { "type": "integer", "minimum": 1 },
-            "job": { "$ref": "./generation-job.schema.json" }
+            "params": {
+              "type": "object"
+            },
+            "retry_policy": {
+              "type": "object"
+            },
+            "existing_job_id": {
+              "type": "string"
+            },
+            "next_attempt": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "job": {
+              "$ref": "./generation-job.schema.json"
+            }
           },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -190,15 +328,25 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "get_generation_job" },
+        "action": {
+          "const": "get_generation_job"
+        },
         "params": {
           "type": "object",
           "required": ["job_id"],
           "properties": {
-            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
-            "job": { "$ref": "./generation-job.schema.json" }
+            "job_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+            },
+            "job": {
+              "$ref": "./generation-job.schema.json"
+            }
           },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -208,16 +356,30 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "wait_generation_job" },
+        "action": {
+          "const": "wait_generation_job"
+        },
         "params": {
           "type": "object",
           "required": ["job_id"],
           "properties": {
-            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
-            "timeout_ms": { "type": "integer", "minimum": 1 },
-            "poll_interval_ms": { "type": "integer", "minimum": 1 }
+            "job_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "poll_interval_ms": {
+              "type": "integer",
+              "minimum": 1
+            }
           },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -227,15 +389,25 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "collect_generation_artifact" },
+        "action": {
+          "const": "collect_generation_artifact"
+        },
         "params": {
           "type": "object",
           "required": ["job_id"],
           "properties": {
-            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
-            "target_path": { "type": "string" }
+            "job_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+            },
+            "target_path": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -245,12 +417,21 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "capture_screen" },
+        "action": {
+          "const": "capture_screen"
+        },
         "params": {
           "type": "object",
           "required": ["output"],
-          "properties": { "output": { "type": "string" } },
+          "properties": {
+            "output": {
+              "type": "string"
+            }
+          },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -260,12 +441,21 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "capture_focused_window" },
+        "action": {
+          "const": "capture_focused_window"
+        },
         "params": {
           "type": "object",
           "required": ["output"],
-          "properties": { "output": { "type": "string" } },
+          "properties": {
+            "output": {
+              "type": "string"
+            }
+          },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -275,21 +465,48 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "record_screen" },
+        "action": {
+          "const": "record_screen"
+        },
         "params": {
           "type": "object",
           "required": ["output"],
           "properties": {
-            "output": { "type": "string" },
-            "duration": { "type": "number", "minimum": 0 },
-            "fps": { "type": "number", "exclusiveMinimum": 0, "maximum": 120 },
-            "max_frames": { "type": "integer", "minimum": 1 },
-            "frame_interval_ms": { "type": "number", "minimum": 0 },
-            "display_index": { "type": "integer", "minimum": 0 },
-            "display_name": { "type": "string" },
-            "capture_mode": { "enum": ["screen", "focused_window"] }
+            "output": {
+              "type": "string"
+            },
+            "duration": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fps": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 120
+            },
+            "max_frames": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "frame_interval_ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "display_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "capture_mode": {
+              "enum": ["screen", "focused_window"]
+            }
           },
           "additionalProperties": false
+        },
+        "op": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -299,10 +516,25 @@
       "type": "object",
       "required": ["action", "steps"],
       "properties": {
-        "action": { "const": "pipeline" },
-        "steps": { "type": "array", "items": { "type": "object" } },
-        "continue_on_error": { "type": "boolean", "default": true },
-        "params": { "type": "object" }
+        "action": {
+          "const": "pipeline"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "continue_on_error": {
+          "type": "boolean",
+          "default": true
+        },
+        "params": {
+          "type": "object"
+        },
+        "op": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
@@ -314,7 +546,13 @@
         "action": {
           "enum": ["lyric_normalize", "vocal_align", "mv_storyboard", "mv_compose"]
         },
-        "params": { "type": "object", "additionalProperties": true }
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "op": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     }

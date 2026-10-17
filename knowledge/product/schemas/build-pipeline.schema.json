@@ -34,14 +34,30 @@
       "type": "boolean",
       "description": "android_test: also run connectedDebugAndroidTest (default false)"
     },
-    "platform": { "enum": ["ios", "android"], "description": "scaffold_app only" },
-    "app_name": { "type": "string" },
-    "bundle_id": { "type": "string" },
-    "dest_dir": { "type": "string", "description": "scaffold_app destination directory" },
+    "platform": {
+      "enum": ["ios", "android"],
+      "description": "scaffold_app only"
+    },
+    "app_name": {
+      "type": "string"
+    },
+    "bundle_id": {
+      "type": "string"
+    },
+    "dest_dir": {
+      "type": "string",
+      "description": "scaffold_app destination directory"
+    },
     "mission_id": {
       "type": "string",
       "description": "When set, logs land under the mission evidence dir"
     },
-    "timeout_ms": { "type": "number", "minimum": 1000 }
+    "timeout_ms": {
+      "type": "number",
+      "minimum": 1000
+    },
+    "action": {
+      "type": "string"
+    }
   }
 }
