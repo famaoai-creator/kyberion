@@ -510,10 +510,102 @@
       }
     },
     "opencode": {
-      "models": ["opencode/muse-spark-1.3-contributor-free"],
+      "models": [
+        "opencode/muse-spark-1.3-contributor-free",
+        "opencode/glm-5.3-flash-free",
+        "opencode/mimo-v2.6-flash-free",
+        "opencode/deepseek-v4.1-flash-free",
+        "opencode/nemotron-3.5-lightning-free",
+        "opencode/nemotron-3.5-super-vl-free",
+        "opencode/nemotron-3-ultra-free",
+        "opencode/beam-free",
+        "opencode/space-bunny-free",
+        "opencode/longcat-2.5-preview-free",
+        "opencode/big-pickle"
+      ],
       "capabilities": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
       "modelCapabilities": {
         "opencode/muse-spark-1.3-contributor-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/glm-5.3-flash-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/mimo-v2.6-flash-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/deepseek-v4.1-flash-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/nemotron-3.5-lightning-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/nemotron-3.5-super-vl-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/nemotron-3-ultra-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/beam-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/space-bunny-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/longcat-2.5-preview-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/big-pickle": [
           "reasoning",
           "planning",
           "analysis",
