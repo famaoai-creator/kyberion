@@ -58,6 +58,27 @@ describe('daemon-heartbeat', () => {
     expect(listDaemonHeartbeatStatuses({ rootDir: HEARTBEAT_TEST_ROOT })).toHaveLength(1);
   });
 
+  it('flags a fresh heartbeat as stale when the daemon reports stale_code', () => {
+    safeRmSync(HEARTBEAT_TEST_ROOT, { recursive: true, force: true });
+    recordDaemonHeartbeat(
+      'agent-runtime-supervisor-daemon',
+      {
+        pid: 789,
+        status: 'running',
+        details: { stale_code: true, code_stamp: 1, dist_stamp: 2 },
+      },
+      { rootDir: HEARTBEAT_TEST_ROOT, now: new Date('2026-07-04T00:00:00.000Z') }
+    );
+
+    const status = readDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      rootDir: HEARTBEAT_TEST_ROOT,
+      now: new Date('2026-07-04T00:00:30.000Z'),
+      staleAfterMs: 180_000,
+    });
+    expect(status.status).toBe('stale');
+    expect(status.reason).toContain('stale_code');
+  });
+
   it('uses the strict schema and daemon binding for persisted heartbeats', () => {
     safeRmSync(HEARTBEAT_TEST_ROOT, { recursive: true, force: true });
     recordDaemonHeartbeat(
