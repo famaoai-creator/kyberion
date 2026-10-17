@@ -399,6 +399,7 @@
 - [Japanese Voiceover + HyperFrames Video Production Playbook](./product/orchestration/japanese-voiceover-production-playbook.md) (public | ecosystem_architect)
 - [Kyberion Development Workflow](./product/orchestration/kyberion-development-workflow.md) (public | Ecosystem Architect)
 - [Kyberion Intent Scenario Catalog](./product/orchestration/intent-scenario-catalog.md) (public | Ecosystem Architect)
+- [LLM CLI から始めるプロンプト経由オンボーディング](./product/orchestration/prompt-first-onboarding.md) (public | Unknown)
 - [Lifestyle Booking Playbook](./product/orchestration/lifestyle-booking-playbook.md) (public | Unknown)
 - [Media Structured-Content Extension Guide](./product/orchestration/media-structured-content-extension.md) (public | Unknown)
 - [Meeting Facilitation Workflow Simplification Proposal](./product/orchestration/meeting-facilitation-workflow-simplification-proposal.md) (public | Unknown)

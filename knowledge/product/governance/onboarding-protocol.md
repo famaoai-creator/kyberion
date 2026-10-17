@@ -4,7 +4,7 @@ category: Orchestration
 tags: [onboarding, setup, concierge, identity]
 importance: 8
 related_roles: [Sovereign Concierge, Ecosystem Architect]
-last_updated: 2026-10-04
+last_updated: 2026-10-18
 kind: playbook
 scope: global
 authority: recipe
@@ -42,13 +42,13 @@ status: active
 ### Stage 3: Provision (環境と capability overlay の配備)
 
 - **役割**: 主権者のロールに応じたツールを準備する。
-- **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、mission / role / phase に応じた capability overlay を確立する。
-- **成果物**: `session.json`, capability overlay。
+- **アクション**: **Sovereign Concierge** が必要な backend、接続、scope を確認し、標準フローの governed facade で設定する。実務に進む際の権限は work item / mission / role に応じて解決し、手書きの session ファイルで付与しない。
+- **成果物**: readiness report と必要な接続・scope の確認結果。
 
 ### Stage 3a: First-Run Wizard (初回導線の固定)
 
 - **役割**: 最初に何を設定すべきかを一つの入口にまとめる。
-- **アクション**: `launch-first-run-onboarding` intent を使い、workspace の前提、主要目的、必要な統合、資料テーマの初期値をまとめて案内する。
+- **アクション**: LLM CLI からの初期設定は [プロンプト経由オンボーディング](../orchestration/prompt-first-onboarding.md)に従い、用途・本人・最初の仕事に必要な接続を会話で確認して既存 facade へ渡す。`launch-first-run-onboarding` pipeline は固定の identity を適用するデモ・自動検証用であり、実際の利用者には使わない。資料テーマ等はその仕事が必要になった時点で確認する。
 - **UX**: ユーザーは「何を決めれば先に進めるか」を一度で理解できる。
 - **成果物**: 初回セットアップ計画。
 
@@ -94,7 +94,7 @@ binding は activation ではない。最初の仕事の apply 前に、[オン�
 
 ## 4. 再起動への耐性
 
-オンボーディングの進捗は `active/missions/{MissionID}/TASK_BOARD.md` に物理的に記録されなければならない。これにより、セッションが揮発しても、次のターンのエージェントが正確にコンテキストを引き継ぐことが可能となる。
+再開時は active profile の onboarding summary / state と、必要に応じて context binding・activation receipt を確認する。初期設定のためだけに mission を要求しない。mission-shaped な作業へ進んだ後の証跡は mission controller で記録する。会話履歴や手編集したチェックリストを正本にしない。
 
 ## 5. 関連ドキュメントとの関係
 
