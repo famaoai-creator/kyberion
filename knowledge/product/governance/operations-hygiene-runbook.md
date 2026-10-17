@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-13
+last_updated: 2026-10-17
 ---
 
 # Operations Hygiene Runbook
@@ -1226,3 +1226,27 @@ explicit `review_required` note naming what bounds it.
 
 **Gate:** `pnpm check -- --only runtime-store-retention`; janitor report
 `uncoveredRuntimeFiles` must stay empty for declared stores.
+
+## Outcome settlement must resume the resident Dot loop
+
+**Rule:** Executor completion and goal achievement are separate events. A delayed
+outcome verdict must be able to wake its owning Dot without relying on a future
+cron, an inbox channel declaration, or an in-memory callback. Use the scoped
+outcome ledger as continuation evidence and the normal wake ledger for receipt,
+backoff and circuit handling; never weaken authority or budget checks.
+
+**Procedure:** Coalesce the valid append-ordered outcome identities into a scoped
+watermark. Duplicate action verdicts are immutable and cannot inflate a progress
+streak or replay a consumed wake. A newly eligible identity, including delayed
+arrival or clock-skew recovery, changes the watermark. Diagnose stagnation per
+KR/signal in measurement order; two non-improving outcomes request replanning,
+an already-met target requests monitoring, and unknown measurements request
+measurement repair. Preserve outcome and wake evidence during recovery; do not
+delete receipts to force another execution. Keep tenant metric prose out of
+shared wake details. Replanning guidance does not authorize new effect classes.
+
+**Gate:** `pnpm exec vitest run libs/core/dot/dot-progress.test.ts` covers duplicate
+and late evidence, clock-skew recovery, an append during a wake, persisted
+consumption, tenant separation, circuit/backoff, goal satisfaction, measurement
+repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
+admission/recovery, digest/recovery and inbox suites when changing this path.
