@@ -27,6 +27,10 @@ import { DAEMON_SPECS } from '@agent/core/daemon/specs';
 import { resolveDaemonManager } from '@agent/core/daemon/service-manager';
 import { safeExecResult } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import {
+  recordAutonomyOutcome,
+  sweepAutonomyActionStates,
+} from '@agent/core/governance/autonomy-action-state';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -216,6 +220,16 @@ export async function checkDaemonHeartbeatsWithRecovery(
 ): Promise<DaemonWatchdogReport> {
   const now = options.now ?? new Date();
   const report = checkDaemonHeartbeats({ ...options, now });
+  // Evidence-driven autonomy sweep runs every watchdog pass — cheap (ledger
+  // tail scan) and keeps promotion/demotion close to the signal source.
+  try {
+    sweepAutonomyActionStates(
+      ['daemon_restart'],
+      options.rootDir ? { rootDir: options.rootDir } : {}
+    );
+  } catch {
+    /* sweep failures must never mask a watchdog verdict */
+  }
   const unhealthy = report.statuses.filter((status) => status.status !== 'healthy');
   if (unhealthy.length === 0) return report;
   try {
@@ -223,6 +237,7 @@ export async function checkDaemonHeartbeatsWithRecovery(
       ...report,
       recovery: await requestDaemonRecovery(unhealthy, now, {
         ...(options.triggerStorePath ? { triggerStorePath: options.triggerStorePath } : {}),
+        ...(options.rootDir ? { rootDir: options.rootDir } : {}),
       }),
     };
   } catch (error) {
@@ -259,8 +274,9 @@ export async function checkDaemonHeartbeatsWithRecovery(
 export async function requestDaemonRecovery(
   unhealthy: DaemonHeartbeatStatus[],
   now: Date,
-  options: { triggerStorePath?: string } = {}
+  options: { triggerStorePath?: string; rootDir?: string } = {}
 ): Promise<DaemonRecoveryOutcome[]> {
+  const recoveryRootDir = options.rootDir;
   if (unhealthy.length === 0) return [];
   // Tests point the receipt store at a temp path so they never write to the
   // real trigger-deliveries ledger.
@@ -345,6 +361,22 @@ export async function requestDaemonRecovery(
           autoExecuted = false;
           autoExecError = `no service spec for ${status.daemon_id} on ${process.platform}`;
         }
+      }
+      // Feed the evidence ledger — every gate decision is a data point for
+      // action-level autonomy promotion (executed runs add the outcome).
+      try {
+        recordAutonomyOutcome(
+          {
+            action_id: 'daemon_restart',
+            decision: evaluated?.decision ?? 'approve',
+            executed: autoExecuted === true,
+            ...(autoExecuted !== undefined ? { ok: autoExecuted } : {}),
+            ...(autoExecError ? { error: autoExecError } : {}),
+          },
+          recoveryRootDir ? { rootDir: recoveryRootDir } : {}
+        );
+      } catch {
+        /* ledger write failures must never mask a recovery verdict */
       }
       outcomes.push({
         daemon_id: status.daemon_id,
