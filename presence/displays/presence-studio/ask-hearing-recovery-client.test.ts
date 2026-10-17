@@ -542,3 +542,49 @@ describe('Ask hearing answer recovery', () => {
       expect(h.elements.get(id)!.textContent).toBe('Server-rendered ' + id);
   });
 });
+
+it.each(['stale_snapshot', 'completion_locked', 'handoff_unresolved'])(
+  'explains answer %s without replaying or claiming the pending answer succeeded',
+  async (code) => {
+    const h = harness();
+    h.fetch.mockResolvedValueOnce({
+      ...response(),
+      ok: false,
+      status: 409,
+      json: async () => ({ ok: false, record: record(), hearing_conflict: code }),
+    });
+    await h.helper.submit('Private answer');
+    expect(h.elements.get('hearing-sync-text')!.textContent).toContain(
+      'front_desk:hearing_conflict_' + code
+    );
+    expect(h.storage.has(KEY)).toBe(true);
+    expect(h.helper.blocked()).toBe(true);
+    await h.helper.submit('Do not replay');
+    expect(h.fetch).toHaveBeenCalledTimes(1);
+    h.fetch.mockResolvedValueOnce(response(record()));
+    await h.helper.load();
+    expect(h.storage.has(KEY)).toBe(true);
+    expect(h.elements.get('hearing-sync-text')!.textContent).toContain(
+      'front_desk:hearing_conflict_' + code
+    );
+  }
+);
+
+it('does not publish a retired answer conflict after scope navigation', async () => {
+  const h = harness();
+  const d = deferred<ReturnType<typeof response>>();
+  h.fetch.mockReturnValueOnce(d.promise);
+  const waiting = h.helper.submit('Private answer');
+  await flush();
+  h.scope('beta');
+  h.shell('blocked');
+  d.resolve({
+    ...response(),
+    ok: false,
+    status: 409,
+    json: async () => ({ ok: false, record: record(), hearing_conflict: 'stale_snapshot' }),
+  });
+  await waiting;
+  expect(h.elements.get('hearing-sync-text')!.textContent).not.toContain('hearing_conflict');
+  expect(h.storage.has(KEY)).toBe(true);
+});

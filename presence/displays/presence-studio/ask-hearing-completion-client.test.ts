@@ -435,3 +435,48 @@ it('keeps ordinary conversation available without the completion helper', async 
   await flush();
   expect(h.elements.get('ask-send')!.disabled).toBe(false);
 });
+
+describe('completion conflict explanations', () => {
+  it.each(['handoff', 'inventory'])(
+    'explains every bounded %s conflict without publishing a destination',
+    async (endpoint) => {
+      for (const code of ['stale_snapshot', 'completion_locked', 'handoff_unresolved']) {
+        const scenario = endpoint === 'inventory' ? 'work_inventory' : 'web_app_build';
+        const h = harness({
+          query: '?mode=hearing&scenario=' + scenario,
+          storage: new Map([['kyberion.ask.session_id', SESSION]]),
+          hearing: async (_url, init) =>
+            init?.method === 'POST'
+              ? response({ ok: false, hearing_conflict: code }, 409)
+              : response({
+                  ok: true,
+                  record: {
+                    session_id: SESSION,
+                    scenario,
+                    requirements: [{ answer: 'Done' }],
+                    decided_at: '2026-10-17T00:00:00Z',
+                  },
+                }),
+        });
+        await flush();
+        h.elements.get('hearing-handoff')!.fire('click');
+        await flush();
+        expect(h.elements.get('hearing-handoff-status')!.textContent).toBe(
+          'front_desk:hearing_conflict_' + code
+        );
+        expect(h.elements.get('hearing-handoff-link')!.attributes.href ?? '').toBe('');
+        if (code !== 'stale_snapshot') {
+          expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
+          // Invoke even a disabled button's handler to verify dispatch is guarded.
+          h.elements.get('hearing-handoff')!.fire('click');
+          await flush();
+        }
+        expect(
+          h.fetch.mock.calls.filter(
+            ([url, init]) => url.includes('/' + endpoint) && init?.method === 'POST'
+          )
+        ).toHaveLength(1);
+      }
+    }
+  );
+});
