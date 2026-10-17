@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge-promotion-policy.schema.json",
+  "title": "Knowledge promotion lane policy",
+  "type": "object",
+  "required": ["version", "lanes", "auto_guards", "evidence_thresholds"],
+  "properties": {
+    "version": { "type": "string" },
+    "lanes": {
+      "type": "object",
+      "properties": {
+        "pattern": { "enum": ["auto", "evidence_gated", "pr_review", "steward"] },
+        "sop_candidate": { "enum": ["auto", "evidence_gated", "pr_review", "steward"] },
+        "knowledge_hint": { "enum": ["auto", "evidence_gated", "pr_review", "steward"] },
+        "report_template": { "enum": ["auto", "evidence_gated", "pr_review", "steward"] },
+        "procedure": { "enum": ["auto", "evidence_gated", "pr_review", "steward"] }
+      },
+      "additionalProperties": false
+    },
+    "auto_guards": {
+      "type": "object",
+      "properties": {
+        "require_public_tier": { "type": "boolean" },
+        "forbidden_content_patterns": { "type": "array", "items": { "type": "string" } },
+        "max_summary_chars": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["require_public_tier", "forbidden_content_patterns", "max_summary_chars"],
+      "additionalProperties": false
+    },
+    "evidence_thresholds": {
+      "type": "object",
+      "properties": { "min_recurrence": { "type": "integer", "minimum": 1 } },
+      "required": ["min_recurrence"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
