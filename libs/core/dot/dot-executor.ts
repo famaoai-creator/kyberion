@@ -362,7 +362,15 @@ async function routeItem(
       summary: `unknown requested_work_shape '${shape}'`,
     };
   }
-  if (shape === 'task_session' && (ports.taskSessionUnavailable || goalMode === 'delegated')) {
+  // task_session runs only for items explicitly marked advisory — a claimed
+  // text-only "complete" must never stand for real task execution (there are
+  // no work tools in this path). Effectful work still requires a pipeline.
+  if (
+    shape === 'task_session' &&
+    (ports.taskSessionUnavailable ||
+      goalMode === 'delegated' ||
+      meta(item, 'task_session_mode') !== 'advisory')
+  ) {
     return {
       mode: 'escalated',
       status: 'blocked',
