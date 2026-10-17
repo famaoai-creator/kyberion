@@ -88,6 +88,7 @@ function harness(
     speech?: boolean;
     recoveryScript?: boolean;
     hearingScript?: boolean;
+    completionScript?: boolean;
     nextActionsScript?: boolean;
     query?: string;
     hash?: string;
@@ -272,6 +273,7 @@ function harness(
     ...(options.recoveryScript === false ? [] : ['ask-read-recovery.js']),
     ...(options.nextActionsScript === false ? [] : ['ask-next-actions.js']),
     ...(options.hearingScript === false ? [] : ['ask-hearing-recovery.js']),
+    ...(options.completionScript === false ? [] : ['ask-hearing-completion.js']),
     'ask.js',
   ];
   runInNewContext(

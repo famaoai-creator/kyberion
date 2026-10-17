@@ -181,6 +181,7 @@
     // `{ refId, href }` (server request id + same-tab decide link) or
     // `{ failed: true }`.
     hearingHandoff: null,
+    hearingCompletion: null,
     // WI-08: same shape as `hearingHandoff` above, for the `work_inventory`
     // scenario's "save to the work inventory" confirm action —
     // `{ entryId, href }` on success.
@@ -260,8 +261,23 @@
       },
       randomId: randomId,
     });
+  var hearingCompletion =
+    window.KyberionAskHearingCompletion &&
+    window.KyberionAskHearingCompletion.create({
+      state: state,
+      vt: vt,
+      scopedUrl: scopedUrl,
+      formatTemplate: formatTemplate,
+      isWorkInventoryScenario: isWorkInventoryScenario,
+      hearingBlocked: hearingBlocked,
+      hearingRecovery: hearingRecovery,
+      fetchJson: fetchJson,
+      renderHearing: renderHearing,
+    });
   function hearingBlocked() {
-    return state.hearingMode && (!hearingRecovery || hearingRecovery.blocked());
+    return (
+      state.hearingMode && (!hearingRecovery || !hearingCompletion || hearingRecovery.blocked())
+    );
   }
 
   var nextActions =
@@ -648,89 +664,8 @@
     return state.hearingScenarioId === 'work_inventory';
   }
 
-  // HT-03 (2nd half) / WI-08: the confirm button + its own local
-  // request/result state, independent from the hearing record itself (the
-  // record only learns the server ids on the next full reload — this keeps
-  // the button responsive without waiting on that round trip). The same
-  // `#hearing-handoff` button/status/link elements carry both confirm
-  // actions — which one is live depends on `isWorkInventoryScenario`: the
-  // governed hand-off (`hearingHandoff`/`front_desk:hearing_handoff_*`) for
-  // every other scenario, the "save to the work inventory" confirm
-  // (`hearingInventory`/`front_desk:hearing_inventory_*`) for `work_inventory`.
   function renderHearingHandoff(record, ready) {
-    var button = document.getElementById('hearing-handoff');
-    var statusEl = document.getElementById('hearing-handoff-status');
-    var linkEl = document.getElementById('hearing-handoff-link');
-    if (!button || !statusEl || !linkEl) return;
-    button.disabled = state.sending || hearingBlocked();
-    statusEl.classList.add('hidden');
-    linkEl.classList.add('hidden');
-
-    if (isWorkInventoryScenario(record)) {
-      button.textContent = vt(state.vocab, 'front_desk:hearing_inventory_button');
-      var inventory = state.hearingInventory;
-      var alreadySaved =
-        Boolean(inventory && inventory.entryId) ||
-        Boolean(record && record.work_inventory_entry_id);
-      button.classList.toggle('hidden', !ready || alreadySaved);
-      if (!inventory) return;
-      if (inventory.pending) {
-        statusEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_pending');
-        statusEl.classList.remove('hidden');
-        return;
-      }
-      if (inventory.failed) {
-        statusEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_failed');
-        statusEl.classList.remove('hidden');
-        return;
-      }
-      if (inventory.entryId) {
-        statusEl.textContent =
-          vt(state.vocab, 'front_desk:hearing_inventory_done') +
-          ' ' +
-          formatTemplate(vt(state.vocab, 'front_desk:hearing_inventory_entry_label'), {
-            id: inventory.entryId,
-          });
-        statusEl.classList.remove('hidden');
-        if (inventory.href) {
-          linkEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_open');
-          linkEl.setAttribute('href', inventory.href);
-          linkEl.classList.remove('hidden');
-        }
-      }
-      return;
-    }
-
-    button.textContent = vt(state.vocab, 'front_desk:hearing_handoff_button');
-    var handoff = state.hearingHandoff;
-    var alreadyHandedOff =
-      Boolean(handoff && handoff.refId) || Boolean(record && record.mission_id);
-    button.classList.toggle('hidden', !ready || alreadyHandedOff);
-    if (!handoff) return;
-    if (handoff.pending) {
-      statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_pending');
-      statusEl.classList.remove('hidden');
-      return;
-    }
-    if (handoff.failed) {
-      statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_failed');
-      statusEl.classList.remove('hidden');
-      return;
-    }
-    if (handoff.refId) {
-      statusEl.textContent =
-        vt(state.vocab, 'front_desk:hearing_handoff_done') +
-        ' ' +
-        formatTemplate(vt(state.vocab, 'front_desk:hearing_mission_label'), {
-          id: handoff.refId,
-        });
-      statusEl.classList.remove('hidden');
-      if (handoff.href) {
-        linkEl.textContent = vt(state.vocab, 'front_desk:hearing_open_decide');
-        linkEl.setAttribute('href', handoff.href);
-        linkEl.classList.remove('hidden');
-      }
-    }
+    if (hearingCompletion) hearingCompletion.render(record, ready);
   }
 
   function renderHearing() {
@@ -777,102 +712,13 @@
   }
 
   function decideHearing() {
-    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
-    fetchJson(
-      '/api/hearing/' +
-        encodeURIComponent(state.sessionId) +
-        '/decide?locale=' +
-        encodeURIComponent(state.locale),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }
-    )
-      .then(function (result) {
-        if (result.ok && result.body && result.body.ok) {
-          state.hearingRecord = result.body.record;
-          renderHearing();
-        }
-      })
-      .catch(function () {
-        /* the record remains available for retry */
-      });
+    if (hearingCompletion) hearingCompletion.decide();
   }
-
-  // HT-03 (2nd half): "confirm and hand off as a request" — carries the
-  // decided hearing record into the governed request/approval flow behind
-  // `POST /api/hearing/:session/handoff`. Idempotent server-side: a second
-  // click after success returns the same ids instead of registering twice.
   function handoffHearing() {
-    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
-    if (state.hearingHandoff && state.hearingHandoff.pending) return;
-    state.hearingHandoff = { pending: true };
-    renderHearing();
-    fetchJson(
-      '/api/hearing/' +
-        encodeURIComponent(state.sessionId) +
-        '/handoff?locale=' +
-        encodeURIComponent(state.locale),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }
-    )
-      .then(function (result) {
-        if (result.ok && result.body && result.body.ok) {
-          state.hearingHandoff = {
-            refId: result.body.mission_id,
-            href: result.body.next_action && result.body.next_action.href,
-          };
-        } else {
-          state.hearingHandoff = { failed: true };
-        }
-        renderHearing();
-      })
-      .catch(function () {
-        state.hearingHandoff = { failed: true };
-        renderHearing();
-      });
+    if (hearingCompletion) hearingCompletion.handoff();
   }
-
-  // WI-08: "save to the work inventory" — the `work_inventory` scenario's
-  // equivalent of `handoffHearing()` above, confirming a decided record into
-  // a work-inventory entry via `POST /api/hearing/:session/inventory`.
-  // Idempotent server-side: a second click after success returns the same
-  // `entry_id` instead of writing a second entry.
   function saveWorkInventory() {
-    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
-    if (state.hearingInventory && state.hearingInventory.pending) return;
-    state.hearingInventory = { pending: true };
-    renderHearing();
-    fetchJson(
-      '/api/hearing/' +
-        encodeURIComponent(state.sessionId) +
-        '/inventory?locale=' +
-        encodeURIComponent(state.locale),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }
-    )
-      .then(function (result) {
-        if (result.ok && result.body && result.body.ok) {
-          state.hearingInventory = {
-            entryId: result.body.entry_id,
-            href: result.body.next && result.body.next.href,
-          };
-        } else {
-          state.hearingInventory = { failed: true };
-        }
-        renderHearing();
-      })
-      .catch(function () {
-        state.hearingInventory = { failed: true };
-        renderHearing();
-      });
+    if (hearingCompletion) hearingCompletion.inventory();
   }
 
   // ---------------------------------------------------------------------
