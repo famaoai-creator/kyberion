@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { PARTITIONED_RUNTIME_STATE_ROOTS as FOUNDATION_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { describe, expect, it } from 'vitest';
 import { rootDir } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
@@ -17,6 +18,10 @@ import {
 } from './storage-layout.js';
 
 describe('storage-layout floors', () => {
+  it('re-exports the single foundation state-root registry used by secure I/O', () => {
+    expect(PARTITIONED_RUNTIME_STATE_ROOTS).toBe(FOUNDATION_STATE_ROOTS);
+  });
+
   it('places platform-wide data under the system partition', () => {
     expect(storageFloorRelativePath('cache', SYSTEM_PARTITION, 'voice', 'whisper.cpp')).toBe(
       'active/shared/cache/system/voice/whisper.cpp'

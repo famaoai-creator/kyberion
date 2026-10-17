@@ -1,7 +1,10 @@
 import * as path from 'node:path';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
+
+export { PARTITIONED_RUNTIME_STATE_ROOTS };
 
 /**
  * Runtime storage layout — one governed place per storage purpose.
@@ -201,15 +204,6 @@ export function protectedStorageFloorPrefixes(): string[] {
 export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   resource_usage: 'active/shared/runtime/usage-ledger',
   execution_metrics: 'active/shared/runtime/execution-metrics',
-} as const;
-
-/**
- * Durable tier-partitioned state, distinct from append-only metrics ledgers.
- * State roots mirror knowledge-tier permissions for reads AND writes; they
- * are never added to metrics offboarding/compaction merely by registration.
- */
-export const PARTITIONED_RUNTIME_STATE_ROOTS = {
-  hearing: 'active/shared/runtime/hearing',
 } as const;
 
 /** Knowledge permission path corresponding to a registered runtime state path. */
