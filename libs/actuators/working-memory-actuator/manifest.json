@@ -1,6 +1,6 @@
 {
   "actuator_id": "working-memory-actuator",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').",
   "contract_schema": "knowledge/product/schemas/working-memory-action.schema.json",
   "resilience_tier": "best_effort",

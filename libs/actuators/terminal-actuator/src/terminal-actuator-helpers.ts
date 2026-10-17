@@ -102,7 +102,14 @@ const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
 
 function resolveTerminalCwd(rootDir: string, cwd: string | undefined): string {
   if (!cwd) return rootDir;
-  return assertSafeRepositoryPath(path.resolve(rootDir, cwd), {
+  const resolved = path.resolve(rootDir, cwd);
+  if (resolved === rootDir) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] cwd "${cwd}" resolves to the repository root itself; ` +
+        `pass a subdirectory (e.g. active/shared/tmp/<job>) as cwd instead.`
+    );
+  }
+  return assertSafeRepositoryPath(resolved, {
     allowMissingLeaf: true,
   });
 }

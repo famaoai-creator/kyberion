@@ -158,7 +158,8 @@
     "voice:route": "node scripts/run_built.mjs dist/scripts/voice_route_cli.js",
     "voice:upgrade": "node scripts/run_built.mjs dist/scripts/voice_upgrade.js",
     "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
-    "work:inventory": "node --import ./scripts/ts-loader.mjs scripts/work_inventory.ts"
+    "work:inventory": "node --import ./scripts/ts-loader.mjs scripts/work_inventory.ts",
+    "terminal": "pnpm exec tsx scripts/terminal_session_cli.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [

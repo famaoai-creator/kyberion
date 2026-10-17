@@ -29,6 +29,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ACTUATOR_TEST",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional runtime setting for actuator test; leave unset to use the built-in configuration.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ADB_BIN",
       "category": "path",
       "type": "path",
@@ -4241,6 +4249,14 @@
       "subsystem": "scope"
     },
     {
+      "name": "KYBERION_TERMINAL_DAEMON_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional numeric tuning value for terminal daemon timeout ms; leave unset to use the governed default.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -4254,6 +4270,14 @@
       "type": "string",
       "required": false,
       "description": "Bind host for the terminal bridge; the default is loopback so terminal control is not exposed remotely by default.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_TERMINAL_REQUEST_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional numeric tuning value for terminal request timeout ms; leave unset to use the governed default.",
       "documented": true
     },
     {

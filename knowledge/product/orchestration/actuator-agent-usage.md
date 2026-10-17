@@ -1,7 +1,7 @@
 ---
 title: Agent-facing actuator discovery and usage
 tags: [actuator, agent, browser-use, computer-use, discovery, cli]
-last_updated: 2026-10-10
+last_updated: 2026-10-18
 role_affinity: [implementer, operator, worker]
 phase_affinity: [alignment, execution]
 ---
@@ -41,7 +41,13 @@ authored parameter schema was checked; `not-available` means no authoritative
 parameter schema was available. Inferred/legacy schemas and examples are hints,
 not proof that every field is valid. The runtime remains the authority.
 
-`--dry-run` can execute capture operations. Use `--check` for zero execution.
+`--dry-run` executes capture operations and only validates apply/transform
+operations; the op kind comes from the discovery registry
+(`actuator-op-discovery.json`), so read-only ops listed as `capture` actually
+run. Use `--check` for zero execution. `--params` may be omitted for
+operations that take no arguments — an omitted flag is treated as `{}`, and
+the payload keeps both the `action` and `op` discriminator keys while
+contract validation accepts whichever key the actuator's schema declares.
 For an authorized live call, omit `--check` and keep `--json`. Fine-grained
 pipeline operations are wrapped into the existing one-step pipeline contract.
 Malformed authored inputs are rejected before execution. Approval and tenant

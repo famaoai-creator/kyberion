@@ -304,6 +304,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion tenant activation`             | `pnpm tenant:activation`            | Check or complete tenant activation                                                                                   |
 | `pnpm kyberion tenant export`                 |                                     | Export one tenant's governed data as a portable bundle.                                                               |
 | `pnpm kyberion tenant watch-drift`            | `pnpm tenant:watch-drift`           | Watch for tenant drift                                                                                                |
+| `pnpm kyberion terminal`                      | `pnpm terminal`                     | Drive persistent PTY sessions through the terminal daemon                                                             |
 | `pnpm kyberion tui`                           | `pnpm tui`                          | Open the terminal HUD                                                                                                 |
 | `pnpm kyberion validation-bundle export`      | `pnpm validation-bundle:export`     | Export the validation evidence bundle                                                                                 |
 | `pnpm kyberion vault cleanup`                 |                                     | Clean up vault mounts                                                                                                 |

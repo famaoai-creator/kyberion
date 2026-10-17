@@ -100,7 +100,7 @@ describe('actuator --dry-run contract across public entry paths', () => {
     expect(executeActuator).not.toHaveBeenCalled();
     expect(apply?.handler_invoked).toBe(false);
     expect(apply?.handler).toBe('skipped');
-    expect(apply?.kind).toBe('apply');
+    expect(apply?.kind).toBe('transform');
 
     const transform = await runPlayground(
       [

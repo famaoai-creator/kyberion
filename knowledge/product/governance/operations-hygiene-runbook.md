@@ -1101,6 +1101,12 @@ the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.
 Replay `scripts/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
+A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions
+run without PTY semantics (no resize, tty prompts like `ssh` password reads
+break, output is block-buffered). On macOS the recurring cause is the
+node-pty prebuilt losing its execute bit —
+`chmod +x node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/spawn-helper`
+restores it; verify with a `resize` op, which only succeeds on a real PTY.
 When adding probe scratch with `sharedTmp()`, register the exact call count and
 the consumable diagnostic purpose in `shared-tmp-allowlist.json`, then run
 `tests/shared-tmp-ratchet.test.ts`. Preserve durable conclusions in mission
