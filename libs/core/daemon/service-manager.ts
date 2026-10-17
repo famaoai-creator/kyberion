@@ -12,9 +12,8 @@
  * No manager performs I/O itself, which keeps them trivially testable and
  * keeps host mutation in the script layer where --apply is enforced.
  *
- * Windows is intentionally unsupported: per docs/operator/DEPLOYMENT.md,
- * Windows-native daemons are managed through the surface commands
- * (`pnpm surfaces status` / `pnpm surfaces repair`), not OS service units.
+ * Windows uses Task Scheduler for per-user daemon tasks, alongside
+ * launchd on macOS and systemd user units on Linux.
  */
 import { launchdManager } from './launchd.js';
 import { systemdUserManager } from './systemd-user.js';
