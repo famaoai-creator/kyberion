@@ -69,6 +69,7 @@ import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { isUIAutomationAvailable } from '@agent/core/virtual/os-automation';
 import { listKnownAppCapabilities } from '@agent/core/virtual/os-app-adapters';
 import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
+import { probeDesktopObservationReadiness } from '@agent/core/virtual/desktop-observation-readiness';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import {
@@ -826,6 +827,7 @@ export async function runBaselineCheck() {
   // is observational and intentionally does not change baseline health: a
   // non-macOS host can still use the permission-free clipboard source while
   // reporting the unavailable accessibility/frame sources explicitly.
+  const desktopObservationReadiness = await probeDesktopObservationReadiness();
   let desktopObservationProbe: Omit<ReturnType<typeof macosAutomationBridge.probe>, 'bridge_id'> & {
     bridge_id: string;
   } = macosAutomationBridge.probe();
@@ -867,12 +869,20 @@ export async function runBaselineCheck() {
       screen_frame: screen.available && screen.backend !== 'stub',
     };
   }
-  const desktopObservation = buildDesktopObservationReport({
-    ...desktopObservationProbe,
-    ...(desktopObservationAvailability
-      ? { sourceAvailability: desktopObservationAvailability }
-      : {}),
-  });
+  const desktopObservation = buildDesktopObservationReport(
+    {
+      ...desktopObservationProbe,
+      ...(desktopObservationAvailability
+        ? { sourceAvailability: desktopObservationAvailability }
+        : {}),
+    },
+    Object.fromEntries(
+      desktopObservationReadiness.map(({ source_id, available, reason }) => [
+        source_id,
+        { available, reason },
+      ])
+    )
+  );
 
   // LC-01b/LC-01c: escalate via ops alerts with day-level dedup (the baseline
   // runs hourly; one alert per class per UTC day). Hard-gated under vitest so

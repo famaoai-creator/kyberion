@@ -4164,6 +4164,10 @@
       "types": "./dist/actuator/deployment-adapter.d.ts",
       "default": "./dist/actuator/deployment-adapter.js"
     },
+    "./virtual/desktop-observation-readiness": {
+      "types": "./dist/virtual/desktop-observation-readiness.d.ts",
+      "default": "./dist/virtual/desktop-observation-readiness.js"
+    },
     "./virtual/desktop-event-feed": {
       "types": "./dist/virtual/desktop-event-feed.d.ts",
       "default": "./dist/virtual/desktop-event-feed.js"
