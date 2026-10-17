@@ -22,6 +22,7 @@ import {
   resolveSamplingParams,
   normalizeReasoningRole,
   resolveStepReasoningRoute,
+  isReasoningRole,
   _resetReasoningRoutePolicyCacheForTests,
 } from './reasoning-route-resolver.js';
 
@@ -440,5 +441,53 @@ describe('reasoning-route-resolver', () => {
         env: {},
       })
     ).toThrow(/PERMISSION_FLOOR/);
+  });
+
+  it('never treats an authority persona or the unknown sentinel as a reasoning role', () => {
+    const policy = {
+      version: 'test',
+      runtime_adapters: {
+        stub: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+      },
+      profiles: {
+        cheap: { mode: 'stub', model: 'cheap' },
+        deep: { mode: 'stub', model: 'deep' },
+      },
+      roles: {
+        default: { candidates: ['cheap'] },
+        ecosystem_architect: { candidates: ['deep'] },
+      },
+      permission_floor: 'readonly' as const,
+      fallback: {
+        max_attempts: 1,
+        max_in_place_retries: 0,
+        on_unsupported_parameter: 'reject' as const,
+      },
+    };
+    expect(isReasoningRole('ecosystem_architect', policy)).toBe(true);
+    expect(isReasoningRole('worker', policy)).toBe(false);
+    expect(isReasoningRole('unknown', policy)).toBe(false);
+    expect(isReasoningRole(undefined, policy)).toBe(false);
+
+    // An authority persona that is not a reasoning role must fall back to the
+    // default route instead of failing the step (previously it threw
+    // `Unknown reasoning role "worker"`).
+    expect(
+      resolveStepReasoningRoute({ stepId: 's', persona: 'worker', policy, env: {} }).profile
+    ).toBe('cheap');
+    // The unresolved-identity sentinel must not be used as a role either.
+    expect(
+      resolveStepReasoningRoute({ stepId: 's', persona: 'unknown', policy, env: {} }).profile
+    ).toBe('cheap');
+    // A persona that *is* a declared reasoning role still selects its candidates.
+    expect(
+      resolveStepReasoningRoute({ stepId: 's', persona: 'ecosystem_architect', policy, env: {} })
+        .profile
+    ).toBe('deep');
   });
 });

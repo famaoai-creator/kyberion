@@ -19,6 +19,7 @@ import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runInlineProductivityScore } from './pipeline-domain-ops.js';
 import {
   DEFAULT_CORE_WAIT_MS,
+  resolveLogMessage,
   resolveReasoningContextParam,
   resolveWaitDurationMs,
 } from './pipeline-execution-part-bootstrap.js';
@@ -247,6 +248,18 @@ describe('run_pipeline compatibility', () => {
     expect(normalizePipelineOp('system:shell')).toBe('system:shell');
     expect(normalizePipelineOp('judge_route')).toBe('core:judge_route');
     expect(normalizePipelineOp('await_decision')).toBe('core:await_decision');
+  });
+
+  it('renders an object-valued system:log message as JSON, never [object Object]', () => {
+    const inventory = { missions: [{ id: 'm-1', status: 'active' }] };
+    const message = resolveLogMessage({ message: '{{channel}}' }, { channel: inventory });
+    expect(message).not.toContain('[object Object]');
+    expect(JSON.parse(message)).toEqual(inventory);
+    // Scalars and mixed templates keep their human-readable form.
+    expect(resolveLogMessage({ message: 'count={{count}}' }, { count: 3 })).toBe('count=3');
+    expect(resolveLogMessage({ message: 'plain' }, {})).toBe('plain');
+    // An unresolved template stays empty rather than logging "undefined".
+    expect(resolveLogMessage({ message: '{{missing}}' }, {})).toBe('');
   });
 
   it('routes a deterministic judge fixture to the selected step', async () => {

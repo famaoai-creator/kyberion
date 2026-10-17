@@ -288,12 +288,16 @@ export async function resolvePipelineReasoningOptions(
   trace?: TraceContext
 ): Promise<ReasoningCallOptions> {
   const reasoning = policy.reasoning;
-  const persona =
+  const resolvedPersona =
     (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
     (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
     registeredEnv('KYBERION_PERSONA') ||
     'default';
-  const { resolveStepReasoningRoute } =
+  // `unknown` is the "no identity resolved" sentinel, not a persona; treating it
+  // as one leaks into the reasoning role and fails every `reasoning:*` step in an
+  // un-onboarded environment.
+  const persona = resolvedPersona === 'unknown' ? 'default' : resolvedPersona;
+  const { resolveStepReasoningRoute, isReasoningRole } =
     await import('@agent/core/reasoning/reasoning-route-resolver');
   const route = resolveStepReasoningRoute({
     stepId,
@@ -320,7 +324,7 @@ export async function resolvePipelineReasoningOptions(
     ...(reasoning?.model_tier ? { model_tier: reasoning.model_tier } : {}),
     ...(route.capability_profile ? { profile: route.capability_profile } : {}),
     permission_mode: route.permission_mode,
-    ...(persona !== 'default' ? { role: persona } : {}),
+    ...(persona !== 'default' && isReasoningRole(persona) ? { role: persona } : {}),
   } satisfies ReasoningCallOptions;
 }
 
@@ -889,7 +893,24 @@ export function resolveLogMessage(
   ctx: Record<string, unknown>
 ): string {
   const template = params.message ?? params.template ?? params.text ?? '';
-  return String(resolveVars(template, ctx));
+  return formatLogPayload(resolveVars(template, ctx));
+}
+
+/**
+ * Render a resolved `system:log` payload for humans and log files.
+ *
+ * `resolveVars` preserves the type of a whole-value template, so
+ * `message: "{{artifact}}"` resolves to the artifact object rather than a
+ * string. `String(object)` collapsed that to `[object Object]` and silently
+ * dropped the payload, so objects and arrays are serialized as pretty JSON
+ * instead. `null`/`undefined` render as the empty string, matching the
+ * behaviour of an unresolved template.
+ */
+function formatLogPayload(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  return String(value);
 }
 
 export function resolveActuatorManifestPath(
