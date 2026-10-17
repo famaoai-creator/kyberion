@@ -1,0 +1,41 @@
+{
+  "action": "pipeline",
+  "name": "ops-health-probe",
+  "version": "1.0.0",
+  "description": "Daily ops-health probe: detects store overgrowth, alert dominance, and uncovered runtime stores; records findings to ops-findings.jsonl and files deduplicated WorkItems (autonomous improvement loop stage 1+2).",
+  "_refs": {
+    "implementation": "libs/core/ops-health-probe.ts"
+  },
+  "context": {
+    "file_work_items": true
+  },
+  "schedule": {
+    "id": "ops-health-probe-daily",
+    "cron": "45 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "probe",
+      "role": "source",
+      "op": "core:run_ops_health_probe",
+      "produces": {
+        "channel": "ops_health_findings",
+        "type": "Json"
+      },
+      "params": {
+        "file_work_items": "{{file_work_items}}"
+      }
+    },
+    {
+      "id": "log_findings",
+      "op": "system:log",
+      "consumes": "ops_health_findings",
+      "params": {
+        "level": "info",
+        "message": "ops-health-probe: {{ops_health_findings.findings}} finding(s), {{ops_health_findings.work_items_filed}} work item(s) filed"
+      }
+    }
+  ]
+}
