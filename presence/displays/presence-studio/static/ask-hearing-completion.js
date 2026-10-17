@@ -23,6 +23,18 @@
     // (`hearingInventory`/`front_desk:hearing_inventory_*`) for `work_inventory`.
     // Destinations are server-derived and may use configured cross-surface HTTP origins.
     // Never turn a malformed/executable URL into a completion action.
+    // Only bounded server conflict codes become user-facing copy, never raw errors.
+    function conflictCode(result) {
+      var code =
+        result &&
+        !result.ok &&
+        result.status === 409 &&
+        result.body &&
+        result.body.hearing_conflict;
+      return ['stale_snapshot', 'completion_locked', 'handoff_unresolved'].indexOf(code) !== -1
+        ? code
+        : null;
+    }
     function hearingCompletionHref(value) {
       if (
         typeof value !== 'string' ||
@@ -67,6 +79,15 @@
         : { refId: value.id, href: href };
     }
 
+    function completionConflictBlocked(value) {
+      return Boolean(
+        value &&
+        value.conflict &&
+        value.action &&
+        hearingActionCurrent(value.action) &&
+        ['completion_locked', 'handoff_unresolved'].indexOf(value.conflict) !== -1
+      );
+    }
     function renderHearingHandoff(record, ready) {
       var button = document.getElementById('hearing-handoff');
       var statusEl = document.getElementById('hearing-handoff-status');
@@ -80,6 +101,7 @@
       if (isWorkInventoryScenario(record)) {
         button.textContent = vt(state.vocab, 'front_desk:hearing_inventory_button');
         var inventory = restoredHearingCompletion('inventory') || state.hearingInventory;
+        if (completionConflictBlocked(state.hearingInventory)) button.disabled = true;
         var alreadySaved =
           Boolean(inventory && inventory.entryId) ||
           Boolean(record && record.work_inventory_entry_id);
@@ -99,7 +121,12 @@
           return;
         }
         if (inventory.failed) {
-          statusEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_failed');
+          statusEl.textContent = vt(
+            state.vocab,
+            inventory.conflict
+              ? 'front_desk:hearing_conflict_' + inventory.conflict
+              : 'front_desk:hearing_inventory_failed'
+          );
           statusEl.classList.remove('hidden');
           return;
         }
@@ -123,6 +150,7 @@
 
       button.textContent = vt(state.vocab, 'front_desk:hearing_handoff_button');
       var handoff = restoredHearingCompletion('mission') || state.hearingHandoff;
+      if (completionConflictBlocked(state.hearingHandoff)) button.disabled = true;
       var alreadyHandedOff =
         Boolean(handoff && handoff.refId) || Boolean(record && record.mission_id);
       button.classList.toggle(
@@ -141,7 +169,12 @@
         return;
       }
       if (handoff.failed) {
-        statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_failed');
+        statusEl.textContent = vt(
+          state.vocab,
+          handoff.conflict
+            ? 'front_desk:hearing_conflict_' + handoff.conflict
+            : 'front_desk:hearing_handoff_failed'
+        );
         statusEl.classList.remove('hidden');
         return;
       }
@@ -262,6 +295,8 @@
       }
       var text = document.getElementById('hearing-decision-text');
       var label = phase && vt(state.vocab, 'front_desk:hearing_decision_' + phase);
+      if (phase === 'unknown' && local.conflict && decisionCurrent(local.conflict.action))
+        label += ' ' + vt(state.vocab, 'front_desk:hearing_conflict_' + local.conflict.code);
       if (text && label) text.textContent = label;
       var exit = document.getElementById('hearing-decision-continue');
       if (exit) {
@@ -414,6 +449,7 @@
       }
       if (hearingRecovery) hearingRecovery.beginCompletion();
       local.rejected = false;
+      local.conflict = null;
       local.active = action;
       action.waiting = true;
       action.timer = window.setTimeout(function () {
@@ -441,6 +477,9 @@
       }
       Promise.resolve(request)
         .then(function (result) {
+          var code = conflictCode(result);
+          if (code && decisionCurrent(action) && local.marker === action.marker)
+            local.conflict = { code: code, action: action };
           var success = validDecision(result, action);
           var rejected = result && !result.ok && [400, 401, 403].indexOf(result.status) !== -1;
           // A retired success cannot refresh the current record safely: retain its
@@ -481,6 +520,7 @@
       )
         return;
       if (state.hearingHandoff && state.hearingHandoff.pending) return;
+      if (completionConflictBlocked(state.hearingHandoff)) return;
       if (hearingRecovery) hearingRecovery.beginCompletion();
       var action = hearingActionContext();
       state.hearingHandoff = { pending: true, action: action };
@@ -507,7 +547,7 @@
               href: result.body.next_action && result.body.next_action.href,
             };
           } else {
-            state.hearingHandoff = { failed: true };
+            state.hearingHandoff = { failed: true, conflict: conflictCode(result), action: action };
           }
           if (hearingRecovery) hearingRecovery.endCompletion();
           renderHearing();
@@ -535,6 +575,7 @@
       )
         return;
       if (state.hearingInventory && state.hearingInventory.pending) return;
+      if (completionConflictBlocked(state.hearingInventory)) return;
       if (hearingRecovery) hearingRecovery.beginCompletion();
       var action = hearingActionContext();
       state.hearingInventory = { pending: true, action: action };
@@ -561,7 +602,11 @@
               href: result.body.next && result.body.next.href,
             };
           } else {
-            state.hearingInventory = { failed: true };
+            state.hearingInventory = {
+              failed: true,
+              conflict: conflictCode(result),
+              action: action,
+            };
           }
           if (hearingRecovery) hearingRecovery.endCompletion();
           renderHearing();
