@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-17
 ---
 
 # Resident Dot Model
@@ -234,6 +234,23 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   and at or after the due time is required before a verdict
   `improved | no_change | regressed | unmeasurable` lands in `outcomes.jsonl`;
   `regressed` feeds execution feedback. Recent verdicts enter the next prompt.
+  Settled outcomes also form a runtime-only `outcome` wake, even for a dot
+  without an inbox trigger. One wake coalesces the eligible ledger prefix:
+  its key hashes scope, dot and the append-ordered, unique action identities.
+  Delivery uses the normal wake ledger, backoff, circuit, authority and budget
+  checks; a result appended during a wake remains due under a new key. No
+  tenant metric prose is copied into shared wake details. First valid verdict
+  per action is immutable; duplicates do not cause new wakes. Future-dated,
+  unsettled or malformed evidence is excluded; clock-skewed evidence becoming
+  valid advances the key even when it precedes the last appended result.
+  Progress context and `dot status` distinguish `progressing`, `satisfied`,
+  `observing`, `replan` and `measurement_needed`. Within a 30-day window,
+  two consecutive non-improving outcomes on the same KR/signal request a new
+  hypothesis, tool or decomposition on the next wake. Streaks use measurement
+  order (append order breaks ties), reset on improvement, and exclude already
+  satisfied KR targets. Unknown measurements request measurement repair rather
+  than inferring success. These are planning instructions, not new execution
+  privileges or a deterministic guarantee that the model changes its plan.
 - **Memory (DL-05)**: `memory/<dot>.json` (notes, open items, hypotheses;
   8 KB, deterministic eviction), edited through the `dot_update_memory` tool /
   `dot-memory` fence and distilled weekly. Persisted ID high-water marks survive

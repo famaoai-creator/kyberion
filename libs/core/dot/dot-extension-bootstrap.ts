@@ -48,6 +48,7 @@ import {
 } from './dot-outcomes.js';
 import { dotEventIntakeStatusSection } from './dot-event-intake-diagnostics.js';
 import { dotArbitrationPreGateCheck } from './dot-arbitration.js';
+import { dotProgressPromptSection, dotProgressStatusSection } from './dot-progress.js';
 
 let registered = false;
 
@@ -75,6 +76,8 @@ export function ensureDotExtensionsRegistered(): void {
   DOT_PROMPT_SECTIONS.push(dotOutcomesPromptSection());
   DOT_STATUS_SECTIONS.push(dotOutcomesStatusSection());
   DOT_DIGEST_SECTIONS.push(dotOutcomesDigestSection());
+  DOT_PROMPT_SECTIONS.push(dotProgressPromptSection());
+  DOT_STATUS_SECTIONS.push(dotProgressStatusSection());
 
   // DL-11 cross-dot arbitration
   DOT_PRE_GATE_CHECKS.push(dotArbitrationPreGateCheck());
