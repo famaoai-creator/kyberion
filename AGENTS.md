@@ -5,7 +5,7 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 
 > **Canonical file**: `AGENTS.md`. `CLAUDE.md`, `CODEX.md`, `GEMINI.md` are symlinks — edit here only.
 > **Language**: rules in English; phase & onboarding docs in Japanese ([policy](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md)).
-> **First-time setup**: [docs/INITIALIZATION.md](./docs/INITIALIZATION.md).
+> **First-time setup**: [docs/QUICKSTART.md](./docs/QUICKSTART.md). For prompt-driven setup from an LLM CLI, follow [prompt-first-onboarding](./knowledge/product/orchestration/prompt-first-onboarding.md) before choosing commands.
 
 ## 1. Invariants — never violate
 
@@ -45,6 +45,8 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 ## 3. Lifecycle — intent → goal → result
 
 The work loop is: **capture intent → agree on the goal before changing anything (③) → execute (④) → review and learn (⑤).**
+
+**Fresh-clone bootstrap**: if dependencies or the baseline entrypoint have not been built yet, first follow QUICKSTART’s install → build → toolchain → doctor → verify-session sequence, then run baseline. Do not repeatedly invoke a missing runtime or invent identity/tenant defaults. This does not bypass a runnable pipeline’s fatal error or recovery circuit breaker.
 
 **On session start**, run `pnpm pipeline --input pipelines/baseline-check.json` and branch on the report's `status`:
 
