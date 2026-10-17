@@ -213,6 +213,34 @@ describe('desktop recording and distillation', () => {
     expect(report.data_tier_note).toContain('separate');
   });
 
+  it('uses source-specific Windows probes for browser tabs and screen capture', () => {
+    const readiness = assessDesktopObservationReadiness(
+      {
+        platform: 'win32',
+        available: false,
+        permissions: {
+          automation: 'unknown',
+          accessibility: 'unknown',
+          screen_recording: 'unknown',
+        },
+      },
+      {
+        browser_tabs: { available: true, reason: 'windows_chrome_tabs_observable' },
+        screen_frame: { available: true, reason: 'screen_capture_backend_available:platform' },
+      }
+    );
+    expect(readiness.find((entry) => entry.source_id === 'browser_tabs')).toEqual({
+      source_id: 'browser_tabs',
+      available: true,
+      reason: 'windows_chrome_tabs_observable',
+    });
+    expect(readiness.find((entry) => entry.source_id === 'screen_frame')).toEqual({
+      source_id: 'screen_frame',
+      available: true,
+      reason: 'screen_capture_backend_available:platform',
+    });
+  });
+
   it('records human observations with semantic target evidence and no clipboard body', () => {
     const recording = buildDesktopRecording([snapshot({ clipboard_text: 'super-secret-token' })]);
     expect(recording.steps[0].selector).toMatchObject({

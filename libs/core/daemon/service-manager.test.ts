@@ -20,8 +20,8 @@ describe('resolveDaemonManager', () => {
     expect(resolveDaemonManager('linux')?.platform).toBe('systemd-user');
   });
 
-  it('returns null for platforms without a user daemon story', () => {
-    expect(resolveDaemonManager('win32')).toBeNull();
+  it('maps Windows to the Task Scheduler user manager', () => {
+    expect(resolveDaemonManager('win32')?.platform).toBe('windows-task-scheduler');
   });
 });
 

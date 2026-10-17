@@ -12,12 +12,12 @@
  * No manager performs I/O itself, which keeps them trivially testable and
  * keeps host mutation in the script layer where --apply is enforced.
  *
- * Windows is intentionally unsupported: per docs/operator/DEPLOYMENT.md,
- * Windows-native daemons are managed through the surface commands
- * (`pnpm surfaces status` / `pnpm surfaces repair`), not OS service units.
+ * Windows uses Task Scheduler for per-user daemon tasks, alongside
+ * launchd on macOS and systemd user units on Linux.
  */
 import { launchdManager } from './launchd.js';
 import { systemdUserManager } from './systemd-user.js';
+import { windowsTaskSchedulerManager } from './windows-task-scheduler.js';
 
 export interface DaemonServiceSpec {
   /** Value accepted by `--daemon` (kebab-case). */
@@ -97,13 +97,15 @@ export interface DaemonPlan {
   verificationHint: string;
 }
 
-export type DaemonManagerPlatform = 'launchd' | 'systemd-user';
+export type DaemonManagerPlatform = 'launchd' | 'systemd-user' | 'windows-task-scheduler';
 
 export interface DaemonManager {
   readonly platform: DaemonManagerPlatform;
   planInstall(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
   planUninstall(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
   planRestart(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
+  planStart(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
+  planStop(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
   /** Status probe for `status` verbs; null when the platform has none. */
   statusCommand(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonCommand | null;
 }
@@ -118,5 +120,6 @@ export function resolveDaemonManager(
 ): DaemonManager | null {
   if (platform === 'darwin') return launchdManager;
   if (platform === 'linux') return systemdUserManager;
+  if (platform === 'win32') return windowsTaskSchedulerManager;
   return null;
 }

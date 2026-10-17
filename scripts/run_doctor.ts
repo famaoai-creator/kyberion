@@ -16,11 +16,8 @@ import {
 } from '@agent/core/surface/surface-coordination-store';
 import { isSurfaceOutboxDue } from '@agent/core/surface/surface-delivery';
 import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
-import {
-  assessDesktopObservationReadiness,
-  listDesktopObservationSources,
-} from '@agent/core/virtual/desktop-recording';
-import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
+import { listDesktopObservationSources } from '@agent/core/virtual/desktop-recording';
+import { probeDesktopObservationReadiness } from '@agent/core/virtual/desktop-observation-readiness';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { formatEnvValidationReport, validateEnv } from '@agent/core/env-validator';
 import { evaluateDegradation, loadHealthThresholds } from '@agent/core/health-degradation';
@@ -358,16 +355,15 @@ function runtimeToDependencyActuator(runtime?: string): string | null {
   }
 }
 
-export function collectDesktopObservationDoctorLines(): string[] {
-  const probe = macosAutomationBridge.probe();
-  const readiness = assessDesktopObservationReadiness(probe);
+export async function collectDesktopObservationDoctorLines(): Promise<string[]> {
+  const readiness = await probeDesktopObservationReadiness();
   const available = readiness.filter((entry) => entry.available).map((entry) => entry.source_id);
   const unavailable = readiness
     .filter((entry) => !entry.available)
     .map((entry) => `${entry.source_id}=${entry.reason}`);
   return [
     t('recorder:recorder_doctor_bridge', {
-      bridge: probe.available ? 'available' : 'unavailable',
+      bridge: available.some((source) => source !== 'clipboard') ? 'available' : 'unavailable',
       registry: listDesktopObservationSources().length,
       available: available.join(',') || 'none',
     }),
@@ -466,7 +462,7 @@ export async function collectDoctorReport(argv: {
     meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
     surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
-    desktopObservationLines: collectDesktopObservationDoctorLines(),
+    desktopObservationLines: await collectDesktopObservationDoctorLines(),
     ...(appPreflight ? { appPreflight } : {}),
   };
 }
