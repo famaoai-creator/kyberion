@@ -19,7 +19,7 @@ describe('autonomous-ops-gate', () => {
 
   it('loads the governed policy and classifies actions', () => {
     const policy = getAutonomousOpsPolicy();
-    expect(policy.version).toBe('1.1.0');
+    expect(policy.version).toBe('1.2.0');
 
     const baseline = evaluateAutonomousOpsAction({ actionId: 'baseline_health_scan' });
     expect(baseline.decision).toBe('auto');
@@ -115,7 +115,7 @@ describe('autonomous-ops-gate', () => {
       tenant_drift_watch: 'notify',
       dependency_vuln_scan: 'auto',
       auto_checkpoint: 'auto',
-      daemon_restart: 'approve',
+      daemon_restart: 'notify',
     };
     for (const [actionId, decision] of Object.entries(expected)) {
       const result = evaluateAutonomousOpsAction({ actionId, executionMode: 'apply' });
