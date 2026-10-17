@@ -42,6 +42,13 @@ export const PROMOTE_NOTIFY_MIN_DECISIONS = 10;
 export const PROMOTE_AUTO_MIN_DECISIONS = 20;
 export const PROMOTE_AUTO_MIN_OUTCOME_SUCCESS = 0.9;
 export const PROMOTE_AUTO_MAX_INCIDENTS_30D = 0;
+/**
+ * Second tier-2 path: an action that cannot accumulate execution rows (it only
+ * executes when the gate already says auto) can still earn auto after a long
+ * veto-free soak at notify — every notify decision surfaced to the operator
+ * and was not rejected, so a sustained clean streak is itself the evidence.
+ */
+export const PROMOTE_AUTO_NOTIFY_SOAK_DECISIONS = 50;
 /** A demotion holds the base decision for this long before re-eligibility. */
 export const DEMOTE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 /** Stats window — promotion evidence ages out. */
@@ -216,12 +223,21 @@ export function sweepAutonomyActionStates(
       continue;
     }
 
-    // Tier-2: notify→auto needs the strict bar.
-    if (
+    // Tier-2: notify→auto, via either execution proof or a notify-tier soak.
+    // Execution-proven needs ≥1 executed row — outcome_success is 0 when
+    // nothing ever ran, which would otherwise block promote-only actions
+    // (a notify-level action never records execution evidence).
+    const executedRuns = stats.succeeded + stats.incidents;
+    const executionProven =
       stats.decisions >= PROMOTE_AUTO_MIN_DECISIONS &&
+      executedRuns > 0 &&
       stats.outcome_success >= PROMOTE_AUTO_MIN_OUTCOME_SUCCESS &&
-      stats.incidents <= PROMOTE_AUTO_MAX_INCIDENTS_30D
-    ) {
+      stats.incidents <= PROMOTE_AUTO_MAX_INCIDENTS_30D;
+    const notifySoaked =
+      existing.relaxed_to === 'notify' &&
+      stats.decisions >= PROMOTE_AUTO_NOTIFY_SOAK_DECISIONS &&
+      stats.incidents === 0;
+    if (executionProven || notifySoaked) {
       if (existing.relaxed_to !== 'auto') {
         state.overrides[actionId] = {
           ...existing,
