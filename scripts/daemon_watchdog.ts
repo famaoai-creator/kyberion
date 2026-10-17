@@ -240,12 +240,12 @@ export async function checkDaemonHeartbeatsWithRecovery(
  * (idempotent per daemon-and-status-minute, authority-checked, audited) whose
  * delivery consults `autonomous-ops-gate`.
  *
- * `daemon_restart` is deliberately scored to land on `approve`: the restart is a
- * platform service-manager command outside the repo sandbox, and restarting a
- * scheduler mid-firing can duplicate or drop work. So this records a governed,
- * attributable request and tells the operator what is waiting — it does not
- * shell out. When the gate says `auto` (a policy the operator can choose), the
- * receipt says so and an executor can act on it.
+ * `daemon_restart` is reclassified to land on `notify` (score 5): a service
+ * restart is designed-reversible (the service manager re-binds the unit) and
+ * touches no secrets — the remaining risk is scope. `notify` still requires
+ * an operator, but it now sits on the evidence ladder: sustained clean
+ * decisions promote it to `auto` via autonomy-action-state, at which point
+ * the receipt says `auto_executed` and the service-manager plan runs.
  */
 export async function requestDaemonRecovery(
   unhealthy: DaemonHeartbeatStatus[],
