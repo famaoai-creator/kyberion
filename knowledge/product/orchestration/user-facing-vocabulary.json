@@ -24159,6 +24159,36 @@
         "ja": "この内容で進める",
         "qps-ploc": "⟦Ṗřőƈėėḓ ẇïŧħ ŧħïş ŀőřėɱ⟧"
       },
+      "hearing_sync_pending": {
+        "en": "Checking the requirements update. You can edit your next answer while this finishes.",
+        "ja": "要件への反映を確認中です。次の回答は下書きできます。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė řėɋůïřėɱėñŧş ůṗḓȧŧė. Ẏőů ƈȧñ ėḓïŧ ẏőůř ñėẋŧ ȧñşẇėř ẇħïŀė ŧħïş ƒïñïşħėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "hearing_sync_unconfirmed": {
+        "en": "The requirements update is unconfirmed. Check again before answering or finalizing requirements, or continue in ordinary conversation. Checking never resends your answer.",
+        "ja": "要件への反映を確認できていません。次の回答や確定の前に再確認するか、通常の会話に戻ってください。再確認で回答を再送することはありません。",
+        "qps-ploc": "⟦Ŧħė řėɋůïřėɱėñŧş ůṗḓȧŧė ïş ůñƈőñƒïřɱėḓ. Ƈħėƈķ ȧɠȧïñ ƀėƒőřė ȧñşẇėřïñɠ őř ƒïñȧŀïẑïñɠ řėɋůïřėɱėñŧş, őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. Ƈħėƈķïñɠ ñėṽėř řėşėñḓş ẏőůř ȧñşẇėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_sync_storage": {
+        "en": "The requirements update could not be safely tracked in this tab. Continue in ordinary conversation; requirements remain paused.",
+        "ja": "このタブで要件の反映状況を安全に保持できません。要件への回答を止めたまま、通常の会話に戻れます。",
+        "qps-ploc": "⟦Ŧħė řėɋůïřėɱėñŧş ůṗḓȧŧė ƈőůŀḓ ñőŧ ƀė şȧƒėŀẏ ŧřȧƈķėḓ ïñ ŧħïş ŧȧƀ. Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ; řėɋůïřėɱėñŧş řėɱȧïñ ṗȧůşėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "hearing_sync_scope": {
+        "en": "This hearing has an unconfirmed update from another selection. Return to that selection to check it, or continue in ordinary conversation.",
+        "ja": "このヒアリングには別の選択対象で反映が未確認の回答があります。元の選択対象に戻って確認するか、通常の会話に戻ってください。",
+        "qps-ploc": "⟦Ŧħïş ħėȧřïñɠ ħȧş ȧñ ůñƈőñƒïřɱėḓ ůṗḓȧŧė ƒřőɱ ȧñőŧħėř şėŀėƈŧïőñ. Řėŧůřñ ŧő ŧħȧŧ şėŀėƈŧïőñ ŧő ƈħėƈķ ïŧ, őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "hearing_sync_retry": {
+        "en": "Check requirements again",
+        "ja": "要件への反映を再確認",
+        "qps-ploc": "⟦Ƈħėƈķ řėɋůïřėɱėñŧş ȧɠȧïñ ŀőřėɱ ï⟧"
+      },
+      "hearing_sync_continue": {
+        "en": "Continue in ordinary conversation",
+        "ja": "通常の会話に戻る",
+        "qps-ploc": "⟦Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
       "hearing_pending": {
         "en": "Preparing…",
         "ja": "準備中",

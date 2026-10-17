@@ -211,6 +211,9 @@
     randomId: randomId,
     saveDraft: saveDraft,
     onHistoryReady: applyUrlPrefill,
+    onConversationRestored: function () {
+      if (hearingRecovery) hearingRecovery.load();
+    },
     retireSend: retireSend,
     retireStartup: retireStartup,
     restoreConversation: restoreConversation,
@@ -243,6 +246,24 @@
       vt: vt,
     });
 
+  var hearingRecovery =
+    window.KyberionAskHearingRecovery &&
+    window.KyberionAskHearingRecovery.create({
+      state: state,
+      fetch: fetch,
+      fetchReadJson: fetchReadJson,
+      scopedUrl: scopedUrl,
+      vt: vt,
+      render: render,
+      renderHearing: function () {
+        if (state.vocabularyReady) renderHearing();
+      },
+      randomId: randomId,
+    });
+  function hearingBlocked() {
+    return state.hearingMode && (!hearingRecovery || hearingRecovery.blocked());
+  }
+
   var nextActions =
     window.KyberionAskNextActions &&
     window.KyberionAskNextActions.create({
@@ -254,9 +275,6 @@
       cancelDraftChoice: cancelDraftChoice,
       renderTurns: renderTurns,
     });
-
-  var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
-  var HEARING_CANVAS_POLL_MAX_TRIES = 10;
 
   var recognition = null;
   var suppressRecognitionRestart = false;
@@ -569,6 +587,7 @@
     syncAvatar();
     renderConversationStatus();
     renderDraftChoice();
+    if (hearingRecovery) hearingRecovery.render();
   }
 
   // PA-09: page state -> avatar controller (the avatar overlays `speaking`
@@ -643,6 +662,7 @@
     var statusEl = document.getElementById('hearing-handoff-status');
     var linkEl = document.getElementById('hearing-handoff-link');
     if (!button || !statusEl || !linkEl) return;
+    button.disabled = state.sending || hearingBlocked();
     statusEl.classList.add('hidden');
     linkEl.classList.add('hidden');
 
@@ -718,6 +738,8 @@
     if (!card) return;
     card.classList.toggle('hidden', !state.hearingMode);
     if (!state.hearingMode) return;
+    var exit = document.getElementById('hearing-sync-continue');
+    if (exit) exit.setAttribute('href', scopedUrl('/ask'));
     var record = state.hearingRecord;
     var titleEl = document.getElementById('hearing-title');
     if (titleEl) titleEl.textContent = vt(state.vocab, 'front_desk:hearing_title');
@@ -725,7 +747,10 @@
     if (canvas)
       canvas.setAttribute('title', vt(state.vocab, 'front_desk:hearing_canvas_frame_title'));
     var decide = document.getElementById('hearing-decide');
-    if (decide) decide.textContent = vt(state.vocab, 'front_desk:hearing_decide');
+    if (decide) {
+      decide.textContent = vt(state.vocab, 'front_desk:hearing_decide');
+      decide.disabled = state.sending || hearingBlocked();
+    }
     var coverage = document.getElementById('hearing-coverage');
     var ready = false;
     if (coverage) {
@@ -751,46 +776,8 @@
     renderHearingHandoff(record, ready);
   }
 
-  // HT-02: the record's canvas may still be generating when this page first
-  // reads it — reload every ~3s (bounded) until `canvas_generation` leaves
-  // `pending`, so the iframe picks up the new `canvas_url` without a manual
-  // refresh. `renderHearing` already swaps the iframe `src` whenever
-  // `canvas_url` changes.
-  function maybeScheduleHearingCanvasPoll() {
-    var record = state.hearingRecord;
-    if (!record || record.canvas_generation !== 'pending') {
-      state.hearingCanvasPollTries = 0;
-      return;
-    }
-    if (state.hearingCanvasPollTries >= HEARING_CANVAS_POLL_MAX_TRIES) return;
-    state.hearingCanvasPollTries += 1;
-    window.setTimeout(loadHearing, HEARING_CANVAS_POLL_INTERVAL_MS);
-  }
-
-  function loadHearing() {
-    if (!state.hearingMode) return;
-    fetchJson(
-      '/api/hearing/' +
-        encodeURIComponent(state.sessionId) +
-        '?locale=' +
-        encodeURIComponent(state.locale) +
-        '&scenario_id=' +
-        encodeURIComponent(state.hearingScenarioId)
-    )
-      .then(function (result) {
-        if (result.ok && result.body && result.body.ok) {
-          state.hearingRecord = result.body.record;
-          renderHearing();
-          maybeScheduleHearingCanvasPoll();
-        }
-      })
-      .catch(function () {
-        /* hearing is additive to the conversation */
-      });
-  }
-
   function decideHearing() {
-    if (!state.hearingMode || !state.hearingRecord) return;
+    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
     fetchJson(
       '/api/hearing/' +
         encodeURIComponent(state.sessionId) +
@@ -818,7 +805,7 @@
   // `POST /api/hearing/:session/handoff`. Idempotent server-side: a second
   // click after success returns the same ids instead of registering twice.
   function handoffHearing() {
-    if (!state.hearingMode || !state.hearingRecord) return;
+    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
     if (state.hearingHandoff && state.hearingHandoff.pending) return;
     state.hearingHandoff = { pending: true };
     renderHearing();
@@ -856,7 +843,7 @@
   // Idempotent server-side: a second click after success returns the same
   // `entry_id` instead of writing a second entry.
   function saveWorkInventory() {
-    if (!state.hearingMode || !state.hearingRecord) return;
+    if (!state.hearingMode || !state.hearingRecord || state.sending || hearingBlocked()) return;
     if (state.hearingInventory && state.hearingInventory.pending) return;
     state.hearingInventory = { pending: true };
     renderHearing();
@@ -886,26 +873,6 @@
         state.hearingInventory = { failed: true };
         renderHearing();
       });
-  }
-
-  function updateHearing(text, intentResolution) {
-    if (!state.hearingMode) return Promise.resolve();
-    return fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId) + '/answer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: text,
-        request_id: randomId(),
-        intent_resolution: intentResolution,
-        locale: state.locale,
-        scenario_id: state.hearingScenarioId,
-      }),
-    }).then(function (result) {
-      if (result.ok && result.body && result.body.ok) {
-        state.hearingRecord = result.body.record;
-        renderHearing();
-      }
-    });
   }
 
   // ---------------------------------------------------------------------
@@ -1105,6 +1072,7 @@
     if (send)
       send.disabled =
         state.sending ||
+        hearingBlocked() ||
         state.historyState !== 'ready' ||
         !state.storageVerified ||
         Boolean(input && input.value.length > 4000);
@@ -1144,6 +1112,7 @@
       !trimmed ||
       String(text || '').length > 4000 ||
       state.sending ||
+      hearingBlocked() ||
       state.historyState !== 'ready' ||
       !state.conversationId ||
       !state.storageVerified
@@ -1261,8 +1230,8 @@
         if (body.historySaved === false) state.errorKey = 'concierge:dock.history.unsaved';
         speakReply(body.reply);
         refreshRecent();
-        if (!body.replayed)
-          return updateHearing(trimmed, body.intent_resolution).catch(function () {});
+        if (!body.replayed && hearingRecovery)
+          hearingRecovery.submit(trimmed, body.intent_resolution);
       })
       .catch(function () {
         if (!currentSend()) return;
@@ -1528,6 +1497,7 @@
     } catch (err) {
       state.hearingMode = false;
     }
+    if (hearingRecovery) hearingRecovery.mount();
     if (correction) correction.mount();
     else {
       var correctionRetry = document.getElementById('ask-correction-retry');
@@ -1588,7 +1558,6 @@
         state.startupReadPending = false;
         renderStartup();
         render();
-        loadHearing();
         // Optional recent activity must never delay or block the conversation.
         refreshRecent();
         var legacy = loadTurns();
