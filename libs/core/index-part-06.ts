@@ -74,6 +74,8 @@ export type {
   VideoFrameArchiveResult,
 } from './video/video-frame-archive.js';
 
+export { probeDesktopObservationReadiness } from './virtual/desktop-observation-readiness.js';
+
 export {
   SCREEN_CAPTURE_BRIDGE_ID,
   createScreenCaptureBridge,

@@ -369,6 +369,7 @@ describe('openai-compatible-backend', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.tool_choice).toBe('auto');
     expect(body.tools).toEqual([
       expect.objectContaining({
         function: expect.objectContaining({ name: 'capability_read' }),
@@ -381,6 +382,76 @@ describe('openai-compatible-backend', () => {
         }),
       ])
     );
+  });
+
+  it('rejects a tool call whose arguments do not satisfy the supplied schema', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call-invalid',
+                    type: 'function',
+                    function: { name: 'lookup', arguments: '{}' },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen3.8:27b-q4_K_M',
+    });
+    await expect(
+      backend.generateWithTools('Lookup a known target.', [
+        {
+          name: 'lookup',
+          description: 'Look up a fixed target.',
+          inputSchema: {
+            type: 'object',
+            properties: { target: { type: 'string' } },
+            required: ['target'],
+          },
+        },
+      ])
+    ).rejects.toThrow('[OPENAI_TOOL_ARGUMENTS_SCHEMA_INVALID]');
+  });
+
+  it('surfaces a text response when the model elects not to call a tool', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { role: 'assistant', content: 'No tool call was produced.' } }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen3.8:27b-q4_K_M',
+    });
+    const result = await backend.generateWithTools('Use the lookup tool.', [
+      {
+        name: 'lookup',
+        description: 'Look up a fixed target.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+    ]);
+    expect(result).toEqual({ text: 'No tool call was produced.' });
+    expect(result.toolCalls).toBeUndefined();
   });
 
   it('streams OpenAI-compatible text deltas without waiting for the full response', async () => {

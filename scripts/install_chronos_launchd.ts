@@ -123,7 +123,7 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
 }
 
 export function launchAgentTargetPath(label: string, homeDir: string = os.homedir()): string {
-  return path.join(homeDir, 'Library/LaunchAgents', `${label}.plist`);
+  return path.posix.join(homeDir, 'Library/LaunchAgents', `${label}.plist`);
 }
 
 export function chronosLaunchAgentTargetPath(homeDir: string = os.homedir()): string {
@@ -150,7 +150,7 @@ function runOrThrow(command: string, args: string[], tolerateFailure = false): v
 }
 
 function printPlan(
-  verb: 'Install' | 'Uninstall' | 'Restart',
+  verb: 'Install' | 'Uninstall' | 'Restart' | 'Start' | 'Stop',
   plan: DaemonPlan,
   applyCommand: string,
   print: (value: unknown) => void
@@ -197,6 +197,12 @@ export async function main(
       describe:
         'Restart the daemon (launchctl kickstart -k / systemctl --user restart) — the fix for a live process with a stale heartbeat',
     })
+    .option('start', { type: 'boolean', default: false, describe: 'Start the registered daemon' })
+    .option('stop', {
+      type: 'boolean',
+      default: false,
+      describe: 'Stop the daemon without removing its registration',
+    })
     .option('status', {
       type: 'boolean',
       default: false,
@@ -227,7 +233,7 @@ export async function main(
   if (!manager) {
     throw new Error(
       `no user-level daemon manager for platform '${options.platform ?? process.platform}' — ` +
-        'on Windows, run daemons through the surface commands (pnpm surfaces start/repair); see docs/operator/DEPLOYMENT.md'
+        'see docs/operator/DEPLOYMENT.md for platform service support'
     );
   }
 
@@ -240,7 +246,12 @@ export async function main(
     uid: currentUid(),
     stagingDir: pathResolver.sharedTmp(`daemon-units/${manager.platform}`),
     env,
-  };
+    userId:
+      options.platform === 'win32' || process.platform === 'win32'
+        ? os.userInfo().username
+        : undefined,
+    systemRoot: process.env.SystemRoot,
+  } as DaemonRenderContext;
   const verbFlag = daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`;
 
   if (argv.status) {
@@ -259,7 +270,15 @@ export async function main(
     return;
   }
 
-  const verb = argv.uninstall ? 'uninstall' : argv.restart ? 'restart' : 'install';
+  const selected = [
+    argv.uninstall && 'uninstall',
+    argv.restart && 'restart',
+    argv.start && 'start',
+    argv.stop && 'stop',
+  ].filter(Boolean);
+  if (selected.length > 1)
+    throw new Error('choose only one of --uninstall, --restart, --start, or --stop');
+  const verb = selected[0] ?? 'install';
   const plan =
     verb === 'uninstall'
       ? manager.planUninstall(spec, ctx)
@@ -270,7 +289,15 @@ export async function main(
 
   if (!argv.apply) {
     printPlan(
-      verb === 'uninstall' ? 'Uninstall' : verb === 'restart' ? 'Restart' : 'Install',
+      verb === 'uninstall'
+        ? 'Uninstall'
+        : verb === 'restart'
+          ? 'Restart'
+          : verb === 'start'
+            ? 'Start'
+            : verb === 'stop'
+              ? 'Stop'
+              : 'Install',
       plan,
       applyCommand,
       print
