@@ -527,6 +527,9 @@ export const PROGRESS_VOCABULARY_KEYS = [
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
 // intent-resolution rendering).
 export const ASK_VOCABULARY_KEYS = [
+  'front_desk:hearing_conflict_stale_snapshot',
+  'front_desk:hearing_conflict_completion_locked',
+  'front_desk:hearing_conflict_handoff_unresolved',
   'front_desk:hearing_decision_pending',
   'front_desk:hearing_decision_unknown',
   'front_desk:hearing_decision_storage',
