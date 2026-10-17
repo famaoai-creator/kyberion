@@ -3355,6 +3355,7 @@
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
         "libs/core/plugin/plugin-lifecycle.ts#importTarget",
+        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5331,6 +5332,28 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "chronos_token_registry_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#<module>",
+            "libs/core/index.ts#<module>",
+            "libs/core/index-part-05.ts#<module>",
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -5588,6 +5611,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
