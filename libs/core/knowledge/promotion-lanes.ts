@@ -81,6 +81,8 @@ export function resetPromotionLanePolicyCache(): void {
 
 export interface LaneSubject {
   target_kind?: string;
+  /** MemoryCandidate vocabulary — same concept, different field name. */
+  proposed_memory_kind?: string;
   tier?: string;
   title?: string;
   summary?: string;
@@ -109,8 +111,9 @@ export function autoLaneEligible(
 ): { eligible: boolean; reason?: string } {
   const g = policy.auto_guards;
   if (g.require_public_tier) {
-    const tier = candidate.tier ?? candidate.scope?.tier ?? 'public';
-    if (tier !== 'public') return { eligible: false, reason: `tier=${tier} is not public` };
+    const tier = candidate.tier ?? candidate.scope?.tier;
+    if (tier !== 'public')
+      return { eligible: false, reason: `tier=${tier ?? 'unknown'} is not public` };
   }
   const haystack = `${candidate.title ?? ''} ${candidate.summary ?? ''}`.toLowerCase();
   for (const pattern of g.forbidden_content_patterns) {
