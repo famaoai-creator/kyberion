@@ -1,0 +1,46 @@
+---
+record_id: mem-MSN-ASK-SEND-DEADLINE-20261017-2026_10_17
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ASK-SEND-DEADLINE-20261017-2026_10_17
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-17T06:21:16.247Z
+source_branch: fix/ask-send-deadline-20261017
+source_commit: faa763ee842fd7af68e424a27ade0464e3bb5b3f
+---
+
+# Bound conversation POST waiting without inferring execution failure
+
+A browser deadline must preserve the durable request identity and make recovery explicit without triggering duplicate execution.
+
+## Applicability
+
+- mission
+- mission:MSN-ASK-SEND-DEADLINE-20261017
+
+## Reusable Steps
+
+1. A browser deadline must preserve the durable request identity and make recovery explicit without triggering duplicate execution
+
+## Expected Outcome
+
+When a conversation POST can stall before response headers or during JSON body delivery, bound the entire browser wait with a single settlement guard. A timeout means the result is unconfirmed, not that the server rejected or cancelled execution. Preserve the exact request ID, submitted payload and any newer composer draft. Never resend automatically; explicit history inspection and same-ID retry must rely on server reservation and replay semantics.
+
+Treat a late response or rejection as retired after timeout, and suppress completion after navigation, pagehide, or shell replacement. Test both headers and body stalls, optional AbortController absence, normal timer cleanup, server pending counts, newer drafts, explicit same-ID retry, and late success/rejection while that retry is active.
+
+Product implementation: https://github.com/famaoai-creator/kyberion/commit/faa763ee842fd7af68e424a27ade0464e3bb5b3f. The 60-second deadline matches the ordinary supervisor Ask transport default but is not a processing SLA. Synthetic cloud-browser fault injection confirmed recovery and no automatic resend; focused and adjacent regressions passed. Full local gate coverage remained 80/81 because the separate Chronos contrast browser dependency could not be downloaded; do not equate this with all checks passing.
+
+## Evidence
+
+- active/missions/public/MSN-ASK-SEND-DEADLINE-20261017/evidence/test-report.md
+- active/missions/public/MSN-ASK-SEND-DEADLINE-20261017/evidence/browser-recovery.md
+- active/missions/public/MSN-ASK-SEND-DEADLINE-20261017/evidence/publication-readiness.md
+
+## Artifacts
