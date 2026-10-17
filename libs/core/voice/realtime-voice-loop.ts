@@ -200,6 +200,8 @@ export function describeRealtimeVoiceLoopEvent(
 }
 
 export interface RealtimeVoiceLoopOptions {
+  /** BCP-47 language passed to every streaming STT request. */
+  language?: string;
   /** Directory for per-turn user WAVs (created if missing). */
   recordingDir: string;
   mic?: MicCaptureOptions;
@@ -361,6 +363,7 @@ interface SttFeed {
 function startSttFeed(
   bridge: StreamingSpeechToTextBridge,
   format: AudioFormat,
+  language?: string,
   onText?: (text: string, isFinal: boolean) => void
 ): SttFeed {
   const queue: AudioChunk[] = [];
@@ -383,7 +386,7 @@ function startSttFeed(
   const finals = (async () => {
     const texts: string[] = [];
     try {
-      for await (const chunk of bridge.transcribeStream(iterate())) {
+      for await (const chunk of bridge.transcribeStream(iterate(), { language })) {
         if (chunk.text.trim()) onText?.(chunk.text.trim(), chunk.is_final);
         if (chunk.is_final && chunk.text.trim()) texts.push(chunk.text.trim());
       }
@@ -391,9 +394,13 @@ function startSttFeed(
       logger.warn(
         `[realtime-voice-loop] streaming STT failed mid-turn: ${err instanceof Error ? err.message : err}`
       );
+      throw err;
     }
     return texts.join(' ');
   })();
+  // A feed can fail before capture ends, or be discarded after a barge-in.
+  // Observe it immediately while preserving rejection for the batch fallback.
+  void finals.catch(() => undefined);
 
   const wake = (): void => {
     notify?.();
@@ -716,7 +723,7 @@ export async function startRealtimeVoiceLoop(
         options.onEvent?.({ kind: 'barge_in_provisional', turn: activeTurnIndex });
         trace?.addEvent('realtime_voice.barge_in_provisional', { turn: activeTurnIndex });
         if (options.streamingStt) {
-          bargeFeed = startSttFeed(options.streamingStt, format, (text) => {
+          bargeFeed = startSttFeed(options.streamingStt, format, options.language, (text) => {
             bargePartials.push(text);
           });
           for (const chunk of buffered) bargeFeed.push(chunk);
@@ -828,6 +835,7 @@ export async function startRealtimeVoiceLoop(
         sttFeed = startSttFeed(
           options.streamingStt,
           format,
+          options.language,
           wantTranscriptText ? onTranscriptText : undefined
         );
         if (replayResult.onsetPreroll?.length) {
@@ -1434,6 +1442,7 @@ export async function startRealtimeVoiceLoop(
             sttFeed = startSttFeed(
               options.streamingStt,
               format,
+              options.language,
               wantTranscriptText ? onTranscriptText : undefined
             );
             if (result.onsetPreroll?.length) {

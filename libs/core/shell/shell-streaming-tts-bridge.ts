@@ -122,6 +122,13 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
       ...(this.opts.max_buffer_ms ? { max_buffer_ms: this.opts.max_buffer_ms } : {}),
     });
     let drained = false;
+    let failure: Error | undefined;
+    const fail = (error: Error): void => {
+      failure ??= error;
+      drained = true;
+      queue.close(failure);
+      terminateProcess(proc);
+    };
 
     proc.stdout.on('data', (buf: Buffer) => {
       const chunk: AudioChunk = {
@@ -138,13 +145,14 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
         );
       }
       drained = true;
-      queue.close(code === 0 ? undefined : new Error(`shell TTS exited with code ${String(code)}`));
+      if (code !== 0) failure ??= new Error(`shell TTS exited with code ${String(code)}`);
+      queue.close(failure);
     };
-    proc.on('exit', finish);
-    proc.on('error', (error) => {
-      drained = true;
-      queue.close(error);
-    });
+    // close follows exit and the closure of stdout: trailing PCM is queued first.
+    proc.on('close', finish);
+    proc.on('error', fail);
+    proc.stdin.on('error', fail);
+    proc.stdout.on('error', fail);
 
     void (async () => {
       try {
@@ -152,19 +160,26 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
           if (drained) break;
           if (!proc.stdin.write(segment + '\n')) await onceDrain(proc.stdin);
         }
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
       } finally {
         proc.stdin.end();
       }
     })();
 
     try {
-      while (!drained) {
+      for (;;) {
         const next = await queue.next();
-        if (next === null) return;
+        if (next === null) {
+          // BoundedAudioQueue resolves an already-pending waiter on close(error).
+          if (failure) throw failure;
+          return;
+        }
         yield next;
       }
     } finally {
-      if (!drained) terminateProcess(proc);
+      drained = true;
+      terminateProcess(proc);
     }
   }
 }

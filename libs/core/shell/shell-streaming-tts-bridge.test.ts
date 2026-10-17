@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import { ShellStreamingTextToSpeechBridge } from './shell-streaming-tts-bridge.js';
@@ -53,6 +53,105 @@ function bridge(env?: Record<string, string>) {
     persistent: true,
   });
 }
+
+function ephemeral(worker: string) {
+  return new ShellStreamingTextToSpeechBridge({
+    bridge_id: 'test-ephemeral',
+    command: process.execPath,
+    args: ['-e', worker],
+  });
+}
+
+describe('shell streaming TTS bridge — ephemeral mode', () => {
+  it('drains queued PCM after the worker closes while the consumer is paused', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    async function* input() {
+      yield 'first';
+      await gate;
+      yield 'last';
+    }
+    const b = ephemeral(`
+      const rl = require('readline').createInterface({ input: process.stdin });
+      let first = true;
+      rl.on('line', () => {
+        if (first) {
+          first = false;
+          const bytes = Buffer.alloc(320);
+          bytes.writeUInt32LE(process.pid);
+          process.stdout.write(bytes);
+        } else {
+          process.stdout.end(Buffer.alloc(640, 2), () => process.exit(0));
+        }
+      });
+    `);
+    const iter = b.synthesizeStream(input(), 'test')[Symbol.asyncIterator]();
+    const first = await iter.next();
+    expect(first.done).toBe(false);
+    const pid = Buffer.from(first.value!.payload).readUInt32LE();
+    release();
+    // Wait for actual process termination, without advancing the audio consumer.
+    await vi.waitFor(() => {
+      expect(() => process.kill(pid, 0)).toThrow();
+    });
+    let bytes = first.value!.payload.byteLength;
+    for (;;) {
+      const next = await iter.next();
+      if (next.done) break;
+      bytes += next.value.payload.byteLength;
+    }
+    expect(bytes).toBe(960);
+  });
+
+  it('rejects a failed worker while waiting for PCM', async () => {
+    await expect(
+      collect(ephemeral('process.exit(7)').synthesizeStream(linesOf(), 'test'))
+    ).rejects.toThrow('code 7');
+  });
+
+  it('rejects a failed worker after yielding PCM', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    async function* input() {
+      yield 'first';
+      await gate;
+      yield 'last';
+    }
+    const b = ephemeral(`
+      const rl = require('readline').createInterface({ input: process.stdin });
+      let first = true;
+      rl.on('line', () => {
+        if (first) { first = false; process.stdout.write(Buffer.alloc(320)); }
+        else process.exit(7);
+      });
+    `);
+    const iter = b.synthesizeStream(input(), 'test')[Symbol.asyncIterator]();
+    expect((await iter.next()).done).toBe(false);
+    release();
+    await expect(iter.next()).rejects.toThrow('code 7');
+  });
+
+  it('surfaces spawn errors to a waiting consumer', async () => {
+    const b = new ShellStreamingTextToSpeechBridge({
+      bridge_id: 'missing',
+      command: '/nonexistent-kyberion-tts-worker',
+    });
+    await expect(collect(b.synthesizeStream(linesOf(), 'test'))).rejects.toThrow(/ENOENT/);
+  });
+
+  it('surfaces text source failures and terminates the worker', async () => {
+    async function* input(): AsyncGenerator<string> {
+      throw new Error('text source failed');
+    }
+    await expect(
+      collect(ephemeral('process.stdin.resume()').synthesizeStream(input(), 'test'))
+    ).rejects.toThrow('text source failed');
+  });
+});
 
 describe('shell streaming TTS bridge — persistent framed mode', () => {
   it('routes environment reads through the governed accessor', () => {
