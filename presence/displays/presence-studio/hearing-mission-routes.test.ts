@@ -259,6 +259,10 @@ describe('POST /api/hearing/:session/handoff', () => {
   afterEach(() => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(
+      pathResolver.rootResolve('active/shared/runtime/hearing/confidential/' + TEST_TENANT),
+      { recursive: true, force: true }
+    );
     safeRmSync(pathResolver.sharedTmp(`hearing/${TEST_TENANT}`), { recursive: true, force: true });
     safeRmSync(pathResolver.sharedTmp('hearing-mission-routes-test'), {
       recursive: true,

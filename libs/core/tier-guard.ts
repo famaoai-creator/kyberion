@@ -16,6 +16,9 @@ import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  partitionedRuntimeStateKnowledgePath,
+  partitionedRuntimeStateTierInPath,
   STORAGE_FLOOR_ROOTS,
   classifyStorageFloorPath,
   storageFloorTier,
@@ -97,7 +100,7 @@ type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { 
 let corruptPolicyWarned = false;
 
 /**
- * A missing policy means an unprovisioned workspace (allow: bootstrap).
+ * A missing policy preserves bootstrap access outside protected durable state.
  * A policy that exists but cannot be parsed must NOT silently disable tier
  * isolation — protected tiers fail closed until the file is repaired.
  */
@@ -127,7 +130,8 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'active/projects/personal') ||
     pathStartsWith(relativePath, 'active/missions/confidential') ||
     pathStartsWith(relativePath, 'active/projects/confidential') ||
-    isProtectedStorageFloorTier(storageFloorTier(relativePath))
+    isProtectedStorageFloorTier(storageFloorTier(relativePath)) ||
+    isProtectedRuntimeStatePath(relativePath)
   );
 }
 
@@ -144,6 +148,54 @@ function protectedFloorPartitionPrefix(relativePath: string): string | undefined
 function isProtectedStorageFloorTier(tier: TierLevel | undefined): boolean {
   return tier === 'personal' || tier === 'confidential';
 }
+
+/** Exact registered durable-state root; copies in scratch keep their own boundary. */
+function isProtectedRuntimeStatePath(relativePath: string): boolean {
+  return (
+    Boolean(partitionedRuntimeStateKnowledgePath(relativePath)) &&
+    isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
+  );
+}
+
+const MISSING_RUNTIME_STATE_POLICY_DENIAL = {
+  allowed: false as const,
+  reason:
+    '[POLICY_VIOLATION] security-policy.json is missing. Access to protected durable runtime state fails closed until the policy file is restored.',
+};
+
+/** A stale but parseable policy must not turn a registered state store public.
+ * Require the exact tier declaration to be the first matching protected prefix:
+ * an earlier ancestor would extract the wrong tenant. Shared exemptions cannot
+ * bypass this store's tenant check. Other stores keep their existing semantics.
+ */
+function runtimeStatePolicyDeclarationValid(
+  policy: { tenant_scope?: { protected_prefixes?: unknown; shared_prefixes?: unknown } } | null,
+  relativePath: string
+): boolean {
+  if (!isProtectedRuntimeStatePath(relativePath)) return true;
+  const root = Object.values(PARTITIONED_RUNTIME_STATE_ROOTS).find((candidate) =>
+    pathStartsWith(relativePath, candidate)
+  );
+  const tier = partitionedRuntimeStateTierInPath(relativePath);
+  const protectedPrefixes: unknown = policy?.tenant_scope?.protected_prefixes;
+  const sharedPrefixes: unknown = policy?.tenant_scope?.shared_prefixes;
+  return (
+    Array.isArray(protectedPrefixes) &&
+    protectedPrefixes.every((prefix) => typeof prefix === 'string') &&
+    protectedPrefixes.find((prefix) => pathStartsWith(relativePath, prefix)) ===
+      root + '/' + tier + '/' &&
+    (sharedPrefixes === undefined ||
+      (Array.isArray(sharedPrefixes) &&
+        sharedPrefixes.every((prefix) => typeof prefix === 'string') &&
+        !sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))))
+  );
+}
+
+const INVALID_RUNTIME_STATE_POLICY_DECLARATION_DENIAL = {
+  allowed: false as const,
+  reason:
+    '[POLICY_VIOLATION] hearing.policy_declaration_invalid — protected durable state requires an exact tier/tenant declaration without a shared exemption in security-policy.json.',
+};
 
 const CORRUPT_POLICY_DENIAL = {
   allowed: false as const,
@@ -878,22 +930,22 @@ export function validateWritePermission(
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const {
-    persona: currentPersona,
-    role: currentRole,
-    authorities,
-    sudoScope,
-    tenantSlug,
-    brokeredTenants,
-    brokerApproval,
-  } = resolvePolicyIdentityContext();
+  const identity = resolvePolicyIdentityContext();
+  const { role: currentRole, authorities, tenantSlug, brokeredTenants, brokerApproval } = identity;
 
   const loaded = loadPolicy();
-  if (loaded.status === 'missing') return { allowed: true };
+  if (loaded.status === 'missing') {
+    return isProtectedRuntimeStatePath(relativePath)
+      ? MISSING_RUNTIME_STATE_POLICY_DENIAL
+      : { allowed: true };
+  }
   if (loaded.status === 'corrupt') {
     return isProtectedTierPath(relativePath) ? CORRUPT_POLICY_DENIAL : { allowed: true };
   }
   const policy = loaded.policy;
+  if (!runtimeStatePolicyDeclarationValid(policy, relativePath)) {
+    return INVALID_RUNTIME_STATE_POLICY_DECLARATION_DENIAL;
+  }
 
   // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
   const tenantDenial = checkTenantScope(
@@ -907,6 +959,16 @@ export function validateWritePermission(
   );
   if (tenantDenial) return tenantDenial;
 
+  // Durable state contains tier data; broad runtime defaults must not grant
+  // knowledge-tier writes that this identity does not already possess.
+  const stateKnowledgePath = partitionedRuntimeStateKnowledgePath(relativePath);
+  if (
+    stateKnowledgePath &&
+    isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
+  ) {
+    return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
+  }
+
   if (
     (policy.default_allow || []).some((p: string) =>
       policyPathMatches(relativePath, p, currentMission)
@@ -914,6 +976,24 @@ export function validateWritePermission(
   )
     return { allowed: true };
 
+  return personaTierWriteDecision(policy, relativePath, identity, operation);
+}
+
+/** Existing persona/role/authority write rules, also used by durable tier state. */
+function personaTierWriteDecision(
+  policy: any,
+  relativePath: string,
+  identity: ReturnType<typeof resolvePolicyIdentityContext>,
+  operation: 'write' | 'mkdir'
+): { allowed: boolean; reason?: string } {
+  const {
+    persona: currentPersona,
+    role: currentRole,
+    authorities,
+    sudoScope,
+    tenantSlug,
+  } = identity;
+  const currentMission = resolveProjectScope().missionId;
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
@@ -969,6 +1049,8 @@ export function detectTier(filePath: string): TierLevel {
     resolved.includes('/active/projects/personal/')
   )
     return 'personal';
+  const stateTier = partitionedRuntimeStateTierInPath(resolved);
+  if (stateTier) return stateTier;
   const floorTier = storageFloorTierInPath(resolved);
   if (floorTier) return floorTier;
   if (
@@ -1002,16 +1084,22 @@ export function validateReadPermission(
     };
   }
 
-  // Tier/tenant-partitioned runtime ledgers (resource usage, execution
-  // metrics: active/shared/runtime/<ledger>/<tier>/<tenant|shared>/) hold
+  // Tier/tenant-partitioned runtime ledgers and durable state stores hold
   // tier data outside knowledge/: a tenant-bound reader never crosses tenants,
   // and a persona reads a partition only if it may read knowledge/<tier>/.
   if (
     pathStartsWith(relativePath, 'active/shared/runtime/') &&
-    /\/(?:personal|confidential)\//u.test(relativePath)
+    (/\/(?:personal|confidential)\//u.test(relativePath) ||
+      isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath)))
   ) {
     const loaded = loadPolicy();
+    if (loaded.status === 'missing' && isProtectedRuntimeStatePath(relativePath)) {
+      return MISSING_RUNTIME_STATE_POLICY_DENIAL;
+    }
     if (loaded.status === 'loaded') {
+      if (!runtimeStatePolicyDeclarationValid(loaded.policy, relativePath)) {
+        return INVALID_RUNTIME_STATE_POLICY_DECLARATION_DENIAL;
+      }
       const cfg = tenantScopeConfig(loaded.policy);
       const protectedMatch = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
       if (protectedMatch) {
@@ -1026,7 +1114,7 @@ export function validateReadPermission(
           { kind: 'read', role: identity.role }
         );
         if (denial) return denial;
-        const ledgerTier = partitionedLedgerTier(protectedMatch.prefix);
+        const ledgerTier = partitionedRuntimeTier(protectedMatch.prefix);
         if (!ledgerTier) return { allowed: true };
         // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
         // libs/core for cap enforcement) holds an explicit read grant on the
@@ -1044,9 +1132,10 @@ export function validateReadPermission(
       }
     } else if (
       loaded.status === 'corrupt' &&
-      Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS).some((root) =>
-        pathStartsWith(relativePath, root)
-      )
+      [
+        ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+        ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
+      ].some((root) => pathStartsWith(relativePath, root))
     ) {
       return CORRUPT_POLICY_DENIAL;
     }
@@ -1126,12 +1215,15 @@ export function validateReadPermission(
 }
 
 /**
- * Tier of a partitioned runtime ledger's protected prefix
+ * Tier of a partitioned runtime ledger or durable state's protected prefix
  * (`active/shared/runtime/<ledger>/<tier>/`), or undefined for any other prefix.
  */
-function partitionedLedgerTier(prefix: string): 'personal' | 'confidential' | undefined {
+function partitionedRuntimeTier(prefix: string): 'personal' | 'confidential' | undefined {
   const normalized = normalizePath(prefix);
-  for (const root of Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS)) {
+  for (const root of [
+    ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+    ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
+  ]) {
     for (const tier of ['personal', 'confidential'] as const) {
       if (normalized === `${root}/${tier}`) return tier;
     }
