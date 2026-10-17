@@ -24,7 +24,7 @@ import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './storage-layout.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
