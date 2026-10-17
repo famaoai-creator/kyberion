@@ -204,6 +204,18 @@
                   >{{t:front_desk:hearing_sync_continue}}</a
                 >
               </div>
+              <div
+                id="hearing-decision-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                hidden
+              >
+                <p id="hearing-decision-text">{{t:front_desk:hearing_decision_unknown}}</p>
+                <a class="kb-btn kb-btn--secondary" id="hearing-decision-continue" href="/ask"
+                  >{{t:front_desk:hearing_decision_continue}}</a
+                >
+              </div>
               <p class="ask-about-text" id="hearing-coverage"></p>
               <iframe id="hearing-canvas" class="hearing-canvas" sandbox=""></iframe>
               <p class="ask-about-label" id="hearing-canvas-status"></p>

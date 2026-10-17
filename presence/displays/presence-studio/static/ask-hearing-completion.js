@@ -168,6 +168,7 @@
           window.location.href,
           scopedUrl('/api/conversation'),
           state.sessionId,
+          state.conversationId,
           state.hearingScenarioId,
           state.locale,
           state.draftScopeEpoch,
@@ -198,40 +199,271 @@
       );
     }
 
+    // This marker is a local no-resend guard, not a server receipt. GET can
+    // restore a destination but cannot correlate this particular decide POST.
+    var decisions = Object.create(null);
+    var decisionGeneration = 0;
+    var decisionHidden = false;
+    var decisionMounted = false;
+    function decisionKey() {
+      return 'kyberion.ask.hearing.decision.' + state.sessionId;
+    }
+    function decisionState() {
+      var key = decisionKey();
+      if (!decisions[key]) decisions[key] = { marker: null, failed: false, active: null };
+      return decisions[key];
+    }
+    function decisionBlocked() {
+      if (!state.hearingMode) return false;
+      var local = decisionState();
+      try {
+        if (
+          !state.sessionId ||
+          window.sessionStorage.getItem('kyberion.ask.session_id') !== state.sessionId
+        )
+          throw new Error('Decision session was not retained');
+        var raw = window.sessionStorage.getItem(decisionKey());
+        if (raw === null && local.marker !== null) throw new Error('Decision correlation was lost');
+        // Even corrupt/foreign markers block. Nothing in storage authorizes a resend.
+        if (raw !== null) local.marker = raw;
+      } catch (err) {
+        local.failed = true;
+      }
+      return local.marker !== null || local.failed;
+    }
+    function decisionCurrent(action) {
+      return (
+        !decisionHidden && action.generation === decisionGeneration && hearingActionCurrent(action)
+      );
+    }
+    function renderDecision() {
+      var locked = decisionBlocked();
+      var local = decisionState();
+      var busy = Boolean(
+        locked &&
+        local.active &&
+        local.marker === local.active.marker &&
+        local.active.waiting &&
+        decisionCurrent(local.active)
+      );
+      var phase = local.failed
+        ? 'storage'
+        : busy
+          ? 'pending'
+          : locked
+            ? 'unknown'
+            : local.rejected
+              ? 'rejected'
+              : null;
+      var host = document.getElementById('hearing-decision-status');
+      if (host) {
+        host.hidden = !state.hearingMode || !phase;
+        host.setAttribute('aria-busy', String(busy));
+      }
+      var text = document.getElementById('hearing-decision-text');
+      var label = phase && vt(state.vocab, 'front_desk:hearing_decision_' + phase);
+      if (text && label) text.textContent = label;
+      var exit = document.getElementById('hearing-decision-continue');
+      if (exit) {
+        exit.hidden = !locked;
+        exit.setAttribute('href', scopedUrl('/ask'));
+        var exitLabel = vt(state.vocab, 'front_desk:hearing_decision_continue');
+        if (exitLabel) exit.textContent = exitLabel;
+      }
+    }
+    function publishDecision() {
+      renderHearing();
+      options.render();
+    }
+    function clearOwnDecision(action) {
+      var local = decisions[action.key];
+      try {
+        if (
+          !local ||
+          local.failed ||
+          local.marker !== action.marker ||
+          window.sessionStorage.getItem(action.key) !== action.marker
+        )
+          return false;
+        window.sessionStorage.removeItem(action.key);
+        if (window.sessionStorage.getItem(action.key) !== null)
+          throw new Error('Decision correlation was not cleared');
+        local.marker = null;
+        return true;
+      } catch (err) {
+        if (local) local.failed = true;
+        return false;
+      }
+    }
+    function validDecision(result, action) {
+      var body = result && result.body;
+      var record = body && body.record;
+      return Boolean(
+        result &&
+        result.ok &&
+        body &&
+        body.ok === true &&
+        record &&
+        record.session_id === action.sessionId &&
+        record.scenario === action.scenarioId &&
+        typeof record.decided_at === 'string' &&
+        record.decided_at.length > 0 &&
+        Number.isFinite(Date.parse(record.decided_at)) &&
+        record.decided_by &&
+        record.decided_by.kind === 'human' &&
+        typeof record.decided_by.id === 'string' &&
+        record.decided_by.id.trim().length > 0 &&
+        ['owner', 'approver'].indexOf(record.decided_by.role) !== -1 &&
+        (record.decided_by.display_name == null ||
+          typeof record.decided_by.display_name === 'string') &&
+        typeof record.updated_at === 'string' &&
+        Number.isFinite(Date.parse(record.updated_at)) &&
+        Array.isArray(record.canvas_versions) &&
+        record.canvas_versions.every(function (version) {
+          return typeof version === 'string';
+        }) &&
+        Array.isArray(record.requirements) &&
+        record.requirements.length > 0 &&
+        record.requirements.every(function (item) {
+          return (
+            item &&
+            typeof item === 'object' &&
+            !Array.isArray(item) &&
+            typeof item.id === 'string' &&
+            item.id.length > 0 &&
+            typeof item.label_key === 'string' &&
+            item.label_key.length > 0 &&
+            typeof item.confidence === 'number' &&
+            Number.isFinite(item.confidence) &&
+            (item.source_turn == null || typeof item.source_turn === 'string') &&
+            typeof item.answer === 'string' &&
+            item.answer.trim().length > 0
+          );
+        })
+      );
+    }
+    function mountDecision() {
+      if (decisionMounted) return;
+      decisionMounted = true;
+      function retire() {
+        decisionGeneration += 1;
+        Object.keys(decisions).forEach(function (key) {
+          var active = decisions[key].active;
+          if (active) {
+            active.waiting = false;
+            window.clearTimeout(active.timer);
+          }
+        });
+        publishDecision();
+      }
+      if (window.addEventListener) {
+        window.addEventListener('pagehide', function () {
+          decisionHidden = true;
+          retire();
+        });
+        window.addEventListener('pageshow', function (event) {
+          if (event && event.persisted) {
+            decisionHidden = false;
+            retire();
+          }
+        });
+        window.addEventListener('popstate', retire);
+        window.addEventListener('storage', function () {
+          publishDecision();
+        });
+      }
+      if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
+        window.FrontDeskRail.subscribe(retire);
+    }
     function decideHearing() {
       if (
         !state.hearingMode ||
         !state.hearingRecord ||
         state.sending ||
         hearingBlocked() ||
-        state.hearingCompletion
+        state.hearingCompletion ||
+        state.hearingRecord.decided_at ||
+        decisionHidden ||
+        !state.draftShellReady ||
+        state.shellBlockedMessage ||
+        state.historyState !== 'ready' ||
+        !state.conversationId
       )
         return;
-      if (hearingRecovery) hearingRecovery.beginCompletion();
+      var local = decisionState();
       var action = hearingActionContext();
-      fetchJson(
-        '/api/hearing/' +
-          encodeURIComponent(state.sessionId) +
-          '/decide?locale=' +
-          encodeURIComponent(state.locale),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        }
-      )
-        .then(function (result) {
-          if (!hearingActionCurrent(action)) return;
+      action.generation = decisionGeneration;
+      action.sessionId = state.sessionId;
+      action.scenarioId = state.hearingScenarioId;
+      action.key = decisionKey();
+      try {
+        action.marker = JSON.stringify({
+          requestId: options.randomId(),
+          conversationId: state.conversationId,
+          scope: scopedUrl('/api/conversation'),
+          scenarioId: state.hearingScenarioId,
+        });
+        local.marker = action.marker;
+        window.sessionStorage.setItem(action.key, action.marker);
+        if (window.sessionStorage.getItem(action.key) !== action.marker)
+          throw new Error('Decision correlation was not retained');
+      } catch (err) {
+        local.failed = true;
+        publishDecision();
+        return;
+      }
+      if (hearingRecovery) hearingRecovery.beginCompletion();
+      local.rejected = false;
+      local.active = action;
+      action.waiting = true;
+      action.timer = window.setTimeout(function () {
+        action.waiting = false;
+        if (decisionCurrent(action)) {
           if (hearingRecovery) hearingRecovery.endCompletion();
-          if (result.ok && result.body && result.body.ok) {
-            state.hearingRecord = result.body.record;
-            renderHearing();
+          publishDecision();
+        }
+      }, 60000);
+      publishDecision();
+      // Dispatch synchronously only after durable ownership and the UI guard exist.
+      var request;
+      try {
+        if (!decisionCurrent(action) || window.sessionStorage.getItem(action.key) !== action.marker)
+          throw new Error('Decision context changed');
+        request = fetchJson(
+          '/api/hearing/' +
+            encodeURIComponent(action.sessionId) +
+            '/decide?locale=' +
+            encodeURIComponent(state.locale),
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+        );
+      } catch (err) {
+        request = Promise.reject(err);
+      }
+      Promise.resolve(request)
+        .then(function (result) {
+          var success = validDecision(result, action);
+          var rejected = result && !result.ok && [400, 401, 403].indexOf(result.status) !== -1;
+          // A retired success cannot refresh the current record safely: retain its
+          // guard rather than unlock a stale GET. A pre-write rejection may
+          // release its own marker without publishing an old payload.
+          if (((success && decisionCurrent(action)) || rejected) && clearOwnDecision(action)) {
+            if (decisionCurrent(action)) {
+              local.rejected = Boolean(rejected);
+              if (success) state.hearingRecord = result.body.record;
+            }
           }
         })
         .catch(function () {
-          if (!hearingActionCurrent(action)) return;
-          if (hearingRecovery) hearingRecovery.endCompletion();
-          /* the record remains available for retry */
+          // Network, parse and server failures are ambiguous. Retain the marker.
+        })
+        .finally(function () {
+          action.waiting = false;
+          window.clearTimeout(action.timer);
+          if (local.active === action) local.active = null;
+          if (decisionCurrent(action)) {
+            if (hearingRecovery) hearingRecovery.endCompletion();
+            publishDecision();
+          }
         });
     }
 
@@ -344,6 +576,9 @@
 
     return {
       render: renderHearingHandoff,
+      renderDecision: renderDecision,
+      blocked: decisionBlocked,
+      mount: mountDecision,
       decide: decideHearing,
       handoff: handoffHearing,
       inventory: saveWorkInventory,

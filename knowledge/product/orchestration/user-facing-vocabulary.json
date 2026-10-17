@@ -26603,6 +26603,31 @@
         "en": "Correction editor unavailable. Reload this page before entering feedback.",
         "ja": "修正欄を読み込めませんでした。ページを再読み込みしてから、コメントを入力してください。",
         "qps-ploc": "⟦Ƈőřřėƈŧïőñ ėḓïŧőř ůñȧṽȧïŀȧƀŀė. Řėŀőȧḓ ŧħïş ṗȧɠė ƀėƒőřė ėñŧėřïñɠ ƒėėḓƀȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "hearing_decision_pending": {
+        "en": "Confirming this hearing. Please wait; do not submit it again.",
+        "ja": "ヒアリングを確定しています。再送せずにお待ちください。",
+        "qps-ploc": "⟦Ƈőñƒïřɱïñɠ ŧħïş ħėȧřïñɠ. Ṗŀėȧşė ẇȧïŧ; ḓő ñőŧ şůƀɱïŧ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "hearing_decision_unknown": {
+        "en": "The result of this confirmation is unknown. Further changes to this hearing are paused, including after reload. Any saved destination shown does not verify this attempt. You can continue in ordinary conversation.",
+        "ja": "今回の確定結果を確認できません。重複を防ぐため、再読み込み後もこのヒアリングの変更を停止しています。保存済みの引き継ぎ先が表示されても、今回の確定が成功した証明にはなりません。通常の会話は続けられます。",
+        "qps-ploc": "⟦Ŧħė řėşůŀŧ őƒ ŧħïş ƈőñƒïřɱȧŧïőñ ïş ůñķñőẇñ. Ƒůřŧħėř ƈħȧñɠėş ŧő ŧħïş ħėȧřïñɠ ȧřė ṗȧůşėḓ, ïñƈŀůḓïñɠ ȧƒŧėř řėŀőȧḓ. Ȧñẏ şȧṽėḓ ḓėşŧïñȧŧïőñ şħőẇñ ḓőėş ñőŧ ṽėřïƒẏ ŧħïş ȧŧŧėɱṗŧ. Ẏőů ƈȧñ ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "hearing_decision_storage": {
+        "en": "This browser could not safely retain the confirmation status. Further changes to this hearing are paused. You can continue in ordinary conversation.",
+        "ja": "このブラウザで確定状況を安全に保持できません。このヒアリングの変更を停止しています。通常の会話は続けられます。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ƈőůŀḓ ñőŧ şȧƒėŀẏ řėŧȧïñ ŧħė ƈőñƒïřɱȧŧïőñ şŧȧŧůş. Ƒůřŧħėř ƈħȧñɠėş ŧő ŧħïş ħėȧřïñɠ ȧřė ṗȧůşėḓ. Ẏőů ƈȧñ ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "hearing_decision_rejected": {
+        "en": "The confirmation request was rejected before any change. Review this hearing before trying again.",
+        "ja": "確定リクエストは変更前に拒否されました。ヒアリングの内容を確認してから、もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ƈőñƒïřɱȧŧïőñ řėɋůėşŧ ẇȧş řėĵėƈŧėḓ ƀėƒőřė ȧñẏ ƈħȧñɠė. Řėṽïėẇ ŧħïş ħėȧřïñɠ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "hearing_decision_continue": {
+        "en": "Continue in ordinary conversation",
+        "ja": "通常の会話を続ける",
+        "qps-ploc": "⟦Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
       }
     },
     "operator": {
