@@ -27,6 +27,7 @@ import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { createWorkItemIfAbsent } from './workforce/work-coordination.js';
 import { appendDotInboxEntry } from './dot/dot-inbox.js';
+import { listDotCharters } from './dot/dot-charter.js';
 import { loadRetentionCatalog } from './storage-retention-catalog.js';
 import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
 
@@ -185,6 +186,30 @@ export interface OpsHealthProbeResult {
   work_items_filed: string[];
 }
 
+/** Resolve the ops dot's charter scope once per run so filed items carry the
+ *  tenant/organization context the cross-tenant claim check requires. */
+function opsDotScope(
+  deps: OpsHealthProbeDeps
+): { tenant_slug?: string; organization_id?: string } | undefined {
+  try {
+    for (const loaded of listDotCharters(deps.rootDir ?? pathResolver.rootDir(), {
+      status: 'active',
+    })) {
+      const c = 'charter' in loaded ? loaded.charter : loaded;
+      if (c.dot_id === OPS_WORK_ITEM_DOT_ID) {
+        return {
+          ...(c.scope?.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
+          ...(c.scope?.organization_id ? { organization_id: c.scope.organization_id } : {}),
+        };
+      }
+    }
+  } catch {
+    // Charter load failure must not block filing — an unscoped item is
+    // unclaimable but the finding itself is still recorded.
+  }
+  return undefined;
+}
+
 export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbeResult {
   const findings = [
     ...probeStoreOvergrowth(deps),
@@ -226,6 +251,15 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
           metadata: {
             dot_id: OPS_WORK_ITEM_DOT_ID,
             requested_work_shape: 'direct_reply',
+          },
+          // The executor refuses items whose context tenant differs from the
+          // charter's — an unscoped item (undefined !== tenant) can NEVER be
+          // claimed. Stamp the target dot's own scope so it passes the
+          // cross-tenant re-check.
+          context: {
+            ...(opsDotScope(deps) ?? {}),
+            project_id: 'default',
+            work_shape: 'routine_operation',
           },
           rootDir: deps.rootDir,
         });
