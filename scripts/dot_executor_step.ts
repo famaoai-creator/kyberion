@@ -36,6 +36,7 @@ import {
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
   DotExecutorPreEffectError,
+  DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   runDotExecutorSweep,
   type DotExecutorDeps,
   type DotExecutorPorts,
@@ -274,7 +275,16 @@ export function buildDotExecutorPorts(
     // task sessions run advisory reasoning turns only, bounded by the same
     // goalTurn budget/turn caps as direct_reply. Unavailable only when there
     // is no reasoning backend at all.
-    taskSessionUnavailable: resolved ? undefined : 'no reasoning backend resolved for task_session',
+    // The driver has goal-control tools only here: no discovered work tools or
+    // executeTool port, so a claimed "complete" cannot prove task execution —
+    // task sessions run advisory reasoning turns bounded by the goalTurn
+    // budget/turn caps. Enabled per-charter via authority.allowed_work_shapes:
+    // a charter that declares task_session opts into the bounded goalTurn
+    // session; charters without it keep the governed-unavailable refusal.
+    taskSessionUnavailable:
+      resolved && charter.authority.allowed_work_shapes?.includes('task_session')
+        ? undefined
+        : DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
     goalMode: () => goalModeOf(resolution),
     async runGoalTurn(options) {
       if (!resolved)
