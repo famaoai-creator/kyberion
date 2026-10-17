@@ -35,7 +35,6 @@ import {
 } from '@agent/core/surface/front-desk-execution';
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
-  DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   DotExecutorPreEffectError,
   runDotExecutorSweep,
   type DotExecutorDeps,
@@ -271,8 +270,11 @@ export function buildDotExecutorPorts(
   const drive = deps.goalDriver ?? runGoalDrivenLoop;
   return {
     // The driver has goal-control tools only here: no discovered work tools or
-    // executeTool port. A model's "complete" cannot prove task execution.
-    taskSessionUnavailable: DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
+    // executeTool port. A model's "complete" cannot prove task execution — so
+    // task sessions run advisory reasoning turns only, bounded by the same
+    // goalTurn budget/turn caps as direct_reply. Unavailable only when there
+    // is no reasoning backend at all.
+    taskSessionUnavailable: resolved ? undefined : 'no reasoning backend resolved for task_session',
     goalMode: () => goalModeOf(resolution),
     async runGoalTurn(options) {
       if (!resolved)
