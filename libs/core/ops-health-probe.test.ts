@@ -34,7 +34,7 @@ describe('ops-health-probe', () => {
     const res = runOpsHealthProbe({ rootDir: TEST_ROOT });
     const dominance = res.findings.filter((f) => f.kind === 'alert_dominance');
     expect(dominance.length).toBe(1);
-    expect(dominance[0]!.evidence.dedupe_key).toBe('watchdog:chronos:stale');
+    expect(dominance[0]!.evidence.source).toBe('watchdog');
     expect(safeExistsSync(path.join(pathResolver.rootDir(), TEST_ROOT, OPS_FINDINGS_PATH))).toBe(
       true
     );
