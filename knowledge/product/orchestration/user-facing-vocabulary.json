@@ -24309,6 +24309,11 @@
         "ja": "依頼として登録しました。承認は「決める」で行えます。",
         "qps-ploc": "⟦Řėɠïşŧėřėḓ ȧş ȧ řėɋůėşŧ. Ȧṗṗřőṽė ïŧ ůñḓėř Ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
+      "hearing_completion_unavailable": {
+        "en": "A previous handoff was recorded, but its destination cannot be verified in this view. Reload to check again; do not submit it again.",
+        "ja": "以前の引き継ぎ記録がありますが、この表示範囲では引き継ぎ先を確認できません。再読み込みして確認してください。再登録はしないでください。",
+        "qps-ploc": "⟦Ȧ ṗřėṽïőůş ħȧñḓőƒƒ ẇȧş řėƈőřḓėḓ, ƀůŧ ïŧş ḓėşŧïñȧŧïőñ ƈȧññőŧ ƀė ṽėřïƒïėḓ ïñ ŧħïş ṽïėẇ. Řėŀőȧḓ ŧő ƈħėƈķ ȧɠȧïñ; ḓő ñőŧ şůƀɱïŧ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
       "hearing_handoff_failed": {
         "en": "Could not register the request. Please try again.",
         "ja": "登録できませんでした。もう一度お試しください。",

@@ -650,6 +650,7 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_handoff_pending',
   'front_desk:hearing_handoff_done',
   'front_desk:hearing_handoff_failed',
+  'front_desk:hearing_completion_unavailable',
   'front_desk:hearing_mission_label',
   'front_desk:hearing_open_decide',
   // WI-08: the "save to the work inventory" confirm action for the

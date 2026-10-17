@@ -13,6 +13,7 @@
     var pollTimer = null;
     var hidden = false;
     var mounted = false;
+    var completionReadPaused = false;
 
     function key() {
       // The backend hearing record is session-owned, even when the UI scope changes.
@@ -147,7 +148,17 @@
       if (pollTimer !== null) window.clearTimeout(pollTimer);
       pollTimer = null;
     }
-    function retire() {
+    function retire(invalidateCompletion) {
+      if (invalidateCompletion) {
+        completionReadPaused = false;
+        var kind = state.hearingCompletion && state.hearingCompletion.kind;
+        if (!kind && state.hearingHandoff && state.hearingHandoff.refId) kind = 'mission';
+        if (!kind && state.hearingInventory && state.hearingInventory.entryId) kind = 'inventory';
+        if (kind) state.hearingCompletion = { kind: kind, status: 'unavailable' };
+        if (!state.hearingHandoff || !state.hearingHandoff.pending) state.hearingHandoff = null;
+        if (!state.hearingInventory || !state.hearingInventory.pending)
+          state.hearingInventory = null;
+      }
       generation += 1;
       clearPoll();
       if (activePost && activePost.cancel) activePost.cancel();
@@ -250,6 +261,10 @@
         if (!clearConfirmed(attempt)) return false;
       }
       state.hearingRecord = record;
+      // Only an accepted current GET/answer may replace the completion read model.
+      state.hearingCompletion = body.completion == null ? null : body.completion;
+      if (!state.hearingHandoff || !state.hearingHandoff.pending) state.hearingHandoff = null;
+      if (!state.hearingInventory || !state.hearingInventory.pending) state.hearingInventory = null;
       return !pending;
     }
     function scheduleCanvas(attempt) {
@@ -267,7 +282,7 @@
       }, 3000);
     }
     function load() {
-      if (!state.hearingMode) return Promise.resolve(false);
+      if (!state.hearingMode || completionReadPaused) return Promise.resolve(false);
       readPending(true);
       if (!usable() || storageFailed || scopeMismatch()) {
         publish();
@@ -384,30 +399,44 @@
       if (retry) retry.addEventListener('click', load);
       if (window.addEventListener) {
         window.addEventListener('popstate', function () {
-          retire();
+          retire(true);
           publish();
         });
         window.addEventListener('pagehide', function () {
           hidden = true;
-          retire();
+          retire(true);
           publish();
         });
         window.addEventListener('pageshow', function (event) {
           if (!event || !event.persisted) return;
           hidden = false;
-          retire();
+          retire(true);
           publish();
           // Conversation restoration calls load once its history and shell are verified.
         });
       }
       if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
         window.FrontDeskRail.subscribe(function () {
-          retire();
+          retire(true);
           publish();
         });
       render();
     }
-    return { blocked: blocked, submit: submit, load: load, mount: mount, render: render };
+    return {
+      blocked: blocked,
+      submit: submit,
+      load: load,
+      mount: mount,
+      render: render,
+      beginCompletion: function () {
+        retire();
+        completionReadPaused = true;
+      },
+      endCompletion: function () {
+        completionReadPaused = false;
+        scheduleCanvas(startAttempt());
+      },
+    };
   }
   window.KyberionAskHearingRecovery = { create: create };
 })();

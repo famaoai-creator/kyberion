@@ -935,7 +935,9 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
 
   it('ask.html/ask.js hearing card has no raw Japanese fixed copy and reads it from /api/ask-vocabulary', () => {
     const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
-    const askJs = readRepoFile('presence/displays/presence-studio/static/ask.js');
+    const askJs =
+      readRepoFile('presence/displays/presence-studio/static/ask.js') +
+      readRepoFile('presence/displays/presence-studio/static/ask-hearing-completion.js');
     for (const oldText of [
       'ヒアリングの整理',
       '項目が埋まっています',

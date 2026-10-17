@@ -1250,3 +1250,11 @@ and late evidence, clock-skew recovery, an append during a wake, persisted
 consumption, tenant separation, circuit/backoff, goal satisfaction, measurement
 repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
 admission/recovery, digest/recovery and inbox suites when changing this path.
+
+## Hearing completion read recovery
+
+Saved handoffs must remain discoverable after a fresh page load. The hearing GET projects a completion only after checking the persisted mission and its exact alignment approval, or the inventory entry in the viewer-derived scope. Strip unchecked completion identifiers from the wire record; missing, partial, deleted, malformed or unauthorized targets produce a non-actionable marker, not a new confirmation action. Keep canonical navigation configuration and scope narrowing; never invent a surface port or repeat a mutation to recover a link.
+
+The Ask client accepts this read model only through its current hearing session/scenario/navigation gate. On scope or page retirement, remove old completion identity and links until a new authorized read restores them. Preserve unresolved in-flight mutation guards, and discard late callbacks from the retired context. This does not add mutation timeouts, retries or exactly-once guarantees.
+
+Regression gate: hearing-completion.test.ts, hearing-routes.test.ts and ask-hearing-completion-client.test.ts, plus the existing hearing/read recovery suites. Verify POST success and reload for both mission and inventory in an isolated loopback fixture, check no repeated POST, unavailable targets, selected scope and stale/unsafe links.
