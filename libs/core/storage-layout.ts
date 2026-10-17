@@ -204,6 +204,48 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
 } as const;
 
 /**
+ * Durable tier-partitioned state, distinct from append-only metrics ledgers.
+ * State roots mirror knowledge-tier permissions for reads AND writes; they
+ * are never added to metrics offboarding/compaction merely by registration.
+ */
+export const PARTITIONED_RUNTIME_STATE_ROOTS = {
+  hearing: 'active/shared/runtime/hearing',
+} as const;
+
+/** Knowledge permission path corresponding to a registered runtime state path. */
+export function partitionedRuntimeStateKnowledgePath(filePath: string): string | undefined {
+  const relative = toPosixRelative(filePath);
+  for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    if (!relative.startsWith(root + '/')) continue;
+    const partition = relative.slice(root.length + 1);
+    if (STORAGE_DATA_TIERS.includes(partition.split('/')[0] as StorageDataTier)) {
+      return 'knowledge/' + partition;
+    }
+  }
+  return undefined;
+}
+
+/** Tier detection stays root-independent, matching storageFloorTierInPath. */
+export function partitionedRuntimeStateTierInPath(filePath: string): StorageDataTier | undefined {
+  const normalized = filePath.replace(/\\/gu, '/');
+  for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
+    const match = normalized.match(
+      new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')
+    );
+    if (match) return match[1] as StorageDataTier;
+  }
+  return undefined;
+}
+
+/** Protected state partitions mirrored in security-policy.json, never shared exemptions. */
+export function protectedRuntimeStatePrefixes(): string[] {
+  return Object.values(PARTITIONED_RUNTIME_STATE_ROOTS).flatMap((root) =>
+    (['personal', 'confidential'] as const).map((tier) => root + '/' + tier + '/')
+  );
+}
+
+/**
  * Inter-process lock id of a metrics ledger file (foundation/lock-utils
  * withLockSync). Every append to a system ledger file and tenant offboarding's
  * read-filter-rewrite of it take the same lock, so a rewrite never loses an

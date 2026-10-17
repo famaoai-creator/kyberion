@@ -24,6 +24,7 @@ import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './storage-layout.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
@@ -38,6 +39,7 @@ import {
   assertCanonicalReadable,
   assertCanonicalWritable,
   canonicalGuardPath,
+  isInside,
   assertHardLinkMove,
   assertNotForeignHardLink,
   mkdirGuarded,
@@ -645,6 +647,49 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
 }
 
 /**
+ * An aggregate rename/removal can otherwise bypass tier checks by naming only
+ * the public container above protected hearing data. Check both structural
+ * tiers even for an empty/replacement tree: tenant-bound identities must never
+ * authorize the whole container from a snapshot of its current descendants.
+ * This also prevents a concurrent foreign-tenant insertion from widening an
+ * already approved tenant operation. Existing unbound tier authority remains
+ * the source of permission; there is no role-name exception.
+ */
+function assertRuntimeStateAggregateAccess(resolved: string, canonical: string): void {
+  for (const relativeRoot of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    const root = path.join(pathResolver.rootDir(), relativeRoot);
+    if (isInside(resolved, root) === undefined && isInside(canonical, root) === undefined) continue;
+    const check = (entry: string): void => {
+      assertSensitivePathAllowed(entry, 'read/write', isSensitivePathMediated());
+      const read = validateReadPermission(entry);
+      const write = validateWritePermission(entry);
+      if (!read.allowed || !write.allowed) {
+        throw new Error(
+          '[SECURITY] hearing.aggregate_denied — protected descendants require read/write authority: ' +
+            (read.reason ?? write.reason)
+        );
+      }
+      assertCanonicalReadable(entry, entry, 'leaf');
+      assertCanonicalWritable(entry, entry, 'leaf');
+    };
+    const inspect = (entry: string): void => {
+      check(entry);
+      const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
+      // rename/rm act on a symlink entry and never recurse through its leaf.
+      if (!stat || !stat.isDirectory() || stat.isSymbolicLink()) return;
+      for (const name of fs.readdirSync(entry)) inspect(path.join(entry, name));
+    };
+    // These are required even when the tier does not exist. A bound identity
+    // fails the missing-tenant check here before any descendant enumeration.
+    for (const tier of ['personal', 'confidential']) check(path.join(root, tier));
+    const stat = fs.lstatSync(root, { throwIfNoEntry: false });
+    if (stat?.isDirectory() && !stat.isSymbolicLink()) {
+      for (const tier of ['personal', 'confidential']) inspect(path.join(root, tier));
+    }
+  }
+}
+
+/**
  * Move a file or directory safely with permission validation.
  */
 export function safeMoveSync(srcPath: string, destPath: string): void {
@@ -666,9 +711,11 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
   }
   // rename(2) never follows the leaf at either end — it moves or replaces
   // the directory entry itself — but it does follow symlinked parents.
-  assertCanonicalReadable(resolvedSrc, srcPath, 'leaf');
+  const canonicalSrc = assertCanonicalReadable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedSrc, srcPath, 'leaf');
-  assertCanonicalWritable(resolvedDest, destPath, 'leaf');
+  const canonicalDest = assertCanonicalWritable(resolvedDest, destPath, 'leaf');
+  assertRuntimeStateAggregateAccess(resolvedSrc, canonicalSrc);
+  assertRuntimeStateAggregateAccess(resolvedDest, canonicalDest);
   // A moved hard link keeps aliasing its other names under any new name.
   assertHardLinkMove(resolvedSrc, srcPath, resolvedDest);
   fs.renameSync(resolvedSrc, resolvedDest);
@@ -721,7 +768,8 @@ export function safeRmSync(
   // rm removes a symlink leaf itself (never its target) and recursion does
   // not descend through links, but a symlinked PARENT would redirect the
   // removal into another scope — so the parent is canonicalized.
-  const { resolved } = guardWritePath(targetPath, 'leaf');
+  const { resolved, canonical } = guardWritePath(targetPath, 'leaf');
+  if (options.recursive) assertRuntimeStateAggregateAccess(resolved, canonical);
   if (fs.existsSync(resolved)) {
     fs.rmSync(resolved, options);
   }

@@ -4,6 +4,10 @@ import { rootDir } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import {
   SYSTEM_PARTITION,
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  partitionedRuntimeStateKnowledgePath,
+  partitionedRuntimeStateTierInPath,
+  protectedRuntimeStatePrefixes,
   classifyStorageFloorPath,
   protectedStorageFloorPrefixes,
   resolveStorageFloor,
@@ -122,6 +126,79 @@ describe('storage-layout floors', () => {
     }
     for (const root of ['tmp', 'staging', 'cache', 'artifacts']) {
       expect(policy.default_allow).toContain(`active/shared/${root}/`);
+    }
+  });
+});
+
+describe('durable partitioned runtime state', () => {
+  it('registers hearing independently of metrics-ledger lifecycle', () => {
+    expect(PARTITIONED_RUNTIME_STATE_ROOTS.hearing).toBe('active/shared/runtime/hearing');
+    expect(
+      partitionedRuntimeStateKnowledgePath(
+        'active/shared/runtime/hearing/personal/shared/all/a.json'
+      )
+    ).toBe('knowledge/personal/shared/all/a.json');
+    expect(
+      partitionedRuntimeStateKnowledgePath(
+        'active/shared/runtime/hearing/confidential/acme/tenant/a.json'
+      )
+    ).toBe('knowledge/confidential/acme/tenant/a.json');
+    expect(
+      partitionedRuntimeStateKnowledgePath(
+        'active/shared/runtime/hearing-else/personal/shared/a.json'
+      )
+    ).toBeUndefined();
+    expect(
+      partitionedRuntimeStateKnowledgePath(
+        'active/shared/runtime/usage-ledger/personal/shared/a.json'
+      )
+    ).toBeUndefined();
+  });
+
+  it('recognizes state tiers across roots and separators without matching adjacent names', () => {
+    expect(
+      partitionedRuntimeStateTierInPath(
+        '/other/root/active/shared/runtime/hearing/personal/shared/a'
+      )
+    ).toBe('personal');
+    expect(
+      partitionedRuntimeStateTierInPath(
+        'C:\\repo\\active\\shared\\runtime\\hearing\\confidential\\acme\\a'
+      )
+    ).toBe('confidential');
+    expect(partitionedRuntimeStateTierInPath('active/shared/runtime/hearing/personal')).toBe(
+      'personal'
+    );
+    expect(
+      partitionedRuntimeStateTierInPath('active/shared/runtime/hearing/personal-notes/a')
+    ).toBeUndefined();
+    expect(
+      partitionedRuntimeStateTierInPath('active/shared/runtime/hearing-else/personal/a')
+    ).toBeUndefined();
+  });
+
+  it('registers protected state partitions without adding grants or shared-prefix exemptions', () => {
+    const policy = JSON.parse(
+      safeReadFile(path.join(rootDir(), 'knowledge/product/governance/security-policy.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(protectedRuntimeStatePrefixes()).toEqual([
+      'active/shared/runtime/hearing/personal/',
+      'active/shared/runtime/hearing/confidential/',
+    ]);
+    for (const prefix of protectedRuntimeStatePrefixes())
+      expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
+    expect(
+      policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes('/hearing/'))
+    ).toBe(false);
+    for (const field of [
+      'default_allow',
+      'persona_permissions',
+      'authority_permissions',
+      'authority_role_permissions',
+    ]) {
+      expect(JSON.stringify(policy[field])).not.toContain('runtime/hearing');
     }
   });
 });
