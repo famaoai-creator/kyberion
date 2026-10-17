@@ -39,29 +39,28 @@ import {
 } from './security.js';
 import {
   applyHearingTurn,
-  hearingRevision,
-  hearingRequirementsKey,
   createHearingRecord,
   validateHearingScenario,
   type HearingDecidedBy,
   type HearingRecord,
+  type HearingDecisionIdentity,
   type HearingScenario,
 } from './hearing.js';
 import {
   defaultHearingRecord,
-  hearingNamespace,
-  loadHearingRecord,
-  loadHearingCanvasVersion,
   renderHearingCanvas,
-  saveHearingCanvasVersion,
-  updateHearingRecord,
-  assertHearingSnapshot,
   assertHearingEditable,
   assertHearingHandoffReplay,
-  reserveHearingHandoff,
-  finishHearingHandoff,
   HearingConflictError,
+  HearingOperationError,
+  parseHearingDecisionOperation,
+  hearingDecisionReceipt,
 } from './hearing-runtime.js';
+import {
+  hearingStorageForViewer,
+  hearingDecisionScopeKey,
+  type HearingStorage,
+} from './hearing-storage-access.js';
 import { generateHearingCanvas } from './hearing-canvas.js';
 import {
   buildWorkInventoryDecompositionInput,
@@ -202,7 +201,7 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
   const status =
     error instanceof HearingConflictError
       ? 409
-      : error instanceof HearingRequestError
+      : error instanceof HearingRequestError || error instanceof HearingOperationError
         ? error.status
         : error instanceof PresenceStudioViewerError
           ? error.status
@@ -247,6 +246,7 @@ function resolveHearingDeciderRole(
  * (only if nothing newer landed meanwhile, see below) before the queued
  * answer's own generation starts. */
 interface HearingCanvasGenerationJob {
+  storage: HearingStorage;
   namespace: string;
   record: HearingRecord;
   locale: SupportedLocale;
@@ -267,27 +267,7 @@ function runHearingCanvasGeneration(key: string, job: HearingCanvasGenerationJob
   generateHearingCanvas(job.record, { locale: job.locale, tenantSlug: job.tenantSlug })
     .then((result) => {
       // Fence requirement inputs under the shared lock; preserve newer decisions/canvas metadata.
-      updateHearingRecord(job.namespace, job.record.session_id, (persisted) => {
-        if (
-          !persisted ||
-          hearingRevision(persisted.requirements_revision) !==
-            hearingRevision(job.record.requirements_revision) ||
-          hearingRequirementsKey(persisted) !== hearingRequirementsKey(job.record)
-        ) {
-          throw new HearingConflictError('stale_snapshot');
-        }
-        assertHearingEditable(persisted);
-        if (result.source === 'generated') {
-          const version = saveHearingCanvasVersion(job.namespace, persisted, result.html);
-          return {
-            ...persisted,
-            canvas_versions: [...persisted.canvas_versions, version],
-            canvas_generation: 'generated',
-            canvas_version_sources: { ...persisted.canvas_version_sources, [version]: 'generated' },
-          };
-        }
-        return { ...persisted, canvas_generation: 'template' };
-      });
+      job.storage.commitGeneratedCanvas(job.record, result.html, result.source);
     })
     .catch((error) => {
       logger.warn(
@@ -319,6 +299,51 @@ function scheduleHearingCanvasGeneration(job: HearingCanvasGenerationJob): void 
   runHearingCanvasGeneration(key, job);
 }
 
+function hearingDecisionActor(
+  viewer: PresenceStudioViewerContext,
+  namespace: string
+): {
+  decidedBy: HearingDecidedBy;
+  identity: HearingDecisionIdentity;
+} {
+  const member = withExecutionContext('ecosystem_architect', () =>
+    resolveMemberByPrincipal({
+      principalId: viewer.principalId,
+      source: viewer.source,
+      registrationLabel: viewer.principal?.registrationLabel,
+      memberId: viewer.principal?.memberId,
+    })
+  );
+  if (!member) {
+    throw new PresenceStudioViewerError(403, 'decisions are recorded for registered members only');
+  }
+  const role = resolveHearingDeciderRole(member, namespace, viewer);
+  if (role !== 'owner' && role !== 'approver') {
+    // Positive allowlist: only decision-capable membership roles may
+    // record a decision (`surface.decision.write` is granted to owner and
+    // approver only — front-desk-roles.ts). Operators execute but never
+    // decide; viewers observe.
+    throw new PresenceStudioViewerError(403, 'this member role cannot record decisions');
+  }
+  const actor = humanActor(member.member_id, member.display_name);
+  const decidedBy: HearingDecidedBy = {
+    kind: 'human',
+    id: actor.id,
+    ...(actor.display_name ? { display_name: actor.display_name } : {}),
+    role,
+  };
+
+  return {
+    decidedBy,
+    identity: {
+      principal_id: viewer.principalId,
+      member_id: member.member_id,
+      source: viewer.source,
+      scope_key: hearingDecisionScopeKey(viewer),
+    },
+  };
+}
+
 export function registerHearingRoutes(app: express.Express): void {
   // HT-01: read-only hearing record and deterministic fixed canvas. A missing
   // record is returned as an in-memory default and persisted after the first
@@ -327,7 +352,7 @@ export function registerHearingRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const sessionId = hearingSessionId(req);
-      const namespace = hearingNamespace(viewer.tenantSlugs);
+      const storage = hearingStorageForViewer(viewer);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       // WI-08: before the first answer there is no persisted record yet —
       // `?scenario_id=` (the same id `/ask?mode=hearing&scenario=...` picked)
@@ -335,12 +360,9 @@ export function registerHearingRoutes(app: express.Express): void {
       // instead of always defaulting to `web_app_build`.
       const scenarioParam = resolveHearingScenarioParam(req.query.scenario_id);
       const record =
-        loadHearingRecord(namespace, sessionId) ||
-        defaultHearingRecord(sessionId, nowIso(), scenarioParam);
+        storage.load(sessionId) || defaultHearingRecord(sessionId, nowIso(), scenarioParam);
       const requestedVersion = typeof req.query.version === 'string' ? req.query.version : '';
-      const versionedCanvas = requestedVersion
-        ? loadHearingCanvasVersion(namespace, sessionId, requestedVersion)
-        : null;
+      const versionedCanvas = requestedVersion ? storage.canvas(sessionId, requestedVersion) : null;
       if (requestedVersion && !versionedCanvas)
         throw new HearingRequestError('Hearing canvas version was not found.');
       const html = versionedCanvas || (await renderCurrentHearingCanvas(record, locale));
@@ -364,9 +386,9 @@ export function registerHearingRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const sessionId = hearingSessionId(req);
-      const namespace = hearingNamespace(viewer.tenantSlugs);
+      const storage = hearingStorageForViewer(viewer);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
-      const existing = loadHearingRecord(namespace, sessionId);
+      const existing = storage.load(sessionId);
       // WI-08: same `?scenario_id=` default-record seam as the canvas route.
       const scenarioParam = resolveHearingScenarioParam(req.query.scenario_id);
       const record = existing || defaultHearingRecord(sessionId, nowIso(), scenarioParam);
@@ -404,8 +426,9 @@ export function registerHearingRoutes(app: express.Express): void {
           typeof input.locale === 'string' ? input.locale : readSurfaceStringParam(req.query.locale)
         ) ?? 'en';
       if (!text) throw new HearingRequestError('Hearing answer text is required.');
-      const namespace = hearingNamespace(viewer.tenantSlugs);
-      const existing = loadHearingRecord(namespace, sessionId);
+      const storage = hearingStorageForViewer(viewer);
+      const namespace = storage.namespace;
+      const existing = storage.load(sessionId);
       assertHearingEditable(existing);
       // WI-08: `scenario_id` (resolved against `hearing-scenarios.json`) is
       // preferred; the legacy inline `scenario` object stays supported for
@@ -447,18 +470,13 @@ export function registerHearingRoutes(app: express.Express): void {
         scenarioDef?.canvas === 'work_inventory_table'
           ? await renderWorkInventoryCanvasHtml(next, locale)
           : renderHearingCanvas(next, locale);
-      const versioned = updateHearingRecord(namespace, sessionId, (current) => {
-        assertHearingEditable(current);
-        assertHearingSnapshot(current, existing);
-        const canvasVersion = saveHearingCanvasVersion(namespace, next, canvasHtml);
-        return {
-          ...next,
-          canvas_versions: [...next.canvas_versions, canvasVersion],
-          canvas_generation:
-            scenarioDef?.canvas === 'work_inventory_table' ? 'template' : 'pending',
-          canvas_version_sources: { ...next.canvas_version_sources, [canvasVersion]: 'template' },
-        };
-      });
+      const versioned = storage.commitTurn(
+        sessionId,
+        existing,
+        next,
+        canvasHtml,
+        scenarioDef?.canvas === 'work_inventory_table' ? 'template' : 'pending'
+      );
       res.status(200).json({
         ok: true,
         record: withResolvedLabels(withoutHearingCompletionFields(versioned), locale),
@@ -469,6 +487,7 @@ export function registerHearingRoutes(app: express.Express): void {
       // canvas schedule the async generation follow-up.
       if (scenarioDef?.canvas !== 'work_inventory_table') {
         scheduleHearingCanvasGeneration({
+          storage,
           namespace,
           record: versioned,
           locale,
@@ -492,52 +511,37 @@ export function registerHearingRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingSessionId(req);
-      const namespace = hearingNamespace(viewer.tenantSlugs);
-      const record = loadHearingRecord(namespace, sessionId);
-      if (!record) throw new HearingRequestError('Hearing record does not exist yet.');
-      const incomplete = record.requirements.filter((item) => !item.answer?.trim());
-      if (incomplete.length > 0) {
-        throw new HearingRequestError(
-          `Hearing still has ${incomplete.length} unanswered requirement(s).`
-        );
-      }
-      const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({
-          principalId: viewer.principalId,
-          source: viewer.source,
-          registrationLabel: viewer.principal?.registrationLabel,
-          memberId: viewer.principal?.memberId,
-        })
+      const storage = hearingStorageForViewer(viewer);
+      const namespace = storage.namespace;
+      const operation = parseHearingDecisionOperation(
+        presenceStudioData.safeParsePresenceStudioRequestBody(req.body ?? {}, 'hearing decision')
       );
-      if (!member) {
-        throw new PresenceStudioViewerError(
-          403,
-          'decisions are recorded for registered members only'
-        );
+      let legacySnapshot: HearingRecord | undefined;
+      if (!operation) {
+        const record = storage.load(sessionId);
+        if (!record) throw new HearingRequestError('Hearing record does not exist yet.');
+        if (record.requirements.some((item) => !item.answer?.trim()))
+          throw new HearingRequestError('Hearing has unanswered requirements.');
+        legacySnapshot = record;
       }
-      const role = resolveHearingDeciderRole(member, namespace, viewer);
-      if (role !== 'owner' && role !== 'approver') {
-        // Positive allowlist: only decision-capable membership roles may
-        // record a decision (`surface.decision.write` is granted to owner and
-        // approver only — front-desk-roles.ts). Operators execute but never
-        // decide; viewers observe.
-        throw new PresenceStudioViewerError(403, 'this member role cannot record decisions');
-      }
-      const actor = humanActor(member.member_id, member.display_name);
-      const decidedBy: HearingDecidedBy = {
-        kind: 'human',
-        id: actor.id,
-        ...(actor.display_name ? { display_name: actor.display_name } : {}),
-        role,
-      };
-      const decided = updateHearingRecord(namespace, sessionId, (current) => {
-        assertHearingEditable(current);
-        assertHearingSnapshot(current, record);
-        return { ...record, decided_by: decidedBy, decided_at: nowIso(), updated_at: nowIso() };
-      });
+      const { decidedBy, identity } = hearingDecisionActor(viewer, namespace);
+      const decided = storage.decide(
+        sessionId,
+        operation,
+        identity,
+        decidedBy,
+        nowIso(),
+        legacySnapshot
+      );
+      const proof = operation
+        ? hearingDecisionReceipt(decided, namespace, operation, identity)
+        : null;
+      res.setHeader('Cache-Control', 'no-store');
+      if (proof?.status === 'superseded') return res.json({ ok: true, decision_receipt: proof });
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       return res.json({
         ok: true,
+        ...(proof ? { decision_receipt: proof } : {}),
         record: withResolvedLabels(withoutHearingCompletionFields(decided), locale),
         next_action: {
           kind: 'alignment_review',
@@ -545,6 +549,35 @@ export function registerHearingRoutes(app: express.Express): void {
           label: catalogT('front_desk:hearing_next_alignment', undefined, locale),
         },
       });
+    } catch (error) {
+      hearingResponseError(req, res, error);
+    }
+  });
+
+  // Read-only exact receipt proof. Absence is unknown, never evidence of non-execution.
+  app.get('/api/hearing/:session/decision-receipts/:operation', (req, res) => {
+    try {
+      const viewer = resolvePresenceStudioViewerContext(req);
+      requirePresenceStudioLocalAdmin(viewer);
+      const storage = hearingStorageForViewer(viewer);
+      const namespace = storage.namespace;
+      const sessionId = hearingSessionId(req);
+      const { identity } = hearingDecisionActor(viewer, namespace);
+      const revision = readSurfaceStringParam(req.query.requirements_revision);
+      if (!revision || !/^(0|[1-9][0-9]*)$/u.test(revision))
+        throw new HearingRequestError('Requirements revision is required.');
+      const operation = parseHearingDecisionOperation({
+        version: Number(readSurfaceStringParam(req.query.version)),
+        operation_id: req.params.operation,
+        scenario_id: readSurfaceStringParam(req.query.scenario_id),
+        requirements_revision: Number(revision),
+      });
+      if (!operation) throw new HearingRequestError('Exact decision operation is required.');
+      const proof = hearingDecisionReceipt(storage.load(sessionId), namespace, operation, identity);
+      res.setHeader('Cache-Control', 'no-store');
+      return proof
+        ? res.json({ ok: true, decision_receipt: proof })
+        : res.status(404).json({ ok: false, decision_receipt_status: 'unknown' });
     } catch (error) {
       hearingResponseError(req, res, error);
     }
@@ -565,13 +598,10 @@ export function registerHearingRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingSessionId(req);
-      const namespace = hearingNamespace(viewer.tenantSlugs);
+      const storage = hearingStorageForViewer(viewer);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
 
-      const record = loadHearingRecord(
-        namespace,
-        sessionId
-      ) as HearingRecordWithInventoryFields | null;
+      const record = storage.load(sessionId) as HearingRecordWithInventoryFields | null;
       if (!record) throw new HearingRequestError('Hearing record does not exist yet.');
 
       const scenarioDef = findHearingScenario(record.scenario);
@@ -612,7 +642,7 @@ export function registerHearingRoutes(app: express.Express): void {
       const scope = workInventoryScopeForHandoff(viewer);
       const input = buildWorkInventoryDecompositionInput(record, { scope });
       const result = await proposeWorkDecomposition(input, { useModel: true });
-      const reserved = reserveHearingHandoff(namespace, record, 'inventory', nowIso());
+      const reserved = storage.reserve(record, 'inventory', nowIso());
       effectReserved = true;
       // Writing a `knowledge/confidential/<tenant>/work-inventory/` entry is
       // a governed confidential-tier write, not a plain surface-runtime one
@@ -644,7 +674,7 @@ export function registerHearingRoutes(app: express.Express): void {
         work_inventory_steps: entry.steps.length,
         updated_at: nowIso(),
       };
-      finishHearingHandoff(namespace, reserved, patch);
+      storage.finish(reserved, patch);
 
       logger.info(
         presenceStudioData.presenceStudioAuditLine(req, 'hearing.inventory.create', {

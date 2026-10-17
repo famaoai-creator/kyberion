@@ -205,6 +205,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/background-review/nudge/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
+  // Durable hearing session/receipt state is always isolated during tests.
+  'shared/runtime/hearing/',
   // Tier/tenant-partitioned resource-usage ledgers (metrics.ts
   // RESOURCE_USAGE_LEDGER_ROOT); the shared `metrics` collector appends to them.
   'shared/runtime/usage-ledger/',

@@ -33,6 +33,8 @@ export interface HearingCompletion {
 export function withoutHearingCompletionFields(record: HearingRecord): HearingRecord {
   const sanitized = { ...record } as StoredHearing;
   delete sanitized.handoff_pending;
+  delete sanitized.decision_receipts;
+  delete sanitized.current_decision_operation_id;
   delete sanitized.mission_id;
   delete sanitized.approval_request_id;
   delete sanitized.handed_off_at;
