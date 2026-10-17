@@ -69,7 +69,7 @@ import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { isUIAutomationAvailable } from '@agent/core/virtual/os-automation';
 import { listKnownAppCapabilities } from '@agent/core/virtual/os-app-adapters';
 import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
-import { probeDesktopObservationReadiness } from '@agent/core';
+import { probeDesktopObservationReadiness } from '@agent/core/virtual/desktop-observation-readiness';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import {

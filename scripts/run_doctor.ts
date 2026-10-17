@@ -17,7 +17,7 @@ import {
 import { isSurfaceOutboxDue } from '@agent/core/surface/surface-delivery';
 import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import { listDesktopObservationSources } from '@agent/core/virtual/desktop-recording';
-import { probeDesktopObservationReadiness } from '@agent/core';
+import { probeDesktopObservationReadiness } from '@agent/core/virtual/desktop-observation-readiness';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { formatEnvValidationReport, validateEnv } from '@agent/core/env-validator';
 import { evaluateDegradation, loadHealthThresholds } from '@agent/core/health-degradation';
