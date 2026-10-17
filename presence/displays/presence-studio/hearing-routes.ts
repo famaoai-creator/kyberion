@@ -60,6 +60,7 @@ import {
   renderWorkInventoryCanvasHtml,
 } from './hearing-work-inventory.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
+import { readHearingCompletion, withoutHearingCompletionFields } from './hearing-completion.js';
 
 class HearingRequestError extends Error {
   readonly status = 400 as const;
@@ -353,7 +354,8 @@ export function registerHearingRoutes(app: express.Express): void {
       res.setHeader('Cache-Control', 'no-store');
       res.json({
         ok: true,
-        record: withResolvedLabels(record, locale),
+        record: withResolvedLabels(withoutHearingCompletionFields(record), locale),
+        completion: readHearingCompletion(record, viewer),
         persisted: Boolean(existing),
         canvas_url: hearingCanvasUrl(sessionId, record),
       });
