@@ -940,6 +940,7 @@ export async function runRealtimeVoiceConversationLoop(
           }
         : {}),
       ...(streamingStt ? { streamingStt } : {}),
+      language,
       transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
       reply: (userText) =>
         generateRealtimeAssistantReply(session.session_id, userText, reasoningOptionsFor(options)),
