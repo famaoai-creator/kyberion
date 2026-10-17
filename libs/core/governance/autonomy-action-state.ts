@@ -25,10 +25,9 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from '../secure-io.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines, readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
 
@@ -138,22 +137,11 @@ export function actionAutonomyStats(
 
 function loadOverrides(deps: AutonomyStateDeps): ActionOverridesFile {
   const p = filePath(deps, AUTONOMY_OVERRIDES_PATH);
-  if (!safeExistsSync(p)) return { version: 1, overrides: {} };
-  try {
-    const parsed = JSON.parse(
-      safeReadFile(p, { encoding: 'utf8' }) as string
-    ) as ActionOverridesFile;
-    if (
-      parsed?.version !== 1 ||
-      typeof parsed.overrides !== 'object' ||
-      parsed.overrides === null
-    ) {
-      return { version: 1, overrides: {} };
-    }
-    return parsed;
-  } catch {
+  const parsed = readJsonIfPresent<ActionOverridesFile>(p);
+  if (parsed?.version !== 1 || typeof parsed.overrides !== 'object' || parsed.overrides === null) {
     return { version: 1, overrides: {} };
   }
+  return parsed;
 }
 
 function saveOverrides(state: ActionOverridesFile, deps: AutonomyStateDeps): void {
