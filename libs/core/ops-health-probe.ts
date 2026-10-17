@@ -32,6 +32,9 @@ import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-r
 const logger = createLogger('ops-health-probe');
 
 export const OPS_FINDINGS_PATH = 'active/shared/observability/ops-findings.jsonl';
+/** Dot that diagnoses filed ops-health findings (allowed shapes:
+ *  direct_reply | pipeline | mission — direct_reply keeps it advisory). */
+export const OPS_WORK_ITEM_DOT_ID = 'org-operations';
 export const OPS_ALERTS_PATH = 'active/shared/observability/ops-alerts.jsonl';
 
 /** One alert key owning this share of the log = alert fatigue. */
@@ -192,6 +195,14 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
           title: `[ops] ${finding.summary.slice(0, 120)}`,
           description: `Detected by ops-health-probe. Evidence: ${JSON.stringify(finding.evidence)}`,
           labels: ['ops-health', finding.kind, `severity:${finding.severity}`],
+          // Address to the ops dot so the item is actually claimed — an
+          // unaddressed item is never picked up (addressedTo requires
+          // metadata.dot_id or handoff_to). direct_reply = one bounded
+          // advisory turn: the dot diagnoses the finding and reports.
+          metadata: {
+            dot_id: OPS_WORK_ITEM_DOT_ID,
+            requested_work_shape: 'direct_reply',
+          },
           rootDir: deps.rootDir,
         });
         workItemsFiled.push(finding.finding_id);
