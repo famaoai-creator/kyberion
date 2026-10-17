@@ -7547,6 +7547,10 @@
     "./ops-health-probe": {
       "types": "./dist/ops-health-probe.d.ts",
       "default": "./dist/ops-health-probe.js"
+    },
+    "./governance/autonomy-action-state": {
+      "types": "./dist/governance/autonomy-action-state.d.ts",
+      "default": "./dist/governance/autonomy-action-state.js"
     }
   },
   "dependencies": {
