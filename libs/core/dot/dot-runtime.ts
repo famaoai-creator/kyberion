@@ -92,6 +92,7 @@ import { dotStatePath } from './dot-state-paths.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import { dotExtCtx, type DotExtCtx } from './dot-extensions.js';
 import { DOT_FOLLOWUP_TOOL_NAME } from './dot-followups.js';
+import { dotOutcomeContinuation } from './dot-progress.js';
 import {
   runDelegatedWake,
   dotBackendIsUnconfiguredStub,
@@ -183,7 +184,7 @@ function estimateWakeTokensFromText(input: {
 export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 
 /** Runtime-only trigger kinds beyond the charter's declared ones. */
-export type DotWakeTrigger = DotTrigger | { kind: 'followup' };
+export type DotWakeTrigger = DotTrigger | { kind: 'followup' } | { kind: 'outcome' };
 
 export interface DotWakeLedgerEntry {
   /** Durable event attempt correlation; absence never proves a dispatch did not occur. */
@@ -984,6 +985,13 @@ export function evaluateDotTriggersDue(
   ) ?? { kind: 'wake', channels: ['inbox'] };
   for (const hit of wakeTriggerKeys(charter, deps)) {
     if (isDue(hit.key)) due.push({ trigger: wakeTrigger, key: hit.key, detail: hit.detail });
+  }
+  // Settlement can happen long after the executor's report-back wake. The
+  // scoped outcome ledger itself keeps this continuation durable across a
+  // supervisor crash; coalesce its visible prefix into one normal gated wake.
+  const outcome = dotOutcomeContinuation(charter, { ...deps, now: () => now });
+  if (outcome && isDue(outcome.key)) {
+    due.push({ trigger: { kind: 'outcome' }, ...outcome });
   }
   return applyDotWakeCircuit(charter, due, deps);
 }

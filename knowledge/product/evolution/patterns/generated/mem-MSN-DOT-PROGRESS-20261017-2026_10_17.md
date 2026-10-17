@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-DOT-PROGRESS-20261017-2026_10_17
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-DOT-PROGRESS-20261017-2026_10_17
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-17T10:15:05.339Z
+source_branch: feat/dot-outcome-progress-20261017
+source_commit: ce2c6670cb3b9a7d244adf90b4f590776b0cd406
+---
+
+# Keep outcome continuation separate from progress ordering
+
+Use durable scoped outcome identities for continuation and measurement time for stagnation, retaining existing execution gates.
+
+## Applicability
+
+- mission
+- mission:MSN-DOT-PROGRESS-20261017
+
+## Reusable Steps
+
+1. Use durable scoped outcome identities for continuation and measurement time for stagnation, retaining existing execution gates
+
+## Expected Outcome
+
+Outcome settlement can occur after the executor report-back. Derive one coalesced wake from the scoped outcome ledger and consume it through the existing wake receipt ledger. Hash every valid unique action identity with canonical scope so late appends and newly eligible clock-skewed evidence advance the watermark. Treat the first valid outcome per action as immutable. Calculate stagnation per KR or signal in measurement order, reset on improvement, and distinguish achieved targets from missing measurement. Replanning instructions must retain authority, approval and budget controls. Test restart, duplicate evidence, late measurements, in-flight appends and scope separation; inject notification ports to keep tests offline.
+
+## Evidence
+
+- active/missions/public/MSN-DOT-PROGRESS-20261017/evidence/distillation.md
+- active/missions/public/MSN-DOT-PROGRESS-20261017/evidence/test-report.md
+- active/missions/public/MSN-DOT-PROGRESS-20261017/evidence/REVIEW-execution-implement.md
+
+## Artifacts
