@@ -30,6 +30,8 @@ import {
   NotMeaningfulPromotionCandidateError,
 } from '../promoted-memory.js';
 import { logger } from '../core.js';
+import { reviewMemoryPromotionCandidate } from './memory-promotion-review.js';
+import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import { resolvePromotionTargetRoot } from './memory-promotion-git.js';
 import { assessMissionMemoryCandidate } from '../mission/mission-assessment.js';
 import { listInboxEntries } from '../deliverable-inbox.js';
@@ -532,9 +534,23 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     );
   }
   if (candidate.ratification_required && candidate.status !== 'approved') {
-    throw new Error(
-      `Memory promotion candidate ${candidateId} requires ratification before promotion.`
-    );
+    // Lane-aware self-ratification: auto/evidence_gated lanes approve without
+    // a steward — the status flip IS the audit trail. Sensitive scopes and
+    // pr_review candidates keep blocking here.
+    const review = reviewMemoryPromotionCandidate(candidateId)[0];
+    const lane = laneApprovesWithoutSteward(candidate, review?.physical_record_count ?? 1);
+    if (!lane.approves) {
+      throw new Error(
+        `Memory promotion candidate ${candidateId} requires ratification before promotion (lane: ${lane.lane}${lane.reason ? `, ${lane.reason}` : ''}).`
+      );
+    }
+    updateMemoryPromotionCandidateStatus({
+      candidateId,
+      status: 'approved',
+      ratificationNote: `lane:${lane.lane}${lane.reason ? ` (${lane.reason})` : ''} — self-ratified by promotion-lanes policy`,
+      ...(candidate.scope ? { scope: candidate.scope } : {}),
+    });
+    (candidate as { status: string }).status = 'approved';
   }
   if ((candidate.evidence_refs || []).length === 0) {
     throw new Error(
