@@ -408,6 +408,8 @@
           state.historyReadPending = false;
           if (state.storageVerified) state.draftRecoveryScope = draftScopeSnapshot();
           options.render();
+          if (state.storageVerified && options.onConversationRestored)
+            options.onConversationRestored();
           if (state.storageVerified && !state.navigationResumed) options.onHistoryReady();
           return state.storageVerified;
         })
