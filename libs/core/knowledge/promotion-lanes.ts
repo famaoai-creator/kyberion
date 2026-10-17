@@ -99,9 +99,18 @@ export function resolvePromotionLane(
   if (tier === 'personal' || tier === 'confidential') return 'steward';
   const haystack = `${candidate.title ?? ''} ${candidate.summary ?? ''}`.toLowerCase();
   if (/(policy|security|permission|secret|tenant[_-]?scope)/.test(haystack)) return 'steward';
-  return (
-    policy.lanes[(candidate.target_kind as PromotionLaneKind) ?? 'knowledge_hint'] ?? 'steward'
-  );
+  const kind = candidate.target_kind ?? candidate.proposed_memory_kind;
+  // MemoryCandidateKind ('sop'|'template'|'heuristic'|'risk_rule'|
+  // 'clarification_prompt'|'archive_advisory') maps onto lane kinds;
+  // anything unmapped — including a missing kind — stays steward (fail-closed).
+  const ALIASES: Record<string, PromotionLaneKind> = {
+    sop: 'sop_candidate',
+    template: 'report_template',
+    heuristic: 'pattern',
+    clarification_prompt: 'knowledge_hint',
+  };
+  const normalized = ALIASES[kind ?? ''] ?? kind;
+  return policy.lanes[normalized as PromotionLaneKind] ?? 'steward';
 }
 
 /** Structural guards for the auto lane — content shape, not judgment. */
