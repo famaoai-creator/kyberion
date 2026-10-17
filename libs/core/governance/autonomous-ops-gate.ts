@@ -5,7 +5,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { clamp } from '../foundation/text.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
 import { resolveIdentityContext } from '../authority.js';
-import { applyAutonomyOverride } from './autonomy-action-state.js';
+import { applyAutonomyOverride, recordAutonomyOutcome } from './autonomy-action-state.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
 export type AutonomousOpsMode = 'apply' | 'dry_run';
@@ -346,6 +346,15 @@ export function evaluateAutonomousOpsAction(
   if (override.applied) {
     reasons.push(`autonomy override: ${override.applied}`);
     decision = override.decision;
+  }
+
+  // Every verdict is autonomy evidence (apply-mode only; never in tests).
+  if (executionMode === 'apply' && !process.env.VITEST) {
+    try {
+      recordAutonomyOutcome({ action_id: input.actionId, decision, executed: false });
+    } catch {
+      /* ledger writes must never alter a gate verdict */
+    }
   }
 
   return {

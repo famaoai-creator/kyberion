@@ -55,6 +55,8 @@ export const DEMOTE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 export const AUTONOMY_STATS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface AutonomyOutcomeRow {
+  /** 'execution' rows carry results only — they never count as decisions. */
+  kind?: 'decision' | 'execution';
   action_id: string;
   /** What the gate decided for this invocation. */
   decision: AutonomousOpsDecision;
@@ -104,6 +106,24 @@ export function recordAutonomyOutcome(
   });
 }
 
+/** Record an execution result without double-counting the decision row
+ *  the gate already wrote for the same evaluation. */
+export function recordAutonomyExecution(
+  row: { action_id: string; ok: boolean; error?: string },
+  deps: AutonomyStateDeps = {}
+): void {
+  const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
+  safeMkdir(path.dirname(p), { recursive: true });
+  appendJsonLine(p, {
+    kind: 'execution',
+    action_id: row.action_id,
+    executed: true,
+    ok: row.ok,
+    ...(row.error ? { error: row.error } : {}),
+    recorded_at: (deps.now?.() ?? new Date()).toISOString(),
+  });
+}
+
 export interface AutonomyActionStats {
   decisions: number;
   /** Executed runs that returned ok=true. */
@@ -131,6 +151,11 @@ export function actionAutonomyStats(
     if (row?.action_id !== actionId) continue;
     const ts = Date.parse(String(row.recorded_at ?? ''));
     if (!Number.isFinite(ts) || ts < cutoff) continue;
+    if (row.kind === 'execution') {
+      if (row.ok === true) stats.succeeded++;
+      else stats.incidents++;
+      continue;
+    }
     stats.decisions++;
     if (row.executed) {
       if (row.ok === true) stats.succeeded++;
