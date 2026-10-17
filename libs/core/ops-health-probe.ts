@@ -119,11 +119,15 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
   return findings;
 }
 
-/** One dedupe key dominating the alert log — the 93%-watchdog defect class. */
+/** One alert source dominating the log — the 93%-watchdog defect class.
+ *  Keys embed detail segments (daemon sets, minute stamps), so dominance must
+ *  group by the source prefix before the first ':' — a per-key count would
+ *  fragment one noisy source into many <50% slices and never fire. */
 export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[] {
   const alertPath = repoFile(deps.rootDir, OPS_ALERTS_PATH);
   if (!safeExistsSync(alertPath)) return [];
   const counts = new Map<string, number>();
+  const topKey = new Map<string, { key: string; count: number }>();
   let total = 0;
   for (const row of readJsonLines<Record<string, unknown>>(alertPath)) {
     // Alert records carry id/title/severity; `kind` is only present on
@@ -133,18 +137,21 @@ export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[]
     total++;
     const key =
       typeof row.dedupe_key === 'string' ? row.dedupe_key : `${row.severity}:${row.title}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const source = key.split(':', 1)[0] ?? key;
+    counts.set(source, (counts.get(source) ?? 0) + 1);
+    const t = topKey.get(source);
+    if (!t || t.key < key) topKey.set(source, { key, count: 0 });
   }
   if (total < 20) return []; // too little data to call dominance
   const findings: OpsFinding[] = [];
-  for (const [key, count] of counts) {
+  for (const [source, count] of counts) {
     if (count / total < ALERT_DOMINANCE_RATIO) continue;
     findings.push({
-      finding_id: findingId('alert_dominance', key),
+      finding_id: findingId('alert_dominance', source),
       kind: 'alert_dominance',
       severity: 'warning',
-      summary: `alert "${key.slice(0, 80)}" is ${((count / total) * 100).toFixed(0)}% of ops-alerts (${count}/${total}) — signal is drowning`,
-      evidence: { dedupe_key: key, count, total },
+      summary: `alert source "${source}" is ${((count / total) * 100).toFixed(0)}% of ops-alerts (${count}/${total}) — signal is drowning (sample: ${(topKey.get(source)?.key ?? '').slice(0, 70)})`,
+      evidence: { source, count, total, sample_key: topKey.get(source)?.key },
       detected_at: (deps.now?.() ?? new Date()).toISOString(),
     });
   }
