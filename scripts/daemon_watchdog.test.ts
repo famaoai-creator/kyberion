@@ -110,10 +110,10 @@ describe('daemon_watchdog', () => {
     expect(report.ok).toBe(false);
     expect(report.recovery).toHaveLength(2);
     for (const recovery of report.recovery ?? []) {
-      // daemon_restart is scored to land on `approve`: the restart is a platform
-      // service-manager command outside the sandbox, and restarting a scheduler
-      // mid-firing can duplicate or drop work.
-      expect(recovery.decision).toBe('approve');
+      // daemon_restart is reclassified to `notify`: reversible service-manager
+      // restart with no secret exposure; still operator-gated until evidence
+      // promotes it to auto.
+      expect(recovery.decision).toBe('notify');
       expect(recovery.requires_operator).toBe(true);
     }
     expect(formatDaemonWatchdogReport(report).join('\n')).toContain('awaiting operator');
@@ -152,7 +152,7 @@ describe('daemon_watchdog', () => {
       expect(routing.routeAutonomousDecision.mock.calls[0]?.[0]).toMatchObject({
         dedupeKey: 'chronos-daemon',
         requestedBy: 'daemon_watchdog',
-        gate: expect.objectContaining({ actionId: 'daemon_restart', decision: 'approve' }),
+        gate: expect.objectContaining({ actionId: 'daemon_restart', decision: 'notify' }),
       });
       expect(report.recovery?.[0]).toMatchObject({
         requires_operator: true,
