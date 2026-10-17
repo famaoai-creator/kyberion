@@ -106,7 +106,12 @@ export const DOT_TOKEN_USAGE_PATH = 'active/shared/runtime/dot-token-usage.jsonl
 export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json';
 export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';
 export { DOT_INBOX_PATH } from './dot-inbox.js';
-import { DOT_INBOX_PATH } from './dot-inbox.js';
+import {
+  DOT_INBOX_PATH,
+  dotInboxRowWakesCharter,
+  dotInboxWakeKey,
+  DOT_EXECUTOR_REPORT_SOURCE_VALUE,
+} from './dot-inbox.js';
 
 /** A failed wake is retried no sooner than this (per trigger key); doubles per consecutive failure. */
 export const DOT_WAKE_RETRY_AFTER_MS = 5 * 60 * 1000;
@@ -648,18 +653,14 @@ function watchTriggerKey(charter: DotCharter, rel: string, deps: DotRuntimeDeps)
 }
 
 /** `payload.report_from` of an executor report-back inbox row (DL-01). */
-export const DOT_EXECUTOR_REPORT_SOURCE = 'dot-executor';
+export const DOT_EXECUTOR_REPORT_SOURCE = DOT_EXECUTOR_REPORT_SOURCE_VALUE;
 
 function wakeTriggerKeys(
   charter: DotCharter,
   deps: DotRuntimeDeps
 ): Array<{ key: string; detail: string }> {
-  const declaredChannels = charter.attention.triggers
-    .filter((t): t is Extract<DotTrigger, { kind: 'wake' }> => t.kind === 'wake')
-    .flatMap((t) => t.channels);
-  const handoffSources = charter.team?.accepts_handoffs_from ?? [];
-  // No early return: every dot hears its own executor's report-backs, even
-  // one that declares no wake channel and accepts no handoffs.
+  // Match + key derivation live in dot-inbox.ts so this consumer and the
+  // tombstone compactor can never drift apart.
   const rows = readJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
     runtimePath(deps.rootDir, DOT_INBOX_PATH),
     {
@@ -673,27 +674,12 @@ function wakeTriggerKeys(
   );
   const hits: Array<{ key: string; detail: string }> = [];
   for (const row of rows) {
-    const payload =
-      row.payload && typeof row.payload === 'object'
-        ? (row.payload as Record<string, unknown>)
-        : undefined;
-    const handoffFrom = payload?.handoff_from;
-    // A handoff wakes its target only from a dot the target accepts; the
-    // dot's own executor reporting a finished WorkItem always wakes it.
-    const addressed =
-      row.dot_id === charter.dot_id &&
-      (typeof handoffFrom === 'string'
-        ? handoffSources.includes(handoffFrom)
-        : payload?.report_from === DOT_EXECUTOR_REPORT_SOURCE || declaredChannels.length > 0);
-    const channelHit =
-      !row.dot_id && typeof row.channel === 'string' && declaredChannels.includes(row.channel);
-    if (!addressed && !channelHit) continue;
+    if (!dotInboxRowWakesCharter(row, charter)) continue;
     // Line number joins the hash so two identical rows are distinct wakes.
-    const key = `wake:${createHash('sha256')
-      .update(`${row.__index}:${String(row.__line)}`)
-      .digest('hex')
-      .slice(0, 16)}`;
-    hits.push({ key, detail: String(row.__line).slice(0, 500) });
+    hits.push({
+      key: dotInboxWakeKey(row.__index as number, String(row.__line)),
+      detail: String(row.__line).slice(0, 500),
+    });
   }
   return hits;
 }

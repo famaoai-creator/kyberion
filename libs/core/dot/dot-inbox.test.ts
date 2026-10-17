@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readJsonLines } from '../foundation/json.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry,
+  compactDotInbox,
+  dotInboxWakeKey,
   DOT_INBOX_PATH,
   DOT_INBOX_RECEIPT_SCAN_BYTES,
   DOT_WAKE_CHANNELS,
@@ -161,5 +163,77 @@ describe('isDotWakeChannel', () => {
     for (const channel of DOT_WAKE_CHANNELS) expect(isDotWakeChannel(channel)).toBe(true);
     expect(isDotWakeChannel('chronos')).toBe(false);
     expect(isDotWakeChannel('terminal')).toBe(false);
+  });
+});
+
+describe('compactDotInbox', () => {
+  const CHARTER = {
+    kind: 'dot-charter',
+    dot_id: 'repo-guardian',
+    version: '1.0.0',
+    title: 'Repo guardian',
+    purpose: 'Keep the repository healthy.',
+    status: 'active',
+    scope: { tier: 'public' },
+    goal: {
+      statement: 'g',
+      budget: { max_turns_per_wake: 1, wall_clock_ms_per_wake: 1000, token_cap_per_day: 1 },
+    },
+    attention: { triggers: [{ kind: 'wake', channels: ['inbox'] }] },
+    authority: { authority_role: 'infrastructure_sentinel' },
+    notification: { deliver_to: { surface: 'slack', channel: '#ops' } },
+    runtime: { heartbeat_id: 'dot-repo-guardian' },
+  };
+  const inbox = (root: string) => `${root}/${DOT_INBOX_PATH}`;
+  const ledger = (root: string) => `${root}/active/shared/runtime/dot-wake-ledger.jsonl`;
+
+  it('tombstones consumed rows in place — surviving rows keep exact keys', () => {
+    const pending = appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'pending' },
+      { rootDir: TEST_ROOT }
+    );
+    const consumed = appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'consumed' },
+      { rootDir: TEST_ROOT }
+    );
+    const before = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    // row indices are 1-based in the raw split; pending=1, consumed=2
+    const consumedKey = dotInboxWakeKey(2, before[1]!);
+    const pendingKey = dotInboxWakeKey(1, before[0]!);
+
+    safeMkdir(`${TEST_ROOT}/active/shared/runtime`, { recursive: true });
+    safeWriteFile(
+      ledger(TEST_ROOT),
+      JSON.stringify({
+        dot_id: 'repo-guardian',
+        trigger_key: consumedKey,
+        outcome: 'delivered',
+        fired_at: new Date().toISOString(),
+      }) + '\n'
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+
+    const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 });
+    expect(r.tombstoned).toBe(1);
+
+    const after = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    expect(after).toHaveLength(before.length); // positions never move
+    expect(after[1]).toBe('{"tombstone":true}');
+    expect(after[0]).toBe(before[0]); // pending row byte-identical
+    // surviving row re-derives the identical wake key — no re-fire, no state loss
+    expect(dotInboxWakeKey(1, after[0]!)).toBe(pendingKey);
+  });
+
+  it('never tombstones a row that still has an unconsumed consumer', () => {
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'pending' },
+      { rootDir: TEST_ROOT }
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+    const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 });
+    expect(r.tombstoned).toBe(0);
+    expect(safeReadFile(inbox(TEST_ROOT)) as string).not.toContain('tombstone');
   });
 });
