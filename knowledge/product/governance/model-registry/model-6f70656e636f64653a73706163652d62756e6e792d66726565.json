@@ -1,0 +1,28 @@
+{
+  "model_id": "opencode:space-bunny-free",
+  "provider": "opencode",
+  "family": "space-bunny",
+  "status": "approved",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "secondary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": [
+    "agentic_coding",
+    "free_tier",
+    "structured_output",
+    "tool_use",
+    "vision_input"
+  ],
+  "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.9s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 1.5s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
+}

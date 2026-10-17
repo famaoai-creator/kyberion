@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import {
@@ -37,6 +39,8 @@ vi.mock('./mission/delegation-concurrency.js', () => ({
   withWallClockBudget: withWallClockBudgetMock,
   DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
 }));
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function createChild(stdoutText: string, exitCode = 0): MockChildProcess {
   const child = new EventEmitter() as MockChildProcess;
@@ -129,8 +133,11 @@ describe('opencode-cli-reasoning-backend', () => {
     expect(args).toContain('opencode/muse-spark-1.3-contributor-free');
     expect(args).toContain('--agent');
     expect(args).toContain('plan');
-    expect(args).toContain('--dir');
-    expect(args).toContain('/tmp/ws');
+    expect(spawnMock).toHaveBeenCalledWith(
+      'opencode',
+      expect.anything(),
+      expect.objectContaining({ cwd: '/tmp/ws' })
+    );
     expect(args).not.toContain('--auto');
     expect(withWallClockBudgetMock).toHaveBeenCalledWith(
       expect.objectContaining({ provider: 'opencode' }),
@@ -229,5 +236,44 @@ describe('opencode-cli-reasoning-backend', () => {
     );
     expect(backend).toBeInstanceOf(OpencodeCliReasoningBackend);
     expect(backend?.name).toBe('opencode-cli');
+  });
+
+  it('attaches images to promptWithImages calls via --file', async () => {
+    spawnMock.mockReturnValueOnce(createChild(ndjson(textEvent('red'))));
+
+    const imageDir = mkdtempSync(join(pathResolver.rootDir(), 'active/shared/tmp/oci-vision-'));
+    const imagePath = join(imageDir, 'probe.png');
+    writeFileSync(imagePath, Buffer.concat([PNG_SIGNATURE, Buffer.alloc(4, 0x00)]));
+
+    try {
+      const backend = new OpencodeCliReasoningBackend({ bin: 'opencode' });
+      expect(backend.supportsVision).toBe(true);
+      const result = await backend.promptWithImages('what color', [
+        { path: imagePath, media_type: 'image/png' },
+      ]);
+
+      expect(result).toBe('red');
+      const [, args] = spawnMock.mock.calls[0];
+      expect(args).toContain('--file');
+      expect(args).toContain(imagePath);
+    } finally {
+      rmSync(imageDir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an attachment whose magic bytes contradict the declared media type', async () => {
+    const imageDir = mkdtempSync(join(pathResolver.rootDir(), 'active/shared/tmp/oci-vision-'));
+    const imagePath = join(imageDir, 'probe.png');
+    writeFileSync(imagePath, Buffer.alloc(16, 0x00));
+
+    try {
+      const backend = new OpencodeCliReasoningBackend({ bin: 'opencode' });
+      await expect(
+        backend.promptWithImages('what color', [{ path: imagePath, media_type: 'image/png' }])
+      ).rejects.toThrow(/VISION_BAD_SIGNATURE/);
+      expect(spawnMock).not.toHaveBeenCalled();
+    } finally {
+      rmSync(imageDir, { recursive: true, force: true });
+    }
   });
 });
