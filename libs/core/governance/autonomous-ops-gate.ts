@@ -5,6 +5,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { clamp } from '../foundation/text.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
 import { resolveIdentityContext } from '../authority.js';
+import { applyAutonomyOverride } from './autonomy-action-state.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
 export type AutonomousOpsMode = 'apply' | 'dry_run';
@@ -337,6 +338,15 @@ export function evaluateAutonomousOpsAction(
   }
 
   if (shadow) reasons.push(AUTONOMOUS_OPS_SHADOW_REASON);
+
+  // Evidence-driven per-action adjustment (autonomy-action-state): a demoted
+  // action falls back to 'approve'; a promoted one relaxes toward relaxed_to
+  // only when no escalation rule fired this call.
+  const override = applyAutonomyOverride(input.actionId, decision, escalations);
+  if (override.applied) {
+    reasons.push(`autonomy override: ${override.applied}`);
+    decision = override.decision;
+  }
 
   return {
     actionId: input.actionId,
