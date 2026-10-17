@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync, safeReadFile, safeWriteFile } from '../secure-io.js';
 import {
+  listAutonomyActionIds,
   recordAutonomyOutcome,
   actionAutonomyStats,
   applyAutonomyOverride,
@@ -97,6 +98,12 @@ describe('autonomy-action-state', () => {
     safeWriteFile(abs(AUTONOMY_OVERRIDES_PATH), '{not json');
     const o = applyAutonomyOverride('daemon_restart', 'notify', [], deps);
     expect(o.decision).toBe('notify');
+  });
+
+  it('lists distinct action ids recorded in the ledger', () => {
+    seed('daemon_restart', 3);
+    seed('auto_checkpoint', 2);
+    expect(listAutonomyActionIds(deps).sort()).toEqual(['auto_checkpoint', 'daemon_restart']);
   });
 
   it('persists promotion state to the runtime overrides file', () => {
