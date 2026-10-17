@@ -3350,7 +3350,6 @@
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
         "libs/core/plugin/plugin-lifecycle.ts#importTarget",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4206,7 +4205,6 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4325,32 +4323,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
-            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
-            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -4530,9 +4502,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4683,34 +4653,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "satellites/imessage-bridge/src/index.ts#<module>",
-            "satellites/imessage-bridge/src/index.ts#main",
-            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
-            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
-            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
-            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -4909,9 +4851,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5029,22 +4969,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "scripts/mcp_server.ts#<module>",
-            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
-            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
-            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -5222,9 +5146,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5402,33 +5324,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "presence/bridge/nexus-daemon.ts#<module>",
-            "presence/bridge/nexus-daemon.ts#nexusLoop",
-            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
-            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
-            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
-            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -5688,7 +5583,6 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -6063,9 +5957,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -6802,33 +6694,6 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "satellites/slack-bridge/src/index.ts#<module>",
-            "satellites/slack-bridge/src/index.ts#start",
-            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
-            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
-            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
-          ]
-        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -7016,9 +6881,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7183,18 +7046,6 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
-          ]
-        },
         "ecosystem_architect": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
@@ -7345,9 +7196,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7465,32 +7314,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
-            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
-            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
-            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -7670,9 +7493,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7800,29 +7621,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
-            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -7993,9 +7791,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -8102,29 +7898,6 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        },
-        "chronos_token_registry_reader": {
-          "example_path": [
-            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
-            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#<module>",
-            "libs/core/index.ts#<module>",
-            "libs/core/index-part-05.ts#<module>",
-            "libs/core/authn-providers.ts#<module>",
-            "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
         "ecosystem_architect": {
@@ -8289,9 +8062,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
-        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
-        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
