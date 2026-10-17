@@ -20,6 +20,23 @@ The system keeps internal runtime detail behind that conversation.
 
 At every step it makes the request, plan, result, and next action visible.
 
+## Set up by asking your LLM CLI
+
+After cloning, open an authenticated LLM CLI in the repository directory and ask:
+
+```text
+この端末で Kyberion を使い始めたい。環境を確認して、必要なことを質問しながら初期設定を進めて。
+まずは個人で、週次レポートの下書きを任せたい。
+```
+
+For company use, say your organization’s name and first task instead. The agent follows the
+[prompt-first onboarding playbook](../knowledge/product/orchestration/prompt-first-onboarding.md):
+checks the environment, asks only for missing information, selects personal / AI company / existing-tenant setup,
+and prepares the services needed for the first task. Personal use needs no tenant.
+You complete service login and human approval when needed; never paste credentials into the conversation.
+To resume, ask 「初期設定の続きをして」. The agent checks saved state before continuing.
+This route uses the same commands and gates below; the manual setup path remains available.
+
 ## 1. Setup
 
 > This document is the canonical first-win source. The full onboarding order after first-win — readiness, identity, getting the baseline to `all_clear`, and the optional tenant / organization / activation steps — is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md). Command-by-command detail is in [INITIALIZATION.md](./INITIALIZATION.md).
