@@ -117,12 +117,21 @@ export function readDaemonHeartbeat(
     }
     const ageMs = now - timestamp;
     const staleAfterMs = options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
+    // A daemon that reports `stale_code` knows its loaded build is older than
+    // the current dist — heartbeats may still be fresh, but the process must
+    // be recycled onto the new build, so it counts as unhealthy.
+    const staleCode = heartbeat.details?.stale_code === true;
+    const stale = ageMs > staleAfterMs || staleCode;
     return {
       daemon_id: daemonId,
-      status: ageMs > staleAfterMs ? 'stale' : 'healthy',
+      status: stale ? 'stale' : 'healthy',
       age_ms: ageMs,
       heartbeat,
-      ...(ageMs > staleAfterMs ? { reason: `heartbeat is older than ${staleAfterMs}ms` } : {}),
+      ...(staleCode
+        ? { reason: 'daemon reports stale_code (running build older than dist)' }
+        : stale
+          ? { reason: `heartbeat is older than ${staleAfterMs}ms` }
+          : {}),
     };
   } catch (error) {
     return {
