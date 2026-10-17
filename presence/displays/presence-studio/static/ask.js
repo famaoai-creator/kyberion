@@ -158,6 +158,7 @@
     draftRevision: 0,
     homeDraftPreserved: false,
     proposedDraft: null,
+    // Server history owns this aggregate; local send uncertainty lives in errorKey/pendingRequest.
     pending: 0,
     errorKey: null,
     setupHref: '/onboarding',
@@ -1181,7 +1182,6 @@
               : body.retry_safe === true
                 ? 'concierge:api.history_unavailable'
                 : 'concierge:dock.history.pending');
-          if (body.retry_safe !== true) state.pending = Math.max(1, state.pending);
           if (body.next_action && typeof body.next_action.href === 'string')
             state.setupHref = body.next_action.href;
           if (result.status === 409 && body.error !== 'conversation_not_started')
@@ -1232,7 +1232,6 @@
           return updateHearing(trimmed, body.intent_resolution).catch(function () {});
       })
       .catch(function () {
-        state.pending = Math.max(1, state.pending);
         state.errorKey = 'concierge:dock.history.pending';
       })
       .finally(function () {
