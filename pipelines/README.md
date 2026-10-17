@@ -21,6 +21,11 @@ knowledge/product/pipeline-templates/
 - User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
 - Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
 - A tenant pipeline that declares `schedule` in `knowledge/confidential/{tenant}/pipelines/*.json` (direct children only) is picked up by chronos for **registered, operational** tenants. It runs in a child process bound to that tenant (`KYBERION_TENANT`, `KYBERION_TENANT_SCOPE_REQUIRED=1`, role `chronos_tenant_runner`) and only after an authenticated human approved its current content via `pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust` (any edit invalidates the approval). Symlinked paths are refused. Run-time needs (credential scope, reasoning backend, tenant egress overlay) are declared in the ADF `runtime` block and injected only into that child process, bounded by `{knowledge_root}/governance/pipeline-runtime-allowlist.json`; the daemon needs no `AUTHORIZED_SCOPE`. Details: [tenant-bound-runtime-probing](../knowledge/product/governance/tenant-bound-runtime-probing.md).
+- The reviewed classification of every pipeline in `pipelines/` — **audience** (`system` / `organization` /
+  `tenant` / `personal` / `product`) and **placement** under this scope rule — lives in
+  [pipeline-scope-registry.json](../knowledge/product/governance/pipeline-scope-registry.json)
+  (schema: [`pipeline-scope-registry.schema.json`](../knowledge/product/schemas/pipeline-scope-registry.schema.json)).
+  It is a documentation/triage aid: the runtime never reads it and no pipeline declares it.
 
 **Workflow composition:**
 

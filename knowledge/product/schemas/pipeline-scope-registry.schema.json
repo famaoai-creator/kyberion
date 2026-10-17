@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pipeline Scope Registry",
+  "description": "Which audience each pipeline under pipelines/ serves (system / organization / tenant / personal / product) and whether it belongs there under the README scope rule. Documentation and triage aid only: the runtime does not read this file and no pipeline declares it.",
+  "type": "object",
+  "required": ["version", "audiences", "placements", "pipelines"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "last_updated": { "type": "string" },
+    "description": { "type": "string" },
+    "audiences": {
+      "type": "object",
+      "description": "Vocabulary: audience key -> meaning.",
+      "additionalProperties": { "type": "string" }
+    },
+    "placements": {
+      "type": "object",
+      "description": "Vocabulary: placement key -> meaning.",
+      "additionalProperties": { "type": "string" }
+    },
+    "pipelines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["pipeline", "audience", "placement"],
+        "additionalProperties": false,
+        "properties": {
+          "pipeline": { "type": "string", "pattern": "^pipelines/.+\\.json$" },
+          "audience": {
+            "type": "string",
+            "enum": ["system", "organization", "tenant", "personal", "product"]
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "canonical",
+              "should_be_template",
+              "should_be_tenant_scoped",
+              "should_be_personal"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required in practice when placement is not `canonical`."
+          }
+        }
+      }
+    }
+  }
+}

@@ -109,7 +109,12 @@ const OP_CATALOG_FILES = new Set([
   ORPHAN_BASELINE_PATH,
 ]);
 /** Ratchet inventories list paths to freeze them; a listing is not a caller. */
-const INVENTORY_LEDGER_FILES = new Set(['knowledge/product/governance/shared-tmp-allowlist.json']);
+const INVENTORY_LEDGER_FILES = new Set([
+  'knowledge/product/governance/shared-tmp-allowlist.json',
+  // Reviewed audience/placement inventory of every pipeline (docs/triage only);
+  // it enumerates pipeline paths without invoking any of them.
+  'knowledge/product/governance/pipeline-scope-registry.json',
+]);
 const HARNESS_CAPABILITY_FILE =
   /^knowledge\/product\/governance\/harness-capabilities\/[^/]+\.json$/u;
 

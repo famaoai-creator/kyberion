@@ -1,0 +1,572 @@
+{
+  "$schema": "../schemas/pipeline-scope-registry.schema.json",
+  "version": 1,
+  "last_updated": "2026-10-18",
+  "description": "Reviewed scope classification for every pipeline under pipelines/ (top level + browser/ + config/; fragments/ are parts, not pipelines). `audience` answers \"whose work is this for?\" and `placement` flags where the README scope rule says it should live. This is a triage/documentation aid only — the runtime never reads it, and no pipeline JSON is modified. Regenerate/refresh by hand when a pipeline is added, moved, or retired; the companion report is docs/developer/improvement-plans-2026-10/PIPELINE_VERIFICATION_INVENTORY_2026-10-17.ja.md.",
+  "audiences": {
+    "system": "Kyberion operating itself: health, self-repair, backup, mission/approval control, capability assimilation, audits, upgrade, soak/chaos, storage janitor, volatile-layer machinery.",
+    "organization": "An organization's operating model and its deliverables: organization cadence, decision/accountability governance, project/SDLC flow, executive reporting.",
+    "tenant": "Tenant- (customer-) scoped work: tenant ingest/drift and the tenant-scoped external-asset inventory procedure.",
+    "personal": "One individual's assistant work: onboarding a person/profile, meetings, voice, personal rituals, personal web procedures.",
+    "product": "Kyberion's own go-to-market output: demos, marketing content, narrated reports, media production."
+  },
+  "placements": {
+    "canonical": "Belongs in pipelines/ (or browser//config/ for its class) under the README scope rule.",
+    "should_be_template": "User-facing workflow: README scope rule points at knowledge/product/pipeline-templates/.",
+    "should_be_tenant_scoped": "Tenant-specific: README scope rule points at knowledge/confidential/{tenant}/pipelines/.",
+    "should_be_personal": "Personal: README scope rule points at knowledge/personal/pipelines/."
+  },
+  "pipelines": [
+    {
+      "pipeline": "pipelines/accountability-report-daily.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/action-item-reminders.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/agent-provider-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/agentic-source-code-review.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/ai-audit.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/approval-store-hygiene.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/assimilate-gateway-capability.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/audit-verify-daily.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/auto-checkpoint.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/aws-operations-simulation.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/background-review-curator.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/backup-daily.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/backup-restore-drill.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/baseline-check.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/browser-failure-evidence.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/browser/sbi.json", "audience": "personal", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/browser/yahoo.json",
+      "audience": "personal",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/browser/yahoo1.json",
+      "audience": "personal",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/browser/yahoo3.json",
+      "audience": "personal",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/browser/yahoo4.json",
+      "audience": "personal",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/campaign-suite.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Produces deck/doc/video/web deliverables from a campaign brief — a user-facing content workflow, not a Kyberion self-op."
+    },
+    {
+      "pipeline": "pipelines/ce-chronos-perf.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/ceo-strategic-report.json",
+      "audience": "organization",
+      "placement": "should_be_template",
+      "reason": "Executive deliverable for an organization, not a self-op."
+    },
+    {
+      "pipeline": "pipelines/chaos-actuator-down.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/chaos-network-partition.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/chaos-secret-missing.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/cloudflare-os-validation.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/config/surface-registration.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/config/tenant-onboarding.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/config/voice-engine-setup.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/contract-review.json",
+      "audience": "organization",
+      "placement": "should_be_template",
+      "reason": "User-facing deliverable workflow; already exists as knowledge/product/pipeline-templates/contract-review.json, so the pipelines/ copy is a duplicate."
+    },
+    {
+      "pipeline": "pipelines/cowork-integration-review.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/create-my-avatar.json",
+      "audience": "personal",
+      "placement": "should_be_personal",
+      "reason": "Personal avatar/profile onboarding (labels: personal); README scope rule points at knowledge/personal/pipelines/ or a template."
+    },
+    {
+      "pipeline": "pipelines/daily-routine.json",
+      "audience": "personal",
+      "placement": "should_be_personal",
+      "reason": "The operator's personal volatile-layer daily ritual."
+    },
+    {
+      "pipeline": "pipelines/decision-digest.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/dependency-vuln-scan.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/executive-narrative-bridge.json",
+      "audience": "organization",
+      "placement": "should_be_template",
+      "reason": "Executive narrative deliverable, not a self-op."
+    },
+    { "pipeline": "pipelines/exposure-check.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/external-asset-ledger.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/first-win-lifecycle-weekly.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/front-desk-request-receipt.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/full-health-report.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/generate-design-system-demo.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/generate-masterclass-pptx.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Premium PPTX demo deliverable (product/GTM), not a self-op."
+    },
+    {
+      "pipeline": "pipelines/health-degradation-watch.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/history-search-refresh.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/i18n-drift-audit.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/incident-review.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/inspect-mission-inventory.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/inspect-network-environment.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/inspect-system-hardware.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/inspect-workspace-surfaces.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/knowledge-curation-weekly.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/knowledge-hygiene-probe.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/knowledge-sync.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/kyberion-autonomous-onboarding.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/kyberion-product-intro.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Narrated product intro (GTM), run by hand."
+    },
+    {
+      "pipeline": "pipelines/kyberion-vtuber-narrated-demo.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "VTuber product demo (GTM)."
+    },
+    {
+      "pipeline": "pipelines/launch-first-run-onboarding.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/list-capabilities.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/marketing-content.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Brand marketing materials (GTM)."
+    },
+    {
+      "pipeline": "pipelines/media-produce-and-review.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "End-to-end media/PPTX production workflow (MP-01..07), user-facing."
+    },
+    {
+      "pipeline": "pipelines/media-review-fix-validation.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/meeting-facilitation-workflow.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing meeting assistant workflow."
+    },
+    {
+      "pipeline": "pipelines/meeting-followup.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing meeting follow-up workflow."
+    },
+    {
+      "pipeline": "pipelines/meeting-hearing-session.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing guided hearing/interview workflow."
+    },
+    {
+      "pipeline": "pipelines/meeting-proxy-workflow.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing meeting proxy (join/listen/action-items) workflow."
+    },
+    {
+      "pipeline": "pipelines/meeting-tutor-session.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing tutoring workflow."
+    },
+    {
+      "pipeline": "pipelines/meeting-watcher.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing calendar auto-join workflow."
+    },
+    { "pipeline": "pipelines/mesh-delivery.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/mission-hygiene-weekly.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/mission-team-prewarm.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/mission-team-staff.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/monitor-service-health.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/mv-generate.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Music-video generation (GTM/user content)."
+    },
+    {
+      "pipeline": "pipelines/open-active-surfaces.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/ops-health-probe.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/orchestration-jobs.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/organization-daily-digest.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/organization-operation-tick.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/organization-retro.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/organization-standup.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/platform-onboarding.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/pr-shadow-observer.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/project-management-validation.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/promote-procedure.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/reconcile-config-fallbacks.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/reconcile-unclassified-errors.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/reconcile-unhandled-intents.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/sdlc-cycle.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/service-lifecycle-smoke.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/setup-oauth.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/soak-endurance-live.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/soak-endurance.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/soak-restart-e2e.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/source-to-engineering-artifacts.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/storage-janitor.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/surface-capability-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/system-diagnostics.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/system-upgrade-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/system-upgrade-execute.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/tenant-drift-watch.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/tenant-ingest.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/terraform-asset-inventory.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/terraform-topology-ir.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/test-inventory-device-pipeline.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/trial-narrated-report.json",
+      "audience": "product",
+      "placement": "should_be_template",
+      "reason": "Narrated executive report demo (GTM)."
+    },
+    {
+      "pipeline": "pipelines/ui-ux-governance-audit.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/ui-voice-browser-smoke.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/verify-session-fallback.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/verify-session.json", "audience": "system", "placement": "canonical" },
+    { "pipeline": "pipelines/vital-check.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/voice-health-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    { "pipeline": "pipelines/voice-hello.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/voice-onboarding.json",
+      "audience": "personal",
+      "placement": "should_be_personal",
+      "reason": "Personal voice-profile onboarding."
+    },
+    { "pipeline": "pipelines/volatile-gc.json", "audience": "system", "placement": "canonical" },
+    { "pipeline": "pipelines/volatile-index.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/weekly-review.json",
+      "audience": "personal",
+      "placement": "should_be_personal",
+      "reason": "The operator's personal weekly memory-promotion ritual."
+    }
+  ]
+}
