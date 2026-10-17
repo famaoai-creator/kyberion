@@ -684,13 +684,257 @@
         "coding": "secondary"
       },
       "cost_band": "low",
-      "latency_band": "medium",
+      "latency_band": "low",
       "structured_output_confidence": "medium",
       "tool_use_confidence": "medium",
       "multilingual_confidence": "medium",
       "reasoning_confidence": "medium",
       "capability_tags": ["agentic_coding", "tool_use", "structured_output"],
-      "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host."
+      "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.3s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) 2026-10-17 later probe: service-side `provider.no-route` \"Model unavailable\" (round-1 4/4 pass earlier the same day) - intermittent free-tier availability; do not use as the sole default. vision probe 2026-10-17: not verifiable at probe time (service-side provider.no-route)."
+    },
+    {
+      "model_id": "opencode:glm-5.3-flash-free",
+      "provider": "opencode",
+      "family": "glm-5.3-flash",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": [
+        "agentic_coding",
+        "free_tier",
+        "structured_output",
+        "tool_use",
+        "vision_input"
+      ],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.9s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 2.2s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
+    },
+    {
+      "model_id": "opencode:mimo-v2.6-flash-free",
+      "provider": "opencode",
+      "family": "mimo-v2.6-flash",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": [
+        "agentic_coding",
+        "free_tier",
+        "structured_output",
+        "tool_use",
+        "vision_input"
+      ],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.6s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 4.7s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
+    },
+    {
+      "model_id": "opencode:deepseek-v4.1-flash-free",
+      "provider": "opencode",
+      "family": "deepseek-v4.1-flash",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 1.9s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 2.3s; promoted to approved. vision probe 2026-10-17: metadata declares image input but the model returned a wrong color (not Red) for a solid-red PNG attachment; treat image input as unreliable."
+    },
+    {
+      "model_id": "opencode:nemotron-3.5-lightning-free",
+      "provider": "opencode",
+      "family": "nemotron-3.5",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "high",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass but highly variable (median 38.9s, spikes past 120s), demoted from fast execution tier. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded))"
+    },
+    {
+      "model_id": "opencode:nemotron-3.5-super-vl-free",
+      "provider": "opencode",
+      "family": "nemotron-3.5",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": [
+        "agentic_coding",
+        "free_tier",
+        "structured_output",
+        "tool_use",
+        "vision_input"
+      ],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 5.1s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 3.1s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
+    },
+    {
+      "model_id": "opencode:nemotron-3-ultra-free",
+      "provider": "opencode",
+      "family": "nemotron-3",
+      "status": "blocked",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "high",
+      "structured_output_confidence": "low",
+      "tool_use_confidence": "low",
+      "multilingual_confidence": "low",
+      "reasoning_confidence": "low",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 0/4 pass; every headless call hung past 300s (also on raw `opencode run`), treat as unusable until the OpenCode service serves it. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded))"
+    },
+    {
+      "model_id": "opencode:beam-free",
+      "provider": "opencode",
+      "family": "beam",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 1.4s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 1.2s; promoted to approved."
+    },
+    {
+      "model_id": "opencode:space-bunny-free",
+      "provider": "opencode",
+      "family": "space-bunny",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": [
+        "agentic_coding",
+        "free_tier",
+        "structured_output",
+        "tool_use",
+        "vision_input"
+      ],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.9s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 1.5s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
+    },
+    {
+      "model_id": "opencode:longcat-2.5-preview-free",
+      "provider": "opencode",
+      "family": "longcat",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "medium",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 7.8s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 4.5s; promoted to approved. vision probe 2026-10-17: metadata declares image input but the model returned a wrong color (not Red) for a solid-red PNG attachment; treat image input as unreliable."
+    },
+    {
+      "model_id": "opencode:big-pickle",
+      "provider": "opencode",
+      "family": "big-pickle",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "high",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
+      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass but slow (median 63.6s). (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 31.5s; promoted to approved. vision probe 2026-10-17: model states it cannot view images directly but decoded the PNG pixel bytes via tools and answered Red; tool-workaround, not vision."
     },
     {
       "model_id": "devin:swe",
