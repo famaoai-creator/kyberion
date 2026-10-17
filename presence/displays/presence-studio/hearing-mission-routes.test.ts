@@ -50,6 +50,14 @@ vi.mock('@agent/core/governance/approval-store', async () => {
 
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { safeExecResult } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { writeMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
+import { writeGovernedArtifactJson } from '@agent/core/workforce/artifact-store';
+import {
+  approvalRequestLogicalPath,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
+import { registerHearingRoutes } from './hearing-routes.js';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission/mission-state';
 import type { MissionState } from '@agent/core/mission/mission-types';
@@ -73,6 +81,9 @@ type Handler = (req: unknown, res: unknown) => void;
 function createFakeApp(): { app: express.Express; handlers: Map<string, Handler> } {
   const handlers = new Map<string, Handler>();
   const fake = {
+    get(routePath: string, handler: Handler) {
+      handlers.set(`GET ${routePath}`, handler);
+    },
     post(routePath: string, handler: Handler) {
       handlers.set(`POST ${routePath}`, handler);
     },
@@ -103,7 +114,11 @@ function fakeResponse() {
     body: unknown;
     status: (code: number) => typeof res;
     json: (body: unknown) => typeof res;
+    setHeader: (name: string, value: string) => typeof res;
   } = {
+    setHeader() {
+      return res;
+    },
     statusCode: 200,
     body: undefined,
     status(code: number) {
@@ -432,5 +447,112 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(res2.statusCode).toBe(200);
     expect((res2.body as { mission_id: string }).mission_id).toBe(missionId);
     expect(safeExecResult).not.toHaveBeenCalled();
+  });
+  it('restores a POST-persisted handoff through real mission and approval readers, and fails closed after deletion', async () => {
+    const actualState = await vi.importActual<typeof import('@agent/core/mission/mission-state')>(
+      '@agent/core/mission/mission-state'
+    );
+    const sessionId = 'roundtrip-' + randomUUID();
+    const record = decidedRecord(sessionId);
+    saveHearingRecord(namespace, record);
+    const missionId = hearingMissionId(record);
+    const missionRoot = pathResolver.sharedTmp('hearing-mission-routes-test/roundtrip');
+    const missionDir = missionRoot + '/' + missionId;
+    const approvalId = randomUUID();
+    const approvalPath = approvalRequestLogicalPath('brief', approvalId);
+    // Never touch live mission or approval state. Only the child-process boundary
+    // is simulated; both completion readers deserialize actual fixture files.
+    expect(approvalPath).toContain('/vitest-approvals/');
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    vi.mocked(findMissionPath).mockReturnValue(missionDir);
+    vi.mocked(loadState).mockImplementation((id) =>
+      actualState.loadState(id, { directories: [missionRoot] })
+    );
+    vi.mocked(safeExecResult).mockImplementation((_command: string, args: string[] = []) => {
+      if (args[0] === 'dist/scripts/mission_controller.js') {
+        withExecutionContext('ecosystem_architect', () =>
+          writeMissionStateAtPath(missionDir + '/mission-state.json', {
+            mission_id: missionId,
+            tenant_slug: TEST_TENANT,
+            tier: 'confidential',
+            status: 'planned',
+            execution_mode: 'local',
+            priority: 1,
+            assigned_persona: 'worker',
+            confidence_score: 1,
+            git: {
+              branch: 'test/hearing-roundtrip',
+              start_commit: 'abc123',
+              latest_commit: 'abc123',
+              checkpoints: [],
+            },
+            history: [],
+          } as MissionState)
+        );
+        return { stdout: '', stderr: '', status: 0 };
+      }
+      expect(args[0]).toBe('dist/scripts/mission_alignment_request.js');
+      writeGovernedArtifactJson('surface_runtime', approvalPath, {
+        id: approvalId,
+        kind: 'mission_gate',
+        status: 'pending',
+        channel: 'brief',
+        storageChannel: 'brief',
+        threadTs: missionId,
+        correlationId: 'mission-alignment-' + missionId,
+        source: { missionId },
+        requestedBy: 'fixture-planner',
+        requestedAt: '2026-10-17T00:00:00Z',
+        title: 'Fixture alignment',
+        summary: 'No external execution',
+      });
+      return { stdout: JSON.stringify({ requestId: approvalId }), stderr: '', status: 0 };
+    });
+    try {
+      const submitted = fakeResponse();
+      handoff(fakeRequest({ params: { session: sessionId } }), submitted);
+      expect(submitted.statusCode).toBe(200);
+      expect(submitted.body).toMatchObject({
+        mission_id: missionId,
+        approval_request_id: approvalId,
+      });
+      expect(loadApprovalRequest('brief', approvalId)?.source?.missionId).toBe(missionId);
+      expect(loadHearingRecord(namespace, sessionId)).toMatchObject({
+        mission_id: missionId,
+        approval_request_id: approvalId,
+      });
+      const cold = createFakeApp();
+      registerHearingRoutes(cold.app);
+      const get = cold.handlers.get('GET /api/hearing/:session')!;
+      const reload = () => {
+        const response = fakeResponse();
+        get(fakeRequest({ params: { session: sessionId } }), response);
+        expect(response.statusCode).toBe(200);
+        return response.body as {
+          record: Record<string, unknown>;
+          completion: { kind: string; status: string; id?: string; next?: { href: string } };
+        };
+      };
+      vi.mocked(safeExecResult).mockClear();
+      const recovered = reload();
+      expect(recovered.completion).toMatchObject({
+        kind: 'mission',
+        status: 'ready',
+        id: missionId,
+      });
+      expect(new URL(recovered.completion.next!.href).searchParams.get('tenant')).toBe(TEST_TENANT);
+      expect(recovered.record).not.toHaveProperty('mission_id');
+      expect(recovered.record).not.toHaveProperty('approval_request_id');
+      expect(safeExecResult).not.toHaveBeenCalled();
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(missionDir + '/mission-state.json', { force: true })
+      );
+      expect(reload().completion).toEqual({ kind: 'mission', status: 'unavailable' });
+      expect(safeExecResult).not.toHaveBeenCalled();
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(pathResolver.rootResolve(approvalPath), { force: true })
+      );
+    }
   });
 });
