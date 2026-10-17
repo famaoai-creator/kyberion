@@ -1042,6 +1042,13 @@
       "note": "Ops alert event log. Rotated when it exceeds rotate_min_bytes; segments expire under the observability 90d sweep. Caveat: 'ops:alerts --redeliver' reads the live file, so undelivered envelopes land in the segment — extend redeliver to scan segments if that path matters."
     },
     {
+      "path": "active/shared/observability/ops-findings.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "audit": true,
+      "note": "ops-health-probe anomaly findings (autonomous improvement loop stage 1). Append-only; rotated past rotate_min_bytes, segments expire under the observability 90d sweep."
+    },
+    {
       "path": "active/shared/observability/work-coordination/events.jsonl",
       "artifact_class": "log",
       "action": "rotate",
