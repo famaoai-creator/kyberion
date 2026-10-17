@@ -32,6 +32,7 @@ import {
   evaluateDotWakeCircuit,
   normalizeDotWakeReason,
   recordDotWakeOutcome,
+  compactDotWakeLedger,
   DOT_WAKE_CIRCUIT_THRESHOLD,
   dotWakeErrorsPath,
   DOT_WAKE_FAILURE_CATEGORY,
@@ -1429,4 +1430,76 @@ describe('dot wake usage attribution', () => {
       expect(getUsageAttribution()).toBeUndefined();
     }
   );
+
+  describe('compactDotWakeLedger', () => {
+    const ledgerPath = `${TEST_ROOT}/${DOT_WAKE_LEDGER_PATH}`;
+    const row = (
+      dotId: string,
+      key: string,
+      outcome: string,
+      extra: Record<string, unknown> = {}
+    ) =>
+      JSON.stringify({
+        dot_id: dotId,
+        trigger_key: key,
+        kind: 'wake',
+        fired_at: '2026-10-15T00:00:00.000Z',
+        outcome,
+        ...extra,
+      });
+
+    function consumedKeys(): Set<string> {
+      // Rebuild the consumed set exactly like buildDotDueChecker does.
+      const consumed = new Set<string>();
+      for (const r of readJsonLines<Record<string, unknown>>(ledgerPath)) {
+        if (typeof r?.dot_id !== 'string' || typeof r?.trigger_key !== 'string') continue;
+        if (
+          r.outcome === 'rejected' ||
+          (r.outcome === 'delivered' && r.trigger_retained !== true)
+        ) {
+          consumed.add(`${r.dot_id}:${r.trigger_key}`);
+        }
+      }
+      return consumed;
+    }
+
+    it('keeps the full history for live keys and folds consumed keys to the final row', () => {
+      safeWriteFile(
+        ledgerPath,
+        [
+          row('repo-guardian', 'wake:k1', 'failed'),
+          row('repo-guardian', 'wake:k1', 'delivered'),
+          row('repo-guardian', 'wake:k2', 'failed'),
+          row('repo-guardian', 'wake:k2', 'failed'),
+          row('repo-guardian', 'wake:k3', 'delivered', { trigger_retained: true }),
+          row('repo-guardian', 'wake:k4', 'skipped'),
+          '{"nonconforming":true}',
+        ].join('\n') + '\n'
+      );
+      const result = compactDotWakeLedger({ rootDir: TEST_ROOT, compactMinBytes: 1 });
+      expect(result.compacted).toBe(true);
+      const kept = readJsonLines<Record<string, unknown>>(ledgerPath);
+      // k1 consumed -> last row only (folds 2->1); k2 live (both failures kept);
+      // k3 retained-delivery is NOT consuming -> kept; k4 skipped stays;
+      // nonconforming row kept.
+      expect(kept).toHaveLength(6);
+      const keys = kept.map((r) => `${r.dot_id}:${r.trigger_key}`);
+      expect(keys.filter((k) => k === 'repo-guardian:wake:k1')).toHaveLength(1);
+      expect(keys.filter((k) => k === 'repo-guardian:wake:k2')).toHaveLength(2);
+      expect(kept.some((r) => r.nonconforming === true)).toBe(true);
+      // consumed set is byte-identical after compaction — no re-fire.
+      expect(consumedKeys().has('repo-guardian:wake:k1')).toBe(true);
+      expect(consumedKeys().has('repo-guardian:wake:k2')).toBe(false);
+      expect(consumedKeys().has('repo-guardian:wake:k3')).toBe(false);
+      expect(consumedKeys().has('repo-guardian:wake:k4')).toBe(false);
+      expect(result.archive_path).toContain('active/archive/jsonl-compaction/');
+    });
+
+    it('skips below the byte threshold and tolerates a missing file', () => {
+      safeRmSync(ledgerPath, { force: true });
+      expect(compactDotWakeLedger({ rootDir: TEST_ROOT }).compacted).toBe(false);
+      safeWriteFile(ledgerPath, row('repo-guardian', 'wake:k1', 'delivered') + '\n');
+      expect(compactDotWakeLedger({ rootDir: TEST_ROOT }).compacted).toBe(false); // default 8 MiB gate
+    });
+  });
 });
