@@ -28,7 +28,7 @@ import { resolveDaemonManager } from '@agent/core/daemon/service-manager';
 import { safeExecResult } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
-  recordAutonomyOutcome,
+  recordAutonomyExecution,
   sweepAutonomyActionStates,
 } from '@agent/core/governance/autonomy-action-state';
 import * as nodePath from 'node:path';
@@ -362,19 +362,17 @@ export async function requestDaemonRecovery(
           autoExecError = `no service spec for ${status.daemon_id} on ${process.platform}`;
         }
       }
-      // Feed the evidence ledger — every gate decision is a data point for
-      // action-level autonomy promotion (executed runs add the outcome).
+      // Execution rows only — the gate already wrote the decision row.
       try {
-        recordAutonomyOutcome(
-          {
-            action_id: 'daemon_restart',
-            decision: evaluated?.decision ?? 'approve',
-            executed: autoExecuted === true,
-            ...(autoExecuted !== undefined ? { ok: autoExecuted } : {}),
-            ...(autoExecError ? { error: autoExecError } : {}),
-          },
-          recoveryRootDir ? { rootDir: recoveryRootDir } : {}
-        );
+        if (autoExecuted !== undefined)
+          recordAutonomyExecution(
+            {
+              action_id: 'daemon_restart',
+              ok: autoExecuted,
+              ...(autoExecError ? { error: autoExecError } : {}),
+            },
+            recoveryRootDir ? { rootDir: recoveryRootDir } : {}
+          );
       } catch {
         /* ledger write failures must never mask a recovery verdict */
       }
