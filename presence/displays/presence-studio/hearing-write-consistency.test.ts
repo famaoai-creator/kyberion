@@ -578,7 +578,11 @@ describe('hearing writer consistency across async boundaries', () => {
     async (mode) => {
       const session = 'replay-' + randomUUID();
       const record = seed(session, 'work_inventory', true);
-      saveHearingRecord(TENANT, {
+      const replayRecord: HearingRecord & {
+        work_inventory_entry_id: string;
+        work_inventory_scope: { tenant_slug: string };
+        work_inventory_steps: number;
+      } = {
         ...record,
         work_inventory_entry_id: 'previous-entry',
         work_inventory_scope: { tenant_slug: TENANT },
@@ -593,7 +597,8 @@ describe('hearing writer consistency across async boundaries', () => {
               },
             }
           : { mission_id: 'MSN-OTHER-HANDOFF' }),
-      } as HearingRecord);
+      };
+      saveHearingRecord(TENANT, replayRecord);
       const res = response();
       await inventory(request(session), res);
       expect(res.statusCode).toBe(409);
