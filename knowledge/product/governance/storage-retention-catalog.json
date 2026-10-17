@@ -471,7 +471,7 @@
       "path": "active/shared/runtime/dot-wake-ledger.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: append-only resident-dot wake ledger (libs/core/dot/dot-runtime.ts). Load-bearing history: a delivered/rejected trigger key stays consumed forever, so truncating it would re-fire old inbox/watch/event wakes — never TTL-deleted. Hot-path reads (due-ness, wake circuit, per-skip dedupe) replay it incrementally via readJsonLinesCached (libs/core/jsonl-tail.ts), parsing only rows appended since the previous call."
+      "note": "G01: append-only resident-dot wake ledger (libs/core/dot/dot-runtime.ts). Load-bearing history: a delivered/rejected trigger key stays consumed forever, so truncating it would re-fire old inbox/watch/event wakes — never TTL-deleted. Hot-path reads (due-ness, wake circuit, per-skip dedupe) replay it incrementally via readJsonLinesCached (libs/core/jsonl-tail.ts). Self-bounding: compactDotWakeLedger() folds consumed (dot_id,trigger_key) pairs to the final consuming row while keeping live-key history intact; invoked opportunistically from recordDotWakeOutcome past 8 MiB."
     },
     {
       "path": "active/shared/runtime/dot-token-usage.jsonl",
