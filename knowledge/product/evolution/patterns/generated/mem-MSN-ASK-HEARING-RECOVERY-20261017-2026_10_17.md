@@ -1,0 +1,63 @@
+---
+record_id: mem-MSN-ASK-HEARING-RECOVERY-20261017-2026_10_17
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ASK-HEARING-RECOVERY-20261017-2026_10_17
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-17T09:28:57.924Z
+source_branch: qa/ask-hearing-published-20261017
+source_commit: eba65f761e71b601efad0857aacf6c329059c211
+---
+
+# Recover ordered downstream updates independently of conversation completion
+
+Display a saved conversation immediately, while preserving an explicit unconfirmed state and ordering gate for non-idempotent downstream updates.
+
+## Applicability
+
+- mission
+- mission:MSN-ASK-HEARING-RECOVERY-20261017
+
+## Reusable Steps
+
+1. Display a saved conversation immediately, while preserving an explicit unconfirmed state and ordering gate for non-idempotent downstream updates
+
+## Expected Outcome
+
+## Applies when
+
+A saved conversation triggers a separate, order-dependent update whose API does not guarantee safe replay.
+
+## Procedure
+
+1. Separate the conversation result and composer lifecycle from the downstream request lifecycle.
+2. Before sending the downstream POST, persist and read back only correlation metadata such as request, session and scope IDs. Do not add answer text to persistence.
+3. While confirmation is missing, gate the next dependent answer and finalization actions in their handlers as well as their controls. Offer ordinary conversation as an escape without deleting the pending marker.
+4. Bound both response headers and body parsing. A timeout, abort or HTTP success is not proof of saved application state.
+5. Reconcile through GET only, requiring the intended session/scenario and exact persisted source_turn/request ID before clearing the marker. Reload and Back must not replay POST.
+6. Retire requests on navigation or scope changes and ignore late responses. Fail closed when pending metadata is unavailable, corrupted or cannot be safely cleared.
+7. Exercise the actual browser transport and inspect server receipts. Calling a native fetch as options.fetch(...) can fail with an invalid receiver even when DOM-double tests pass.
+
+## Limits
+
+Client cancellation does not roll back server work. A no-op without a source_turn trace cannot be confirmed by this protocol. Tab-local persistence is not server idempotency or cross-tab exclusion. Synthetic browser fixtures do not establish authenticated integration coverage.
+
+## Product evidence
+
+Verified product commit: https://github.com/famaoai-creator/kyberion/commit/eba65f761e71b601efad0857aacf6c329059c211 . Its eleven changed blobs match the tested file manifest. Related tests, independent review and loopback browser interruption/recovery evidence accompany the mission.
+
+## Evidence
+
+- active/missions/public/MSN-ASK-HEARING-RECOVERY-20261017/evidence/validated-blobs.json
+- active/missions/public/MSN-ASK-HEARING-RECOVERY-20261017/evidence/browser-qa.md
+- active/missions/public/MSN-ASK-HEARING-RECOVERY-20261017/evidence/test-report.md
+- active/missions/public/MSN-ASK-HEARING-RECOVERY-20261017/evidence/REVIEW-execution-implement.md
+
+## Artifacts
