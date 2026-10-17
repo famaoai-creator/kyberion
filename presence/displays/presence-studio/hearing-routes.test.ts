@@ -674,6 +674,25 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithInventoryFields;
     expect(persisted.work_inventory_entry_id).toBe(body.entry_id);
 
+    // A fresh GET reconstructs the saved completion without exposing raw IDs.
+    const reload = fakeResponse();
+    handlers.get('GET /api/hearing/:session')!(
+      fakeRequest({ params: { session: sessionId } }),
+      reload
+    );
+    const reloaded = reload.body as {
+      record: HearingRecordWithInventoryFields;
+      completion: { kind: string; status: string; id: string; next: { href: string } };
+    };
+    expect(reloaded.completion).toEqual({
+      kind: 'inventory',
+      status: 'ready',
+      id: body.entry_id,
+      next: { href: '/progress?tenant=' + INVENTORY_TEST_TENANT },
+    });
+    expect(reloaded.record.work_inventory_entry_id).toBeUndefined();
+    expect(reloaded.record.work_inventory_scope).toBeUndefined();
+
     // Idempotent: a second call returns the same entry_id, no second write.
     const res2 = fakeResponse();
     await inventory(fakeRequest({ params: { session: sessionId } }), res2);
@@ -714,5 +733,44 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     expect(stored?.title).toBe('Occupant');
     const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithInventoryFields;
     expect(persisted.work_inventory_entry_id).toBeUndefined();
+  });
+});
+
+describe('GET /api/hearing/:session completion safety', () => {
+  it('keeps a partial persisted handoff non-actionable and hides raw IDs', () => {
+    const savedTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = TEST_TENANT;
+    const sessionId = 'partial-' + randomUUID();
+    try {
+      const stored = { ...fullyAnsweredRecord(sessionId), mission_id: 'MSN-UNVERIFIED' };
+      saveHearingRecord(TEST_TENANT, stored);
+      const { app, handlers } = createFakeApp();
+      registerHearingRoutes(app);
+      const res = fakeResponse();
+      handlers.get('GET /api/hearing/:session')!(
+        fakeRequest({ params: { session: sessionId } }),
+        res
+      );
+      expect(res.statusCode).toBe(200);
+      const body = res.body as {
+        record: Record<string, unknown>;
+        completion: unknown;
+        persisted: boolean;
+      };
+      expect(body.completion).toEqual({ kind: 'mission', status: 'unavailable' });
+      expect(body.record).not.toHaveProperty('mission_id');
+      expect(body.persisted).toBe(true);
+      expect(loadHearingRecord(TEST_TENANT, sessionId)).toHaveProperty(
+        'mission_id',
+        'MSN-UNVERIFIED'
+      );
+    } finally {
+      if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = savedTenant;
+      safeRmSync(pathResolver.sharedTmp('hearing/' + TEST_TENANT), {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 });
