@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/knowledge-promotion-policy.schema.json",
   "version": "1.0.0",
   "lanes": {
     "knowledge_hint": "auto",
@@ -12,5 +13,7 @@
     "forbidden_content_patterns": ["api[_-]?key", "secret", "token", "password", "credential"],
     "max_summary_chars": 2000
   },
-  "evidence_thresholds": { "min_recurrence": 3 }
+  "evidence_thresholds": {
+    "min_recurrence": 3
+  }
 }
