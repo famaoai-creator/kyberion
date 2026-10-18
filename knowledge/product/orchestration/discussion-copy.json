@@ -691,5 +691,103 @@
         "en": "Still open: {question}"
       }
     }
+  },
+  "execution": {
+    "heading": {
+      "en": "Execution provenance",
+      "ja": "実行の出所"
+    },
+    "single_pass_title": {
+      "en": "Tentative single-model brief",
+      "ja": "単一モデルによる暫定ブリーフ"
+    },
+    "single_pass_record": {
+      "en": "Draft record: {title}",
+      "ja": "草案の記録: {title}"
+    },
+    "draft": {
+      "en": "Tentative proposal",
+      "ja": "暫定案"
+    },
+    "single_pass_notice": {
+      "en": "One model generated this tentative brief. No panel deliberation or independent evidence verification was performed.",
+      "ja": "単一モデルが作成した暫定ブリーフです。複数者による審議や、根拠の独立検証は行っていません。"
+    },
+    "scripted_notice": {
+      "en": "Scripted demonstration. No model was called; this is illustrative content, not verified evidence.",
+      "ja": "スクリプトによるデモです。モデルは呼び出していません。例示内容であり、検証済みの根拠ではありません。"
+    },
+    "reasoning_notice": {
+      "en": "Model-generated content. External claims have not been independently verified.",
+      "ja": "モデルによる生成内容です。外部の主張を独立に検証していません。"
+    },
+    "unknown_notice": {
+      "en": "Execution provenance is unavailable. The actual provider and model are unverified.",
+      "ja": "実行の出所が記録されていません。実際のプロバイダーとモデルは未確認です。"
+    },
+    "requested_mode": {
+      "en": "Requested mode",
+      "ja": "要求したモード"
+    },
+    "actual_mode": {
+      "en": "Observed execution",
+      "ja": "記録された実行"
+    },
+    "requested_provider": {
+      "en": "Requested provider",
+      "ja": "要求したプロバイダー"
+    },
+    "provider": {
+      "en": "Observed provider",
+      "ja": "記録されたプロバイダー"
+    },
+    "model": {
+      "en": "Exact model",
+      "ja": "正確なモデル"
+    },
+    "unknown": {
+      "en": "Unknown / not observed",
+      "ja": "不明・未確認"
+    },
+    "not_selected": {
+      "en": "Not selected",
+      "ja": "未選択"
+    },
+    "model_unknown": {
+      "en": "Unknown (not reported by the transport)",
+      "ja": "不明（通信側から報告なし）"
+    },
+    "calls": {
+      "en": "Isolated invocations (used / budget)",
+      "ja": "分離された呼び出し（使用数 / 上限）"
+    },
+    "turns": {
+      "en": "Internal turn limit per invocation",
+      "ja": "呼び出しあたりの内部ターン上限"
+    },
+    "mode_auto": {
+      "en": "Automatic",
+      "ja": "自動"
+    },
+    "mode_reasoning": {
+      "en": "Real model invocation",
+      "ja": "実モデル呼び出し"
+    },
+    "mode_scripted": {
+      "en": "Scripted demonstration",
+      "ja": "スクリプトデモ"
+    },
+    "mode_unknown": {
+      "en": "Unknown / unverified",
+      "ja": "不明・未確認"
+    },
+    "revision_notice": {
+      "en": "For another model-generated draft, start a new room. You can still accept or reject this draft.",
+      "ja": "モデルで草案を作り直す場合は、新しいルームを開始してください。この草案の承認・却下は引き続き行えます。"
+    },
+    "rationale": {
+      "en": "Proposed rationale",
+      "ja": "提案の理由"
+    }
   }
 }

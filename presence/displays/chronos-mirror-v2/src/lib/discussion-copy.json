@@ -5,8 +5,8 @@
       "en": "Discussion Room"
     },
     "subtitle": {
-      "ja": "目的に向けて、組織のエージェントがファシリテーターのもとで議論します",
-      "en": "Organization agents deliberate toward a goal under a facilitator"
+      "ja": "目的を渡し、生成・議論の進行と保存した結果を確認できます",
+      "en": "Submit a goal, follow generation or discussion, and inspect saved results"
     },
     "goalLabel": {
       "ja": "達成したい目的",
@@ -735,6 +735,130 @@
     "dialogueEnded": {
       "ja": "この対話は終了しました。下の成果を確認してください。",
       "en": "This conversation has ended. Review the outcomes below."
+    },
+    "savedBrief": {
+      "ja": "保存済みブリーフ",
+      "en": "Saved brief"
+    },
+    "savedMinutes": {
+      "ja": "保存済み議事録",
+      "en": "Saved minutes"
+    },
+    "generatedBrief": {
+      "ja": "現在のブリーフを表示",
+      "en": "View current brief"
+    },
+    "modeBrief": {
+      "ja": "単一モデルのブリーフ",
+      "en": "Single-model brief"
+    },
+    "modeBriefHint": {
+      "ja": "1回の生成から、議事録とブリーフを保存します",
+      "en": "One generation, then saved minutes and brief"
+    },
+    "engineClaude": {
+      "ja": "Claude（隔離されたテキスト生成）",
+      "en": "Claude (isolated text generation)"
+    },
+    "engineCodex": {
+      "ja": "Codex（隔離されたテキスト生成）",
+      "en": "Codex (isolated text generation)"
+    },
+    "runBounds": {
+      "ja": "実行上限",
+      "en": "Run limits"
+    },
+    "isolatedInvocations": {
+      "ja": "隔離された生成呼び出し",
+      "en": "Isolated generation invocations"
+    },
+    "perInvocation": {
+      "ja": "1呼び出しの上限",
+      "en": "Per-invocation limit"
+    },
+    "noAutomaticRetry": {
+      "ja": "自動再試行・別プロバイダーへの切り替えはしません",
+      "en": "No automatic retry or provider switching"
+    },
+    "claudeTurnLimit": {
+      "ja": "Claudeは1呼び出しで最大3内部ターン。APIリクエスト数とは異なります",
+      "en": "Claude: at most 3 internal turns per invocation. This is not an API request count."
+    },
+    "codexTurnLimit": {
+      "ja": "Codexの内部リクエスト数は未計測。時間上限とツール使用検出で停止します",
+      "en": "Codex internal request count is not measured. Timeout and tool-attempt detection bound the invocation."
+    },
+    "inlineSourceHint": {
+      "ja": "資料の本文を直接貼り付けてください。URLの内容は取得しません",
+      "en": "Paste the source text directly. URLs are not fetched."
+    },
+    "executionUnknown": {
+      "ja": "実行元の記録がありません",
+      "en": "Execution provenance unavailable"
+    },
+    "executionScripted": {
+      "ja": "台本による出力・モデル呼び出しなし",
+      "en": "Scripted output · no model call"
+    },
+    "executionUnconfirmed": {
+      "ja": "プロバイダーの応答は未確認",
+      "en": "Provider response not confirmed"
+    },
+    "executionConfirmed": {
+      "ja": "プロバイダーの応答を受信",
+      "en": "Provider response received"
+    },
+    "selectedProvider": {
+      "ja": "選択したプロバイダー",
+      "en": "Selected provider"
+    },
+    "confirmedProvider": {
+      "ja": "応答したプロバイダー",
+      "en": "Responding provider"
+    },
+    "modelUnknown": {
+      "ja": "正確なモデル名: 未確認",
+      "en": "Exact model: unknown"
+    },
+    "attemptsStarted": {
+      "ja": "開始済み呼び出し",
+      "en": "Started invocations"
+    },
+    "attemptsSucceeded": {
+      "ja": "成功した呼び出し",
+      "en": "Successful invocations"
+    },
+    "briefStart": {
+      "ja": "ブリーフを生成して保存",
+      "en": "Generate and save brief"
+    },
+    "providerRestartHint": {
+      "ja": "実行が途切れたルームは自動再実行しません。追加の生成は新しいルームで開始してください",
+      "en": "Interrupted provider rooms are not rerun automatically. Start a new room for another generation."
+    },
+    "newRoomForRevision": {
+      "en": "For another model-generated draft, start a new room. You can still accept or reject this draft.",
+      "ja": "モデルで草案を作り直す場合は、新しいルームを開始してください。この草案の承認・却下は引き続き行えます。"
+    },
+    "singleBriefNotice": {
+      "ja": "1回の生成による暫定ブリーフです。複数エージェントの討議や根拠の検証は行いません。実行中の操作は中止のみです。",
+      "en": "A tentative brief from one generation. No panel deliberation or evidence verification. While running, only Stop is available."
+    },
+    "commandFailed": {
+      "ja": "操作の応答を確認できませんでした。自動再送はしません。",
+      "en": "The command response could not be confirmed. It will not be resent automatically."
+    },
+    "briefResult": {
+      "ja": "暫定ブリーフの結果",
+      "en": "Tentative brief result"
+    },
+    "briefResultPending": {
+      "ja": "確認できる生成結果はまだありません。進行状況を確認してください。",
+      "en": "No generated result is available yet. Check the execution status."
+    },
+    "providerPrerequisite": {
+      "en": "Provider readiness is not verified here. Browser rooms use confidential scope. Real generation requires an existing tenant with this provider approved for zero-retention egress and a working login/runtime. Ask the workspace administrator to verify that setup before starting. Pasting public text or selecting a provider does not change scope or grant access; the server checks policy before any model invocation.",
+      "ja": "プロバイダーの準備状況はここでは未確認です。ブラウザーのルームは機密扱いです。実生成には、既存テナントでの当該プロバイダーへの送信・ゼロ保持の承認と、利用可能なログイン・実行環境が必要です。開始前に管理者へ既存設定の確認を依頼してください。公開資料の貼り付けやプロバイダー選択では範囲・権限は変わらず、モデル呼び出し前にサーバーが方針を確認します。"
     }
   },
   "role_labels": {
