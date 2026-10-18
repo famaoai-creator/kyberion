@@ -60,6 +60,11 @@
     "gpt-4o-mini": { "prompt": 0.00015, "completion": 0.0006 },
     "gpt-4.1": { "prompt": 0.002, "completion": 0.008 },
     "gemini-2.0-flash": { "prompt": 0.0001, "completion": 0.0004 },
+    "gemini-4-argon": {
+      "prompt": 0.002,
+      "completion": 0.01,
+      "cache_read": 0.0001
+    },
     "gemini-3.8-flash": { "prompt": 0.0015, "completion": 0.0075 },
     "gemini-3.7-flash": { "prompt": 0.0015, "completion": 0.0075 },
     "gemini-3.6-flash": { "prompt": 0.0015, "completion": 0.0075 },
@@ -99,6 +104,7 @@
     }
   },
   "aliases": {
+    "argon": "gemini-4-argon",
     "fable": "claude-fable-5",
     "opus": "claude-opus-5-5",
     "sonnet": "claude-sonnet-5",

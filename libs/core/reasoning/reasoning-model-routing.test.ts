@@ -226,6 +226,24 @@ describe('reasoning-model-routing', () => {
         effort: 'low',
       })
     );
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'implement',
+          estimated_scope: 'L',
+          model_id: 'gemini:gemini-4-argon',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        model_id: 'gemini:gemini-4-argon',
+        tier: 'large',
+        execution_tier: 'deep',
+        effort: 'high',
+      })
+    );
   });
 
   it('falls back to the next eligible model when the small lane is unavailable', () => {
