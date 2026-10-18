@@ -953,6 +953,25 @@ export function createPeerConversationResponder(
     if (message.tenant_id !== context.envelope.tenant_id) {
       throw new Error(`peer_conversation_tenant_mismatch:${message.session_id}`);
     }
+    // Sessions are keyed by (tenant, local peer, session id) only: a third
+    // peer holding the shared secret must not append into another pair's
+    // session (and so into a later auto-reply prompt). A new session is fine.
+    const existingSession = loadPeerConversationSession(
+      responderTenantId,
+      responderPeerId,
+      normalizeSessionId(message.session_id)
+    );
+    if (existingSession && existingSession.remote_peer_id !== context.envelope.sender_peer_id) {
+      recordEvent(responderTenantId, responderPeerId, {
+        type: 'conversation_message_rejected',
+        reason: 'session_peer_mismatch',
+        session_id: existingSession.session_id,
+        sender_peer_id: context.envelope.sender_peer_id,
+        session_remote_peer_id: existingSession.remote_peer_id,
+        message_id: context.envelope.message_id,
+      });
+      throw new Error(`peer_conversation_session_peer_mismatch:${existingSession.session_id}`);
+    }
     const session = appendPeerConversationTranscript({
       tenantId: responderTenantId,
       sessionId: message.session_id,

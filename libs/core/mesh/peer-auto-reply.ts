@@ -9,7 +9,15 @@
  * whose latest row per `<sender>:<message_id>` key is the job's current state.
  *
  * Bounds: only enabled peers, only `message`/`reply` kinds, an inbound
- * `metadata.auto_turn` cap and a per-session cap on auto replies already sent.
+ * `metadata.auto_turn` cap, a per-(sender, session) cap on reply jobs counted
+ * from the ledger, and a rolling per-remote-peer hourly generation budget
+ * (which also bounds a peer that rotates session ids to dodge the session cap).
+ *
+ * Single-writer assumption: exactly one auto-reply instance (one peer
+ * conversation server process) owns the ledger of a given local peer. The
+ * instance loads the ledger once and keeps an in-memory latest-per-key index
+ * that it updates on every append; a second concurrent writer for the same
+ * local peer would not be seen until restart.
  */
 
 import * as crypto from 'node:crypto';
@@ -53,7 +61,14 @@ const HISTORY_MAX_CHARS = 6000;
 const INBOUND_MAX_CHARS = 4000;
 const KNOWLEDGE_TOPIC_MAX_CHARS = 500;
 const DELIVERY_TIMEOUT_MS = 10_000;
-const STOP_WAIT_MS = 5_000;
+const BUDGET_WINDOW_MS = 60 * 60 * 1000;
+/** Job states that represent a reply sent or on its way (session cap). */
+const SESSION_CAP_STATUSES = new Set<PeerReplyJobStatus>([
+  'queued',
+  'generating',
+  'delivering',
+  'delivered',
+]);
 const AUTO_REPLY_KINDS = new Set(['message', 'reply']);
 const AUTO_REPLY_SCOPE_PURPOSE = 'peer-conversation:auto-reply';
 
@@ -147,6 +162,10 @@ export interface PeerAutoReplyConfig {
   deliveryBackoffMs?: number;
   /** Worker poll interval while started. */
   pollIntervalMs?: number;
+  /** Generation attempts per job before it is failed with `attempts_exhausted`. */
+  maxGenerationAttempts?: number;
+  /** Rolling hourly cap on reply jobs per remote peer (beyond it: skipped). */
+  budgetPerHour?: number;
   generate?: (input: PeerAutoReplyGenerateInput) => Promise<string>;
   retrieveKnowledge?: (input: {
     tenantId: string;
@@ -253,8 +272,16 @@ export function selectPeerAutoReplyHistory(
   }
   const maxEntries = options.maxEntries ?? HISTORY_MAX_ENTRIES;
   const maxChars = options.maxChars ?? HISTORY_MAX_CHARS;
+  const local = job.local_peer_id;
+  const remote = job.sender_peer_id;
+  // Only the {local, remote} pair: an entry from any third peer never feeds the prompt.
+  const isPairEntry = (entry: PeerConversationTranscriptEntry) =>
+    (entry.sender_peer_id === local && entry.recipient_peer_id === remote) ||
+    (entry.sender_peer_id === remote && entry.recipient_peer_id === local);
   const entries = session.transcript
-    .filter((entry) => !isAckEntry(entry) && entry.message_id !== job.message_id)
+    .filter(
+      (entry) => isPairEntry(entry) && !isAckEntry(entry) && entry.message_id !== job.message_id
+    )
     .slice(-maxEntries);
   let total = entries.reduce((sum, entry) => sum + entry.text.length, 0);
   while (entries.length > 0 && total > maxChars) {
@@ -349,6 +376,8 @@ export async function defaultPeerAutoReplyGenerate(
         schema: AUTO_REPLY_SCHEMA,
         abortController,
         metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
+        // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
+        isolation: 'strict',
       })
   );
   return result.parsed.reply;
@@ -434,6 +463,8 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
   const generationTimeoutMs = positiveInt(config.generationTimeoutMs, 60_000);
   const concurrency = positiveInt(config.concurrency, 1);
   const maxDeliveryAttempts = positiveInt(config.maxDeliveryAttempts, 3);
+  const maxGenerationAttempts = positiveInt(config.maxGenerationAttempts, 2);
+  const budgetPerHour = positiveInt(config.budgetPerHour, 30);
   const knowledgeLimit = positiveInt(config.knowledgeLimit, 5, 0);
   const staleLeaseMs = positiveInt(
     config.staleLeaseMs,
@@ -449,18 +480,38 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
     config.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const enabled = enabledPeers.size > 0;
 
+  /** In-memory latest-per-key index (single writer per local peer; see header). */
+  let index: Map<string, PeerReplyJob> | undefined;
+  const controllers = new Map<string, AbortController>();
   const inflight = new Set<string>();
-  let recovered = false;
   let timer: ReturnType<typeof setInterval> | undefined;
   let running: Promise<PeerReplyJob[]> | undefined;
   let stopped = false;
 
   const isoNow = () => new Date(now()).toISOString();
 
-  const write = (job: PeerReplyJob, patch: Partial<PeerReplyJob>): PeerReplyJob => {
-    const next: PeerReplyJob = { ...job, ...patch, updated_at: isoNow() };
-    appendJobRow(next);
-    return next;
+  const jobs = (): Map<string, PeerReplyJob> => {
+    if (!index) {
+      index = new Map(
+        listPeerReplyJobs(tenantId, localPeerId).map((job) => [job.key, job] as const)
+      );
+    }
+    return index;
+  };
+
+  const append = (job: PeerReplyJob): PeerReplyJob => {
+    appendJobRow(job);
+    jobs().set(job.key, job);
+    return job;
+  };
+
+  const write = (job: PeerReplyJob, patch: Partial<PeerReplyJob>): PeerReplyJob =>
+    append({ ...job, ...patch, updated_at: isoNow() });
+
+  /** Back to the queue, keeping any generated reply so it is not regenerated. */
+  const requeue = (job: PeerReplyJob, reason: string, patch: Partial<PeerReplyJob> = {}) => {
+    const { lease_at: _lease, ...rest } = job;
+    return append({ ...rest, ...patch, status: 'queued', reason, updated_at: isoNow() });
   };
 
   const ackReply = (
@@ -482,19 +533,35 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
     },
   });
 
+  const exhaustGeneration = (job: PeerReplyJob): PeerReplyJob =>
+    write(job, {
+      status: 'generation_failed',
+      generation: {
+        attempts: job.generation?.attempts ?? 0,
+        error_code: 'attempts_exhausted',
+        error_message: `generation attempts exhausted (${maxGenerationAttempts})`,
+      },
+    });
+
+  /** Requeue abandoned leases (never in-flight ones); exhausted generations fail instead. */
   const recoverStale = (): void => {
-    recovered = true;
     const cutoff = now() - staleLeaseMs;
-    for (const job of listPeerReplyJobs(tenantId, localPeerId)) {
+    for (const job of Array.from(jobs().values())) {
       if (job.status !== 'generating' && job.status !== 'delivering') continue;
       if (inflight.has(job.key)) continue;
       const leaseAt = Date.parse(job.lease_at || job.updated_at);
       if (Number.isFinite(leaseAt) && leaseAt > cutoff) continue;
-      write(job, { status: 'queued', reason: `requeued_stale_${job.status}` });
+      if (job.status === 'generating' && (job.generation?.attempts ?? 0) >= maxGenerationAttempts) {
+        exhaustGeneration(job);
+        continue;
+      }
+      requeue(job, `requeued_stale_${job.status}`);
     }
   };
 
   const generateReply = async (job: PeerReplyJob): Promise<PeerReplyJob> => {
+    if ((job.generation?.attempts ?? 0) >= maxGenerationAttempts) return exhaustGeneration(job);
+    const priorGeneration = job.generation;
     const attempts = (job.generation?.attempts ?? 0) + 1;
     let current = write(job, {
       status: 'generating',
@@ -552,19 +619,26 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
     });
 
     const controller = new AbortController();
+    controllers.set(job.key, controller);
     const timeoutError = Object.assign(
       new Error(`generation timed out after ${generationTimeoutMs}ms`),
       { code: 'timeout' }
     );
     let timedOut = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
+    // Rejects on the generation timeout and on stop(), so a generator that
+    // ignores its abort signal can still never hold the worker.
+    const interrupted = new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => {
         timedOut = true;
         reject(timeoutError);
         controller.abort();
       }, generationTimeoutMs);
+      controller.signal.addEventListener('abort', () => reject(new Error('generation aborted')), {
+        once: true,
+      });
     });
+    interrupted.catch(() => undefined);
     try {
       const raw = await Promise.race([
         generate({
@@ -575,7 +649,7 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
           userPrompt,
           signal: controller.signal,
         }),
-        timeout,
+        interrupted,
       ]);
       const reply = typeof raw === 'string' ? raw.trim() : '';
       if (!reply) return fail('empty_reply', 'generator returned an empty reply');
@@ -588,6 +662,10 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       });
       return current;
     } catch (caught) {
+      // A stop is not a failure: the job goes back to the queue unchanged.
+      if (stopped && !timedOut) {
+        return requeue(current, 'requeued_on_stop', { generation: priorGeneration });
+      }
       // A generator that rejects on abort must still be classified as a timeout.
       const error = timedOut ? timeoutError : caught;
       log.warn(
@@ -596,6 +674,7 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       return fail(errorCode(error), errorMessage(error));
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      controllers.delete(job.key);
     }
   };
 
@@ -609,6 +688,8 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       if (attempt > priorAttempts + 1 && deliveryBackoffMs > 0) {
         await sleep(deliveryBackoffMs * 2 ** (attempt - priorAttempts - 2));
       }
+      // No delivery starts once stop() was called; the reply is kept for later.
+      if (stopped) return requeue(current, 'requeued_on_stop');
       try {
         const result = await deliver({
           tenantId,
@@ -675,8 +756,9 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
   };
 
   const drain = async (): Promise<PeerReplyJob[]> => {
-    if (!recovered) recoverStale();
-    const queue = listPeerReplyJobs(tenantId, localPeerId).filter(
+    if (stopped) return [];
+    recoverStale();
+    const queue = Array.from(jobs().values()).filter(
       (job) => job.status === 'queued' && !inflight.has(job.key)
     );
     const results: PeerReplyJob[] = [];
@@ -718,7 +800,7 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
     if (!AUTO_REPLY_KINDS.has(message.kind)) return undefined;
 
     const key = peerReplyJobKey(sender, context.envelope.message_id);
-    const existing = listPeerReplyJobs(tenantId, localPeerId).find((job) => job.key === key);
+    const existing = jobs().get(key);
     if (existing) {
       return ackReply(
         context,
@@ -727,46 +809,51 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       );
     }
 
+    const sessionId = context.session.session_id;
     const inboundAutoTurn = autoTurnOf(message.metadata);
-    const sentAutoReplies = context.session.transcript.filter(
-      (entry) => entry.direction === 'outbound' && entry.metadata?.auto_generated === true
-    ).length;
-    const capped = inboundAutoTurn >= maxTurns || sentAutoReplies >= maxTurns;
-    if (capped) {
-      if (message.metadata?.auto_generated !== true) return undefined;
-      const at = isoNow();
-      appendJobRow({
-        key,
-        tenant_id: tenantId,
-        local_peer_id: localPeerId,
-        sender_peer_id: sender,
-        session_id: context.session.session_id,
-        message_id: context.envelope.message_id,
-        topic: context.session.topic,
-        inbound_text: '',
-        inbound_auto_turn: inboundAutoTurn,
-        status: 'skipped',
-        reason: inboundAutoTurn >= maxTurns ? 'inbound_auto_turn_cap' : 'session_auto_reply_cap',
-        enqueued_at: at,
-        updated_at: at,
-      });
-      return ackReply(context, 'skipped', `Auto-reply turn limit reached for ${localPeerId}`);
-    }
-
     const at = isoNow();
-    appendJobRow({
+    const base = {
       key,
       tenant_id: tenantId,
       local_peer_id: localPeerId,
       sender_peer_id: sender,
-      session_id: context.session.session_id,
+      session_id: sessionId,
       message_id: context.envelope.message_id,
       topic: context.session.topic,
+      enqueued_at: at,
+      updated_at: at,
+    };
+    const skip = (reason: string) => {
+      append({
+        ...base,
+        inbound_text: '',
+        inbound_auto_turn: inboundAutoTurn,
+        status: 'skipped',
+        reason,
+      });
+      return ackReply(context, 'skipped', `Auto-reply limit reached for ${localPeerId}`);
+    };
+
+    // Counted from the durable ledger, not the (truncated) transcript.
+    const senderJobs = Array.from(jobs().values()).filter((job) => job.sender_peer_id === sender);
+    const sessionReplies = senderJobs.filter(
+      (job) => job.session_id === sessionId && SESSION_CAP_STATUSES.has(job.status)
+    ).length;
+    if (inboundAutoTurn >= maxTurns || sessionReplies >= maxTurns) {
+      if (message.metadata?.auto_generated !== true) return undefined;
+      return skip(inboundAutoTurn >= maxTurns ? 'inbound_auto_turn_cap' : 'session_auto_reply_cap');
+    }
+    const windowStart = now() - BUDGET_WINDOW_MS;
+    const recent = senderJobs.filter(
+      (job) => job.status !== 'skipped' && Date.parse(job.enqueued_at) > windowStart
+    ).length;
+    if (recent >= budgetPerHour) return skip('peer_budget_exhausted');
+
+    append({
+      ...base,
       inbound_text: message.text,
       inbound_auto_turn: inboundAutoTurn,
       status: 'queued',
-      enqueued_at: at,
-      updated_at: at,
     });
     setImmediate(kick);
     return ackReply(context, 'queued', `Queued for reply by ${localPeerId}`);
@@ -779,7 +866,6 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
     start() {
       if (!enabled || timer) return;
       stopped = false;
-      recoverStale();
       timer = setInterval(kick, pollIntervalMs);
       timer.unref?.();
       kick();
@@ -788,20 +874,11 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       stopped = true;
       if (timer) clearInterval(timer);
       timer = undefined;
-      // Bounded wait: an in-flight generation may run up to its timeout; a job
-      // left in generating/delivering is requeued by stale-lease recovery.
-      if (running) {
-        let handle: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          running.catch(() => undefined),
-          new Promise<void>((resolve) => {
-            handle = setTimeout(resolve, STOP_WAIT_MS);
-            handle.unref?.();
-          }),
-        ]);
-        if (handle) clearTimeout(handle);
-      }
+      // Abort in-flight generations (their jobs are requeued, not failed) and
+      // wait for the pass to settle: no delivery starts after this resolves.
+      for (const controller of controllers.values()) controller.abort();
+      if (running) await running.catch(() => undefined);
     },
-    listJobs: () => listPeerReplyJobs(tenantId, localPeerId),
+    listJobs: () => Array.from(jobs().values()),
   };
 }
