@@ -41,6 +41,10 @@ export interface PostToolUseInput extends PreToolUseInput {
 }
 
 export interface PreToolUseHookOutput {
+  // Devin CLI honors these top-level fields; Claude Code reads
+  // hookSpecificOutput.permissionDecision. Both mean "deny" — see pre().
+  decision?: 'block';
+  reason?: string;
   hookSpecificOutput: {
     hookEventName: 'PreToolUse';
     permissionDecision: PermissionDecision;
@@ -67,6 +71,44 @@ export interface StopHookOutput {
     hookEventName: 'Stop';
     additionalContext: string;
   };
+}
+
+/**
+ * Devin CLI auto-loads `.claude/settings.json` hooks (compat), so this
+ * entrypoint can run under either host. Distinguish the host for co-session
+ * presence and audit attribution via the env Devin injects into hook
+ * processes (`DEVIN_PROJECT_DIR`, and the `AI_AGENT` / `CHISEL_SESSION_DB`
+ * markers present in its process environment).
+ */
+export function resolveHookHostProvider(): 'claude' | 'devin' {
+  const env = process.env;
+  return env.DEVIN_PROJECT_DIR || env.CHISEL_SESSION_DB || /^devin/i.test(env.AI_AGENT ?? '')
+    ? 'devin'
+    : 'claude';
+}
+
+function hookHostAgentId(): string {
+  return resolveHookHostProvider() === 'devin' ? 'devin-cli' : 'claude-code';
+}
+
+/**
+ * Devin CLI tool names → the Claude Code names this bridge was written
+ * against (`exec` is Devin's shell). Applied unconditionally: the lowercase
+ * names never appear under Claude Code, so aliasing is a no-op there.
+ * `apply_patch` has no reliable path field — it maps to Edit, but tier/lease
+ * checks only run when a path actually extracts.
+ */
+const HOST_TOOL_ALIASES: Record<string, string> = {
+  write: 'Write',
+  edit: 'Edit',
+  apply_patch: 'Edit',
+  notebook_edit: 'NotebookEdit',
+  exec: 'Bash',
+};
+
+function canonicalHookToolName(tool: string | undefined): string {
+  const name = tool ?? '';
+  return HOST_TOOL_ALIASES[name] ?? name;
 }
 
 /** File-mutating tools whose target path we can reliably extract + tier-check. */
@@ -106,13 +148,26 @@ function targetPaths(toolInput: Record<string, unknown> = {}): string[] {
 }
 
 function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput {
-  return {
+  const out: PreToolUseHookOutput = {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: decision,
       permissionDecisionReason: reason,
     },
   };
+  // Devin ignores permissionDecision — its hook contract reads top-level
+  // `decision`/`reason` instead. Emit them only for deny; 'ask' falls through
+  // to Devin's own permission prompt just like a silent response would.
+  if (decision === 'deny' && resolveHookHostProvider() === 'devin') {
+    out.decision = 'block';
+    out.reason = reason;
+  }
+  return out;
+}
+
+/** Deny response for fail-closed paths in the script boundary. */
+export function denyHookResponse(reason: string): PreToolUseHookOutput {
+  return pre('deny', reason);
 }
 
 /**
@@ -137,7 +192,7 @@ function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput
  * allow rules) stays in charge — returning 'allow' would silently auto-approve.
  */
 export function evaluatePreToolUseShellDeny(input: PreToolUseInput): PreToolUseHookOutput | null {
-  if ((input.tool_name ?? '') !== 'Bash') return null;
+  if (canonicalHookToolName(input.tool_name) !== 'Bash') return null;
   const command = String(input.tool_input?.command ?? input.tool_input?.cmd ?? '').trim();
   if (!command) return null;
   const decision = evaluateShellCommandPolicy(command);
@@ -146,7 +201,7 @@ export function evaluatePreToolUseShellDeny(input: PreToolUseInput): PreToolUseH
 }
 
 export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput {
-  const tool = input.tool_name ?? '';
+  const tool = canonicalHookToolName(input.tool_name);
   if (tool === 'Bash') {
     const command = String(input.tool_input?.command ?? input.tool_input?.cmd ?? '').trim();
     const decision = evaluateShellCommandPolicy(command);
@@ -175,7 +230,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
   }
   for (const p of targetPaths(input.tool_input)) {
     const gate = coSessionHookLeaseGate({
-      provider: 'claude',
+      provider: resolveHookHostProvider(),
       session_key: input.session_id,
       file_path: p,
     });
@@ -189,7 +244,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
 function recordSessionSignal(action: string, metadata: Record<string, unknown>): void {
   try {
     auditChain.record({
-      agentId: 'claude-code',
+      agentId: hookHostAgentId(),
       action,
       operation: 'session_signal',
       result: 'completed',
@@ -212,7 +267,7 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
 
   const handoffBlock = formatPendingHandoffs(
     coSessionHookDrain({
-      provider: 'claude',
+      provider: resolveHookHostProvider(),
       session_key: input.session_id as string | undefined,
       only_new: true,
     })
@@ -251,7 +306,7 @@ export function buildStopContext(input: Record<string, unknown> = {}): string {
  */
 export function buildSessionEndContext(input: Record<string, unknown> = {}): string {
   const ended = coSessionHookEnd({
-    provider: 'claude',
+    provider: resolveHookHostProvider(),
     session_key: input.session_id as string | undefined,
   });
   return ended.released_leases > 0
@@ -345,11 +400,11 @@ export function recordPostToolUse(input: PostToolUseInput): {
   recorded: boolean;
   entryId?: string;
 } {
-  const tool = input.tool_name ?? '';
+  const tool = canonicalHookToolName(input.tool_name);
   if (!AUDITED_TOOLS.has(tool)) return { recorded: false };
 
   const entry = auditChain.record({
-    agentId: 'claude-code',
+    agentId: hookHostAgentId(),
     action: 'claude_code_tool',
     operation: tool,
     result: 'completed',
@@ -360,8 +415,9 @@ export function recordPostToolUse(input: PostToolUseInput): {
 
 /** Context injected at session start so Claude Code follows the operating guide. */
 export function buildSessionStartContext(input: Record<string, unknown> = {}): string {
+  const provider = resolveHookHostProvider();
   const join = coSessionHookJoin({
-    provider: 'claude',
+    provider,
     session_key: input.session_id as string | undefined,
   });
   return [
@@ -376,7 +432,7 @@ export function buildSessionStartContext(input: Record<string, unknown> = {}): s
       ? [
           `Co-session ${join.session_id}: joined as ${join.participant_id}. ` +
             `Acquire a path lease before editing shared paths: ` +
-            `\`co-session lease --action acquire --as claude --participant-id ${join.participant_id} --path <repo/path>\`. ` +
+            `\`co-session lease --action acquire --as ${provider} --participant-id ${join.participant_id} --path <repo/path>\`. ` +
             'Pending handoffs arrive via prompt context.',
         ]
       : []),

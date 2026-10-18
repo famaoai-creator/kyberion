@@ -23,6 +23,7 @@ import {
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
+  denyHookResponse,
   evaluatePreToolUse,
   evaluatePreToolUseShellDeny,
   recordCliUsage,
@@ -104,13 +105,9 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         if (decision) process.stdout.write(JSON.stringify(decision));
       } catch (err) {
         process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'deny',
-              permissionDecisionReason: `Kyberion shell policy could not be evaluated: ${String(err)}`,
-            },
-          })
+          JSON.stringify(
+            denyHookResponse(`Kyberion shell policy could not be evaluated: ${String(err)}`)
+          )
         );
       }
       return;
@@ -166,13 +163,9 @@ export const claudeCodeHook = defineScript({
       // Fail closed for PreToolUse so a hook bug cannot bypass the policy.
       if (hookArgv[2] === 'PreToolUse') {
         process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'deny',
-              permissionDecisionReason: `Kyberion hook errored; refusing tool use: ${String(err)}`,
-            },
-          })
+          JSON.stringify(
+            denyHookResponse(`Kyberion hook errored; refusing tool use: ${String(err)}`)
+          )
         );
       } else {
         process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
