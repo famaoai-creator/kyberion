@@ -909,6 +909,17 @@ export function normalizeStoredPath(targetPath: string): { path: string; foreign
   return { path: targetPath, foreign: true };
 }
 
+/** Whether `candidate` is strictly inside `parent` (equality is not inside). */
+export function isPathInside(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
 // Named export for older scripts that import * as pathResolver
 export const pathResolver = {
   rootDir: () => PROJECT_ROOT_DIR,
@@ -955,4 +966,5 @@ export const pathResolver = {
   vitestLivePath,
   toRepoRelative,
   normalizeStoredPath,
+  isPathInside,
 };
