@@ -209,3 +209,74 @@ describe('probed-bytes adoption (R7-04)', () => {
     expect(String(safeReadFile(path.join(again.staged_snapshot!, 'extra.txt')))).toBe('new');
   });
 });
+
+describe('snapshot integrity verification (R1 review)', () => {
+  it('halts materialization_error when the scenario tampers the winner snapshot', async () => {
+    // win's own probe writes into ../.snapshots/win post-staging — the
+    // manifest must catch the drift at adoption time.
+    const scenDir = path.join(ROOT, 'scenario-tamper');
+    const ovDir = path.join(ROOT, 'ov', 'win-tamper');
+    safeMkdir(scenDir, { recursive: true });
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo TAMPER > "../.snapshots/win/pass_marker"\n`
+    );
+    overlay('win-tamper', { pass_marker: 'ORIG', iam_win: '1' });
+    const r = await runRecursiveSession({
+      session_id: 'rec-tamper',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-tamper'),
+      candidates: [
+        { label: 'win', overlayDir: ovDir },
+        { label: 'none', overlayDir: overlay('none-tamper', {}) },
+      ],
+      rounds: 2,
+    });
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.adopted_overlays).toEqual([]);
+    expect(r.rounds[0].rejected.some((x) => /snapshot drifted/.test(x.reason))).toBe(true);
+  });
+  it('halts materialization_error when the scenario mutates the base mid-round', async () => {
+    const scenDir = path.join(ROOT, 'scenario-basedrift');
+    const injected = path.join(scenDir, 'injected.txt');
+    safeMkdir(scenDir, { recursive: true });
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo EVIL > "${injected}"\n`
+    );
+    const r = await runRecursiveSession({
+      session_id: 'rec-basedrift',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-basedrift'),
+      candidates: [
+        {
+          label: 'win',
+          overlayDir: overlay('win-bd', { pass_marker: '1', iam_win: '1' }),
+        },
+        { label: 'none', overlayDir: overlay('none-bd', {}) },
+      ],
+      rounds: 2,
+    });
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.adopted_overlays).toEqual([]);
+    expect(r.rounds[0].rejected.some((x) => /base dir drifted/.test(x.reason))).toBe(true);
+  });
+  it('rejects a scenarioDir nested inside the snapshot tree', () => {
+    const runRoot = path.join(ROOT, 'run-f2');
+    const scenDir = path.join(runRoot, '.snapshots');
+    safeMkdir(scenDir, { recursive: true });
+    expect(() =>
+      runProbe({
+        label: 'c',
+        scenarioDir: scenDir,
+        overlayDir: overlay('f2', { a: '1' }),
+        command: ['sh', 'x.sh'],
+        runRoot,
+      })
+    ).toThrow(/nest inside each other/);
+  });
+});

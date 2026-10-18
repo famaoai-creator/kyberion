@@ -22,7 +22,14 @@ import {
 } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { copyTree, runProbe, validateProbeSpec, type RunOutcome } from './probe-runner.js';
+import {
+  copyTree,
+  manifestsEqual,
+  runProbe,
+  treeManifest,
+  validateProbeSpec,
+  type RunOutcome,
+} from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
@@ -231,6 +238,10 @@ export async function runRecursiveSession(
 
   for (let round = 1; round <= spec.rounds; round++) {
     const roundRoot = path.join(runRoot, `round-${round}`);
+    // Manifest of the base BEFORE this round's probes — the scenario runs
+    // unsandboxed and could write into bases/round-N or the scenario input;
+    // a drift must fail adoption, not ride into the next base.
+    const baseManifest = treeManifest(currentBase);
     // Round-scoped run dirs: no cross-round or cross-session contamination.
     let roundProposeMeta: RoundRecord['propose_meta'];
     const candidates = [...supplied];
@@ -339,12 +350,30 @@ export async function runRecursiveSession(
       // bytes probed (R7-04).
       const winnerOutcome = outcomes.find((o) => o.label === decision.winner);
       const adoptionSource = winnerOutcome?.staged_snapshot;
-      if (!adoptionSource || !safeExistsSync(adoptionSource)) {
-        rejected.push({
+      const adoptionManifest = winnerOutcome?.snapshot_manifest;
+      // adopted bytes == probed bytes, verified — the scenario is
+      // unsandboxed, so BOTH the winner snapshot and the current base can
+      // drift during this round's probes.
+      const driftReason = !adoptionSource
+        ? 'probed-bytes snapshot unavailable'
+        : !adoptionManifest
+          ? 'snapshot manifest unavailable — bytes unverifiable'
+          : !manifestsEqual(treeManifest(adoptionSource), adoptionManifest)
+            ? 'winner snapshot drifted after probe'
+            : !manifestsEqual(treeManifest(currentBase), baseManifest)
+              ? 'base dir drifted during round probes'
+              : null;
+      if (driftReason || !adoptionSource) {
+        const rejection = {
           label: `r${round}:${decision.winner}`,
           path: '.',
-          reason: 'materialization failed: probed-bytes snapshot unavailable',
-        });
+          reason: `materialization failed: ${driftReason ?? 'probed-bytes snapshot unavailable'}`,
+        };
+        rejected.push(rejection);
+        // The round record was already pushed with a snapshot of `rejected` —
+        // reflect the materialization failure into it or the report loses the
+        // reason entirely (only halted_by would remain).
+        rounds[rounds.length - 1].rejected.push(rejection);
         halted = 'materialization_error';
         break;
       }
@@ -369,11 +398,13 @@ export async function runRecursiveSession(
         adopted.push(`r${round}:${decision.winner}`);
       } catch (error) {
         // Fail soft — the rounds already probed are evidence; don't lose them.
-        rejected.push({
+        const rejection = {
           label: `r${round}:${decision.winner}`,
           path: '.',
           reason: `materialization failed: ${error instanceof Error ? error.message : error}`,
-        });
+        };
+        rejected.push(rejection);
+        rounds[rounds.length - 1].rejected.push(rejection);
         halted = 'materialization_error';
         break;
       }
