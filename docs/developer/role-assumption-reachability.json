@@ -732,6 +732,13 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
+      "roles": [],
+      "unresolved": [
+        "role argument `charter.authority.authority_role` could not be resolved at libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner"
+      ]
+    },
+    {
       "site": "libs/core/organization/organization-standup.ts#persistOrganizationCadenceReport (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -2216,6 +2223,28 @@
       "unresolved": []
     },
     {
+      "site": "scripts/continuous_operations_report.ts#runContinuousOperationsReport (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/continuous_work_owner.ts#createContinuousOwnerPorts",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/continuous_work_owner.ts#createContinuousOwnerPorts [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/daemon_watchdog.ts#requestDaemonRecovery",
       "roles": ["daemon_watchdog"],
       "unresolved": []
@@ -2512,6 +2541,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations",
+      "roles": ["organization_operator"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2763,6 +2797,9 @@
     "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner": [
+      "role argument `charter.authority.authority_role` could not be resolved at libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner"
+    ],
     "libs/core/plugin/plugin-lifecycle.ts#importTarget": [
       "dynamic import with a computed specifier at libs/core/plugin/plugin-lifecycle.ts#importTarget"
     ],
@@ -2866,6 +2903,9 @@
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "scripts/check_doc_examples.ts#runBashSyntax": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "scripts/continuous_owner_process.ts#runContinuousOwnerProcess": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate": [
@@ -3268,17 +3308,13 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "reconcile_config_fallbacks": {
@@ -3364,6 +3400,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/plugin/plugin-lifecycle.ts#importTarget",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
@@ -3389,6 +3426,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -3609,18 +3647,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -3713,6 +3744,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
@@ -3733,6 +3765,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -4146,17 +4179,16 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -4220,6 +4252,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4240,6 +4273,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -4429,18 +4463,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -4518,6 +4545,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4537,6 +4565,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -4771,18 +4800,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -4867,6 +4889,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -4886,6 +4909,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -5080,11 +5104,14 @@
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -5162,6 +5189,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5181,6 +5209,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -5474,18 +5503,15 @@
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
-            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "reconcile_config_fallbacks": {
@@ -5598,6 +5624,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5626,6 +5653,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -5887,18 +5915,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "reasoning_settings_writer": {
@@ -5973,6 +5994,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -5993,6 +6015,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -6228,18 +6251,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -6320,6 +6336,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/plugin/plugin-lifecycle.ts#importTarget",
         "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
@@ -6341,6 +6358,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -6508,15 +6526,16 @@
         "organization_operator": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
-            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
-            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -6586,6 +6605,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
@@ -6606,6 +6626,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -6804,18 +6825,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -6897,6 +6911,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -6916,6 +6931,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -7135,11 +7151,14 @@
         "organization_operator": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -7212,6 +7231,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7231,6 +7251,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -7420,18 +7441,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -7509,6 +7523,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7528,6 +7543,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -7720,18 +7736,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -7807,6 +7816,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -7828,6 +7838,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
@@ -7997,18 +8008,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
-            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
         "scope_locale_reader": {
@@ -8078,6 +8082,7 @@
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
         "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
@@ -8099,6 +8104,7 @@
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
         "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",

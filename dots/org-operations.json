@@ -53,7 +53,9 @@
       "pipelines/ops-health-probe.json",
       "pipelines/knowledge-hygiene-probe.json",
       "pipelines/storage-janitor.json",
-      "pipelines/baseline-check.json"
+      "pipelines/baseline-check.json",
+      "pipelines/continuous-operations-report.json",
+      "pipelines/continuous-managed-work.json"
     ]
   },
   "decisions": {
