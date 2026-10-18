@@ -441,6 +441,22 @@ export function resolveCliActionKind(
   const raw =
     typeof rec.action === 'string' ? rec.action : typeof rec.op === 'string' ? rec.op : '';
   const name = raw.includes(':') ? raw.slice(raw.lastIndexOf(':') + 1) : raw;
+  if (name === 'pipeline' && Array.isArray(rec.steps) && rec.steps.length === 1) {
+    // One-step pipeline envelopes (buildSingleOpPipelinePayload) carry the real
+    // op kind on the step; 'pipeline' itself is not in CAPTURE_ACTION_NAMES, so
+    // without this lookup a wrapped capture op is misread as apply and --dry-run
+    // skips the handler instead of running it. Multi-step pipelines keep the
+    // conservative 'apply' default — no single kind describes mixed steps.
+    const stepType = (rec.steps[0] as Record<string, unknown> | undefined)?.type;
+    if (
+      stepType === 'capture' ||
+      stepType === 'apply' ||
+      stepType === 'transform' ||
+      stepType === 'control'
+    ) {
+      return stepType;
+    }
+  }
   return CAPTURE_ACTION_NAMES.has(name) ? 'capture' : 'apply';
 }
 

@@ -80,6 +80,33 @@ describe('actuator SDK', () => {
     expect(resolveCliActionKind({ op: 'secret:list' })).toBe('capture');
   });
 
+  it('resolves the wrapped single-op kind from one-step pipeline payloads', () => {
+    // Playground/agent try-outs wrap a discovery op into {action:'pipeline',
+    // steps:[{type, op, params}]}; the kind lives on the step, so a wrapped
+    // capture must resolve to capture for --dry-run to actually run it.
+    expect(
+      resolveCliActionKind(
+        buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture')
+      )
+    ).toBe('capture');
+    expect(
+      resolveCliActionKind(
+        buildSingleOpPipelinePayload('write', { path: 'a', content: 'x' }, 'apply')
+      )
+    ).toBe('apply');
+    // Multi-step pipelines have no single kind — keep the conservative default.
+    expect(
+      resolveCliActionKind({
+        action: 'pipeline',
+        steps: [
+          { type: 'capture', op: 'read', params: {} },
+          { type: 'apply', op: 'write', params: {} },
+        ],
+      })
+    ).toBe('apply');
+    expect(resolveCliActionKind({ action: 'pipeline', steps: [] })).toBe('apply');
+  });
+
   it('wraps a discovery-only single op into the runtime one-step pipeline shape', () => {
     expect(buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture')).toEqual({
       action: 'pipeline',
