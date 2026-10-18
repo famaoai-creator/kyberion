@@ -42,6 +42,7 @@ export const CO_SESSION_PROVIDERS = [
   'claude',
   'cursor',
   'codex',
+  'devin',
   'agy',
   'grok',
   'gemini',

@@ -732,6 +732,15 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
     permission profile is set, `runCodexCliQuery` / `runGeminiCliQuery` also drop caller
     `extraArgs` that would widen it (sandbox, approval, yolo, `--dangerously-*`, `--add-dir`,
     `-c sandbox*|approval_policy*`). Do not forward a whole profile object as CLI options.
+  - **Explicit Codex call permissions must survive the backend boundary.**
+    `CodexCliReasoningBackend.prompt` / `delegateTask` project `profile` or
+    `capability_profile` through the same provider permission resolver as the query runner.
+    `permission_mode: readonly` narrows an implementer to explorer; an explicit explorer
+    stays read-only even if edit was requested. Conflicting profile aliases, unknown tiers,
+    unsupported full mode and the unsupported planner projection fail before query execution.
+    `route_profile` selects reasoning, not authority. Keep calls without explicit constraints
+    backward-compatible and keep ambient sandbox restrictions authoritative. Cover this handoff
+    with mocked backend tests and query argv tests; read-only is not a tool-less guarantee.
   - **Residual risk:** neither CLI can switch its tools off the way `claude --tools ""` does.
     - Codex `read-only` still lets the model run read-only shell commands. Its sandbox does not
       limit reads to the cwd, and the scratch cwd is inside the checkout, so codex can still find
@@ -1362,6 +1371,24 @@ consumption, tenant separation, circuit/backoff, goal satisfaction, measurement
 repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
 admission/recovery, digest/recovery and inbox suites when changing this path.
 
+## Workflow reuse completion assessment
+
+**Rule.** Completion-time workflow assessment must pass the governed wisdom LLM
+profiles into the adaptive runner. A successful mission finish does not prove
+that assessment ran: inspect `workflow-reuse.json` and distinguish `not_assessed`
+from a validated `needs_review` candidate.
+
+**Procedure.** Exercise the ordinary retrospective with a real configured provider.
+Transport arbitrary ADF dictionaries as JSON text in strict provider output schemas,
+then parse and validate through the internal schema, ADF, guardrails and dry-run
+checks. Verify stable candidate identity on unchanged evidence. Replay remains
+subject to project-trust approval; never infer execution authority from candidate
+generation or dry-run success.
+
+**Gate.** `mission-workflow-reuse.test.ts` covers governed profile forwarding,
+malformed transport JSON refusal and stable retries. A live probe must additionally
+record provider success, queue handoff and the separately approved replay result.
+
 ## §14 CLI hook continuation loops
 
 **Build-safe hook startup.** Provider hook commands enter through
@@ -1454,13 +1481,13 @@ Historical handoffs are not migrated or duplicated on GET. Tenant-only legacy mi
 
 Regression gates: hearing-selected-scope.test.ts, hearing-request-scope.test.ts, hearing-completion.test.ts, hearing-mission-routes.test.ts, hearing-routes.test.ts and the hearing decision/receipt/handoff client recovery suites. Cover authorized alternative selections, malformed/foreign selections, omitted scope, wrong project parent, scoped canvas URLs, stale snapshots and exact receipts after navigation, historical read-only completion restoration, and zero effects on unsupported inventory scope. Route/store and client-harness proof must be reported separately from rendered-browser evidence.
 
-## Mission execution-ledger receipt integrity
+## First-job mutation response deadlines
 
-`execution-ledger.jsonl` is whole-file receipted: every append MUST go through `appendProvisionedText` so `provisioned-entries.jsonl` tracks the file's real bytes. Never raw-append — unreceipted growth makes the next provisioned writer hard-stop on `provisioned_entry_mismatch` forever, blocking record-evidence, review-task, reconcile-work and finish for that mission.
+Bound the first-job UI wait for intake, revision, approval, rejection and unstarted-recovery mutations, including response-body parsing. Reaching the deadline means an unknown outcome, never server cancellation, confirmed failure or permission to replay. Keep the exact pending intake identity and no-resend guard; release the busy flag so an explicit read-only refresh remains available. Missing or unrelated read results do not prove nonexecution. Late original responses must not change the settled unknown state or overwrite a newer read or access-loss state.
 
-Drift repair is operator-only: `pnpm mission repair <ID>` re-baselines via `receiptCurrentProvisionedText` after `validateExecutionLedgerText` proves every row parses and belongs to that mission. Rows that fail validation are real corruption, not drift — keep the hard stop; do not hand-edit `provisioned-entries.jsonl` (a receipt attesting unverified bytes destroys the evidence value).
+Reuse the same deadline semantics for approval decisions and recovery. Do not abort a mutation to imply cancellation, add automatic retries, invoke an operator tick from a refresh, or weaken authenticated approval checks. On a stalled submission, retain evidence and reconcile the original request through the normal read model; report unresolved state honestly.
 
-Regression gate: `mission-team-binding.test.ts` ledger receipt cases — hard-stop on unreceipted growth, re-baseline on repair, refusal on cross-mission rows.
+Regression gates: first-job-client.test.ts and first-job-approval-client.test.ts. Cover initial and revised intake, approve/reject, stalled headers and JSON, timely success and deadline cleanup, exact stored identities, no replay after repeated clicks or empty reads, read-only refresh, late responses and newer signed-out state. Exercise both controls together so the parent and approval view both unlock their read actions. A client VM harness is not a rendered browser or a live authenticated diagnostic execution; report each verification layer separately.
 
 ## Mission execution-ledger receipt integrity
 

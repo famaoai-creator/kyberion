@@ -1,6 +1,7 @@
 /**
- * document-reader: the one pdf / pptx / docx / xlsx / html / md / txt → Markdown path shared by
- * `pnpm kyberion read`, media:document_digest and ingest:parse_document.
+ * document-reader: the one pdf / pptx / docx / xlsx / html / md / txt / csv /
+ * json / yaml → Markdown path shared by `pnpm kyberion read`,
+ * media:document_digest and ingest:parse_document.
  * Fixtures are synthesized in memory (and one uniquely named sharedTmp dir).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,7 +9,12 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import ExcelJS from 'exceljs';
-import { assertReadableOfficeBytes, inferDocumentFormat, readDocument } from './document-reader.js';
+import {
+  assertReadableOfficeBytes,
+  DELIMITED_TABLE_MAX_ROWS,
+  inferDocumentFormat,
+  readDocument,
+} from './document-reader.js';
 import { generateNativePdf } from './native-pdf-engine/engine.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -96,7 +102,11 @@ describe('document-reader', () => {
     expect(inferDocumentFormat('page.HTM')).toBe('html');
     expect(inferDocumentFormat('README.markdown')).toBe('markdown');
     expect(inferDocumentFormat('notes.txt')).toBe('text');
-    expect(inferDocumentFormat('data.csv')).toBeUndefined();
+    expect(inferDocumentFormat('data.csv')).toBe('csv');
+    expect(inferDocumentFormat('rows.TSV')).toBe('tsv');
+    expect(inferDocumentFormat('config.json')).toBe('json');
+    expect(inferDocumentFormat('policy.yaml')).toBe('yaml');
+    expect(inferDocumentFormat('policy.yml')).toBe('yaml');
     expect(inferDocumentFormat('archive.mhtml')).toBeUndefined();
   });
 
@@ -125,6 +135,40 @@ describe('document-reader', () => {
     expect(text.markdown).toBe('# not a title\n');
     const empty = await readDocument(Buffer.from('<html><body> </body></html>'), 'html');
     expect(empty.warnings).toContain('document body is empty');
+  });
+
+  it('pretty-prints JSON, leaves YAML as-is, and turns small CSV/TSV into tables', async () => {
+    const json = await readDocument(Buffer.from('{"b":1,"a":2}'), 'json');
+    expect(json).toMatchObject({ format: 'json', warnings: [] });
+    expect(json.markdown).toBe('{\n  "b": 1,\n  "a": 2\n}\n');
+
+    const badJson = await readDocument(Buffer.from('{not-json'), 'json');
+    expect(badJson.markdown).toBe('{not-json');
+    expect(badJson.warnings).toEqual([expect.stringMatching(/not parseable/)]);
+
+    const yaml = await readDocument(Buffer.from('name: kyberion\nenabled: true\n'), 'yaml');
+    expect(yaml).toMatchObject({ format: 'yaml', warnings: [] });
+    expect(yaml.markdown).toBe('name: kyberion\nenabled: true\n');
+
+    const csv = await readDocument(Buffer.from('Name,Score\n"Alpha, Inc",10\nBeta,20\n'), 'csv');
+    expect(csv.format).toBe('csv');
+    expect(csv.markdown).toContain('| Name | Score |');
+    expect(csv.markdown).toContain('| Alpha, Inc | 10 |');
+    expect(csv.tables).toEqual([{ name: 'csv', markdown: csv.markdown }]);
+
+    const tsv = await readDocument(Buffer.from('a\tb\n1\t2\n'), 'tsv');
+    expect(tsv.markdown).toContain('| a | b |');
+    expect(tsv.markdown).toContain('| 1 | 2 |');
+
+    const wideHeader = Array.from({ length: 41 }, (_, i) => `c${i}`).join(',');
+    const large = await readDocument(
+      Buffer.from(
+        `${wideHeader}\n${Array.from({ length: DELIMITED_TABLE_MAX_ROWS }, () => 'x').join(',')}\n`
+      ),
+      'csv'
+    );
+    expect(large.markdown.startsWith('c0,')).toBe(true);
+    expect(large.warnings.join(' ')).toMatch(/left as-is/);
   });
 
   it('reads pptx slides and flags images that were not OCR’d', async () => {
