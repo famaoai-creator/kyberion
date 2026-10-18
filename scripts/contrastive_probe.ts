@@ -6,9 +6,14 @@
  * anonymized recommendation when the axis routes to human_gate.
  */
 
+import * as path from 'node:path';
 import { runContrastiveSession } from '@agent/core/harnessing/contrastive-session';
-import { runRecursiveSession } from '@agent/core/harnessing/recursive-session';
+import {
+  resumeRecursiveSession,
+  runRecursiveSession,
+} from '@agent/core/harnessing/recursive-session';
 import type { MetricSpec } from '@agent/core/harnessing/decision-axis';
+import { assertSafeRepositoryPath, loadJson } from '@agent/core/secure-io';
 import { loadSurfaceSpec } from '@agent/core/harnessing/surface-spec';
 import { loadProbeScenario } from '@agent/core/harnessing/eval-scenario';
 import {
@@ -50,7 +55,8 @@ const USAGE =
   '[--candidate <label>=<dir> | --propose <n> --brief <text> --surface <spec.json> ' +
   '[--library <root> --domain <name>]] ' +
   '[--expect <rel>] [--metric <key>:lower|higher] [--select blind] [--markers <a,b,c>] ' +
-  '[--seed <n>] [--rounds <n>] [--work-shape <name>]';
+  '[--seed <n>] [--rounds <n>] [--work-shape <name>] ' +
+  '[--resume <report.json> --adopt <label>]';
 
 function parseSeed(raw: string): number {
   const n = Number(raw);
@@ -82,6 +88,8 @@ export const runContrastiveProbe = defineScript({
       'library',
       'domain',
       'markers',
+      'resume',
+      'adopt',
     ]);
     for (const key of Object.keys(args)) {
       if (!KNOWN.has(key)) {
@@ -102,6 +110,8 @@ export const runContrastiveProbe = defineScript({
       'library',
       'domain',
       'work-shape',
+      'resume',
+      'adopt',
     ]) {
       if ((args[key]?.length ?? 0) > 1) {
         throw new ScriptExitError(
@@ -114,7 +124,19 @@ export const runContrastiveProbe = defineScript({
     const scenarioSpecPath = args['scenario-spec']?.[0];
     const runRoot = args['run-root']?.[0];
     const commandRaw = args['command']?.[0];
-    if (!runRoot || (!scenarioSpecPath && (!scenario || !commandRaw))) {
+    // --resume <report.json> --adopt <label>: continue a human_gate-halted
+    // recursive session with the human's pick. Mutually exclusive with
+    // --propose; --run-root may be omitted (defaults to a 'resumed-<ts>'
+    // sibling of the halted report so evidence stays separate).
+    const resumeReport = args['resume']?.[0];
+    const adoptLabel = args['adopt']?.[0];
+    if (Boolean(resumeReport) !== Boolean(adoptLabel)) {
+      throw new ScriptExitError(2, '--resume and --adopt must be given together');
+    }
+    if (!runRoot && !resumeReport) {
+      throw new ScriptExitError(2, USAGE);
+    }
+    if (!scenarioSpecPath && (!scenario || !commandRaw)) {
       throw new ScriptExitError(2, USAGE);
     }
     if ((scenario || commandRaw) && scenarioSpecPath) {
@@ -159,6 +181,12 @@ export const runContrastiveProbe = defineScript({
     if (proposeCount > 0 && !args['brief']?.[0]) {
       throw new ScriptExitError(2, '--propose requires --brief <text>');
     }
+    if (resumeReport && proposeCount > 0) {
+      throw new ScriptExitError(
+        2,
+        '--resume and --propose are mutually exclusive — a resumed session adopts the human pick, it does not re-propose round 1'
+      );
+    }
     const surface = args['surface']?.[0] ? loadSurfaceSpec(args['surface'][0]) : undefined;
     if (proposeCount > 0 && !surface) {
       throw new ScriptExitError(2, '--propose requires --surface <spec.json>');
@@ -191,6 +219,61 @@ export const runContrastiveProbe = defineScript({
     const rounds = args['rounds']?.[0] ? Number(args['rounds'][0]) : 1;
     if (args['rounds']?.[0] && (!Number.isInteger(rounds) || rounds < 1 || rounds > 10)) {
       throw new ScriptExitError(2, `--rounds expects an integer 1..10, got ${args['rounds'][0]}`);
+    }
+    if (resumeReport) {
+      // Total declared budget: --rounds wins, else the halted report's
+      // declared_rounds. The resumed session runs (total - haltedRound).
+      const prior = loadJson<{ declared_rounds?: unknown }>(assertSafeRepositoryPath(resumeReport));
+      const totalRounds = args['rounds']?.[0]
+        ? rounds
+        : typeof prior.declared_rounds === 'number' && Number.isInteger(prior.declared_rounds)
+          ? prior.declared_rounds
+          : null;
+      if (totalRounds === null) {
+        throw new ScriptExitError(
+          2,
+          '--resume needs --rounds or declared_rounds in the halted report'
+        );
+      }
+      const resumeRoot =
+        runRoot ??
+        path.join(
+          path.dirname(assertSafeRepositoryPath(resumeReport)),
+          `resumed-${Date.now().toString(36)}`
+        );
+      const rec = await resumeRecursiveSession(
+        {
+          session_id: `ppc-${Date.now().toString(36)}`,
+          scenarioDir,
+          command,
+          candidates,
+          ...(surface ? { surface } : {}),
+          ...(markers ? { markers } : {}),
+          ...(select ? { selection: select } : {}),
+          ...(args['seed']?.[0] ? { seed: parseSeed(args['seed'][0]) } : {}),
+          rounds: totalRounds,
+          expectOutputs,
+          metrics,
+          runRoot: resumeRoot,
+          work_shape: args['work-shape']?.[0],
+        },
+        { fromReport: resumeReport, adopt: adoptLabel! }
+      );
+      context.print(
+        JSON.stringify(
+          {
+            final: rec.final_decision.decision,
+            halted_by: rec.halted_by,
+            budget: rec.budget,
+            adopted: rec.adopted_overlays,
+            resume: rec.resume ?? null,
+          },
+          null,
+          2
+        )
+      );
+      context.print(`report: ${rec.report_path}`);
+      return;
     }
     if (rounds > 1) {
       const rec = await runRecursiveSession({
