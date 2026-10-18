@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   createCoreAudioDeviceInventoryBridge: vi.fn(),
   checkSpeakConsent: vi.fn(),
   createStandardYargs: vi.fn(),
+  probeMacOSNativeAutomation: vi.fn(),
+}));
+
+vi.mock('@agent/core/macos-native-automation', () => ({
+  probeMacOSNativeAutomation: mocks.probeMacOSNativeAutomation,
 }));
 
 vi.mock('@agent/core/environment-capability', () => ({
@@ -140,6 +145,8 @@ describe('meeting_preflight', () => {
       ],
     });
     mocks.checkSpeakConsent.mockReturnValue({ allowed: true });
+    // Default: probe unavailable, so the env self-report fallback applies.
+    mocks.probeMacOSNativeAutomation.mockReturnValue({ available: false, microphone: 'unknown' });
     process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED = '1';
     delete process.env.MISSION_ID;
   });
@@ -306,5 +313,67 @@ describe('meeting_preflight', () => {
     const blackhole = report.items.find((item) => item.id === 'blackhole.device');
     expect(blackhole?.status).toBe('warn');
     expect(blackhole?.detail).toContain('skipped on linux');
+  });
+
+  describe('audio.permission real probe', () => {
+    async function audioItem(probe: Record<string, unknown>, confirmed = false) {
+      if (!confirmed) delete process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED;
+      mocks.probeMacOSNativeAutomation.mockReturnValue(probe);
+      const { runMeetingPreflight } = await import('./meeting_preflight.js');
+      const report = await runMeetingPreflight({
+        missionId: 'MSN-MEETING-TEST',
+        platform: 'darwin',
+      });
+      return report.items.find((entry) => entry.id === 'audio.permission')!;
+    }
+
+    it('passes on a granted microphone even without the env confirmation', async () => {
+      const entry = await audioItem({
+        available: true,
+        microphone: 'granted',
+        host_app: 'com.apple.Terminal',
+      });
+      expect(entry.status).toBe('pass');
+      expect(entry.data).toEqual({ host_app: 'com.apple.Terminal' });
+    });
+
+    it('only warns on a granted microphone when the host app is unknown', async () => {
+      const entry = await audioItem({ available: true, microphone: 'granted' });
+      expect(entry.status).toBe('warn');
+    });
+
+    it('sends a policy-restricted microphone to the device administrator', async () => {
+      const entry = await audioItem({ available: true, microphone: 'restricted' });
+      expect(entry.status).toBe('operator_action_required');
+      expect(entry.reason_code).toBe('MICROPHONE_PERMISSION_RESTRICTED');
+      expect(entry.fix).not.toContain('KYBERION_AUDIO_PERMISSION_CONFIRMED');
+    });
+
+    it('asks for the warm-up command when the microphone is not determined', async () => {
+      const entry = await audioItem({ available: true, microphone: 'not_determined' });
+      expect(entry.status).toBe('operator_action_required');
+      expect(entry.reason_code).toBe('MICROPHONE_PERMISSION_NOT_DETERMINED');
+      expect(entry.fix).toBe('pnpm kyberion permissions warmup');
+    });
+
+    it('points at System Settings when the microphone is denied, ignoring the env self-report', async () => {
+      const entry = await audioItem(
+        { available: true, microphone: 'denied', host_app: 'iTerm.app' },
+        true
+      );
+      expect(entry.status).toBe('operator_action_required');
+      expect(entry.reason_code).toBe('MICROPHONE_PERMISSION_DENIED');
+      expect(entry.fix).toContain('Privacy & Security > Microphone');
+      expect(entry.fix).toContain('iTerm.app');
+    });
+
+    it('falls back to the env self-report only when the probe is unavailable', async () => {
+      const missing = await audioItem({ available: false, microphone: 'unknown' });
+      expect(missing.status).toBe('operator_action_required');
+      expect(missing.reason_code).toBe('MICROPHONE_PERMISSION_REQUIRED');
+      process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED = '1';
+      const confirmed = await audioItem({ available: false, microphone: 'unknown' }, true);
+      expect(confirmed.status).toBe('pass');
+    });
   });
 });
