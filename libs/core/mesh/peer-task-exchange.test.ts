@@ -105,7 +105,7 @@ function wirePeers() {
       }),
     ])
   );
-  const sent: Array<Record<string, any>> = [];
+  const sent: Array<{ recipient_peer_id: string; message_id: string }> = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: unknown, init?: RequestInit) => {
     const envelope = JSON.parse(String(init?.body || '{}'));
     sent.push(envelope);
