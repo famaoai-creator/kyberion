@@ -56,9 +56,11 @@ function allowed(rel: string, patterns: string[]): boolean {
   return false;
 }
 
-/** A rel path must be clean: no absolute, no '..', no empty segments. */
+/** A rel path must be clean: no absolute, no '..', no empty segments —
+ *  on either separator. Backslash is rejected outright so win32 semantics
+ *  can never smuggle '..' past the '/'-based check. */
 export function isValidRelPath(rel: string): boolean {
-  if (!rel || path.isAbsolute(rel)) return false;
+  if (!rel || rel.includes('\\') || path.isAbsolute(rel)) return false;
   return !rel.split('/').some((seg) => seg === '..' || seg === '');
 }
 
@@ -77,7 +79,7 @@ export function loadSurfaceSpec(specPath: string): SurfaceSpec {
 }
 
 export function validateOverlay(overlayDir: string, spec: SurfaceSpec): OverlayValidation {
-  const dir = assertSafeRepositoryPath(overlayDir);
+  const dir = assertSafeRepositoryPath(overlayDir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) {
     return {
       ok: false,

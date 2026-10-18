@@ -12,6 +12,8 @@ export interface AnonymizedRow {
   exit_code: number | null;
   wall_ms: number;
   produced_files: number;
+  /** Scrubbed failure detail — the outcome's own label is masked and the
+   *  string truncated so a chatty candidate cannot deanonymize itself. */
   error: string;
 }
 
@@ -66,7 +68,7 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
       exit_code: o.exit_code,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
-      error: o.error,
+      error: o.error.split(label).join('[CANDIDATE]').slice(0, 120),
     });
   });
   return { seed, letterToLabel, labelToLetter, rows };

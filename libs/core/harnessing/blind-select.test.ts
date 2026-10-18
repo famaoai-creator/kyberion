@@ -54,3 +54,18 @@ describe('applyBlindSelection', () => {
     expect(rec.recommended_winner).toBeDefined();
   });
 });
+
+describe('anonymizeOutcomes — scale', () => {
+  it('stays bijective past 26 outcomes', () => {
+    const many = Array.from({ length: 30 }, (_, i) => out(`c${i}`, true));
+    const m = anonymizeOutcomes(many, 9);
+    expect(Object.keys(m.letterToLabel)).toHaveLength(30);
+    expect(new Set(Object.values(m.letterToLabel)).size).toBe(30);
+  });
+  it('scrubs the outcome label out of error text', () => {
+    const o = { ...out('secret-name', false), error: 'secret-name blew up: exit=1' };
+    const m = anonymizeOutcomes([o], 1);
+    expect(m.rows[0].error).not.toContain('secret-name');
+    expect(m.rows[0].error).toContain('[CANDIDATE]');
+  });
+});

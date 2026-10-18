@@ -70,7 +70,13 @@ export async function proposeCandidates(opts: {
     result.error = `no reasoning backend: ${error instanceof Error ? error.message : error}`;
     return result;
   }
-  result.backend_used = true;
+  // getReasoningBackend never throws — it falls back to the stub. Per the
+  // stub-taint policy a stub run is not a real proposal, so only a non-stub
+  // backend counts as backend_used.
+  result.backend_used = backend.name !== 'stub';
+  if (!result.backend_used) {
+    result.error = `degraded: only the stub backend is active (name=${backend.name}); proposals will be rejected`;
+  }
 
   for (let i = 0; i < opts.count; i++) {
     const label = `${prefix}${i + 1}`;
