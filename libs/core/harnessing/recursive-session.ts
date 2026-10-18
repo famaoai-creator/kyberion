@@ -80,12 +80,19 @@ export interface RecursiveSessionResult {
   final_decision: DecisionReport;
   adopted_overlays: string[];
   /** 'budget' is the defensive default — every in-loop path currently sets a concrete halt before break, so it should never appear in a real report. */
-  halted_by: 'budget' | 'human_gate' | 'keep_base' | 'decline' | 'auto_advance_final';
+  halted_by:
+    | 'budget'
+    | 'human_gate'
+    | 'keep_base'
+    | 'decline'
+    | 'auto_advance_final'
+    | 'materialization_error';
   budget: {
     expected_probes: number;
     planned_probes: number;
     actual_probes: number;
-    status: 'ok' | 'short' | 'exceeded';
+    status: 'ok' | 'rejected_shortfall' | 'probe_loss';
+    actual_matches_plan: boolean;
   };
 }
 
@@ -93,6 +100,9 @@ export async function runRecursiveSession(
   spec: RecursiveSessionSpec
 ): Promise<RecursiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  // Freeze the library horizon at session start — lessons appended mid-run
+  // must not change later rounds (retain causal order = reproducibility).
+  const libraryAsOf = nowIso();
   const scen = path.resolve(spec.scenarioDir);
   const resolvedRoot = path.resolve(runRoot);
   if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
@@ -229,7 +239,9 @@ export async function runRecursiveSession(
         count: spec.propose.count,
         outDir: path.join(roundRoot, '_proposed'),
         labelPrefix: spec.propose.labelPrefix,
-        ...(spec.propose.library ? { library: spec.propose.library } : {}),
+        ...(spec.propose.library
+          ? { library: { ...spec.propose.library, asOf: libraryAsOf } }
+          : {}),
       });
       rejected.push(...proposed.rejected.map((r) => ({ ...r, label: `r${round}:${r.label}` })));
       // Mirror contrastive-session: a degraded empty propose run is recorded
@@ -341,7 +353,7 @@ export async function runRecursiveSession(
           path: '.',
           reason: `materialization failed: ${error instanceof Error ? error.message : error}`,
         });
-        halted = 'decline';
+        halted = 'materialization_error';
         break;
       }
       currentBase = nextBase;
@@ -360,14 +372,15 @@ export async function runRecursiveSession(
     expected_probes: declaredProbes,
     planned_probes: plannedProbes,
     actual_probes: actualProbes,
-    // planned vs declared: rejected overlays and degraded propose runs show
-    // as 'short'; actual vs planned exposes lost probes. Early halts are
-    // fine — a halted session plans only what it executed.
-    status: (plannedProbes === declaredProbes
-      ? 'ok'
+    // 'ok': executed everything declared. 'rejected_shortfall': overlay
+    // rejections or a degraded propose consumed declared capacity.
+    // 'probe_loss': a planned probe never produced an outcome.
+    // Early halts are fine — halted sessions only plan what they executed.
+    status: (actualProbes < plannedProbes
+      ? 'probe_loss'
       : plannedProbes < declaredProbes
-        ? 'short'
-        : 'exceeded') as 'ok' | 'short' | 'exceeded',
+        ? 'rejected_shortfall'
+        : 'ok') as 'ok' | 'rejected_shortfall' | 'probe_loss',
     actual_matches_plan: actualProbes === plannedProbes,
   };
   const report = {

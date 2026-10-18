@@ -74,7 +74,7 @@ export async function proposeCandidates(opts: {
   labelPrefix?: string;
   /** Optional experience library: the domain's prior lessons seed the
    *  propose prompt (looked up once, before the loop). */
-  library?: { root: string; domain: string };
+  library?: { root: string; domain: string; asOf?: string };
 }): Promise<ProposeResult> {
   const result: ProposeResult = { backend_used: false, candidates: [], rejected: [], error: '' };
   const outDir = assertSafeRepositoryPath(opts.outDir, { allowMissingLeaf: true });
@@ -121,6 +121,7 @@ export async function proposeCandidates(opts: {
         lookupLessons({
           libraryRoot: opts.library.root,
           domain: opts.library.domain,
+          ...(opts.library.asOf ? { asOf: opts.library.asOf } : {}),
           cue: opts.brief,
         })
       );
