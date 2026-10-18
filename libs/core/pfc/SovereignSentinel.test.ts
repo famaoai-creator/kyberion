@@ -87,4 +87,19 @@ describe('SovereignSentinel (Integrated PFC)', () => {
     expect(result.failedLayer).toBe('L6');
     expect(l7Reached).toBe(false);
   });
+  it('returns a deferred result without consuming the observation-only budget', async () => {
+    const sentinel = new SovereignSentinel(STATE_FILE);
+    sentinel.registerLayer(
+      'L2',
+      async () => ({ passed: false, deferred: true, reason: 'build active' }),
+      { countFailure: false }
+    );
+    expect(await sentinel.run()).toEqual({
+      success: false,
+      failedLayer: 'L2',
+      circuitBroken: false,
+      deferred: true,
+    });
+    expect(sentinel.getState().layers.L2.attempt_count).toBe(0);
+  });
 });

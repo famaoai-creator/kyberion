@@ -7,16 +7,19 @@ import { describe, it, expect, vi } from 'vitest';
 // secure-io.test.ts) keeps behaviour real while giving these tests a
 // spyable reference to assert the exact options passed to the sink.
 const childProcessSpies = vi.hoisted(() => ({
+  spawn: undefined as unknown as ReturnType<typeof vi.fn>,
   spawnSync: undefined as unknown as ReturnType<typeof vi.fn>,
   execFileSync: undefined as unknown as ReturnType<typeof vi.fn>,
 }));
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
+  childProcessSpies.spawn = vi.fn(actual.spawn);
   childProcessSpies.spawnSync = vi.fn(actual.spawnSync);
   childProcessSpies.execFileSync = vi.fn(actual.execFileSync);
   return {
     ...actual,
+    spawn: childProcessSpies.spawn,
     spawnSync: childProcessSpies.spawnSync,
     execFileSync: childProcessSpies.execFileSync,
   };
@@ -223,5 +226,21 @@ describe('safeExecResultAsync — stdin input', () => {
     const result = await safeExecResultAsync('cat', []);
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('');
+  });
+});
+
+describe('safeSpawn process groups', () => {
+  it('forwards explicit detached execution while retaining the governed shell boundary', async () => {
+    childProcessSpies.spawn.mockClear();
+    const child = safeSpawn(process.execPath, ['-e', 'process.exit(0)'], { detached: true });
+    const closed = new Promise<void>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
+    });
+    expect(childProcessSpies.spawn.mock.calls[0][2]).toMatchObject({
+      detached: true,
+      shell: false,
+    });
+    await closed;
   });
 });

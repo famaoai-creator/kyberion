@@ -27,7 +27,9 @@ describe('Runtime surface operations contract', () => {
     // reconcile` in docs/INITIALIZATION.md / AGENTS.md §3, not a script.
     // The successor is the documented two-command sequence, so the contract
     // is that both halves exist and the onboarding doc still spells it out.
-    expect(pkg.scripts.build).toContain('build:packages');
+    expect(pkg.scripts.build).toContain('scripts/build_repository.ts all');
+    expect(pkg.scripts['build:packages']).toContain('scripts/build_repository.ts packages');
+    expect(pkg.scripts['build:repo']).toContain('scripts/build_repository.ts repo');
     expect(read('docs/INITIALIZATION.md')).toContain('pnpm surfaces reconcile');
     expect(pkg.scripts.dashboard).toBe(
       'node scripts/run_built.mjs dist/scripts/sovereign_dashboard.js'

@@ -1352,17 +1352,27 @@ export function safeExecShellScriptResult(
 export function safeSpawn(
   command: string,
   args?: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv; detached?: boolean }
 ): ChildProcessWithoutNullStreams;
 export function safeSpawn(
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; stdio: SpawnOptions['stdio'] }
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    detached?: boolean;
+    stdio: SpawnOptions['stdio'];
+  }
 ): ChildProcess;
 export function safeSpawn(
   command: string,
   args: string[] = [],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; stdio?: SpawnOptions['stdio'] } = {}
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    detached?: boolean;
+    stdio?: SpawnOptions['stdio'];
+  } = {}
 ): ChildProcess {
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
@@ -1371,6 +1381,7 @@ export function safeSpawn(
     cwd: options.cwd ?? process.cwd(),
     env: buildSafeExecEnv(options.env ?? {}),
     shell: false,
+    ...(options.detached === undefined ? {} : { detached: options.detached }),
     stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
   });
 }

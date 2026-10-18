@@ -30,7 +30,8 @@
     "presence/displays/concierge/",
     "libs/actuators/**/*.test.ts",
     "scripts/clean.ts",
-    "scripts/clean_entrypoint.ts"
+    "scripts/clean_entrypoint.ts",
+    "scripts/build_repository.ts"
   ],
   "extends": "./tsconfig.base.json",
   "references": [
