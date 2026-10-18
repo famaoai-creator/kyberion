@@ -95,4 +95,4 @@ heartbeat の stale_code、healthy、PID と continuous cadence checkpoint を�
 
 分配枠が満杯の場合は inventory の limited として待機し、admission identity を増やさない。枠が空き、cooldown を満たした周期で分配する。既に確定拒否された試行は上記 recover-admissions を明示的に使い、元の cooldown を保持する。指標が回復しても同じ episode の既存 action / WorkItem 参照は保持し、進行中の仕事と成果を追跡する。
 
-managed lifecycle の controller runner は POSIX の専用 process group を使い、期限・中断・親の正常終了でも残る子孫を終了する。安全なツリー終了手段をまだ持たない Windows では実行前に停止する。snapshot の分析・dry-run と lifecycle 実行の対応環境を混同しない。
+managed lifecycle の controller runner は POSIX の専用 process group、Windows の kill-on-close Job Object で controller と子孫を監督する。期限・中断・出力超過に加え、controller の正常終了後に残った worker も終了する。Job Object を設定できない Windows 環境では未監督の実行をせず、エラーで停止する。snapshot の分析・dry-run と lifecycle 実行の対応環境を混同しない。
