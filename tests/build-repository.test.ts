@@ -103,7 +103,11 @@ describe('governed compiler build', () => {
 
 // The injected child never launches a process or sends an OS signal.
 import { EventEmitter } from 'node:events';
-import { runBuildStage, type BuildStageRuntime } from '../scripts/build_repository.js';
+import {
+  runBuildStage,
+  resolveBuildCommand,
+  type BuildStageRuntime,
+} from '../scripts/build_repository.js';
 
 function stageRuntime() {
   const emitter = new EventEmitter();
@@ -129,6 +133,30 @@ function stageRuntime() {
 }
 
 describe('compiler stage shutdown', () => {
+  it('executes the Windows pnpm JS entrypoint through Node without a shell', async () => {
+    const { runtime, child } = stageRuntime();
+    runtime.windows = true;
+    runtime.packageManagerEntrypoint = 'C:\\Program Files\\pnpm\\pnpm.cjs';
+    const pending = runBuildStage(
+      { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] },
+      runtime
+    );
+    expect(runtime.spawn).toHaveBeenCalledWith(
+      process.execPath,
+      [runtime.packageManagerEntrypoint, 'run', 'build:ui'],
+      expect.objectContaining({ detached: false })
+    );
+    child.emit('close', 0, null);
+    await pending;
+  });
+
+  it('rejects unavailable or non-JavaScript Windows lifecycle entrypoints', () => {
+    const stage = { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] };
+    for (const entry of [undefined, 'pnpm.cjs', 'C:\\pnpm.cmd']) {
+      expect(() => resolveBuildCommand(stage, true, entry)).toThrow('run pnpm build');
+    }
+    expect(resolveBuildCommand(stage, false)).toBe(stage);
+  });
   it('forwards termination to the process group, retains the build lock until close, and stops later stages', async () => {
     vi.useFakeTimers();
     try {

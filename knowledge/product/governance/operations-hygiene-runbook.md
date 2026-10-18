@@ -46,6 +46,11 @@ compiler invocations and ad-hoc cleanup bypass this coordination: use the root e
 when other processes are observing this checkout. The bootstrap and its cleanup imports stay
 out of the runtime emit graph (`ROOT_SOURCE_EXCLUSIONS`, `tsconfig.json`); bootstrap tests live
 under `tests/` so importing them cannot pull source-only modules back into that graph.
+Register source-only entrypoints explicitly in both the ESM integrity gate and
+`tests/package-boundary-contract.test.ts`; register white-box bootstrap test imports by exact
+specifier. Run that boundary suite whenever bootstrap imports change.
+On Windows, spawn package-manager lifecycle stages through Node and the pnpm-provided
+`npm_execpath` JavaScript entrypoint; `.cmd` shims cannot be executed with `shell: false`.
 
 Health observations never consume L2 recovery attempts. Only executed compiler commands record
 repair outcomes; lock contention is not an attempt. A successful partial command clears the
