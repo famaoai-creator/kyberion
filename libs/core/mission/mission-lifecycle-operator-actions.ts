@@ -18,6 +18,7 @@ import { isValidTenantSlug } from '../entity-scope.js';
 import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import { grantAccess, grantAccessGuarded } from '../secret/secret-guard.js';
 import type { HumanDecidedBy } from './mission-types.js';
+import { repairLegacyMissionExecutionLedger } from './mission-team-binding.js';
 
 export async function delegateMission(
   id: string,
@@ -262,6 +263,7 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
     );
   }
   state.tier = tierFromPath;
+  const repairedLedger = repairLegacyMissionExecutionLedger(upperId, missionPath);
   if (state.tenant_id && !isValidTenantSlug(state.tenant_id)) delete state.tenant_id;
   if (state.tenant_slug && !isValidTenantSlug(state.tenant_slug)) delete state.tenant_slug;
   state.execution_mode = state.execution_mode === 'delegated' ? 'delegated' : 'local';
@@ -276,6 +278,15 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
   };
   state.history = [
     ...(Array.isArray(state.history) ? state.history : []),
+    ...(repairedLedger
+      ? [
+          {
+            ts: nowIso(),
+            event: 'EXECUTION_LEDGER_RECEIPT_REPAIRED',
+            note: 'Validated legacy JSONL and retained every byte; added a current hash receipt. The historical empty-file receipt did not authenticate later appends.',
+          },
+        ]
+      : []),
     {
       ts: nowIso(),
       event: 'LEGACY_STATE_REPAIRED',
@@ -286,6 +297,10 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
   // Pass the already-resolved path: saveState's own findMissionPath lookup
   // goes through the visibility locator and would reject the repair target.
   await saveState(upperId, state, { missionDir: missionPath });
+  if (repairedLedger)
+    logger.info(
+      `Execution ledger receipt migrated without changing history | evidence: ${missionPath}/execution-ledger.jsonl`
+    );
   logger.success(`✅ Repaired legacy mission state for ${upperId}.`);
 }
 

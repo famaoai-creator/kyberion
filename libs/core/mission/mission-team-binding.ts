@@ -1,4 +1,4 @@
-import { appendJsonLine } from '../foundation/json.js';
+import { z } from 'zod';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
@@ -32,7 +32,7 @@ import {
 import {
   provisionMissionEntry,
   writeProvisionedJson,
-  writeProvisionedText,
+  appendProvisionedText,
 } from './mission-orchestration-journal.js';
 import type {
   MissionTeamGovernance,
@@ -40,6 +40,7 @@ import type {
 } from './mission-team-plan-composer.js';
 import {
   normalizeEventScope,
+  parseEventScopeInput,
   resolveEventScopeAgainstAuthority,
   type EventScope,
   type EventScopeInput,
@@ -420,7 +421,7 @@ export function initializeMissionTeamBindings(
     ),
   });
   if (!safeExistsSync(paths.executionLedgerPath)) {
-    writeProvisionedText({
+    appendProvisionedText({
       missionId: plan.mission_id,
       filePath: paths.executionLedgerPath,
       targetPath: path
@@ -428,7 +429,7 @@ export function initializeMissionTeamBindings(
         .split(path.sep)
         .join('/'),
       missionPathHint: paths.missionPath,
-      provisioned: provisionMissionEntry(''),
+      content: '',
     });
   }
   return paths;
@@ -783,23 +784,73 @@ export function appendMissionExecutionLedgerEntry(
     scope: resolveMissionLedgerScope(input, missionId, paths.missionPath),
   };
   safeMkdir(paths.missionPath, { recursive: true });
-  if (!safeExistsSync(paths.executionLedgerPath)) {
-    writeProvisionedText({
-      missionId,
-      filePath: paths.executionLedgerPath,
-      targetPath: path
-        .relative(paths.missionPath, paths.executionLedgerPath)
-        .split(path.sep)
-        .join('/'),
-      missionPathHint: paths.missionPath,
-      provisioned: provisionMissionEntry(''),
-    });
-  }
   const entry: MissionExecutionLedgerEntry = {
     ts: nowIso(),
     mission_id: missionId,
     ...entryPayload,
   };
-  appendJsonLine(paths.executionLedgerPath, entry);
+  appendProvisionedText({
+    missionId,
+    filePath: paths.executionLedgerPath,
+    targetPath: 'execution-ledger.jsonl',
+    missionPathHint: paths.missionPath,
+    content: `${JSON.stringify(entry)}\n`,
+    validateContent: (content) =>
+      validateExecutionLedgerText(content, missionId, paths.missionPath),
+  });
   return paths.executionLedgerPath;
+}
+
+const executionLedgerRowSchema = z
+  .object({
+    ts: z.string().datetime(),
+    mission_id: z.string().min(1),
+    event_type: z.string().min(1),
+    actor_type: z.enum(['agent', 'human', 'service']).optional(),
+    evidence: z.array(z.string()).optional(),
+    task_id: z.string().optional(),
+  })
+  .passthrough();
+
+/** Legacy initialization receipts never authenticated later rows; validate, do not invent history. */
+function validateExecutionLedgerText(
+  content: string,
+  missionId: string,
+  missionPath: string
+): void {
+  if (content && !content.endsWith('\n'))
+    throw new Error('MISSION_LOG_CORRUPT:ledger_incomplete_line');
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    const entry = executionLedgerRowSchema.parse(JSON.parse(line));
+    if (entry.mission_id !== missionId)
+      throw new Error('MISSION_LOG_CORRUPT:ledger_mission_mismatch');
+    if (entry.scope !== undefined) {
+      const authority = resolveMissionLedgerScope(
+        { mission_id: missionId, event_type: entry.event_type, task_id: entry.task_id },
+        missionId,
+        missionPath
+      );
+      resolveEventScopeAgainstAuthority(authority, parseEventScopeInput(entry.scope));
+    }
+  }
+}
+
+/** Called only by the operator repair facade, never by ordinary append or resume. */
+export function repairLegacyMissionExecutionLedger(
+  missionId: string,
+  missionPath: string
+): boolean {
+  const paths = resolveMissionBindingPaths(missionId, missionPath);
+  if (!safeExistsSync(paths.executionLedgerPath)) return false;
+  return appendProvisionedText({
+    missionId,
+    filePath: paths.executionLedgerPath,
+    targetPath: 'execution-ledger.jsonl',
+    missionPathHint: paths.missionPath,
+    content: '',
+    repairLegacyEmptyLedger: true,
+    validateContent: (content) =>
+      validateExecutionLedgerText(content, missionId, paths.missionPath),
+  });
 }
