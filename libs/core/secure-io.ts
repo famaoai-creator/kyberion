@@ -826,6 +826,16 @@ export function safeOpenAppendFile(filePath: string): number {
   return openInPlace(resolved, filePath, 'a', 'write', undefined, false, canonical);
 }
 
+/** Borrow a governed append descriptor and close it even if the callback throws. */
+export function withSafeAppendFile<T>(filePath: string, use: (fd: number) => T): T {
+  const fd = safeOpenAppendFile(filePath);
+  try {
+    return use(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /**
  * Create a file exclusively. The open is atomic: it fails with EEXIST
  * when another process already owns the path.

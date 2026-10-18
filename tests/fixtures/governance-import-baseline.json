@@ -259,6 +259,7 @@
     "scripts/run_realtime_voice_conversation.ts",
     "scripts/setup_oauth.ts",
     "scripts/surface_runtime.ts",
+    "scripts/terminal_session_cli.ts",
     "scripts/ts-loader-cache.test.ts",
     "scripts/ts-loader-resolve.test.ts",
     "scripts/voice_upgrade.ts",

@@ -10,6 +10,7 @@ import {
 } from './actuator/actuator-sdk.js';
 import type { PipelineStepType } from './actuator/actuator-op-registry.js';
 import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import { assertCapabilityAllowed } from './capability-restriction-policy.js';
@@ -108,6 +109,12 @@ export async function runActuatorCliEntryPoint(
   } catch (error: unknown) {
     console.error(`[${name}] ${formatUnknownError(error)}`);
     process.exitCode = 1;
+  }
+  // Spawned PTYs, keep-alive handles, or open streams can pin the event loop
+  // after the result was already printed; a CLI entry point must not linger.
+  // Under test runners, defer to the harness instead of exiting.
+  if (!isVitestProcess() && !getRegisteredEnvText('KYBERION_ACTUATOR_TEST')) {
+    process.exit(process.exitCode ?? 0);
   }
 }
 
