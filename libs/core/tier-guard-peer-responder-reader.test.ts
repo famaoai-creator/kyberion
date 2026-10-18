@@ -85,6 +85,29 @@ describe('tier-guard peer_responder_reader authority role', () => {
     ).toEqual({ allowed: true });
   });
 
+  it('matches the deny_read carve-out case-insensitively and after `..` resolution', () => {
+    // Case-insensitive volumes (APFS, NTFS) open these as the carved-out files,
+    // so the broader allow_read grant must not reach them through a respelling.
+    for (const relative of [
+      'knowledge/confidential/acme-corp/Connections/peer-network.json',
+      'knowledge/confidential/acme-corp/CONNECTIONS/peer-network.json',
+      'knowledge/confidential/acme-corp/connections/Peer-Network.json',
+      'knowledge/confidential/acme-corp/cOnNeCtIoNs/nested/notes.md',
+    ]) {
+      const decision = validateReadPermission(at(relative));
+      expect(decision.allowed, relative).toBe(false);
+      expect(decision.reason, relative).toMatch(/deny_read/);
+    }
+    const dotted = `${ROOT}/knowledge/confidential/acme-corp/notes/../Connections/peer-network.json`;
+    const decision = validateReadPermission(dotted);
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toMatch(/deny_read/);
+    // Case folding only widens the deny; ordinary siblings stay readable.
+    expect(
+      validateReadPermission(at('knowledge/confidential/acme-corp/Notes/handbook.md'))
+    ).toEqual({ allowed: true });
+  });
+
   it('the peer catalog reader still reads the bound tenant peer catalog', () => {
     process.env.MISSION_ROLE = 'peer_catalog_reader';
     expect(
