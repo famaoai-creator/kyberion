@@ -14,7 +14,9 @@ import { pathResolver } from '../path-resolver.js';
 import {
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
+  peerNetworkCatalogPath,
   resolvePeerDispatchTarget,
+  resolvePeerNetworkCatalogPath,
   sendPeerMessage,
   type PeerMessageDispatchReceipt,
   type PeerMessageEnvelope,
@@ -778,16 +780,40 @@ export function buildPeerConversationEnvelope(input: {
   });
 }
 
+/**
+ * Least-privilege reader of a tenant's peer transport catalog
+ * (knowledge/confidential/<tenant>/connections/peer-network.json). Senders
+ * resolve the recipient endpoint and HMAC secret under it, bound to the
+ * sending tenant, so a caller whose role cannot read the confidential tier
+ * can still send; it grants that single file only and no write.
+ */
+export const PEER_CATALOG_READER_ROLE = 'peer_catalog_reader';
+
+function loadSenderPeerCatalog(input: SendPeerConversationMessageInput) {
+  const options = {
+    ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  };
+  const tenantCatalog =
+    !input.catalogPath &&
+    input.tenantId &&
+    resolvePeerNetworkCatalogPath(options) === peerNetworkCatalogPath(input.tenantId);
+  if (!tenantCatalog) return loadPeerNetworkCatalog(options);
+  return withExecutionContext(
+    PEER_CATALOG_READER_ROLE,
+    () => loadPeerNetworkCatalog(options),
+    undefined,
+    input.tenantId
+  );
+}
+
 export async function sendPeerConversationMessageToPeer(
   input: SendPeerConversationMessageInput
 ): Promise<{
   session: PeerConversationSession;
   receipt: PeerMessageDispatchReceipt;
 }> {
-  const catalog = loadPeerNetworkCatalog({
-    ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
-    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
-  });
+  const catalog = loadSenderPeerCatalog(input);
   const target = resolvePeerDispatchTarget(input.recipientPeerId, catalog);
   const sessionId = input.sessionId || randomId('PCS');
   const localSession = appendPeerConversationTranscript({

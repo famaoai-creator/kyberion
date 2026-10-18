@@ -510,6 +510,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh/peer-conversation.ts#loadSenderPeerCatalog",
+      "roles": ["peer_catalog_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/peer-conversation.ts#readPeerConversationEdges",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -4573,6 +4578,7 @@
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
+        "peer_catalog_reader",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime"
@@ -5681,6 +5687,7 @@
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
+        "peer_catalog_reader",
         "scope_locale_reader",
         "slack_bridge"
       ]
@@ -6995,7 +7002,8 @@
         "chronos_tenant_runner",
         "knowledge_steward",
         "metrics_cap_reader",
-        "organization_operator"
+        "organization_operator",
+        "peer_catalog_reader"
       ]
     },
     "system_configurator": {
