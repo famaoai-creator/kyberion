@@ -770,7 +770,8 @@ export function safeRmSync(
   // removal into another scope — so the parent is canonicalized.
   const { resolved, canonical } = guardWritePath(targetPath, 'leaf');
   if (options.recursive) {
-    const scratchRoot = pathResolver.rootResolve('active/shared/tmp');
+    // Match the physical checkout floor, independent of domain-level rootResolve overrides.
+    const scratchRoot = path.join(pathResolver.rootDir(), 'active/shared/tmp');
     if (resolved === scratchRoot || canonical === canonicalGuardPath(scratchRoot, 'leaf'))
       throw new Error(
         '[SECURITY] scratch_root_removal_denied — remove only a named job workspace, never the shared scratch root'

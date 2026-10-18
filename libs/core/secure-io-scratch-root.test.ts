@@ -12,6 +12,13 @@ vi.mock('node:fs', async (original) => {
   };
 });
 import * as fs from 'node:fs';
+// Domain callers may replace rootResolve with an unconfigured mock.
+// The physical storage floor must remain protected independently.
+vi.mock('./path-resolver.js', async (original) => {
+  const actual = await original<typeof import('./path-resolver.js')>();
+  return { ...actual, rootResolve: vi.fn() };
+});
+
 describe('shared scratch root removal guard', () => {
   it.each([
     'active/shared/tmp',
