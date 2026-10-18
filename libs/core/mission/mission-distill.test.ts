@@ -59,8 +59,10 @@ import { loadState } from './mission-state.js';
 import {
   gatherDistillContext,
   distillMission,
+  formatWisdomMarkdown,
   isRegularMissionDistillPromptPath,
   resolveWisdomOutputPath,
+  WISDOM_SCHEMA,
 } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
 import { safeExec } from '../secure-io.js';
@@ -294,5 +296,127 @@ describe('resolveWisdomOutputPath', () => {
       safeRmSync(link, { force: true });
       safeRmSync(target, { recursive: true, force: true });
     }
+  });
+});
+
+describe('WISDOM_SCHEMA harness2 experience contract', () => {
+  const baseWisdom = {
+    title: 'Test wisdom',
+    category: 'Evolution' as const,
+    tags: ['test'],
+    importance: 5,
+    sections: {
+      summary: 'summary',
+      key_learnings: ['l1'],
+      patterns_discovered: ['p1'],
+      failures_and_recoveries: ['None'],
+      reusable_artifacts: ['None identified'],
+    },
+  };
+
+  it('accepts a wisdom object without the new optional fields (backward compatible)', () => {
+    expect(WISDOM_SCHEMA.safeParse(baseWisdom).success).toBe(true);
+  });
+
+  it('accepts a complete experience block and edit rows', () => {
+    const wisdom = {
+      ...baseWisdom,
+      experience: {
+        cue: 'when a task changes several components at once',
+        lesson: 'isolate component changes in separate rollout probes',
+        evidence: 'edit_rows[0], edit_rows[1]',
+        confidence: 'medium',
+      },
+      edit_rows: [
+        {
+          component: 'scripts/check_totals.py',
+          change: 'added a deterministic totals checker',
+          observed: 'rollout inv1 reconciled totals without manual loop',
+          verdict: 'helped',
+        },
+        {
+          component: 'guardrails',
+          change: 'rewrote completion rules while also changing skills',
+          observed: 'cannot attribute the divergence to either change',
+          verdict: 'confounded',
+        },
+      ],
+    };
+    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(true);
+  });
+
+  it('rejects a partial experience block (missing evidence)', () => {
+    const wisdom = {
+      ...baseWisdom,
+      experience: { cue: 'cue', lesson: 'lesson', confidence: 'high' },
+    };
+    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+  });
+
+  it('rejects empty-string fields inside an experience block', () => {
+    expect(
+      WISDOM_SCHEMA.safeParse({
+        ...baseWisdom,
+        experience: { cue: 'c', lesson: 'l', evidence: '', confidence: 'high' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a verdict outside the enum', () => {
+    const wisdom = {
+      ...baseWisdom,
+      edit_rows: [{ component: 'c', change: 'x', observed: 'y', verdict: 'probably_helped' }],
+    };
+    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+  });
+});
+
+describe('formatWisdomMarkdown experience rendering', () => {
+  const baseWisdom = {
+    title: 'Render Test',
+    category: 'Operations',
+    tags: ['t'],
+    importance: 3,
+    sections: {
+      summary: 's',
+      key_learnings: [],
+      patterns_discovered: [],
+      failures_and_recoveries: ['None'],
+      reusable_artifacts: ['None identified'],
+    },
+  };
+
+  it('renders change-attribution rows and the transferable lesson when present', () => {
+    const md = formatWisdomMarkdown(
+      {
+        ...baseWisdom,
+        edit_rows: [
+          {
+            component: 'skills/doc_review',
+            change: 'added a trigger line',
+            observed: 'rollout dom1 invoked the skill',
+            verdict: 'helped',
+          },
+        ],
+        experience: {
+          cue: 'document-review tasks',
+          lesson: 'name the trigger in always-on text',
+          evidence: 'edit_rows[0]',
+          confidence: 'high',
+        },
+      },
+      'MSN-RENDER-1'
+    );
+    expect(md).toContain('What Each Change Did');
+    expect(md).toContain('**skills/doc_review** (helped)');
+    expect(md).toContain('Transferable Lesson');
+    expect(md).toContain('**cue**: document-review tasks');
+    expect(md).toContain('**confidence**: high');
+  });
+
+  it('omits both sections when the fields are absent', () => {
+    const md = formatWisdomMarkdown(baseWisdom, 'MSN-RENDER-2');
+    expect(md).not.toContain('What Each Change Did');
+    expect(md).not.toContain('Transferable Lesson');
   });
 });

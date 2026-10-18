@@ -499,3 +499,64 @@ describe('memory lineage resolution', () => {
     ).toBe('tenant-a');
   });
 });
+
+describe('distill experience fields', () => {
+  const queuePath = memoryPromotionQueuePath();
+
+  beforeEach(() => {
+    if (safeExistsSync(queuePath)) safeRmSync(queuePath);
+  });
+
+  it('carries distill_experience through enqueue and the identity merge', () => {
+    const base = createMemoryPromotionCandidate({
+      candidateId: 'MEM-QUEUE-DISTILL-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-QUEUE-DISTILL-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'First enqueue without the lesson.',
+      evidenceRefs: ['artifact:ART-QUEUE-DISTILL-1'],
+      sensitivityTier: 'public',
+    });
+    enqueueMemoryPromotionCandidate({ ...base, distill_experience_declined: true });
+
+    // Second enqueue of the same logical candidate (different summary forces the
+    // identity-match merge path) carries the lesson the first write lacked.
+    enqueueMemoryPromotionCandidate({
+      ...base,
+      summary: 'Second enqueue of the same mission, now carrying the lesson.',
+      distill_experience: {
+        cue: 'tasks that touch multiple components',
+        lesson: 'attribute changes per component via isolated probes',
+        evidence: 'edit_rows[0..2]',
+        confidence: 'medium',
+      },
+      distill_experience_declined: false,
+    });
+
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.distill_experience?.confidence).toBe('medium');
+    expect(rows[0]?.distill_experience_declined).toBe(false);
+  });
+
+  it('rejects an experience object missing the evidence field at validation', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-QUEUE-DISTILL-INVALID',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-QUEUE-DISTILL-INVALID',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Candidate with a partial experience record.',
+      evidenceRefs: ['artifact:ART-QUEUE-DISTILL-2'],
+      sensitivityTier: 'public',
+    });
+    // The missing `evidence` field makes this an invalid MemoryDistillExperience;
+    // JSON.parse yields the malformed shape without an `as any` cast.
+    const partialExperience = JSON.parse('{"cue":"c","lesson":"l","confidence":"high"}');
+    expect(() =>
+      enqueueMemoryPromotionCandidate({
+        ...candidate,
+        distill_experience: partialExperience,
+      })
+    ).toThrow(/Invalid memory promotion candidate/);
+  });
+});

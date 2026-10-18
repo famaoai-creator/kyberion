@@ -207,6 +207,8 @@ function recordShape(candidate: MemoryCandidate): Record<string, unknown> {
     audit_ref: candidate.audit_ref || null,
     promotion: candidate.promotion || null,
     knowledge_domain: candidate.knowledge_domain || 'organization',
+    distill_experience: candidate.distill_experience || null,
+    distill_experience_declined: candidate.distill_experience_declined ?? null,
   };
 }
 
@@ -332,6 +334,23 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
     !candidate.source_ref.startsWith('task_session:')
   ) {
     warnings.push('Legacy source_ref without a type prefix.');
+  }
+
+  // Harness2 experience contract: surface the lesson's evidence basis so the
+  // steward can narrow a weak lesson in curation or reject it outright.
+  if (candidate.distill_experience_declined === true) {
+    warnings.push(
+      'Distillation produced no transferable lesson (NO_ENTRY); approve only if the curation supplies a record the evidence supports.'
+    );
+  } else if (candidate.distill_experience?.confidence === 'low') {
+    warnings.push(
+      'Distilled lesson confidence is low — it may rest on confounded evidence; narrow it in curation or decline.'
+    );
+  }
+  if (candidate.distill_experience && candidate.promotion) {
+    warnings.push(
+      'Brokered promotion carries free-text lesson fields (cue/lesson/evidence); the approver is responsible for confirming no tenant-private detail crosses the tier boundary.'
+    );
   }
 
   const statuses = Array.from(new Set(group.map((row) => row.status)));
