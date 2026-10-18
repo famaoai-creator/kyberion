@@ -573,7 +573,10 @@
       "allow_write": []
     },
     "peer_catalog_reader": {
-      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json"],
+      "allow_read": [
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json",
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-tasks.json"
+      ],
       "allow_write": []
     },
     "peer_responder_reader": {
