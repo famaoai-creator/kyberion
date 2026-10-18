@@ -367,15 +367,19 @@ describe('integrity hardening (R3 review)', () => {
     safeWriteFile(path.join(dst, 'a.txt'), 'changed');
     expect(manifestsEqual(treeManifest(dst), manifest)).toBe(false);
   });
-  it('blind selection excludes never-executed outcomes', async () => {
-    // base delivers (scenario ships pass_marker); ok1 delivers; mark is
-    // stage-refused. Pool must be exactly the two executed rows.
+  it('blind selection excludes a stage-refused outcome', async () => {
+    // 'mark' passes the session-start scan CLEAN — the base probe injects a
+    // marker into its live overlay before mark is staged, so the in-stage
+    // snapshot scan refuses it. The probe_refused outcome reaches `outcomes`,
+    // and the ok-filter must keep it out of the blind pool (3 rows if not).
     const scenDir = path.join(ROOT, 'scenario-pool');
+    const markDir = path.join(ROOT, 'ov', 'pool-mark');
     safeWriteFile(path.join(scenDir, 'pass_marker'), '1');
     safeWriteFile(
       path.join(scenDir, 'run.sh'),
-      '#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\n'
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_mark || echo 'rubric eval_score' > "${path.join(markDir, 'n.txt')}"\n`
     );
+    overlay('pool-mark', { benign: '1' });
     let poolSize = -1;
     const r = await runRecursiveSession({
       session_id: 'rec-pool',
@@ -385,10 +389,7 @@ describe('integrity hardening (R3 review)', () => {
       runRoot: path.join(ROOT, 'run-pool'),
       candidates: [
         { label: 'ok1', overlayDir: overlay('pool-ok', { extra: '1' }) },
-        {
-          label: 'mark',
-          overlayDir: overlay('pool-mark', { 'n.txt': 'rubric eval_score' }),
-        },
+        { label: 'mark', overlayDir: markDir },
       ],
       rounds: 1,
       selection: 'blind',
@@ -398,9 +399,9 @@ describe('integrity hardening (R3 review)', () => {
       },
     });
     expect(r.rounds[0].decision.decision).toBe('human_gate');
-    // 'mark' refused at the session's live-dir scan first — check the
-    // rejection trail rather than pool presence.
-    expect(r.rounds[0].rejected.some((x) => /leak marker/.test(x.reason))).toBe(true);
+    expect(r.rounds[0].rejected.some((x) => /probe refused: leak marker/.test(x.reason))).toBe(
+      true
+    );
     expect(poolSize).toBe(2);
   });
 });

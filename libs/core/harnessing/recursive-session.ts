@@ -227,10 +227,12 @@ export async function runRecursiveSession(
 
   const rounds: RoundRecord[] = [];
   const adopted: string[] = [];
-  // Per-label manifest of the last probed snapshot — a supplied overlay whose
-  // bytes change between rounds is surfaced, not silently re-probed as if
-  // nothing moved (supplied dirs are assumed session-immutable).
+  // Per-label manifest of the last probed snapshot — a SUPPLIED overlay
+  // whose bytes change between rounds is surfaced, not silently re-probed.
+  // Proposed overlays share labels across rounds but legitimately regenerate
+  // — they have no cross-round identity to compare, so they are excluded.
   const overlayManifests = new Map<string, string>();
+  const suppliedLabels = new Set(supplied.map((c) => c.label));
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
@@ -351,7 +353,7 @@ export async function runRecursiveSession(
       // Cross-round honesty: same label, different bytes than last round —
       // the supplied overlay mutated under the session's immutability
       // assumption. Surface it; don't pretend the probes were comparable.
-      if (o.snapshot_manifest) {
+      if (o.snapshot_manifest && suppliedLabels.has(o.label)) {
         const canon = JSON.stringify(
           Object.keys(o.snapshot_manifest)
             .sort()
