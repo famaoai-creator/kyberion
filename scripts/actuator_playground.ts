@@ -35,9 +35,33 @@ import {
   ScriptExitError,
   stripSharedScriptFlags,
 } from './lib/harness.js';
-import { parseSafeJsonInput, parseSafeJsonObjectInput } from './lib/json-input.js';
+import {
+  parseSafeJsonInput,
+  parseSafeJsonObjectInput,
+  readSafeJsonFile,
+} from './lib/json-input.js';
 
 type Print = (value: unknown) => void;
+
+const PLAYGROUND_USAGE = `Usage: pnpm playground -- [options]
+
+Discovery (read-only — never builds, writes scratch files, or invokes a handler):
+  --list [--actuator <id>] [--op <op>] [--search <text>] [--json]
+  --actuator <id> --op <op> --describe [--json]
+
+Try a single op:
+  --actuator <id> --op <op> [--params '<json>' | --params @file.json]
+  --check    validate schema + contract only; never invokes a handler
+  --dry-run  capture ops run the handler; apply/transform/control validate only
+  (neither)  live execution
+
+Other flags: --json (machine output) --quiet --help
+No flags:    interactive wizard
+
+Examples:
+  pnpm playground -- --list --search browser --json
+  pnpm playground -- --actuator file-actuator --op read --describe --json
+  pnpm playground -- --actuator file-actuator --op read --params '{"path":"package.json"}' --check`;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -80,6 +104,17 @@ function tryCoerceValue(val: string): any {
 
 export function parsePlaygroundParams(raw: string, label = '--params'): Record<string, unknown> {
   return parseSafeJsonObjectInput(raw, label) || {};
+}
+
+/**
+ * `--params @path/to/file.json` loads the parameter object from a repository
+ * file — useful for payloads too large to paste inline. Anything else is
+ * parsed as inline JSON.
+ */
+export function resolvePlaygroundParamsInput(raw: string): Record<string, unknown> {
+  if (!raw.startsWith('@')) return parsePlaygroundParams(raw);
+  const filePath = assertSafeRepositoryPath(pathResolver.rootResolve(raw.slice(1)));
+  return readSafeJsonFile<Record<string, unknown>>(filePath, '--params file');
 }
 
 export function buildPlaygroundPayload(
@@ -355,6 +390,11 @@ export async function runPlayground(
   const machineOutput =
     discoveryOnly || options.json === true || options.dryRun === true || options.check === true;
   const print = options.print ?? (() => undefined);
+  if (cliParams.help !== undefined || args.includes('-h')) {
+    rl.close();
+    print(PLAYGROUND_USAGE);
+    return { ok: true, mode: 'help' };
+  }
   const emit = (...values: unknown[]): void => values.forEach((value) => print(value));
   const log = (...values: unknown[]) => {
     if (!machineOutput && !options.quiet) emit(...values);
@@ -468,6 +508,20 @@ export async function runPlayground(
     return result;
   }
 
+  // A supplied --actuator that matches nothing must not fall back silently to
+  // the wizard or the generic machine-mode message — surface the name.
+  if (!selectedActuator && targetActuatorId) {
+    const available = actuators.map((a) => a.manifest.actuator_id).join(', ');
+    if (machineOutput) {
+      rl.close();
+      throw new ScriptExitError(
+        1,
+        `Unknown --actuator '${targetActuatorId}'. Available: ${available}.`
+      );
+    }
+    log(chalk.yellow(`⚠️  Unknown --actuator '${targetActuatorId}'. Pick one from the list.`));
+  }
+
   // 3. Actuator Selection Wizard
   if (!selectedActuator) {
     if (machineOutput) {
@@ -485,14 +539,20 @@ export async function runPlayground(
       log(`     ${chalk.gray(act.manifest.description)}`);
     });
 
-    const choiceStr = await question(chalk.bold.blue('\nSelect an Actuator by number: '));
+    const choiceStr = await question(chalk.bold.blue('\nSelect an Actuator by number or id: '));
     const idx = parseInt(choiceStr, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= actuators.length) {
+    const pick =
+      !isNaN(idx) && idx >= 0 && idx < actuators.length
+        ? actuators[idx]
+        : actuators.find(
+            (a) => a.id === choiceStr || a.manifest.actuator_id === choiceStr
+          );
+    if (!pick) {
       logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
       throw new ScriptExitError(1, 'Invalid actuator selection');
     }
-    selectedActuator = actuators[idx];
+    selectedActuator = pick;
   }
 
   const manifest = selectedActuator.manifest;
@@ -502,6 +562,10 @@ export async function runPlayground(
   // Manifest is coarse (pipeline-style actuators list only `pipeline`);
   // union with describeOps from the discovery index so single ops work.
   const ops = resolvePlaygroundCapabilities(manifest, selectedActuator.id);
+  const opDetails = loadDiscoveryOpDetailsForActuator(
+    manifest.actuator_id,
+    selectedActuator.id
+  );
   let selectedOpObj = ops.find((o) => o.op === targetOp);
 
   if (!selectedOpObj) {
@@ -523,35 +587,72 @@ export async function runPlayground(
       );
     }
 
+    if (targetOp) {
+      log(
+        chalk.yellow(
+          `⚠️  Unknown --op '${targetOp}' for '${manifest.actuator_id}'. Pick one from the list.`
+        )
+      );
+    }
     log(chalk.white('\nAvailable Operations (ops):'));
     ops.forEach((opObj, idx) => {
+      const kind = opDetails.find((entry) => entry.op === opObj.op)?.kind;
+      const kindTag = kind ? chalk.gray(` [${kind}]`) : '';
       const desc = opObj.description ? ` - ${opObj.description}` : '';
-      log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(opObj.op)}${chalk.gray(desc)}`);
+      log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(opObj.op)}${kindTag}${chalk.gray(desc)}`);
     });
 
-    const choiceStr = await question(chalk.bold.blue('\nSelect an Operation by number: '));
+    const choiceStr = await question(
+      chalk.bold.blue('\nSelect an Operation by number or name: ')
+    );
     const idx = parseInt(choiceStr, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= ops.length) {
+    const pick =
+      !isNaN(idx) && idx >= 0 && idx < ops.length
+        ? ops[idx]
+        : ops.find((o) => o.op === choiceStr);
+    if (!pick) {
       logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
       throw new ScriptExitError(1, 'Invalid operation selection');
     }
-    selectedOpObj = ops[idx];
+    selectedOpObj = pick;
   }
 
   const op = selectedOpObj.op;
+  const selectedOpDetail = opDetails.find((entry) => entry.op === op);
   log(chalk.green(`✓ Selected Operation: ${chalk.bold(op)}`));
 
   // 5. Parameter Gathering Wizard
   let paramsObject: Record<string, any> = {};
 
+  // Surface the declared parameter surface before asking for values —
+  // otherwise the wizard prompts blind key/value pairs.
+  if (!machineOutput && !rawParamsStr) {
+    const schema = selectedOpDetail?.input_schema;
+    const properties =
+      schema?.properties && typeof schema.properties === 'object'
+        ? Object.keys(schema.properties as Record<string, unknown>)
+        : [];
+    const required = Array.isArray(schema?.required)
+      ? (schema.required as unknown[]).filter((v): v is string => typeof v === 'string')
+      : [];
+    const optional = properties.filter((name) => !required.includes(name));
+    const example = selectedOpDetail?.examples?.[0];
+    if (required.length > 0 || optional.length > 0 || example !== undefined) {
+      log(chalk.white('\nParameters:'));
+      if (required.length > 0) log(`  ${chalk.gray('required:')} ${required.join(', ')}`);
+      if (optional.length > 0) log(`  ${chalk.gray('optional:')} ${optional.join(', ')}`);
+      if (example !== undefined) log(`  ${chalk.gray('example:')} ${JSON.stringify(example)}`);
+    }
+  }
+
   if (rawParamsStr) {
     try {
-      paramsObject = parsePlaygroundParams(rawParamsStr);
+      paramsObject = resolvePlaygroundParamsInput(rawParamsStr);
     } catch (err: any) {
-      logError(chalk.red(`\n❌ Failed to parse --params JSON: ${err.message}`));
+      logError(chalk.red(`\n❌ Failed to load --params: ${err.message}`));
       rl.close();
-      throw new ScriptExitError(1, `Failed to parse --params JSON: ${err.message}`);
+      throw new ScriptExitError(1, `Failed to load --params: ${err.message}`);
     }
   } else if (!machineOutput) {
     log(chalk.white('\nHow would you like to provide the operation parameters?'));
@@ -563,16 +664,16 @@ export async function runPlayground(
     if (methodChoice === '2') {
       log(
         chalk.yellow(
-          '\nPaste the full JSON value for "params" (e.g. {"channel": "slack", "text": "hello"}):'
+          '\nPaste the full JSON value for "params" (e.g. {"channel": "slack", "text": "hello"}), or @path to load a file:'
         )
       );
       const jsonStr = await question('> ');
       try {
-        paramsObject = parsePlaygroundParams(jsonStr, 'params');
+        paramsObject = resolvePlaygroundParamsInput(jsonStr);
       } catch (err: any) {
-        logError(chalk.red(`❌ Invalid JSON block: ${err.message}`));
+        logError(chalk.red(`❌ Invalid params input: ${err.message}`));
         rl.close();
-        throw new ScriptExitError(1, `Invalid JSON block: ${err.message}`);
+        throw new ScriptExitError(1, `Invalid params input: ${err.message}`);
       }
     } else {
       log(chalk.yellow('\nEnter parameter key-value pairs one by one. Leave key empty to finish.'));
@@ -592,9 +693,7 @@ export async function runPlayground(
   // try-out matches production. Actuators without a `pipeline` entry
   // (agent/secret/…) dispatch single actions directly and stay bare.
   const isManifestOp = (manifest.capabilities || []).some((entry) => entry.op === op);
-  const detail = loadDiscoveryOpDetailsForActuator(manifest.actuator_id, selectedActuator.id).find(
-    (entry) => entry.op === op
-  );
+  const detail = selectedOpDetail;
   const discoveryKind = detail?.kind ?? null;
   const isPipelineWrapped =
     !isManifestOp && discoveryKind !== null && actuatorAcceptsPipeline(manifest);

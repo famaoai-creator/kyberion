@@ -11,6 +11,7 @@ phase_affinity: [alignment, execution]
 Choose an executor by target, discover its contract, then observe → act → verify.
 Use the existing pipeline for repeatable work. During exploration, describe one
 operation instead of loading the entire catalog into the model context.
+`pnpm playground -- --help` prints the full flag summary.
 
 ## Discover without execution
 
@@ -44,10 +45,13 @@ not proof that every field is valid. The runtime remains the authority.
 `--dry-run` executes capture operations and only validates apply/transform
 operations; the op kind comes from the discovery registry
 (`actuator-op-discovery.json`), so read-only ops listed as `capture` actually
-run. Use `--check` for zero execution. `--params` may be omitted for
+run — including fine-grained ops wrapped into a one-step pipeline envelope.
+Use `--check` for zero execution. `--params` may be omitted for
 operations that take no arguments — an omitted flag is treated as `{}`, and
-the payload keeps both the `action` and `op` discriminator keys while
-contract validation accepts whichever key the actuator's schema declares.
+`--params @path/to/file.json` reads the object from a repository file instead
+of inline JSON. The payload keeps both the `action` and `op` discriminator
+keys while contract validation accepts whichever key the actuator's schema
+declares.
 For an authorized live call, omit `--check` and keep `--json`. Fine-grained
 pipeline operations are wrapped into the existing one-step pipeline contract.
 Malformed authored inputs are rejected before execution. Approval and tenant
