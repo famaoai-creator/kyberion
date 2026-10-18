@@ -115,6 +115,13 @@ function canonicalHookToolName(tool: string | undefined): string {
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 /** Tools whose completed execution we record into the audit chain. */
 const AUDITED_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash']);
+/**
+ * Devin-only tools worth auditing under their own name (no canonical alias):
+ * `write_to_process` can inject input into a running process — a side channel
+ * for shell-adjacent effects — so its use is recorded (metadata only; the
+ * payload text may carry secrets and is never captured).
+ */
+const HOST_EXTRA_AUDITED = new Set(['write_to_process']);
 
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
@@ -142,9 +149,28 @@ function classifyPromptIntent(prompt: string): string[] {
   return hints.slice(0, 3);
 }
 
+// apply_patch carries no `file_path` — its targets live inside the patch text.
+// Cover the OpenAI apply_patch grammar (`*** Add|Update|Delete File:` /
+// `*** Move to:`) and unified-diff headers so a patch cannot bypass the tier
+// or lease gate by hiding its destination in the payload body. `content` is
+// deliberately not scanned: for `write`/`edit` it holds file body text where
+// diff-looking lines would be false positives.
+const PATCH_MARKER_RE = /\*\*\*\s*(?:(?:Add|Update|Delete)\s+File|Move to):\s*(\S+)/g;
+const DIFF_HEADER_RE = /^(?:---|\+\+\+)\s+[ab]\/(\S+)/gm;
+
 function targetPaths(toolInput: Record<string, unknown> = {}): string[] {
+  const paths: string[] = [];
   const candidate = toolInput.file_path ?? toolInput.notebook_path ?? toolInput.path;
-  return typeof candidate === 'string' && candidate ? [candidate] : [];
+  if (typeof candidate === 'string' && candidate) paths.push(candidate);
+  const patch = toolInput.patch;
+  if (typeof patch === 'string' && patch) {
+    for (const re of [PATCH_MARKER_RE, DIFF_HEADER_RE]) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(patch))) paths.push(m[1]!);
+    }
+  }
+  return [...new Set(paths)];
 }
 
 function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput {
@@ -314,6 +340,29 @@ export function buildSessionEndContext(input: Record<string, unknown> = {}): str
     : '';
 }
 
+/**
+ * PostCompaction (Devin-only event today; dormant under Claude Code): after
+ * context compaction the SessionStart governance brief is gone — re-inject a
+ * minimal reminder and refresh co-session presence (re-join is idempotent).
+ * `additionalContext` on this event is undocumented for Devin; emit it anyway
+ * — worst case it is ignored while the presence side effect still lands.
+ */
+export function buildPostCompactionContext(input: Record<string, unknown> = {}): string {
+  const provider = resolveHookHostProvider();
+  const join = coSessionHookJoin({
+    provider,
+    session_key: input.session_id as string | undefined,
+  });
+  return [
+    'Kyberion governance remains active after compaction (kyberion-claude-code plugin).',
+    '- Knowledge tier writes stay gated; file/shell executions are audited.',
+    '- Run /ky-review after changes; follow the Operating Guide (CLAUDE.md §3).',
+    ...(join.joined
+      ? [`Co-session ${join.session_id}: ${join.participant_id} (provider ${provider}).`]
+      : []),
+  ].join('\n');
+}
+
 export interface CliUsageSummary {
   model: string;
   inputTokens: number;
@@ -389,6 +438,13 @@ function describeToolInput(
   if (typeof candidate === 'string' && candidate) {
     return { file_path: candidate, tier: detectTier(candidate) };
   }
+  if (tool === 'write_to_process') {
+    // Never capture text_input / bytes_input — the payload may carry secrets.
+    return {
+      shell_id: toolInput.shell_id,
+      input_kind: typeof toolInput.text_input === 'string' ? 'text' : 'bytes',
+    };
+  }
   return {};
 }
 
@@ -401,14 +457,22 @@ export function recordPostToolUse(input: PostToolUseInput): {
   entryId?: string;
 } {
   const tool = canonicalHookToolName(input.tool_name);
-  if (!AUDITED_TOOLS.has(tool)) return { recorded: false };
+  // Host-specific extras (e.g. Devin `write_to_process`) audit under their
+  // own tool name — no canonical alias exists.
+  const extraAudited = !AUDITED_TOOLS.has(tool) && HOST_EXTRA_AUDITED.has(input.tool_name ?? '');
+  if (!AUDITED_TOOLS.has(tool) && !extraAudited) return { recorded: false };
+  const operation = extraAudited ? String(input.tool_name) : tool;
 
   const entry = auditChain.record({
     agentId: hookHostAgentId(),
     action: 'claude_code_tool',
-    operation: tool,
+    operation,
     result: 'completed',
-    metadata: { tool, ...describeToolInput(tool, input.tool_input), cwd: input.cwd },
+    metadata: {
+      tool: operation,
+      ...describeToolInput(operation, input.tool_input),
+      cwd: input.cwd,
+    },
   });
   return { recorded: true, entryId: entry.id };
 }
