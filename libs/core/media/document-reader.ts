@@ -1,6 +1,6 @@
 /**
  * The single document reader: pdf / pptx / docx / xlsx / html / markdown /
- * text → Markdown.
+ * text / csv / tsv / json / yaml → Markdown.
  *
  * Every surface that "reads a file" goes through here — `pnpm kyberion read`,
  * `media:document_digest` and the ingest ceremony's `parse_document` — so an
@@ -14,8 +14,9 @@
  * first. Everything this module stages or extracts is removed before it
  * returns — tenant figures never outlive a read in the tmp floor.
  *
- * Prose/web files are read from local bytes only (html via the core
- * htmlToMarkdown converter; markdown / text as-is). URLs are never fetched
+ * Prose/web/data files are read from local bytes only (html via the core
+ * htmlToMarkdown converter; markdown / text / yaml as-is; json pretty-printed
+ * when valid; small csv/tsv as Markdown tables). URLs are never fetched
  * here — remote content goes through the egress-governed network actuator.
  */
 import * as path from 'node:path';
@@ -48,7 +49,7 @@ import type { PdfDesignProtocol } from '../contracts/pdf-protocol.js';
 import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
 
 export type OfficeDocumentFormat = 'pdf' | 'pptx' | 'docx' | 'xlsx';
-export type TextDocumentFormat = 'html' | 'markdown' | 'text';
+export type TextDocumentFormat = 'html' | 'markdown' | 'text' | 'csv' | 'tsv' | 'json' | 'yaml';
 export type ReadableDocumentFormat = OfficeDocumentFormat | TextDocumentFormat;
 
 /** Binary office/pdf documents only — for callers that must not accept prose files. */
@@ -67,7 +68,16 @@ export const READABLE_DOCUMENT_EXTENSIONS: Readonly<Record<string, ReadableDocum
   '.md': 'markdown',
   '.markdown': 'markdown',
   '.txt': 'text',
+  '.csv': 'csv',
+  '.tsv': 'tsv',
+  '.json': 'json',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
 };
+
+/** Small delimited files become Markdown tables; larger ones stay as raw text. */
+export const DELIMITED_TABLE_MAX_ROWS = 200;
+export const DELIMITED_TABLE_MAX_COLS = 40;
 
 export interface ReadDocumentOptions {
   /** OCR embedded images (slides, pages, pictures). */
@@ -147,7 +157,7 @@ function loadBytes(source: string | Buffer): Buffer {
   return safeReadFile(absolute, { encoding: null }) as Buffer;
 }
 
-/** Read a pdf / pptx / docx / xlsx / html / markdown / text (path inside the repository, or raw bytes) into Markdown. */
+/** Read a pdf / pptx / docx / xlsx / html / markdown / text / csv / tsv / json / yaml into Markdown. */
 export async function readDocument(
   source: string | Buffer,
   format: ReadableDocumentFormat,
@@ -173,6 +183,10 @@ export async function readDocument(
     case 'html':
     case 'markdown':
     case 'text':
+    case 'csv':
+    case 'tsv':
+    case 'json':
+    case 'yaml':
       result = readTextDocument(raw, format);
       break;
     default:
@@ -594,7 +608,94 @@ async function readXlsx(raw: Buffer): Promise<Omit<ReadDocumentResult, 'images'>
   return { format: 'xlsx', markdown: chunks.join('\n\n'), tables, warnings };
 }
 
-// ─── HTML / Markdown / text ────────────────────────────────
+// ─── HTML / Markdown / text / csv / tsv / json / yaml ───────
+
+function splitDelimitedLine(line: string, delimiter: ',' | '\t'): string[] {
+  if (delimiter === '\t') {
+    return line.split('\t').map((cell) => cell.trim());
+  }
+  const cells: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const ch = line[index];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function readDelimitedDocument(
+  source: string,
+  format: 'csv' | 'tsv'
+): Omit<ReadDocumentResult, 'images'> {
+  const warnings: string[] = [];
+  const delimiter = format === 'tsv' ? '\t' : ',';
+  const nonEmpty = source
+    .split('\n')
+    .map((line) => line.replace(/\s+$/u, ''))
+    .filter((line) => line.length > 0);
+
+  if (nonEmpty.length === 0) {
+    warnings.push('document body is empty');
+    return { format, markdown: source, tables: [], warnings };
+  }
+
+  const rows = nonEmpty.map((line) => splitDelimitedLine(line, delimiter));
+  const width = Math.max(...rows.map((row) => row.length));
+  const tooWide = width > DELIMITED_TABLE_MAX_COLS;
+  const tooTall = rows.length > DELIMITED_TABLE_MAX_ROWS;
+  if (tooWide || tooTall) {
+    const reasons: string[] = [];
+    if (tooTall) reasons.push(`${rows.length} rows > ${DELIMITED_TABLE_MAX_ROWS}`);
+    if (tooWide) reasons.push(`${width} columns > ${DELIMITED_TABLE_MAX_COLS}`);
+    warnings.push(`${format} left as-is (${reasons.join(', ')}) — use data-actuator for queries`);
+    return { format, markdown: source, tables: [], warnings };
+  }
+
+  const padded = rows.map((row) => Array.from({ length: width }, (_, i) => row[i] ?? ''));
+  const markdown = markdownTable(padded);
+  return {
+    format,
+    markdown,
+    tables: [{ name: format, markdown }],
+    warnings,
+  };
+}
+
+function readJsonDocument(source: string): Omit<ReadDocumentResult, 'images'> {
+  const warnings: string[] = [];
+  if (!source.trim()) {
+    warnings.push('document body is empty');
+    return { format: 'json', markdown: source, tables: [], warnings };
+  }
+  try {
+    const parsed: unknown = JSON.parse(source);
+    const markdown = `${JSON.stringify(parsed, null, 2)}\n`;
+    return { format: 'json', markdown, tables: [], warnings };
+  } catch {
+    warnings.push('JSON is not parseable — printed as-is');
+    return { format: 'json', markdown: source, tables: [], warnings };
+  }
+}
 
 function readTextDocument(
   raw: Buffer,
@@ -604,6 +705,9 @@ function readTextDocument(
     .toString('utf8')
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n');
+  if (format === 'csv' || format === 'tsv') return readDelimitedDocument(source, format);
+  if (format === 'json') return readJsonDocument(source);
+
   const warnings: string[] = [];
   let markdown: string;
   let title: string | undefined;
@@ -617,6 +721,7 @@ function readTextDocument(
     markdown = title && title !== headingTitle ? `# ${title}\n\n${body}` : body;
     title = title ?? headingTitle;
   } else {
+    // markdown / text / yaml — already readable; do not invent a document shape.
     markdown = source;
     if (format === 'markdown') title = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim() || undefined;
   }
