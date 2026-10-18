@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { DiscussionProviderError } from './discussion-provider.js';
 import { loadDiscussionCopy } from './discussion-copy.js';
 import {
   beginLiveReply,
@@ -312,7 +313,16 @@ export class DialogueRunner {
         }
       );
     } catch (error) {
+      const stoppedByUser = generationStopRequested(this.roomId);
       endLiveReply(this.roomId);
+      if (
+        stoppedByUser &&
+        error instanceof DiscussionProviderError &&
+        error.code === 'DISCUSSION_PROVIDER_ABORTED'
+      ) {
+        appendDiscussionEvent(this.roomId, { type: 'generation_stopped', speaker: facilitator.id });
+        return;
+      }
       throw error;
     }
     const stoppedByUser = generationStopRequested(this.roomId);

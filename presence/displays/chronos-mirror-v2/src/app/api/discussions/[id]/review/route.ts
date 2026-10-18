@@ -63,6 +63,19 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (!room)
       return NextResponse.json({ ok: false, error: 'discussion not found' }, { status: 404 });
     assertDiscussionVisible(viewer, room.scope);
+    if (
+      verdict === 'request-changes' &&
+      (room.config.speaker !== 'scripted' || room.execution?.actual_mode === 'reasoning')
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'This bounded provider run cannot be reopened. Start a new room; the saved decision is preserved.',
+        },
+        { status: 409 }
+      );
+    }
     const result = withViewerExecutionContext(viewer, () => {
       const outcome = reviewDiscussion(roomId, viewer.principalId ?? viewer.role, {
         verdict: verdict as DiscussionReviewVerdict,

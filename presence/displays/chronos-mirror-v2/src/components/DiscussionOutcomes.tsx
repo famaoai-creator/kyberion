@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { savedDiscussionArtifactUrl } from '../lib/discussion-artifact-url';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, ExternalLink, FileText, Flag, Rocket, X } from 'lucide-react';
 import {
@@ -38,6 +39,11 @@ function BriefDialog({
   onRoom: (room: DiscussionRoomState) => void;
 }) {
   const frame = React.useRef<HTMLIFrameElement>(null);
+  const canReopen =
+    room.config.speaker === 'scripted' &&
+    room.execution?.actual_mode !== 'reasoning' &&
+    room.execution?.provider == null &&
+    (room.execution?.attempts.length ?? 0) === 0;
 
   React.useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
@@ -51,6 +57,18 @@ function BriefDialog({
       if (data?.source !== 'kyberion-brief' || data.type !== 'review' || data.roomId !== room.id)
         return;
       if (!data.payload) return;
+      if (!canReopen && data.payload.verdict === 'request-changes') {
+        frame.current?.contentWindow?.postMessage(
+          {
+            source: 'kyberion-brief-host',
+            type: 'result',
+            ok: false,
+            error: dt('newRoomForRevision', locale),
+          },
+          '*'
+        );
+        return;
+      }
       const result = await reviewDiscussionDecision(room.id, data.payload);
       frame.current?.contentWindow?.postMessage(
         {
@@ -69,7 +87,7 @@ function BriefDialog({
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [room.id, onRoom, onClose]);
+  }, [room.id, onRoom, onClose, canReopen, locale]);
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -158,6 +176,14 @@ export function OutcomesCard({
         </div>
       ) : null}
 
+      {(room.config.speaker !== 'scripted' ||
+        room.execution?.actual_mode === 'reasoning' ||
+        room.execution?.provider != null ||
+        (room.execution?.attempts.length ?? 0) > 0) &&
+      !review ? (
+        <p className="dr-muted">{dt('newRoomForRevision', locale)}</p>
+      ) : null}
+
       {review ? (
         <div className="dr-review-result" data-verdict={review.verdict}>
           <CheckCircle2 size={14} aria-hidden /> {dt('reviewed', locale)}:{' '}
@@ -244,8 +270,18 @@ export function OutcomesCard({
         ) : null}
         {brief ? (
           <button type="button" className="dr-btn" onClick={() => setDialog('view')}>
-            <ExternalLink size={13} aria-hidden /> {dt('openBrief', locale)}
+            <ExternalLink size={13} aria-hidden /> {dt('generatedBrief', locale)}
           </button>
+        ) : null}
+        {brief ? (
+          <a
+            className="dr-btn"
+            href={savedDiscussionArtifactUrl(room.id, brief.artifact_id)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <FileText size={13} aria-hidden /> {dt('savedBrief', locale)}
+          </a>
         ) : null}
         {review && review.verdict === 'accept' ? (
           <a className="dr-btn" href="/?section=work-items">
@@ -253,8 +289,13 @@ export function OutcomesCard({
           </a>
         ) : null}
         {minutes ? (
-          <a className="dr-btn" href="/?section=deliverables">
-            <ExternalLink size={13} aria-hidden /> {dt('minutes', locale)}
+          <a
+            className="dr-btn"
+            href={savedDiscussionArtifactUrl(room.id, minutes.artifact_id)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={13} aria-hidden /> {dt('savedMinutes', locale)}
           </a>
         ) : null}
       </div>

@@ -9,6 +9,7 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-4-argon",
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
@@ -41,6 +42,17 @@
         "a2ui"
       ],
       "modelCapabilities": {
+        "gemini-4-argon": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
         "gemini-3.8-flash": [
           "reasoning",
           "planning",
@@ -632,6 +644,11 @@
     },
     "agy": {
       "models": [
+        "Gemini 4 Argon (Medium)",
+        "Gemini 4 Argon (High)",
+        "Gemini 4 Argon (Low)",
+        "Gemini 4 Argon",
+        "gemini-4-argon",
         "Gemini 3.8 Flash (Medium)",
         "Gemini 3.8 Flash (High)",
         "Gemini 3.8 Flash (Low)",
@@ -668,6 +685,51 @@
         "gateway"
       ],
       "modelCapabilities": {
+        "Gemini 4 Argon (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Argon (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Argon (Low)": ["reasoning", "analysis", "code", "structured_json", "low_latency"],
+        "Gemini 4 Argon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-argon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
         "Gemini 3.8 Flash (Medium)": [
           "reasoning",
           "planning",
