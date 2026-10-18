@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-HEARING-UI-RECOVERY-20261017-2026_10_18",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Recover uncertain decisions only from exact current proof",
+  "summary": "A recovery read must fence earlier mutation responses and match the authenticated operation receipt to a freshly validated current record before clearing a pending guard.",
+  "candidate_id": "mem-MSN-HEARING-UI-RECOVERY-20261017-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-HEARING-UI-RECOVERY-20261017/evidence/lessons-source.md",
+    "active/missions/public/MSN-HEARING-UI-RECOVERY-20261017/evidence/implementation-report.md",
+    "active/missions/public/MSN-HEARING-UI-RECOVERY-20261017/evidence/test-report.md",
+    "active/missions/public/MSN-HEARING-UI-RECOVERY-20261017/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-18T02:11:10.899Z",
+  "applicability": ["mission", "mission:MSN-HEARING-UI-RECOVERY-20261017"],
+  "reusable_steps": [
+    "A recovery read must fence earlier mutation responses and match the authenticated operation receipt to a freshly validated current record before clearing a pending guard"
+  ],
+  "expected_outcome": "## When to apply\nUse this rule when a browser mutation can commit despite a lost response.\n\n## Recovery protocol\nPersist only the minimal operation ID, version, requirements revision, scenario, session and scope before sending the mutation. Do not store private answers or infer a receipt for legacy markers. Offer an explicit bounded read-only recovery action; absent or denied proof remains unknown, while superseded proof remains historical. Neither outcome authorizes an automatic resend or downstream execution.\n\nStarting recovery must retire the original POST settlement as well as older reads. Guard every callback by scope, session, generation and exact marker ownership. A late successful POST or rejection cannot overwrite a newer recovery result. Read the current record, then verify the authenticated exact-operation receipt, canonical actor identity and revision before unlocking. Downstream handoff still independently validates current state.\n\n## Verification\nUse canonical actor constructors and actual durable route responses through the client harness. Two independently invented mocks can agree on the wrong identity format. Reproduce late POST success/rejection after timeout, scope changes, stale generations, storage failures, missing proof and superseded proof. Keep ordinary test children neutral; mission and stub flags belong to governance calls and otherwise contaminate unrelated fixtures. Preserve per-shard logs so interrupted verification cannot be reported as passing.\n\n## Limits\nA client harness is not rendered browser E2E. Report missing browser binaries and denied IPC separately; do not elevate or infer nonexecution from missing receipts.",
+  "source_branch": "qa/hearing-ui-published",
+  "source_commit": "1288b5777bbc60d57104db36ae10e5e6cf093c74"
+}
