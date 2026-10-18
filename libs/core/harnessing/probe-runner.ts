@@ -53,7 +53,7 @@ export interface RunOutcome {
   recorded_at: string;
 }
 
-function copyTree(src: string, dst: string): void {
+export function copyTree(src: string, dst: string): void {
   safeMkdir(dst, { recursive: true });
   for (const entry of safeReaddir(src)) {
     const s = path.join(src, entry);
