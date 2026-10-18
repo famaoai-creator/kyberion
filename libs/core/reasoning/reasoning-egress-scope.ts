@@ -7,6 +7,10 @@ import {
   isLocalReasoningEndpoint,
   resolveReasoningProviderDescriptor,
 } from './reasoning-provider-registry.js';
+import {
+  lookupTenantProviderAttestation,
+  providerIdForReasoningIdentifier,
+} from '../provider/provider-egress-gate.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -84,6 +88,68 @@ export class ReasoningEgressDeniedError extends Error {
   }
 }
 
+let tenantRegistryRootForTests: string | undefined;
+
+/** Test-only: point the attestation lookup at a hermetic tenant registry root. */
+export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefined): void {
+  tenantRegistryRootForTests = rootDir;
+}
+
+/**
+ * `zero_retention` toward an external backend is allowed only when the
+ * tenant that owns the material holds a valid (unexpired) provider attestation
+ * of `training_use: 'none'` for the backend's egress provider id — the same
+ * attestation `checkProviderEgress` honours, read through the same governed
+ * lookup. Anything else keeps the fail-closed denial.
+ */
+function assertZeroRetentionAttested(backendName: string, scope: ReasoningPayloadScope): void {
+  const next =
+    "next: record one with 'pnpm onboarding llm attest --request-approval' (or 'pnpm tenant attest-provider'), or declare training_use 'training_eligible' explicitly";
+  const deny = (why: string, evidence: string): never => {
+    throw new ReasoningEgressDeniedError(
+      `backend ${backendName} has no zero_retention declaration — ${why} | ${next} | ${evidence}`
+    );
+  };
+  const provider = providerIdForReasoningIdentifier(backendName);
+  if (!provider) {
+    deny(
+      'the backend maps to no egress provider id, so no tenant attestation can cover it',
+      `backend=${backendName}`
+    );
+  }
+  const tenantSlug = scope.tenant_slug?.trim();
+  if (!tenantSlug) {
+    deny(
+      'the payload scope names no tenant_slug whose provider attestation could apply',
+      `provider=${provider}`
+    );
+  }
+  const attestation = lookupTenantProviderAttestation({
+    tenant_slug: tenantSlug,
+    provider,
+    ...(tenantRegistryRootForTests ? { tenant_registry_root_dir: tenantRegistryRootForTests } : {}),
+  });
+  const evidence = `tenant=${tenantSlug} provider=${provider} attestation=${attestation.status}`;
+  if (attestation.error) {
+    deny(`the tenant attestation lookup failed: ${attestation.error}`, evidence);
+  }
+  if (attestation.status === 'absent') {
+    deny(`tenant '${tenantSlug}' has no attestation for provider '${provider}'`, evidence);
+  }
+  if (attestation.status === 'expired') {
+    deny(
+      `tenant '${tenantSlug}' attestation for provider '${provider}' expired${attestation.expires_at ? ` on ${attestation.expires_at}` : ''}`,
+      evidence
+    );
+  }
+  if (attestation.training_use !== 'none') {
+    deny(
+      `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for provider '${provider}'`,
+      `${evidence} training_use=${attestation.training_use}`
+    );
+  }
+}
+
 /**
  * Throw if the ambient scope forbids sending to this backend.
  *
@@ -140,9 +206,7 @@ export function assertReasoningEgressAllowedAtEndpoint(
     scope.training_use === 'zero_retention' &&
     reasoningDataPolicy(backendName) === 'training_eligible'
   ) {
-    throw new ReasoningEgressDeniedError(
-      `backend ${backendName} has no zero_retention declaration; use training_eligible explicitly or configure an attested provider policy`
-    );
+    assertZeroRetentionAttested(backendName, scope);
   }
   if (scope.tier === 'public') return;
 
