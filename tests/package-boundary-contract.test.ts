@@ -27,6 +27,8 @@ const RUNTIME_ROOTS = [
 ];
 const TEST_ROOTS = ['tests'];
 const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
+  // The source-only compiler bootstrap must be exercised before package dist exists.
+  ['tests/build-repository.test.ts', ['../libs/core/secure-io.js']],
   [
     'tests/mission-team-orchestrator.test.ts',
     [
@@ -239,6 +241,8 @@ describe('Package boundary contract', () => {
     // check_esm_integrity ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES).
     const sourceImportExceptions = new Set([
       'scripts/clean.ts',
+      'scripts/clean_entrypoint.ts',
+      'scripts/build_repository.ts',
       'scripts/bindings.ts',
       'scripts/check_install_script_allowlist.ts',
       'scripts/check_lockfile_commit_gate.ts',
