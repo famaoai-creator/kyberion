@@ -7,6 +7,7 @@
  */
 
 import { runContrastiveSession } from '@agent/core/harnessing/contrastive-session';
+import { runRecursiveSession } from '@agent/core/harnessing/recursive-session';
 import type { MetricSpec } from '@agent/core/harnessing/decision-axis';
 import { loadSurfaceSpec } from '@agent/core/harnessing/surface-spec';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -87,6 +88,41 @@ export const runContrastiveProbe = defineScript({
     }
     const select = selectArg as 'blind' | undefined;
     const command = commandRaw.split(/\s+/).filter(Boolean);
+    const rounds = args['rounds']?.[0] ? Number(args['rounds'][0]) : 1;
+    if (args['rounds']?.[0] && (!Number.isInteger(rounds) || rounds < 1 || rounds > 10)) {
+      throw new ScriptExitError(2, `--rounds expects an integer 1..10, got ${args['rounds'][0]}`);
+    }
+    if (rounds > 1) {
+      const rec = await runRecursiveSession({
+        session_id: `ppc-${Date.now().toString(36)}`,
+        scenarioDir: scenario,
+        command,
+        candidates,
+        ...(proposeCount > 0 ? { propose: { brief: args['brief']![0], count: proposeCount } } : {}),
+        ...(surface ? { surface } : {}),
+        ...(select ? { selection: select } : {}),
+        ...(args['seed']?.[0] ? { seed: parseSeed(args['seed'][0]) } : {}),
+        rounds,
+        expectOutputs: args['expect'] ?? [],
+        metrics,
+        runRoot,
+        work_shape: args['work-shape']?.[0],
+      });
+      context.print(
+        JSON.stringify(
+          {
+            final: rec.final_decision.decision,
+            halted_by: rec.halted_by,
+            budget: rec.budget,
+            adopted: rec.adopted_overlays,
+          },
+          null,
+          2
+        )
+      );
+      context.print(`report: ${rec.report_path}`);
+      return;
+    }
     const result = await runContrastiveSession({
       session_id: `ppc-${Date.now().toString(36)}`,
       scenarioDir: scenario,

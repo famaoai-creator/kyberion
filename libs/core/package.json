@@ -1816,6 +1816,10 @@
       "types": "./dist/harnessing/propose.d.ts",
       "import": "./dist/harnessing/propose.js"
     },
+    "./harnessing/recursive-session": {
+      "types": "./dist/harnessing/recursive-session.d.ts",
+      "import": "./dist/harnessing/recursive-session.js"
+    },
     "./harnessing/surface-spec": {
       "types": "./dist/harnessing/surface-spec.d.ts",
       "import": "./dist/harnessing/surface-spec.js"
