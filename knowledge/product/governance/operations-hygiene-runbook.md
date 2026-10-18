@@ -811,6 +811,28 @@ call fails.
 
 ## §8 Mission evidence: generated files and recorded deliverables
 
+**Execution-ledger receipts.** Append the ledger bytes and their provisioned/verified
+whole-file receipt under the same fenced writer lease. An initial empty-file receipt
+does not authenticate later rows. Ordinary append and resume must reject a changed
+receipted prefix; never clear receipts or replace the ledger to make replay pass.
+For the legacy writer that recorded only the initial empty ledger, use
+`pnpm mission repair <ID> --note "repair legacy empty-ledger receipt"`, then
+`pnpm mission resume <ID>`. Repair accepts only the sole matching initial empty
+receipt pair and complete JSONL rows with valid mission/scope identity. It retains
+every ledger byte, appends a current receipt, and records the migration in mission
+history; it cannot retroactively authenticate historical appends. Other hash
+mismatches and pending writes remain blocked for investigation.
+The canonical `writeMissionNextTasks` writer must also refresh its receipt on every
+task transition. If an older task file has a stale receipt, re-record the actual
+evidence or independent review through `record-evidence` / `review-task` after
+fixing the writer; never hand-edit task status or rebaseline arbitrary artifacts.
+Replay reads journal, receipts and target hashes under the same mutex as writers,
+without changing the lease fence or metrics, so an active append is not reported
+as corruption.
+Gates: `mission-orchestration-journal.test.ts`, `mission-team-binding.test.ts` and
+`mission-lifecycle.test.ts` cover append integrity, refusal after tampering, explicit
+legacy migration and lifecycle recovery.
+
 Video gates that derive approval scope through strict `findMissionPath` must register
 the caller as `scope-derivation` in `tests/mission-lookup-boundary.test.ts`. Run that
 boundary test with the production regression suite before publishing.
@@ -1341,6 +1363,19 @@ repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
 admission/recovery, digest/recovery and inbox suites when changing this path.
 
 ## §14 CLI hook continuation loops
+
+**Build-safe hook startup.** Provider hook commands enter through
+`scripts/provider_hook_entry.mjs`, which has no built-runtime dependency. Canonical
+build cleanup may temporarily remove the entrypoint or an imported dist module.
+During that window, notification events report a bounded diagnostic on stderr and
+end successfully; Claude/Gemini tool-authorization events return a native deny.
+Once loaded, the provider runner retains its own output and exit semantics.
+Regenerate managed commands with `pnpm generate:provider-hooks`; preserve other
+hooks and settings, including permissions. The generator owns only the exact
+Claude settings output in addition to its existing Codex/Gemini outputs.
+Gates: `provider_hook_entry.test.ts`, `generate_provider_hook_configs.test.ts` and
+`claude-hook-wiring-contract.test.ts` cover missing runtime imports, native deny,
+normal stdin forwarding and idempotent wiring migration.
 
 **Rule.** A coordination notification must not start another model turn or reply to itself.
 `Stop` is telemetry only; never emit review instructions or `decision: block` there.

@@ -470,6 +470,7 @@
 - [プロジェクト依存ミッション連鎖の実走メモ (PRJ-KYBERION-PRODUCTION-READINESS, 2026-10-07)](./product/orchestration/mission-dependency-chain-demo-20261007.md) (public | Unknown)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
+- [作業完了から再利用候補への自動接続](./product/orchestration/workflow-reuse-playbook.md) (public | Unknown)
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)

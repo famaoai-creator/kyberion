@@ -186,6 +186,12 @@ export function writerLeaseResourceId(leasePath: string): string {
   return `path:${crypto.createHash('sha256').update(path.resolve(leasePath)).digest('hex')}`;
 }
 
+/** Read a coherent resource snapshot without changing its fence or lease metrics. */
+export function withWriterLeaseSnapshotSync<T>(leasePath: string, read: () => T): T {
+  const safePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
+  return withLockSync(leaseLockId(writerLeaseResourceId(safePath)), read);
+}
+
 function readLease(leasePath: string): FencedWriterLease | undefined {
   const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeLeasePath)) return undefined;

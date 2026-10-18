@@ -37,9 +37,8 @@
     },
     {
       "id": "run_reminder_sweep",
-      "role": "source",
+      "role": "sink",
       "op": "meeting:run_action_item_reminder_sweep",
-      "produces": { "channel": "reminder_sweep_raw", "type": "ActionItemReminderSweepReport" },
       "params": {
         "tone": "{{tone}}",
         "language": "{{language}}",
@@ -51,7 +50,6 @@
       "id": "log_summary",
       "role": "sink",
       "op": "system:log",
-      "consumes": "reminder_sweep_raw",
       "params": {
         "message": "✅ Reminder sweep complete: report={{report_path}}"
       }
