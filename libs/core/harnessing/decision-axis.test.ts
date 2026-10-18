@@ -59,3 +59,32 @@ describe('classifyProbeSet', () => {
     expect(r.decision).toBe('human_gate');
   });
 });
+
+describe('classifyProbeSet — round-2 edge cases', () => {
+  const wall = [{ key: 'wall_ms', direction: 'lower' as const }];
+  const dead = (label: string): RunOutcome => ({
+    label,
+    run_dir: `/x/${label}`,
+    ok: false,
+    delivered: false,
+    exit_code: null,
+    wall_ms: 0,
+    produced_files: [],
+    error: 'spawn',
+    recorded_at: 't',
+  });
+
+  it('human_gate when base is null and a candidate delivered', () => {
+    const r = classifyProbeSet(null, [out('c1', true)], wall);
+    expect(r.decision).toBe('human_gate');
+  });
+  it('human_gate when base probe never executed but candidate delivered', () => {
+    const r = classifyProbeSet(dead('base'), [out('c1', true)], wall);
+    expect(r.decision).toBe('human_gate');
+  });
+  it('human_gate when base delivered, candidate delivered, no metrics declared', () => {
+    const r = classifyProbeSet(out('base', true), [out('c1', true)], []);
+    expect(r.decision).toBe('human_gate');
+    expect(r.auto_advance_allowed).toBe(false);
+  });
+});
