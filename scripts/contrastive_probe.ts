@@ -19,7 +19,10 @@ function parseArgs(argv: string[]): Record<string, string[]> {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
-    const val = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'true';
+    const val = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : null;
+    if (val === null) {
+      throw new ScriptExitError(2, `--${key} requires a value`);
+    }
     (out[key] ??= []).push(val);
   }
   return out;
@@ -52,8 +55,11 @@ export const runContrastiveProbe = defineScript({
     if (!runRoot || (!scenarioSpecPath && (!scenario || !commandRaw))) {
       throw new ScriptExitError(2, USAGE);
     }
-    if (scenario && scenarioSpecPath) {
-      throw new ScriptExitError(2, '--scenario and --scenario-spec are mutually exclusive');
+    if ((scenario || commandRaw) && scenarioSpecPath) {
+      throw new ScriptExitError(
+        2,
+        '--scenario/--command and --scenario-spec are mutually exclusive'
+      );
     }
     // --scenario-spec wraps an eval fixture as {workspace_dir, command,
     // expect_outputs}; --expect appends on top of the spec's expectations.

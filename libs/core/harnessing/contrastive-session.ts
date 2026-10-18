@@ -162,7 +162,17 @@ export async function runContrastiveSession(
   // must never reach a probe or be served as evidence later.
   const eligible = supplied.filter((c) => {
     if (spec.surface) {
-      const v = validateOverlay(c.overlayDir, spec.surface);
+      let v: ReturnType<typeof validateOverlay>;
+      try {
+        v = validateOverlay(c.overlayDir, spec.surface);
+      } catch (error) {
+        rejected.push({
+          label: c.label,
+          path: '.',
+          reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
+        });
+        return false;
+      }
       if (!v.ok) {
         rejected.push(
           ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
