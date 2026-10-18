@@ -73,6 +73,7 @@ export interface MissionBrief {
   trackId?: string;
   trackType?: string;
   lifecycleModel?: string;
+  source?: { kind: 'hearing'; ref: string; tenantSlug: string };
 }
 
 const MISSION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
@@ -113,11 +114,21 @@ export function assertHearingMissionId(missionId: string): void {
  * mission id, so re-running the handoff (idempotency) or retrying after a
  * transient failure never mints a second mission for one hearing.
  */
-export function hearingMissionId(record: Pick<HearingRecord, 'session_id'>): string {
+export function hearingMissionId(
+  record: Pick<HearingRecord, 'session_id'>,
+  tenantSlug?: string
+): string {
+  if (tenantSlug !== undefined && !TENANT_SLUG_PATTERN.test(tenantSlug))
+    throw new Error('[HEARING_MISSION_INVALID] invalid mission tenant');
+  // Preserve the legacy helper identity for existing callers. New handoffs bind
+  // the tenant because the browser reuses its hearing session across selections.
   const digest = createHash('sha256')
-    .update(record.session_id, 'utf8')
+    .update(
+      tenantSlug ? JSON.stringify([tenantSlug, record.session_id]) : record.session_id,
+      'utf8'
+    )
     .digest('hex')
-    .slice(0, 8)
+    .slice(0, tenantSlug ? 16 : 8)
     .toUpperCase();
   const missionId = `MSN-HEARING-${digest}`;
   assertHearingMissionId(missionId);
@@ -138,6 +149,8 @@ export interface HearingMissionMember {
 export interface HearingRecordToMissionBriefOptions {
   locale: SupportedLocale;
   tenantSlug: string;
+  organizationId?: string;
+  projectId?: string;
   member: HearingMissionMember;
 }
 
@@ -210,7 +223,9 @@ export function hearingRecordToMissionBrief(
   ];
 
   const brief: MissionBrief = {
-    missionId: hearingMissionId(record),
+    missionId: hearingMissionId(record, options.tenantSlug),
+    ...(options.projectId ? { projectId: options.projectId } : {}),
+    source: { kind: 'hearing', ref: record.session_id, tenantSlug: options.tenantSlug },
     title,
     intent,
     tier: 'confidential',
@@ -236,6 +251,8 @@ export interface BuildHearingMissionCreateArgsInput {
   missionId: string;
   brief: MissionBrief;
   tenantSlug: string;
+  organizationId?: string;
+  projectId?: string;
   /** Tenant-scoped hearing handoffs are always confidential, never personal. */
   tier: 'confidential';
   decidedBy: HearingMissionMember;
@@ -277,6 +294,8 @@ export function buildHearingMissionCreateArgs(input: BuildHearingMissionCreateAr
     input.tier,
     '--tenant-slug',
     input.tenantSlug,
+    ...(input.organizationId ? ['--organization-id', input.organizationId] : []),
+    ...(input.projectId ? ['--project-id', input.projectId] : []),
     '--goal',
     goal,
     ...(successCondition ? ['--success-condition', successCondition] : []),

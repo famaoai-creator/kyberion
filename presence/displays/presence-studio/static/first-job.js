@@ -993,8 +993,19 @@
         );
       });
     }
-    // Mutation uncertainty keeps its existing workflow; only GETs have an automatic read timeout.
-    if (options && options.method === 'POST') return request(options);
+    if (options && options.method === 'POST') {
+      var mutationTimer;
+      // Bound the UI wait, never the server effect. A lost response is unknown,
+      // not cancelled or safe to replay; late responses cannot change that state.
+      return new Promise(function (resolve, reject) {
+        mutationTimer = window.setTimeout(function () {
+          reject(new Error('mutation_unknown'));
+        }, 15000);
+        request(options).then(resolve, reject);
+      }).finally(function () {
+        window.clearTimeout(mutationTimer);
+      });
+    }
     var readController =
       controller || (window.AbortController ? new window.AbortController() : null);
     var timer;

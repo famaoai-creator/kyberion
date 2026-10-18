@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeReadFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
+  // Continuous owner controllers are cancellable, supervised children.
+  'scripts/continuous_owner_process.ts',
+  'scripts/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
   'libs/core/ocr-bridge.ts',
@@ -95,7 +98,26 @@ function read(relPath: string): string {
 
 describe('Process boundary governance', () => {
   it('confines managed-process API usage to long-lived runtime ownership paths', () => {
-    const codeFiles = getAllFiles(rootDir).filter((filePath) =>
+    // Runtime data grows independently of source and may contain tenant-only trees.
+    // Prune it before walking so this source boundary stays bounded and scope-safe.
+    const dataRoots = new Set([
+      'active',
+      'knowledge',
+      'customer',
+      'vault',
+      'work',
+      'dist',
+      'coverage',
+      'node_modules',
+    ]);
+    const sourceFiles = safeReaddir(rootDir)
+      .filter((name) => !name.startsWith('.') && !dataRoots.has(name))
+      .flatMap((name) => {
+        const target = path.join(rootDir, name);
+        const stat = safeLstat(target);
+        return stat.isSymbolicLink() ? [] : stat.isDirectory() ? getAllFiles(target) : [target];
+      });
+    const codeFiles = sourceFiles.filter((filePath) =>
       /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath)
     );
     const actual = codeFiles

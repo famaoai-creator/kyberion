@@ -56,6 +56,17 @@ describe('hearingMissionId', () => {
     expect(hearingMissionId({ session_id: 'sess-abc' })).toBe(id);
   });
 
+  it('binds new identities to tenant and session while preserving the legacy helper', () => {
+    const record = { session_id: 'shared-browser-session' };
+    const legacy = hearingMissionId(record);
+    const first = hearingMissionId(record, 'tenant-alpha');
+    expect(legacy).toMatch(/^MSN-HEARING-[A-F0-9]{8}$/);
+    expect(first).toMatch(/^MSN-HEARING-[A-F0-9]{16}$/);
+    expect(first).toBe(hearingMissionId(record, 'tenant-alpha'));
+    expect(first).not.toBe(legacy);
+    expect(first).not.toBe(hearingMissionId(record, 'tenant-bravo'));
+  });
+
   it('differs across sessions', () => {
     expect(hearingMissionId({ session_id: 'sess-abc' })).not.toBe(
       hearingMissionId({ session_id: 'sess-xyz' })
@@ -72,7 +83,7 @@ describe('hearingRecordToMissionBrief', () => {
       member: MEMBER,
     });
 
-    expect(brief.missionId).toBe(hearingMissionId(record));
+    expect(brief.missionId).toBe(hearingMissionId(record, 'jisha'));
     expect(brief.tier).toBe('confidential');
     expect(brief.title).toContain('double-book');
     expect(brief.intent).toContain("Who it's for");
@@ -89,6 +100,21 @@ describe('hearingRecordToMissionBrief', () => {
     // Every fixed label came through the catalog, never inline copy.
     expect(brief.intent).not.toContain('undefined');
 
+    expect(() => validateHearingMissionBrief(brief)).not.toThrow();
+  });
+
+  it('records the authoritative project and tenant-bound hearing provenance', () => {
+    const record = decidedRecord('project-brief');
+    const brief = hearingRecordToMissionBrief(record, {
+      locale: 'en',
+      tenantSlug: 'jisha',
+      organizationId: 'org-one',
+      projectId: 'project-one',
+      member: MEMBER,
+    });
+    expect(brief.projectId).toBe('project-one');
+    expect(brief.source).toEqual({ kind: 'hearing', ref: record.session_id, tenantSlug: 'jisha' });
+    expect(brief).not.toHaveProperty('organizationId');
     expect(() => validateHearingMissionBrief(brief)).not.toThrow();
   });
 
@@ -158,6 +184,24 @@ describe('buildHearingMissionCreateArgs', () => {
       'ZZ Tester',
       '--decided-by-role',
       'approver',
+    ]);
+  });
+
+  it('propagates selected hierarchy only through governed create flags', () => {
+    const args = buildHearingMissionCreateArgs({
+      missionId: brief.missionId!,
+      brief,
+      tenantSlug: 'jisha',
+      tier: 'confidential',
+      organizationId: 'org-one',
+      projectId: 'project-one',
+      decidedBy: MEMBER,
+    });
+    expect(args.slice(args.indexOf('--organization-id'), args.indexOf('--goal'))).toEqual([
+      '--organization-id',
+      'org-one',
+      '--project-id',
+      'project-one',
     ]);
   });
 

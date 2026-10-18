@@ -1,0 +1,76 @@
+{
+  "version": "1",
+  "loop_id": "organization-operations",
+  "dot_id": "org-operations",
+  "scope": {
+    "tier": "confidential",
+    "tenant_slug": "kyberion-service-studio",
+    "organization_id": "kyberion-development-team"
+  },
+  "enabled": true,
+  "schedule": {
+    "every_seconds": 900
+  },
+  "max_proposals_per_run": 2,
+  "cooldown_seconds": 86400,
+  "sources": [
+    {
+      "source_id": "organization",
+      "kind": "organization_metrics",
+      "max_age_seconds": 300
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "incident-inventory",
+      "source_id": "organization",
+      "metric": "open_incidents",
+      "operator": "gt",
+      "threshold": 0,
+      "objective_ref": "production-readiness",
+      "title": "未解決インシデントの運営レポート",
+      "objective": "同一組織の運用指標・観測時刻・目標との差をスコープ付きレポートにする。外部送信や状態変更は行わない。",
+      "pipeline_ref": "pipelines/continuous-operations-report.json",
+      "requested_decision": "notify",
+      "priority": "normal"
+    },
+    {
+      "rule_id": "decision-followup-project",
+      "source_id": "organization",
+      "metric": "pending_decisions",
+      "operator": "gt",
+      "threshold": 0,
+      "objective_ref": "production-readiness",
+      "title": "判断待ち事項の棚卸しとフォローアップ",
+      "objective": "判断待ち事項をプロジェクトと依存関係付きミッションに整理し、根拠付き判断案をオーナー承認へ渡す。判断の代行や外部送信は行わない。",
+      "pipeline_ref": "pipelines/continuous-managed-work.json",
+      "requested_decision": "approve",
+      "priority": "normal",
+      "work_plan": {
+        "kind": "project",
+        "project": {
+          "name": "意思決定フォローアップ",
+          "summary": "判断待ち事項を棚卸しし、根拠付き判断案を組織オーナーに提示する。",
+          "objective_ids": ["production-readiness"]
+        },
+        "missions": [
+          {
+            "key": "inventory",
+            "title": "判断待ち事項の棚卸し",
+            "goal": "同一組織の判断待ち事項から根拠・期限・担当・不足情報を整理する。状態変更や外部送信は行わない。",
+            "success_condition": "スコープ付き棚卸しレポートが根拠参照とともに独立レビューされている。",
+            "mission_type": "operations_report"
+          },
+          {
+            "key": "followup",
+            "title": "判断案と次のアクションの整理",
+            "goal": "検証済み棚卸しから判断案と推奨アクションを整理し、組織オーナーの承認へ提示する。判断を代行しない。",
+            "success_condition": "判断案と推奨アクションが根拠付き成果物となり、独立レビューとオーナー承認待ちが記録されている。",
+            "mission_type": "operations_report",
+            "depends_on": ["inventory"]
+          }
+        ]
+      }
+    }
+  ]
+}
