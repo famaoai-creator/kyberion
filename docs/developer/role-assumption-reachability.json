@@ -1921,13 +1921,18 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/hearing-mission-routes.ts#missionChildEnv [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
       "roles": ["ecosystem_architect", "mission_controller"],
       "unresolved": []
     },
     {
-      "site": "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes [delegated child role]",
-      "roles": ["mission_controller"],
+      "site": "presence/displays/presence-studio/hearing-request-scope.ts#resolveHearingHandoffScope",
+      "roles": ["ecosystem_architect"],
       "unresolved": []
     },
     {
