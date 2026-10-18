@@ -233,6 +233,10 @@ export async function runRecursiveSession(
   // — they have no cross-round identity to compare, so they are excluded.
   const overlayManifests = new Map<string, string>();
   const suppliedLabels = new Set(supplied.map((c) => c.label));
+  // Verified manifest of the last materialized base, carried into the next
+  // round — a detached writer hitting the verify→next-manifest window must
+  // not silently re-baseline into unverified bytes.
+  let pendingBaseManifest: Record<string, string> | null = null;
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
@@ -262,6 +266,20 @@ export async function runRecursiveSession(
         path: '.',
         reason: `base manifest failed: ${error instanceof Error ? error.message : error} — drift unverifiable this round`,
       });
+    }
+    if (pendingBaseManifest) {
+      if (baseManifest && !manifestsEqual(baseManifest, pendingBaseManifest)) {
+        rejected.push({
+          label: `r${round}:base`,
+          path: '.',
+          reason: 'base mutated between rounds — verified manifest kept as drift baseline',
+        });
+        // Keep the last VERIFIED state as the baseline: this round's probes
+        // run against mutated bytes (base_drifted will record it) and any
+        // adoption must still verify against the known-good manifest.
+        baseManifest = pendingBaseManifest;
+      }
+      pendingBaseManifest = null;
     }
     // Round-scoped run dirs: no cross-round or cross-session contamination.
     let roundProposeMeta: RoundRecord['propose_meta'];
@@ -483,6 +501,8 @@ export async function runRecursiveSession(
           throw new Error('materialized base failed post-copy integrity check');
         }
         adopted.push(`r${round}:${decision.winner}`);
+        // Carry the verified state into the next round's baseline check.
+        pendingBaseManifest = expected;
       } catch (error) {
         // Fail soft — the rounds already probed are evidence; don't lose them.
         const rejection = {
