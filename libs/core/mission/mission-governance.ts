@@ -61,16 +61,6 @@ function safeMissionArtifactPath(missionPath: string, relativePath: string): str
   });
 }
 
-function isPathInside(parent: string, candidate: string): boolean {
-  const relative = path.relative(parent, candidate);
-  return (
-    relative !== '' &&
-    relative !== '..' &&
-    !relative.startsWith(`..${path.sep}`) &&
-    !path.isAbsolute(relative)
-  );
-}
-
 export function syncRoleProcedure(missionId: string, persona: string): void {
   const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
   let sourcePath: string;
@@ -318,7 +308,7 @@ export function validateMissionArtifactReviewGate(input: {
       };
     }
     const receiptPath = path.resolve(missionPath, receiptReference);
-    if (!isPathInside(missionPath, receiptPath)) {
+    if (!pathResolver.isPathInside(missionPath, receiptPath)) {
       return {
         ok: false,
         reason: `Artifact review gate failed for ${taskId}: receipt must remain inside the mission directory.`,

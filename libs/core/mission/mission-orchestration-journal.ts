@@ -4,7 +4,7 @@ import { isRecord, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
-import { pathResolver } from '../path-resolver.js';
+import { isPathInside, pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -449,7 +449,7 @@ function provisionedTargetPath(
   }
   const missionPath = missionPathForScope(missionId, scope);
   const resolved = nodePath.resolve(missionPath, record.target_path);
-  if (resolved !== missionPath && !resolved.startsWith(`${missionPath}${nodePath.sep}`)) {
+  if (resolved !== missionPath && !isPathInside(missionPath, resolved)) {
     throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_scope:${record.entry_id}`);
   }
   return artifactPath(resolved);
@@ -620,10 +620,7 @@ export function appendProvisionedText(input: {
   const leasePath = nodePath.join(writeDir, 'writer-lease.json');
   const file = artifactPath(input.filePath);
   const expected = nodePath.resolve(writeDir, '..', input.targetPath);
-  if (
-    file !== expected ||
-    !expected.startsWith(`${nodePath.resolve(writeDir, '..')}${nodePath.sep}`)
-  ) {
+  if (file !== expected || !isPathInside(nodePath.resolve(writeDir, '..'), expected)) {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_scope');
   }
   return withFencedWriterLeaseSync({
@@ -992,4 +989,69 @@ export function loadMissionOrchestrationReplayPlan(
     unverified_provisioned_entries: unverifiedProvisionedEntries,
     missing_provisioned_entries: missingProvisionedEntries,
   };
+}
+
+/**
+ * Operator-repair only: re-baseline the receipt chain to the CURRENT bytes.
+ * A provisioned receipt binds the whole file, so a ledger that grew through
+ * an unreceipted writer is honest content but fails the append-time check
+ * forever. The content is validated BEFORE the receipt is issued — this
+ * attests existing bytes, it can never mint new history. Callable only
+ * from the operator repair facade (repairLegacyMissionExecutionLedger),
+ * never from ordinary append or resume paths.
+ */
+export function receiptCurrentProvisionedText(input: {
+  missionId: string;
+  filePath: string;
+  targetPath: string;
+  missionPathHint?: string;
+  scope?: EventScope;
+  validateContent?: (content: string) => void;
+}): boolean {
+  const writeDir = writeJournalDir(input.missionId, input.scope, input.missionPathHint);
+  const recordPath = nodePath.join(writeDir, 'provisioned-entries.jsonl');
+  const leasePath = nodePath.join(writeDir, 'writer-lease.json');
+  const file = artifactPath(input.filePath);
+  const expected = nodePath.resolve(writeDir, '..', input.targetPath);
+  if (file !== expected || !isPathInside(nodePath.resolve(writeDir, '..'), expected)) {
+    throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_scope');
+  }
+  return withFencedWriterLeaseSync({
+    resourceId: writerLeaseResourceId(leasePath),
+    ownerId: `process:${process.pid}`,
+    leasePath,
+    fn: () => {
+      const records = safeExistsSync(recordPath)
+        ? readJsonLines<ProvisionedEntryRecord>(recordPath, {
+            map: (value, line) => loadProvisionedEntryRecordAtLine(value, `${recordPath}:${line}`),
+            onMalformed: () => {
+              throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_record');
+            },
+          }).filter((record) => record.target_path === input.targetPath)
+        : [];
+      if (findUnverifiedProvisionedEntries(records).length) {
+        throw new Error('MISSION_LOG_CORRUPT:unverified_provisioned_entries');
+      }
+      const current = safeExistsSync(file) ? readTextFile(assertRegularArtifactPath(file)) : '';
+      // Content validity is proven before the receipt is issued — the
+      // receipt attests what is on disk, nothing else.
+      input.validateContent?.(current);
+      const latest = records.at(-1);
+      if (latest?.content_hash === provisionedEntryHash(current)) return false;
+      const provisioned = provisionMissionEntry(current);
+      writeProvisionedEntryRecord(recordPath, {
+        missionId: input.missionId,
+        entry: provisioned,
+        targetPath: input.targetPath,
+        phase: 'provisioned',
+      });
+      writeProvisionedEntryRecord(recordPath, {
+        missionId: input.missionId,
+        entry: provisioned,
+        targetPath: input.targetPath,
+        phase: 'verified',
+      });
+      return true;
+    },
+  });
 }
