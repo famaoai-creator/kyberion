@@ -176,6 +176,13 @@ describe('hearing completion read model', () => {
           tenantSlugs: tenantSlugs === 'all' ? 'all' : [],
         })?.status
       ).toBe('ready');
+      expect(
+        readHearingCompletion(hearing, {
+          ...viewer,
+          source: 'loopback',
+          tenantSlugs: tenantSlugs === 'all' ? 'all' : [],
+        })?.next?.href
+      ).toBe('/progress');
     }
     expect(
       readHearingCompletion(hearing, { ...viewer, source: 'token', tenantSlugs: [] })?.status
@@ -213,5 +220,130 @@ describe('hearing completion read model', () => {
         viewer
       )
     ).toBeUndefined();
+  });
+});
+
+describe('selected hierarchy completion proof', () => {
+  it('keeps parentless legacy project relationships tenant-visible without claiming narrower membership', () => {
+    const legacy = {
+      mission_id: missionId,
+      tenant_slug: 'alpha',
+      relationships: { project: { project_id: 'project-a' } },
+    };
+    mocks.mission.mockReturnValue(legacy);
+    expect(readHearingCompletion(record(), viewer)?.status).toBe('ready');
+    expect(readHearingCompletion(record(), { ...viewer, projectIds: ['project-a'] })?.status).toBe(
+      'unavailable'
+    );
+    expect(readHearingCompletion(record(), { ...viewer, organizationIds: ['org-a'] })?.status).toBe(
+      'unavailable'
+    );
+    for (const scope_context of [
+      { tenant_slug: 'beta' },
+      { tenant_slug: 'alpha', organization_id: 'org-a', project_id: 'project-b' },
+    ]) {
+      mocks.mission.mockReturnValue({ ...legacy, scope_context });
+      expect(readHearingCompletion(record(), viewer)?.status).toBe('unavailable');
+    }
+  });
+  it('restores legacy tenant-only mission and inventory links after explicitly clearing a narrower selection', () => {
+    const mission = record();
+    const inventory = {
+      ...decision,
+      scenario: 'work_inventory',
+      work_inventory_entry_id: 'entry-1',
+      work_inventory_scope: { tenant_slug: 'alpha' },
+    } as unknown as HearingRecord;
+    for (const hearing of [mission, inventory]) {
+      const before = structuredClone(hearing);
+      expect(readHearingCompletion(hearing, viewer)?.status).toBe('ready');
+      expect(readHearingCompletion(hearing, { ...viewer, organizationIds: ['org-a'] })).toEqual({
+        kind: hearing === mission ? 'mission' : 'inventory',
+        status: 'unavailable',
+      });
+      expect(readHearingCompletion(hearing, viewer)?.status).toBe('ready');
+      expect(hearing).toEqual(before);
+    }
+  });
+  it('restores canonical mission project membership and exact selected destination', () => {
+    mocks.mission.mockReturnValue({
+      mission_id: missionId,
+      tenant_slug: 'alpha',
+      organization_id: 'org-a',
+      relationships: { project: { project_id: 'project-a' } },
+      status: 'planned',
+    });
+    expect(
+      readHearingCompletion(record(), {
+        ...viewer,
+        organizationIds: ['org-a'],
+        projectIds: ['project-a'],
+      })
+    ).toEqual({
+      kind: 'mission',
+      status: 'ready',
+      id: missionId,
+      next: {
+        href: 'https://review.example.test/?tenant=alpha&organizationId=org-a&projectId=project-a',
+      },
+    });
+  });
+  it.each([
+    { project_id: 'project-b' },
+    {
+      relationships: {
+        organization: { organization_id: 'org-b' },
+        project: { project_id: 'project-a' },
+      },
+    },
+    { scope: { tenant_slug: 'alpha', organization_id: 'org-a', project_id: 'project-b' } },
+    { scope_context: { tenant_slug: 'alpha', organization_id: 'org-b', project_id: 'project-a' } },
+  ])('refuses conflicting canonical mission metadata %j', (extra) => {
+    mocks.mission.mockReturnValue({
+      mission_id: missionId,
+      tenant_slug: 'alpha',
+      organization_id: 'org-a',
+      relationships: { project: { project_id: 'project-a' } },
+      ...extra,
+    });
+    expect(
+      readHearingCompletion(record(), {
+        ...viewer,
+        organizationIds: ['org-a'],
+        projectIds: ['project-a'],
+      })?.status
+    ).toBe('unavailable');
+    expect(readHearingCompletion(record(), viewer)?.status).toBe('unavailable');
+    expect(mocks.approval).not.toHaveBeenCalled();
+  });
+  it('restores organization inventory but rejects a different selected organization or project', () => {
+    const hearing = {
+      ...decision,
+      scenario: 'work_inventory',
+      work_inventory_entry_id: 'entry-1',
+      work_inventory_scope: { tenant_slug: 'alpha', organization_id: 'org-a' },
+    } as unknown as HearingRecord;
+    mocks.inventory.mockReturnValue({
+      entry_id: 'entry-1',
+      scope: { tenant_slug: 'alpha', organization_id: 'org-a' },
+      status: 'confirmed',
+    });
+    expect(readHearingCompletion(hearing, { ...viewer, organizationIds: ['org-a'] })).toMatchObject(
+      {
+        kind: 'inventory',
+        status: 'ready',
+        next: { href: '/progress?tenant=alpha&organizationId=org-a' },
+      }
+    );
+    expect(readHearingCompletion(hearing, { ...viewer, organizationIds: ['org-b'] })?.status).toBe(
+      'unavailable'
+    );
+    expect(
+      readHearingCompletion(hearing, {
+        ...viewer,
+        organizationIds: ['org-a'],
+        projectIds: ['project-a'],
+      })?.status
+    ).toBe('unavailable');
   });
 });

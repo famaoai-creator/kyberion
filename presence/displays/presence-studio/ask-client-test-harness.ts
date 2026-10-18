@@ -170,7 +170,7 @@ function harness(
   };
   const scopedUrl = (path: string) => {
     const url = new URL(path, location.href);
-    url.searchParams.set('tenant', 'alpha');
+    url.searchParams.set('tenant', new URLSearchParams(location.search).get('tenant') || 'alpha');
     for (const key of ['organizationId', 'projectId']) {
       const value = new URLSearchParams(location.search).get(key);
       if (value) url.searchParams.set(key, value);
@@ -201,7 +201,11 @@ function harness(
       setItem: (key: string, value: string) => storage.set(key, value),
       removeItem: (key: string) => storage.delete(key),
     },
-    KyberionPrefs: { locale: () => 'en', tenant: () => 'alpha', scopedUrl },
+    KyberionPrefs: {
+      locale: () => 'en',
+      tenant: () => new URLSearchParams(location.search).get('tenant') || 'alpha',
+      scopedUrl,
+    },
     FrontDeskRail: {
       ready: options.ready ?? Promise.resolve(),
       subscribe(listener: (state: { phase: string; message: string }) => void) {

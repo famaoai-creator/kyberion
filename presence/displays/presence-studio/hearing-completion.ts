@@ -1,7 +1,9 @@
 import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 import { frontDeskRoleFromViewerScope } from '@agent/core/front-desk-identity';
 import { withExecutionContext } from '@agent/core/authority';
+import { parseEventScopeFromRecord } from '@agent/core/event-scope';
 import { loadState } from '@agent/core/mission/mission-state';
+import type { MissionState } from '@agent/core/mission/mission-types';
 import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   loadWorkInventoryEntry,
@@ -15,6 +17,7 @@ import {
 } from './security.js';
 import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
 import { hearingNamespace } from './hearing-runtime.js';
+import { hearingScopedUrl } from './hearing-request-scope.js';
 import type { HearingRecord } from './hearing.js';
 import type { HearingMissionHandoffFields } from './hearing-mission-routes.js';
 import type { HearingWorkInventoryHandoffFields } from './hearing-routes.js';
@@ -54,23 +57,50 @@ function completionHref(
     role: frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer)),
   }).find((candidate) => candidate.id === (kind === 'mission' ? 'decide' : 'progress'));
   if (!item?.allowed) return undefined;
-  const url = new URL(item.href, 'http://hearing.invalid');
-  const namespace = hearingNamespace(viewer.tenantSlugs);
-  url.searchParams.set(
-    'tenant',
-    namespace === 'all' || namespace === 'unscoped' ? 'personal' : namespace
-  );
+
   const scope = toFrontDeskViewerScope(viewer);
-  for (const [key, values] of [
-    ['organizationId', scope.organizationIds],
-    ['projectId', scope.projectIds],
-  ] as const) {
+  for (const values of [scope.organizationIds, scope.projectIds]) {
     if (values === 'all') continue;
     // These destinations accept one hierarchy selection, never an expanded set.
     if (values.length !== 1) return undefined;
-    url.searchParams.set(key, values[0]);
   }
-  return item.external ? url.href : url.pathname + url.search + url.hash;
+  return hearingScopedUrl(item.href, viewer);
+}
+
+/** Mission project membership is canonical under relationships, unlike inventory scope.
+ * Project it only when legacy flat/nested claims do not contradict that membership. */
+function missionInHearingScope(
+  viewer: PresenceStudioViewerContext,
+  mission: MissionState
+): boolean {
+  const projected = { ...mission } as unknown as Record<string, unknown>;
+  const organizationId = mission.relationships?.organization?.organization_id;
+  const projectId = mission.relationships?.project?.project_id;
+  for (const [key, value] of [
+    ['organization_id', organizationId],
+    ['project_id', projectId],
+  ] as const) {
+    if (!value) continue;
+    if (projected[key] !== undefined && projected[key] !== value) return false;
+    projected[key] = value;
+  }
+  const parsed = parseEventScopeFromRecord(projected);
+  if (!parsed.invalid) return presenceStudioRecordInScope(viewer, projected);
+  // Older project-linked missions may lack a canonical organization parent.
+  // Preserve only their tenant-wide view, without inventing narrower membership.
+  const allowed = toFrontDeskViewerScope(viewer);
+  const original = mission as unknown as Record<string, unknown>;
+  return Boolean(
+    projectId &&
+    !projected.organization_id &&
+    original.project_id === undefined &&
+    original.scope === undefined &&
+    original.scope_context === undefined &&
+    allowed.organizationIds === 'all' &&
+    allowed.projectIds === 'all' &&
+    !parseEventScopeFromRecord(original).invalid &&
+    presenceStudioRecordInScope(viewer, original)
+  );
 }
 
 /** Read-only proof of the handoff. Missing, corrupt and unauthorized targets all
@@ -109,15 +139,25 @@ export function readHearingCompletion(
       if (!stored.mission_id || !stored.approval_request_id) return unavailable;
       const namespace = hearingNamespace(viewer.tenantSlugs);
       if (namespace === 'all' || namespace === 'unscoped') return unavailable;
-      const mission = loadState(stored.mission_id);
+      const mission = withExecutionContext(
+        'ecosystem_architect',
+        () => loadState(stored.mission_id!),
+        undefined,
+        namespace
+      );
       if (
         !mission ||
         mission.mission_id !== stored.mission_id ||
         mission.tenant_slug !== namespace ||
-        !presenceStudioRecordInScope(viewer, mission)
+        !missionInHearingScope(viewer, mission)
       )
         return unavailable;
-      const approval = loadApprovalRequest('brief', stored.approval_request_id);
+      const approval = withExecutionContext(
+        'ecosystem_architect',
+        () => loadApprovalRequest('brief', stored.approval_request_id!),
+        undefined,
+        namespace
+      );
       // Existing alignment requests carry a mission source, not always an event
       // scope. Derive visibility only from that exact, already authorized mission.
       if (
@@ -143,8 +183,11 @@ export function readHearingCompletion(
           workInventoryScopeKey(stored.work_inventory_scope) !== workInventoryScopeKey(scope))
       )
         return unavailable;
-      const entry = withExecutionContext('ecosystem_architect', () =>
-        loadWorkInventoryEntry(scope, stored.work_inventory_entry_id!)
+      const entry = withExecutionContext(
+        'ecosystem_architect',
+        () => loadWorkInventoryEntry(scope, stored.work_inventory_entry_id!),
+        undefined,
+        scope.tenant_slug
       );
       if (
         !entry ||

@@ -69,6 +69,7 @@ import { resolveMemberByPrincipal } from '@agent/core/organization/member-regist
 import { safeWriteFile } from '@agent/core/secure-io';
 import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
 import * as hearingSecurity from './security.js';
+import * as organizationModel from '@agent/core/organization/organization-operating-model';
 import type { HearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
 import {
   createWorkInventoryEntry,
@@ -956,6 +957,135 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
     expectNoEffects();
     expect(loadHearingRecord('zz-inventory-other', sessionId)).toEqual(before);
+  });
+
+  it('saves selected organization metadata and restores only that organization after reload', async () => {
+    const sessionId = 'org-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const organization = vi
+      .spyOn(organizationModel, 'loadOrganizationOperationalState')
+      .mockReturnValue({
+        organization_id: 'org-a',
+        name: 'Synthetic organization',
+        tier: 'confidential',
+        tenant_slug: INVENTORY_TEST_TENANT,
+        status: 'active',
+        updated_at: '2026-10-18T07:00:00Z',
+      });
+    try {
+      const query = { organizationId: 'org-a' };
+      const decision = fakeResponse();
+      decide(fakeRequest({ params: { session: sessionId }, query }), decision);
+      const snapshot = responseSnapshot(decision);
+      clearEffectCalls();
+      const response = fakeResponse();
+      await inventory(
+        fakeRequest({
+          params: { session: sessionId },
+          query,
+          body: { handoff_snapshot: snapshot },
+        }),
+        response
+      );
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toMatchObject({
+        scope: { tenant_slug: INVENTORY_TEST_TENANT, organization_id: 'org-a' },
+      });
+      expect(proposeWorkDecomposition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: { tenant_slug: INVENTORY_TEST_TENANT, organization_id: 'org-a' },
+        }),
+        { useModel: true }
+      );
+      const saved = response.body as { entry_id: string; next: { href: string } };
+      expect(new URL(saved.next.href, 'http://localhost').searchParams.get('organizationId')).toBe(
+        'org-a'
+      );
+      const reload = fakeResponse();
+      get(fakeRequest({ params: { session: sessionId }, query }), reload);
+      expect(reload.body).toMatchObject({
+        completion: { status: 'ready', kind: 'inventory', id: saved.entry_id },
+      });
+      const other = fakeResponse();
+      get(
+        fakeRequest({ params: { session: sessionId }, query: { organizationId: 'org-b' } }),
+        other
+      );
+      expect(other.body).toMatchObject({ completion: { status: 'unavailable' } });
+      expect(other.body).not.toHaveProperty('record.work_inventory_entry_id');
+      expect(saveWorkInventoryEntry).toHaveBeenCalledTimes(1);
+    } finally {
+      organization.mockRestore();
+    }
+  });
+
+  it('rejects project inventory before preparation or reservation and preserves the decided record', async () => {
+    const sessionId = 'project-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const query = { organizationId: 'org-a', projectId: 'project-a' };
+    const decision = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId }, query }), decision);
+    const snapshot = responseSnapshot(decision);
+    const before = loadHearingRecord(namespace, sessionId);
+    clearEffectCalls();
+    const response = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, query, body: { handoff_snapshot: snapshot } }),
+      response
+    );
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      hearing_scope_error: 'hearing_inventory_project_unsupported',
+    });
+    expectNoEffects();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+    const reload = fakeResponse();
+    get(fakeRequest({ params: { session: sessionId }, query }), reload);
+    expect(responseSnapshot(reload)).toEqual(snapshot);
+    expect((reload.body as { completion?: unknown }).completion).toBeUndefined();
+  });
+
+  it('revalidates selected organization after async preparation before reservation', async () => {
+    const sessionId = 'org-changed-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const organization = vi
+      .spyOn(organizationModel, 'loadOrganizationOperationalState')
+      .mockReturnValueOnce({
+        organization_id: 'org-a',
+        name: 'Synthetic organization',
+        tier: 'confidential',
+        tenant_slug: INVENTORY_TEST_TENANT,
+        status: 'active',
+        updated_at: '2026-10-18T07:00:00Z',
+      })
+      .mockReturnValue(null);
+    try {
+      const query = { organizationId: 'org-a' };
+      const decision = fakeResponse();
+      decide(fakeRequest({ params: { session: sessionId }, query }), decision);
+      const before = loadHearingRecord(namespace, sessionId);
+      clearEffectCalls();
+      const response = fakeResponse();
+      await inventory(
+        fakeRequest({
+          params: { session: sessionId },
+          query,
+          body: { handoff_snapshot: responseSnapshot(decision) },
+        }),
+        response
+      );
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toMatchObject({ hearing_scope_error: 'hearing_scope_unavailable' });
+      expect(proposeWorkDecomposition).toHaveBeenCalledTimes(1);
+      expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+      expect(safeWriteFile).not.toHaveBeenCalled();
+      expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+    } finally {
+      organization.mockRestore();
+    }
   });
 
   it('creates a confirmed work inventory entry under the tenant scope, parses frequency/effort/trigger/systems, and is idempotent', async () => {

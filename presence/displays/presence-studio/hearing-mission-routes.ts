@@ -24,7 +24,10 @@ import { readSurfaceStringParam } from '@agent/core/surface/surface-request-inpu
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
-import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { resolveFrontDeskMenu, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
+import { frontDeskRoleFromViewerScope } from '@agent/core/front-desk-identity';
+import type { MissionState } from '@agent/core/mission/mission-types';
+import { eventScopeFromRecord } from '@agent/core/event-scope';
 import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission/mission-state';
@@ -39,8 +42,10 @@ import {
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import {
   PresenceStudioViewerError,
-  resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
+  presenceStudioRecordInScope,
+  toFrontDeskViewerScope,
+  type PresenceStudioViewerContext,
 } from './security.js';
 import {
   assertHearingEditable,
@@ -49,6 +54,11 @@ import {
   assertHearingHandoffReplay,
 } from './hearing-runtime.js';
 import { hearingStorageForViewer } from './hearing-storage-access.js';
+import {
+  HearingScopeError,
+  resolveHearingRequestViewer,
+  resolveHearingHandoffScope,
+} from './hearing-request-scope.js';
 import { assertHearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
 import type { HearingDecidedBy, HearingRecord } from './hearing.js';
 import {
@@ -95,7 +105,9 @@ function hearingMissionResponseError(req: Request, res: Response, error: unknown
   const status =
     error instanceof HearingConflictError
       ? 409
-      : error instanceof HearingMissionRequestError || error instanceof HearingOperationError
+      : error instanceof HearingMissionRequestError ||
+          error instanceof HearingOperationError ||
+          error instanceof HearingScopeError
         ? error.status
         : error instanceof PresenceStudioViewerError
           ? error.status
@@ -109,6 +121,7 @@ function hearingMissionResponseError(req: Request, res: Response, error: unknown
   res.status(status).json({
     ...presenceStudioData.presenceStudioWireError(error, status),
     ...(error instanceof HearingConflictError ? { hearing_conflict: error.conflict } : {}),
+    ...(error instanceof HearingScopeError ? { hearing_scope_error: error.code } : {}),
   });
 }
 
@@ -125,10 +138,28 @@ function assertGovernedScriptBuilt(scriptPath: string, label: string): void {
   }
 }
 
-function buildDecideNextAction(locale: SupportedLocale) {
-  const decideItem = FRONT_DESK_MENU.find((item) => item.id === 'decide');
-  const ports = readFrontDeskSurfacePorts();
-  const href = decideItem ? `http://127.0.0.1:${ports[decideItem.surface]}${decideItem.path}` : '';
+function buildDecideNextAction(locale: SupportedLocale, viewer: PresenceStudioViewerContext) {
+  const scope = toFrontDeskViewerScope(viewer);
+  const item = resolveFrontDeskMenu({
+    currentSurface: 'presence-studio',
+    urls: readFrontDeskSurfaceUrls(),
+    role: frontDeskRoleFromViewerScope(scope),
+  }).find((candidate) => candidate.id === 'decide');
+  if (!item?.allowed) throw new HearingScopeError('hearing_scope_unavailable');
+  const url = new URL(item.href);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+    throw new HearingScopeError('hearing_scope_unavailable');
+  for (const [key, values] of [
+    ['tenant', scope.tenantSlugs],
+    ['organizationId', scope.organizationIds],
+    ['projectId', scope.projectIds],
+  ] as const) {
+    url.searchParams.delete(key);
+    if (values === 'all') continue;
+    if (values.length !== 1) throw new HearingScopeError('hearing_scope_unavailable');
+    url.searchParams.set(key, values[0]);
+  }
+  const href = url.href;
   return {
     kind: 'alignment_review' as const,
     label_key: 'front_desk:hearing_open_decide' as const,
@@ -167,6 +198,63 @@ function decidedByToHearingMissionMember(decidedBy: HearingDecidedBy): HearingMi
   };
 }
 
+type HearingMissionScope = ReturnType<typeof resolveHearingHandoffScope>;
+
+/** Child scope is explicit; the role/delegation remains the existing governed one. */
+function missionChildEnv(scope: HearingMissionScope, controller: boolean): NodeJS.ProcessEnv {
+  const env = controller
+    ? buildExecutionEnv(process.env, 'mission_controller')
+    : { ...process.env };
+  env.KYBERION_TENANT = scope.tenantSlug;
+  if (scope.organizationId) env.KYBERION_ORGANIZATION_ID = scope.organizationId;
+  else delete env.KYBERION_ORGANIZATION_ID;
+  if (scope.projectId) env.KYBERION_PROJECT_ID = scope.projectId;
+  else delete env.KYBERION_PROJECT_ID;
+  return env;
+}
+
+/** A successful child exit never proves that it created the intended destination. */
+function missionMatchesHandoff(
+  state: MissionState | null,
+  missionId: string,
+  scope: HearingMissionScope,
+  viewer: PresenceStudioViewerContext
+): boolean {
+  if (
+    !state ||
+    state.mission_id !== missionId ||
+    state.status !== 'planned' ||
+    state.tier !== 'confidential' ||
+    state.tenant_slug !== scope.tenantSlug
+  )
+    return false;
+  const flat = state as MissionState & { project_id?: string };
+  const relationshipOrg = state.relationships?.organization?.organization_id;
+  const relationshipProject = state.relationships?.project?.project_id;
+  if (state.organization_id && relationshipOrg && state.organization_id !== relationshipOrg)
+    return false;
+  if (flat.project_id && relationshipProject && flat.project_id !== relationshipProject)
+    return false;
+  const organizationId = state.organization_id ?? relationshipOrg;
+  const projectId = relationshipProject ?? flat.project_id;
+  if (organizationId !== scope.organizationId || projectId !== scope.projectId) return false;
+  const projection = {
+    ...state,
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+  };
+  const canonical = eventScopeFromRecord(projection);
+  return Boolean(
+    canonical &&
+    canonical.mission_id === missionId &&
+    canonical.tier === 'confidential' &&
+    canonical.tenant_slug === scope.tenantSlug &&
+    canonical.organization_id === scope.organizationId &&
+    canonical.project_id === scope.projectId &&
+    presenceStudioRecordInScope(viewer, projection)
+  );
+}
+
 export function registerHearingMissionRoutes(app: express.Express): void {
   // HT-03 (2nd half): confirm-and-hand-off. Localadmin only (a held-action
   // mutation, same posture as `/decide`); member resolution mirrors
@@ -178,7 +266,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
   app.post('/api/hearing/:session/handoff', (req, res) => {
     let effectReserved = false;
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingMissionSessionId(req);
       const storage = hearingStorageForViewer(viewer);
@@ -233,7 +321,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
           ok: true,
           mission_id: record.mission_id,
           approval_request_id: record.approval_request_id,
-          next_action: buildDecideNextAction(locale),
+          next_action: buildDecideNextAction(locale, viewer),
         });
         return;
       }
@@ -246,17 +334,14 @@ export function registerHearingMissionRoutes(app: express.Express): void {
           'Hearing record must be decided (POST .../decide) before handoff.'
         );
       }
-      if (namespace === 'all' || namespace === 'unscoped') {
-        throw new HearingMissionRequestError(
-          400,
-          'Hearing handoff requires a concrete tenant scope.'
-        );
-      }
-
+      const scope = resolveHearingHandoffScope(viewer, 'mission');
+      const nextAction = buildDecideNextAction(locale, viewer);
       const decidedBy = decidedByToHearingMissionMember(record.decided_by);
       const brief: MissionBrief = hearingRecordToMissionBrief(record, {
         locale,
         tenantSlug: namespace,
+        organizationId: scope.organizationId,
+        projectId: scope.projectId,
         member: decidedBy,
       });
       const missionId = brief.missionId as string;
@@ -272,12 +357,14 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         brief,
         tenantSlug: namespace,
         tier: 'confidential',
+        organizationId: scope.organizationId,
+        projectId: scope.projectId,
         decidedBy,
       });
       const reserved = storage.reserve(record, 'mission', nowIso());
       effectReserved = true;
       const createResult = safeExecResult(process.execPath, [CONTROLLER_RELATIVE, ...createArgs], {
-        env: buildExecutionEnv(process.env, 'mission_controller'),
+        env: missionChildEnv(scope, true),
         cwd: rootDir,
         timeoutMs: 60_000,
         maxOutputMB: 5,
@@ -292,9 +379,21 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       // Exit code 0 alone is not success — verify the mission actually
       // landed on disk in `planned` status before trusting the CLI's exit
       // code (mirrors the concierge hygiene route's same verification).
-      const missionDir = findMissionPath(missionId);
-      const state = missionDir ? loadState(missionId) : null;
-      if (createResult.status !== 0 || !missionDir || state?.status !== 'planned') {
+      const { missionDir, state } = withExecutionContext(
+        'ecosystem_architect',
+        () => {
+          const missionDir = findMissionPath(missionId);
+          return { missionDir, state: missionDir ? loadState(missionId) : null };
+        },
+        undefined,
+        namespace,
+        scope.organizationId
+      );
+      if (
+        createResult.status !== 0 ||
+        !missionDir ||
+        !missionMatchesHandoff(state, missionId, scope, viewer)
+      ) {
         throw new HearingMissionRequestError(502, `Mission ${missionId} was not created.`);
       }
 
@@ -306,21 +405,27 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       // above — delegated under SYSTEM_ROLE, AUTHORITY_MODEL 3.B2 DR-01). Elevate
       // only for this write, the same pattern `mission-coordination-bus.ts` /
       // `mission-task-recovery.ts` use for direct mission-directory writes.
-      withExecutionContext('mission_controller', () => {
-        const evidenceDir = assertSafeRepositoryPath(`${missionDir}/evidence`, {
-          allowMissingLeaf: true,
-        });
-        if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
-        const briefPath = assertSafeRepositoryPath(`${missionDir}/evidence/mission-brief.json`, {
-          allowMissingLeaf: true,
-        });
-        safeWriteFile(briefPath, `${JSON.stringify(brief, null, 2)}\n`, { encoding: 'utf8' });
-      });
+      withExecutionContext(
+        'mission_controller',
+        () => {
+          const evidenceDir = assertSafeRepositoryPath(`${missionDir}/evidence`, {
+            allowMissingLeaf: true,
+          });
+          if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
+          const briefPath = assertSafeRepositoryPath(`${missionDir}/evidence/mission-brief.json`, {
+            allowMissingLeaf: true,
+          });
+          safeWriteFile(briefPath, `${JSON.stringify(brief, null, 2)}\n`, { encoding: 'utf8' });
+        },
+        undefined,
+        namespace,
+        scope.organizationId
+      );
 
       const alignmentResult = safeExecResult(
         process.execPath,
         [ALIGNMENT_REQUEST_RELATIVE, '--mission', missionId, '--json'],
-        { env: { ...process.env }, cwd: rootDir, timeoutMs: 30_000, maxOutputMB: 5 }
+        { env: missionChildEnv(scope, false), cwd: rootDir, timeoutMs: 30_000, maxOutputMB: 5 }
       );
       const approvalRequestId = resolveAlignmentRequestId(missionId, alignmentResult);
       if (!approvalRequestId) {
@@ -341,7 +446,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         ok: true,
         mission_id: missionId,
         approval_request_id: approvalRequestId,
-        next_action: buildDecideNextAction(locale),
+        next_action: nextAction,
       });
     } catch (error) {
       if (effectReserved) {
