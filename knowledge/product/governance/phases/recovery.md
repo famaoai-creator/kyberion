@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Recovery & Resilience'
 tags: [governance, lifecycle, recovery]
-last_updated: 2026-08-01
+last_updated: 2026-10-18
 runtime_stages: [preflight, execution]
 ---
 
@@ -36,10 +36,26 @@ If the physical or neural base of the ecosystem is broken or uninitialized, the 
 - **Condition**: Missing build artifacts (`dist/` directories).
 - **Action**: Run `pnpm build`
 - **Goal**: Compile TypeScript and package the runtime.
+- **Observation versus repair**: repeated L2 checks do not count as build attempts. The canonical
+  `pnpm build`, `pnpm build:packages` and `pnpm build:repo` entrypoints record completed compiler
+  commands; a failed command consumes one recovery attempt. A successful command resets it only
+  when the complete compiler output tree also passes import and freshness checks. A partial build
+  that leaves other targets stale records `restored: false` and retains the existing budget.
+  UI-only failures do not consume the compiler budget. Legacy observation counts are retained as
+  `legacy_observation_attempt_count`, not treated as failed repairs.
+- **Build in progress**: builds and baseline scans share the `compiler-outputs` lock. A busy
+  scan reports `needs_attention` with `deferred: true`; wait for the active build rather than
+  launching another recovery. Inspect `build_readiness` and L2's `last_observation` for exact
+  source/output paths, failure fingerprint and timestamp; `last_recovery` identifies the last
+  completed compiler command. Do not delete the PFC state to clear a failure.
 
 ### 3. Circuit Breaker Constraint
 
-- If the `baseline-check` reports `circuit_broken: true`, the agent **MUST NOT** attempt further automated recovery. It must stop and ask the Sovereign for manual intervention (e.g., "Dependency resolution failed 3 times. Please check package.json").
+- If the `baseline-check` reports `needs_recovery` with `circuit_broken: true`, the agent **MUST NOT**
+  attempt further automated recovery. Surface the failed layer and recorded evidence to the
+  Sovereign. For L2, the budget counts completed failed compiler commands, not health polls.
+  An explicit operator-authorized build remains available; a successful subsequent health probe
+  also closes the circuit. A deferred observation never requests another automatic build.
 
 ---
 
