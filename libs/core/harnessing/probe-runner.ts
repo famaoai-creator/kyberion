@@ -53,6 +53,11 @@ export interface RunOutcome {
    *  overlay OR shipped in the base scenario) — a non-empty list means
    *  `delivered` may not be earned by the command itself. */
   staged_expected: string[];
+  /** Immutable copy of the overlay bytes that were actually staged into the
+   *  run dir (runRoot/.snapshots/<label>). Adoption must source from THIS —
+   *  the live overlayDir may have changed since the probe ran. Absent when
+   *  the probe had no overlay (base run) or failed before staging. */
+  staged_snapshot?: string;
   error: string;
   recorded_at: string;
 }
@@ -146,6 +151,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   // All overlay validation happens BEFORE the first write — a rejected
   // overlay must not leave a partial run-dir tree inside the caller's input.
   let overlay: string | null = null;
+  let snapshotDir: string | null = null;
   if (spec.overlayDir) {
     overlay = assertSafeRepositoryPath(spec.overlayDir);
     if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
@@ -161,6 +167,21 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
         `overlay dir ${spec.overlayDir} and run dir ${runDir} nest inside each other — copyTree would recurse or delete input`
       );
     }
+    // Frozen byte record of what this probe staged. Sibling of the run dir —
+    // inside it the scenario could tamper; outside runRoot it would escape
+    // the repo-scoped path contract. runDir-vs-overlay nesting above already
+    // covers this dir too (same runRoot tree).
+    snapshotDir = path.join(runRoot, '.snapshots', spec.label);
+    const resolvedSnapshot = path.resolve(snapshotDir);
+    if (
+      resolvedSnapshot === resolvedOverlay ||
+      resolvedSnapshot.startsWith(`${resolvedOverlay}${path.sep}`) ||
+      resolvedOverlay.startsWith(`${resolvedSnapshot}${path.sep}`)
+    ) {
+      return fail(
+        `overlay dir ${spec.overlayDir} and snapshot dir nest inside each other — copyTree would recurse`
+      );
+    }
   }
 
   try {
@@ -168,7 +189,14 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     // probe (including declared expectOutputs) would fake delivered=true.
     if (safeExistsSync(runDir)) safeRmSync(runDir);
     copyTree(scenarioDir, runDir);
-    if (overlay) copyTree(overlay, runDir);
+    if (overlay && snapshotDir) {
+      // Stage through the snapshot, not the live overlay: ONE read of the
+      // mutable source, so the snapshot IS the probed bytes by construction.
+      // A later overlayDir mutation cannot retro-edit what the probe ran.
+      if (safeExistsSync(snapshotDir)) safeRmSync(snapshotDir);
+      copyTree(overlay, snapshotDir);
+      copyTree(snapshotDir, runDir);
+    }
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
   }
@@ -222,6 +250,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     wall_ms,
     produced_files: after.filter((f) => !stagedBefore.has(f)),
     staged_expected,
+    ...(snapshotDir ? { staged_snapshot: snapshotDir } : {}),
     error: delivered
       ? ''
       : (allStaged ? 'all_expected_staged ' : '') +

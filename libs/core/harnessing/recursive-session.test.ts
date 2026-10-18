@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeMkdir, safeWriteFile } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { runRecursiveSession } from './recursive-session.js';
+import { runProbe } from './probe-runner.js';
 
 const ROOT = path.join(process.cwd(), 'active/shared/tmp/harnessing-recursive-test');
 
@@ -134,5 +135,77 @@ describe('honesty + edge cases', () => {
     // reported honestly, not as a real backend.
     expect(r.rounds[0].propose_meta!.backend_used).toBe(false);
     expect(r.rounds[0].propose_meta!.error).toMatch(/degraded/);
+  });
+});
+
+describe('probed-bytes adoption (R7-04)', () => {
+  it('materializes the winner from the staged snapshot, not the live overlayDir', async () => {
+    // The scenario command itself MUTATES the live overlay during the round-1
+    // probe (writes into the overlay dir via absolute path). Materialization
+    // must still adopt the bytes that were actually probed ('ORIG'), never
+    // the post-probe mutation ('MUT').
+    const scenDir = path.join(ROOT, 'scenario-mut');
+    const ovDir = path.join(ROOT, 'ov', 'win-mut');
+    const target = path.join(ovDir, 'pass_marker');
+    safeMkdir(scenDir, { recursive: true });
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      // Mutate only when the run contains the win overlay's iam_win marker —
+      // otherwise the base probe would corrupt the overlay before 'win' is
+      // even staged, which is a different bug than the one under test.
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo MUT > "${target}"\n`
+    );
+    overlay('win-mut', { pass_marker: 'ORIG', iam_win: '1' });
+    const runRoot = path.join(ROOT, 'run-mut');
+    const r = await runRecursiveSession({
+      session_id: 'rec-mut',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot,
+      candidates: [
+        { label: 'win', overlayDir: ovDir },
+        { label: 'none', overlayDir: overlay('none-mut', {}) },
+      ],
+      rounds: 2,
+      metrics: [{ key: 'produced_files', direction: 'higher' }],
+    });
+    expect(r.adopted_overlays).toEqual(['r1:win']);
+    // The live overlay was mutated mid-probe — proof the window existed.
+    expect(String(safeReadFile(target)).trim()).toBe('MUT');
+    // The adopted next base carries the PROBED bytes, not the live ones.
+    const nextBaseMarker = path.join(runRoot, 'bases', 'round-2', 'pass_marker');
+    expect(String(safeReadFile(nextBaseMarker)).trim()).toBe('ORIG');
+    // The snapshot itself records the staged bytes.
+    const snap = r.rounds[0].outcomes.find((o) => o.label === 'win')!.staged_snapshot!;
+    expect(String(safeReadFile(path.join(snap, 'pass_marker'))).trim()).toBe('ORIG');
+  });
+  it('runProbe exposes staged_snapshot and reruns reset it', async () => {
+    const scenDir = scenario();
+    const ovDir = overlay('snap', { pass_marker: 'v1' });
+    const runRoot = path.join(ROOT, 'run-snap');
+    const outcome = runProbe({
+      label: 'c',
+      scenarioDir: scenDir,
+      overlayDir: ovDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot,
+    });
+    expect(outcome.staged_snapshot).toBeDefined();
+    expect(String(safeReadFile(path.join(outcome.staged_snapshot!, 'pass_marker')))).toBe('v1');
+    // Mutate the live overlay and re-probe — snapshot must reset, not merge.
+    safeWriteFile(path.join(ovDir, 'pass_marker'), 'v2');
+    safeWriteFile(path.join(ovDir, 'extra.txt'), 'new');
+    const again = runProbe({
+      label: 'c',
+      scenarioDir: scenDir,
+      overlayDir: ovDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot,
+    });
+    expect(String(safeReadFile(path.join(again.staged_snapshot!, 'pass_marker')))).toBe('v2');
+    expect(String(safeReadFile(path.join(again.staged_snapshot!, 'extra.txt')))).toBe('new');
   });
 });
