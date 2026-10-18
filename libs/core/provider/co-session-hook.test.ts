@@ -1,5 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const race = vi.hoisted(() => ({ beforeDeliveryLock: undefined as (() => void) | undefined }));
+vi.mock('../foundation/lock-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../foundation/lock-utils.js')>();
+  return {
+    ...actual,
+    withLockSync: <T>(id: string, fn: () => T, timeout?: number): T => {
+      if (id.startsWith('co-session-delivery:')) {
+        const trigger = race.beforeDeliveryLock;
+        race.beforeDeliveryLock = undefined;
+        trigger?.();
+      }
+      return actual.withLockSync(id, fn, timeout);
+    },
+  };
+});
 import {
+  ackCoSessionHandoff,
   acquireCoSessionLease,
   clearCoSessionNamespace,
   clearCoSessionStore,
@@ -17,6 +33,7 @@ import {
 } from './co-session-hook.js';
 
 beforeEach(() => {
+  race.beforeDeliveryLock = undefined;
   setCoSessionNamespace(`co-session-hook-test-${process.pid}`);
   clearCoSessionStore();
 });
@@ -53,6 +70,37 @@ describe('coSessionHookJoin', () => {
 });
 
 describe('coSessionHookDrain + formatPendingHandoffs', () => {
+  it('refreshes pending inside the receipt lock after a competing hook delivered newer work', () => {
+    startCoSession({ goal: 'race', provider: 'claude', session_id: 'cos-hook-race' });
+    const old = createCoSessionHandoff({
+      kind: 'review.request',
+      from_provider: 'claude',
+      to_provider: 'codex',
+      body: 'old',
+    });
+    const input = { provider: 'codex', session_key: 'race', only_new: true };
+    let delivered: string | undefined;
+    // Interleave after A begins but before its receipt lock: ack old work,
+    // append new work, and let hook B deliver it first.
+    race.beforeDeliveryLock = () => {
+      ackCoSessionHandoff({
+        provider: 'codex',
+        participant_id: 'codex-race',
+        handoff_id: old.handoff_id,
+      });
+      const fresh = createCoSessionHandoff({
+        kind: 'review.request',
+        from_provider: 'claude',
+        to_provider: 'codex',
+        body: 'new',
+      });
+      delivered = coSessionHookDrain(input)?.handoffs[0]?.handoff_id;
+      expect(delivered).toBe(fresh.handoff_id);
+    };
+    expect(coSessionHookDrain(input)?.handoffs).toEqual([]);
+    expect(delivered).toBeDefined();
+    expect(coSessionHookDrain(input)?.handoffs).toEqual([]);
+  });
   it('surfaces handoffs addressed to the participant, provider, or broadcast', () => {
     startCoSession({ goal: 'x', provider: 'claude', session_id: 'cos-hook-3' });
     createCoSessionHandoff({

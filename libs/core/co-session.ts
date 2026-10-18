@@ -1006,6 +1006,39 @@ export function clearCoSessionStore(): void {
   });
 }
 
+/** Hook delivery receipts are not acknowledgements. Serialize across short-lived
+ * hook processes and retain only pending ids so repeated tool events stay quiet. */
+export function takeUnseenCoSessionHandoffs(
+  sessionId: string,
+  participantId: string,
+  readPending: () => CoSessionHandoff[],
+  limit = 10
+): CoSessionHandoff[] {
+  const session = readSession(sessionId);
+  if (session.status !== 'open') return [];
+  const key = createHash('sha256').update(participantId).digest('hex');
+  const file = path.join(sessionDir(sessionId), 'hook-deliveries', `${key}.json`);
+  return withLockSync(`co-session-delivery:${sessionId}:${key}`, () => {
+    // Read inside the receipt lock: a stale pre-lock snapshot could erase a
+    // newer delivery receipt and make a later hook echo that message again.
+    const pending = readPending();
+    const previous = readJsonIfPresent<unknown>(file);
+    const seen = new Set(
+      Array.isArray(previous) ? previous.filter((id) => typeof id === 'string') : []
+    );
+    const fresh = pending.filter((h) => !seen.has(h.handoff_id)).slice(0, limit);
+    for (const handoff of fresh) seen.add(handoff.handoff_id);
+    if (fresh.length) {
+      withCoSessionWrite(() => safeMkdir(path.dirname(file), { recursive: true }));
+      writeJson(
+        file,
+        pending.filter((h) => seen.has(h.handoff_id)).map((h) => h.handoff_id)
+      );
+    }
+    return fresh;
+  });
+}
+
 export function buildCoSessionPromoteHint(sessionId?: string): {
   session_id: string;
   peer_lift: string;

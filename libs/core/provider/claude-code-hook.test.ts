@@ -171,14 +171,20 @@ describe('claude-code-hook — UserPromptSubmit and Stop', () => {
     expect(ctx).toContain('mission');
   });
 
-  it('summarizes stop events and nudges review completion', () => {
+  it('records stop events without instructions that resume the turn', () => {
     const ctx = buildStopContext({
       reason: 'Stopping after the first draft and validation pass.',
       cwd: '/repo',
     });
 
-    expect(ctx).toContain('Stop summary');
-    expect(ctx).toContain('/ky-review');
+    expect(ctx).toBe('');
+    expect(recordSpy).toHaveBeenCalledWith(expect.objectContaining({ action: 'claude_code_stop' }));
+  });
+
+  it('ignores recursive Stop invocations', () => {
+    recordSpy.mockClear();
+    expect(buildStopContext({ stop_hook_active: true })).toBe('');
+    expect(recordSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -188,7 +194,7 @@ describe('claude-code-hook — SessionEnd', () => {
   // fail-closed, so only the store-free properties are asserted.
   it('Stop no longer touches co-session leases', () => {
     const ctx = buildStopContext({ reason: 'turn done', session_id: 's7' });
-    expect(ctx).toContain('Stop summary');
+    expect(ctx).toBe('');
     expect(ctx).not.toContain('co-session');
   });
 

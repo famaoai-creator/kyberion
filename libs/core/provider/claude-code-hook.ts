@@ -211,7 +211,11 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
   });
 
   const handoffBlock = formatPendingHandoffs(
-    coSessionHookDrain({ provider: 'claude', session_key: input.session_id as string | undefined })
+    coSessionHookDrain({
+      provider: 'claude',
+      session_key: input.session_id as string | undefined,
+      only_new: true,
+    })
   );
 
   return [
@@ -226,6 +230,7 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
 }
 
 export function buildStopContext(input: Record<string, unknown> = {}): string {
+  if (input.stop_hook_active === true) return '';
   const reason = normalizePrompt(input.reason);
   const summary = reason ? truncate(reason, 180) : 'No stop reason was provided.';
   recordSessionSignal('claude_code_stop', {
@@ -233,12 +238,9 @@ export function buildStopContext(input: Record<string, unknown> = {}): string {
     reason_summary: summary,
   });
 
-  return [
-    'Kyberion received a Stop event for this session.',
-    `Stop summary: ${summary}`,
-    'If code or knowledge changed, run /ky-review before ending the work.',
-    'If the task is incomplete, checkpoint the mission instead of leaving it implicit.',
-  ].join('\n');
+  // Stop is telemetry only. Review reminders belong on UserPromptSubmit;
+  // injecting instructions here can repeatedly resume an otherwise done turn.
+  return '';
 }
 
 /**
@@ -367,7 +369,7 @@ export function buildSessionStartContext(input: Record<string, unknown> = {}): s
     '- Writes into knowledge/ tiers are gated by tier-guard (PreToolUse) — leaks are denied.',
     '- Write/Edit/Bash executions are recorded into the Kyberion audit chain (PostToolUse).',
     '- UserPromptSubmit captures the user prompt as a shared coordination signal.',
-    '- Stop emits a review reminder so the session closes with an explicit handoff.',
+    '- Run /ky-review after changes; Stop only records telemetry and never resumes the turn.',
     '- Follow the Operating Guide (CLAUDE.md §3): capture intent → align → execute → review.',
     'Use /ky-baseline to check system health, or /ky-mission-start to open a governed mission.',
     ...(join.joined

@@ -1,5 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import { buildGeminiSettings } from './generate_provider_hook_configs.js';
+import { buildCodexHooks, buildGeminiSettings } from './generate_provider_hook_configs.js';
+
+describe('buildCodexHooks', () => {
+  it('refuses to overwrite malformed user hook configuration', () => {
+    expect(() => buildCodexHooks({ hooks: 'broken' })).toThrow('refusing to replace');
+    expect(() => buildCodexHooks({ hooks: { UserPromptSubmit: {} } })).toThrow(
+      'refusing to replace'
+    );
+  });
+  it('preserves user hooks and stays idempotent across repeated generation', () => {
+    const custom = { hooks: [{ type: 'command', command: 'custom-tool' }] };
+    const existing = {
+      description: 'my hooks',
+      hooks: { UserPromptSubmit: [custom], Stop: [custom] },
+    };
+    const first = buildCodexHooks(existing);
+    expect(buildCodexHooks(first)).toEqual(first);
+    const hooks = first.hooks as Record<string, unknown[]>;
+    expect(hooks.UserPromptSubmit).toHaveLength(2);
+    expect(hooks.UserPromptSubmit![0]).toEqual(custom);
+    expect(hooks.Stop).toEqual([custom]);
+    expect(first.description).toBe('my hooks');
+    expect((buildCodexHooks().hooks as Record<string, unknown>).Stop).toBeUndefined();
+  });
+
+  it('uses Codex timeouts in seconds and preserves mixed command groups', () => {
+    const generated = buildCodexHooks().hooks as Record<
+      string,
+      Array<{ hooks: Array<{ command: string; timeout: number }> }>
+    >;
+    const own = generated.UserPromptSubmit![0]!.hooks[0]!;
+    const mixed = buildCodexHooks({
+      hooks: {
+        UserPromptSubmit: [
+          { matcher: '*', hooks: [own, { type: 'command', command: 'custom-tool' }] },
+        ],
+      },
+    });
+    expect((mixed.hooks as typeof generated).UserPromptSubmit![0]!.hooks).toEqual([
+      { type: 'command', command: 'custom-tool' },
+    ]);
+    expect(generated.SessionEnd![0]!.hooks[0]!.timeout).toBe(3);
+    expect(generated.PostToolUse![0]!.hooks[0]!.timeout).toBe(10);
+  });
+});
 
 describe('buildGeminiSettings', () => {
   it('renders the four owned hook event groups', () => {

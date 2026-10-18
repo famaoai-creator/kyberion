@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-COSESSION-HOOKS-20261018-2026_10_18",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Loop-safe Co-Session hook delivery",
+  "summary": "Use safe event boundaries, telemetry-only Stop hooks, and serialized per-participant receipts to prevent cross-CLI notification loops.",
+  "candidate_id": "mem-MSN-COSESSION-HOOKS-20261018-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-COSESSION-HOOKS-20261018/evidence/test-report.md",
+    "active/missions/public/MSN-COSESSION-HOOKS-20261018/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-18T04:43:20.329Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Co-Session hooks should join on SessionStart, pull new handoffs on user input and supported tool completion, and release leases only on SessionEnd. Stop must not emit continuation instructions; skip recursive Stop invocations before telemetry. Persist delivery receipts separately from explicit acknowledgements. Read pending handoffs inside the same lock as receipt updates: an outside snapshot can erase a newer delivery receipt and cause repeats. Suppress self messages, preserve user hook commands during regeneration, and let native CLI trust control activation. Delivery remains best-effort, so the pending handoff list is canonical. Validate repeated events, concurrent delivery interleavings, batch overflow, separate CLI instances, and compiled hook stdout. Run test leak checks without concurrent owner evidence writes."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-COSESSION-HOOKS-20261018/evidence/test-report.md",
+    "active/missions/public/MSN-COSESSION-HOOKS-20261018/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "feat/codex-co-session-hooks-20261018",
+  "source_commit": "22030878354a8174dd02903020ca98fb189df9b8"
+}
