@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-PPC-PROBE-20261018-2026_10_18",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Evidence-strength decision axis for contrastive harness tuning",
+  "summary": "A probe result set on the same scenario classifies into auto_advance (single dominant winner — self-evident, proceed on evidence), human_gate (ambiguous contrast or no declared metrics), keep_base (no candidate beat base), or decline (no usable evidence); a baseline that never executed is missing evidence, never a losing baseline.",
+  "candidate_id": "mem-MSN-PPC-PROBE-20261018-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/distillation.md",
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-18T04:08:09.316Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "When tuning agent configuration on repeating idempotent work shapes, run the base and each candidate overlay in isolated run dirs on the same scenario, then classify on the decision axis instead of asking a human every time. Rules learned implementing it: (1) dominance requires declared metrics — delivered-vs-delivered with no metrics is human_gate, never auto_advance; (2) auto_advance requires the baseline to have actually executed — a failed-to-run base is missing evidence; (3) a single winner must dominate base AND every delivered rival, else human_gate; (4) validate probe labels upfront (reserved base, duplicates) or run dirs silently merge and evidence corrupts; (5) record stderr tail and spawn error — exit=null hides why a probe died."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/distillation.md",
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-PPC-PROBE-20261018/evidence/test-report.md"
+  ],
+  "source_branch": "feat/ppc-probe-20261018",
+  "source_commit": "010a26957d57a0b050080039ae4df821a477dc28"
+}
