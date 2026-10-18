@@ -88,6 +88,28 @@ export const runContrastiveProbe = defineScript({
         throw new ScriptExitError(2, `unknown flag --${key}`);
       }
     }
+    for (const key of [
+      'scenario',
+      'command',
+      'scenario-spec',
+      'run-root',
+      'propose',
+      'brief',
+      'surface',
+      'select',
+      'seed',
+      'rounds',
+      'library',
+      'domain',
+      'work-shape',
+    ]) {
+      if ((args[key]?.length ?? 0) > 1) {
+        throw new ScriptExitError(
+          2,
+          `--${key} given ${args[key].length} times — scalar flags accept one value`
+        );
+      }
+    }
     const scenario = args['scenario']?.[0];
     const scenarioSpecPath = args['scenario-spec']?.[0];
     const runRoot = args['run-root']?.[0];
@@ -114,9 +136,10 @@ export const runContrastiveProbe = defineScript({
       return { label: entry.slice(0, eq), overlayDir: entry.slice(eq + 1) };
     });
     const metrics: MetricSpec[] = (args['metric'] ?? []).map((m) => {
-      const [key, dir] = m.split(':');
-      if (!key) {
-        throw new ScriptExitError(2, `--metric expects a non-empty key, got ${m}`);
+      const parts = m.split(':');
+      const [key, dir] = parts;
+      if (!key || parts.length !== 2) {
+        throw new ScriptExitError(2, `--metric expects key:higher|lower, got ${m}`);
       }
       if (dir !== 'lower' && dir !== 'higher') {
         throw new ScriptExitError(2, `--metric expects <key>:lower|higher, got ${m}`);

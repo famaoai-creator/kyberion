@@ -139,6 +139,12 @@ export async function runContrastiveSession(
       ...(spec.propose.library ? { library: spec.propose.library } : {}),
     });
     rejected.push(...proposed.rejected);
+    // A degraded/empty propose run still yields evidence — record it as a
+    // rejection so the decline report carries the reason instead of the
+    // 'at least one candidate' throw misstating the cause.
+    if (proposed.error && !proposed.candidates.length) {
+      rejected.push({ label: 'propose', path: '.', reason: proposed.error });
+    }
     propose_meta = {
       backend_used: proposed.backend_used,
       error: proposed.error || undefined,
