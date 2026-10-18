@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
   safeCopyFileSync,
+  safeRmSync,
   safeExecResult,
   safeExistsSync,
   safeLstat,
@@ -104,6 +105,9 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   });
 
   try {
+    // A rerun of the same label must start empty: stale files from a prior
+    // probe (including declared expectOutputs) would fake delivered=true.
+    if (safeExistsSync(runDir)) safeRmSync(runDir);
     copyTree(scenarioDir, runDir);
     if (spec.overlayDir) {
       const overlay = assertSafeRepositoryPath(spec.overlayDir);

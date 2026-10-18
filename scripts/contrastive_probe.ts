@@ -56,6 +56,9 @@ export const runContrastiveProbe = defineScript({
     });
     const metrics: MetricSpec[] = (args['metric'] ?? []).map((m) => {
       const [key, dir] = m.split(':');
+      if (!key) {
+        throw new ScriptExitError(2, `--metric expects a non-empty key, got ${m}`);
+      }
       if (dir !== 'lower' && dir !== 'higher') {
         throw new ScriptExitError(2, `--metric expects <key>:lower|higher, got ${m}`);
       }

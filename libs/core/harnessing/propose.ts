@@ -7,8 +7,16 @@
 
 import * as path from 'node:path';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { STRUCTURED_DELEGATION_PROMPT_HEADER } from '../reasoning/reasoning-delegation-policy.js';
+import { getStubServedOps } from '../reasoning/stub-served-registry.js';
 import { logger } from '../core.js';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { isValidRelPath, validateOverlay, type SurfaceSpec } from './surface-spec.js';
 
 export interface ProposedFile {
@@ -27,7 +35,11 @@ const PROPOSE_INSTRUCTION = (
   brief: string,
   spec: SurfaceSpec,
   index: number
-) => `You are proposing ONE candidate overlay for a contrastive harness-tuning probe.
+) => `${STRUCTURED_DELEGATION_PROMPT_HEADER}
+
+Schema: [{"path": "<relative file path>", "content": "<file text>"}] — a JSON array only.
+
+You are proposing ONE candidate overlay for a contrastive harness-tuning probe.
 
 Brief: ${brief}
 
@@ -62,6 +74,12 @@ export async function proposeCandidates(opts: {
   const result: ProposeResult = { backend_used: false, candidates: [], rejected: [], error: '' };
   const outDir = assertSafeRepositoryPath(opts.outDir, { allowMissingLeaf: true });
   const prefix = opts.labelPrefix ?? 'llm';
+  // The prefix becomes part of probe labels — it must satisfy the same charset
+  // or it could escape the _proposed dir (e.g. '../x').
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(prefix)) {
+    throw new Error(`[PROPOSE] invalid labelPrefix ${JSON.stringify(prefix)}`);
+  }
+  const stubServedBefore = getStubServedOps().length;
 
   let backend;
   try {
@@ -71,8 +89,9 @@ export async function proposeCandidates(opts: {
     return result;
   }
   // getReasoningBackend never throws — it falls back to the stub. Per the
-  // stub-taint policy a stub run is not a real proposal, so only a non-stub
-  // backend counts as backend_used.
+  // stub-taint policy a stub run is not a real proposal; honest accounting
+  // reads the stub-served registry, not the registered backend's name (a
+  // failover composite can still serve a stub candidate).
   result.backend_used = backend.name !== 'stub';
   if (!result.backend_used) {
     result.error = `degraded: only the stub backend is active (name=${backend.name}); proposals will be rejected`;
@@ -106,6 +125,10 @@ export async function proposeCandidates(opts: {
       continue;
     }
     try {
+      // Recreate the overlay dir: leftovers from a previous run would silently
+      // merge into this candidate and corrupt the probed evidence.
+      if (safeExistsSync(overlayDir)) safeRmSync(overlayDir);
+      safeMkdir(overlayDir, { recursive: true });
       for (const f of clean) {
         const target = assertSafeRepositoryPath(path.join(overlayDir, f.path), {
           allowMissingLeaf: true,
@@ -130,6 +153,14 @@ export async function proposeCandidates(opts: {
     }
     logger.info(`[propose:${label}] accepted ${validation.accepted_files.length} file(s)`);
     result.candidates.push({ label, overlayDir, files: validation.accepted_files });
+  }
+  // Any delegateTask served by the stub during this call taints the batch.
+  const stubServed = getStubServedOps()
+    .slice(stubServedBefore)
+    .some((r) => r.op === 'delegateTask');
+  if (stubServed) {
+    result.backend_used = false;
+    result.error = result.error || 'degraded: stub backend served one or more proposals';
   }
   return result;
 }
