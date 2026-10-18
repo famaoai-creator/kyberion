@@ -4,7 +4,7 @@ category: Architecture
 tags: [adr, mesh-hub, peer, messaging, routing, tenancy, security]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-06-24
+last_updated: 2026-10-18
 ---
 
 # Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane
@@ -53,6 +53,8 @@ v1 routes on deterministic eligibility only: enrollment, tenant, presence freshn
 ### 6. Recipient acceptance and approval
 
 Hub delivery is transport acceptance only. A recipient may convert a request into a WorkItem proposal or an A2A task proposal after local schema, tenant, and policy validation. It must require explicit recipient acceptance for `review.request`, `workitem.handoff`, and every request that could cause external side effects. No Hub message may create, start, resume, alter, or approve a mission.
+
+**Amendment (2026-10-18) — opt-in conversation auto replies.** A peer conversation server may answer inbound `message` / `reply` conversation messages with an LLM-generated text reply only for remote peers the recipient operator listed explicitly (`--auto-reply-peers`). That operator opt-in is the recipient's explicit acceptance of this one behaviour: it is recipient-local, runs outside the HTTP receive path, sends a text reply back to the same peer, and has no tool, actuator, WorkItem, or mission effect. `handoff` messages and collaboration requests keep the proposal-and-accept path above. The LLM call itself is an external egress and stays subject to the tenant's provider attestation and egress policy.
 
 ## Rationale
 
