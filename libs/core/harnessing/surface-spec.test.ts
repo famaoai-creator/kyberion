@@ -54,3 +54,14 @@ describe('isValidRelPath', () => {
     expect(isValidRelPath('')).toBe(false);
   });
 });
+
+describe('validateOverlay — review coverage', () => {
+  it('missing overlay dir returns structured rejection, not a throw', () => {
+    const v = validateOverlay(path.join(root, 'nonexistent-dir'), spec);
+    expect(v.ok).toBe(false);
+    expect(v.rejected_files[0].reason).toBe('overlay dir missing');
+  });
+  it('backslash path is rejected as unsafe', () => {
+    expect(isValidRelPath('a\\..\\evil')).toBe(false);
+  });
+});
