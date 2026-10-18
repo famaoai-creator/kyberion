@@ -330,6 +330,79 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     expect(reloaded.posts()).toHaveLength(0);
   });
 
+  it.each([
+    ['approved', 'fetch'],
+    ['approved', 'body'],
+    ['rejected', 'fetch'],
+    ['rejected', 'body'],
+  ])(
+    'bounds a stalled %s decision %s response and ignores late success',
+    async (decision, stage) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const pendingBody = deferred<unknown>();
+      let signedOut = false;
+      const h = harness({
+        get: () =>
+          response(
+            signedOut
+              ? view({
+                  auth: { status: 'authentication_required' },
+                  readiness: { ready: false, status: 'authentication_required' },
+                  approvals: [],
+                })
+              : view()
+          ),
+        post: () =>
+          stage === 'fetch'
+            ? pending.promise
+            : Promise.resolve({ ok: true, status: 200, json: () => pendingBody.promise }),
+      });
+      await flush();
+      const button = h.buttons()[decision === 'approved' ? 0 : 1];
+      button.fire();
+      button.fire();
+      await flush();
+      expect(h.posts()).toHaveLength(1);
+      expect(h.get('refresh').disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(14999);
+      expect(h.get('refresh').disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      await flush();
+      expect(h.get('error').textContent).toContain('approval_uncertain');
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ready: false, busy: false })
+      );
+      expect(h.context.onDecision).not.toHaveBeenCalled();
+      expect(h.buttons().every((item) => item.disabled)).toBe(true);
+      button.fire();
+      signedOut = true;
+      await h.refresh();
+      const late = { ok: true, approval_request_id: approvalId, status: decision };
+      pending.resolve(response(late));
+      pendingBody.resolve(late);
+      await flush();
+      expect(h.get('readiness').textContent).toContain('approval_auth_needed');
+      expect(h.get('status').textContent).not.toContain('approval_recorded');
+      expect(h.context.onDecision).not.toHaveBeenCalled();
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(1);
+    }
+  );
+
+  it('clears the decision deadline after a timely confirmed response', async () => {
+    const h = harness();
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('status').textContent).toContain('approval_recorded');
+    await vi.advanceTimersByTimeAsync(30000);
+    await flush();
+    expect(h.get('error').textContent).toBe('');
+    expect(h.context.onDecision).toHaveBeenCalledTimes(1);
+    expect(h.posts()).toHaveLength(1);
+  });
+
   it('requires fresh review after stale-target rejection, without automatic retry', async () => {
     const h = harness({
       post: async () => response({ ok: false, error: 'stale_digest', retry_safe: true }, 409),
