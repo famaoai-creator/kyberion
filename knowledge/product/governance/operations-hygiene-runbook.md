@@ -732,6 +732,15 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
     permission profile is set, `runCodexCliQuery` / `runGeminiCliQuery` also drop caller
     `extraArgs` that would widen it (sandbox, approval, yolo, `--dangerously-*`, `--add-dir`,
     `-c sandbox*|approval_policy*`). Do not forward a whole profile object as CLI options.
+  - **Explicit Codex call permissions must survive the backend boundary.**
+    `CodexCliReasoningBackend.prompt` / `delegateTask` project `profile` or
+    `capability_profile` through the same provider permission resolver as the query runner.
+    `permission_mode: readonly` narrows an implementer to explorer; an explicit explorer
+    stays read-only even if edit was requested. Conflicting profile aliases, unknown tiers,
+    unsupported full mode and the unsupported planner projection fail before query execution.
+    `route_profile` selects reasoning, not authority. Keep calls without explicit constraints
+    backward-compatible and keep ambient sandbox restrictions authoritative. Cover this handoff
+    with mocked backend tests and query argv tests; read-only is not a tool-less guarantee.
   - **Residual risk:** neither CLI can switch its tools off the way `claude --tools ""` does.
     - Codex `read-only` still lets the model run read-only shell commands. Its sandbox does not
       limit reads to the cwd, and the scratch cwd is inside the checkout, so codex can still find

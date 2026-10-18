@@ -16,6 +16,9 @@ import {
   structuredReasoningSpecs,
 } from '../structured-reasoning.js';
 
+import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+import type { ReasoningCallOptions } from '../reasoning/reasoning-backend-contracts.js';
+
 const mockRun = vi.mocked(runCodexCliQuery);
 
 describe('CodexCliReasoningBackend — structured ops via shared specs (no codex binary)', () => {
@@ -83,6 +86,115 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
     const arg = mockRun.mock.calls[0][0] as any;
     expect(arg.systemPrompt).toContain('focused autonomous sub-agent');
     expect(arg.userPrompt).toContain('Task: do it');
+  });
+
+  describe('explicit CLI permission constraints', () => {
+    it.each([
+      [{ profile: 'explorer' }, 'explorer', 'read-only'],
+      [{ capability_profile: 'explorer' }, 'explorer', 'read-only'],
+      [{ permission_mode: 'readonly' }, 'explorer', 'read-only'],
+      [{ profile: 'implementer', permission_mode: 'readonly' }, 'explorer', 'read-only'],
+      [{ profile: 'explorer', permission_mode: 'edit' }, 'explorer', 'read-only'],
+      [{ profile: 'explorer', capability_profile: 'explorer' }, 'explorer', 'read-only'],
+      [{ permission_mode: 'edit' }, 'implementer', 'workspace-write'],
+      [{ profile: 'implementer' }, 'implementer', 'workspace-write'],
+    ] as const)('projects %j without widening', async (options, profile, mode) => {
+      mockRun.mockResolvedValue({ answer: 'bounded' });
+      const backend = new CodexCliReasoningBackend();
+
+      await expect(backend.delegateTask('inspect only', undefined, options)).resolves.toBe(
+        'bounded'
+      );
+
+      expect(mockRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ profile, mode }));
+    });
+
+    it('preserves the legacy default and keeps routing metadata out of permissions', async () => {
+      mockRun.mockResolvedValue({ answer: 'done' });
+      const backend = new CodexCliReasoningBackend();
+
+      await backend.delegateTask('legacy');
+      await backend.delegateTask('routed', undefined, { route_profile: 'deep', role: 'analyst' });
+
+      for (const [query] of mockRun.mock.calls) {
+        expect(query.mode).toBe('workspace-write');
+        expect(query).not.toHaveProperty('profile');
+      }
+    });
+
+    it.each([
+      [{ profile: 'planner' }, /permission profile "planner" refused/],
+      [{ profile: 'planner', permission_mode: 'readonly' }, /permission profile "planner" refused/],
+      [{ profile: 'unknown-tier', permission_mode: 'readonly' }, /SUBAGENT_PROFILE_UNKNOWN/],
+      [{ profile: 'unknown-tier' }, /SUBAGENT_PROFILE_UNKNOWN/],
+      [{ capability_profile: 'unknown-tier' }, /SUBAGENT_PROFILE_UNKNOWN/],
+      [
+        { profile: 'explorer', capability_profile: 'implementer' },
+        /conflicting capability profiles/,
+      ],
+      [{ permission_mode: 'full' }, /unsupported permission mode/],
+      [{ permission_mode: 'invalid' }, /unsupported permission mode/],
+    ])('refuses %j before calling the query', async (options, error) => {
+      const backend = new CodexCliReasoningBackend();
+
+      await expect(
+        backend.delegateTask('bounded task', undefined, options as ReasoningCallOptions)
+      ).rejects.toThrow(error as RegExp);
+      expect(mockRun).not.toHaveBeenCalled();
+    });
+
+    it('prompt forwards readonly while preserving model, effort and cancellation', async () => {
+      mockRun.mockResolvedValue({ answer: 'summary' });
+      const signal = new AbortController().signal;
+      const backend = new CodexCliReasoningBackend({ timeoutMs: 1234 });
+
+      await expect(
+        backend.prompt('summarize', {
+          permission_mode: 'readonly',
+          model: 'openai:test-model',
+          effort: 'low',
+          signal,
+        })
+      ).resolves.toBe('summary');
+
+      expect(mockRun).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          profile: 'explorer',
+          mode: 'read-only',
+          options: expect.objectContaining({
+            model: 'test-model',
+            effort: 'low',
+            signal,
+            timeoutMs: 1234,
+          }),
+        })
+      );
+    });
+
+    it('keeps ambient readonly authoritative over an explicit implementer', async () => {
+      mockRun.mockResolvedValue({ answer: 'bounded' });
+      const backend = new CodexCliReasoningBackend();
+      // The query is mocked; allow the egress precheck while testing filesystem narrowing.
+      const policy = resolveSandboxPolicy({
+        provider: 'codex',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+
+      await withSandboxPolicy(policy, () =>
+        backend.delegateTask('inspect', undefined, {
+          profile: 'implementer',
+          permission_mode: 'edit',
+        })
+      );
+
+      expect(mockRun).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          profile: 'explorer',
+          mode: 'read-only',
+        })
+      );
+    });
   });
 
   it('native adopter reuses one session while fresh tasks reset its context', async () => {
