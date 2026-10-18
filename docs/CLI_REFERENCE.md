@@ -43,6 +43,9 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion memory`                  |             | Inspect or capture operator memory                                                  |
 | `pnpm kyberion mobile-profiles`         |             | List or inspect shared mobile app profiles                                          |
 | `pnpm kyberion open-artifact`           |             | Open a generated artifact in the OS viewer                                          |
+| `pnpm kyberion permissions`             |             | Check OS permissions                                                                |
+| `pnpm kyberion permissions status`      |             | Show microphone, camera and screen recording permission state                       |
+| `pnpm kyberion permissions warmup`      |             | Request undetermined OS permissions (microphone by default)                         |
 | `pnpm kyberion preview`                 |             | Validate a pipeline JSON and show its step tree                                     |
 | `pnpm kyberion read`                    |             | Read a document (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown |
 | `pnpm kyberion recording`               |             | Inspect the intent and steps reconstructed from a recording                         |
