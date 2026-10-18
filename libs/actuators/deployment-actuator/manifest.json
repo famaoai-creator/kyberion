@@ -1,6 +1,6 @@
 {
   "actuator_id": "deployment-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deployment capability boundary backed by the governed DeploymentAdapter",
   "contract_schema": "knowledge/product/schemas/deployment-action.schema.json",
   "resilience_tier": "no_auto_retry_external_effect",

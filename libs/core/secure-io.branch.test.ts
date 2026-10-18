@@ -57,6 +57,32 @@ describe('secure-io branch coverage', () => {
     }
   });
 
+  it('closes borrowed append descriptors after success and failure and enforces write guards', async () => {
+    const io = await import('./secure-io.js');
+    const file = path.join(tmpDir, 'borrowed.log');
+    let borrowed = -1;
+    expect(
+      io.withSafeAppendFile(file, (fd) => {
+        borrowed = fd;
+        fs.writeSync(fd, 'hello');
+        return 'done';
+      })
+    ).toBe('done');
+    expect(() => fs.fstatSync(borrowed)).toThrow();
+    expect(() =>
+      io.withSafeAppendFile(file, (fd) => {
+        borrowed = fd;
+        throw new Error('spawn failed');
+      })
+    ).toThrow('spawn failed');
+    expect(() => fs.fstatSync(borrowed)).toThrow();
+    expect(io.safeReadFile(file)).toBe('hello');
+    guardMocks.validateWritePermission.mockReturnValue({ allowed: false, reason: 'denied' });
+    const use = vi.fn();
+    expect(() => io.withSafeAppendFile(file, use)).toThrow();
+    expect(use).not.toHaveBeenCalled();
+  });
+
   it('covers file io wrappers and guard-denied branches', async () => {
     const io = await import('./secure-io.js');
     const file = path.join(tmpDir, 'a.txt');

@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-17
+last_updated: 2026-10-18
 ---
 
 # Operations Hygiene Runbook
@@ -67,6 +67,12 @@ had regressed.
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
 4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
+
+**Generated catalogs in shared checkouts.** Regenerate knowledge indexes in the PR's isolated
+worktree, using only the files that ship with that branch. A shared checkout can contain another
+task's untracked knowledge file; its index entry then becomes a broken link in CI. Before pushing,
+run `pnpm generate:knowledge-index` and the `documentation-links` PR gate in the isolated worktree.
+Do not copy an index from a dirty checkout or add another task's document to satisfy the link.
 
 **Build-artifact identity and diagnostics.** Freshness checks must compare directory
 components after artifact-only path normalization: a buildinfo entry under `src-other/`
@@ -1071,6 +1077,11 @@ test needs a link, create it inside `active/shared/tmp/` with a target the test 
 secure-io. A link target in `os.tmpdir()` is outside the repository and is refused. A fixture root
 needs copies, not links, of catalogs from the real checkout.
 
+CLI daemons use the same secure-io boundary for runtime files. Borrow log descriptors through
+`withSafeAppendFile` so spawn failures also close them; redirect detached stderr to that descriptor
+instead of appending the same log line again. Run `libs/core/security-boundary.contract.test.ts`
+alongside the CLI tests: adding a raw-fs exception to an import baseline does not satisfy this gate.
+
 **Cost.** realpath(3) walks every component: about 30 µs per call at depth 15. Measured on an idle
 CI VM (median µs/op, 2,000 ops × 5 runs, deep path in `active/shared/tmp/`, two runs each),
 main → this fix: append 378–393 → 437, read 107 → 86–93 (fd-based read does fewer syscalls),
@@ -1114,6 +1125,12 @@ the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.
 Replay `scripts/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
+A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions
+run without PTY semantics (no resize, tty prompts like `ssh` password reads
+break, output is block-buffered). On macOS the recurring cause is the
+node-pty prebuilt losing its execute bit —
+`chmod +x node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/spawn-helper`
+restores it; verify with a `resize` op, which only succeeds on a real PTY.
 When adding probe scratch with `sharedTmp()`, register the exact call count and
 the consumable diagnostic purpose in `shared-tmp-allowlist.json`, then run
 `tests/shared-tmp-ratchet.test.ts`. Preserve durable conclusions in mission

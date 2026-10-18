@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-03
+last_updated: 2026-10-18
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -120,3 +120,16 @@ Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
   both usage texts.
 - `accept` with no follow-up — `next_steps` now printed on accept and in the
   cowork review completion log.
+- Playground machine mode always emitted `{action, op, params}`; strict
+  contracts declaring `required: ["op"]` with `additionalProperties: false`
+  (vcs, scheduler, calendar, data, working-memory, media-generation, wisdom,
+  deployment, build) rejected every call — fixed 2026-10-18 by allowing the
+  compatibility discriminator key in those schemas and by validating
+  normalized candidates in `evaluatePlaygroundDryRun`.
+- `pipeline` ops and flat schemas (build) never validated because user params
+  were nested under `params` — fixed by spreading params top-level when the
+  contract schema declares a flat shape (`contractSchemaUsesFlatParams`).
+- `--dry-run` skipped capture ops outside the hardcoded name list
+  (`adb_health_check`, `list_calendars`, `knowledge_search`, …) — fixed by
+  resolving the op kind from the discovery registry.
+- Machine mode required `--params` even for zero-argument ops — now optional.

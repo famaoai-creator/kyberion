@@ -20,70 +20,142 @@
         "reconcile"
       ]
     },
-    "params": { "type": "object" },
-    "steps": { "type": "array", "items": { "$ref": "#/$defs/pipelineStep" }, "minItems": 1 },
-    "context": { "type": "object" },
-    "options": { "$ref": "#/$defs/pipelineOptions" },
-    "strategy_path": { "type": "string", "minLength": 1 }
+    "params": {
+      "type": "object"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pipelineStep"
+      },
+      "minItems": 1
+    },
+    "context": {
+      "type": "object"
+    },
+    "options": {
+      "$ref": "#/$defs/pipelineOptions"
+    },
+    "strategy_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "op": {
+      "type": "string"
+    }
   },
   "oneOf": [
     {
       "properties": {
-        "action": { "const": "knowledge_search" },
-        "params": { "$ref": "#/$defs/knowledgeSearchParams" }
+        "action": {
+          "const": "knowledge_search"
+        },
+        "params": {
+          "$ref": "#/$defs/knowledgeSearchParams"
+        }
       },
       "required": ["action", "params"]
     },
     {
       "properties": {
-        "action": { "const": "knowledge_read" },
-        "params": { "$ref": "#/$defs/knowledgeReadParams" }
+        "action": {
+          "const": "knowledge_read"
+        },
+        "params": {
+          "$ref": "#/$defs/knowledgeReadParams"
+        }
       },
       "required": ["action", "params"]
     },
     {
       "properties": {
-        "action": { "const": "history_search" },
-        "params": { "$ref": "#/$defs/historySearchParams" }
+        "action": {
+          "const": "history_search"
+        },
+        "params": {
+          "$ref": "#/$defs/historySearchParams"
+        }
       },
       "required": ["action", "params"]
     },
     {
       "properties": {
-        "action": { "const": "knowledge_inject" },
-        "params": { "$ref": "#/$defs/knowledgeInjectParams" }
+        "action": {
+          "const": "knowledge_inject"
+        },
+        "params": {
+          "$ref": "#/$defs/knowledgeInjectParams"
+        }
       },
       "required": ["action", "params"]
     },
     {
       "properties": {
-        "action": { "const": "knowledge_export" },
-        "params": { "$ref": "#/$defs/knowledgeExportParams" }
+        "action": {
+          "const": "knowledge_export"
+        },
+        "params": {
+          "$ref": "#/$defs/knowledgeExportParams"
+        }
       },
       "required": ["action", "params"]
     },
     {
       "properties": {
-        "action": { "const": "knowledge_import" },
-        "params": { "$ref": "#/$defs/knowledgeImportParams" }
+        "action": {
+          "const": "knowledge_import"
+        },
+        "params": {
+          "$ref": "#/$defs/knowledgeImportParams"
+        }
       },
       "required": ["action", "params"]
     },
-    { "properties": { "action": { "const": "pipeline" } }, "required": ["action", "steps"] },
-    { "properties": { "action": { "const": "reconcile" } }, "required": ["action"] }
+    {
+      "properties": {
+        "action": {
+          "const": "pipeline"
+        }
+      },
+      "required": ["action", "steps"]
+    },
+    {
+      "properties": {
+        "action": {
+          "const": "reconcile"
+        }
+      },
+      "required": ["action"]
+    }
   ],
   "$defs": {
-    "exportAs": { "type": "string", "minLength": 1 },
-    "knowledgeTier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "exportAs": {
+      "type": "string",
+      "minLength": 1
+    },
+    "knowledgeTier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
     "knowledgeSearchParams": {
       "type": "object",
       "additionalProperties": false,
       "required": ["query"],
       "properties": {
-        "query": { "type": "string", "minLength": 1 },
-        "tier": { "$ref": "#/$defs/knowledgeTier" },
-        "limit": { "type": "integer", "minimum": 1 },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "$ref": "#/$defs/knowledgeTier"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "knowledgeReadParams": {
@@ -91,21 +163,42 @@
       "additionalProperties": false,
       "required": ["path"],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "skill_path": { "type": "string", "minLength": 1 },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skill_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "historySearchParams": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "query": { "type": "string" },
-        "session_id": { "type": "string" },
-        "mode": { "type": "string" },
-        "max_results": { "type": "integer", "minimum": 1 },
-        "include_scheduled": { "type": "boolean" },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "query": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "include_scheduled": {
+          "type": "boolean"
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "knowledgeInjectParams": {
@@ -113,9 +206,17 @@
       "additionalProperties": false,
       "required": ["knowledge_path", "mission_id"],
       "properties": {
-        "knowledge_path": { "type": "string", "minLength": 1 },
-        "mission_id": { "type": "string", "minLength": 1 },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "knowledge_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "knowledgeExportParams": {
@@ -123,31 +224,67 @@
       "additionalProperties": false,
       "required": ["path"],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "output_path": { "type": "string" },
-        "domain": { "type": "string" },
-        "visibility": { "$ref": "#/$defs/knowledgeTier" },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_path": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/knowledgeTier"
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "knowledgeImportParams": {
       "type": "object",
       "additionalProperties": false,
-      "anyOf": [{ "required": ["package_path"] }, { "required": ["source_path"] }],
+      "anyOf": [
+        {
+          "required": ["package_path"]
+        },
+        {
+          "required": ["source_path"]
+        }
+      ],
       "properties": {
-        "package_path": { "type": "string", "minLength": 1 },
-        "source_path": { "type": "string", "minLength": 1 },
-        "tier": { "$ref": "#/$defs/knowledgeTier" },
-        "export_as": { "$ref": "#/$defs/exportAs" }
+        "package_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "$ref": "#/$defs/knowledgeTier"
+        },
+        "export_as": {
+          "$ref": "#/$defs/exportAs"
+        }
       }
     },
     "pipelineOptions": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "max_steps": { "type": "integer", "minimum": 1 },
-        "timeout_ms": { "type": "integer", "minimum": 1 },
-        "compatibility_mode": { "type": "boolean" }
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "compatibility_mode": {
+          "type": "boolean"
+        }
       }
     },
     "pipelineParams": {
@@ -162,7 +299,9 @@
           "additionalProperties": false,
           "required": ["type", "op"],
           "properties": {
-            "type": { "const": "capture" },
+            "type": {
+              "const": "capture"
+            },
             "op": {
               "enum": [
                 "glob_files",
@@ -175,7 +314,9 @@
                 "shell"
               ]
             },
-            "params": { "$ref": "#/$defs/pipelineParams" }
+            "params": {
+              "$ref": "#/$defs/pipelineParams"
+            }
           }
         },
         {
@@ -183,11 +324,15 @@
           "additionalProperties": false,
           "required": ["type", "op"],
           "properties": {
-            "type": { "const": "transform" },
+            "type": {
+              "const": "transform"
+            },
             "op": {
               "enum": ["array_count", "json_query", "regex_extract", "regex_replace", "yaml_update"]
             },
-            "params": { "$ref": "#/$defs/pipelineParams" }
+            "params": {
+              "$ref": "#/$defs/pipelineParams"
+            }
           }
         },
         {
@@ -195,7 +340,9 @@
           "additionalProperties": false,
           "required": ["type", "op"],
           "properties": {
-            "type": { "const": "apply" },
+            "type": {
+              "const": "apply"
+            },
             "op": {
               "enum": [
                 "a2a_fanout",
@@ -266,7 +413,9 @@
                 "write_file"
               ]
             },
-            "params": { "$ref": "#/$defs/pipelineParams" }
+            "params": {
+              "$ref": "#/$defs/pipelineParams"
+            }
           }
         },
         {
@@ -274,9 +423,15 @@
           "additionalProperties": false,
           "required": ["type", "op"],
           "properties": {
-            "type": { "const": "control" },
-            "op": { "enum": ["if", "while"] },
-            "params": { "$ref": "#/$defs/pipelineParams" }
+            "type": {
+              "const": "control"
+            },
+            "op": {
+              "enum": ["if", "while"]
+            },
+            "params": {
+              "$ref": "#/$defs/pipelineParams"
+            }
           }
         }
       ]
