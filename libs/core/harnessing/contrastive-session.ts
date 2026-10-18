@@ -87,6 +87,12 @@ export async function runContrastiveSession(
   // Label integrity BEFORE any probe or backend call — 'base' is reserved,
   // dupes corrupt run dirs, and a collision with a predicted proposed label
   // must be caught before spending propose calls.
+  if (
+    spec.propose &&
+    (!Number.isInteger(spec.propose.count) || spec.propose.count < 1 || spec.propose.count > 10)
+  ) {
+    throw new Error('[CONTRASTIVE_SESSION] propose.count must be an integer 1..10');
+  }
   const predicted = spec.propose
     ? Array.from(
         { length: spec.propose.count },
