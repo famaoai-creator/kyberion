@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const native = vi.hoisted(() => ({
   ensureMacOSSwiftBinary: vi.fn(),
+  resolveMacOSHostApp: vi.fn(),
   runMacOSNativeBinary: vi.fn(),
 }));
 vi.mock('./macos-native-automation.js', () => native);
@@ -22,6 +23,7 @@ describe('macOS permission warm-up', () => {
     vi.resetAllMocks();
     platform('darwin');
     native.ensureMacOSSwiftBinary.mockReturnValue('/cache/warmup-bin');
+    native.resolveMacOSHostApp.mockReturnValue('com.apple.Terminal');
   });
   afterEach(() => platform(originalPlatform));
 
@@ -44,6 +46,7 @@ describe('macOS permission warm-up', () => {
     );
     expect(result).toEqual({
       supported: true,
+      host_app: 'com.apple.Terminal',
       results: { microphone: { before: 'not_determined', after: 'granted' } },
     });
   });
@@ -68,14 +71,36 @@ describe('macOS permission warm-up', () => {
     expect(results.screen_recording?.remedy).toBe(PERMISSION_SETTINGS_PANE.screen_recording);
   });
 
-  it('reports a failed helper instead of throwing', () => {
-    native.runMacOSNativeBinary.mockImplementation(() => {
-      throw new Error('native_execution_failed');
+  it('keeps other kinds when one helper run fails', () => {
+    native.runMacOSNativeBinary.mockImplementation((_bin: string, args: string[]) => {
+      if (args[0].includes('camera')) throw new Error('native_execution_failed');
+      return { microphone: { before: 'granted', after: 'granted' } };
     });
-    expect(warmupMacOSPermissions()).toEqual({
+    const { results } = warmupMacOSPermissions(['microphone', 'camera']);
+    expect(native.runMacOSNativeBinary).toHaveBeenCalledTimes(2);
+    expect(results.microphone).toEqual({ before: 'granted', after: 'granted' });
+    expect(results.camera).toEqual({
+      before: 'unknown',
+      after: 'unknown',
+      error: 'native_execution_failed',
+    });
+  });
+
+  it('refuses to request anything when no terminal host app is identified', () => {
+    expect(warmupMacOSPermissions(['microphone'], '')).toEqual({
       supported: true,
       results: {},
-      reason: 'native_execution_failed',
+      reason: 'host_app_unknown',
     });
+    expect(native.ensureMacOSSwiftBinary).not.toHaveBeenCalled();
+    expect(native.runMacOSNativeBinary).not.toHaveBeenCalled();
+  });
+
+  it('gives no settings remedy for a policy-restricted permission', () => {
+    native.runMacOSNativeBinary.mockReturnValue({
+      microphone: { before: 'restricted', after: 'restricted' },
+    });
+    const { results } = warmupMacOSPermissions(['microphone']);
+    expect(results.microphone).toEqual({ before: 'restricted', after: 'restricted' });
   });
 });

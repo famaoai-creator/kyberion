@@ -111,13 +111,26 @@ export function renderPermissionsWarmup(result: PermissionWarmupResult, json: bo
       ...entries.map(([kind, r]) => [kind, r?.before ?? '', r?.after ?? '']),
     ]),
   ];
-  for (const [kind, r] of entries)
+  if (result.host_app) lines.splice(1, 0, '', `- host app: ${result.host_app}`);
+  for (const [kind, r] of entries) {
+    if (r?.after === 'restricted')
+      lines.push(
+        '',
+        `> [permissions] ${kind} is restricted by a device policy (MDM / Screen Time). Ask the device administrator.`
+      );
+    if (r?.error) lines.push('', `> [permissions] ${kind} warm-up failed: ${r.error}`);
     if (r?.remedy)
       lines.push(
         '',
         `> [permissions] ${kind} is not granted. Enable the host app in System Settings, then restart it: ${r.remedy}`
       );
-  if (result.reason) lines.push('', `> [permissions] warm-up failed: ${result.reason}`);
+  }
+  if (result.reason === 'host_app_unknown')
+    lines.push(
+      '',
+      '> [permissions] warm-up must run from a terminal app (Terminal, iTerm, an IDE); the host app could not be identified'
+    );
+  else if (result.reason) lines.push('', `> [permissions] warm-up failed: ${result.reason}`);
   return lines.join('\n');
 }
 

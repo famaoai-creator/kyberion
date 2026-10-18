@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runPermissionsCommand, type PermissionsDeps } from './cli-permissions.js';
+import { renderPermissionsWarmup } from './cli-permissions.js';
 
 function deps(): PermissionsDeps & { warmup: ReturnType<typeof vi.fn> } {
   return {
@@ -54,5 +55,25 @@ describe('cli permissions', () => {
     const { d } = await run(['warmup', '--only', 'microphone,camera']);
     expect(d.warmup).toHaveBeenCalledWith(['microphone', 'camera']);
     await expect(run(['warmup', '--only', 'speakers'])).rejects.toThrow('Unknown permission kind');
+  });
+
+  it('warmup explains restricted kinds, per-kind failures and an unknown host', () => {
+    const out = renderPermissionsWarmup(
+      {
+        supported: true,
+        host_app: 'com.apple.Terminal',
+        results: {
+          microphone: { before: 'restricted', after: 'restricted' },
+          camera: { before: 'unknown', after: 'unknown', error: 'native_execution_failed' },
+        },
+      },
+      false
+    );
+    expect(out).toContain('host app: com.apple.Terminal');
+    expect(out).toContain('microphone is restricted by a device policy');
+    expect(out).toContain('camera warm-up failed: native_execution_failed');
+    expect(
+      renderPermissionsWarmup({ supported: true, results: {}, reason: 'host_app_unknown' }, false)
+    ).toContain('must run from a terminal app');
   });
 });

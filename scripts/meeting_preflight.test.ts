@@ -342,6 +342,13 @@ describe('meeting_preflight', () => {
       expect(entry.status).toBe('warn');
     });
 
+    it('sends a policy-restricted microphone to the device administrator', async () => {
+      const entry = await audioItem({ available: true, microphone: 'restricted' });
+      expect(entry.status).toBe('operator_action_required');
+      expect(entry.reason_code).toBe('MICROPHONE_PERMISSION_RESTRICTED');
+      expect(entry.fix).not.toContain('KYBERION_AUDIO_PERMISSION_CONFIRMED');
+    });
+
     it('asks for the warm-up command when the microphone is not determined', async () => {
       const entry = await audioItem({ available: true, microphone: 'not_determined' });
       expect(entry.status).toBe('operator_action_required');
