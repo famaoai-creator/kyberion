@@ -89,7 +89,7 @@ function printHelp(): void {
       'Commands:',
       '  list [--json]',
       '  show <PROJECT_ID> [--json]',
-      '  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]',
+      '  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--metadata <JSON>] [--dry-run] [--json]',
       '  scaffold <PROJECT_ID> [--json]',
       '  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--primary-locale <LOCALE>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]',
       '  track update <TRACK_ID> [--name <TEXT>] [--summary <TEXT>] [--status <planned|active|paused|completed|archived>] [--tenant-slug <SLUG>] [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--primary-locale <LOCALE>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]',
@@ -350,6 +350,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
           '--project-path',
           '--pipeline-refs',
           '--objective-ids',
+          '--metadata',
         ],
         ['--dry-run', '--json']
       );
@@ -358,6 +359,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
         name: requiredOption(argv, '--name'),
         summary: requiredOption(argv, '--summary'),
         tier: parseTier(optionValue(argv, '--tier')),
+        ...(parseProjectMetadata(optionValue(argv, '--metadata'))
+          ? { metadata: parseProjectMetadata(optionValue(argv, '--metadata')) }
+          : {}),
         ...(optionValue(argv, '--organization-id')
           ? { organization_id: optionValue(argv, '--organization-id') }
           : {}),

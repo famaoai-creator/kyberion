@@ -84,6 +84,8 @@ const allowedCoreFsImports = [
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.
   'libs/core/secret/secret-bridge.test.ts',
   'libs/core/secure-io.branch.test.ts',
+  // Mock native rm only to prove broad scratch deletion never reaches the OS.
+  'libs/core/secure-io-scratch-root.test.ts',
   // Fault-inject native open/readlink/stat; fixture I/O remains secure-io.
   'libs/core/secure-io.metadata-fd.test.ts',
   // secure-io's permission guards (literal + canonical symlink checks), split

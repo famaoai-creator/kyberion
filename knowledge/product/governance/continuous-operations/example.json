@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "loop_id": "service-health",
+  "dot_id": "example-operations",
+  "scope": {
+    "tier": "public",
+    "organization_id": "example-organization"
+  },
+  "enabled": false,
+  "max_proposals_per_run": 2,
+  "cooldown_seconds": 86400,
+  "sources": [
+    {
+      "source_id": "service-metrics",
+      "path": "active/shared/runtime/public/shared/service-metrics/latest.json",
+      "max_age_seconds": 3600
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "failed-jobs",
+      "source_id": "service-metrics",
+      "metric": "failed_jobs",
+      "operator": "gt",
+      "threshold": 0,
+      "objective_ref": "objective:service-reliability",
+      "title": "Investigate recurring job failures",
+      "objective": "Diagnose job failures and produce a scoped report with evidence and a recovery recommendation.",
+      "pipeline_ref": "pipelines/ops-health-probe.json",
+      "requested_decision": "approve",
+      "priority": "high",
+      "expected_effect": {
+        "signal": "failed_jobs",
+        "direction": "decrease"
+      }
+    }
+  ]
+}

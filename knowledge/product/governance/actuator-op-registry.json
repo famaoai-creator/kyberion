@@ -305,6 +305,8 @@
       "apply": [
         "apply_onboarding",
         "capture_avatar_photo",
+        "continuous_operations",
+        "continuous_operations_report",
         "generate_avatar",
         "grant_voice_consent",
         "organization_operation_tick",

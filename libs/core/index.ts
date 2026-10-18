@@ -80,3 +80,12 @@ export * from './workforce/work-effect-ownership.js';
 export * from './reasoning/reasoning-selection-settings.js';
 
 export * from './macos-native-automation.js';
+
+export * from './organization/continuous-operations-policy.js';
+export * from './organization/continuous-operations.js';
+
+export * from './organization/continuous-operations-sources.js';
+
+export * from './organization/continuous-work-plan.js';
+
+export * from './organization/continuous-work-owner.js';

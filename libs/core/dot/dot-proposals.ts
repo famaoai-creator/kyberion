@@ -13,6 +13,7 @@
  */
 
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
+import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
 
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
 
@@ -20,6 +21,8 @@ export type DotWorkShape = 'mission' | 'task_session' | 'pipeline' | 'direct_rep
 export type DotDecisionLevel = 'auto' | 'notify' | 'approve';
 
 export interface DotProposal {
+  /** Trusted configuration binding; model normalization deliberately discards it. */
+  continuous_work?: ContinuousWorkPlan;
   /** Internal server-owned binding; never accepted by the model proposal parser. */
   front_desk_execution?: FrontDeskExecutionBinding;
   /** Derived, never dot-chosen: {@link DOT_HANDOFF_ACTION_ID} with handoff_to, else {@link DEFAULT_DOT_ACTION_ID}. */
