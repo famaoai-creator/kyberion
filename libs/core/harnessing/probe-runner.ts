@@ -2,8 +2,9 @@
  * Isolated probe execution for contrastive harness tuning (harness2 import).
  *
  * One probe = one candidate overlay applied to a copy of the base scenario in
- * its own run dir under the run root. A probe that fails records a RunOutcome;
- * it never throws — a dead rollout is evidence, not an exception.
+ * its own run dir under the run root. A probe whose scenario fails records a
+ * RunOutcome — a dead rollout is evidence, not an exception. Spec-validation
+ * errors (bad label, missing scenario, empty command) throw before any run.
  */
 
 import * as path from 'node:path';
@@ -115,6 +116,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
   }
 
+  const stagedBefore = new Set(listFiles(runDir));
   const started = Date.now();
   let result;
   try {
@@ -126,8 +128,15 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     return fail(`command failed to start: ${error instanceof Error ? error.message : error}`);
   }
   const wall_ms = Date.now() - started;
+  const stderrTail = String(result.stderr || '')
+    .trim()
+    .split('\n')
+    .slice(-5)
+    .join('\n')
+    .slice(0, 500);
+  const spawnError = result.error ? ` spawn=${result.error.message}` : '';
   const exit_code = typeof result.status === 'number' ? result.status : null;
-  const produced = listFiles(runDir);
+  const after = listFiles(runDir);
   const missing = (spec.expectOutputs ?? []).filter(
     (rel) => !safeExistsSync(path.join(runDir, rel))
   );
@@ -142,10 +151,13 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     delivered,
     exit_code,
     wall_ms,
-    produced_files: produced,
+    produced_files: after.filter((f) => !stagedBefore.has(f)),
     error: delivered
       ? ''
-      : `exit=${exit_code}` + (missing.length ? ` missing=${missing.join(',')}` : ''),
+      : `exit=${exit_code}` +
+        (missing.length ? ` missing=${missing.join(',')}` : '') +
+        spawnError +
+        (stderrTail ? ` stderr_tail=${stderrTail}` : ''),
     recorded_at,
   };
 }

@@ -44,6 +44,15 @@ export function runContrastiveSession(spec: ContrastiveSessionSpec): Contrastive
   if (!spec.candidates.length) {
     throw new Error('[CONTRASTIVE_SESSION] at least one candidate overlay is required');
   }
+  // Validate labels up front — a 'base' candidate or duplicate label would
+  // silently merge distinct probes into one run dir and corrupt the evidence.
+  const labels = spec.candidates.map((c) => c.label);
+  if (labels.includes('base')) {
+    throw new Error("[CONTRASTIVE_SESSION] 'base' is a reserved probe label");
+  }
+  if (new Set(labels).size !== labels.length) {
+    throw new Error(`[CONTRASTIVE_SESSION] duplicate candidate labels: ${labels.join(', ')}`);
+  }
 
   const probeFor = (label: string, overlayDir?: string): RunOutcome =>
     runProbe({
@@ -76,8 +85,8 @@ export function runContrastiveSession(spec: ContrastiveSessionSpec): Contrastive
     scenario_dir: spec.scenarioDir,
     command: spec.command,
     decision,
-    outcomes: outcomes.map((o) => ({ ...o, run_dir: path.relative(process.cwd(), o.run_dir) })),
-    base: { ...base, run_dir: path.relative(process.cwd(), base.run_dir) },
+    outcomes: outcomes.map((o) => ({ ...o, run_dir: o.run_dir })),
+    base: { ...base, run_dir: base.run_dir },
     experience,
   };
   const reportPath = assertSafeRepositoryPath(path.join(runRoot, 'report.json'), {
