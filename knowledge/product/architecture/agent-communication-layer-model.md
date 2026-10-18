@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, agents, prompt, subagent, a2a, bridge, protocol, coordination]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-09-23
+last_updated: 2026-10-18
 ---
 
 # Agent Communication and Coordination Model
@@ -103,6 +103,8 @@ Keep these checks separate and ordered:
 5. **Execution authority**: which local WorkItem claim or mission owner may perform work and change lifecycle state?
 
 Passing one check does not imply passing the next. A valid HMAC proves possession of a peer secret; it does not approve a proposal, grant shell or actuator access, or authorize remote mission lifecycle changes.
+
+Opt-in conversation auto replies are the one recipient-local behaviour accepted in advance: when the recipient operator lists a peer in `--auto-reply-peers`, that peer's conversation `message` / `reply` texts are answered with a tool-free LLM text reply, generated outside the receive path and bounded by a per-session turn cap and a per-peer budget. The opt-in is the recipient's acceptance for that text reply only; it never accepts a proposal, runs tools or actuators, or changes WorkItems or missions. See the [Peer Network Catalog](../orchestration/peer-network.md#conversation-auto-replies-opt-in) and the 2026-10-18 amendment of the [Mesh Hub v1 ADR](./decisions/2026-06-24-mesh-hub-v1-boundaries.md).
 
 For v1 Peer / Mesh, keep same-tenant enrollment, explicit peer selection, request-kind allowlists, recipient validation, data-tier restrictions, expiry / replay protection, and local acceptance. A new cross-tenant or network-exposed control plane requires a new security and operations decision record.
 

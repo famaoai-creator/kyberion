@@ -572,6 +572,19 @@
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []
     },
+    "peer_catalog_reader": {
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json"],
+      "allow_write": []
+    },
+    "peer_responder_reader": {
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "knowledge/confidential/${KYBERION_TENANT}/",
+        "customer/${KYBERION_TENANT}/"
+      ],
+      "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+      "allow_write": []
+    },
     "metrics_cap_reader": {
       "allow_read": [
         "active/shared/runtime/execution-metrics/",

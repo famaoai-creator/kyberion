@@ -3032,6 +3032,10 @@
       "types": "./dist/mesh/mesh-topic-registry.d.ts",
       "default": "./dist/mesh/mesh-topic-registry.js"
     },
+    "./mesh/peer-auto-reply": {
+      "types": "./dist/mesh/peer-auto-reply.d.ts",
+      "default": "./dist/mesh/peer-auto-reply.js"
+    },
     "./mesh/peer-conversation": {
       "types": "./dist/mesh/peer-conversation.d.ts",
       "default": "./dist/mesh/peer-conversation.js"
@@ -4819,6 +4823,14 @@
     "./provider/codex-cli-query": {
       "types": "./dist/provider/codex-cli-query.d.ts",
       "default": "./dist/provider/codex-cli-query.js"
+    },
+    "./provider/codex-isolated-query": {
+      "types": "./dist/provider/codex-isolated-query.d.ts",
+      "default": "./dist/provider/codex-isolated-query.js"
+    },
+    "./provider/isolated-text-generator": {
+      "types": "./dist/provider/isolated-text-generator.d.ts",
+      "default": "./dist/provider/isolated-text-generator.js"
     },
     "./provider/codex-cli-reasoning-backend": {
       "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",

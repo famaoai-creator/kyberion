@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **Pluggable isolated text generators for peer auto replies** — `@agent/core/provider/isolated-text-generator` adds a registry (`registerIsolatedTextGenerator`, `resolveIsolatedTextGenerator`, `listIsolatedTextGenerators`) behind `pnpm peer:conversation-server --auto-reply-backend <id>`. Built-ins: `claude` (Agent SDK strict isolation, `structural`) and `codex` (isolated codex CLI, `fail_closed_detection`). Resolution fails closed (`ISOLATED_GENERATOR_UNKNOWN` / `ISOLATED_GENERATOR_UNDECLARED`) unless the provider's reasoning-provider descriptor declares the new `isolated_text_generation.isolation` field with the same level, so the server refuses to start on an undeclared backend. `--auto-reply-allow-untested` replaces the codex-specific flag; a strictly isolated Claude query now also discards the output on any tool_use other than the structured-output tool. A reusable conformance suite checks egress-before-transport, scratch cwd cleanup, a minimal env, fail-closed tool attempts, schema rejection, and abort/timeout for every generator.

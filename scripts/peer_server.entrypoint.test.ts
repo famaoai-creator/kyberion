@@ -21,6 +21,18 @@ describe('peer server entrypoints', () => {
     expect(source).toContain('await server.close();\n    throw error;');
   });
 
+  it('resolves the auto-reply generator from the registry before dry run or listen', () => {
+    const source = readScript('peer_conversation_server.ts');
+    expect(source).toContain(
+      'choices: listIsolatedTextGenerators().map((generator) => generator.id)'
+    );
+    const resolveAt = source.indexOf('resolveIsolatedTextGenerator(autoReplyOptions.backend)');
+    expect(resolveAt).toBeGreaterThanOrEqual(0);
+    expect(resolveAt).toBeLessThan(source.indexOf('options.dryRun === true'));
+    expect(resolveAt).toBeLessThan(source.indexOf('await server.listen(port, host)'));
+    expect(source).not.toContain("'claude', 'codex'");
+  });
+
   it('keeps startup failures in the shared harness boundary', () => {
     for (const name of ['peer_conversation_server.ts']) {
       const source = readScript(name);

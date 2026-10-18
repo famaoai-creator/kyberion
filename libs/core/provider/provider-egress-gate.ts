@@ -337,18 +337,88 @@ function readTenantProfileAsPolicyInput(
   };
 }
 
+export interface TenantProviderAttestationLookup extends ResolvedTenantProviderAttestation {
+  /** Set when the lookup itself could not be completed; treat as absent. */
+  error?: string;
+}
+
+/**
+ * Resolve one tenant's attestation for one provider through the same governed
+ * path `checkProviderEgress` uses (tenant-scope conflict check, narrow
+ * policy-input read of the profile, policy TTL). Never throws and never
+ * returns the profile: a lookup that cannot complete reports `absent` with an
+ * `error`, which callers must treat as "no attestation" (fail closed).
+ *
+ * Exists so the reasoning-send gate (`reasoning-egress-scope.ts`) can honour
+ * the same attestations without duplicating the read or the expiry rule.
+ */
+export function lookupTenantProviderAttestation(input: {
+  tenant_slug: string;
+  provider: string;
+  tenant_registry_root_dir?: string;
+}): TenantProviderAttestationLookup {
+  const requestedTenantSlug = input.tenant_slug?.trim();
+  const provider = String(input.provider || '').trim();
+  if (!requestedTenantSlug || !provider) {
+    return {
+      status: 'absent',
+      training_use: 'unknown',
+      error: 'tenant_slug and provider are both required',
+    };
+  }
+  let activeTenantSlug: string | undefined;
+  try {
+    activeTenantSlug = resolveIdentityContext().tenantSlug?.trim();
+  } catch (error) {
+    return {
+      status: 'absent',
+      training_use: 'unknown',
+      error: `active tenant scope could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (activeTenantSlug && requestedTenantSlug !== activeTenantSlug) {
+    return {
+      status: 'absent',
+      training_use: 'unknown',
+      error: `tenant '${requestedTenantSlug}' conflicts with the active tenant scope '${activeTenantSlug}'.`,
+    };
+  }
+  let profile: TenantPolicyInput;
+  try {
+    profile = readTenantProfileAsPolicyInput(
+      requestedTenantSlug,
+      provider,
+      input.tenant_registry_root_dir
+    );
+  } catch (error) {
+    return {
+      status: 'absent',
+      training_use: 'unknown',
+      error: `tenant '${requestedTenantSlug}' could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  const loaded = loadProviderEgressPolicy();
+  return resolveTenantProviderAttestation({
+    profile,
+    provider,
+    ttlDays: loaded.status === 'ok' ? loaded.policy.attestation_ttl_days : undefined,
+  });
+}
+
 /**
  * Side-effect-free evaluation of the tier x egress rule. A denial carries the
  * bare reason (no prefix) and emits no log line or ops-alert, so planning
  * views (`describeProviderTierAvailability`) can ask "would this be allowed?"
  * for every provider without raising an alert per hypothetical denial.
+ * Exported so the reasoning-send gate (`reasoning-egress-scope.ts`) decides
+ * with this exact rule instead of a parallel copy that could drift.
  */
-type EvaluatedProviderEgress = ProviderEgressCheckResult & {
+export type EvaluatedProviderEgress = ProviderEgressCheckResult & {
   /** Which rule allowed it (set only when allowed). */
   basis?: ProviderTierUsableBasis;
 };
 
-function evaluateProviderEgress(input: ProviderEgressCheckInput): EvaluatedProviderEgress {
+export function evaluateProviderEgress(input: ProviderEgressCheckInput): EvaluatedProviderEgress {
   const provider = String(input.provider || '').trim();
   const dataTier = input.dataTier;
 

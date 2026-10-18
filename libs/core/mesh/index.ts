@@ -16,6 +16,7 @@ export * from './mesh-hub-peer-messaging-adapter.js';
 export * from './mesh-message-broker.js';
 export * from './mesh-peer-directory.js';
 export * from './mesh-topic-registry.js';
+export * from './peer-auto-reply.js';
 export * from './peer-conversation.js';
 export * from './peer-messaging.js';
 export * from './peer-runtime-recovery.js';

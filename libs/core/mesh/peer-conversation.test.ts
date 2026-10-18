@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createPeerMessagingServer } from './peer-messaging.js';
-import { pathResolver } from '../path-resolver.js';
-import { withExecutionContext } from '../authority.js';
-import { safeAppendFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
+  clearPeerRuntime,
+  createPeerMessagingServer,
+  peerNetworkCatalogPath,
+  registerPeerNetworkPeer,
+} from './peer-messaging.js';
+import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
+import { safeAppendFile, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  PEER_CATALOG_READER_ROLE,
   appendPeerConversationTranscript,
   buildPeerConversationEnvelope,
   clearPeerConversationRuntime,
@@ -27,6 +33,10 @@ const CATALOG_PATH = pathResolver.sharedTmp('peer-conversation-catalog.test.json
 afterEach(() => {
   clearPeerConversationRuntime(TENANT_ID, 'peer-a-test');
   clearPeerConversationRuntime(TENANT_ID, 'peer-b-test');
+  // The receiving server dedups on message_handled events; drop them so an
+  // explicit messageId is not seen as a duplicate on the next run.
+  clearPeerRuntime(TENANT_ID, 'peer-a-test');
+  clearPeerRuntime(TENANT_ID, 'peer-b-test');
   try {
     safeRmSync(CATALOG_PATH, { force: true });
   } catch (_) {
@@ -155,7 +165,7 @@ describe('peer conversation', () => {
 
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async (_input: any, init?: RequestInit) => {
+      .mockImplementation(async (_input: unknown, init?: RequestInit) => {
         const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<
           typeof server.processEnvelope
         >[0];
@@ -192,6 +202,172 @@ describe('peer conversation', () => {
     expect(senderSession.related_work_item_ids).toContain('WIT-1');
     expect(receiverSession.related_work_item_ids).toContain('WIT-1');
     fetchSpy.mockRestore();
+  });
+
+  it('resends with an explicit messageId idempotently and keeps fresh ids otherwise', async () => {
+    safeWriteFile(
+      CATALOG_PATH,
+      JSON.stringify({
+        version: '1',
+        tenant_id: TENANT_ID,
+        peers: [
+          {
+            peer_id: 'peer-b-test',
+            base_url: 'http://127.0.0.1:4555',
+            shared_secret: SHARED_SECRET,
+            allow_local_network: true,
+          },
+        ],
+      })
+    );
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+      responder: createPeerConversationResponder({ peerId: 'peer-b-test', tenantId: TENANT_ID }),
+    });
+    const envelopeIds: string[] = [];
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input: unknown, init?: RequestInit) => {
+        const envelope = JSON.parse(String(init?.body || '{}'));
+        envelopeIds.push(envelope.message_id);
+        const result = await server.processEnvelope(envelope);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      });
+    const send = (sessionId: string, messageId?: string) =>
+      sendPeerConversationMessageToPeer({
+        senderPeerId: 'peer-a-test',
+        recipientPeerId: 'peer-b-test',
+        tenantId: TENANT_ID,
+        sessionId,
+        topic: 'idempotent',
+        text: 'same text',
+        catalogPath: CATALOG_PATH,
+        timeoutMs: 5000,
+        ...(messageId ? { messageId } : {}),
+      });
+
+    const first = await send('PCS-IDEMPOTENT', 'PCM-STABLE-1');
+    const second = await send('PCS-IDEMPOTENT', 'PCM-STABLE-1');
+    expect(first.receipt.duplicate).toBeUndefined();
+    expect(second.receipt).toMatchObject({ ok: true, duplicate: true });
+    expect(envelopeIds).toEqual(['PCM-STABLE-1', 'PCM-STABLE-1']);
+    const idempotent = loadPeerConversationSession(TENANT_ID, 'peer-a-test', 'PCS-IDEMPOTENT')!;
+    expect(
+      idempotent.transcript
+        .filter((entry) => entry.direction === 'outbound')
+        .map((e) => e.message_id)
+    ).toEqual(['PCM-STABLE-1']);
+
+    // Without messageId: unchanged behaviour, fresh ids and one entry per send.
+    envelopeIds.length = 0;
+    await send('PCS-FRESH');
+    await send('PCS-FRESH');
+    const fresh = loadPeerConversationSession(TENANT_ID, 'peer-a-test', 'PCS-FRESH')!;
+    const outbound = fresh.transcript.filter((entry) => entry.direction === 'outbound');
+    expect(outbound).toHaveLength(2);
+    expect(new Set(envelopeIds).size).toBe(2);
+    expect(new Set(outbound.map((entry) => entry.message_id)).size).toBe(2);
+
+    await expect(send('PCS-FRESH', '../outside')).rejects.toThrow(
+      'invalid_peer_conversation_message_id'
+    );
+    fetchSpy.mockRestore();
+  });
+});
+
+describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
+  const tenant = 'zz-peer-catalog-test';
+  const tenantRoot = pathResolver.knowledge(`confidential/${tenant}`);
+  const otherTenantRoot = pathResolver.knowledge('confidential/zz-peer-catalog-other');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearPeerConversationRuntime(tenant, 'peer-a-test');
+    clearPeerConversationRuntime(tenant, 'peer-b-test');
+    withExecutionContext('ecosystem_architect', () => {
+      safeRmSync(tenantRoot, { recursive: true, force: true });
+      safeRmSync(otherTenantRoot, { recursive: true, force: true });
+    });
+  });
+
+  function registerRecipient(tenantId: string): void {
+    withExecutionContext('sovereign_concierge', () =>
+      registerPeerNetworkPeer({
+        tenantId,
+        peerId: 'peer-b-test',
+        baseUrl: 'http://127.0.0.1:4556',
+        sharedSecret: SHARED_SECRET,
+        exposure: 'same_host',
+      })
+    );
+  }
+
+  it('sends through the tenant confidential catalog without a confidential caller role', async () => {
+    registerRecipient(tenant);
+    // Pin the sender to a role without confidential read access so the test
+    // does not depend on the ambient MISSION_ROLE (CI runs as mission_controller).
+    const asSender = <T>(fn: () => Promise<T> | T): Promise<T> =>
+      withExecutionContextAsync('infrastructure_sentinel', fn);
+    await expect(
+      asSender(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' }))
+    ).rejects.toThrow();
+
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: tenant,
+      sharedSecret: SHARED_SECRET,
+      responder: createPeerConversationResponder({ peerId: 'peer-b-test', tenantId: tenant }),
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: unknown, init?: RequestInit) => {
+        const result = await server.processEnvelope(JSON.parse(String(init?.body || '{}')));
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+    );
+
+    const outcome = await asSender(() =>
+      sendPeerConversationMessageToPeer({
+        senderPeerId: 'peer-a-test',
+        recipientPeerId: 'peer-b-test',
+        tenantId: tenant,
+        topic: 'handoff',
+        text: 'reachable?',
+        timeoutMs: 5000,
+      })
+    );
+    expect(outcome.receipt.ok).toBe(true);
+    expect(outcome.receipt.accepted).toBe(true);
+  });
+
+  it('grants only the bound tenant catalog and no other confidential file', () => {
+    registerRecipient(tenant);
+    registerRecipient('zz-peer-catalog-other');
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(`${tenantRoot}/locale.json`, JSON.stringify({ locale: 'ja' }))
+    );
+    const asReader = <T>(fn: () => T): T =>
+      withExecutionContext(PEER_CATALOG_READER_ROLE, fn, undefined, tenant);
+
+    expect(
+      asReader(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' }))
+    ).toContain('peer-b-test');
+    expect(() =>
+      asReader(() =>
+        safeReadFile(peerNetworkCatalogPath('zz-peer-catalog-other'), { encoding: 'utf8' })
+      )
+    ).toThrow();
+    expect(() =>
+      asReader(() => safeReadFile(`${tenantRoot}/locale.json`, { encoding: 'utf8' }))
+    ).toThrow();
+    expect(() => asReader(() => safeWriteFile(peerNetworkCatalogPath(tenant), '{}'))).toThrow();
   });
 });
 

@@ -85,6 +85,7 @@
           }
         ]
       },
+      "isolated_text_generation": { "isolation": "fail_closed_detection" },
       "runtime_instructions": [
         "Provider note: inspect before editing, use governed file I/O, and report the exact verification performed.",
         "Provider note: do not broaden the requested scope or publish external changes without an explicit handoff."

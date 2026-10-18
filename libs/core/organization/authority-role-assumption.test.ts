@@ -785,3 +785,89 @@ describe('RA-02 policy coverage', () => {
     }
   });
 });
+
+describe('tenant-bound reader roles never follow a caller-supplied tenant', () => {
+  const KEYS = [...ENV_KEYS, 'KYBERION_TENANT'] as const;
+  const original: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  afterEach(() => {
+    for (const key of KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  for (const role of ['peer_catalog_reader', 'peer_responder_reader', 'scope_locale_reader']) {
+    it(`${role}: another tenant than the active one is rejected`, () => {
+      process.env.KYBERION_TENANT = 'tenant-a';
+      expect(() => withExecutionContext(role, () => 'ran', undefined, 'tenant-b')).toThrow(
+        /\[ROLE_TENANT_SCOPE_MISMATCH\].*active tenant is 'tenant-a'/
+      );
+    });
+
+    it(`${role}: the active tenant binds`, () => {
+      process.env.KYBERION_TENANT = 'tenant-a';
+      expect(
+        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-a')
+      ).toBe('tenant-a');
+    });
+
+    it(`${role}: without an active tenant the process binds its own tenant`, async () => {
+      expect(
+        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-b')
+      ).toBe('tenant-b');
+      await expect(
+        withExecutionContextAsync(
+          role,
+          async () => currentExecutionScope()?.tenantSlug,
+          undefined,
+          'tenant-b'
+        )
+      ).resolves.toBe('tenant-b');
+    });
+
+    it(`${role}: a missing or invalid tenant is rejected`, async () => {
+      expect(() => withExecutionContext(role, () => 'ran')).toThrow(
+        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
+      );
+      expect(() => withExecutionContext(role, () => 'ran', undefined, '../x')).toThrow(
+        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
+      );
+      await expect(withExecutionContextAsync(role, async () => 'ran')).rejects.toThrow(
+        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
+      );
+    });
+  }
+
+  it('an outer tenant-bound scope is the active tenant for a nested assumption', () => {
+    expect(() =>
+      withExecutionContext(
+        'peer_responder_reader',
+        () => withExecutionContext('peer_catalog_reader', () => 'ran', undefined, 'tenant-b'),
+        undefined,
+        'tenant-a'
+      )
+    ).toThrow(/\[ROLE_TENANT_SCOPE_MISMATCH\]/);
+  });
+
+  it('other roles keep binding a caller-supplied tenant', () => {
+    process.env.KYBERION_TENANT = 'tenant-a';
+    expect(
+      withExecutionContext(
+        'audit_mirror_writer',
+        () => currentExecutionScope()?.tenantSlug,
+        undefined,
+        'tenant-b'
+      )
+    ).toBe('tenant-b');
+  });
+});
