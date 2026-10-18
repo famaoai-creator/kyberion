@@ -124,7 +124,19 @@
         "display_name": { "type": "string", "minLength": 1 },
         "role": { "enum": ["owner", "approver", "viewer"] }
       }
-    }
+    },
+    "distill_experience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cue", "lesson", "evidence", "confidence"],
+      "properties": {
+        "cue": { "type": "string", "minLength": 1 },
+        "lesson": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 },
+        "confidence": { "enum": ["high", "medium", "low"] }
+      }
+    },
+    "distill_experience_declined": { "type": "boolean" }
   },
   "additionalProperties": false,
   "definitions": {
@@ -174,6 +186,13 @@
       "description": "A promotion grant is meaningless without the scope envelope it was brokered from.",
       "if": { "required": ["promotion"] },
       "then": { "required": ["scope"] }
+    },
+    {
+      "description": "A row holding a distilled experience is never 'declined' — the flag cannot be true while a lesson is present.",
+      "if": { "required": ["distill_experience"] },
+      "then": {
+        "properties": { "distill_experience_declined": { "const": false } }
+      }
     },
     {
       "description": "A tenant-scoped candidate needs a brokered promotion to become public (mirrors assertPublicTierReferencesSafe).",

@@ -381,6 +381,7 @@
 - [Code Documentation And Video Production Playbook](./product/orchestration/code-documentation-production-playbook.md) (public | Unknown)
 - [Codex CLI Multi-Account Profile Operations](./product/orchestration/codex-multi-account-operations.md) (public | Unknown)
 - [Context Precedence Protocol](./product/orchestration/context-precedence-protocol.md) (public | Unknown)
+- [Contrastive Harness Tuning — harness2 concepts and their Kyberion landing zones](./product/orchestration/contrastive-harness-tuning-playbook.md) (public | Unknown)
 - [Counterfactual Simulation Protocol](./product/orchestration/counterfactual-simulation-protocol.md) (public | Ecosystem Architect)
 - [Cross-Role Directive Protocol (CRDP)](./product/orchestration/directives-protocol.md) (public | Ecosystem Architect)
 - [Cross-Tenant Brokering Protocol](./product/orchestration/cross-tenant-brokering-protocol.md) (public | Unknown)

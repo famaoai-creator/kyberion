@@ -7,7 +7,9 @@
     "key_learnings": "Key Learnings",
     "patterns_discovered": "Patterns Discovered",
     "failures_and_recoveries": "Failures & Recoveries",
-    "reusable_artifacts": "Reusable Artifacts"
+    "reusable_artifacts": "Reusable Artifacts",
+    "change_attribution": "What Each Change Did",
+    "transferable_lesson": "Transferable Lesson"
   },
   "prompt_titles": {
     "mission_state": "Mission State",
