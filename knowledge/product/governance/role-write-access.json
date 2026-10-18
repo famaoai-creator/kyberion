@@ -111,6 +111,12 @@
     "peer_responder_reader": {
       "allow": []
     },
+    "peer_task_artifact_writer": {
+      "allow": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ]
+    },
     "metrics_cap_reader": {
       "allow": []
     },

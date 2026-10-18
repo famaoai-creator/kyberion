@@ -6,6 +6,7 @@ import {
   listPeerTasks,
   loadPeerTaskCatalog,
   proposePeerTask,
+  resumePeerTask,
   type PeerTaskDirection,
   type PeerTaskState,
 } from '@agent/core/mesh/peer-task-exchange';
@@ -41,6 +42,11 @@ async function main(
       () => undefined
     )
     .command('reject', 'Reject a pending inbound task and tell the proposer', () => undefined)
+    .command(
+      'resume',
+      'Resume an accepted inbound task that stopped before its result',
+      () => undefined
+    )
     .command('resend-result', 'Resend the stored result of an inbound task', () => undefined)
     .option('peer-id', { type: 'string', demandOption: true, description: 'This Kyberion peer id' })
     .option('tenant-id', {
@@ -117,6 +123,11 @@ async function main(
       };
       if (previewOnly) return { dry_run: true, operation: `peer-task.${command}`, ...input };
       return decidePeerTask(input);
+    }
+    case 'resume': {
+      const taskId = required(argv['task-id'], 'task-id', command);
+      if (previewOnly) return { dry_run: true, operation: 'peer-task.resume', task_id: taskId };
+      return resumePeerTask({ tenantId, localPeerId: peerId, taskId });
     }
     case 'resend-result': {
       const taskId = required(argv['task-id'], 'task-id', command);
