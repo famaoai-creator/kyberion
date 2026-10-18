@@ -79,6 +79,10 @@ export interface RoundRecord {
   outcomes: RunOutcome[];
   /** Cumulative — includes rejections from earlier rounds (session-level trail). */
   rejected: Array<{ label: string; path: string; reason: string }>;
+  /** The base dir changed during this round's probes — later probes ran
+   *  against different bytes than the base probe saw. Recorded on every
+   *  round; on auto_advance it additionally halts adoption. */
+  base_drifted?: boolean;
   propose_meta?: { backend_used: boolean; error?: string };
 }
 
@@ -295,6 +299,7 @@ export async function runRecursiveSession(
         ...(spec.expectOutputs ? { expectOutputs: spec.expectOutputs } : {}),
         runRoot: roundRoot,
         timeoutMs: spec.timeoutMs,
+        ...(spec.markers ? { markers: spec.markers } : {}),
       });
 
     if (!candidates.length) {
@@ -315,8 +320,25 @@ export async function runRecursiveSession(
     const base = probeFor('base');
     const outcomes = candidates.map((c) => probeFor(c.label, c.overlayDir));
     actualProbes += outcomes.length + 1;
+    // A marker caught at stage time means the probe REFUSED to run — mirror
+    // it into the rejection trail so the audit reads the same as a pre-probe
+    // rejection (it is one: the command never executed).
+    for (const o of outcomes) {
+      if (/^leak marker:/.test(o.error) || /marker scan failed/.test(o.error)) {
+        rejected.push({ label: o.label, path: '.', reason: `probe refused: ${o.error}` });
+      }
+    }
     const decision = classifyProbeSet(base, outcomes, spec.metrics ?? []);
     finalDecision = decision;
+    // The scenario is unsandboxed: a probe can mutate the base mid-round and
+    // silently skew every later probe's comparability. Detect + record drift
+    // on EVERY round, not only when adoption needs it.
+    let baseDrifted = false;
+    try {
+      baseDrifted = !manifestsEqual(treeManifest(currentBase), baseManifest);
+    } catch {
+      baseDrifted = true;
+    }
 
     const selection =
       spec.selection === 'blind' && decision.decision === 'human_gate'
@@ -336,6 +358,7 @@ export async function runRecursiveSession(
       selection,
       outcomes,
       rejected: [...rejected],
+      ...(baseDrifted ? { base_drifted: true } : {}),
       ...(roundProposeMeta ? { propose_meta: roundProposeMeta } : {}),
     });
 
@@ -354,15 +377,23 @@ export async function runRecursiveSession(
       // adopted bytes == probed bytes, verified — the scenario is
       // unsandboxed, so BOTH the winner snapshot and the current base can
       // drift during this round's probes.
-      const driftReason = !adoptionSource
-        ? 'probed-bytes snapshot unavailable'
-        : !adoptionManifest
-          ? 'snapshot manifest unavailable — bytes unverifiable'
-          : !manifestsEqual(treeManifest(adoptionSource), adoptionManifest)
-            ? 'winner snapshot drifted after probe'
-            : !manifestsEqual(treeManifest(currentBase), baseManifest)
-              ? 'base dir drifted during round probes'
-              : null;
+      // treeManifest on a tampered path (dir swapped for a file, etc.) throws
+      // — that IS drift, so convert it to a halt instead of crashing the
+      // session and losing the probed evidence.
+      let driftReason: string | null;
+      try {
+        driftReason = !adoptionSource
+          ? 'probed-bytes snapshot unavailable'
+          : !adoptionManifest
+            ? 'snapshot manifest unavailable — bytes unverifiable'
+            : !manifestsEqual(treeManifest(adoptionSource), adoptionManifest)
+              ? 'winner snapshot drifted after probe'
+              : !manifestsEqual(treeManifest(currentBase), baseManifest)
+                ? 'base dir drifted during round probes'
+                : null;
+      } catch {
+        driftReason = 'manifest unreadable — drifted';
+      }
       if (driftReason || !adoptionSource) {
         const rejection = {
           label: `r${round}:${decision.winner}`,
@@ -444,6 +475,15 @@ export async function runRecursiveSession(
     command: spec.command,
     declared_rounds: spec.rounds,
     halted_by: halted,
+    // final_decision still says auto_advance+winner on this halt path —
+    // without the reason here a consumer keyed on final_decision alone would
+    // see an adopted winner that never landed.
+    ...(halted === 'materialization_error'
+      ? {
+          materialization_error:
+            rounds[rounds.length - 1]?.rejected.at(-1)?.reason ?? 'materialization failed',
+        }
+      : {}),
     budget,
     ...(spec.work_shape ? { work_shape: spec.work_shape } : {}),
   };

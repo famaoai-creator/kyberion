@@ -23,6 +23,7 @@ import {
 } from '../secure-io.js';
 import { logger } from '../core.js';
 import { isValidRelPath } from './surface-spec.js';
+import { scanOverlayForMarkers } from './leak-tripwire.js';
 import { nowIso } from '../foundation/time.js';
 
 export interface ProbeSpec {
@@ -39,6 +40,10 @@ export interface ProbeSpec {
   /** Parent directory for the per-candidate run dirs (repo-scoped). */
   runRoot: string;
   timeoutMs?: number;
+  /** Extra leak-tripwire markers — the STAGED SNAPSHOT is scanned before the
+   *  command runs, so probed bytes == scanned bytes (live-dir scans have a
+   *  TOCTOU gap between session-start scan and probe-time staging). */
+  markers?: string[];
 }
 
 export interface RunOutcome {
@@ -92,12 +97,14 @@ function listFiles(dir: string, prefix = ''): string[] {
   return out;
 }
 
-/** Content manifest of every file under root: relpath → sha256 hex. */
+/** Content manifest of every file under root: relpath → sha256 hex.
+ *  Reads raw bytes — hashing the utf8-decoded string would map distinct
+ *  byte sequences to the same replacement-char digest (invisible drift). */
 export function treeManifest(root: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const rel of listFiles(root)) {
     out[rel] = createHash('sha256')
-      .update(safeReadFile(path.join(root, rel)))
+      .update(safeReadFile(path.join(root, rel), { encoding: null }))
       .digest('hex');
   }
   return out;
@@ -240,6 +247,24 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     }
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
+  }
+
+  if (overlay && snapshotDir) {
+    // Tripwire the exact bytes about to be probed — a mutation between a
+    // caller's session-start scan and this stage cannot smuggle marker
+    // content into the run dir or a later adoption.
+    let scan;
+    try {
+      scan = scanOverlayForMarkers(snapshotDir, spec.markers);
+    } catch (error) {
+      return fail(
+        `staged-snapshot marker scan failed: ${error instanceof Error ? error.message : error}`
+      );
+    }
+    if (!scan.clean) {
+      const h = scan.hits[0];
+      return fail(`leak marker: ${h.marker} at ${h.path}:${h.line} (staged snapshot)`);
+    }
   }
 
   const stagedBefore = new Set(listFiles(runDir));
