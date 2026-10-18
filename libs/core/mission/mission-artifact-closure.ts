@@ -150,16 +150,6 @@ function safeMissionArtifactPath(missionDir: string, relativePath: string): stri
   });
 }
 
-function isPathInside(parent: string, candidate: string): boolean {
-  const relative = path.relative(parent, candidate);
-  return (
-    relative !== '' &&
-    relative !== '..' &&
-    !relative.startsWith(`..${path.sep}`) &&
-    !path.isAbsolute(relative)
-  );
-}
-
 function readIndexLines(indexPath: string): IndexLine[] {
   if (!safeExistsSync(indexPath)) return [];
   ensureRegularScopedArtifactIndex(indexPath);
@@ -204,7 +194,7 @@ function deleteIndexEntryFile(missionDir: string, entry: ScopedArtifactIndexEntr
   } catch {
     return;
   }
-  if (!isPathInside(missionDir, safeResolved)) return;
+  if (!pathResolver.isPathInside(missionDir, safeResolved)) return;
   if (safeExistsSync(safeResolved)) safeRmSync(safeResolved, { recursive: true, force: true });
 }
 

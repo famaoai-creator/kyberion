@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readTextFile } from '../foundation/text.js';
+import { readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -33,6 +33,7 @@ import {
   provisionMissionEntry,
   writeProvisionedJson,
   appendProvisionedText,
+  receiptCurrentProvisionedText,
 } from './mission-orchestration-journal.js';
 import type {
   MissionTeamGovernance,
@@ -750,17 +751,9 @@ export function readMissionExecutionLedger(
 ): MissionExecutionLedgerEntry[] {
   const paths = resolveExistingMissionBindingPaths(normalizeMissionId(missionId), missionPathHint);
   if (!paths || !safeExistsSync(paths.executionLedgerPath)) return [];
-  const entries: MissionExecutionLedgerEntry[] = [];
-  for (const line of readTextFile(paths.executionLedgerPath).split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      entries.push(JSON.parse(trimmed) as MissionExecutionLedgerEntry);
-    } catch {
-      continue;
-    }
-  }
-  return entries;
+  return readJsonLines<MissionExecutionLedgerEntry>(paths.executionLedgerPath, {
+    onMalformed: 'skip',
+  });
 }
 
 export function appendMissionExecutionLedgerEntry(
@@ -843,14 +836,33 @@ export function repairLegacyMissionExecutionLedger(
 ): boolean {
   const paths = resolveMissionBindingPaths(missionId, missionPath);
   if (!safeExistsSync(paths.executionLedgerPath)) return false;
-  return appendProvisionedText({
-    missionId,
-    filePath: paths.executionLedgerPath,
-    targetPath: 'execution-ledger.jsonl',
-    missionPathHint: paths.missionPath,
-    content: '',
-    repairLegacyEmptyLedger: true,
-    validateContent: (content) =>
-      validateExecutionLedgerText(content, missionId, paths.missionPath),
-  });
+  if (
+    appendProvisionedText({
+      missionId,
+      filePath: paths.executionLedgerPath,
+      targetPath: 'execution-ledger.jsonl',
+      missionPathHint: paths.missionPath,
+      content: '',
+      repairLegacyEmptyLedger: true,
+      validateContent: (content) =>
+        validateExecutionLedgerText(content, missionId, paths.missionPath),
+    })
+  )
+    return true;
+  // Unreceipted growth (legacy writer appended rows no receipt attested):
+  // validate the existing bytes, then re-baseline the receipt chain.
+  try {
+    return receiptCurrentProvisionedText({
+      missionId,
+      filePath: paths.executionLedgerPath,
+      targetPath: 'execution-ledger.jsonl',
+      missionPathHint: paths.missionPath,
+      validateContent: (content) =>
+        validateExecutionLedgerText(content, missionId, paths.missionPath),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('provisioned_entry_mismatch'))
+      return false;
+    throw error;
+  }
 }
