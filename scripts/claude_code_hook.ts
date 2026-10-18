@@ -19,10 +19,12 @@
  */
 
 import {
+  buildPostCompactionContext,
   buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
+  denyHookResponse,
   evaluatePreToolUse,
   evaluatePreToolUseShellDeny,
   recordCliUsage,
@@ -104,13 +106,9 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         if (decision) process.stdout.write(JSON.stringify(decision));
       } catch (err) {
         process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'deny',
-              permissionDecisionReason: `Kyberion shell policy could not be evaluated: ${String(err)}`,
-            },
-          })
+          JSON.stringify(
+            denyHookResponse(`Kyberion shell policy could not be evaluated: ${String(err)}`)
+          )
         );
       }
       return;
@@ -136,6 +134,19 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         // usage capture is best-effort; never block session close
       }
       buildStopContext(payload);
+      return;
+    }
+    case 'PostCompaction': {
+      // Devin-only event today; dormant under Claude Code. Re-injects a
+      // compact governance reminder and refreshes co-session presence.
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PostCompaction',
+            additionalContext: buildPostCompactionContext(payload),
+          },
+        })
+      );
       return;
     }
     case 'SessionEnd': {
@@ -166,13 +177,9 @@ export const claudeCodeHook = defineScript({
       // Both policy entrypoints fail closed, including failures while reading stdin.
       if (hookArgv[2] === 'PreToolUse' || hookArgv[2] === 'PreToolUseShellDeny') {
         process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'deny',
-              permissionDecisionReason: `Kyberion hook errored; refusing tool use: ${String(err)}`,
-            },
-          })
+          JSON.stringify(
+            denyHookResponse(`Kyberion hook errored; refusing tool use: ${String(err)}`)
+          )
         );
       } else {
         process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
