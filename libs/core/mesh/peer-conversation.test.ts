@@ -7,7 +7,7 @@ import {
   registerPeerNetworkPeer,
 } from './peer-messaging.js';
 import { pathResolver } from '../path-resolver.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
 import { safeAppendFile, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   PEER_CATALOG_READER_ROLE,
@@ -309,7 +309,13 @@ describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
 
   it('sends through the tenant confidential catalog without a confidential caller role', async () => {
     registerRecipient(tenant);
-    expect(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' })).toThrow();
+    // Pin the sender to a role without confidential read access so the test
+    // does not depend on the ambient MISSION_ROLE (CI runs as mission_controller).
+    const asSender = <T>(fn: () => Promise<T> | T): Promise<T> =>
+      withExecutionContextAsync('infrastructure_sentinel', fn);
+    await expect(
+      asSender(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' }))
+    ).rejects.toThrow();
 
     const server = createPeerMessagingServer({
       peerId: 'peer-b-test',
@@ -327,14 +333,16 @@ describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
       }
     );
 
-    const outcome = await sendPeerConversationMessageToPeer({
-      senderPeerId: 'peer-a-test',
-      recipientPeerId: 'peer-b-test',
-      tenantId: tenant,
-      topic: 'handoff',
-      text: 'reachable?',
-      timeoutMs: 5000,
-    });
+    const outcome = await asSender(() =>
+      sendPeerConversationMessageToPeer({
+        senderPeerId: 'peer-a-test',
+        recipientPeerId: 'peer-b-test',
+        tenantId: tenant,
+        topic: 'handoff',
+        text: 'reachable?',
+        timeoutMs: 5000,
+      })
+    );
     expect(outcome.receipt.ok).toBe(true);
     expect(outcome.receipt.accepted).toBe(true);
   });
