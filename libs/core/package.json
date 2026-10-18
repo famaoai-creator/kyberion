@@ -4828,6 +4828,10 @@
       "types": "./dist/provider/codex-isolated-query.d.ts",
       "default": "./dist/provider/codex-isolated-query.js"
     },
+    "./provider/isolated-text-generator": {
+      "types": "./dist/provider/isolated-text-generator.d.ts",
+      "default": "./dist/provider/isolated-text-generator.js"
+    },
     "./provider/codex-cli-reasoning-backend": {
       "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",
       "default": "./dist/provider/codex-cli-reasoning-backend.js"
