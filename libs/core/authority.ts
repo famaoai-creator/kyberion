@@ -653,6 +653,46 @@ interface PreparedExecutionContext {
   resolvedPersona: Persona;
 }
 
+/**
+ * Shared core reader roles whose grants are parameterised by
+ * `${KYBERION_TENANT}` and which libs/core assumes on behalf of any caller
+ * (role-assumption-policy.json `shared_core_roles`). The bound tenant comes
+ * from the caller, so it must be the caller's own: a caller-supplied tenant
+ * never broadens access (peer-network.md). Kept as a typed constant rather
+ * than governance data so the check cannot disappear with a missing or
+ * malformed policy file. metrics_cap_reader is deliberately absent: its grant
+ * names no tenant placeholder and its caller binds the active tenant itself.
+ */
+export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
+  'peer_catalog_reader',
+  'peer_responder_reader',
+  'scope_locale_reader',
+]);
+
+/**
+ * A tenant-bound reader role must be bound to an explicit, valid tenant, and
+ * to the caller's active tenant when one exists. Without an active tenant
+ * (operator CLI, a server process configured for one tenant) the binding is
+ * the process's own choice and stays allowed.
+ */
+function assertTenantBoundReaderScope(role: string, tenantSlug: string | undefined): void {
+  if (!TENANT_BOUND_READER_ROLES.has(role)) return;
+  const requested = normalizeTenantSlug(tenantSlug);
+  if (!requested) {
+    throw new Error(
+      `[ROLE_TENANT_SCOPE_REQUIRED] role '${role}' was assumed without a valid tenant — its grants are tenant-parameterised, so an unbound assumption has no defined scope | ` +
+        `pass the tenant slug to withExecutionContext / withExecutionContextAsync | role=${role} tenant=${tenantSlug ?? '(none)'}`
+    );
+  }
+  const active = normalizeTenantSlug(resolveIdentityContext().tenantSlug);
+  if (active && active !== requested) {
+    throw new Error(
+      `[ROLE_TENANT_SCOPE_MISMATCH] role '${role}' may not be bound to tenant '${requested}' — the caller's active tenant is '${active}' and a caller-supplied tenant never broadens access | ` +
+        `assume the role for the active tenant, or run in a process scoped to '${requested}' | role=${role} active_tenant=${active} requested_tenant=${requested}`
+    );
+  }
+}
+
 function prepareExecutionContext(
   role: string,
   persona: Persona | undefined,
@@ -661,6 +701,7 @@ function prepareExecutionContext(
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
+  assertTenantBoundReaderScope(normalizedRole, tenantSlug);
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();
     if (
