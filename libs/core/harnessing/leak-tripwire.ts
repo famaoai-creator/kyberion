@@ -44,14 +44,27 @@ export interface LeakScanResult {
   hits: LeakHit[];
 }
 
-function listFiles(dir: string, prefix = ''): string[] {
+function listFiles(dir: string, hits: LeakHit[], prefix = ''): string[] {
   const out: string[] = [];
   if (!safeExistsSync(dir)) return out;
-  for (const entry of safeReaddir(dir).sort()) {
+  let entries: string[];
+  try {
+    entries = safeReaddir(dir).sort();
+  } catch {
+    hits.push({ path: prefix || '.', marker: '<dir-unreadable>', line: 0 });
+    return out;
+  }
+  for (const entry of entries) {
     const p = path.join(dir, entry);
     const rel = prefix ? `${prefix}/${entry}` : entry;
-    const stat = safeLstat(p);
-    if (stat.isDirectory()) out.push(...listFiles(p, rel));
+    let stat;
+    try {
+      stat = safeLstat(p);
+    } catch {
+      hits.push({ path: rel, marker: '<file-unreadable>', line: 0 });
+      continue;
+    }
+    if (stat.isDirectory()) out.push(...listFiles(p, hits, rel));
     else if (stat.isFile()) out.push(rel);
   }
   return out;
@@ -69,7 +82,8 @@ export function scanOverlayForMarkers(overlayDir: string, markers?: string[]): L
     };
   }
   const hits: LeakHit[] = [];
-  for (const rel of listFiles(dir)) {
+  const lowerMarkers = markerList.map((m) => m.toLowerCase());
+  for (const rel of listFiles(dir, hits)) {
     let text: string;
     try {
       text = String(safeReadFile(path.join(dir, rel)));
@@ -79,10 +93,11 @@ export function scanOverlayForMarkers(overlayDir: string, markers?: string[]): L
     }
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
-      for (const marker of markerList) {
-        if (lines[i].includes(marker)) {
+      const lowLine = lines[i].toLowerCase();
+      for (let mi = 0; mi < lowerMarkers.length; mi++) {
+        if (lowLine.includes(lowerMarkers[mi])) {
           // One hit per line is enough to reject the overlay.
-          hits.push({ path: rel, marker, line: i + 1 });
+          hits.push({ path: rel, marker: markerList[mi], line: i + 1 });
           break;
         }
       }
