@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import ApplicationServices
 import CoreGraphics
 import CoreServices
@@ -17,6 +18,15 @@ func automationPermission(_ bundle: String) -> String {
   case noErr: return "granted"
   case -1743: return "denied" // errAEEventNotPermitted
   default: return "unknown" // includes -1744 (consent undetermined), procNotFound
+  }
+}
+// AVCaptureDevice.authorizationStatus never prompts; requesting access lives in macos-permission-warmup.swift.
+func captureAuthorization(_ type: AVMediaType) -> String {
+  switch AVCaptureDevice.authorizationStatus(for: type) {
+  case .authorized: return "granted"
+  case .denied, .restricted: return "denied"
+  case .notDetermined: return "not_determined"
+  @unknown default: return "unsupported"
   }
 }
 func fail() -> Never { emit(["ok": false]); exit(1) }
@@ -49,7 +59,7 @@ switch CommandLine.arguments[1] {
 case "probe":
   let screen: String
   if #available(macOS 10.15, *) { screen = CGPreflightScreenCaptureAccess() ? "granted" : "denied" } else { screen = "unsupported" }
-  emit(["automation": automationPermission("com.apple.systemevents"), "browser_automation": automationPermission("com.google.Chrome"), "accessibility": AXIsProcessTrusted() ? "granted" : "denied", "screen_recording": screen])
+  emit(["automation": automationPermission("com.apple.systemevents"), "browser_automation": automationPermission("com.google.Chrome"), "accessibility": AXIsProcessTrusted() ? "granted" : "denied", "screen_recording": screen, "microphone": captureAuthorization(.audio), "camera": captureAuthorization(.video)])
 case "screen":
   let bounds = CGDisplayBounds(CGMainDisplayID())
   emit(["width": bounds.width, "height": bounds.height])

@@ -4,12 +4,16 @@ import { listKnownAppCapabilities, type KnownAppCapability } from './virtual/os-
 
 export const MACOS_AUTOMATION_BRIDGE_ID = 'macos-automation-bridge';
 
-export type MacOSAutomationPermissionStatus = 'granted' | 'denied' | 'unsupported' | 'unknown';
+export type MacOSAutomationPermissionStatus =
+  'granted' | 'denied' | 'not_determined' | 'unsupported' | 'unknown';
 
 export interface MacOSAutomationPermissions {
   automation: MacOSAutomationPermissionStatus;
   accessibility: MacOSAutomationPermissionStatus;
   screen_recording: MacOSAutomationPermissionStatus;
+  /** Informational only: does not affect `available`, `sourceAvailability` or `reason`. */
+  microphone?: MacOSAutomationPermissionStatus;
+  camera?: MacOSAutomationPermissionStatus;
 }
 
 export interface MacOSAutomationProbe {
@@ -17,6 +21,7 @@ export interface MacOSAutomationProbe {
   platform: NodeJS.Platform;
   available: boolean;
   permissions: MacOSAutomationPermissions;
+  host_app?: string;
   known_applications: KnownAppCapability[];
   sourceAvailability?: Partial<
     Record<'active_window' | 'browser_tabs' | 'focused_input' | 'screen_frame', boolean>
@@ -70,11 +75,16 @@ function probe(): MacOSAutomationProbe {
     .filter(([, status]) => status !== 'granted')
     .map(([permission, status]) => `${permission}_permission_${status}`);
   if (native.reason) unavailable.unshift(native.reason);
+  const capturePermissions = {
+    ...(native.microphone ? { microphone: native.microphone } : {}),
+    ...(native.camera ? { camera: native.camera } : {}),
+  };
   return {
     bridge_id: MACOS_AUTOMATION_BRIDGE_ID,
     platform: process.platform,
     available: uiAvailable,
-    permissions,
+    permissions: { ...permissions, ...capturePermissions },
+    ...(native.host_app ? { host_app: native.host_app } : {}),
     known_applications: knownApplications,
     sourceAvailability: {
       active_window: uiAvailable,

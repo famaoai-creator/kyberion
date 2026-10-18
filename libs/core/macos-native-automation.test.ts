@@ -91,6 +91,8 @@ describe('macOS native automation', () => {
       browser_automation: 'unknown',
       accessibility: 'unknown',
       screen_recording: 'unknown',
+      microphone: 'unknown',
+      camera: 'unknown',
       reason: 'native_execution_failed',
     });
     io.safeExecResult.mockReturnValue(response({ accessibility: true }));
@@ -185,14 +187,29 @@ describe('macOS native automation', () => {
           screen_recording: 'unsupported',
         })
       );
-      expect(probeMacOSNativeAutomation()).toEqual({
+      expect(probeMacOSNativeAutomation()).toMatchObject({
         available: true,
         automation: state,
         browser_automation: state,
         accessibility: 'granted',
         screen_recording: 'unsupported',
+        microphone: 'unknown',
+        camera: 'unknown',
       });
     }
+    io.safeExecResult.mockReturnValue(
+      response({
+        accessibility: 'granted',
+        screen_recording: 'granted',
+        microphone: 'not_determined',
+        camera: 'denied',
+      })
+    );
+    expect(probeMacOSNativeAutomation()).toMatchObject({
+      available: true,
+      microphone: 'not_determined',
+      camera: 'denied',
+    });
     io.safeExecResult.mockReturnValue(
       response({
         automation: 'unknown',
