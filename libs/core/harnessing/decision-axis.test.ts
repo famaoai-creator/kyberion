@@ -88,3 +88,19 @@ describe('classifyProbeSet — round-2 edge cases', () => {
     expect(r.auto_advance_allowed).toBe(false);
   });
 });
+
+describe('metric resolvability honesty', () => {
+  it('produced_files resolves to element count in dominance', () => {
+    const pf = [{ key: 'produced_files', direction: 'higher' as const }];
+    const small = { ...out('base', true), produced_files: ['a'] };
+    const big = { ...out('c1', true), produced_files: ['a', 'b', 'c'] };
+    const r = classifyProbeSet(small, [big], pf);
+    expect(r.decision).toBe('auto_advance');
+    expect(r.unresolved_metrics).toEqual([]);
+  });
+  it('unresolvable declared metric is reported, not silently ignored', () => {
+    const bad = [{ key: 'nonexistent_metric', direction: 'higher' as const }];
+    const r = classifyProbeSet(out('base', true), [out('c1', true)], bad);
+    expect(r.unresolved_metrics).toEqual(['nonexistent_metric']);
+  });
+});
