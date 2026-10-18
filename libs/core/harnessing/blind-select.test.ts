@@ -10,6 +10,7 @@ const out = (label: string, delivered: boolean, wall_ms = 100): RunOutcome => ({
   exit_code: delivered ? 0 : 1,
   wall_ms,
   produced_files: delivered ? ['o.txt'] : [],
+  staged_expected: [],
   error: delivered ? '' : 'exit=1',
   recorded_at: 't',
 });

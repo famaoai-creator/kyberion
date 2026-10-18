@@ -1,0 +1,18 @@
+{
+  "record_id": "mem-MSN-PPC-ECO-20261018-2026_10_18",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Harness2 ecosystem closes the retain-seed loop — but the write side is operator-curated",
+  "summary": "experience-library gives causally-ordered lessons that seed propose; leak-tripwire scans overlays; eval-scenario seam maps contracts to ProbeSpecs.",
+  "candidate_id": "mem-MSN-PPC-ECO-20261018-2026_10_18",
+  "evidence_refs": ["active/missions/public/MSN-PPC-ECO-20261018/evidence/distillation.md"],
+  "created_at": "2026-10-18T05:10:12.670Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Ecosystem pieces landed: (1) experience-library — domain JSONL with asOf causal cutoff + token-overlap cue match (NOT substring-of-brief — direction matters); lessons are untrusted so seed blocks go through frameUntrustedInput with field/entry caps; malformed lines skip-and-count, never poison a domain. (2) leak-tripwire — fail-closed marker scan incl. nested dir errors, case-folded; applied to supplied AND LLM-proposed overlays in both sessions. (3) eval-scenario — ProbeScenarioSpec contract -> ProbeSpec. Review lessons: a feature that looks wired can be inert (seed matched nothing because the whole brief was the needle — test with realistic multi-word input); match direction and shape-validate every JSONL parse; normalize timestamps before comparing. The write side stays operator-curated — nothing auto-appends to the library yet (documented, deliberate)."
+  ],
+  "recommended_refs": ["active/missions/public/MSN-PPC-ECO-20261018/evidence/distillation.md"],
+  "source_branch": "feat/ppc-eco-20261018",
+  "source_commit": "d4c4ac150b0dd8083b139fb3216091922f38a167"
+}
