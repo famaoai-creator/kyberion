@@ -1,0 +1,21 @@
+{
+  "action": "pipeline",
+  "name": "continuous-operations-report",
+  "version": "1.0.0",
+  "description": "Publish tenant-scoped internal organization metric evidence under a verified dot executor claim.",
+  "steps": [
+    {
+      "id": "report",
+      "role": "source",
+      "op": "core:continuous_operations_report",
+      "params": {
+        "config_ref": "knowledge/product/governance/continuous-operations/organization-operations.json"
+      },
+      "produces": {
+        "channel": "continuous_operations_report",
+        "type": "ContinuousOperationsArtifactReport",
+        "sensitive": true
+      }
+    }
+  ]
+}

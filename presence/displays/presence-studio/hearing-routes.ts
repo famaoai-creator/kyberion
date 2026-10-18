@@ -17,7 +17,7 @@ import { logger } from '@agent/core/core';
 import { humanActor } from '@agent/core/actor';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { frontDeskRoleFromViewerScope, type FrontDeskRole } from '@agent/core/front-desk-identity';
-import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { resolveFrontDeskMenu, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import {
   findHearingScenario,
@@ -32,7 +32,6 @@ import {
 import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
 import {
   PresenceStudioViewerError,
-  resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
   toFrontDeskViewerScope,
   type PresenceStudioViewerContext,
@@ -68,6 +67,12 @@ import {
 } from './hearing-work-inventory.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { readHearingCompletion } from './hearing-completion.js';
+import {
+  resolveHearingRequestViewer,
+  resolveHearingHandoffScope,
+  hearingScopedUrl,
+  HearingScopeError,
+} from './hearing-request-scope.js';
 import {
   assertHearingHandoffSnapshot,
   withHearingHandoffSnapshot,
@@ -155,33 +160,47 @@ async function renderCurrentHearingCanvas(
  * first tenant slug -> tenant scope; `'unscoped'` (no tenant) -> personal
  * scope. */
 function workInventoryScopeForHandoff(viewer: PresenceStudioViewerContext): WorkInventoryScope {
+  const destination = resolveHearingHandoffScope(viewer, 'inventory');
   const scope = resolveWorkInventoryScopeForViewer(viewer);
   if (!scope) {
     throw new HearingRequestError(
       'Work inventory hand-off requires a concrete tenant or a local owner session.'
     );
   }
-  return scope;
+  return {
+    ...scope,
+    ...(destination.organizationId ? { organization_id: destination.organizationId } : {}),
+  };
 }
 
 /** WI-08: `?scenario_id=` on the canvas URL itself (not just the record
  * fetch) so the canvas iframe's own, separate request also resolves the
  * right default scenario before anything is persisted — the browser loads
  * this URL directly, it never carries whatever query the record fetch used. */
-function hearingCanvasUrl(sessionId: string, record: HearingRecord): string {
-  return `/api/hearing/${encodeURIComponent(sessionId)}/canvas?scenario_id=${encodeURIComponent(record.scenario)}`;
+function hearingCanvasUrl(
+  sessionId: string,
+  record: HearingRecord,
+  viewer: PresenceStudioViewerContext
+): string {
+  return hearingScopedUrl(
+    `/api/hearing/${encodeURIComponent(sessionId)}/canvas?scenario_id=${encodeURIComponent(record.scenario)}`,
+    viewer
+  );
 }
 
-function buildWorkInventoryNextAction(locale: SupportedLocale) {
-  const progressItem = FRONT_DESK_MENU.find((item) => item.id === 'progress');
-  const ports = readFrontDeskSurfacePorts();
-  const href = progressItem
-    ? `http://127.0.0.1:${ports[progressItem.surface]}${progressItem.path}`
-    : '';
+function buildWorkInventoryNextAction(
+  locale: SupportedLocale,
+  viewer: PresenceStudioViewerContext
+) {
+  const progressItem = resolveFrontDeskMenu({
+    currentSurface: 'presence-studio',
+    urls: readFrontDeskSurfaceUrls(),
+    role: frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer)),
+  }).find((item) => item.id === 'progress');
   return {
     label_key: 'front_desk:hearing_inventory_open' as const,
     label: catalogT('front_desk:hearing_inventory_open', undefined, locale),
-    href,
+    href: progressItem?.allowed ? hearingScopedUrl(progressItem.href, viewer) : '',
   };
 }
 
@@ -205,7 +224,9 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
   const status =
     error instanceof HearingConflictError
       ? 409
-      : error instanceof HearingRequestError || error instanceof HearingOperationError
+      : error instanceof HearingRequestError ||
+          error instanceof HearingOperationError ||
+          error instanceof HearingScopeError
         ? error.status
         : error instanceof PresenceStudioViewerError
           ? error.status
@@ -221,6 +242,7 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
   res.status(status).json({
     ...presenceStudioData.presenceStudioWireError(error, status),
     ...(error instanceof HearingConflictError ? { hearing_conflict: error.conflict } : {}),
+    ...(error instanceof HearingScopeError ? { hearing_scope_error: error.code } : {}),
   });
 }
 
@@ -354,7 +376,7 @@ export function registerHearingRoutes(app: express.Express): void {
   // answer mutation.
   app.get('/api/hearing/:session/canvas', async (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       const sessionId = hearingSessionId(req);
       const storage = hearingStorageForViewer(viewer);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
@@ -388,7 +410,7 @@ export function registerHearingRoutes(app: express.Express): void {
   // of freezing the answering locale.
   app.get('/api/hearing/:session', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       const sessionId = hearingSessionId(req);
       const storage = hearingStorageForViewer(viewer);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
@@ -402,7 +424,7 @@ export function registerHearingRoutes(app: express.Express): void {
         record: withResolvedLabels(withHearingHandoffSnapshot(record, viewer), locale),
         completion: readHearingCompletion(record, viewer),
         persisted: Boolean(existing),
-        canvas_url: hearingCanvasUrl(sessionId, record),
+        canvas_url: hearingCanvasUrl(sessionId, record, viewer),
       });
     } catch (error) {
       hearingResponseError(req, res, error);
@@ -411,7 +433,7 @@ export function registerHearingRoutes(app: express.Express): void {
 
   app.post('/api/hearing/:session/answer', async (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingSessionId(req);
       const body = presenceStudioData.safeParsePresenceStudioRequestBody(
@@ -484,7 +506,7 @@ export function registerHearingRoutes(app: express.Express): void {
       res.status(200).json({
         ok: true,
         record: withResolvedLabels(withHearingHandoffSnapshot(versioned, viewer), locale),
-        canvas_url: hearingCanvasUrl(sessionId, versioned),
+        canvas_url: hearingCanvasUrl(sessionId, versioned, viewer),
       });
       // WI-08: `work_inventory_table` never calls a reasoning backend for its
       // canvas — only scenarios that keep the model-drawn `web_app_preview`
@@ -512,7 +534,7 @@ export function registerHearingRoutes(app: express.Express): void {
   // loopback/token principal id.
   app.post('/api/hearing/:session/decide', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingSessionId(req);
       const storage = hearingStorageForViewer(viewer);
@@ -561,7 +583,7 @@ export function registerHearingRoutes(app: express.Express): void {
   // Read-only exact receipt proof. Absence is unknown, never evidence of non-execution.
   app.get('/api/hearing/:session/decision-receipts/:operation', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       requirePresenceStudioLocalAdmin(viewer);
       const storage = hearingStorageForViewer(viewer);
       const namespace = storage.namespace;
@@ -599,7 +621,7 @@ export function registerHearingRoutes(app: express.Express): void {
   app.post('/api/hearing/:session/inventory', async (req, res) => {
     let effectReserved = false;
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const viewer = resolveHearingRequestViewer(req);
       requirePresenceStudioLocalAdmin(viewer);
       const sessionId = hearingSessionId(req);
       const storage = hearingStorageForViewer(viewer);
@@ -629,7 +651,7 @@ export function registerHearingRoutes(app: express.Express): void {
           entry_id: record.work_inventory_entry_id,
           scope: record.work_inventory_scope ?? {},
           steps: record.work_inventory_steps ?? 0,
-          next: buildWorkInventoryNextAction(locale),
+          next: buildWorkInventoryNextAction(locale, viewer),
         });
         return;
       }
@@ -653,6 +675,8 @@ export function registerHearingRoutes(app: express.Express): void {
       const result = await proposeWorkDecomposition(input, { useModel: true });
       // Preparation may outlive the initiating actor's current membership.
       assertHearingHandoffSnapshot({ handoff_snapshot: handoffSnapshot }, record, viewer);
+      if (JSON.stringify(workInventoryScopeForHandoff(viewer)) !== JSON.stringify(scope))
+        throw new HearingScopeError('hearing_scope_unavailable');
       const reserved = storage.reserve(record, 'inventory', nowIso());
       effectReserved = true;
       // Writing a `knowledge/confidential/<tenant>/work-inventory/` entry is
@@ -661,22 +685,27 @@ export function registerHearingRoutes(app: express.Express): void {
       // uses for its own confidential-tier assignment writes and
       // `hearing-mission-routes.ts` uses for its mission-evidence write.
       // `mode: 'create'`: a new entry never overwrites an existing one.
-      const entry = withExecutionContext('ecosystem_architect', () =>
-        saveWorkInventoryEntry(
-          {
-            ...result.entry,
-            status: 'confirmed',
-            observations: [
-              ...(result.entry.observations ?? []),
-              {
-                source: 'self_report' as const,
-                ref: `hearing:${record.session_id}`,
-                observed_at: nowIso(),
-              },
-            ],
-          },
-          { mode: 'create' }
-        )
+      const entry = withExecutionContext(
+        'ecosystem_architect',
+        () =>
+          saveWorkInventoryEntry(
+            {
+              ...result.entry,
+              scope,
+              status: 'confirmed',
+              observations: [
+                ...(result.entry.observations ?? []),
+                {
+                  source: 'self_report' as const,
+                  ref: `hearing:${record.session_id}`,
+                  observed_at: nowIso(),
+                },
+              ],
+            },
+            { mode: 'create' }
+          ),
+        undefined,
+        scope.tenant_slug
       );
 
       const patch: Partial<HearingRecordWithInventoryFields> = {
@@ -699,7 +728,7 @@ export function registerHearingRoutes(app: express.Express): void {
         entry_id: entry.entry_id,
         scope: entry.scope,
         steps: entry.steps.length,
-        next: buildWorkInventoryNextAction(locale),
+        next: buildWorkInventoryNextAction(locale, viewer),
       });
     } catch (error) {
       if (effectReserved) {

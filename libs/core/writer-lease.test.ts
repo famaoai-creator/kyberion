@@ -17,6 +17,8 @@ import {
   writerLeaseMetricsPath,
   withFencedWriterLease,
   withFencedWriterLeaseSync,
+  withWriterLeaseSnapshotSync,
+  writerLeaseResourceId,
 } from './writer-lease.js';
 
 const root = path.resolve(`active/shared/tmp/writer-lease-${process.pid}`);
@@ -28,6 +30,18 @@ afterEach(() => {
 });
 
 describe('withFencedWriterLease (PI-16)', () => {
+  it('reads a snapshot using the writer mutex without updating its fence or metrics', () => {
+    const resourceId = writerLeaseResourceId(leasePath);
+    withFencedWriterLeaseSync({ resourceId, ownerId: 'writer', leasePath, fn: () => undefined });
+    const before = String(safeReadFile(leasePath));
+    const metrics = getWriterLeaseMetrics(resourceId);
+    expect(withWriterLeaseSnapshotSync(leasePath, () => String(safeReadFile(leasePath)))).toBe(
+      before
+    );
+    expect(String(safeReadFile(leasePath))).toBe(before);
+    expect(getWriterLeaseMetrics(resourceId)).toEqual(metrics);
+  });
+
   it('increments the fence and releases an expired lease after a successful write', async () => {
     let clock = 1_000;
     const first = await withFencedWriterLease({

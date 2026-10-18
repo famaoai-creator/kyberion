@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" SessionStart"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude SessionStart"
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" UserPromptSubmit"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude UserPromptSubmit"
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" PreToolUse"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude PreToolUse"
           }
         ]
       },
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" PreToolUseShellDeny"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude PreToolUseShellDeny"
           }
         ]
       }
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" PostToolUse"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude PostToolUse"
           }
         ]
       }
@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" Stop"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude Stop"
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" SessionEnd"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude SessionEnd"
           }
         ]
       }
