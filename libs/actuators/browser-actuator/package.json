@@ -12,8 +12,8 @@
   "dependencies": {
     "@agent/core": "workspace:*",
     "@agent/shared-vision": "workspace:*",
-    "@playwright/test": "^1.63.0",
-    "chalk": "^6.0.0",
+    "@playwright/test": "^1.64.1",
+    "chalk": "^6.0.1",
     "yargs": "^17.7.3"
   }
 }

@@ -7644,11 +7644,11 @@
   "dependencies": {
     "@simplewebauthn/server": "^13.3.3",
     "axios": "^1.20.0",
-    "chalk": "^6.0.0",
+    "chalk": "^6.0.1",
     "fontkit": "^2.0.4",
-    "js-yaml": "^5.4.2",
-    "marked": "^18.0.14",
-    "openai": "^7.25.0",
+    "js-yaml": "^5.5.0",
+    "marked": "^18.1.1",
+    "openai": "^7.36.0",
     "web-push": "3.6.7",
     "yargs": "^18.2.0"
   },
