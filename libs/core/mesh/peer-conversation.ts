@@ -953,9 +953,12 @@ export function createPeerConversationResponder(
     if (message.tenant_id !== context.envelope.tenant_id) {
       throw new Error(`peer_conversation_tenant_mismatch:${message.session_id}`);
     }
-    // Sessions are keyed by (tenant, local peer, session id) only: a third
-    // peer holding the shared secret must not append into another pair's
-    // session (and so into a later auto-reply prompt). A new session is fine.
+    // Sessions are keyed by (tenant, local peer, session id) only, so this
+    // check stops cross-pair appends by peers that identify themselves
+    // honestly and accidental session-id reuse (keeping another pair's text
+    // out of a later auto-reply prompt). It is NOT authentication: the server
+    // verifies a single shared secret, so sender ids are self-asserted by any
+    // secret holder (see peer-network.md). A new session is fine.
     const existingSession = loadPeerConversationSession(
       responderTenantId,
       responderPeerId,
