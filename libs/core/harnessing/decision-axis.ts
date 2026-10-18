@@ -19,11 +19,17 @@ export interface DecisionReport {
   rationale: string;
   decisive_evidence: Array<{ label: string; delivered: boolean; metrics: Record<string, number> }>;
   auto_advance_allowed: boolean;
+  /** Declared metrics that resolved to null on every outcome — the axis
+   *  judged nothing with them, so the report must not imply it did. */
+  unresolved_metrics: string[];
 }
 
 function metricOf(outcome: RunOutcome, key: string): number | null {
   const v = (outcome as unknown as Record<string, unknown>)[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  // Array-typed fields (produced_files) resolve to their element count.
+  if (Array.isArray(v)) return v.length;
+  return null;
 }
 
 /** a dominates b: no-worse on every resolvable metric AND strictly-better on >=1. Empty metrics => false. */
