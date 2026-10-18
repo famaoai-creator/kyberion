@@ -9,9 +9,8 @@ import {
 const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
 
 /**
- * Keep the middleware decision on the same registered environment accessor as
- * the route guard. The accessor is edge-safe here because it has no Node-only
- * dependencies; using it also prevents this boundary from drifting in its
+ * Keep the proxy decision on the same registered environment accessor as
+ * the route guard. Using it prevents this boundary from drifting in its
  * accepted boolean spellings.
  */
 function isTrustProxyEnabled(): boolean {
@@ -36,13 +35,13 @@ function resolvePeerIp(request: NextRequest): string | undefined {
 
 /**
  * Keep the API surface closed before a route module is evaluated. The route
- * guard performs the full token/registry/role decision; this node-free
+ * guard performs the full token/registry/role decision; this request
  * boundary prevents accidental unguarded API routes and leaves /healthz as
  * the sole explicit public probe. Unauthenticated remote browser page
  * navigations are redirected to the shared OIDC /login page; API calls keep
  * returning 401 JSON and loopback is never redirected.
  */
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname;
   if (pathname === '/api/healthz') return NextResponse.next();
   const authorization = request.headers.get('authorization');
@@ -70,7 +69,7 @@ export function middleware(request: NextRequest): NextResponse {
       hasCredential: hasCredential && !staleSessionOnly,
     });
     if (redirect) {
-      // Next's middleware runtime rejects a bare relative Location ("Invalid URL");
+      // Next's proxy runtime rejects a bare relative Location ("Invalid URL");
       // resolve against the request URL like the other Next surfaces do.
       return NextResponse.redirect(new URL(redirect, request.url), 302);
     }

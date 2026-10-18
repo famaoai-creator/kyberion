@@ -25,7 +25,7 @@ export function isPwaAssetPath(pathname: string): boolean {
  * authorization decision: API routes (unchanged, JSON 401) verify the real
  * credential themselves, and loopback is never redirected.
  */
-export function middleware(req: NextRequest): NextResponse {
+export function proxy(req: NextRequest): NextResponse {
   const { pathname, search } = req.nextUrl;
   if (isSurfaceAuthPath(pathname) || PRE_AUTH_PAGES.has(pathname)) return NextResponse.next();
   // Installability assets are public and carry no data. A browser fetches the
@@ -52,8 +52,7 @@ export function middleware(req: NextRequest): NextResponse {
   return NextResponse.redirect(new URL(target, req.url), 302);
 }
 
-// Share the local adapter's process-only proof registry. Edge isolates cannot.
+// Proxy uses Node.js, sharing the local adapter's process-only proof registry.
 export const config = {
-  runtime: 'nodejs',
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
