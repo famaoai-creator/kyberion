@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createPeerMessagingServer } from './peer-messaging.js';
+import {
+  createPeerMessagingServer,
+  peerNetworkCatalogPath,
+  registerPeerNetworkPeer,
+} from './peer-messaging.js';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
-import { safeAppendFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeAppendFile, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
+  PEER_CATALOG_READER_ROLE,
   appendPeerConversationTranscript,
   buildPeerConversationEnvelope,
   clearPeerConversationRuntime,
@@ -192,6 +197,87 @@ describe('peer conversation', () => {
     expect(senderSession.related_work_item_ids).toContain('WIT-1');
     expect(receiverSession.related_work_item_ids).toContain('WIT-1');
     fetchSpy.mockRestore();
+  });
+});
+
+describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
+  const tenant = 'zz-peer-catalog-test';
+  const tenantRoot = pathResolver.knowledge(`confidential/${tenant}`);
+  const otherTenantRoot = pathResolver.knowledge('confidential/zz-peer-catalog-other');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearPeerConversationRuntime(tenant, 'peer-a-test');
+    clearPeerConversationRuntime(tenant, 'peer-b-test');
+    withExecutionContext('ecosystem_architect', () => {
+      safeRmSync(tenantRoot, { recursive: true, force: true });
+      safeRmSync(otherTenantRoot, { recursive: true, force: true });
+    });
+  });
+
+  function registerRecipient(tenantId: string): void {
+    withExecutionContext('sovereign_concierge', () =>
+      registerPeerNetworkPeer({
+        tenantId,
+        peerId: 'peer-b-test',
+        baseUrl: 'http://127.0.0.1:4556',
+        sharedSecret: SHARED_SECRET,
+        exposure: 'same_host',
+      })
+    );
+  }
+
+  it('sends through the tenant confidential catalog without a confidential caller role', async () => {
+    registerRecipient(tenant);
+    expect(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' })).toThrow();
+
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: tenant,
+      sharedSecret: SHARED_SECRET,
+      responder: createPeerConversationResponder({ peerId: 'peer-b-test', tenantId: tenant }),
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: any, init?: RequestInit) => {
+      const result = await server.processEnvelope(JSON.parse(String(init?.body || '{}')));
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    });
+
+    const outcome = await sendPeerConversationMessageToPeer({
+      senderPeerId: 'peer-a-test',
+      recipientPeerId: 'peer-b-test',
+      tenantId: tenant,
+      topic: 'handoff',
+      text: 'reachable?',
+      timeoutMs: 5000,
+    });
+    expect(outcome.receipt.ok).toBe(true);
+    expect(outcome.receipt.accepted).toBe(true);
+  });
+
+  it('grants only the bound tenant catalog and no other confidential file', () => {
+    registerRecipient(tenant);
+    registerRecipient('zz-peer-catalog-other');
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(`${tenantRoot}/locale.json`, JSON.stringify({ locale: 'ja' }))
+    );
+    const asReader = <T>(fn: () => T): T =>
+      withExecutionContext(PEER_CATALOG_READER_ROLE, fn, undefined, tenant);
+
+    expect(
+      asReader(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' }))
+    ).toContain('peer-b-test');
+    expect(() =>
+      asReader(() =>
+        safeReadFile(peerNetworkCatalogPath('zz-peer-catalog-other'), { encoding: 'utf8' })
+      )
+    ).toThrow();
+    expect(() =>
+      asReader(() => safeReadFile(`${tenantRoot}/locale.json`, { encoding: 'utf8' }))
+    ).toThrow();
+    expect(() => asReader(() => safeWriteFile(peerNetworkCatalogPath(tenant), '{}'))).toThrow();
   });
 });
 

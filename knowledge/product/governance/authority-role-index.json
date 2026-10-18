@@ -294,6 +294,14 @@
       "allowed_actuators": ["process-actuator"],
       "tier_access": ["confidential", "public"]
     },
+    "peer_catalog_reader": {
+      "description": "Least-privilege reader of a tenant's peer transport catalog (knowledge/confidential/<tenant>/connections/peer-network.json). libs/core/mesh/peer-conversation.ts assumes it, bound to the sending tenant, to resolve the recipient endpoint and HMAC secret, so peer senders whose role cannot read the confidential tier can still send; it grants that single file only and no write (persona worker).",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
       "default_persona": "qa_lead",
