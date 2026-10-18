@@ -70,11 +70,20 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
       exit_code: o.exit_code,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
-      error: outcomes
-        .map((x) => x.label)
-        .filter((l) => l.length >= 3)
-        .reduce((t, l) => t.split(l).join('[CANDIDATE]'), o.error)
-        .slice(0, 120),
+      error: (() => {
+        const mask = (t: string) =>
+          outcomes
+            .map((x) => x.label)
+            .filter((l) => l.length >= 2)
+            .reduce(
+              (acc, l) => acc.split(l).join('[CANDIDATE]'),
+              // Single-char labels: whole tokens only, or text gets garbled.
+              t.replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
+                outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
+              )
+            );
+        return mask(mask(o.error).slice(0, 120));
+      })(),
     });
   });
   return { seed, letterToLabel, labelToLetter, rows };

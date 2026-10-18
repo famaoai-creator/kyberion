@@ -267,8 +267,10 @@ export async function runRecursiveSession(
       if (
         resolvedNext === resolvedWinner ||
         resolvedNext.startsWith(`${resolvedWinner}${path.sep}`) ||
+        resolvedWinner.startsWith(`${resolvedNext}${path.sep}`) ||
         resolvedNext === resolvedCurrent ||
-        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`)
+        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`) ||
+        resolvedCurrent.startsWith(`${resolvedNext}${path.sep}`)
       ) {
         throw new Error('[RECURSIVE_SESSION] next base dir would nest inside its copy sources');
       }
