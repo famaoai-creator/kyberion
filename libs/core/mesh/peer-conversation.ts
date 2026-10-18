@@ -130,6 +130,12 @@ export interface SendPeerConversationMessageInput {
   ttlMs?: number;
   catalogPath?: string;
   timeoutMs?: number;
+  /**
+   * Stable message id for idempotent resends: used for both the outbound
+   * transcript entry and the peer envelope, so a retry is deduped by the
+   * recipient (`sender:message_id`) and recorded locally only once.
+   */
+  messageId?: string;
 }
 
 export interface CreatePeerConversationResponderOptions {
@@ -196,6 +202,14 @@ function normalizePeerId(peerId: string): string {
   const normalized = String(peerId || '').trim();
   if (!PEER_ID_PATTERN.test(normalized)) {
     throw new Error(`invalid_peer_conversation_peer_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+function normalizeMessageId(messageId: string): string {
+  const normalized = String(messageId || '').trim();
+  if (!SESSION_ID_PATTERN.test(normalized)) {
+    throw new Error(`invalid_peer_conversation_message_id:${normalized || 'missing'}`);
   }
   return normalized;
 }
@@ -750,6 +764,7 @@ export function buildPeerConversationEnvelope(input: {
   metadata?: Record<string, unknown>;
   replyToMessageId?: string;
   ttlMs?: number;
+  messageId?: string;
 }): PeerMessageEnvelope<PeerConversationMessagePayload> {
   return buildPeerMessageEnvelope<PeerConversationMessagePayload>({
     senderPeerId: input.senderPeerId,
@@ -775,6 +790,7 @@ export function buildPeerConversationEnvelope(input: {
     tenantId: input.tenantId,
     sharedSecret: input.sharedSecret,
     conversationId: input.sessionId,
+    ...(input.messageId ? { messageId: normalizeMessageId(input.messageId) } : {}),
     ...(input.replyToMessageId ? { replyToMessageId: input.replyToMessageId } : {}),
     ...(typeof input.ttlMs === 'number' ? { ttlMs: input.ttlMs } : {}),
   });
@@ -816,22 +832,36 @@ export async function sendPeerConversationMessageToPeer(
   const catalog = loadSenderPeerCatalog(input);
   const target = resolvePeerDispatchTarget(input.recipientPeerId, catalog);
   const sessionId = input.sessionId || randomId('PCS');
-  const localSession = appendPeerConversationTranscript({
-    tenantId: input.tenantId,
-    sessionId,
-    localPeerId: input.senderPeerId,
-    remotePeerId: input.recipientPeerId,
-    kind: input.messageKind || 'message',
-    direction: 'outbound',
-    text: input.text,
-    relatedWorkItemIds: input.relatedWorkItemIds,
-    metadata: input.metadata,
-    replyToMessageId: input.replyToMessageId,
-    payload: {
-      topic: input.topic,
-      title: input.title || defaultSessionTitle(input.topic, input.recipientPeerId),
-    },
-  });
+  const messageId = input.messageId ? normalizeMessageId(input.messageId) : undefined;
+  // Idempotent resend: an outbound entry already recorded under this
+  // message id is kept as-is instead of being appended a second time.
+  const recordedSession = messageId
+    ? loadPeerConversationSession(input.tenantId, input.senderPeerId, sessionId)
+    : null;
+  const alreadyRecorded = Boolean(
+    recordedSession?.transcript.some(
+      (entry) => entry.message_id === messageId && entry.direction === 'outbound'
+    )
+  );
+  const localSession = alreadyRecorded
+    ? recordedSession!
+    : appendPeerConversationTranscript({
+        tenantId: input.tenantId,
+        sessionId,
+        localPeerId: input.senderPeerId,
+        remotePeerId: input.recipientPeerId,
+        kind: input.messageKind || 'message',
+        direction: 'outbound',
+        text: input.text,
+        relatedWorkItemIds: input.relatedWorkItemIds,
+        metadata: input.metadata,
+        replyToMessageId: input.replyToMessageId,
+        payload: {
+          topic: input.topic,
+          title: input.title || defaultSessionTitle(input.topic, input.recipientPeerId),
+        },
+        ...(messageId ? { messageId } : {}),
+      });
 
   const envelope = buildPeerConversationEnvelope({
     tenantId: input.tenantId,
@@ -846,6 +876,7 @@ export async function sendPeerConversationMessageToPeer(
     metadata: input.metadata,
     replyToMessageId: input.replyToMessageId,
     ttlMs: input.ttlMs,
+    ...(messageId ? { messageId } : {}),
   });
 
   const receipt = await sendPeerMessage(envelope, {
