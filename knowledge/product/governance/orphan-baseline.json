@@ -66,16 +66,16 @@
     {
       "id": "libs/core/intent/intent-resolution-eval.ts",
       "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance \u2192 selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md \u00a74.3; no production module calls it."
-    },
-    {
-      "path": "scripts/contrastive_probe.ts",
-      "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; wired via defineScript entry and invoked by hand until a pipeline wraps it."
     }
   ],
   "scripts": [
     {
       "id": "scripts/dev_oidc_idp.ts",
       "reason": "Operator-run local dev tool: a loopback-only throw-away OIDC IdP for trying the surface /login flow without a Google or Entra client. Started by hand per docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md (no package script, to stay under the SX-05 script ratchet); unit-tested by scripts/dev_oidc_idp.test.ts."
+    },
+    {
+      "id": "scripts/contrastive_probe.ts",
+      "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it \u2014 unit-tested via libs/core/harnessing tests."
     }
   ],
   "pipelines": [],
