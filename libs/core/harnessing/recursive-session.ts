@@ -122,10 +122,18 @@ export async function runRecursiveSession(
   }
   // Predict proposed labels and reject collisions before spending backend calls.
   if (spec.propose) {
-    const predicted = Array.from(
-      { length: spec.propose.count },
-      (_, i) => `${spec.propose!.labelPrefix ?? 'llm'}${i + 1}`
-    );
+    if (
+      !Number.isInteger(spec.propose.count) ||
+      spec.propose.count < 1 ||
+      spec.propose.count > 10
+    ) {
+      throw new Error('[RECURSIVE_SESSION] propose.count must be an integer 1..10');
+    }
+    const prefix = spec.propose.labelPrefix ?? 'llm';
+    if (!/^[A-Za-z0-9_-]*$/.test(prefix)) {
+      throw new Error('[RECURSIVE_SESSION] invalid propose.labelPrefix charset');
+    }
+    const predicted = Array.from({ length: spec.propose.count }, (_, i) => `${prefix}${i + 1}`);
     const all = [...labels, ...predicted];
     if (new Set(all).size !== all.length) {
       throw new Error('[RECURSIVE_SESSION] supplied label collides with predicted proposed labels');
@@ -167,8 +175,12 @@ export async function runRecursiveSession(
     let roundProposeMeta: RoundRecord['propose_meta'];
     const candidates = [...supplied];
     if (spec.propose && spec.surface) {
+      const roundBrief =
+        adopted.length || round > 1
+          ? `${spec.propose.brief} (round ${round} of ${spec.rounds}; adopted so far: ${adopted.join(', ') || 'none'})`
+          : spec.propose.brief;
       const proposed = await proposeCandidates({
-        brief: spec.propose.brief,
+        brief: roundBrief,
         surface: spec.surface,
         count: spec.propose.count,
         outDir: path.join(roundRoot, '_proposed'),
@@ -229,6 +241,8 @@ export async function runRecursiveSession(
       spec.selection === 'blind' && decision.decision === 'human_gate'
         ? applyBlindSelection(
             [base, ...outcomes],
+            // Per-round variation: +round makes each round's letter mapping
+            // differ — deliberate, unlike the single-shot session's raw seed.
             (spec.seed ?? sessionHash(spec.session_id)) + round,
             spec.selector ?? metricsFallbackSelector
           )
@@ -283,6 +297,9 @@ export async function runRecursiveSession(
     rounds,
     final_decision: finalDecision,
     adopted_overlays: adopted,
+    scenario_dir: spec.scenarioDir,
+    command: spec.command,
+    declared_rounds: spec.rounds,
     halted_by: halted,
     budget,
     ...(spec.work_shape ? { work_shape: spec.work_shape } : {}),
