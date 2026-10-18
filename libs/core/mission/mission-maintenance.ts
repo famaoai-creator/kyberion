@@ -124,16 +124,6 @@ export function loadMissionFlightRecorderAtPath(filePath: string): MissionFlight
   return missionFlightRecorderCatalogAtPath(safeFilePath).load();
 }
 
-function isPathInside(parent: string, candidate: string): boolean {
-  const relative = path.relative(parent, candidate);
-  return (
-    relative !== '' &&
-    relative !== '..' &&
-    !relative.startsWith(`..${path.sep}`) &&
-    !path.isAbsolute(relative)
-  );
-}
-
 function resolveApprovalActor(requestedBy?: string): string {
   const resolvedActor =
     getRegisteredEnvText('KYBERION_PERSONA') ||
@@ -914,7 +904,8 @@ export async function recordEvidence(args: {
       const rel = String(task?.deliverable || '');
       if (!rel) return null;
       const candidate = path.resolve(missionPath, rel);
-      if (!isPathInside(missionPath, candidate) || !safeExistsSync(candidate)) return null;
+      if (!pathResolver.isPathInside(missionPath, candidate) || !safeExistsSync(candidate))
+        return null;
       return { rel, mtime: new Date(safeStat(candidate).mtimeMs).toISOString() };
     } catch {
       return null;
@@ -1065,7 +1056,7 @@ export async function recordArtifactReview(args: {
     throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
   }
   const artifactCandidate = path.resolve(missionPath, deliverable);
-  if (!isPathInside(missionPath, artifactCandidate)) {
+  if (!pathResolver.isPathInside(missionPath, artifactCandidate)) {
     throw new Error(`Reviewed artifact must remain inside the mission directory: ${deliverable}`);
   }
   const artifactPath = assertSafeRepositoryPath(artifactCandidate, { allowMissingLeaf: false });
