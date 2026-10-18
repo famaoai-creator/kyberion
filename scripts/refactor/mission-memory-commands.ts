@@ -103,6 +103,15 @@ export function showMemoryReview(
   print(`Tier: ${candidate.sensitivity_tier}`);
   print(`Scope: ${candidate.scope?.tenant_slug || 'legacy/global'}`);
   print(`Ratification required: ${review.approval_required ? 'yes' : 'no'}`);
+  if (candidate.distill_experience) {
+    print(
+      `Distilled lesson: confidence=${candidate.distill_experience.confidence} | cue: ${candidate.distill_experience.cue}`
+    );
+    print(`  lesson: ${candidate.distill_experience.lesson}`);
+    print(`  evidence: ${candidate.distill_experience.evidence}`);
+  } else if (candidate.distill_experience_declined === true) {
+    print('Distilled lesson: declined (no evidence-backed lesson emitted)');
+  }
   print(`Physical records: ${review.physical_record_count}`);
   print(
     `Audit: ${review.audit.status}${review.audit.audit_id ? ` (${review.audit.audit_id})` : ''}`

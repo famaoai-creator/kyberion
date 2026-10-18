@@ -9,13 +9,21 @@
     "title_suffix": { "type": "string", "minLength": 1 },
     "section_titles": {
       "type": "object",
-      "required": ["summary", "key_learnings", "patterns_discovered", "failures_and_recoveries", "reusable_artifacts"],
+      "required": [
+        "summary",
+        "key_learnings",
+        "patterns_discovered",
+        "failures_and_recoveries",
+        "reusable_artifacts"
+      ],
       "properties": {
         "summary": { "type": "string", "minLength": 1 },
         "key_learnings": { "type": "string", "minLength": 1 },
         "patterns_discovered": { "type": "string", "minLength": 1 },
         "failures_and_recoveries": { "type": "string", "minLength": 1 },
-        "reusable_artifacts": { "type": "string", "minLength": 1 }
+        "reusable_artifacts": { "type": "string", "minLength": 1 },
+        "change_attribution": { "type": "string", "minLength": 1 },
+        "transferable_lesson": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
