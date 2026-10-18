@@ -41,6 +41,7 @@ import {
   loadMissionNextTaskObjectsAtPath,
   validateMissionNextTaskObjects,
 } from './mission-next-task-reader.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 
 const DELIVERY_PACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/delivery-pack.schema.json'
@@ -408,7 +409,13 @@ export function writeMissionNextTasks(
 ): void {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   const validated = validateMissionNextTaskObjects(tasks, nextTasksPath);
-  safeWriteFile(nextTasksPath, JSON.stringify(validated, null, 2));
+  writeProvisionedJson({
+    missionId: path.basename(safeMissionDir(missionDir, true)),
+    filePath: nextTasksPath,
+    targetPath: 'NEXT_TASKS.json',
+    missionPathHint: missionDir,
+    provisioned: provisionMissionEntry(validated),
+  });
 }
 
 export const MISSION_TASK_COMPLETED_STATUSES = new Set([
