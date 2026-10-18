@@ -20,19 +20,20 @@ write mission evidence, or project lifecycle commands.
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                          | Section |
-| ----------------------------- | --------------------------------------------------------------------- | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                   | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists    | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                       | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                        | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)       | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                       | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
-| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
-| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
-| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias` | §10     |
-| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes       | §11     |
+| Class                         | Gate / check                                                                    | Section |
+| ----------------------------- | ------------------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                             | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists              | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                                 | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                                  | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)                 | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                                 | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)              | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts`           | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                           | §9      |
+| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`           | §10     |
+| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                 | §11     |
+| CLI hook continuation loops   | `scripts/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
 
 ---
 
@@ -1337,6 +1338,23 @@ and late evidence, clock-skew recovery, an append during a wake, persisted
 consumption, tenant separation, circuit/backoff, goal satisfaction, measurement
 repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
 admission/recovery, digest/recovery and inbox suites when changing this path.
+
+## §14 CLI hook continuation loops
+
+**Rule.** A coordination notification must not start another model turn or reply to itself.
+`Stop` is telemetry only; never emit review instructions or `decision: block` there.
+Exit immediately when `stop_hook_active` is true. Release leases on `SessionEnd`, not per-turn Stop.
+
+**Procedure.** Pull handoffs at session start, user input, and supported tool-completion boundaries.
+Persist notification receipts per participant under the existing Co-Session store, serialize receipt
+updates across hook processes, and keep ack an explicit agent action. Preserve unrelated user hooks
+when regenerating wiring. Do not change hook trust records or invoke an LLM from a hook.
+
+**Gate.** `scripts/codex_cli_hook.test.ts` exercises repeated tool events, own-message filtering,
+separate CLI instances, bounded batches, Stop silence and SessionEnd release.
+`libs/core/provider/co-session-hook.test.ts` checks interleaved hook delivery;
+`libs/core/provider/claude-code-hook.test.ts` checks recursive Stop silence;
+`scripts/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
 
 ## Hearing completion read recovery
 
