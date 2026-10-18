@@ -701,3 +701,49 @@ describe.each(['mission', 'inventory'] as const)('%s completion uncertainty reco
     }
   );
 });
+
+describe('selected-scope prewrite handoff rejection', () => {
+  it.each(['hearing_inventory_project_unsupported', 'hearing_scope_unavailable'])(
+    'explains %s while retaining answers and selection without an unknown guard or resend',
+    async (code) => {
+      const storage = new Map([['kyberion.ask.session_id', SESSION]]);
+      const query =
+        '?mode=hearing&scenario=work_inventory&tenant=alpha&organizationId=org-a&projectId=project-a';
+      const record = {
+        session_id: SESSION,
+        scenario: 'work_inventory',
+        requirements: [{ answer: 'Retained selected-scope answer' }],
+        decided_at: '2026-10-18T07:00:00Z',
+        handoff_snapshot: { version: 1, token: 'e'.repeat(64) },
+      };
+      const options = {
+        storage,
+        query,
+        hearing: async (_url: string, init?: { method?: string }) =>
+          init?.method === 'POST'
+            ? response({ ok: false, hearing_scope_error: code }, 400)
+            : response({ ok: true, record }),
+      };
+      const h = harness(options);
+      await flush();
+      h.input.value = 'Retained unsent correction';
+      const originalUrl = h.window.location.href;
+      click(h);
+      await flush();
+      expect(posts(h)).toHaveLength(1);
+      expect(posts(h)[0][0]).toContain('organizationId=org-a&projectId=project-a');
+      expect(storage.has(KEY)).toBe(false);
+      expect(h.elements.get('hearing-handoff-status')!.textContent).toBe('front_desk:' + code);
+      expect(h.elements.get('hearing-completion-status')!.hidden).toBe(true);
+      expect(h.input.value).toBe('Retained unsent correction');
+      expect(h.window.location.href).toBe(originalUrl);
+      expect(h.window.history.replaceState).not.toHaveBeenCalled();
+      const restored = harness(options);
+      await flush();
+      expect(posts(restored)).toHaveLength(0);
+      expect(restored.storage.has(KEY)).toBe(false);
+      expect(restored.window.location.href).toBe(originalUrl);
+      expect(restored.elements.get('hearing-handoff')!.disabled).toBe(false);
+    }
+  );
+});

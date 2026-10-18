@@ -26723,6 +26723,16 @@
         "en": "A saved destination is available. This does not confirm the latest handoff attempt.",
         "ja": "保存済みの引き継ぎ先があります。直前の引き継ぎ操作の完了を示すものではありません。",
         "qps-ploc": "⟦Ȧ şȧṽėḓ ḓėşŧïñȧŧïőñ ïş ȧṽȧïŀȧƀŀė. Ŧħïş ḓőėş ñőŧ ƈőñƒïřɱ ŧħė ŀȧŧėşŧ ħȧñḓőƒƒ ȧŧŧėɱṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "hearing_inventory_project_unsupported": {
+        "en": "Project-level work inventory is not supported yet. Your answers are kept. To save at organization level, clear the project selection yourself and review the scope before confirming again.",
+        "ja": "作業台帳はプロジェクト単位の登録にまだ対応していません。回答は保持されています。組織単位で登録する場合は、ご自身でプロジェクトの選択を外し、対象範囲を確認してから再度登録してください。",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ-ŀėṽėŀ ẇőřķ ïñṽėñŧőřẏ ïş ñőŧ şůṗṗőřŧėḓ ẏėŧ. Ẏőůř ȧñşẇėřş ȧřė ķėṗŧ. Ŧő şȧṽė ȧŧ őřɠȧñïẑȧŧïőñ ŀėṽėŀ, ƈŀėȧř ŧħė ṗřőĵėƈŧ şėŀėƈŧïőñ ẏőůřşėŀƒ ȧñḓ řėṽïėẇ ŧħė şƈőṗė ƀėƒőřė ƈőñƒïřɱïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "hearing_scope_unavailable": {
+        "en": "This destination is unavailable in the selected scope. Check the tenant, organization, and project selection before confirming again. Your answers are kept.",
+        "ja": "選択した範囲では登録先を利用できません。テナント・組織・プロジェクトの選択を確認してから、再度登録してください。回答は保持されています。",
+        "qps-ploc": "⟦Ŧħïş ḓėşŧïñȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė ïñ ŧħė şėŀėƈŧėḓ şƈőṗė. Ƈħėƈķ ŧħė ŧėñȧñŧ, őřɠȧñïẑȧŧïőñ, ȧñḓ ṗřőĵėƈŧ şėŀėƈŧïőñ ƀėƒőřė ƈőñƒïřɱïñɠ ȧɠȧïñ. Ẏőůř ȧñşẇėřş ȧřė ķėṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
       }
     },
     "operator": {
