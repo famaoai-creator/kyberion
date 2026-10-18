@@ -219,6 +219,7 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
     .filter(
       (item) =>
         item.status === 'ready' &&
+        !item.metadata?.continuous_work &&
         !item.lease_id &&
         addressedTo(c, item) &&
         !activeTerminalResult(terminal, item) &&
@@ -536,6 +537,15 @@ export async function executeDotWorkItem(
   const startedAt = nowOf(deps).toISOString();
   const actionRef = meta(item, 'action_ref') ?? item.item_id;
   const actor = actorOf(c);
+  if (item.metadata?.continuous_work) {
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      'Managed continuous work requires the governed owner surface',
+      deps
+    );
+  }
   if (denyCrossTenantItem(c, item, deps)) {
     return skippedRow(c, item, startedAt, DOT_EXECUTOR_CROSS_TENANT_DENIAL, deps);
   }

@@ -70,6 +70,8 @@ describe('actuator-op-registry', () => {
       'capture_avatar_photo',
       'generate_avatar',
       'grant_voice_consent',
+      'continuous_operations',
+      'continuous_operations_report',
       'organization_operation_tick',
       'organization_record_run',
       'programmatic_tool_call',
@@ -102,7 +104,7 @@ describe('actuator-op-registry', () => {
     ];
     expect(captureOps).toHaveLength(12);
     expect(transformOps).toHaveLength(3);
-    expect(applyOps).toHaveLength(33);
+    expect(applyOps).toHaveLength(35);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
     for (const op of transformOps) expect(determineActuatorStepType('core', op)).toBe('transform');
     for (const op of applyOps) expect(determineActuatorStepType('core', op)).toBe('apply');
@@ -111,7 +113,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(48);
+    ]).toHaveLength(50);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {

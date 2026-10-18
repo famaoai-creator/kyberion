@@ -1,4 +1,8 @@
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
+import {
+  CONTINUOUS_MANAGED_WORK_PIPELINE,
+  parseContinuousWorkPlan,
+} from '../organization/continuous-work-plan.js';
 import { reconcileAdmittedDotAction } from './dot-admission-reconciliation.js';
 import { composeDotDigestText, dotCharterTimezone } from './dot-digest-composition.js';
 import { dotWorkItemInput } from './dot-work-item.js';
@@ -178,7 +182,12 @@ export interface DotDispatchDeps {
       charter: DotCharter;
       proposal: Pick<
         DotProposal,
-        'action_id' | 'work_shape' | 'handoff_to' | 'pipeline_ref' | 'front_desk_execution'
+        | 'action_id'
+        | 'work_shape'
+        | 'handoff_to'
+        | 'pipeline_ref'
+        | 'front_desk_execution'
+        | 'continuous_work'
       >;
     }
   ) => void;
@@ -260,6 +269,16 @@ function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
     deps.countOpenWorkItems ?? ((dotId: string) => defaultCountOpenWorkItems(dotId, deps.rootDir));
   return count(charter.dot_id) + parked;
 }
+/** Current admission capacity, shared by preflight and the enforced dispatch bound. */
+export function dotDelegationCapacity(
+  charter: DotCharter,
+  deps: DotDispatchDeps = {}
+): { cap: number; open: number; free: number } {
+  const cap =
+    charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
+  const open = openDelegations(charter, deps);
+  return { cap, open, free: Math.max(0, cap - open) };
+}
 
 /**
  * The charter bounds, phrased for the wake prompt, so the dot proposes inside
@@ -268,9 +287,7 @@ function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
 export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
   const shapes = effectiveDotWorkShapes(charter, deps);
   const pipelines = charter.authority.allowed_pipelines ?? [];
-  const cap =
-    charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
-  const free = Math.max(0, cap - openDelegations(charter, deps));
+  const { cap, free } = dotDelegationCapacity(charter, deps);
   const partners = (deps.listCharters?.() ?? defaultListCharters(deps))
     .filter(
       (other) =>
@@ -364,10 +381,36 @@ function checkDotProposalScope(
   charter: DotCharter,
   proposal: Pick<
     DotProposal,
-    'action_id' | 'work_shape' | 'handoff_to' | 'pipeline_ref' | 'front_desk_execution'
+    | 'action_id'
+    | 'work_shape'
+    | 'handoff_to'
+    | 'pipeline_ref'
+    | 'front_desk_execution'
+    | 'continuous_work'
   >,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
+  if (proposal.continuous_work) {
+    try {
+      parseContinuousWorkPlan(proposal.continuous_work);
+    } catch (error) {
+      return { ok: false, reason: String(error) };
+    }
+    if (
+      !charter.scope.organization_id ||
+      proposal.work_shape !== 'pipeline' ||
+      proposal.pipeline_ref !== CONTINUOUS_MANAGED_WORK_PIPELINE ||
+      !(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_MANAGED_WORK_PIPELINE) ||
+      proposal.handoff_to ||
+      proposal.front_desk_execution
+    ) {
+      return {
+        ok: false,
+        reason:
+          'Continuous managed work requires an organization and the explicitly allowed owner pipeline without handoff',
+      };
+    }
+  }
   if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
     return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
   }
@@ -435,9 +478,7 @@ export function checkDotProposalBounds(
 ): DotBoundsVerdict {
   const scope = checkDotProposalScope(charter, proposal, deps);
   if (scope.ok === false) return scope;
-  const cap =
-    charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
-  const open = openDelegations(charter, deps);
+  const { cap, open } = dotDelegationCapacity(charter, deps);
   if (open >= cap) {
     return {
       ok: false,
@@ -457,6 +498,7 @@ export function evaluateDotProposalGate(
   // Floors that can never be relaxed: charter default, the dot's own request,
   // and every registered floor contributor.
   const hardFloor = strictest(
+    proposal.continuous_work ? 'approve' : undefined,
     charter.decisions?.default_decision,
     proposal.requested_decision,
     ...DOT_FLOOR_CONTRIBUTORS.map((contributor) => {
@@ -1026,6 +1068,7 @@ function dispatchDotProposalsUnlocked(
       ...(proposal.priority ? { priority: proposal.priority } : {}),
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
       ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
+      ...(proposal.continuous_work ? { continuous_work: proposal.continuous_work } : {}),
       ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
       ...(proposal.target ? { target: proposal.target } : {}),
       ...(proposal.intent ? { intent: proposal.intent } : {}),
@@ -1092,6 +1135,12 @@ function dispatchDotProposalsUnlocked(
         continue;
       }
       let accountability: RouteAutonomousDecisionInput['accountability'];
+      if (proposal.continuous_work) {
+        accountability = {
+          payloadHash: identity!.admission!.semantic_hash,
+          effectBinding: `continuous-work:${base.action_ref}`,
+        };
+      }
       if (
         isFrontDeskDiagnosticDot(charter) ||
         hasFirstJobDiagnosticProvenance(proposal.front_desk_execution)
@@ -1100,7 +1149,7 @@ function dispatchDotProposalsUnlocked(
         const effect = firstJobApprovalEffect(charter, proposal.front_desk_execution);
         accountability = { payloadHash: effect.payloadHash, effectBinding: effect.effectBinding };
       }
-      const question = `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`;
+      const question = `${charter.title} proposes: ${proposal.title} — ${proposal.continuous_work ? proposal.objective : proposal.objective.slice(0, 500)}`;
       const routed = (deps.route ?? routeAutonomousDecision)({
         role: GOVERNED_STORE_ROLE,
         gate,
@@ -1110,7 +1159,7 @@ function dispatchDotProposalsUnlocked(
         requestedBy: actor,
         source: { agentId: actor },
         ...(accountability ? { accountability } : {}),
-        dedupeKey: `${charter.dot_id}-${hash}`,
+        dedupeKey: `${charter.dot_id}-${hash}${proposal.continuous_work ? '-' + base.action_ref : ''}`,
         notificationRoute: dotNotificationRoute(charter),
         quietHours: dotQuietHours(charter),
         ...(charter.scope.tenant_slug
