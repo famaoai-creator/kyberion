@@ -27,6 +27,7 @@ import {
 import { loadHearingRecord, saveHearingRecord, updateHearingRecord } from './hearing-runtime.js';
 import { registerHearingRoutes } from './hearing-routes.js';
 import * as security from './security.js';
+import { harness, response as clientResponse, flush } from './ask-client-test-harness.js';
 
 type Handler = (req: unknown, res: unknown) => unknown;
 type RequestInput = {
@@ -257,6 +258,48 @@ describe('hearing decision receipt HTTP contract', () => {
       decision_receipt: { status: 'current', receipt: record.decision_receipts?.[0] },
     });
     expect(proof.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('recovers a lost POST response through the actual durable routes and browser client', async () => {
+    const storage = new Map([['kyberion.ask.session_id', session]]);
+    let posts = 0;
+    const h = harness({
+      storage,
+      query: '?mode=hearing&tenant=' + tenant,
+      hearing: async (url, init) => {
+        const parsed = new URL(url, 'http://localhost');
+        const query = Object.fromEntries(parsed.searchParams);
+        if (init?.method === 'POST') {
+          posts += 1;
+          const result = decide(JSON.parse(init.body!));
+          expect(result.statusCode).toBe(200);
+          throw new Error('Response lost after durable commit');
+        }
+        const operationId = parsed.pathname.split('/decision-receipts/')[1];
+        const result = operationId
+          ? callRoute('GET /api/hearing/:session/decision-receipts/:operation', {
+              params: { session, operation: operationId },
+              query,
+            })
+          : callRoute('GET /api/hearing/:session', { params: { session }, query });
+        return clientResponse(result.body, result.statusCode);
+      },
+    });
+    await flush();
+    h.elements.get('hearing-decide')!.fire('click');
+    await flush();
+    const key = 'kyberion.ask.hearing.decision.' + session;
+    expect(storage.has(key)).toBe(true);
+    const before = bytes();
+    h.elements.get('hearing-decision-check')!.fire('click');
+    await flush();
+    expect(storage.has(key)).toBe(false);
+    expect(h.elements.get('hearing-handoff')!.disabled).toBe(false);
+    expect(h.elements.get('hearing-decision-text')!.textContent).toBe(
+      'front_desk:hearing_decision_recovered'
+    );
+    expect(posts).toBe(1);
+    expect(bytes()).toBe(before);
   });
 
   it('replays duplicate POSTs and exact GETs without a record write or revision bump', () => {

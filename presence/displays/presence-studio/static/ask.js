@@ -271,6 +271,7 @@
       isWorkInventoryScenario: isWorkInventoryScenario,
       hearingBlocked: hearingBlocked,
       hearingRecovery: hearingRecovery,
+      fetchReadJson: fetchReadJson,
       fetchJson: fetchJson,
       renderHearing: renderHearing,
       render: render,

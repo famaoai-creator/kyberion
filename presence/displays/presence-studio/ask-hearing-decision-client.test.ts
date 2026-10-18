@@ -1,9 +1,12 @@
+import { humanActor } from '@agent/core/actor';
 import { ASK_VOCABULARY_KEYS } from './front-desk-pages.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { harness, response, flush, deferred } from './ask-client-test-harness.js';
 const SESSION = 'decision-session';
 const KEY = 'kyberion.ask.hearing.decision.' + SESSION;
 const record = {
+  requirements_revision: 4,
+  record_revision: 5,
   session_id: SESSION,
   scenario: 'web_app_build',
   requirements: [{ id: 'goal', label_key: 'goal', confidence: 1, answer: 'Private answer' }],
@@ -12,7 +15,7 @@ const record = {
 };
 const decided = {
   ...record,
-  decided_by: { kind: 'human', id: 'MEMBER-1', role: 'owner' },
+  decided_by: { ...humanActor('member-1'), role: 'owner' },
   decided_at: '2026-10-17T00:00:00Z',
 };
 function setup(
@@ -22,8 +25,37 @@ function setup(
   return harness({
     storage,
     query: '?mode=hearing&tenant=alpha&organizationId=org-a&projectId=project-a',
-    hearing: async (_url, init) =>
-      init?.method === 'POST' ? post() : response({ ok: true, record }),
+    hearing: async (_url, init) => {
+      if (init?.method !== 'POST') return response({ ok: true, record });
+      const result = await post();
+      const body = await result.json();
+      const operation = JSON.parse(init.body!);
+      // Successful fixtures mirror the exact receipt now returned by the server.
+      return response(
+        body && typeof body === 'object' && 'record' in body
+          ? {
+              ...body,
+              decision_receipt: {
+                status: 'current',
+                receipt: {
+                  operation,
+                  identity: {
+                    principal_id: 'human:test',
+                    scope_key: 'alpha',
+                    member_id: 'member-1',
+                    source: 'loopback',
+                  },
+                  namespace: 'alpha',
+                  session_id: SESSION,
+                  record_revision: 5,
+                  decided_at: decided.decided_at,
+                },
+              },
+            }
+          : body,
+        result.status
+      );
+    },
   });
 }
 const click = (h: ReturnType<typeof setup>) => h.elements.get('hearing-decide')!.fire('click');
@@ -297,7 +329,7 @@ it('does not treat a restored completed destination as this decision receipt', a
   await flush();
   expect(h.elements.get('hearing-handoff-link')!.attributes.href).toContain('/review');
   expect(h.elements.get('hearing-decision-text')!.textContent).toBe(
-    'front_desk:hearing_decision_unknown'
+    'front_desk:hearing_decision_scope'
   );
   expect(h.elements.get('ask-send')!.disabled).toBe(true);
   expect(h.storage.has(KEY)).toBe(true);
@@ -350,7 +382,7 @@ it('blocks work inventory save while decide is unresolved', async () => {
 
 it.each([
   null,
-  { kind: 'human', id: 'MEMBER-1', role: 'viewer' },
+  { kind: 'human', id: 'member-1', role: 'viewer' },
   { kind: 'agent', id: 'AGENT-1', role: 'owner' },
   { kind: 'human', id: '', role: 'owner' },
 ])('retains unknown for invalid decision actor %#', async (actor) => {
@@ -396,7 +428,19 @@ it('ignores a hidden decide handler on an already decided record', async () => {
 });
 
 it('registers every decision status in the real ask vocabulary', () => {
-  for (const suffix of ['pending', 'unknown', 'storage', 'rejected', 'continue'])
+  for (const suffix of [
+    'pending',
+    'unknown',
+    'storage',
+    'rejected',
+    'continue',
+    'check',
+    'checking',
+    'recovered',
+    'superseded',
+    'legacy',
+    'scope',
+  ])
     expect(ASK_VOCABULARY_KEYS).toContain('front_desk:hearing_decision_' + suffix);
 });
 
