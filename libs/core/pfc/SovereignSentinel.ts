@@ -1,26 +1,34 @@
-import { PfcController, Layer } from './PfcController.js';
+import { PfcController, Layer, LayerObservation, LayerRunOptions } from './PfcController.js';
 
 export interface LayerDefinition {
   layer: Layer;
-  logic: () => Promise<boolean>;
+  logic: () => Promise<boolean | LayerObservation>;
 }
 
 export interface SentinelResult {
   success: boolean;
   failedLayer?: Layer;
   circuitBroken: boolean;
+  deferred?: true;
 }
 
 export class SovereignSentinel {
   private controller: PfcController;
-  private registry: Map<Layer, () => Promise<boolean>> = new Map();
+  private registry: Map<
+    Layer,
+    { logic: () => Promise<boolean | LayerObservation>; options: LayerRunOptions }
+  > = new Map();
 
   constructor(stateFilePath: string) {
     this.controller = new PfcController(stateFilePath);
   }
 
-  public registerLayer(layer: Layer, logic: () => Promise<boolean>) {
-    this.registry.set(layer, logic);
+  public registerLayer(
+    layer: Layer,
+    logic: () => Promise<boolean | LayerObservation>,
+    options: LayerRunOptions = {}
+  ) {
+    this.registry.set(layer, { logic, options });
   }
 
   public async run(): Promise<SentinelResult> {
@@ -45,14 +53,15 @@ export class SovereignSentinel {
 
     for (const layer of ORDER) {
       if (this.registry.has(layer)) {
-        const logic = this.registry.get(layer)!;
-        const result = await this.controller.runLayer(layer, logic);
+        const { logic, options } = this.registry.get(layer)!;
+        const result = await this.controller.runLayer(layer, logic, options);
 
         if (!result.passed) {
           return {
             success: false,
             failedLayer: layer,
             circuitBroken: result.circuit_broken,
+            ...(result.deferred ? { deferred: true as const } : {}),
           };
         }
       }

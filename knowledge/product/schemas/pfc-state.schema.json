@@ -13,8 +13,78 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "status": { "type": "string", "enum": ["pending", "passed", "failed"] },
-            "attempt_count": { "type": "integer", "minimum": 0 }
+            "status": {
+              "type": "string",
+              "enum": ["pending", "passed", "failed"]
+            },
+            "attempt_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "budget_source": {
+              "const": "recovery"
+            },
+            "legacy_observation_attempt_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "last_observation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "passed": {
+                  "type": "boolean"
+                },
+                "deferred": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "maxItems": 25
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              },
+              "required": ["passed", "timestamp"]
+            },
+            "last_recovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "passed": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "timestamp": {
+                  "type": "string"
+                },
+                "restored": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["id", "passed", "timestamp"]
+            }
           },
           "required": ["status", "attempt_count"]
         }
