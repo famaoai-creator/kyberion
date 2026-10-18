@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Bootstrap must work before package dist exists: every import is source-relative.
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { createLogger } from '../libs/core/logger.js';
 import { withCompilerOutputs } from '../libs/core/build-coordination.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';
@@ -55,13 +56,32 @@ export interface BuildStageRuntime {
   offSignal(signal: 'SIGINT' | 'SIGTERM', handler: () => void): void;
   signalGroup(pid: number, signal: NodeJS.Signals): void;
   windows: boolean;
+  packageManagerEntrypoint?: string;
 }
 
-export function resolveBuildCommand(stage: BuildStage, windows: boolean): BuildStage {
+export function resolveBuildCommand(
+  stage: BuildStage,
+  windows: boolean,
+  packageManagerEntrypoint?: string
+): BuildStage {
   if (!windows || stage.command !== 'pnpm') return stage;
-  // Windows cannot exec a .cmd shim with shell:false. Use pnpm's native
-  // executable so the build works with both standalone pnpm and Node installs.
-  return { ...stage, command: 'pnpm.exe' };
+  // Windows cannot exec a .cmd shim with shell:false, and npm-installed pnpm
+  // exposes only .cmd/.ps1 shims on PATH. npm_execpath reports the pnpm that
+  // launched the build: a native .exe (standalone) spawns directly by
+  // absolute path, a JS entrypoint (npm package) goes through Node.
+  if (packageManagerEntrypoint && path.win32.isAbsolute(packageManagerEntrypoint)) {
+    if (/\.exe$/i.test(packageManagerEntrypoint)) {
+      return { ...stage, command: packageManagerEntrypoint };
+    }
+    if (/\.[cm]?js$/i.test(packageManagerEntrypoint)) {
+      return {
+        ...stage,
+        command: process.execPath,
+        args: [packageManagerEntrypoint, ...stage.args],
+      };
+    }
+  }
+  throw new Error('Windows UI build requires the pnpm lifecycle entrypoint; run pnpm build.');
 }
 
 export async function runBuildStage(
@@ -80,9 +100,10 @@ export async function runBuildStage(
       process.kill(-pid, signal);
     },
     windows: process.platform === 'win32',
+    packageManagerEntrypoint: process.env.npm_execpath,
     ...overrides,
   };
-  const command = resolveBuildCommand(stage, runtime.windows);
+  const command = resolveBuildCommand(stage, runtime.windows, runtime.packageManagerEntrypoint);
   assertGovernedExec(command.command, command.args);
   await new Promise<void>((resolve, reject) => {
     let cancelled: string | undefined;
