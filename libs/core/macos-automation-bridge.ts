@@ -5,7 +5,7 @@ import { listKnownAppCapabilities, type KnownAppCapability } from './virtual/os-
 export const MACOS_AUTOMATION_BRIDGE_ID = 'macos-automation-bridge';
 
 export type MacOSAutomationPermissionStatus =
-  'granted' | 'denied' | 'not_determined' | 'unsupported' | 'unknown';
+  'granted' | 'denied' | 'restricted' | 'not_determined' | 'unsupported' | 'unknown';
 
 export interface MacOSAutomationPermissions {
   automation: MacOSAutomationPermissionStatus;

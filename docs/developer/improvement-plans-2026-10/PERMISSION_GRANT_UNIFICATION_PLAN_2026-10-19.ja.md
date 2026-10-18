@@ -198,11 +198,12 @@ resolveGrant({ capability, context }): {
 | PG-08  | Concierge 設定の「録音への同意」を Grant 一覧に広げる(付与・取消、i18n 必須)                        | PG-03        | 未着手   |
 | PG-09  | env 自己申告の整理(`KYBERION_AUDIO_PERMISSION_CONFIRMED` 廃止、`KYBERION_SUDO` 迂回の audit 化)     | PG-01、PG-03 | 未着手   |
 
-### PG-01〜02 のレビューで残した課題
+### PG-01〜02 のレビュー指摘への対応
 
-- `.restricted`(MDM やペアレンタルコントロールで制限)を `denied` と同じに扱っている。運用者がシステム設定で直せないので、別の状態として案内を分ける。
-- 用途説明(usage description)を持たないプロセスから warm-up を呼ぶと、`requestAccess` でプロセスごと落ちることがある。ターミナルから実行する前提なので今は問題ないが、デーモン経由で使うなら kind ごとに結果を残す。
-- `meeting_preflight` の pass は、probe を実行したホストアプリの許可。実際の録音を別プロセス(Playwright の Chromium など)が行う場合は PG-02b で経路ごとに判定する。
+- `.restricted`(MDM やスクリーンタイムでの制限)は `restricted` という別の状態にした。運用者はシステム設定で直せないので、案内は「管理者に依頼」にしている(`MICROPHONE_PERMISSION_RESTRICTED`)。
+- warm-up はホストアプリ(ターミナル)を特定できないときは何も要求しない(`host_app_unknown`)。用途説明を持たないデーモンが `requestAccess` で落ちるのを防ぐため。
+- warm-up は kind ごとに別プロセスで実行するので、1 つが失敗してもほかの結果は残る。
+- 残課題: `meeting_preflight` の pass は、probe を実行したホストアプリの許可。実際の録音を別プロセス(Playwright の Chromium など)が行う場合は PG-02b で経路ごとに判定する。
 
 ## 4. 移行と互換
 
