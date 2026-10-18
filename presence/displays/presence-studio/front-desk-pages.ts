@@ -680,6 +680,8 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_inventory_pending',
   'front_desk:hearing_inventory_done',
   'front_desk:hearing_inventory_failed',
+  'front_desk:hearing_inventory_project_unsupported',
+  'front_desk:hearing_scope_unavailable',
   'front_desk:hearing_inventory_entry_label',
   'front_desk:hearing_inventory_open',
 ] as const satisfies readonly VocabularyKey[];
