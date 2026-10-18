@@ -36,7 +36,8 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
-import { missionPathOrNull } from './mission-lookup.js';
+import { missionScopeMissing } from './mission-lookup.js';
+import { boundTenant } from './owner-scope.js';
 import { safeExistsSync } from './secure-io.js';
 import { readTenantProfile } from './organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from './actor.js';
@@ -292,17 +293,27 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
         });
         continue;
       }
-      // An ambiguous or hidden mission id is reported like a missing one: one
-      // such record must not abort the whole lifecycle report.
-      if (missionId && !missionPathOrNull(findMissionPath, missionId)) {
-        orphans.push({
-          nhi_id: record.nhi_id,
-          lifecycle_status: record.lifecycle_status,
-          accountable_human_id: record.accountable_human_id,
-          reason: 'mission_scope_missing',
-          missing_scope_id: missionId,
-        });
-        continue;
+      // An ambiguous or hidden mission still EXISTS (OWNER_NOT_VISIBLE /
+      // OWNER_AMBIGUOUS prove the directory is on disk): the affiliation is
+      // intact, so the identity is not an orphan — it is simply outside this
+      // process's tenant view. Only a genuine absence counts as missing —
+      // and a miss is only decidable when the scan covers every place the
+      // mission could live: an unbound process sees all partitions, while a
+      // tenant-bound one may not enumerate other tenants' partitions, so a
+      // miss there means "not in my view" unless the affiliation pins the
+      // bound tenant (then the mission should have been visible).
+      if (missionId && missionScopeMissing(findMissionPath, missionId)) {
+        const bound = boundTenant();
+        if (!bound || tenantSlug === bound) {
+          orphans.push({
+            nhi_id: record.nhi_id,
+            lifecycle_status: record.lifecycle_status,
+            accountable_human_id: record.accountable_human_id,
+            reason: 'mission_scope_missing',
+            missing_scope_id: missionId,
+          });
+          continue;
+        }
       }
       if (projectId && !projectScopeExists(projectId)) {
         orphans.push({

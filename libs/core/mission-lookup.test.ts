@@ -3,6 +3,7 @@ import { OwnerScopeError } from './owner-scope.js';
 import {
   isMissionLookupRefusal,
   missionPathOrNull,
+  missionScopeMissing,
   readOrNullOnMissionRefusal,
 } from './mission-lookup.js';
 
@@ -98,5 +99,44 @@ describe('missionPathOrNull', () => {
     expect(isMissionLookupRefusal(refusal('SCOPE_CONTRADICTS_OWNER'))).toBe(false);
     expect(isMissionLookupRefusal(new Error('x'))).toBe(false);
     expect(isMissionLookupRefusal(null)).toBe(false);
+  });
+});
+
+describe('missionScopeMissing', () => {
+  it('is missing only when the mission is genuinely absent', () => {
+    expect(missionScopeMissing(() => null, 'MSN-A')).toBe(true);
+    expect(missionScopeMissing(() => undefined, 'MSN-A')).toBe(true);
+    expect(
+      missionScopeMissing(() => {
+        throw refusal('OWNER_NOT_FOUND');
+      }, 'MSN-A')
+    ).toBe(true);
+  });
+
+  it('a mission that exists outside this process view is not missing', () => {
+    // The NHI orphan audit must not accuse an affiliation that resolves to a
+    // real directory merely because another tenant owns it (OWNER_NOT_VISIBLE)
+    // or several tenants claim the id (OWNER_AMBIGUOUS).
+    for (const code of ['OWNER_NOT_VISIBLE', 'OWNER_AMBIGUOUS']) {
+      expect(
+        missionScopeMissing(() => {
+          throw refusal(code);
+        }, 'MSN-A')
+      ).toBe(false);
+    }
+    expect(missionScopeMissing(() => '/repo/active/missions/public/MSN-A', 'MSN-A')).toBe(false);
+  });
+
+  it('rethrows errors that are not lookup refusals', () => {
+    expect(() =>
+      missionScopeMissing(() => {
+        throw refusal('SCOPE_CONTRADICTS_OWNER');
+      }, 'MSN-A')
+    ).toThrow(/SCOPE_CONTRADICTS_OWNER/);
+    expect(() =>
+      missionScopeMissing(() => {
+        throw new TypeError('boom');
+      }, 'MSN-A')
+    ).toThrow(TypeError);
   });
 });
