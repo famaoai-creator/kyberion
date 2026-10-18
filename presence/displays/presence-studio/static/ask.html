@@ -224,6 +224,26 @@
                   >{{t:front_desk:hearing_decision_continue}}</a
                 >
               </div>
+              <div
+                id="hearing-completion-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                hidden
+              >
+                <p id="hearing-completion-text">{{t:front_desk:hearing_completion_unknown}}</p>
+                <button
+                  type="button"
+                  class="kb-btn kb-btn--secondary"
+                  id="hearing-completion-check"
+                  hidden
+                >
+                  {{t:front_desk:hearing_completion_check}}
+                </button>
+                <a class="kb-btn kb-btn--secondary" id="hearing-completion-continue" href="/ask"
+                  >{{t:front_desk:hearing_decision_continue}}</a
+                >
+              </div>
               <p class="ask-about-text" id="hearing-coverage"></p>
               <iframe id="hearing-canvas" class="hearing-canvas" sandbox=""></iframe>
               <p class="ask-about-label" id="hearing-canvas-status"></p>
