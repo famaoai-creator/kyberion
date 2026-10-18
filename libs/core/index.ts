@@ -80,6 +80,7 @@ export * from './workforce/work-effect-ownership.js';
 export * from './reasoning/reasoning-selection-settings.js';
 
 export * from './macos-native-automation.js';
+export * from './macos-permission-warmup.js';
 
 export * from './organization/continuous-operations-policy.js';
 export * from './organization/continuous-operations.js';
