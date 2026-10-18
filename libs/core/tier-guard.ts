@@ -1261,10 +1261,11 @@ function ledgerRoleReadGrant(
 
 /**
  * The persona/role/authority half of a protected-tier read decision (after the
- * tenant check): SUDO scope, authority grants, role grants, persona grants,
- * project scope, then the tier restriction. Partitioned runtime ledgers reuse
- * it with their `knowledge/<tier>` path, so their persona rules are exactly
- * those of the knowledge tier.
+ * tenant check): the role's deny_read carve-outs, SUDO scope, authority
+ * grants, role grants, persona grants, project scope, then the tier
+ * restriction. Partitioned runtime ledgers reuse it with their
+ * `knowledge/<tier>` path, so their persona rules are exactly those of the
+ * knowledge tier.
  */
 function personaTierReadDecision(
   policy: any,
@@ -1279,6 +1280,26 @@ function personaTierReadDecision(
     tenantSlug,
   } = identity;
   const currentMission = resolveProjectScope().missionId;
+  // A role's `deny_read` carves paths out of its own read grants (e.g. a
+  // tenant-knowledge reader that must never see the tenant's connection
+  // secrets). It wins over every grant, SUDO included: the role is a
+  // least-privilege assumption, so nothing reached through it may widen it.
+  const deniedPatterns: unknown = currentRole
+    ? policy.authority_role_permissions?.[currentRole]?.deny_read
+    : undefined;
+  if (
+    Array.isArray(deniedPatterns) &&
+    deniedPatterns.some(
+      (pattern) =>
+        typeof pattern === 'string' &&
+        policyPathMatches(relativePath, pattern, currentMission, tenantSlug)
+    )
+  ) {
+    return {
+      allowed: false,
+      reason: `[ROLE_VIOLATION] role '${currentRole}' may not read ${relativePath} — the path is carved out of its grants (security-policy.json authority_role_permissions.${currentRole}.deny_read) | read it under a role that owns it | role=${currentRole}`,
+    };
+  }
   const projectTier = relativePath.match(
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];

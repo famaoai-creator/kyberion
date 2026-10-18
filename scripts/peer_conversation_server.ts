@@ -4,6 +4,14 @@ import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
 import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
 import { createPeerConversationResponder } from '@agent/core/mesh/peer-conversation';
 import {
+  createPeerAutoReply,
+  DEFAULT_PEER_AUTO_REPLY_BACKEND,
+} from '@agent/core/mesh/peer-auto-reply';
+import {
+  listIsolatedTextGenerators,
+  resolveIsolatedTextGenerator,
+} from '@agent/core/provider/isolated-text-generator';
+import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
   registerMeshPeer,
@@ -83,6 +91,55 @@ async function main(
       default: 64,
       description: 'Maximum inbound requests waiting for a handler slot before retryable overload',
     })
+    .option('auto-reply-peers', {
+      type: 'string',
+      default: '',
+      description: 'Comma-separated peer ids that receive LLM auto replies (empty = disabled)',
+    })
+    .option('auto-reply-max-turns', {
+      type: 'number',
+      default: 6,
+      description: 'Maximum auto-reply turns per session (inbound auto_turn and replies sent)',
+    })
+    .option('auto-reply-timeout-ms', {
+      type: 'number',
+      default: 60_000,
+      description: 'Auto-reply generation timeout',
+    })
+    .option('auto-reply-concurrency', {
+      type: 'number',
+      default: 1,
+      description: 'Maximum concurrent auto-reply jobs',
+    })
+    .option('auto-reply-max-attempts', {
+      type: 'number',
+      default: 3,
+      description: 'Maximum auto-reply delivery attempts',
+    })
+    .option('auto-reply-knowledge-limit', {
+      type: 'number',
+      default: 5,
+      description: 'Tenant knowledge excerpts injected into an auto-reply prompt',
+    })
+    .option('auto-reply-budget-per-hour', {
+      type: 'number',
+      default: 30,
+      description: 'Rolling hourly cap on auto-reply jobs per remote peer',
+    })
+    .option('auto-reply-backend', {
+      type: 'string',
+      choices: listIsolatedTextGenerators().map((generator) => generator.id),
+      default: DEFAULT_PEER_AUTO_REPLY_BACKEND,
+      description: `Isolated auto-reply generator: ${listIsolatedTextGenerators()
+        .map((generator) => `${generator.id} (${generator.isolation})`)
+        .join(', ')}`,
+    })
+    .option('auto-reply-allow-untested', {
+      type: 'boolean',
+      default: false,
+      description:
+        'Version-gated generators only (e.g. codex): run on a CLI version the isolation probe has not verified',
+    })
     .parseSync();
 
   const peerId = String(argv['peer-id']);
@@ -109,6 +166,50 @@ async function main(
   ) {
     throw new Error('invalid_peer_receive_capacity');
   }
+  const autoReplyPeers = String(argv['auto-reply-peers'] || '')
+    .split(',')
+    .map((peer) => peer.trim())
+    .filter(Boolean);
+  const autoReplyOptions = {
+    max_turns: Number(argv['auto-reply-max-turns']),
+    timeout_ms: Number(argv['auto-reply-timeout-ms']),
+    concurrency: Number(argv['auto-reply-concurrency']),
+    max_attempts: Number(argv['auto-reply-max-attempts']),
+    knowledge_limit: Number(argv['auto-reply-knowledge-limit']),
+    budget_per_hour: Number(argv['auto-reply-budget-per-hour']),
+    backend: String(argv['auto-reply-backend'] || DEFAULT_PEER_AUTO_REPLY_BACKEND),
+    allow_untested: argv['auto-reply-allow-untested'] === true,
+  };
+  if (
+    !Number.isInteger(autoReplyOptions.max_turns) ||
+    autoReplyOptions.max_turns < 0 ||
+    !Number.isInteger(autoReplyOptions.timeout_ms) ||
+    autoReplyOptions.timeout_ms < 1 ||
+    !Number.isInteger(autoReplyOptions.concurrency) ||
+    autoReplyOptions.concurrency < 1 ||
+    !Number.isInteger(autoReplyOptions.max_attempts) ||
+    autoReplyOptions.max_attempts < 1 ||
+    !Number.isInteger(autoReplyOptions.knowledge_limit) ||
+    autoReplyOptions.knowledge_limit < 0 ||
+    !Number.isInteger(autoReplyOptions.budget_per_hour) ||
+    autoReplyOptions.budget_per_hour < 1
+  ) {
+    throw new Error('invalid_peer_auto_reply_options');
+  }
+  // Fails closed on an unknown or descriptor-undeclared generator: the server
+  // refuses to start rather than send peer text to an unvetted backend.
+  const generator = resolveIsolatedTextGenerator(autoReplyOptions.backend);
+  const backendSummary = {
+    id: generator.id,
+    reasoning_backend: generator.reasoningBackend,
+    isolation: generator.isolation,
+    version_gated: generator.versionGated,
+  };
+  if (autoReplyOptions.allow_untested && !generator.versionGated) {
+    logger.warn(
+      `[peer-conversation-server] --auto-reply-allow-untested ignored — backend ${generator.id} has no version gate | next: drop the flag`
+    );
+  }
   if (options.dryRun === true || options.check === true) {
     return {
       dry_run: true,
@@ -119,6 +220,12 @@ async function main(
       port,
       max_inflight: maxInflight,
       max_queued: maxQueued,
+      auto_reply: {
+        enabled: autoReplyPeers.length > 0,
+        peers: autoReplyPeers,
+        ...autoReplyOptions,
+        backend_isolation: backendSummary,
+      },
     };
   }
   const meshNamespace = String(argv['mesh-namespace'] || '').trim() || undefined;
@@ -127,6 +234,20 @@ async function main(
     tenantId,
     sharedSecret,
     namespace: meshNamespace,
+  });
+
+  const autoReply = createPeerAutoReply({
+    tenantId,
+    localPeerId: peerId,
+    enabledPeers: autoReplyPeers,
+    maxTurns: autoReplyOptions.max_turns,
+    generationTimeoutMs: autoReplyOptions.timeout_ms,
+    concurrency: autoReplyOptions.concurrency,
+    maxDeliveryAttempts: autoReplyOptions.max_attempts,
+    knowledgeLimit: autoReplyOptions.knowledge_limit,
+    budgetPerHour: autoReplyOptions.budget_per_hour,
+    backend: generator.id,
+    allowUntestedVersion: autoReplyOptions.allow_untested,
   });
 
   const server = createPeerMessagingServer({
@@ -138,9 +259,10 @@ async function main(
     responder: createPeerConversationResponder({
       peerId,
       tenantId,
-      onMessage: ({ message, envelope }) => {
+      onMessage: (context) => {
+        const { message, envelope } = context;
         const candidate = message.metadata?.collaboration_request as MeshRequest | undefined;
-        if (!candidate || message.kind !== 'handoff') return;
+        if (!candidate || message.kind !== 'handoff') return autoReply.handleInbound(context);
         if (!tenantId) throw new Error('mesh_collaboration_requires_tenant_id');
         if (candidate.sender_peer_id !== envelope.sender_peer_id) {
           throw new Error(`mesh_collaboration_sender_mismatch:${candidate.request_id}`);
@@ -253,10 +375,17 @@ async function main(
     throw error;
   }
   logger.success(`[peer-conversation-server] peer ${peerId} listening on http://${host}:${port}`);
+  if (autoReply.enabled) {
+    autoReply.start();
+    logger.info(
+      `[peer-conversation-server] auto reply enabled for peers: ${autoReplyPeers.join(', ')} (backend=${generator.id}, isolation=${generator.isolation}${autoReplyOptions.allow_untested && generator.versionGated ? ', allow_untested=true' : ''})`
+    );
+  }
 
   const shutdown = async () => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeat('maintenance');
+    await autoReply.stop();
     try {
       recordProtocolServiceLifecycle({
         serviceId: 'peer-messaging',

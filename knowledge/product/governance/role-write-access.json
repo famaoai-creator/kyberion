@@ -105,6 +105,12 @@
     "scope_locale_reader": {
       "allow": []
     },
+    "peer_catalog_reader": {
+      "allow": []
+    },
+    "peer_responder_reader": {
+      "allow": []
+    },
     "metrics_cap_reader": {
       "allow": []
     },

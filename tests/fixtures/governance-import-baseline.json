@@ -216,6 +216,7 @@
     "libs/core/provider/agy-sdk-adapter.ts",
     "libs/core/provider/claude-cli-session-adapter.ts",
     "libs/core/provider/codex-cli-query.ts",
+    "libs/core/provider/codex-isolated-query.ts",
     "libs/core/provider/cursor-cli-reasoning-backend.ts",
     "libs/core/provider/cursor-cli-session-adapter.ts",
     "libs/core/provider/devin-cli-reasoning-backend.ts",
