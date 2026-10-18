@@ -38,6 +38,36 @@ had regressed.
 
 ## §1 CI workflows
 
+**Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
+`pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
+writer and L2 baseline scanner share the `compiler-outputs` mutex; standalone clean uses the
+same mutex. Never call a wrapped build recursively while holding it. Direct package-local
+compiler invocations and ad-hoc cleanup bypass this coordination: use the root entrypoints
+when other processes are observing this checkout. The bootstrap and its cleanup imports stay
+out of the runtime emit graph (`ROOT_SOURCE_EXCLUSIONS`, `tsconfig.json`); bootstrap tests live
+under `tests/` so importing them cannot pull source-only modules back into that graph.
+
+Health observations never consume L2 recovery attempts. Only executed compiler commands record
+repair outcomes; lock contention is not an attempt. A successful partial command clears the
+budget only if all compiler outputs pass import/freshness checks. UI failures do not consume
+the compiler budget. Busy observations defer with `needs_attention`; persist bounded, redacted
+diagnostics and retain full structured source/output provenance in the baseline report.
+State mutations reload and merge under the PFC state lock; slow probes cannot undo a newer
+recovery result. Gates: PFC, compiler-coordination, build-runner and baseline-readiness tests.
+Normal SIGINT/SIGTERM cancellation forwards to the managed compiler process group and keeps
+the mutex until the child closes, with bounded escalation. This is cooperative serialization,
+not a crash-safe lease: after force-killing the wrapper (SIGKILL), stop any surviving compiler
+children before starting another build. PID-based stale-lock recovery cannot identify those
+orphans on its own.
+
+**GitHub CLI diagnosis.** Run the existing `gh_status` operation before resetting authentication.
+DNS and network failures take precedence over generic auth wording. `gh auth status` saying
+that a token is invalid does not establish API rejection: only explicit HTTP 401 / Bad credentials
+does. Credential-store access failures need a comparison with the operator's normal host
+terminal. Shell and connected-app authentication are independent; a CLI probe leaves connector
+status `not_probed`. Never persist token values, change host DNS/hosts, or copy credentials as a
+diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.ts`.
+
 **Rules** (enforced by `scripts/check_ci_workflow_contract.ts`):
 
 - Every job declares `timeout-minutes`. The default of 360 minutes lets a hung worker hold a runner

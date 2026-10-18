@@ -1,6 +1,125 @@
 import { safeExec, safeExecResult, type SafeExecOptions } from '../secure-io.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
+import { redactActiveSecretsForHostLog } from '../secret/secret-guard.js';
+
+export interface GhDiagnostic {
+  status:
+    | 'ready'
+    | 'cli_missing'
+    | 'dns_failure'
+    | 'network_failure'
+    | 'credential_unavailable'
+    | 'credential_rejected'
+    | 'credential_missing'
+    | 'credential_unverified'
+    | 'missing_resource'
+    | 'permission_denied'
+    | 'invalid_arguments'
+    | 'command_failure';
+  next: string;
+  /** A shell probe cannot establish the state of a separately authenticated connector. */
+  connector_status: 'not_probed';
+}
+
+/** Never publish raw gh auth output: it can include credentials, including unknown formats. */
+export function sanitizeGhOutput(value: string): string {
+  let sanitized = redactActiveSecretsForHostLog(value);
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN'] as const) {
+    const token = getRegisteredEnvText(name);
+    if (token) sanitized = sanitized.split(token).join('[REDACTED]');
+  }
+  return sanitized
+    .replace(/github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+/g, '[REDACTED]')
+    .replace(/((?:token|authorization|password)\s*[:=]\s*)([^\r\n]+)/gi, '$1[REDACTED]');
+}
+
+/** Classify evidence, not the auth command's potentially misleading summary. */
+export function diagnoseGhResult(
+  result: VcsCommandResult,
+  context: { authProbe?: boolean } = {}
+): GhDiagnostic {
+  const message = `${result.stderr || ''}\n${result.stdout || ''}\n${result.error?.message || ''}`;
+  let status: GhDiagnostic['status'];
+  let next: string;
+  if (!result.error && result.status === 0) {
+    status = 'ready';
+    next = 'Continue with the GitHub CLI.';
+  } else if (
+    (result.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT' ||
+    /command not found|executable file not found|spawn gh ENOENT/i.test(message)
+  ) {
+    status = 'cli_missing';
+    next = 'Install the GitHub CLI and verify it is on PATH.';
+  } else if (
+    /ENOTFOUND|EAI_AGAIN|getaddrinfo|no such host|could not resolve host|temporary failure in name resolution/i.test(
+      message
+    )
+  ) {
+    status = 'dns_failure';
+    next =
+      'Check DNS from this runtime and compare with a normal host terminal before changing authentication.';
+  } else if (
+    /ECONNRESET|ECONNREFUSED|ETIMEDOUT|network is unreachable|connection refused|TLS handshake|i\/o timeout|error connecting to/i.test(
+      message
+    )
+  ) {
+    status = 'network_failure';
+    next = 'Check network access from this runtime before changing authentication.';
+  } else if (
+    /keychain|keyring|credential store|securityd|getpwuid|failed to (?:read|retrieve|access).*credential/i.test(
+      message
+    )
+  ) {
+    status = 'credential_unavailable';
+    next =
+      'Compare credential-store access with a normal host terminal; restore runtime OS access before resetting authentication.';
+  } else if (/\bHTTP\s+401\b|\b401\s+Unauthorized\b|\bBad credentials\b/i.test(message)) {
+    status = 'credential_rejected';
+    next =
+      'GitHub rejected the credential; review the CLI authentication in a normal host terminal.';
+  } else if (/not logged (?:in|into)|not authenticated/i.test(message)) {
+    status = 'credential_missing';
+    next =
+      'Check runtime credential-store access and compare with a normal host terminal before signing in.';
+  } else if (
+    /\bHTTP\s+403\b|permission denied|resource not accessible|insufficient (?:permission|scope)|not authorized|forbidden/i.test(
+      message
+    )
+  ) {
+    status = 'permission_denied';
+    next = 'Review repository access and the permissions required by this GitHub operation.';
+  } else if (
+    /\bHTTP\s+404\b|no pull requests? found|could not resolve to (?:a|an)|repository not found|could not find (?:pull request|repository)|not found in repository/i.test(
+      message
+    )
+  ) {
+    status = 'missing_resource';
+    next =
+      'Check the repository and resource reference, and whether the current identity can access it.';
+  } else if (
+    /unknown (?:flag|command)|invalid (?:argument|flag|value)|accepts? \d+ arg|requires? (?:an? |at least )?argument|flag needs an argument/i.test(
+      message
+    )
+  ) {
+    status = 'invalid_arguments';
+    next = 'Check the arguments supported by this GitHub CLI operation.';
+  } else if (
+    context.authProbe ||
+    /(?:token|credential|authentication).*(?:invalid|failed|unverified)|invalid.*(?:token|credential)/i.test(
+      message
+    )
+  ) {
+    status = 'credential_unverified';
+    next =
+      'Credential validity is unverified; compare DNS and OS credential access with a normal host terminal before resetting authentication.';
+  } else {
+    status = 'command_failure';
+    next =
+      'Review this operation in a normal host terminal; the failure does not establish an authentication or network problem.';
+  }
+  return { status, next, connector_status: 'not_probed' };
+}
 
 /**
  * Typed GitHub CLI (`gh`) operations over the governed exec boundary — the
@@ -18,6 +137,18 @@ export interface GhCallOptions {
   timeoutMs?: number;
 }
 
+function ghExecOptions(options: GhCallOptions): SafeExecOptions {
+  const registeredTokens = {
+    GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
+    GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
+  };
+  const env = {
+    ...Object.fromEntries(Object.entries(registeredTokens).filter(([, v]) => v)),
+    ...(options.env || {}),
+  };
+  return { ...options, ...(Object.keys(env).length > 0 ? { env } : {}) };
+}
+
 export function ghRun(
   args: string[],
   options: GhCallOptions = {},
@@ -27,20 +158,7 @@ export function ghRun(
   // attach the *registered* values explicitly — the same explicit-override
   // channel publish_pull_request/pr_shadow use. Without this, the gh ops
   // only work where keyring auth exists (a GH_TOKEN-only CI env fails).
-  const registeredTokens = {
-    GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
-    GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
-  };
-  const env = {
-    ...Object.fromEntries(Object.entries(registeredTokens).filter(([, v]) => v)),
-    ...(options.env || {}),
-  };
-  const execOptions: SafeExecOptions = {
-    ...(options.cwd ? { cwd: options.cwd } : {}),
-    ...(Object.keys(env).length > 0 ? { env } : {}),
-    ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
-  };
-  return run('gh', args, execOptions);
+  return run('gh', args, ghExecOptions(options));
 }
 
 export function ghMust(
@@ -48,22 +166,47 @@ export function ghMust(
   options: GhCallOptions = {},
   run?: VcsCommandRunner
 ): string {
+  const authProbe = args[0] === 'auth' && args[1] === 'status';
+  // Only fixed operation names are safe in errors; resource refs and flags may contain secrets.
+  const knownOperations = new Set([
+    'auth status',
+    'pr view',
+    'pr list',
+    'pr checks',
+    'pr create',
+    'pr merge',
+    'repo view',
+  ]);
+  const candidate = `${args[0]} ${args[1]}`;
+  const operation = knownOperations.has(candidate)
+    ? `gh ${candidate}`
+    : args[0] === '--version'
+      ? 'gh --version'
+      : 'gh command';
   if (run) {
     const result = ghRun(args, options, run);
     if (result.error || result.status !== 0) {
-      throw new Error(
-        `[VCS_GH_FAILED] gh ${args.slice(0, 2).join(' ')}: ${result.stderr || result.error?.message || `exit ${result.status}`}`
-      );
+      const diagnostic = diagnoseGhResult(result, { authProbe });
+      throw new Error(`[VCS_GH_FAILED] ${operation}: ${diagnostic.status}: ${diagnostic.next}`);
     }
     return result.stdout;
   }
   // Default path uses the throwing safeExec — the seam existing callers and
   // their tests already intercept (publish_pull_request's credential checks).
   try {
-    return safeExec('gh', args, options);
+    return safeExec('gh', args, ghExecOptions(options));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`[VCS_GH_FAILED] gh ${args.slice(0, 2).join(' ')}: ${message}`);
+    const diagnostic = diagnoseGhResult(
+      {
+        status: 1,
+        stdout: '',
+        stderr: message,
+        error: error instanceof Error ? error : undefined,
+      },
+      { authProbe }
+    );
+    throw new Error(`[VCS_GH_FAILED] ${operation}: ${diagnostic.status}: ${diagnostic.next}`);
   }
 }
 

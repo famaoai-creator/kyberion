@@ -426,3 +426,5 @@ export {
 } from './next-action.js';
 
 export { buildCompletionSummary, reconcileCompletion } from './intent/intent-reconciliation.js';
+
+export * from './build-coordination.js';
