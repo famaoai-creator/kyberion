@@ -257,6 +257,7 @@
     "scripts/install_git_merge_driver.mjs",
     "scripts/kyberion_cli_entry.mjs",
     "scripts/oauth_callback_surface.test.ts",
+    "scripts/provider_hook_entry.test.ts",
     "scripts/run_generation_schedule_daemon.ts",
     "scripts/run_realtime_voice_conversation.ts",
     "scripts/setup_oauth.ts",
