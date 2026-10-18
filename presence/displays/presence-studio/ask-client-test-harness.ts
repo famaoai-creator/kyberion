@@ -104,6 +104,7 @@ function harness(
       'hearing-decision-status',
       'hearing-decision-text',
       'hearing-decision-continue',
+      'hearing-decision-check',
       'hearing-handoff',
       'hearing-handoff-status',
       'hearing-handoff-link',

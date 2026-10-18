@@ -26649,6 +26649,36 @@
         "ja": "確定リクエストは変更前に拒否されました。ヒアリングの内容を確認してから、もう一度お試しください。",
         "qps-ploc": "⟦Ŧħė ƈőñƒïřɱȧŧïőñ řėɋůėşŧ ẇȧş řėĵėƈŧėḓ ƀėƒőřė ȧñẏ ƈħȧñɠė. Řėṽïėẇ ŧħïş ħėȧřïñɠ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
+      "hearing_decision_check": {
+        "en": "Check saved confirmation",
+        "ja": "保存された確定結果を確認",
+        "qps-ploc": "⟦Ƈħėƈķ şȧṽėḓ ƈőñƒïřɱȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "hearing_decision_checking": {
+        "en": "Checking the saved confirmation and current hearing. Nothing will be sent again.",
+        "ja": "保存された確定結果と現在のヒアリングを確認しています。再送は行いません。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė şȧṽėḓ ƈőñƒïřɱȧŧïőñ ȧñḓ ƈůřřėñŧ ħėȧřïñɠ. Ñőŧħïñɠ ẇïŀŀ ƀė şėñŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "hearing_decision_recovered": {
+        "en": "The saved confirmation matches the current hearing. Review it before choosing the next step; nothing has been handed off automatically.",
+        "ja": "保存された確定結果が現在のヒアリングと一致しました。内容を確認してから次の操作を選んでください。自動での引き継ぎは行っていません。",
+        "qps-ploc": "⟦Ŧħė şȧṽėḓ ƈőñƒïřɱȧŧïőñ ɱȧŧƈħėş ŧħė ƈůřřėñŧ ħėȧřïñɠ. Řėṽïėẇ ïŧ ƀėƒőřė ƈħőőşïñɠ ŧħė ñėẋŧ şŧėṗ; ñőŧħïñɠ ħȧş ƀėėñ ħȧñḓėḓ őƒƒ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "hearing_decision_superseded": {
+        "en": "This confirmation was saved, but it is no longer the current decision. Changes remain paused. Continue in ordinary conversation to review what changed; do not submit it again.",
+        "ja": "今回の確定は保存されていますが、現在の確定内容ではありません。変更は停止したままです。再送せず、通常の会話で変更内容を確認してください。",
+        "qps-ploc": "⟦Ŧħïş ƈőñƒïřɱȧŧïőñ ẇȧş şȧṽėḓ, ƀůŧ ïŧ ïş ñő ŀőñɠėř ŧħė ƈůřřėñŧ ḓėƈïşïőñ. Ƈħȧñɠėş řėɱȧïñ ṗȧůşėḓ. Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ ŧő řėṽïėẇ ẇħȧŧ ƈħȧñɠėḓ; ḓő ñőŧ şůƀɱïŧ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_decision_legacy": {
+        "en": "This browser has no exact receipt reference for the earlier confirmation. It cannot be checked safely here. Changes remain paused; continue in ordinary conversation without submitting again.",
+        "ja": "以前の確定に対応する照合情報がこのブラウザにないため、ここでは安全に確認できません。変更は停止したままです。再送せず、通常の会話を続けてください。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ħȧş ñő ėẋȧƈŧ řėƈėïṗŧ řėƒėřėñƈė ƒőř ŧħė ėȧřŀïėř ƈőñƒïřɱȧŧïőñ. Ïŧ ƈȧññőŧ ƀė ƈħėƈķėḓ şȧƒėŀẏ ħėřė. Ƈħȧñɠėş řėɱȧïñ ṗȧůşėḓ; ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ ẇïŧħőůŧ şůƀɱïŧŧïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "hearing_decision_scope": {
+        "en": "This confirmation belongs to a different conversation or scope. Return to its original context to check it, or continue in ordinary conversation. Do not submit it again.",
+        "ja": "この確定は別の会話または範囲に属しています。元の会話・範囲に戻って確認するか、通常の会話を続けてください。再送はしないでください。",
+        "qps-ploc": "⟦Ŧħïş ƈőñƒïřɱȧŧïőñ ƀėŀőñɠş ŧő ȧ ḓïƒƒėřėñŧ ƈőñṽėřşȧŧïőñ őř şƈőṗė. Řėŧůřñ ŧő ïŧş őřïɠïñȧŀ ƈőñŧėẋŧ ŧő ƈħėƈķ ïŧ, őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. Ḓő ñőŧ şůƀɱïŧ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
       "hearing_decision_continue": {
         "en": "Continue in ordinary conversation",
         "ja": "通常の会話を続ける",
