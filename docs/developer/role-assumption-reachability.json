@@ -993,6 +993,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/oidc-browser-login.ts#completeOidcLogin",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/oidc-login-settings.ts#loadStoredOidcLoginSettings",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1826,6 +1831,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#startIdentityLinkForViewer",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/first-run-server.ts#viewerIsInstanceOwner",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1887,6 +1897,11 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/selected-tenant.ts#conciergeAllowedTenants",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/surface-auth-route.ts#linkIdentity",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3878,6 +3893,7 @@
         "presence/displays/concierge/src/app/api/setup/avatar-actions.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-generation/route.ts",
         "presence/displays/concierge/src/app/api/setup/first-run/route.ts",
+        "presence/displays/concierge/src/app/api/setup/link-identity/route.ts",
         "presence/displays/concierge/src/app/api/setup/oidc/route.ts",
         "presence/displays/concierge/src/app/api/setup/route.ts",
         "presence/displays/concierge/src/app/api/setup/setup-input.ts",
@@ -3946,6 +3962,7 @@
         "presence/displays/concierge/src/app/settings/settings-api.ts",
         "presence/displays/concierge/src/app/settings/settings-navigation.ts",
         "presence/displays/concierge/src/app/setup/first-run/page.tsx",
+        "presence/displays/concierge/src/app/setup/identity-link-section.tsx",
         "presence/displays/concierge/src/app/setup/page.tsx",
         "presence/displays/concierge/src/app/setup/sso-settings-form.tsx",
         "presence/displays/concierge/src/app/setup/sso/page.tsx",
