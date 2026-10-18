@@ -582,6 +582,7 @@
         "knowledge/confidential/${KYBERION_TENANT}/",
         "customer/${KYBERION_TENANT}/"
       ],
+      "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
       "allow_write": []
     },
     "metrics_cap_reader": {

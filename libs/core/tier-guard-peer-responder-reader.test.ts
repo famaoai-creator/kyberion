@@ -68,6 +68,30 @@ describe('tier-guard peer_responder_reader authority role', () => {
     }
   });
 
+  it('never reads the bound tenant connection secrets (deny_read carve-out)', () => {
+    for (const relative of [
+      'knowledge/confidential/acme-corp/connections/peer-network.json',
+      'knowledge/confidential/acme-corp/connections/',
+      'knowledge/confidential/acme-corp/connections/nested/notes.md',
+    ]) {
+      const decision = validateReadPermission(at(relative));
+      expect(decision.allowed, relative).toBe(false);
+      expect(decision.reason, relative).toMatch(/deny_read/);
+    }
+    // The carve-out is exact: a sibling whose name only starts with
+    // `connections` stays readable.
+    expect(
+      validateReadPermission(at('knowledge/confidential/acme-corp/connections-notes.md'))
+    ).toEqual({ allowed: true });
+  });
+
+  it('the peer catalog reader still reads the bound tenant peer catalog', () => {
+    process.env.MISSION_ROLE = 'peer_catalog_reader';
+    expect(
+      validateReadPermission(at('knowledge/confidential/acme-corp/connections/peer-network.json'))
+    ).toEqual({ allowed: true });
+  });
+
   // customer/ overlays and active/shared/runtime/ are not tier-protected
   // paths, so the role adds nothing there; only its confidential/personal
   // grants are asserted.
