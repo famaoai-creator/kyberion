@@ -7233,6 +7233,21 @@
         "ja": "音声を文字起こし",
         "qps-ploc": "⟦Ŧřȧñşƈřïƀė ȧůḓïő ŀőřėɱ⟧"
       },
+      "cli_cmd_operator_cli_permissions": {
+        "en": "Check OS permissions",
+        "ja": "OS の許可状態を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŐŞ ṗėřɱïşşïőñş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_operator_cli_permissions_status": {
+        "en": "Show microphone, camera and screen recording permission state",
+        "ja": "マイク・カメラ・画面収録の許可状態を表示",
+        "qps-ploc": "⟦Şħőẇ ɱïƈřőṗħőñė, ƈȧɱėřȧ ȧñḓ şƈřėėñ řėƈőřḓïñɠ ṗėřɱïşşïőñ şŧȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_operator_cli_permissions_warmup": {
+        "en": "Request undetermined OS permissions (microphone by default)",
+        "ja": "未決定の OS 許可を要求(既定はマイク)",
+        "qps-ploc": "⟦Řėɋůėşŧ ůñḓėŧėřɱïñėḓ ŐŞ ṗėřɱïşşïőñş (ɱïƈřőṗħőñė ƀẏ ḓėƒȧůŀŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "cli_cmd_operator_cli_watch": {
         "en": "Summarize a video",
         "ja": "動画の内容を要約",

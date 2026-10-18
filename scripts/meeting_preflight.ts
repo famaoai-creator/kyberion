@@ -10,6 +10,7 @@ import {
   resolveAudioDevice,
   type CoreAudioDeviceInventoryBridge,
 } from '@agent/core/coreaudio-device-inventory';
+import { probeMacOSNativeAutomation } from '@agent/core/macos-native-automation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
@@ -214,7 +215,18 @@ async function probeCoreAudioOutputBridge(
   );
 }
 
-function probeAudioPermission(platform: NodeJS.Platform): MeetingPreflightItem {
+const MICROPHONE_WARMUP_COMMAND = 'pnpm kyberion permissions warmup';
+
+type MicrophoneProbe = () => {
+  microphone?: string;
+  host_app?: string;
+  available?: boolean;
+};
+
+function probeAudioPermission(
+  platform: NodeJS.Platform,
+  probeMicrophone: MicrophoneProbe = probeMacOSNativeAutomation
+): MeetingPreflightItem {
   if (platform !== 'darwin') {
     return item(
       'audio.permission',
@@ -226,6 +238,42 @@ function probeAudioPermission(platform: NodeJS.Platform): MeetingPreflightItem {
       }
     );
   }
+  let native: ReturnType<MicrophoneProbe> | undefined;
+  try {
+    native = probeMicrophone();
+  } catch {
+    native = undefined;
+  }
+  const hostApp = native?.host_app;
+  const data = hostApp ? { host_app: hostApp } : undefined;
+  if (native?.microphone === 'granted') {
+    return item(
+      'audio.permission',
+      'pass',
+      `macOS microphone permission is granted${hostApp ? ` to ${hostApp}` : ''}`,
+      'none',
+      { data }
+    );
+  }
+  if (native?.microphone === 'not_determined') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone permission has not been requested yet${hostApp ? ` for ${hostApp}` : ''}`,
+      MICROPHONE_WARMUP_COMMAND,
+      { reasonCode: 'MICROPHONE_PERMISSION_NOT_DETERMINED', data }
+    );
+  }
+  if (native?.microphone === 'denied') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone permission is denied${hostApp ? ` for ${hostApp}` : ''}`,
+      `System Settings > Privacy & Security > Microphone; enable ${hostApp ?? 'the terminal app running Kyberion'}, then restart it`,
+      { reasonCode: 'MICROPHONE_PERMISSION_DENIED', data }
+    );
+  }
+  // Probe unavailable or inconclusive: fall back to the operator's self-report.
   if (getRegisteredEnvText('KYBERION_AUDIO_PERMISSION_CONFIRMED') === '1') {
     return item(
       'audio.permission',
@@ -237,7 +285,7 @@ function probeAudioPermission(platform: NodeJS.Platform): MeetingPreflightItem {
   return item(
     'audio.permission',
     'operator_action_required',
-    'macOS permission state is not auto-requested; operator confirmation is required before a live capture',
+    'macOS microphone permission state could not be probed; operator confirmation is required before a live capture',
     'System Settings > Privacy & Security > Microphone; then set KYBERION_AUDIO_PERMISSION_CONFIRMED=1 for this session',
     { reasonCode: 'MICROPHONE_PERMISSION_REQUIRED' }
   );
@@ -339,6 +387,7 @@ export async function runMeetingPreflight(
     missionId?: string;
     platform?: NodeJS.Platform;
     inventory_bridge?: CoreAudioDeviceInventoryBridge;
+    microphone_probe?: MicrophoneProbe;
   } = {}
 ): Promise<MeetingPreflightReport> {
   installCoreEnvironmentProbes();
@@ -352,7 +401,7 @@ export async function runMeetingPreflight(
     await probePlaywrightBrowser(),
     await probeBlackHoleDevice(platform, options.inventory_bridge),
     await probeCoreAudioOutputBridge(platform),
-    probeAudioPermission(platform),
+    probeAudioPermission(platform, options.microphone_probe),
     probeMlxAudioRuntime(platform),
     probeVoiceProfileStore(),
     probeVoiceConsent(),
