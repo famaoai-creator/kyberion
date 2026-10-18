@@ -204,8 +204,13 @@ export function buildCodexIsolatedEnv(
 
 /** `codex-cli 0.163.0` → `0.163`; undefined when no version is found. */
 export function parseCodexCliMajorMinor(versionOutput: string): string | undefined {
-  const match = versionOutput.match(/(\d+)\.(\d+)(?:\.\d+)?/);
-  return match ? `${match[1]}.${match[2]}` : undefined;
+  // Linear scan: bounded input, whitespace tokens, bounded digit runs (no
+  // backtracking on long digit strings from untrusted CLI output).
+  for (const token of versionOutput.slice(0, 256).split(/\s+/)) {
+    const match = /^v?(\d{1,6})\.(\d{1,6})(?:\.\d{1,6})?$/.exec(token);
+    if (match) return `${match[1]}.${match[2]}`;
+  }
+  return undefined;
 }
 
 /**
