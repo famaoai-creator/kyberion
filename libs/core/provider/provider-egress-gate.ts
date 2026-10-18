@@ -410,13 +410,15 @@ export function lookupTenantProviderAttestation(input: {
  * bare reason (no prefix) and emits no log line or ops-alert, so planning
  * views (`describeProviderTierAvailability`) can ask "would this be allowed?"
  * for every provider without raising an alert per hypothetical denial.
+ * Exported so the reasoning-send gate (`reasoning-egress-scope.ts`) decides
+ * with this exact rule instead of a parallel copy that could drift.
  */
-type EvaluatedProviderEgress = ProviderEgressCheckResult & {
+export type EvaluatedProviderEgress = ProviderEgressCheckResult & {
   /** Which rule allowed it (set only when allowed). */
   basis?: ProviderTierUsableBasis;
 };
 
-function evaluateProviderEgress(input: ProviderEgressCheckInput): EvaluatedProviderEgress {
+export function evaluateProviderEgress(input: ProviderEgressCheckInput): EvaluatedProviderEgress {
   const provider = String(input.provider || '').trim();
   const dataTier = input.dataTier;
 
