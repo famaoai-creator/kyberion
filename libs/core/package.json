@@ -4824,6 +4824,10 @@
       "types": "./dist/provider/codex-cli-query.d.ts",
       "default": "./dist/provider/codex-cli-query.js"
     },
+    "./provider/codex-isolated-query": {
+      "types": "./dist/provider/codex-isolated-query.d.ts",
+      "default": "./dist/provider/codex-isolated-query.js"
+    },
     "./provider/codex-cli-reasoning-backend": {
       "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",
       "default": "./dist/provider/codex-cli-reasoning-backend.js"
