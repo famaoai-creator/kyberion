@@ -124,6 +124,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
       return;
     }
     case 'Stop': {
+      if (payload.stop_hook_active === true) return;
       // Capture this CLI session's token usage into metrics (best-effort).
       try {
         const transcriptPath =
@@ -134,14 +135,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
       } catch {
         // usage capture is best-effort; never block session close
       }
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'Stop',
-            additionalContext: buildStopContext(payload),
-          },
-        })
-      );
+      buildStopContext(payload);
       return;
     }
     case 'SessionEnd': {
