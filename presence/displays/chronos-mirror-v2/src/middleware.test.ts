@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { middleware } from './middleware.js';
+import { proxy as middleware } from './proxy.js';
 
 function makeReq(
   options: {

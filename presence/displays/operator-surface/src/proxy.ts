@@ -8,14 +8,14 @@ import {
 import { LOOPBACK_HEADER, isLoopbackPeer } from './lib/peer';
 
 /**
- * Edge gate. Loopback (real socket peer) stays open. For remote callers this
+ * Request gate. Loopback (real socket peer) stays open. For remote callers this
  * is the UX/presence layer only — unauthenticated page navigations go to
  * /login, unauthenticated API calls get 401. The signature/expiry/member
  * verification happens server-side (`requireOperatorViewer` in the root
  * layout, `requireOperatorViewerAccess` in API guards), so a forged cookie
  * that passes this peek still cannot render a page or mutate.
  */
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   const loopback = isLoopbackPeer(request);
 
