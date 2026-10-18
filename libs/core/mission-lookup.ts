@@ -51,3 +51,24 @@ export function missionPathOrNull(find: MissionPathFinder, missionId: string): s
     throw error;
   }
 }
+
+/**
+ * Is the mission scope actually gone — for existence audits (e.g. the NHI
+ * orphan scan), where {@link missionPathOrNull}'s degrade-to-null contract is
+ * too coarse: OWNER_NOT_VISIBLE and OWNER_AMBIGUOUS prove the mission EXISTS
+ * (its directory is on disk), so the affiliation is intact and the identity
+ * is not orphaned — the mission is merely outside this process's tenant view.
+ * Only a genuine absence (null from the finder, or a strict OWNER_NOT_FOUND)
+ * counts as missing. Any other refusal still means "could not establish",
+ * which an audit must not silently turn into either verdict — rethrow.
+ */
+export function missionScopeMissing(find: MissionPathFinder, missionId: string): boolean {
+  try {
+    return find(missionId) == null;
+  } catch (error) {
+    const code = (error as { code?: unknown } | null | undefined)?.code;
+    if (code === 'OWNER_NOT_FOUND') return true;
+    if (isMissionLookupRefusal(error)) return false;
+    throw error;
+  }
+}

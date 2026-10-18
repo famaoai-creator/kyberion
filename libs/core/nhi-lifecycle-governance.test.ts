@@ -344,6 +344,25 @@ describe('NI-05 orphan detection', () => {
     expect(governance.isNhiLedgerHealthy()).toBe(false);
   });
 
+  it('a tenant-bound scan never accuses a mission it cannot enumerate', () => {
+    // Bound processes cannot see other tenants' mission partitions: an
+    // untagged affiliation whose mission resolves to nothing visible is
+    // undecidable, not missing — skip, never accuse (an unbound scan would
+    // still flag it, as the test above shows).
+    const previousTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = 'bound-tenant';
+    try {
+      issue('worker-unseen-scope', {
+        organization_id: 'demo-org',
+        mission_id: 'MSN-NI05-ELSEWHERE',
+      });
+      expect(governance.listOrphanNhiIdentities()).toEqual([]);
+    } finally {
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
+    }
+  });
+
   it('flags a live identity whose project scope no longer exists', () => {
     seedProject('proj-present');
     issue('worker-project-ok', { organization_id: 'demo-org', project_id: 'proj-present' });

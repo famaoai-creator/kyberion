@@ -853,10 +853,25 @@ async function main(_args: string[] = []): Promise<void> {
   logger.info(`[CHRONOS] Running. Tick interval: ${TICK_INTERVAL_MS / 1000}s`);
 }
 
+const CHRONOS_USAGE = `Usage: pnpm scheduler [--help]
+
+Starts the Kyberion pipeline scheduler (chronos) in the FOREGROUND: runs an
+immediate tick, then ticks every ${TICK_INTERVAL_MS / 1000}s while holding the
+leader lease. Stop with SIGINT/SIGTERM for a graceful shutdown.
+
+  --help, -h   show this usage (does NOT start the daemon)
+
+Inspect scheduler health without starting it: \`pnpm kyberion doctor\`,
+\`pnpm ops:alerts\`, or the baseline-check L10 layer.`;
+
 const runChronosDaemon = defineScript({
   name: 'chronos:daemon',
   flags: [],
-  run: async ({ argv }) => {
+  run: async ({ argv, print }) => {
+    if (argv.includes('--help') || argv.includes('-h')) {
+      print(CHRONOS_USAGE);
+      return;
+    }
     try {
       await main(argv);
     } catch (err: any) {
