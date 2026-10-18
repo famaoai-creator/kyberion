@@ -55,6 +55,12 @@
     "claude-sonnet-4-6": { "prompt": 0.003, "completion": 0.015 },
     "claude-haiku-4-5-20251001": { "prompt": 0.001, "completion": 0.005 },
     "claude-haiku-4-5": { "prompt": 0.001, "completion": 0.005 },
+    "claude-haiku-5-5": {
+      "prompt": 0.0001,
+      "completion": 0.0005,
+      "cache_read": 0.00001,
+      "cache_write": 0.000125
+    },
     "claude-3-5-sonnet": { "prompt": 0.003, "completion": 0.015 },
     "gpt-4o": { "prompt": 0.005, "completion": 0.015 },
     "gpt-4o-mini": { "prompt": 0.00015, "completion": 0.0006 },
