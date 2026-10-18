@@ -26,8 +26,16 @@ function parseArgs(argv: string[]): Record<string, string[]> {
 const USAGE =
   'Usage: contrastive_probe --scenario <dir> --run-root <dir> --command "<argv>" ' +
   '[--candidate <label>=<dir> | --propose <n> --brief <text> --surface <spec.json>] ' +
-  '[--expect <rel>] [--metric <key>:lower|higher] [--select metrics|blind] ' +
+  '[--expect <rel>] [--metric <key>:lower|higher] [--select blind] ' +
   '[--seed <n>] [--work-shape <name>]';
+
+function parseSeed(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+    throw new ScriptExitError(2, `--seed expects a non-negative integer, got ${raw}`);
+  }
+  return n;
+}
 
 export const runContrastiveProbe = defineScript({
   name: 'contrastive_probe',
@@ -54,6 +62,15 @@ export const runContrastiveProbe = defineScript({
       return { key, direction: dir };
     });
     const proposeCount = args['propose']?.[0] ? Number(args['propose'][0]) : 0;
+    if (
+      args['propose']?.[0] &&
+      (!Number.isFinite(proposeCount) || proposeCount < 1 || !Number.isInteger(proposeCount))
+    ) {
+      throw new ScriptExitError(
+        2,
+        `--propose expects a positive integer, got ${args['propose'][0]}`
+      );
+    }
     if (proposeCount > 0 && !args['brief']?.[0]) {
       throw new ScriptExitError(2, '--propose requires --brief <text>');
     }
@@ -62,10 +79,10 @@ export const runContrastiveProbe = defineScript({
       throw new ScriptExitError(2, '--propose requires --surface <spec.json>');
     }
     const selectArg = args['select']?.[0];
-    if (selectArg && selectArg !== 'metrics' && selectArg !== 'blind') {
-      throw new ScriptExitError(2, `--select expects metrics|blind, got ${selectArg}`);
+    if (selectArg && selectArg !== 'blind') {
+      throw new ScriptExitError(2, `--select expects blind, got ${selectArg}`);
     }
-    const select = selectArg as 'metrics' | 'blind' | undefined;
+    const select = selectArg as 'blind' | undefined;
     const command = commandRaw.split(/\s+/).filter(Boolean);
     const result = await runContrastiveSession({
       session_id: `ppc-${Date.now().toString(36)}`,
@@ -75,7 +92,7 @@ export const runContrastiveProbe = defineScript({
       ...(proposeCount > 0 ? { propose: { brief: args['brief']![0], count: proposeCount } } : {}),
       ...(surface ? { surface } : {}),
       ...(select ? { selection: select } : {}),
-      ...(args['seed']?.[0] ? { seed: Number(args['seed'][0]) } : {}),
+      ...(args['seed']?.[0] ? { seed: parseSeed(args['seed'][0]) } : {}),
       expectOutputs: args['expect'] ?? [],
       metrics,
       runRoot,

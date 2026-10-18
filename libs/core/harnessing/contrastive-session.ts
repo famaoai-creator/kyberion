@@ -107,6 +107,11 @@ export async function runContrastiveSession(
   if (new Set(labels).size !== labels.length) {
     throw new Error(`[CONTRASTIVE_SESSION] duplicate candidate labels: ${labels.join(', ')}`);
   }
+  for (const label of labels) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
+      throw new Error(`[CONTRASTIVE_SESSION] invalid candidate label ${JSON.stringify(label)}`);
+    }
+  }
 
   // Surface validation: off-surface overlays are rejected, not probed.
   const eligible = supplied.filter((c) => {
@@ -154,7 +159,9 @@ export async function runContrastiveSession(
           cue: spec.work_shape || `contrastive probe on ${path.basename(spec.scenarioDir)}`,
           lesson: `apply the '${decision.winner}' overlay; it dominated the base under the same scenario`,
           evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}`,
-          confidence: base.delivered ? ('medium' as const) : ('high' as const),
+          // Dominance over a delivering base is the stronger evidence;
+          // a single delivery over a dead base may just be a broken baseline.
+          confidence: base.delivered ? ('high' as const) : ('medium' as const),
         }
       : null;
 
