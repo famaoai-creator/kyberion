@@ -39,7 +39,7 @@ describe('role-assumption workspace entry points', () => {
       expect.arrayContaining([
         'presence/displays/concierge/server/local-server.ts',
         'presence/displays/concierge/server/local-peer.ts',
-        'presence/displays/concierge/src/middleware.ts',
+        'presence/displays/concierge/src/proxy.ts',
         'presence/displays/concierge/src/app/api/services/operator/route.ts',
         'presence/displays/concierge/src/app/api/headless/manifest/route.ts',
       ])
