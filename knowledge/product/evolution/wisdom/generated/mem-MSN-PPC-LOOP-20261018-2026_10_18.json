@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-PPC-LOOP-20261018-2026_10_18",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Propose-and-blind-select completes the contrastive loop — recommendations never become decisions",
+  "summary": "The PPC loop now covers candidate generation (LLM propose under a declared editable surface), isolated probes, axis classification, and anonymized blind selection — but blind selection outputs a recommendation for human_gate only; the decision axis remains the sole auto_advance authority.",
+  "candidate_id": "mem-MSN-PPC-LOOP-20261018-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/distillation.md",
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-18T04:18:48.806Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Imported harness2 loop-complete mechanics: (1) SurfaceSpec declares allowed overlay paths — off-surface proposals are rejected before probing; validate with allowMissingLeaf or the missing-dir branch is dead code and a typo kills the session. (2) Sanitize proposed paths for BOTH separators — a /-only split passes a\\..\\.. traversal on win32; reject backslash outright. (3) Blind selection anonymizes labels behind seeded letters so a judge weighs evidence not provenance — but its output is a recommendation, never a decision: auto_advance still requires metric dominance. Scrub the outcome label out of error text or a chatty candidate deanonymizes itself. (4) getReasoningBackend never throws — it returns the stub; backend honesty requires checking backend.name, otherwise a stub run reports backend_used:true. (5) Validate CLI numerics and candidate label charset upfront — mid-session throws burn probes and lose the report."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/distillation.md",
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-PPC-LOOP-20261018/evidence/test-report.md"
+  ],
+  "source_branch": "feat/ppc-loop-20261018",
+  "source_commit": "789b4156e84fdc99f7f9f5d809ab8999c0ecb769"
+}
