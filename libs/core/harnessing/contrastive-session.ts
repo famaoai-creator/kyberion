@@ -78,6 +78,7 @@ export async function runContrastiveSession(
   safeMkdir(runRoot, { recursive: true });
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
+  let propose_meta: { backend_used: boolean; error?: string } | undefined;
   const supplied = [...(spec.candidates ?? [])];
 
   // Label integrity BEFORE any probe or backend call — 'base' is reserved,
@@ -115,6 +116,10 @@ export async function runContrastiveSession(
       labelPrefix: spec.propose.labelPrefix,
     });
     rejected.push(...proposed.rejected);
+    propose_meta = {
+      backend_used: proposed.backend_used,
+      error: proposed.error || undefined,
+    };
     supplied.push(
       ...proposed.candidates.map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
     );
@@ -210,6 +215,7 @@ export async function runContrastiveSession(
     decision,
     selection,
     rejected_overlays: rejected,
+    propose_meta,
     outcomes,
     base: baseResult,
     experience,
