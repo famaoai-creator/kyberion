@@ -10,6 +10,7 @@ import {
   lookupDiscoveryOpKind,
   parsePlaygroundParams,
   resolvePlaygroundCapabilities,
+  resolvePlaygroundParamsInput,
   runPlayground,
 } from './actuator_playground.js';
 
@@ -112,6 +113,42 @@ describe('actuator playground JSON input boundary', () => {
     expect(() => parsePlaygroundParams('{"params":{"__proto__":{"polluted":true}}}')).toThrow(
       '--params contains a dangerous JSON key'
     );
+  });
+
+  it('loads --params from a repository file with the @path form', () => {
+    const params = resolvePlaygroundParamsInput('@package.json');
+    expect(params).toMatchObject({ name: 'kyberion' });
+    expect(() => resolvePlaygroundParamsInput('@does/not/exist.json')).toThrow();
+    expect(() => resolvePlaygroundParamsInput('@../../etc/passwd')).toThrow();
+  });
+
+  it('prints usage on --help without scanning actuators or prompting', async () => {
+    const printed: unknown[] = [];
+    const result = await runPlayground(['--help'], {
+      print: (value) => printed.push(value),
+      resolveExecutable: () => {
+        throw new Error('must not resolve executables for --help');
+      },
+    });
+    expect(result).toMatchObject({ ok: true, mode: 'help' });
+    expect(String(printed[0])).toContain('Usage: pnpm playground');
+    expect(String(printed[0])).toContain('--describe');
+    expect(String(printed[0])).toContain('--params');
+  });
+
+  it('names the unknown --actuator instead of the generic machine-mode error', async () => {
+    await expect(
+      runPlayground(['--actuator', 'nonexistent', '--op', 'read'], {
+        json: true,
+        check: true,
+      })
+    ).rejects.toThrow("Unknown --actuator 'nonexistent'");
+    await expect(
+      runPlayground(['--actuator', 'nonexistent', '--op', 'read'], {
+        json: true,
+        check: true,
+      })
+    ).rejects.toThrow('file-actuator');
   });
 
   it('blocks live secret-actuator set with a value', async () => {
