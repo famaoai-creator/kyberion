@@ -37,11 +37,44 @@ vi.mock('./hearing-canvas.js', async () => {
   return { ...actual, generateHearingCanvas: vi.fn() };
 });
 
+// Keep preparation deterministic while observing whether a rejected request
+// ever reaches the decomposition, persistence, or raw record-write boundaries.
+vi.mock('@agent/core/workforce/work-inventory-decompose', async () => {
+  const actual = await vi.importActual<
+    typeof import('@agent/core/workforce/work-inventory-decompose')
+  >('@agent/core/workforce/work-inventory-decompose');
+  return {
+    ...actual,
+    proposeWorkDecomposition: vi.fn(
+      (
+        input: Parameters<typeof actual.proposeWorkDecomposition>[0],
+        options: Parameters<typeof actual.proposeWorkDecomposition>[1]
+      ) => actual.proposeWorkDecomposition(input, { ...options, useModel: false })
+    ),
+  };
+});
+vi.mock('@agent/core/workforce/work-inventory', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/workforce/work-inventory')>(
+    '@agent/core/workforce/work-inventory'
+  );
+  return { ...actual, saveWorkInventoryEntry: vi.fn(actual.saveWorkInventoryEntry) };
+});
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return { ...actual, safeWriteFile: vi.fn(actual.safeWriteFile) };
+});
+
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
+import { safeWriteFile } from '@agent/core/secure-io';
+import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
+import * as hearingSecurity from './security.js';
+import type { HearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
 import {
   createWorkInventoryEntry,
   loadWorkInventoryEntry,
   saveWorkInventoryEntry,
+  workInventoryRoot,
 } from '@agent/core/workforce/work-inventory';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
@@ -121,6 +154,14 @@ function fakeResponse() {
     },
   };
   return res;
+}
+
+function responseSnapshot(response: ReturnType<typeof fakeResponse>): HearingHandoffSnapshot {
+  expect(response.statusCode).toBe(200);
+  const snapshot = (response.body as { record: { handoff_snapshot?: HearingHandoffSnapshot } })
+    .record.handoff_snapshot;
+  expect(snapshot).toEqual({ version: 1, token: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  return snapshot!;
 }
 
 const TEST_TENANT = 'zz-hearing-route-test';
@@ -260,7 +301,10 @@ describe('POST /api/hearing/:session/decide', () => {
       label: catalogT('front_desk:hearing_next_alignment', undefined, 'en'),
     });
 
+    responseSnapshot(res);
     const persisted = loadHearingRecord(namespace, sessionId);
+    expect(persisted?.decision_revision).toBeGreaterThan(0);
+    expect(persisted).not.toHaveProperty('handoff_snapshot');
     expect(persisted?.decided_by).toEqual({
       kind: 'human',
       id: 'user:zz-hearing-route-member',
@@ -539,6 +583,7 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
   const answer = handlers.get('POST /api/hearing/:session/answer')!;
   const decide = handlers.get('POST /api/hearing/:session/decide')!;
   const inventory = handlers.get('POST /api/hearing/:session/inventory')!;
+  const get = handlers.get('GET /api/hearing/:session')!;
   const INVENTORY_TEST_TENANT = 'zz-hearing-inventory-test';
   const INVENTORY_TEST_MEMBER_ID = 'zz-hearing-inventory-member';
   const namespace = hearingNamespace([INVENTORY_TEST_TENANT]);
@@ -579,16 +624,49 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     }
   }
 
+  function displayedSnapshot(sessionId: string): HearingHandoffSnapshot {
+    const response = fakeResponse();
+    get(fakeRequest({ params: { session: sessionId } }), response);
+    return responseSnapshot(response);
+  }
+
+  function clearEffectCalls() {
+    vi.mocked(proposeWorkDecomposition).mockClear();
+    vi.mocked(saveWorkInventoryEntry).mockClear();
+    vi.mocked(safeWriteFile).mockClear();
+  }
+
+  function expectNoEffects() {
+    expect(proposeWorkDecomposition).not.toHaveBeenCalled();
+    expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+    expect(safeWriteFile).not.toHaveBeenCalled();
+  }
+
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
     process.env.KYBERION_TENANT = INVENTORY_TEST_TENANT;
     vi.mocked(resolveMemberByPrincipal).mockReset();
     vi.mocked(generateHearingCanvas).mockReset();
+    vi.mocked(generateHearingCanvas).mockResolvedValue({
+      source: 'template',
+      html: '<html><head></head><body>fixture</body></html>',
+    });
+    clearEffectCalls();
   });
 
   afterEach(() => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
+    for (const tenant of [INVENTORY_TEST_TENANT, 'zz-inventory-other']) {
+      safeRmSync(pathResolver.rootResolve('active/shared/runtime/hearing/confidential/' + tenant), {
+        recursive: true,
+        force: true,
+      });
+    }
+    safeRmSync(pathResolver.sharedTmp('hearing/zz-inventory-other'), {
+      recursive: true,
+      force: true,
+    });
     safeRmSync(pathResolver.sharedTmp(`hearing/${INVENTORY_TEST_TENANT}`), {
       recursive: true,
       force: true,
@@ -643,6 +721,243 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects displayed inventory decision A after editing and deciding B, before decomposition or persistence', async () => {
+    const sessionId = 'stale-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const firstDecision = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), firstDecision);
+    const snapshotA = responseSnapshot(firstDecision);
+    expect(displayedSnapshot(sessionId)).toEqual(snapshotA);
+    const edit = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: {
+          text: 'A revised invoice review workflow',
+          request_id: 'edit-task',
+          intent_resolution: { missing_inputs: ['task_name'] },
+        },
+      }),
+      edit
+    );
+    expect(edit.statusCode).toBe(200);
+    const secondDecision = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), secondDecision);
+    const snapshotB = responseSnapshot(secondDecision);
+    expect(snapshotB).not.toEqual(snapshotA);
+    const before = loadHearingRecord(namespace, sessionId);
+    clearEffectCalls();
+
+    const response = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshotA } }),
+      response
+    );
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expectNoEffects();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+    // The unchanged current snapshot is still actionable after a stale attempt.
+    const current = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshotB } }),
+      current
+    );
+    expect(current.statusCode).toBe(200);
+    expect(proposeWorkDecomposition).toHaveBeenCalledTimes(1);
+    expect(proposeWorkDecomposition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'A revised invoice review workflow',
+      }),
+      { useModel: true }
+    );
+    expect(saveWorkInventoryEntry).toHaveBeenCalledTimes(1);
+    const completed = loadHearingRecord(namespace, sessionId);
+    expect(completed?.decided_by).toEqual(before?.decided_by);
+    expect(completed?.decision_revision).toBe(before?.decision_revision);
+  });
+
+  it.each(['legacy', 'versioned'] as const)(
+    'rejects a token from a same-actor, same-timestamp %s redecision',
+    async (mode) => {
+      const sessionId = 'redecide-' + randomUUID();
+      await answerAllWorkInventoryRequirements(sessionId);
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+      const requirementsRevision = loadHearingRecord(namespace, sessionId)!.requirements_revision;
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-17T10:00:00.000Z'));
+      try {
+        const decision = (operationId: string) => {
+          const response = fakeResponse();
+          decide(
+            fakeRequest({
+              params: { session: sessionId },
+              body:
+                mode === 'legacy'
+                  ? {}
+                  : {
+                      version: 1,
+                      operation_id: operationId,
+                      scenario_id: 'work_inventory',
+                      requirements_revision: requirementsRevision,
+                    },
+            }),
+            response
+          );
+          responseSnapshot(response);
+          return (
+            response.body as {
+              record: HearingRecord & { handoff_snapshot: HearingHandoffSnapshot };
+            }
+          ).record;
+        };
+        const first = decision('inventory-a');
+        const second = decision('inventory-b');
+        expect(second.decided_at).toBe(first.decided_at);
+        expect(second.decided_by).toEqual(first.decided_by);
+        expect(second.decision_revision).toBeGreaterThan(first.decision_revision!);
+        expect(second.handoff_snapshot).not.toEqual(first.handoff_snapshot);
+        const before = loadHearingRecord(namespace, sessionId);
+        clearEffectCalls();
+        const response = fakeResponse();
+        await inventory(
+          fakeRequest({
+            params: { session: sessionId },
+            body: { handoff_snapshot: first.handoff_snapshot },
+          }),
+          response
+        );
+        expect(response.statusCode).toBe(409);
+        expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+        expectNoEffects();
+        expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('rejects malformed or missing displayed snapshots before decomposition, reservation, or save', async () => {
+    const sessionId = 'invalid-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const decided = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), decided);
+    const snapshot = responseSnapshot(decided);
+    const before = loadHearingRecord(namespace, sessionId);
+    clearEffectCalls();
+    for (const body of [
+      undefined,
+      null,
+      {},
+      [],
+      'not-json',
+      { handoff_snapshot: null },
+      { handoff_snapshot: { version: 2, token: snapshot.token } },
+      { handoff_snapshot: { version: 1, token: 'invalid' } },
+      { handoff_snapshot: { version: 1, token: 1 } },
+      { handoff_snapshot: { ...snapshot, ignored: true } },
+      { handoff_snapshot: snapshot, scope: { tenant_slug: INVENTORY_TEST_TENANT } },
+    ]) {
+      const response = fakeResponse();
+      await inventory(fakeRequest({ params: { session: sessionId }, body }), response);
+      expect(response.statusCode).toBe(400);
+      expect(response.body).not.toHaveProperty('entry_id');
+    }
+    expectNoEffects();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+  });
+
+  it.each(['principal', 'source', 'organizationIds', 'projectIds'] as const)(
+    'rejects a displayed inventory snapshot after server-resolved %s changes',
+    async (field) => {
+      const sessionId = 'scope-' + randomUUID();
+      await answerAllWorkInventoryRequirements(sessionId);
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+      const decided = fakeResponse();
+      decide(fakeRequest({ params: { session: sessionId } }), decided);
+      const snapshot = responseSnapshot(decided);
+      const before = loadHearingRecord(namespace, sessionId);
+      const current = hearingSecurity.resolvePresenceStudioViewerContext(fakeRequest({}));
+      const viewer = vi
+        .spyOn(hearingSecurity, 'resolvePresenceStudioViewerContext')
+        .mockReturnValue({
+          ...current,
+          ...(field === 'principal'
+            ? { principalId: 'human:other-principal' }
+            : field === 'source'
+              ? { source: 'token' as const }
+              : { [field]: ['changed-scope'] }),
+        });
+      try {
+        clearEffectCalls();
+        const response = fakeResponse();
+        await inventory(
+          fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+          response
+        );
+        expect(response.statusCode).toBe(field === 'source' ? 403 : 409);
+        expectNoEffects();
+        expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+      } finally {
+        viewer.mockRestore();
+      }
+    }
+  );
+
+  it('rejects a token copied to an otherwise identical hearing in another tenant', async () => {
+    const sessionId = 'tenant-' + randomUUID();
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    const decided = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), decided);
+    const snapshot = responseSnapshot(decided);
+    const record = loadHearingRecord(namespace, sessionId)!;
+    process.env.KYBERION_TENANT = 'zz-inventory-other';
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue({
+      ...inventoryFixtureMember(),
+      memberships: [
+        ...inventoryFixtureMember().memberships,
+        { tenant_slug: 'zz-inventory-other', role: 'approver' },
+      ],
+    });
+    // Recreate the same semantic history through the real routes. A raw copy
+    // into a new store would reset record_revision below decision_revision.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(record.decided_at!));
+    try {
+      await answerAllWorkInventoryRequirements(sessionId);
+      const otherDecision = fakeResponse();
+      decide(fakeRequest({ params: { session: sessionId } }), otherDecision);
+      expect(otherDecision.statusCode).toBe(200);
+      expect(responseSnapshot(otherDecision)).not.toEqual(snapshot);
+    } finally {
+      vi.useRealTimers();
+    }
+    const before = loadHearingRecord('zz-inventory-other', sessionId);
+    expect(before).toMatchObject({
+      requirements_revision: record.requirements_revision,
+      decision_revision: record.decision_revision,
+      decided_at: record.decided_at,
+      decided_by: record.decided_by,
+    });
+    expect(
+      before?.requirements.map(({ id, label_key, answer }) => ({ id, label_key, answer }))
+    ).toEqual(record.requirements.map(({ id, label_key, answer }) => ({ id, label_key, answer })));
+    clearEffectCalls();
+    const response = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      response
+    );
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expectNoEffects();
+    expect(loadHearingRecord('zz-inventory-other', sessionId)).toEqual(before);
+  });
+
   it('creates a confirmed work inventory entry under the tenant scope, parses frequency/effort/trigger/systems, and is idempotent', async () => {
     const sessionId = `sess-${randomUUID()}`;
     await answerAllWorkInventoryRequirements(sessionId);
@@ -651,9 +966,13 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     const decideRes = fakeResponse();
     decide(fakeRequest({ params: { session: sessionId } }), decideRes);
     expect(decideRes.statusCode).toBe(200);
+    const snapshot = responseSnapshot(decideRes);
 
     const res = fakeResponse();
-    await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res
+    );
     expect(res.statusCode).toBe(200);
     const body = res.body as {
       ok: boolean;
@@ -689,7 +1008,7 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
       reload
     );
     const reloaded = reload.body as {
-      record: HearingRecordWithInventoryFields;
+      record: HearingRecordWithInventoryFields & { handoff_snapshot?: HearingHandoffSnapshot };
       completion: { kind: string; status: string; id: string; next: { href: string } };
     };
     expect(reloaded.completion).toEqual({
@@ -700,11 +1019,55 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     });
     expect(reloaded.record.work_inventory_entry_id).toBeUndefined();
     expect(reloaded.record.work_inventory_scope).toBeUndefined();
+    expect(reloaded.record.handoff_snapshot).toEqual(snapshot);
 
     // Idempotent: a second call returns the same entry_id, no second write.
+    clearEffectCalls();
     const res2 = fakeResponse();
-    await inventory(fakeRequest({ params: { session: sessionId } }), res2);
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res2
+    );
+    expect(res2.statusCode).toBe(200);
     expect((res2.body as { entry_id: string }).entry_id).toBe(body.entry_id);
+    expectNoEffects();
+    // Replay still validates its POST body and current actor before exposing IDs.
+    const missing = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), missing);
+    expect(missing.statusCode).toBe(400);
+    expect(missing.body).not.toHaveProperty('entry_id');
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue({
+      ...inventoryFixtureMember(),
+      member_id: 'other-member',
+    });
+    const otherActor = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      otherActor
+    );
+    expect(otherActor.statusCode).toBe(409);
+    expect(otherActor.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(otherActor.body).not.toHaveProperty('entry_id');
+    expectNoEffects();
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember());
+    withExecutionContext('ecosystem_architect', () =>
+      safeRmSync(
+        workInventoryRoot({ tenant_slug: INVENTORY_TEST_TENANT }) +
+          '/entries/' +
+          body.entry_id +
+          '.json',
+        { force: true }
+      )
+    );
+    const deletedReplay = fakeResponse();
+    await inventory(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      deletedReplay
+    );
+    expect(deletedReplay.statusCode).toBe(409);
+    expect(deletedReplay.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(deletedReplay.body).not.toHaveProperty('entry_id');
+    expectNoEffects();
   });
 
   it('refuses with 409 instead of overwriting an existing entry with the same id', async () => {
@@ -714,6 +1077,7 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     const decideRes = fakeResponse();
     decide(fakeRequest({ params: { session: sessionId } }), decideRes);
     expect(decideRes.statusCode).toBe(200);
+    const snapshot = responseSnapshot(decideRes);
 
     const fixedNow = new Date('2026-09-22T09:00:00.000Z');
     const scope = { tenant_slug: INVENTORY_TEST_TENANT };
@@ -730,7 +1094,10 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     vi.setSystemTime(fixedNow);
     const res = fakeResponse();
     try {
-      await inventory(fakeRequest({ params: { session: sessionId } }), res);
+      await inventory(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        res
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -767,6 +1134,7 @@ describe('GET /api/hearing/:session completion safety', () => {
       };
       expect(body.completion).toEqual({ kind: 'mission', status: 'unavailable' });
       expect(body.record).not.toHaveProperty('mission_id');
+      expect(body.record).not.toHaveProperty('handoff_snapshot');
       expect(body.persisted).toBe(true);
       expect(loadHearingRecord(TEST_TENANT, sessionId)).toHaveProperty(
         'mission_id',
