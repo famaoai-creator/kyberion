@@ -50,7 +50,8 @@ export interface RunOutcome {
   wall_ms: number;
   produced_files: string[];
   /** Expected outputs that existed BEFORE the command ran (staged by the
-   *  overlay) — a non-empty list means `delivered` may not be earned. */
+   *  overlay OR shipped in the base scenario) — a non-empty list means
+   *  `delivered` may not be earned by the command itself. */
   staged_expected: string[];
   error: string;
   recorded_at: string;
@@ -165,6 +166,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   }
 
   const stagedBefore = new Set(listFiles(runDir));
+  // Per-entry snapshot including directories — listFiles only returns files,
+  // so a staged 'out/' dir would evade the staged_expected honesty check.
+  const expectedPreStaged = (spec.expectOutputs ?? []).filter((rel) =>
+    safeExistsSync(path.join(runDir, rel))
+  );
   const started = Date.now();
   let result;
   try {
@@ -190,7 +196,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   );
   // An overlay that stages the expected outputs satisfies `delivered`
   // without the command producing anything — surface that honestly.
-  const staged_expected = (spec.expectOutputs ?? []).filter((rel) => stagedBefore.has(rel));
+  const staged_expected = expectedPreStaged;
   // A candidate that merely staged every expected output earned nothing —
   // count it as not delivered so the axis can't auto_advance on the sham.
   const allStaged =
@@ -210,7 +216,8 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     staged_expected,
     error: delivered
       ? ''
-      : `exit=${exit_code}` +
+      : (allStaged ? 'all_expected_staged ' : '') +
+        `exit=${exit_code}` +
         (missing.length ? ` missing=${missing.join(',')}` : '') +
         spawnError +
         (stderrTail ? ` stderr_tail=${stderrTail}` : ''),
