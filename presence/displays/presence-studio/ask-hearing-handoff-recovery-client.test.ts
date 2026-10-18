@@ -42,6 +42,7 @@ describe.each(['mission', 'inventory'] as const)('%s completion uncertainty reco
     scenario,
     requirements: [{ answer: 'Private completion answer' }],
     decided_at: '2026-10-17T00:00:00Z',
+    handoff_snapshot: { version: 1, token: 'd'.repeat(64) },
   };
   const marker = {
     version: 1,
@@ -111,6 +112,10 @@ describe.each(['mission', 'inventory'] as const)('%s completion uncertainty reco
     });
     expect(JSON.parse(savedBeforeDispatch!).operationId).not.toBe('');
     expect(savedBeforeDispatch).not.toContain('Private completion answer');
+    expect(savedBeforeDispatch).not.toContain(record.handoff_snapshot.token);
+    expect(JSON.parse(posts(h)[0][1]!.body!)).toEqual({
+      handoff_snapshot: record.handoff_snapshot,
+    });
     expect(label(h)).toBe('front_desk:hearing_completion_pending');
     locked(h);
     h.browserEvent('pagehide');
@@ -637,4 +642,62 @@ describe.each(['mission', 'inventory'] as const)('%s completion uncertainty reco
     expect(posts(h)).toHaveLength(1);
     locked(h);
   });
+
+  it.each(['absent', 'new snapshot', 'ready'])(
+    'keeps stale-snapshot 409 guarded across a newer %s GET and reload',
+    async (outcome) => {
+      const newer = {
+        ...record,
+        requirements: [{ answer: 'Newer server answer' }],
+        handoff_snapshot: { version: 1, token: 'b'.repeat(64) },
+      };
+      const h = setup({
+        post: async () => response({ ok: false, hearing_conflict: 'stale_snapshot' }, 409),
+        read: async (number) =>
+          response({
+            ok: true,
+            record: number === 1 || outcome === 'absent' ? record : newer,
+            completion: number > 1 && outcome === 'ready' ? ready : undefined,
+          }),
+      });
+      await flush();
+      click(h);
+      await flush();
+      const saved = h.storage.get(KEY);
+      expect(saved).toBeTruthy();
+      expect(h.elements.get('hearing-handoff-status')!.textContent).toBe(
+        'front_desk:hearing_conflict_stale_snapshot'
+      );
+      expect(label(h)).toBe('front_desk:hearing_completion_unknown');
+      mutations(h);
+      await flush();
+      expect(posts(h)).toHaveLength(1);
+      locked(h);
+      check(h);
+      await flush();
+      expect(reads(h)).toHaveLength(2);
+      expect(h.storage.get(KEY)).toBe(saved);
+      if (outcome === 'ready') expect(href(h)).toContain('SAVED-RESULT');
+      else expect(href(h)).toBe('');
+      mutations(h);
+      await flush();
+      expect(posts(h)).toHaveLength(1);
+      locked(h);
+      const restored = setup({
+        storage: h.storage,
+        read: async () =>
+          response({
+            ok: true,
+            record: newer,
+            completion: outcome === 'ready' ? ready : undefined,
+          }),
+      });
+      await flush();
+      mutations(restored);
+      await flush();
+      expect(restored.storage.get(KEY)).toBe(saved);
+      expect(posts(restored)).toHaveLength(0);
+      locked(restored);
+    }
+  );
 });

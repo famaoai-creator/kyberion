@@ -88,12 +88,26 @@
         ['completion_locked', 'handoff_unresolved'].indexOf(value.conflict) !== -1
       );
     }
+    function handoffSnapshot(record) {
+      var snapshot = record && record.handoff_snapshot;
+      if (
+        !snapshot ||
+        typeof snapshot !== 'object' ||
+        Array.isArray(snapshot) ||
+        Object.keys(snapshot).length !== 2 ||
+        snapshot.version !== 1 ||
+        typeof snapshot.token !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(snapshot.token)
+      )
+        return null;
+      return { version: 1, token: snapshot.token };
+    }
     function renderHearingHandoff(record, ready) {
       var button = document.getElementById('hearing-handoff');
       var statusEl = document.getElementById('hearing-handoff-status');
       var linkEl = document.getElementById('hearing-handoff-link');
       if (!button || !statusEl || !linkEl) return;
-      button.disabled = state.sending || hearingBlocked();
+      button.disabled = state.sending || hearingBlocked() || !handoffSnapshot(record);
       statusEl.classList.add('hidden');
       linkEl.classList.add('hidden');
       linkEl.setAttribute('href', '');
@@ -941,6 +955,12 @@
       action.key = completionKey();
       action.kind = kind;
       action.sessionId = state.sessionId;
+      action.handoffSnapshot = handoffSnapshot(state.hearingRecord);
+      if (!action.handoffSnapshot) {
+        state[field] = { failed: true, conflict: 'stale_snapshot', action: action };
+        publishDecision();
+        return;
+      }
       try {
         action.marker = JSON.stringify({
           version: 1,
@@ -983,7 +1003,11 @@
               (kind === 'inventory' ? '/inventory?locale=' : '/handoff?locale=') +
               encodeURIComponent(state.locale)
           ),
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ handoff_snapshot: action.handoffSnapshot }),
+          }
         );
       } catch (err) {
         request = Promise.reject(err);

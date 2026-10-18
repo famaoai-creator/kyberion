@@ -17,6 +17,7 @@ const decided = {
   ...record,
   decided_by: { ...humanActor('member-1'), role: 'owner' },
   decided_at: '2026-10-17T00:00:00Z',
+  handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
 };
 function setup(
   post: () => Promise<ReturnType<typeof response>> = () => new Promise(() => {}),
@@ -508,3 +509,49 @@ it('does not publish a retired conflict after navigation', async () => {
   expect(h.elements.get('hearing-decision-text')!.textContent).not.toContain('hearing_conflict');
   expect(h.storage.has(KEY)).toBe(true);
 });
+
+it('uses the snapshot delivered by its accepted decision for the explicit handoff', async () => {
+  const snapshot = { version: 1, token: 'c'.repeat(64) };
+  let requests = 0;
+  const h = setup(async () =>
+    ++requests === 1
+      ? response({ ok: true, record: { ...decided, handoff_snapshot: snapshot } })
+      : response({ ok: true, mission_id: 'MISSION-1', next_action: { href: '/result' } })
+  );
+  await flush();
+  click(h);
+  await flush();
+  expect(h.storage.has(KEY)).toBe(false);
+  expect(h.elements.get('hearing-handoff')!.disabled).toBe(false);
+  const readsBefore = h.fetch.mock.calls.filter(
+    ([url, init]) => url.startsWith('/api/hearing/') && init?.method !== 'POST'
+  ).length;
+  h.elements.get('hearing-handoff')!.fire('click');
+  await flush();
+  expect(posts(h)).toHaveLength(2);
+  expect(posts(h)[1][0]).toContain('/handoff?');
+  expect(JSON.parse(posts(h)[1][1]!.body!)).toEqual({ handoff_snapshot: snapshot });
+  expect(
+    h.fetch.mock.calls.filter(
+      ([url, init]) => url.startsWith('/api/hearing/') && init?.method !== 'POST'
+    )
+  ).toHaveLength(readsBefore);
+});
+
+it.each([undefined, { version: 1, token: 'malformed' }])(
+  'does not infer handoff proof from an accepted decision receipt %#',
+  async (snapshot) => {
+    const h = setup(async () =>
+      response({ ok: true, record: { ...decided, handoff_snapshot: snapshot } })
+    );
+    await flush();
+    click(h);
+    await flush();
+    expect(h.storage.has(KEY)).toBe(false);
+    expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
+    h.elements.get('hearing-handoff')!.fire('click');
+    await flush();
+    expect(posts(h)).toHaveLength(1);
+    expect(h.storage.has('kyberion.ask.hearing.completion.' + SESSION)).toBe(false);
+  }
+);

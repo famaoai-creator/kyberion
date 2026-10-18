@@ -67,7 +67,11 @@ import {
   renderWorkInventoryCanvasHtml,
 } from './hearing-work-inventory.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
-import { readHearingCompletion, withoutHearingCompletionFields } from './hearing-completion.js';
+import { readHearingCompletion } from './hearing-completion.js';
+import {
+  assertHearingHandoffSnapshot,
+  withHearingHandoffSnapshot,
+} from './hearing-handoff-snapshot.js';
 
 class HearingRequestError extends Error {
   readonly status = 400 as const;
@@ -395,7 +399,7 @@ export function registerHearingRoutes(app: express.Express): void {
       res.setHeader('Cache-Control', 'no-store');
       res.json({
         ok: true,
-        record: withResolvedLabels(withoutHearingCompletionFields(record), locale),
+        record: withResolvedLabels(withHearingHandoffSnapshot(record, viewer), locale),
         completion: readHearingCompletion(record, viewer),
         persisted: Boolean(existing),
         canvas_url: hearingCanvasUrl(sessionId, record),
@@ -479,7 +483,7 @@ export function registerHearingRoutes(app: express.Express): void {
       );
       res.status(200).json({
         ok: true,
-        record: withResolvedLabels(withoutHearingCompletionFields(versioned), locale),
+        record: withResolvedLabels(withHearingHandoffSnapshot(versioned, viewer), locale),
         canvas_url: hearingCanvasUrl(sessionId, versioned),
       });
       // WI-08: `work_inventory_table` never calls a reasoning backend for its
@@ -542,7 +546,7 @@ export function registerHearingRoutes(app: express.Express): void {
       return res.json({
         ok: true,
         ...(proof ? { decision_receipt: proof } : {}),
-        record: withResolvedLabels(withoutHearingCompletionFields(decided), locale),
+        record: withResolvedLabels(withHearingHandoffSnapshot(decided, viewer), locale),
         next_action: {
           kind: 'alignment_review',
           label_key: 'front_desk:hearing_next_alignment',
@@ -614,6 +618,11 @@ export function registerHearingRoutes(app: express.Express): void {
       // Idempotent: a session already saved returns the same entry instead
       // of writing a second one.
       assertHearingHandoffReplay(record, 'inventory');
+      const handoffSnapshot = assertHearingHandoffSnapshot(
+        presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'hearing handoff'),
+        record,
+        viewer
+      );
       if (record.work_inventory_entry_id) {
         res.status(200).json({
           ok: true,
@@ -642,6 +651,8 @@ export function registerHearingRoutes(app: express.Express): void {
       const scope = workInventoryScopeForHandoff(viewer);
       const input = buildWorkInventoryDecompositionInput(record, { scope });
       const result = await proposeWorkDecomposition(input, { useModel: true });
+      // Preparation may outlive the initiating actor's current membership.
+      assertHearingHandoffSnapshot({ handoff_snapshot: handoffSnapshot }, record, viewer);
       const reserved = storage.reserve(record, 'inventory', nowIso());
       effectReserved = true;
       // Writing a `knowledge/confidential/<tenant>/work-inventory/` entry is
