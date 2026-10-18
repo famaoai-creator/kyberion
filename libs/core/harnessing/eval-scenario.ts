@@ -47,6 +47,9 @@ export interface LoadedProbeScenario {
 export function loadProbeScenario(specPath: string): LoadedProbeScenario {
   const resolved = assertSafeRepositoryPath(specPath);
   const parsed = loadJson<ProbeScenarioSpec>(resolved);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`[EVAL_SCENARIO] spec must be a JSON object, got ${typeof parsed}`);
+  }
   if (typeof parsed.name !== 'string' || !parsed.name.trim()) {
     throw new Error('[EVAL_SCENARIO] name must be a non-empty string');
   }

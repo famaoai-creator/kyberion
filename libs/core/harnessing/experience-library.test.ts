@@ -129,3 +129,49 @@ describe('seedPromptFromLessons', () => {
     expect(text).toContain('[high]');
   });
 });
+
+describe('lookup edge cases (round-2 regressions)', () => {
+  it('skips malformed JSONL lines instead of throwing', () => {
+    const dir = path.join(ROOT, 'malformed');
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(
+      path.join(dir, 'ops.jsonl'),
+      `${JSON.stringify(row({}))}\nnot-json\n42\n{"cue":"x"}\n`
+    );
+    const out = lookupLessons({ libraryRoot: dir, domain: 'ops' });
+    expect(out).toHaveLength(1);
+    expect(out[0].cue).toBe('probe tuning');
+  });
+  it('throws on unparseable asOf', () => {
+    seedFile('asofx', [row({})]);
+    expect(() =>
+      lookupLessons({ libraryRoot: path.join(ROOT, 'seeded'), domain: 'asofx', asOf: 'bogus' })
+    ).toThrow(/asOf/);
+  });
+  it('cue with no usable tokens matches nothing, not everything', () => {
+    seedFile('stopx', [row({})]);
+    expect(
+      lookupLessons({ libraryRoot: path.join(ROOT, 'seeded'), domain: 'stopx', cue: 'the and' })
+    ).toHaveLength(0);
+  });
+  it('token overlap is word-boundary, not substring', () => {
+    seedFile('tokx', [
+      row({ cue: 'restart the probe harness', lesson: 'apply the winning overlay' }),
+    ]);
+    // 'art' must not match inside 'restart'; 'probe' must match.
+    expect(
+      lookupLessons({
+        libraryRoot: path.join(ROOT, 'seeded'),
+        domain: 'tokx',
+        cue: 'the art of it',
+      })
+    ).toHaveLength(0);
+    expect(
+      lookupLessons({
+        libraryRoot: path.join(ROOT, 'seeded'),
+        domain: 'tokx',
+        cue: 'run the probe again',
+      })
+    ).toHaveLength(1);
+  });
+});

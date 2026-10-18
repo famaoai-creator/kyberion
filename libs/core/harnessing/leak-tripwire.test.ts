@@ -62,3 +62,14 @@ describe('scanOverlayForMarkers', () => {
     );
   });
 });
+
+describe('marker scan (round-2 regressions)', () => {
+  it('matches markers case-insensitively', () => {
+    const r = scanOverlayForMarkers(overlay('casefold', { 'a.txt': 'The Grader EXPECTS x\n' }));
+    expect(r.clean).toBe(false);
+  });
+  it('whitespace-only caller marker is ignored, not a match-all', () => {
+    const r = scanOverlayForMarkers(overlay('ws-marker', { 'a.txt': 'clean content\n' }), ['   ']);
+    expect(r.clean).toBe(true);
+  });
+});
