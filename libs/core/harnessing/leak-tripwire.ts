@@ -66,6 +66,7 @@ function listFiles(dir: string, hits: LeakHit[], prefix = ''): string[] {
     }
     if (stat.isDirectory()) out.push(...listFiles(p, hits, rel));
     else if (stat.isFile()) out.push(rel);
+    else hits.push({ path: rel, marker: '<non-file entry skipped>', line: 0 });
   }
   return out;
 }
@@ -73,7 +74,7 @@ function listFiles(dir: string, hits: LeakHit[], prefix = ''): string[] {
 /** Scan every file under overlayDir for marker strings. Fails closed: an
  *  unreadable dir or file is reported as a hit, never as clean. */
 export function scanOverlayForMarkers(overlayDir: string, markers?: string[]): LeakScanResult {
-  const markerList = [...DEFAULT_MARKERS, ...(markers ?? [])].filter(Boolean);
+  const markerList = [...DEFAULT_MARKERS, ...(markers ?? [])].map((m) => m.trim()).filter(Boolean);
   const dir = assertSafeRepositoryPath(overlayDir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) {
     return {

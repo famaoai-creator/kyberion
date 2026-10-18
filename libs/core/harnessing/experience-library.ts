@@ -68,28 +68,75 @@ export function appendLesson(opts: {
   safeMkdir(root, { recursive: true });
   const file = domainFilePath(opts.libraryRoot, opts.domain);
   const row: ExperienceEntry = { ...entry, recorded_at: nowIso() };
-  appendJsonLine(file, row);
+  appendJsonLine(file, row, { leadingNewline: true });
   return file;
 }
 
 export function lookupLessons(opts: {
   libraryRoot: string;
   domain: string;
-  /** Case-insensitive substring matched against cue OR lesson text. */
+  /** Case-insensitive token-overlap matched against cue OR lesson text.
+   *  Common stopwords are dropped; a cue that yields no usable tokens
+   *  matches NOTHING (returns []) rather than the whole domain. */
   cue?: string;
   /** Causal horizon: only entries with recorded_at <= asOf are visible. */
   asOf?: string;
 }): ExperienceEntry[] {
   const file = domainFilePath(opts.libraryRoot, opts.domain);
   if (!safeExistsSync(file)) return [];
-  // Cue query (a full brief) matches an entry when the entry's cue OR lesson
-  // shares a token — direction matters: a brief never appears inside a cue.
-  const briefTokens = opts.cue
-    ? opts.cue
+  // Cue query: token-set overlap (word boundaries, not substrings — 'art'
+  // must not hit 'start'). Stopwords are dropped or they match everything.
+  const STOPWORDS = new Set([
+    'the',
+    'and',
+    'for',
+    'with',
+    'that',
+    'this',
+    'from',
+    'into',
+    'when',
+    'then',
+    'are',
+    'was',
+    'were',
+    'have',
+    'has',
+    'had',
+    'not',
+    'but',
+    'can',
+    'all',
+    'any',
+    'its',
+    'our',
+    'their',
+    'they',
+    'them',
+    'will',
+    'would',
+    'should',
+    'could',
+    'use',
+    'used',
+    'using',
+    'via',
+    'per',
+    'out',
+    'how',
+    'why',
+    'who',
+    'what',
+  ]);
+  const tokenize = (v: string) =>
+    new Set(
+      v
         .toLowerCase()
         .split(/[^a-z0-9_-]+/)
-        .filter((t) => t.length >= 3)
-    : [];
+        .filter((t) => t.length >= 3 && !STOPWORDS.has(t))
+    );
+  const cueProvided = opts.cue !== undefined && opts.cue !== '';
+  const briefTokens = cueProvided ? tokenize(opts.cue) : new Set<string>();
   let asOfMs: number | null = null;
   if (opts.asOf) {
     asOfMs = Date.parse(opts.asOf);
@@ -127,9 +174,10 @@ export function lookupLessons(opts: {
       const recMs = Date.parse(entry.recorded_at);
       if (Number.isNaN(recMs) || recMs > asOfMs) continue;
     }
-    if (briefTokens.length) {
-      const hay = `${entry.cue}\n${entry.lesson}`.toLowerCase();
-      if (!briefTokens.some((t) => hay.includes(t))) continue;
+    if (cueProvided) {
+      if (!briefTokens.size) continue; // usable-token-less cue matches nothing
+      const hayTokens = tokenize(`${entry.cue}\n${entry.lesson}`);
+      if (![...briefTokens].some((t) => hayTokens.has(t))) continue;
     }
     out.push(entry);
   }
