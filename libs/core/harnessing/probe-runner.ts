@@ -49,6 +49,9 @@ export interface RunOutcome {
   exit_code: number | null;
   wall_ms: number;
   produced_files: string[];
+  /** Expected outputs that existed BEFORE the command ran (staged by the
+   *  overlay) — a non-empty list means `delivered` may not be earned. */
+  staged_expected: string[];
   error: string;
   recorded_at: string;
 }
@@ -109,12 +112,21 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     );
   }
   const runDir = path.join(runRoot, spec.label);
+  const resolvedRunDir = path.resolve(runDir);
+  // Staging onto (or inside) the scenario would recurse the copy into itself
+  // — or worse, safeRmSync a live scenario. Deterministic spec error, not evidence.
+  if (resolvedRunDir === scen || resolvedRunDir.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[PROBE_SPEC] run dir must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   const recorded_at = nowIso();
   const fail = (error: string): RunOutcome => ({
     label: spec.label,
     run_dir: runDir,
     ok: false,
     delivered: false,
+    staged_expected: [],
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
@@ -172,6 +184,9 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   const missing = (spec.expectOutputs ?? []).filter(
     (rel) => !safeExistsSync(path.join(runDir, rel))
   );
+  // An overlay that stages the expected outputs satisfies `delivered`
+  // without the command producing anything — surface that honestly.
+  const staged_expected = (spec.expectOutputs ?? []).filter((rel) => stagedBefore.has(rel));
   const delivered = exit_code === 0 && missing.length === 0;
   logger.debug?.(
     `[probe:${spec.label}] exit=${exit_code} delivered=${delivered} wall=${wall_ms}ms`
@@ -184,6 +199,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     exit_code,
     wall_ms,
     produced_files: after.filter((f) => !stagedBefore.has(f)),
+    staged_expected,
     error: delivered
       ? ''
       : `exit=${exit_code}` +

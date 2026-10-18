@@ -85,6 +85,11 @@ export function loadSurfaceSpec(specPath: string): SurfaceSpec {
     if (typeof p !== 'string') {
       throw new Error(`[SURFACE_SPEC] allowed_paths entries must be strings, got ${typeof p}`);
     }
+    if (/\s|\u0000-\u001f/u.test(p)) {
+      throw new Error(
+        `[SURFACE_SPEC] allowed_paths entries must not contain whitespace or control characters: ${JSON.stringify(p)}`
+      );
+    }
     const effective = p.endsWith('/') ? p.slice(0, -1) : p;
     if (!isValidRelPath(effective) && !p.includes('*')) {
       throw new Error(`[SURFACE_SPEC] invalid allowed_path ${JSON.stringify(p)}`);
