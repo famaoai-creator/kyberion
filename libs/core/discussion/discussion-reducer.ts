@@ -23,6 +23,7 @@ function emptyState(id: string): DiscussionRoomState {
     participants: [],
     staffing_gaps: [],
     roster_source: 'rules',
+    execution: null,
     agenda: [],
     messages: [],
     speaking: null,
@@ -120,6 +121,35 @@ export function reduceDiscussionRoom(
         state.created_by = event.created_by;
         state.created_at = event.ts;
         break;
+      case 'execution_initialized':
+        // Never reset counters or rewrite provenance on resume/reopen.
+        if (!state.execution) state.execution = { ...event.execution, attempts: [] };
+        break;
+      case 'provider_call_started':
+        if (
+          state.execution &&
+          !state.execution.attempts.some((attempt) => attempt.id === event.id)
+        ) {
+          state.execution.attempts.push({
+            id: event.id,
+            operation: event.operation,
+            provider: event.provider,
+            status: 'started',
+            started_at: event.ts,
+          });
+        }
+        break;
+      case 'provider_call_finished': {
+        const attempt = state.execution?.attempts.find((item) => item.id === event.id);
+        if (attempt && attempt.status === 'started') {
+          attempt.status = event.status;
+          attempt.finished_at = event.ts;
+          if (event.error_code) attempt.error_code = event.error_code;
+          if (event.status === 'succeeded' && state.execution)
+            state.execution.provider = attempt.provider;
+        }
+        break;
+      }
       case 'team_formed':
         state.participants = event.participants;
         state.staffing_gaps = event.gaps;
@@ -412,6 +442,7 @@ export function summarizeDiscussionRoom(state: DiscussionRoomState): DiscussionR
     work_item_count: Object.keys(state.outcomes.work_items).length,
     has_minutes: state.outcomes.minutes !== null,
     mode: state.config.mode,
+    single_pass: state.config.single_pass === true,
     archived: state.archived,
     readiness: state.dialogue.readiness,
     last_message_preview: (() => {

@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import * as React from 'react';
+import { discussionArtifactUrlForDeliverable } from '../lib/discussion-artifact-url';
 import { usePathname, useSearchParams } from 'next/navigation';
 import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
@@ -29,6 +30,8 @@ import {
 } from '../lib/deliverables-response';
 
 function assetUrl(item: Deliverable): string | null {
+  const savedDiscussionUrl = discussionArtifactUrlForDeliverable(item);
+  if (savedDiscussionUrl) return savedDiscussionUrl;
   if (item.externalRef && /^https?:\/\//i.test(item.externalRef)) return item.externalRef;
   if (!item.path) {
     if (!item.previewText) return null;
@@ -145,7 +148,12 @@ export function DeliverablesWorkspace({
     let cancelled = false;
     void fetch(url, { cache: 'no-store' })
       .then(async (response) => {
-        if (!response.ok) throw new Error('Failed to load the preview');
+        if (!response.ok) {
+          const failure = await response.json().catch(() => null);
+          throw new Error(
+            typeof failure?.error === 'string' ? failure.error : 'Failed to load the preview'
+          );
+        }
         return response.text();
       })
       .then((text) => {

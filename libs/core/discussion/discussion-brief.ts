@@ -1,4 +1,9 @@
-import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
+import {
+  discussionExecutionSummary,
+  discussionRoleLabel,
+  fillCopy,
+  loadDiscussionCopy,
+} from './discussion-copy.js';
 import { pickByLocale } from '../locale-normalize.js';
 import type {
   DiscussionMessageView,
@@ -162,6 +167,14 @@ export function renderDiscussionBriefHtml(
 ): string {
   const locale = room.config.locale;
   const copy = loadDiscussionCopy().brief;
+  const executionCopy = loadDiscussionCopy().execution;
+  const execution = discussionExecutionSummary(room);
+  const singlePass = room.config.single_pass === true;
+  const canReopen =
+    room.config.speaker === 'scripted' &&
+    room.execution?.actual_mode !== 'reasoning' &&
+    room.execution?.provider == null &&
+    (room.execution?.attempts.length ?? 0) === 0;
   const t = (key: string, vars: Record<string, string | number> = {}) =>
     fillCopy(copy[key]?.[locale] ?? key, vars);
   const decision = room.decision;
@@ -175,9 +188,11 @@ export function renderDiscussionBriefHtml(
   const verdictLabel = review ? t(`verdict_${review.verdict.replace('-', '_')}`) : '';
 
   const chips = [
-    `${esc(t('consensus'))} ${Math.round(room.consensus * 100)}%`,
+    singlePass ? '' : `${esc(t('consensus'))} ${Math.round(room.consensus * 100)}%`,
     `${room.participants.length} ${esc(t('participants'))}`,
-    `${room.messages.length} / ${room.round} ${esc(t('round', { round: '' }).trim())}`,
+    singlePass
+      ? ''
+      : `${room.messages.length} / ${room.round} ${esc(t('round', { round: '' }).trim())}`,
     room.scope.tenant_slug ? esc(room.scope.tenant_slug) : '',
     room.scope.mission_id ? esc(room.scope.mission_id) : '',
   ]
@@ -255,7 +270,7 @@ export function renderDiscussionBriefHtml(
     ? `<h3>${esc(t('dissent'))}</h3><ul>${decision.dissent.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>`
     : '';
   const agreementsHtml = decision?.agreements.length
-    ? `<h3>${esc(t('agreements'))}</h3><ul>${decision.agreements.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>`
+    ? `<h3>${esc(singlePass ? executionCopy.rationale[locale] : t('agreements'))}</h3><ul>${decision.agreements.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>`
     : '';
 
   const reviewPanel = (() => {
@@ -269,10 +284,11 @@ export function renderDiscussionBriefHtml(
     }
     return `<section class="card review" id="review"><h2>${esc(t('review_title'))}</h2>
       <p class="muted">${esc(t('edit_hint'))}</p>
+      ${canReopen ? '' : `<p class="muted">${esc(executionCopy.revision_notice[locale])}</p>`}
       <label class="fld"><span>${esc(t('note_label'))}</span><textarea id="note" rows="3" maxlength="1000" placeholder="${esc(t('note_placeholder'))}"></textarea></label>
       ${room.scope.mission_id ? '' : `<label class="chk"><input type="checkbox" id="req-mission" checked> ${esc(t('request_mission'))}</label>`}
       <div class="actions"><button type="button" class="btn primary" data-verdict="accept">${esc(t('accept'))}</button>
-      <button type="button" class="btn" data-verdict="request-changes">${esc(t('request_changes'))}</button>
+      <button type="button" class="btn" data-verdict="request-changes"${canReopen ? '' : ' disabled'}>${esc(t('request_changes'))}</button>
       <button type="button" class="btn danger" data-verdict="reject">${esc(t('reject'))}</button></div>
       <p id="status" class="muted" role="status"></p></section>`;
   })();
@@ -290,20 +306,25 @@ export function renderDiscussionBriefHtml(
 
   return `<!doctype html>
 <html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(t('eyebrow'))}: ${esc(room.title)}</title>
+<title>${esc(singlePass ? executionCopy.draft[locale] : t('eyebrow'))}: ${esc(room.title)}</title>
 <style>${BRIEF_CSS}</style></head><body>
 <main>
-<header class="top"><div class="eyebrow">${esc(t('eyebrow'))}</div><h1>${esc(room.title)}</h1>
+<header class="top"><div class="eyebrow">${esc(singlePass ? executionCopy.draft[locale] : t('eyebrow'))}</div><h1>${esc(room.title)}</h1>
 <p class="goal"><strong>${esc(t('goal'))}:</strong> ${esc(room.goal)}</p><div class="chips">${chips}</div></header>
+<section class="card provenance"><h2>${esc(execution.heading)}</h2><p>${esc(execution.notice)}</p><dl>${execution.entries.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('')}</dl></section>
 ${
   decision
-    ? `<section class="card decision"><h2>${esc(t('decision'))}</h2><p class="lead">${esc(decision.summary)}</p>${agreementsHtml}${dissentHtml}</section>`
+    ? `<section class="card decision"><h2>${esc(singlePass ? executionCopy.draft[locale] : t('decision'))}</h2><p class="lead">${esc(decision.summary)}</p>${agreementsHtml}${dissentHtml}</section>`
     : ''
 }
-<div class="cols">
+${
+  singlePass
+    ? ''
+    : `<div class="cols">
 <section class="card"><h2>${esc(t('stance_map'))}</h2>${stanceMatrix(room, locale)}</section>
 <section class="card"><h2>${esc(t('consensus_trend'))}</h2>${trendSvg(room, t('no_data'))}</section>
-</div>
+</div>`
+}
 ${
   objections.length
     ? `<section class="card"><h2>${esc(t('objections'))}</h2><ul class="objections">${objections

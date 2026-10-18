@@ -13,6 +13,7 @@ import { issueMissionForDiscussion, withLiveMissionStatus } from './discussion-m
 import { reviewDiscussion } from './discussion-review.js';
 import { ScriptedDiscussionSpeaker } from './discussion-speaker.js';
 import {
+  appendDiscussionEvent,
   createDiscussionRoom,
   readDiscussionRoom,
   submitDiscussionCommand,
@@ -157,6 +158,70 @@ describe('decision review', () => {
       clearWorkCoordinationNamespace();
     }
   });
+
+  it.each(['reasoning', 'auto', 'observed-real'] as const)(
+    'preserves %s decisions and edits when an in-place provider rerun is refused',
+    (mode) => {
+      const id = 'test-review-bounded-' + mode;
+      created.push(id);
+      withExecutionContext(ROLE, () => {
+        createDiscussionRoom({
+          id,
+          goal: 'Bounded brief',
+          config: {
+            speaker: mode === 'observed-real' ? 'scripted' : mode,
+            provider: 'claude',
+            single_pass: true,
+          },
+        });
+        if (mode === 'observed-real')
+          appendDiscussionEvent(id, {
+            type: 'execution_initialized',
+            execution: {
+              requested_mode: 'scripted',
+              actual_mode: 'reasoning',
+              requested_provider: 'claude',
+              provider: 'claude',
+              model: null,
+              internal_turn_limit: 3,
+              call_budget: 1,
+              timeout_ms: 60000,
+            },
+          });
+        appendDiscussionEvent(id, {
+          type: 'decision',
+          summary: 'Keep this decision',
+          agreements: [],
+          dissent: [],
+          next_steps: ['Keep this proposal'],
+          consensus: 0,
+          concluded_by: 'facilitator',
+        });
+        appendDiscussionEvent(id, {
+          type: 'outcomes_proposed',
+          proposals: [
+            {
+              id: 'wp-1',
+              title: 'Keep this proposal',
+              description: 'Original',
+              priority: 'normal',
+            },
+          ],
+        });
+      });
+      const before = readDiscussionRoom(id)!;
+      expect(() =>
+        withExecutionContext(ROLE, () =>
+          reviewDiscussion(id, 'reviewer', {
+            verdict: 'request-changes',
+            note: 'Revise this',
+            edits: [{ id: 'wp-1', title: 'Must not apply' }],
+          })
+        )
+      ).toThrow(/Start a new room/);
+      expect(readDiscussionRoom(id)).toEqual(before);
+    }
+  );
 
   it('request-changes needs a comment, reopens the room, and a new decision can then be accepted', async () => {
     const id = 'test-review-changes';
