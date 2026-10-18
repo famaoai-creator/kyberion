@@ -65,6 +65,18 @@ export interface MemoryPromotionGrant {
 export type MemoryApprovalChannel = 'steward' | 'pr_review';
 export const MEMORY_APPROVAL_CHANNELS: readonly MemoryApprovalChannel[] = ['steward', 'pr_review'];
 
+/**
+ * The transferable-lesson record emitted by mission distillation
+ * (harness2 experience contract: cue/lesson/evidence/confidence). Present on a
+ * candidate only when the distiller produced a complete evidence-backed lesson.
+ */
+export interface MemoryDistillExperience {
+  cue: string;
+  lesson: string;
+  evidence: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
 export interface MemoryCandidate {
   candidate_id: string;
   source_type: MemoryCandidateSourceType;
@@ -100,6 +112,10 @@ export interface MemoryCandidate {
   scope?: MemoryScopeEnvelope;
   /** Required when a tenant-scoped candidate is promoted to a broader tier. */
   promotion?: MemoryPromotionGrant;
+  /** Harness2 contract: the evidence-backed transferable lesson, when distillation produced one. */
+  distill_experience?: MemoryDistillExperience;
+  /** True when distillation ran but declined to emit a lesson (no reusable contrast). */
+  distill_experience_declined?: boolean;
 }
 
 const SCHEMA_PATH = pathResolver.rootResolve(
@@ -435,6 +451,8 @@ export function createMemoryPromotionCandidate(input: {
   queuedAt?: string;
   scope?: MemoryScopeEnvelope;
   promotion?: MemoryCandidate['promotion'];
+  distillExperience?: MemoryDistillExperience;
+  distillExperienceDeclined?: boolean;
 }): MemoryCandidate {
   const now = input.queuedAt || nowIso();
   const summary = normalizeMemoryFact(String(input.summary || ''), Date.parse(now) || Date.now());
@@ -460,6 +478,16 @@ export function createMemoryPromotionCandidate(input: {
     last_seen: now,
     ...(input.scope ? { scope: assertMemoryScope(input.scope, input.scope.tier) } : {}),
     ...(input.promotion ? { promotion: input.promotion } : {}),
+    ...(input.distillExperience ? { distill_experience: input.distillExperience } : {}),
+    ...(input.distillExperienceDeclined !== undefined || input.distillExperience
+      ? {
+          // An experience-bearing row is never 'declined' (schema-enforced for
+          // direct enqueues); normalize here so factory callers get it right.
+          distill_experience_declined: input.distillExperience
+            ? false
+            : input.distillExperienceDeclined,
+        }
+      : {}),
   };
 }
 
@@ -551,6 +579,25 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       last_seen: now,
       ...(current.scope ? { scope: current.scope } : {}),
       ...(current.promotion ? { promotion: current.promotion } : {}),
+      // Adopt the incoming distill-experience fields when the retained row
+      // lacks them: distill and finish enqueue the same logical candidate, so
+      // whichever write carries the lesson must not be dropped by the merge.
+      // A row holding an experience is never "declined" — a stale declined flag
+      // from an earlier empty write must not outlive the lesson itself.
+      ...(current.distill_experience || normalizedCandidate.distill_experience
+        ? {
+            distill_experience:
+              current.distill_experience || normalizedCandidate.distill_experience,
+            distill_experience_declined: false,
+          }
+        : current.distill_experience_declined !== undefined ||
+            normalizedCandidate.distill_experience_declined !== undefined
+          ? {
+              distill_experience_declined:
+                current.distill_experience_declined ??
+                normalizedCandidate.distill_experience_declined,
+            }
+          : {}),
     };
     assertPublicTierReferencesSafe(next);
     const updatedValidation = validateMemoryPromotionCandidate(next);

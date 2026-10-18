@@ -10,6 +10,10 @@ export interface MissionDistillMarkdownPolicyCatalog {
     patterns_discovered: string;
     failures_and_recoveries: string;
     reusable_artifacts: string;
+    /** Optional: harness2 change-attribution rows heading. */
+    change_attribution?: string;
+    /** Optional: harness2 transferable-lesson (cue/lesson/evidence/confidence) heading. */
+    transferable_lesson?: string;
   };
   prompt_titles: {
     mission_state: string;

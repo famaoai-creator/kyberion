@@ -285,6 +285,12 @@ function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unkn
     memory_candidate_source_ref: candidate.source_ref,
     memory_candidate_kind: candidate.proposed_memory_kind,
     memory_ratification_required: candidate.ratification_required,
+    // Preserve the distill-time evidence basis so the promoted record keeps
+    // its cue/lesson/evidence/confidence after the queue row is done with it.
+    ...(candidate.distill_experience ? { distill_experience: candidate.distill_experience } : {}),
+    ...(candidate.distill_experience_declined !== undefined
+      ? { distill_experience_declined: candidate.distill_experience_declined }
+      : {}),
   };
   switch (candidate.proposed_memory_kind) {
     case 'sop':
