@@ -335,13 +335,15 @@ describe('peer task exchange', () => {
     );
     expect(runner).not.toHaveBeenCalled();
 
-    // The runner died (pid gone): resume takes over on the same WorkItem.
+    // The runner process is gone but its executor child could outlive it until
+    // the deadline: plain resume still refuses, --force takes over.
     appendGovernedArtifactJsonl(
       'infrastructure_sentinel',
       peerRuntimeLogicalPath(TENANT, RECIPIENT, 'task-exchange.jsonl'),
       { ...stuck, execution: { ...stuck.execution!, pid: 999_999 } }
     );
-    const done = await resumePeerTask({ ...base, runner: okRunner });
+    await expect(resumePeerTask({ ...base, runner })).rejects.toThrow(/peer_task_still_running/);
+    const done = await resumePeerTask({ ...base, runner: okRunner, force: true });
     expect(done).toMatchObject({ state: 'completed', work_item_id: stuck.work_item_id });
     expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
       'completed'
