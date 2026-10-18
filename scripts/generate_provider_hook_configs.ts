@@ -3,7 +3,7 @@
  * hook wiring that cannot be committed (provider state dirs are gitignored
  * per the multi-provider co-execution contract).
  *
- * Currently owns the `hooks` block of `.gemini/settings.json`: SessionStart /
+ * Owns Gemini event groups in `.gemini/settings.json`: SessionStart /
  * BeforeAgent / BeforeTool / SessionEnd are wired to
  * dist/scripts/gemini_cli_hook.js so Gemini CLI sessions join the checkout's
  * co-session, receive pending handoffs on each prompt, and get denied when
@@ -14,7 +14,11 @@
  * are ceremony-owned and replaced wholesale.
  *
  * Usage:
- *   pnpm generate:provider-hooks           — write .gemini/settings.json
+ * Codex wiring lives in `.codex/hooks.json`: SessionStart / UserPromptSubmit /
+ * PostToolUse / SessionEnd. Preserve user commands within the same events and
+ * never register Stop. Hook trust remains a native CLI /hooks decision.
+ *
+ *   pnpm generate:provider-hooks           — write Gemini + Codex hooks
  *   pnpm generate:provider-hooks -- --check — fail if the file drifted
  */
 
@@ -27,6 +31,7 @@ import { isRecord } from '@agent/core/foundation/text';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const GEMINI_SETTINGS = '.gemini/settings.json';
+const CODEX_HOOKS = '.codex/hooks.json';
 const OWNED_EVENTS = ['SessionStart', 'BeforeAgent', 'BeforeTool', 'SessionEnd'] as const;
 
 function hookCommand(event: string): string {
@@ -57,15 +62,55 @@ function buildManagedHooks(): Record<string, GeminiHookGroup[]> {
   };
 }
 
-function loadExistingSettings(): Record<string, unknown> {
-  const filePath = pathResolver.rootResolve(GEMINI_SETTINGS);
+function loadExistingSettings(relativePath = GEMINI_SETTINGS): Record<string, unknown> {
+  const filePath = pathResolver.rootResolve(relativePath);
   if (!safeExistsSync(filePath)) return {};
-  try {
-    const parsed = parseSafeJsonInput(readTextFile(filePath), GEMINI_SETTINGS);
-    return isRecord(parsed) ? parsed : {};
-  } catch {
-    return {};
+  const parsed = parseSafeJsonInput(readTextFile(filePath), relativePath);
+  if (!isRecord(parsed))
+    throw new Error(`${relativePath} must contain an object; refusing to replace it`);
+  return parsed;
+}
+
+/** Preserve user hooks even in owned event groups. Only our command is replaced. */
+export function buildCodexHooks(existing: Record<string, unknown> = {}): Record<string, unknown> {
+  if ('hooks' in existing && !isRecord(existing.hooks)) {
+    throw new Error('Codex hooks must be an object; refusing to replace existing configuration');
   }
+  const hooks = isRecord(existing.hooks) ? { ...existing.hooks } : {};
+  const script = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'codex_cli_hook.js');
+  // Quote for the command shell, including checkout paths containing $ or `.
+  const quoted = `'${script.replaceAll("'", "'\\''")}'`;
+  for (const event of ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'SessionEnd']) {
+    if (event in hooks && !Array.isArray(hooks[event])) {
+      throw new Error(`Codex ${event} hooks must be an array; refusing to replace them`);
+    }
+    const groups = Array.isArray(hooks[event]) ? hooks[event] : [];
+    const preserved = groups.flatMap((group: unknown) => {
+      if (!isRecord(group) || !Array.isArray(group.hooks)) return [group];
+      const remaining = group.hooks.filter(
+        (hook: unknown) =>
+          !(
+            isRecord(hook) &&
+            typeof hook.command === 'string' &&
+            /(?:^|[\\/])codex_cli_hook\.js["']?\s/.test(hook.command)
+          )
+      );
+      return remaining.length ? [{ ...group, hooks: remaining }] : [];
+    });
+    hooks[event] = [
+      ...preserved,
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: `node ${quoted} ${event}`,
+            timeout: event === 'SessionEnd' ? 3 : 10,
+          },
+        ],
+      },
+    ];
+  }
+  return { ...existing, hooks };
 }
 
 export function buildGeminiSettings(
@@ -84,7 +129,7 @@ export function buildGeminiSettings(
 
 export const runGenerateProviderHookConfigs = defineGenerator({
   id: 'provider-hook-configs',
-  outputs: [GEMINI_SETTINGS],
+  outputs: [GEMINI_SETTINGS, CODEX_HOOKS],
   executionContext: 'generate_provider_hook_configs',
   render: async () => {
     const hookJs = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'gemini_cli_hook.js');
@@ -95,7 +140,11 @@ export const runGenerateProviderHookConfigs = defineGenerator({
       );
     }
     const merged = buildGeminiSettings(loadExistingSettings());
-    return [{ path: GEMINI_SETTINGS, content: `${JSON.stringify(merged, null, 2)}\n` }];
+    const codex = buildCodexHooks(loadExistingSettings(CODEX_HOOKS));
+    return [
+      { path: GEMINI_SETTINGS, content: `${JSON.stringify(merged, null, 2)}\n` },
+      { path: CODEX_HOOKS, content: `${JSON.stringify(codex, null, 2)}\n` },
+    ];
   },
 });
 
