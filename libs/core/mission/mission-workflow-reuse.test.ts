@@ -56,6 +56,11 @@ vi.mock('../path-resolver.js', () => ({
 }));
 vi.mock('./mission-state-reader.js', () => ({ loadMissionStateAtPath: () => fixture.state }));
 vi.mock('./mission-llm.js', () => ({ runAdaptiveStructuredLlmProfile: fixture.llm }));
+vi.mock('./mission-distill.js', () => ({
+  loadWisdomPolicy: () => ({
+    llm: { default_profile: 'heavy', profiles: { heavy: { command: 'codex', args: [] } } },
+  }),
+}));
 vi.mock('../knowledge/memory-promotion-queue.js', () => ({
   enqueueMemoryPromotionCandidate: fixture.enqueue,
 }));
@@ -77,7 +82,8 @@ const assessment = () => ({
   inputs: [{ name: 'topic', description: 'Requested topic' }],
   steps: [{ kind: 'reasoning', instruction: 'Evaluate the requested topic' }],
   success_conditions: ['Reviewed output'],
-  pipeline: { action: 'pipeline', steps: [] },
+  pipeline_json: JSON.stringify({ action: 'pipeline', steps: [] }),
+  existing_pipeline_ref: null,
 });
 beforeEach(() => {
   vi.clearAllMocks();
@@ -99,6 +105,22 @@ beforeEach(() => {
 });
 
 describe('automatic workflow reuse preparation', () => {
+  it('refuses malformed pipeline JSON before queue handoff', async () => {
+    fixture.llm.mockResolvedValue({ ...assessment(), pipeline_json: '{broken' });
+    expect(await prepareMissionWorkflowReuse(id, mission)).toMatchObject({
+      status: 'not_assessed',
+    });
+    expect(fixture.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('passes governed LLM profiles into assessment invocation', async () => {
+    await prepareMissionWorkflowReuse(id, mission);
+    expect(fixture.llm.mock.calls[0][3].policy).toMatchObject({
+      default_profile: 'heavy',
+      profiles: { heavy: { command: 'codex' } },
+    });
+  });
+
   it('repairs a missing snapshot artifact after interruption before queueing', async () => {
     fixture.failWrite = '/preparation.json';
     expect(await prepareMissionWorkflowReuse(id, mission)).toMatchObject({

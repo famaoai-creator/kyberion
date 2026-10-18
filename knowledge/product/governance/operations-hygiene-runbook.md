@@ -1371,6 +1371,24 @@ consumption, tenant separation, circuit/backoff, goal satisfaction, measurement
 repair, and authority/budget enforcement. Run the adjacent outcome/runtime,
 admission/recovery, digest/recovery and inbox suites when changing this path.
 
+## Workflow reuse completion assessment
+
+**Rule.** Completion-time workflow assessment must pass the governed wisdom LLM
+profiles into the adaptive runner. A successful mission finish does not prove
+that assessment ran: inspect `workflow-reuse.json` and distinguish `not_assessed`
+from a validated `needs_review` candidate.
+
+**Procedure.** Exercise the ordinary retrospective with a real configured provider.
+Transport arbitrary ADF dictionaries as JSON text in strict provider output schemas,
+then parse and validate through the internal schema, ADF, guardrails and dry-run
+checks. Verify stable candidate identity on unchanged evidence. Replay remains
+subject to project-trust approval; never infer execution authority from candidate
+generation or dry-run success.
+
+**Gate.** `mission-workflow-reuse.test.ts` covers governed profile forwarding,
+malformed transport JSON refusal and stable retries. A live probe must additionally
+record provider success, queue handoff and the separately approved replay result.
+
 ## §14 CLI hook continuation loops
 
 **Build-safe hook startup.** Provider hook commands enter through
