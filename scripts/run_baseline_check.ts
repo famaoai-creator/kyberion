@@ -79,6 +79,7 @@ import {
 } from '@agent/core/baseline-check-cache';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { inspectBaselineBuildReadiness, type BuildReadiness } from './baseline_build_readiness.js';
 
 type ReadinessRule = {
   required_keys_any?: string[];
@@ -583,11 +584,12 @@ function maybeSubmitJanitorMaintenanceJob(): {
 }
 
 export function deriveBaselineStatus(
-  result: { success: boolean; failedLayer?: string | null },
+  result: { success: boolean; failedLayer?: string | null; deferred?: boolean },
   janitorMaintenance: BaselineMaintenanceState,
   reasoningDegraded = false
 ): 'all_clear' | 'needs_onboarding' | 'needs_recovery' | 'needs_attention' {
   if (!result.success) {
+    if (result.deferred) return 'needs_attention';
     if (result.failedLayer === 'L3') return 'needs_onboarding';
     if (['L0', 'L1', 'L2'].includes(result.failedLayer || '')) return 'needs_recovery';
     return 'needs_attention';
@@ -1018,32 +1020,20 @@ export async function runBaselineCheck() {
   // with `pnpm run build` as the fix.
   let distImportViolations: string[] = [];
   let staleDistTargets: string[] = [];
-  sentinel.registerLayer('L2', async () => {
-    const distPath = pathResolver.rootResolve('dist/scripts');
-    if (!safeExistsSync(distPath)) return false;
-    const { checkDistWorkspaceImports } = await import('./check_dist_workspace_imports.js');
-    try {
-      distImportViolations = checkDistWorkspaceImports();
-    } catch (error) {
-      // A throwing scan (e.g. a malformed package.json under libs/) must not
-      // leave L2 failed with an empty report — surface the error as the
-      // violation so the hint still names something actionable.
-      distImportViolations = [
-        `scan failed: ${error instanceof Error ? error.message : String(error)}`,
-      ];
-    }
-    // Staleness is the sibling failure mode: a dist tree older than its
-    // sources serves old exports — e.g. `pnpm organization` dying on a
-    // missing export while baseline reported all_clear.
-    const { findStaleDistTargets } = await import('./check_stale_dist.js');
-    try {
-      const staleScan = findStaleDistTargets();
-      staleDistTargets = staleScan.stale.map((entry) => `${entry.target}: ${entry.reason}`);
-    } catch (error) {
-      staleDistTargets = [`scan failed: ${error instanceof Error ? error.message : String(error)}`];
-    }
-    return distImportViolations.length === 0 && staleDistTargets.length === 0;
-  });
+  let buildReadiness: BuildReadiness | null = null;
+  sentinel.registerLayer(
+    'L2',
+    async () => {
+      buildReadiness = await inspectBaselineBuildReadiness();
+      distImportViolations = buildReadiness.import_violations;
+      staleDistTargets = buildReadiness.stale_targets.map(
+        (entry) => `${entry.target}: ${entry.reason}`
+      );
+      const { passed, deferred, reason, fingerprint, evidence } = buildReadiness;
+      return { passed, ...(deferred ? { deferred } : {}), reason, fingerprint, evidence };
+    },
+    { countFailure: false }
+  );
 
   // L3: Identity Layer (Soul)
   sentinel.registerLayer('L3', async () => {
@@ -1122,6 +1112,7 @@ export async function runBaselineCheck() {
     circuit_broken: result.circuitBroken,
     failed_layer: result.failedLayer || null,
     details: state.layers,
+    build_readiness: buildReadiness,
     config_degraded: baselineConfigDegraded,
     reasoning_degraded: reasoningDegraded,
     warnings: {

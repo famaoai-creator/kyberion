@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "rootDir": "."
+  },
+  "files": ["scripts/build_repository.ts", "scripts/clean.ts", "scripts/clean_entrypoint.ts"],
+  "references": [{ "path": "./libs/core" }]
+}

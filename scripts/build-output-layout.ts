@@ -20,7 +20,7 @@ export const ROOT_SOURCE_EXCLUSIONS = {
     'displays/operator-surface',
     'displays/concierge',
   ],
-  scripts: ['clean.ts', 'clean_entrypoint.ts'],
+  scripts: ['clean.ts', 'clean_entrypoint.ts', 'build_repository.ts'],
 } as const;
 
 // These are exact historical compiler-owned locations, not a recursive dist search.
