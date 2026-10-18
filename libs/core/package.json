@@ -1800,6 +1800,10 @@
       "types": "./dist/mesh/handoff-packet.d.ts",
       "default": "./dist/mesh/handoff-packet.js"
     },
+    "./harnessing/blind-select": {
+      "types": "./dist/harnessing/blind-select.d.ts",
+      "import": "./dist/harnessing/blind-select.js"
+    },
     "./harnessing/contrastive-session": {
       "types": "./dist/harnessing/contrastive-session.d.ts",
       "import": "./dist/harnessing/contrastive-session.js"
@@ -1807,6 +1811,14 @@
     "./harnessing/decision-axis": {
       "types": "./dist/harnessing/decision-axis.d.ts",
       "import": "./dist/harnessing/decision-axis.js"
+    },
+    "./harnessing/propose": {
+      "types": "./dist/harnessing/propose.d.ts",
+      "import": "./dist/harnessing/propose.js"
+    },
+    "./harnessing/surface-spec": {
+      "types": "./dist/harnessing/surface-spec.d.ts",
+      "import": "./dist/harnessing/surface-spec.js"
     },
     "./headless-surface-contract": {
       "types": "./dist/headless-surface-contract.d.ts",
