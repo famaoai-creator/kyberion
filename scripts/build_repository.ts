@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Bootstrap must work before package dist exists: every import is source-relative.
 import { randomUUID } from 'node:crypto';
-import * as path from 'node:path';
 import { createLogger } from '../libs/core/logger.js';
 import { withCompilerOutputs } from '../libs/core/build-coordination.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';
@@ -56,25 +55,13 @@ export interface BuildStageRuntime {
   offSignal(signal: 'SIGINT' | 'SIGTERM', handler: () => void): void;
   signalGroup(pid: number, signal: NodeJS.Signals): void;
   windows: boolean;
-  packageManagerEntrypoint?: string;
 }
 
-export function resolveBuildCommand(
-  stage: BuildStage,
-  windows: boolean,
-  packageManagerEntrypoint?: string
-): BuildStage {
+export function resolveBuildCommand(stage: BuildStage, windows: boolean): BuildStage {
   if (!windows || stage.command !== 'pnpm') return stage;
-  // Windows cannot exec a .cmd shim with shell:false. pnpm supplies its JS
-  // entrypoint to lifecycle scripts, so keep argv boundaries without a shell.
-  if (
-    !packageManagerEntrypoint ||
-    !path.win32.isAbsolute(packageManagerEntrypoint) ||
-    !/\.[cm]?js$/i.test(packageManagerEntrypoint)
-  ) {
-    throw new Error('Windows UI build requires the pnpm lifecycle entrypoint; run pnpm build.');
-  }
-  return { ...stage, command: process.execPath, args: [packageManagerEntrypoint, ...stage.args] };
+  // Windows cannot exec a .cmd shim with shell:false. Use pnpm's native
+  // executable so the build works with both standalone pnpm and Node installs.
+  return { ...stage, command: 'pnpm.exe' };
 }
 
 export async function runBuildStage(
@@ -93,10 +80,9 @@ export async function runBuildStage(
       process.kill(-pid, signal);
     },
     windows: process.platform === 'win32',
-    packageManagerEntrypoint: process.env.npm_execpath,
     ...overrides,
   };
-  const command = resolveBuildCommand(stage, runtime.windows, runtime.packageManagerEntrypoint);
+  const command = resolveBuildCommand(stage, runtime.windows);
   assertGovernedExec(command.command, command.args);
   await new Promise<void>((resolve, reject) => {
     let cancelled: string | undefined;
