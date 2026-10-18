@@ -502,8 +502,9 @@ describe('hearing decision receipt HTTP contract', () => {
     vi.stubEnv('KYBERION_TENANT', otherTenant);
     vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember(otherTenant));
     const response = receipt(operation, { ...receiptQuery(), tenant });
-    expect(response.statusCode).toBe(404);
-    expect(response.body).toEqual({ ok: false, decision_receipt_status: 'unknown' });
+    expect(response.statusCode).toBe(403);
+    expect(response.body).not.toHaveProperty('decision_receipt');
+    expect(response.body).not.toHaveProperty('decision_receipt_status');
     expect(bytes()).toBe(before);
     expect(
       withExecutionContext('ecosystem_architect', () => loadHearingRecord(otherTenant, session))
