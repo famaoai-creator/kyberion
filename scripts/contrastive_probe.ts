@@ -59,6 +59,30 @@ export const runContrastiveProbe = defineScript({
   name: 'contrastive_probe',
   run: async (context: { argv: string[]; print: (line: string) => void }) => {
     const args = parseArgs(stripSharedScriptFlags(context.argv));
+    const KNOWN = new Set([
+      'scenario',
+      'command',
+      'scenario-spec',
+      'run-root',
+      'candidate',
+      'propose',
+      'brief',
+      'surface',
+      'select',
+      'seed',
+      'expect',
+      'metric',
+      'work-shape',
+      'rounds',
+      'library',
+      'domain',
+      'markers',
+    ]);
+    for (const key of Object.keys(args)) {
+      if (!KNOWN.has(key)) {
+        throw new ScriptExitError(2, `unknown flag --${key}`);
+      }
+    }
     const scenario = args['scenario']?.[0];
     const scenarioSpecPath = args['scenario-spec']?.[0];
     const runRoot = args['run-root']?.[0];
