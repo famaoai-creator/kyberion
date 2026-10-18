@@ -34,6 +34,12 @@ import {
 } from './DiscussionExecutionStatus';
 import { DiscussionBriefControls } from './DiscussionBriefControls';
 import { DiscussionBriefResult } from './DiscussionBriefResult';
+import {
+  DiscussionCreateUncertainty,
+  DiscussionReadiness,
+  useDiscussionReadiness,
+} from './DiscussionReadiness';
+import { canAttemptDiscussion } from '../lib/discussion-readiness-state';
 import { OutcomesCard } from './DiscussionOutcomes';
 import {
   discussionRunConfig,
@@ -132,9 +138,14 @@ function Launcher({
   const submitting = React.useRef(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [createUnconfirmed, setCreateUnconfirmed] = React.useState(false);
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
   const [missions, setMissions] = React.useState<MissionOption[]>([]);
   const [missionId, setMissionId] = React.useState('');
+  const readinessSelection =
+    format === 'brief' && speaker !== 'scripted' ? { provider: speaker, missionId } : null;
+  const readiness = useDiscussionReadiness(readinessSelection);
+  const canAttempt = canAttemptDiscussion(format, speaker, missionId, readiness.state);
 
   // Deep links (`?goal=…&mission=…`) let a mission or WorkItem open a room with its context.
   React.useEffect(() => {
@@ -164,10 +175,16 @@ function Launcher({
 
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!goal.trim() || submitting.current) return;
+    if (
+      !goal.trim() ||
+      submitting.current ||
+      !canAttemptDiscussion(format, speaker, missionId, readiness.getState())
+    )
+      return;
     submitting.current = true;
     setBusy(true);
     setError(null);
+    setCreateUnconfirmed(false);
     const result = await createDiscussion({
       goal: goal.trim(),
       locale,
@@ -178,6 +195,10 @@ function Launcher({
     submitting.current = false;
     setBusy(false);
     if (!result.ok || !result.data) {
+      if (readinessSelection) {
+        readiness.invalidate(result.status);
+        setCreateUnconfirmed(true);
+      }
       setError(result.error ?? 'failed');
       return;
     }
@@ -200,6 +221,7 @@ function Launcher({
               role="radio"
               aria-checked={locale === code}
               data-active={locale === code ? 'true' : undefined}
+              disabled={busy}
               onClick={() => onLocale(code)}
             >
               {code.toUpperCase()}
@@ -234,6 +256,7 @@ function Launcher({
               className="dl-mode"
               aria-checked={format === option.id}
               aria-pressed={format === option.id}
+              disabled={busy}
               onClick={() => setFormat(option.id)}
             >
               <option.icon size={18} aria-hidden />
@@ -248,6 +271,7 @@ function Launcher({
         <textarea
           id="dr-goal"
           value={goal}
+          disabled={busy}
           onChange={(e) => setGoal(e.target.value)}
           placeholder={dt(mode === 'dialogue' ? 'dlgGoalPlaceholder' : 'goalPlaceholder', locale)}
           rows={3}
@@ -263,14 +287,14 @@ function Launcher({
         <div className="dr-examples">
           <span className="dr-muted">{dt('examples', locale)}</span>
           {DISCUSSION_EXAMPLES[locale].map((example) => (
-            <button type="button" key={example} onClick={() => setGoal(example)}>
+            <button type="button" key={example} disabled={busy} onClick={() => setGoal(example)}>
               {example}
             </button>
           ))}
         </div>
         <label className="dr-field dr-mission-field">
           <span>{dt('linkMission', locale)}</span>
-          <select value={missionId} onChange={(e) => setMissionId(e.target.value)}>
+          <select value={missionId} disabled={busy} onChange={(e) => setMissionId(e.target.value)}>
             <option value="">{dt('noMission', locale)}</option>
             {missionId && !missions.some((m) => m.missionId === missionId) ? (
               <option value={missionId}>{missionId}</option>
@@ -292,6 +316,7 @@ function Launcher({
                 role="radio"
                 aria-checked={tempo === t.id}
                 data-active={tempo === t.id ? 'true' : undefined}
+                disabled={busy}
                 onClick={() => setTempo(t.id)}
               >
                 {dt(t.key, locale)}
@@ -300,7 +325,11 @@ function Launcher({
           </div>
           <label className="dr-field dr-field--inline">
             <span>{dt('engine', locale)}</span>
-            <select value={speaker} onChange={(e) => setSpeaker(e.target.value as typeof speaker)}>
+            <select
+              value={speaker}
+              disabled={busy}
+              onChange={(e) => setSpeaker(e.target.value as typeof speaker)}
+            >
               <option value="scripted">{dt('engineScripted', locale)}</option>
               <option value="claude">{dt('engineClaude', locale)}</option>
               <option value="codex">{dt('engineCodex', locale)}</option>
@@ -309,14 +338,20 @@ function Launcher({
           <button
             type="submit"
             className="dr-btn dr-btn--primary dr-btn--lg"
-            disabled={busy || !goal.trim()}
-            aria-describedby="dr-run-bounds"
+            disabled={busy || !goal.trim() || !canAttempt}
+            aria-describedby={readinessSelection ? 'dr-run-bounds dr-readiness' : 'dr-run-bounds'}
           >
             <Rocket size={16} aria-hidden />{' '}
             {busy
               ? dt('starting', locale)
               : dt(
-                  format === 'brief' ? 'briefStart' : mode === 'dialogue' ? 'dlgStart' : 'start',
+                  format === 'brief'
+                    ? speaker === 'scripted'
+                      ? 'briefStart'
+                      : 'briefAttempt'
+                    : mode === 'dialogue'
+                      ? 'dlgStart'
+                      : 'start',
                   locale
                 )}
           </button>
@@ -329,16 +364,25 @@ function Launcher({
               <div>
                 {dt('perInvocation', locale)}: 60s · {dt('noAutomaticRetry', locale)}
               </div>
-              <DiscussionProviderPrerequisite locale={locale} />
+              {format !== 'brief' ? <DiscussionProviderPrerequisite locale={locale} /> : null}
               <div>{dt('providerRestartHint', locale)}</div>
               <div>{dt(speaker === 'claude' ? 'claudeTurnLimit' : 'codexTurnLimit', locale)}</div>
             </>
           ) : null}
           {format === 'panel' ? <div>{dt('round', locale)}: 1</div> : null}
         </div>
+        {readinessSelection ? (
+          <DiscussionReadiness
+            locale={locale}
+            state={readiness.state}
+            busy={busy}
+            onRetry={readiness.retry}
+          />
+        ) : null}
         {error ? (
           <div className="dr-note" data-tone="danger" role="alert">
             {error}
+            {createUnconfirmed ? <DiscussionCreateUncertainty locale={locale} /> : null}
           </div>
         ) : null}
       </form>
