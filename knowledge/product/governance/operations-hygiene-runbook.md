@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-17
+last_updated: 2026-10-18
 ---
 
 # Operations Hygiene Runbook
@@ -67,6 +67,12 @@ had regressed.
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
 4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
+
+**Generated catalogs in shared checkouts.** Regenerate knowledge indexes in the PR's isolated
+worktree, using only the files that ship with that branch. A shared checkout can contain another
+task's untracked knowledge file; its index entry then becomes a broken link in CI. Before pushing,
+run `pnpm generate:knowledge-index` and the `documentation-links` PR gate in the isolated worktree.
+Do not copy an index from a dirty checkout or add another task's document to satisfy the link.
 
 **Build-artifact identity and diagnostics.** Freshness checks must compare directory
 components after artifact-only path normalization: a buildinfo entry under `src-other/`
@@ -1057,6 +1063,11 @@ test needs a link, create it inside `active/shared/tmp/` with a target the test 
 (`safeSymlinkSync`), or plant it with raw `node:fs` when the test models a link created outside
 secure-io. A link target in `os.tmpdir()` is outside the repository and is refused. A fixture root
 needs copies, not links, of catalogs from the real checkout.
+
+CLI daemons use the same secure-io boundary for runtime files. Borrow log descriptors through
+`withSafeAppendFile` so spawn failures also close them; redirect detached stderr to that descriptor
+instead of appending the same log line again. Run `libs/core/security-boundary.contract.test.ts`
+alongside the CLI tests: adding a raw-fs exception to an import baseline does not satisfy this gate.
 
 **Cost.** realpath(3) walks every component: about 30 µs per call at depth 15. Measured on an idle
 CI VM (median µs/op, 2,000 ops × 5 runs, deep path in `active/shared/tmp/`, two runs each),

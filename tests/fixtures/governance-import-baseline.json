@@ -161,7 +161,6 @@
     "scripts/org.test.ts",
     "scripts/reconcile_knowledge_scopes.entrypoint.test.ts",
     "scripts/run_realtime_voice_conversation.test.ts",
-    "scripts/terminal_session_cli.ts",
     "scripts/ts-loader-cache.mjs",
     "scripts/ts-loader-cache.test.ts",
     "scripts/ts-loader.mjs",

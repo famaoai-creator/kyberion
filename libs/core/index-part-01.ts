@@ -76,6 +76,7 @@ export {
   safeLstat,
   safeReadlink,
   safeOpenAppendFile,
+  withSafeAppendFile,
   safeFsyncFile,
   safeCreateExclusiveFileSync,
   safeChmodSync,
