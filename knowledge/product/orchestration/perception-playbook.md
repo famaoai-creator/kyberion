@@ -32,12 +32,12 @@ Japanese: [perception-playbook.ja.md](./perception-playbook.ja.md).
 
 ## 1. The four senses
 
-| Sense      | Command                                                        | Inputs                                               | Engine (shared with the pipeline op)                                                          |
-| ---------- | -------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 文章を読む | `pnpm kyberion read <file> [--ocr]`                            | pdf, pptx, docx, xlsx/xlsm, html/htm, md, txt        | `@agent/core/document-reader` = `media:document_digest`                                       |
-| 画像を見る | `pnpm kyberion see <image> [--describe]`                       | png, jpg, webp, gif, heic, tiff, bmp                 | `@agent/core/ocr-bridge` (local) = `vision:ocr_image`; `--describe` = `vision:describe_image` |
-| 話を聞く   | `pnpm kyberion listen <audio> [--timestamps]`                  | wav, mp3, m4a, aac, flac, ogg, opus, webm, caf, aiff | speech-to-text seam (`@agent/core/speech-to-text-bridge`) = `voice:transcribe`                |
-| 動画を見る | `pnpm kyberion watch <video> [--every <sec>] [--frames <dir>]` | mp4, mov, m4v, webm, mkv, avi                        | ffprobe/ffmpeg → frames through `see`'s OCR + audio through `listen`                          |
+| Sense      | Command                                                        | Inputs                                                                 | Engine (shared with the pipeline op)                                                          |
+| ---------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 文章を読む | `pnpm kyberion read <file> [--ocr]`                            | pdf, pptx, docx, xlsx/xlsm, html/htm, md, txt, csv/tsv, json, yaml/yml | `@agent/core/document-reader` = `media:document_digest`                                       |
+| 画像を見る | `pnpm kyberion see <image> [--describe]`                       | png, jpg, webp, gif, heic, tiff, bmp                                   | `@agent/core/ocr-bridge` (local) = `vision:ocr_image`; `--describe` = `vision:describe_image` |
+| 話を聞く   | `pnpm kyberion listen <audio> [--timestamps]`                  | wav, mp3, m4a, aac, flac, ogg, opus, webm, caf, aiff                   | speech-to-text seam (`@agent/core/speech-to-text-bridge`) = `voice:transcribe`                |
+| 動画を見る | `pnpm kyberion watch <video> [--every <sec>] [--frames <dir>]` | mp4, mov, m4v, webm, mkv, avi                                          | ffprobe/ffmpeg → frames through `see`'s OCR + audio through `listen`                          |
 
 `watch` is a composition, not a new engine: frames are OCR'd like `see` and the audio
 track is transcribed like `listen`, then merged into a timeline (`## Transcript`,
