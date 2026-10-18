@@ -2,7 +2,7 @@
 title: '事前許可(同意・承認・egress・OS 許可)の統一 改善計画 (PG-01〜09)'
 tags: [improvement-plan, governance, consent, approval, egress, permission, meeting]
 last_updated: 2026-10-19
-status: in_progress
+status: partial
 ---
 
 # 事前許可(同意・承認・egress・OS 許可)の統一 改善計画 (PG-01〜09)
@@ -12,7 +12,7 @@ status: in_progress
 - 関連:
   - [HUMAN_APPROVAL_TRUST_PLAN](./HUMAN_APPROVAL_TRUST_PLAN_2026-10-05.ja.md)(承認者の本人性と assurance。本計画はその上に乗る)
   - [SCOPE_GOVERNANCE_UNIFICATION_PLAN](./SCOPE_GOVERNANCE_UNIFICATION_PLAN_2026-10-03.ja.md)(スコープ軸の統一)
-  - [WORK_INVENTORY_PLAN](../improvement-plans-2026-08/WORK_INVENTORY_PLAN_2026-09-22.ja.md)(作業観察の同意。本計画の手本)
+  - [WORK_INVENTORY_PLAN](../improvement-plans-2026-09/WORK_INVENTORY_PLAN_2026-09-22.ja.md)(作業観察の同意。本計画の手本)
   - [entity-scope-hierarchy](../../../knowledge/product/architecture/entity-scope-hierarchy.md)
 
 ## 0. 問題
@@ -197,6 +197,12 @@ resolveGrant({ capability, context }): {
 | PG-07  | カレンダー会議の前の readiness 通知                                                                 | PG-06        | 未着手   |
 | PG-08  | Concierge 設定の「録音への同意」を Grant 一覧に広げる(付与・取消、i18n 必須)                        | PG-03        | 未着手   |
 | PG-09  | env 自己申告の整理(`KYBERION_AUDIO_PERMISSION_CONFIRMED` 廃止、`KYBERION_SUDO` 迂回の audit 化)     | PG-01、PG-03 | 未着手   |
+
+### PG-01〜02 のレビューで残した課題
+
+- `.restricted`(MDM やペアレンタルコントロールで制限)を `denied` と同じに扱っている。運用者がシステム設定で直せないので、別の状態として案内を分ける。
+- 用途説明(usage description)を持たないプロセスから warm-up を呼ぶと、`requestAccess` でプロセスごと落ちることがある。ターミナルから実行する前提なので今は問題ないが、デーモン経由で使うなら kind ごとに結果を残す。
+- `meeting_preflight` の pass は、probe を実行したホストアプリの許可。実際の録音を別プロセス(Playwright の Chromium など)が行う場合は PG-02b で経路ごとに判定する。
 
 ## 4. 移行と互換
 

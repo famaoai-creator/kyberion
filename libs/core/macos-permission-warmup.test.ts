@@ -60,6 +60,14 @@ describe('macOS permission warm-up', () => {
     expect(results.screen_recording?.remedy).toContain('Privacy_ScreenCapture');
   });
 
+  it('points screen recording at System Settings when it stays ungranted after a request', () => {
+    native.runMacOSNativeBinary.mockReturnValue({
+      screen_recording: { before: 'unknown', after: 'unknown' },
+    });
+    const { results } = warmupMacOSPermissions(['screen_recording']);
+    expect(results.screen_recording?.remedy).toBe(PERMISSION_SETTINGS_PANE.screen_recording);
+  });
+
   it('reports a failed helper instead of throwing', () => {
     native.runMacOSNativeBinary.mockImplementation(() => {
       throw new Error('native_execution_failed');

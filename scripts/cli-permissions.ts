@@ -25,8 +25,9 @@ export const PERMISSIONS_USAGE = `Usage: pnpm kyberion permissions <status|warmu
   warmup [--only <kinds>] [--json]
                                   Ask macOS for permissions that are still undetermined.
                                   <kinds>: comma list of ${PERMISSION_WARMUP_KINDS.join(' / ')}
-                                  (default: microphone). Denied kinds are not re-requested;
-                                  the System Settings pane to enable them is printed instead.
+                                  (default: microphone). Denied microphone/camera are not
+                                  re-requested; the System Settings pane to enable them is
+                                  printed instead (screen recording always needs that pane).
 
 macOS grants belong to the terminal app running this command (host app).`;
 
@@ -114,7 +115,7 @@ export function renderPermissionsWarmup(result: PermissionWarmupResult, json: bo
     if (r?.remedy)
       lines.push(
         '',
-        `> [permissions] ${kind} is denied. Enable the host app in System Settings: ${r.remedy}`
+        `> [permissions] ${kind} is not granted. Enable the host app in System Settings, then restart it: ${r.remedy}`
       );
   if (result.reason) lines.push('', `> [permissions] warm-up failed: ${result.reason}`);
   return lines.join('\n');
