@@ -490,6 +490,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh/peer-auto-reply.ts#defaultPeerAutoReplyGenerate",
+      "roles": ["peer_responder_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/peer-auto-reply.ts#defaultRetrieveKnowledge",
       "roles": ["peer_responder_reader"],
       "unresolved": []
