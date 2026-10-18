@@ -549,10 +549,13 @@ describe('distill experience fields', () => {
       evidenceRefs: ['artifact:ART-QUEUE-DISTILL-2'],
       sensitivityTier: 'public',
     });
+    // The missing `evidence` field makes this an invalid MemoryDistillExperience;
+    // JSON.parse yields the malformed shape without an `as any` cast.
+    const partialExperience = JSON.parse('{"cue":"c","lesson":"l","confidence":"high"}');
     expect(() =>
       enqueueMemoryPromotionCandidate({
         ...candidate,
-        distill_experience: { cue: 'c', lesson: 'l', confidence: 'high' } as any,
+        distill_experience: partialExperience,
       })
     ).toThrow(/Invalid memory promotion candidate/);
   });
