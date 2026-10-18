@@ -39,6 +39,7 @@ beforeEach(() => {
       tenant_allowed_domains: {
         'approved-tenant': ['api.anthropic.com'],
         'attested-tenant': ['api.anthropic.com'],
+        'restricted-tenant': ['api.anthropic.com'],
       },
     })
   );
@@ -213,7 +214,11 @@ describe('zero_retention honours tenant provider attestations', () => {
   const TENANTS_DIR = path.join(REGISTRY_ROOT, 'knowledge', 'personal', 'tenants');
   const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 
-  function writeTenant(slug: string, attestations?: Record<string, unknown>): void {
+  function writeTenant(
+    slug: string,
+    attestations?: Record<string, unknown>,
+    extra: Record<string, unknown> = {}
+  ): void {
     safeWriteFile(
       path.join(TENANTS_DIR, `${slug}.json`),
       JSON.stringify({
@@ -222,6 +227,7 @@ describe('zero_retention honours tenant provider attestations', () => {
         status: 'active',
         assigned_role: 'owner',
         ...(attestations ? { provider_attestations: attestations } : {}),
+        ...extra,
       })
     );
   }
@@ -246,6 +252,12 @@ describe('zero_retention honours tenant provider attestations', () => {
       codex: { training_use: 'none', attested_at: daysFromNow(-1) },
     });
     writeTenant('unattested-tenant');
+    // Valid claude attestation, but the tenant only allows codex.
+    writeTenant(
+      'restricted-tenant',
+      { claude: { training_use: 'none', attested_at: daysFromNow(-1) } },
+      { allowed_reasoning_backends: ['codex'] }
+    );
     _setReasoningTenantRegistryRootForTests(REGISTRY_ROOT);
     _resetProviderEgressPolicyCacheForTests();
   });
@@ -278,6 +290,41 @@ describe('zero_retention honours tenant provider attestations', () => {
         /no zero_retention declaration/
       );
     });
+  });
+
+  it("denies an attested provider outside the tenant's allowed_reasoning_backends", () => {
+    zeroRetention('restricted-tenant', () => {
+      expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
+        /provider egress policy denies confidential material: tenant 'restricted-tenant' does not allow provider 'claude'/
+      );
+    });
+  });
+
+  it('denies an attested provider the provider egress policy does not declare or approve', () => {
+    const providerPolicyPath = path.join(REGISTRY_ROOT, 'provider-egress-policy.json');
+    safeWriteFile(
+      providerPolicyPath,
+      JSON.stringify({
+        version: '1.3.0',
+        providers: { codex: { egress: 'external-api', training_use: 'unknown' } },
+        tier_policy: {
+          confidential: { mode: 'approved-only', approved_providers: [] },
+          personal: { mode: 'local-only-or-approved', approved_providers: [] },
+        },
+      })
+    );
+    process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = providerPolicyPath;
+    _resetProviderEgressPolicyCacheForTests();
+    try {
+      zeroRetention('attested-tenant', () => {
+        expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
+          /'claude' is not declared/
+        );
+      });
+    } finally {
+      delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+      _resetProviderEgressPolicyCacheForTests();
+    }
   });
 
   it('denies without an attestation', () => {

@@ -8,6 +8,7 @@ import {
   resolveReasoningProviderDescriptor,
 } from './reasoning-provider-registry.js';
 import {
+  evaluateProviderEgress,
   lookupTenantProviderAttestation,
   providerIdForReasoningIdentifier,
 } from '../provider/provider-egress-gate.js';
@@ -100,7 +101,11 @@ export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefi
  * tenant that owns the material holds a valid (unexpired) provider attestation
  * of `training_use: 'none'` for the backend's egress provider id — the same
  * attestation `checkProviderEgress` honours, read through the same governed
- * lookup. Anything else keeps the fail-closed denial.
+ * lookup. For confidential/personal material the send must additionally pass
+ * `evaluateProviderEgress` — the side-effect-free evaluator behind
+ * `checkProviderEgress` — so the tenant's `allowed_reasoning_backends` and the
+ * provider-declared / approved_providers rule apply exactly as they do on the
+ * delegation face. Anything else keeps the fail-closed denial.
  */
 function assertZeroRetentionAttested(backendName: string, scope: ReasoningPayloadScope): void {
   const next =
@@ -146,6 +151,19 @@ function assertZeroRetentionAttested(backendName: string, scope: ReasoningPayloa
     deny(
       `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for provider '${provider}'`,
       `${evidence} training_use=${attestation.training_use}`
+    );
+  }
+  if (scope.tier === 'public') return;
+  const decision = evaluateProviderEgress({
+    provider,
+    dataTier: scope.tier,
+    tenant_slug: tenantSlug,
+    ...(tenantRegistryRootForTests ? { tenant_registry_root_dir: tenantRegistryRootForTests } : {}),
+  });
+  if (!decision.allowed) {
+    deny(
+      `the provider egress policy denies ${scope.tier} material: ${decision.reason ?? 'denied'}`,
+      `${evidence} tier=${scope.tier}`
     );
   }
 }
