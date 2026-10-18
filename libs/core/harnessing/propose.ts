@@ -160,9 +160,11 @@ export async function proposeCandidates(opts: {
   }
   // Any delegateTask served by the stub mid-loop (failover) taints the batch —
   // purge the affected candidates so stub-authored overlays can't reach a probe.
-  const stubServed = getStubServedOps()
-    .slice(stubServedBefore)
-    .some((r) => r.op === 'delegateTask');
+  // Any stub-served op in the window taints the batch — a backend can route
+  // internally through 'prompt' etc., so don't filter on op. A saturated
+  // registry (records dropped at cap) is treated conservatively as tainted.
+  const registry = getStubServedOps();
+  const stubServed = registry.length >= 500 || registry.slice(stubServedBefore).length > 0;
   if (stubServed) {
     result.backend_used = false;
     result.error = result.error || 'degraded: stub backend served one or more proposals';
