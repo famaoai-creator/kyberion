@@ -2,6 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { buildSafeExecEnv } from '@agent/core/secure-io';
+import { resolveContinuousOwnerPlatform } from './continuous_owner_platform.js';
+
 export interface ContinuousOwnerProcessOptions {
   cwd: string;
   env: Record<string, string | undefined>;
@@ -15,6 +17,7 @@ export interface ContinuousOwnerProcessResult {
   status: number | null;
   error?: Error;
 }
+
 export function runContinuousOwnerProcess(
   command: string,
   args: string[],
@@ -22,12 +25,8 @@ export function runContinuousOwnerProcess(
 ): Promise<ContinuousOwnerProcessResult> {
   if (options.signal?.aborted)
     return Promise.reject(new Error('Continuous owner controller aborted before spawn'));
-  if (process.platform === 'win32')
-    return Promise.reject(
-      new Error(
-        'Continuous owner requires supervised process-tree cancellation; Windows execution is unavailable'
-      )
-    );
+  const platform = resolveContinuousOwnerPlatform();
+  const invocation = platform.createInvocation(command, args, options.cwd);
   return new Promise((resolve) => {
     const resourceId = 'continuous-owner:' + randomUUID();
     const { child } = spawnManagedProcess({
@@ -35,8 +34,8 @@ export function runContinuousOwnerProcess(
       kind: 'service',
       ownerId: 'continuous-work-owner',
       ownerType: 'mission_controller',
-      command,
-      args,
+      command: invocation.command,
+      args: invocation.args,
       shutdownPolicy: 'manual',
       metadata: {
         tenant_slug: options.env.KYBERION_TENANT,
@@ -46,8 +45,8 @@ export function runContinuousOwnerProcess(
         cwd: options.cwd,
         env: buildSafeExecEnv(options.env),
         shell: false,
-        detached: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: invocation.detached,
+        stdio: [invocation.stdin, 'pipe', 'pipe'],
       },
     });
     let stdout = '',
@@ -55,16 +54,13 @@ export function runContinuousOwnerProcess(
       bytes = 0,
       settled = false;
     let failure: Error | undefined;
-    const killGroup = () => {
-      if (child.pid) {
-        try {
-          process.kill(-child.pid, 'SIGKILL');
-        } catch (error) {
-          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH'))
-            failure = error instanceof Error ? error : new Error(String(error));
-        }
-      }
-    };
+    invocation.writeInput?.(child, (error) => {
+      if (!settled) failure = error;
+    });
+    const killGroup = () =>
+      invocation.terminate(child, (error) => {
+        failure = error;
+      });
     const stop = (error: Error) => {
       failure = error;
       killGroup();
@@ -80,8 +76,7 @@ export function runContinuousOwnerProcess(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      // A successful controller may leave workers with detached stdio behind.
-      // Keep group ownership until those descendants have been terminated too.
+      // Keep process-group ownership until possible detached descendants are reaped.
       killGroup();
       options.signal?.removeEventListener('abort', onAbort);
       stopManagedProcess(resourceId, null);
@@ -98,7 +93,6 @@ export function runContinuousOwnerProcess(
     };
     child.stdout?.on('data', (chunk: Buffer) => append('stdout', chunk));
     child.stderr?.on('data', (chunk: Buffer) => append('stderr', chunk));
-    // AbortError means a kill was requested. Wait for close before reporting settlement.
     child.on('error', (error: Error) => {
       failure = error;
       if (!child.pid) finish(null, error);

@@ -38,6 +38,109 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('continuous owner managed controller', () => {
+  it.skipIf(process.platform !== 'win32')(
+    'cleans up a worker after its Windows Job Object controller exits successfully',
+    async () => {
+      vi.mocked(process.kill).mockRestore();
+      const actual = await vi.importActual<typeof import('@agent/core/managed-process')>(
+        '@agent/core/managed-process'
+      );
+      mocks.spawn.mockImplementationOnce((spec) => actual.spawnManagedProcess(spec));
+      const script =
+        "const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(child.pid);child.unref();";
+      const result = await runContinuousOwnerProcess(process.execPath, ['-e', script], {
+        ...options,
+        cwd: process.cwd(),
+        env: { ...process.env },
+        timeoutMs: 10000,
+      });
+      expect(result).toMatchObject({ status: 0 });
+      expect(result.error).toBeUndefined();
+      let descendantPid: number | undefined = Number(result.stdout.trim());
+      expect(descendantPid, JSON.stringify(result)).toBeGreaterThan(0);
+      for (let attempt = 0; attempt < 150; attempt++) {
+        try {
+          process.kill(descendantPid!, 0);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+            descendantPid = undefined;
+            break;
+          }
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(descendantPid).toBeUndefined();
+    },
+    15000
+  );
+  it.skipIf(process.platform !== 'win32')(
+    'terminates a Windows Job Object controller and its worker descendant on abort',
+    async () => {
+      vi.mocked(process.kill).mockRestore();
+      const actual = await vi.importActual<typeof import('@agent/core/managed-process')>(
+        '@agent/core/managed-process'
+      );
+      let readyResolve!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        readyResolve = resolve;
+      });
+      let descendantPid: number | undefined;
+      let wrapperStderr = '';
+      mocks.spawn.mockImplementationOnce((spec) => {
+        const handle = actual.spawnManagedProcess(spec);
+        handle.child.stdout?.on('data', (chunk: Buffer) => {
+          const parsed = Number(String(chunk).match(/\d+/)?.[0]);
+          if (Number.isSafeInteger(parsed) && parsed > 0 && !descendantPid) {
+            descendantPid = parsed;
+            readyResolve();
+          }
+        });
+        handle.child.stderr?.on('data', (chunk: Buffer) => {
+          wrapperStderr += String(chunk);
+        });
+        return handle;
+      });
+      const abort = new AbortController();
+      const script =
+        "const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(child.pid);setInterval(()=>{},1000);";
+      const promise = runContinuousOwnerProcess(process.execPath, ['-e', script], {
+        ...options,
+        cwd: process.cwd(),
+        env: { ...process.env },
+        timeoutMs: 10000,
+        signal: abort.signal,
+      });
+      try {
+        await Promise.race([
+          ready,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('descendant did not start: ' + wrapperStderr)), 5000)
+          ),
+        ]);
+        expect(descendantPid).toBeGreaterThan(0);
+        abort.abort();
+        expect((await promise).error?.message).toContain('aborted');
+        for (let attempt = 0; attempt < 150; attempt++) {
+          try {
+            process.kill(descendantPid!, 0);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+              descendantPid = undefined;
+              break;
+            }
+            throw error;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        expect(descendantPid).toBeUndefined();
+      } finally {
+        abort.abort();
+        await promise;
+      }
+    },
+    20000
+  );
   it.skipIf(process.platform === 'win32')(
     'cleans up a worker after its controller exits successfully',
     async () => {
