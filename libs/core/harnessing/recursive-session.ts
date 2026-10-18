@@ -302,6 +302,16 @@ export async function runRecursiveSession(
       // Materialize: next base = current base + winner overlay.
       const winner = candidates.find((c) => c.label === decision.winner)!;
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
+      const resolvedWinner = path.resolve(assertSafeRepositoryPath(winner.overlayDir));
+      const resolvedNext = path.resolve(nextBase);
+      if (
+        resolvedNext === resolvedWinner ||
+        resolvedNext.startsWith(`${resolvedWinner}${path.sep}`)
+      ) {
+        throw new Error(
+          `[RECURSIVE_SESSION] winner overlay ${JSON.stringify(winner.overlayDir)} contains the next base dir`
+        );
+      }
       if (safeExistsSync(nextBase)) safeRmSync(nextBase);
       copyTree(currentBase, nextBase);
       copyTree(winner.overlayDir, nextBase);
