@@ -769,7 +769,14 @@ export function safeRmSync(
   // not descend through links, but a symlinked PARENT would redirect the
   // removal into another scope — so the parent is canonicalized.
   const { resolved, canonical } = guardWritePath(targetPath, 'leaf');
-  if (options.recursive) assertRuntimeStateAggregateAccess(resolved, canonical);
+  if (options.recursive) {
+    const scratchRoot = pathResolver.rootResolve('active/shared/tmp');
+    if (resolved === scratchRoot || canonical === canonicalGuardPath(scratchRoot, 'leaf'))
+      throw new Error(
+        '[SECURITY] scratch_root_removal_denied — remove only a named job workspace, never the shared scratch root'
+      );
+    assertRuntimeStateAggregateAccess(resolved, canonical);
+  }
   if (fs.existsSync(resolved)) {
     fs.rmSync(resolved, options);
   }
