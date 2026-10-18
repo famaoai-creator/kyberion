@@ -191,7 +191,27 @@ describe('mission lifecycle finish gate', () => {
       )
     );
 
+    const { provisionMissionEntry, writeProvisionedText, loadMissionOrchestrationReplayPlan } =
+      await import('./mission-orchestration-journal.js');
+    const ledgerPath = `${personalRepairMissionPath}/execution-ledger.jsonl`;
+    writeProvisionedText({
+      missionId: personalRepairMissionId,
+      filePath: ledgerPath,
+      targetPath: 'execution-ledger.jsonl',
+      missionPathHint: personalRepairMissionPath,
+      provisioned: provisionMissionEntry(''),
+    });
+    const ledger = `${JSON.stringify({
+      ts: '2026-10-18T09:00:00.000Z',
+      mission_id: personalRepairMissionId,
+      event_type: 'evidence_recorded',
+    })}\n`;
+    safeWriteFile(ledgerPath, ledger);
     await repairLegacyMissionState(personalRepairMissionId, 'personal tier repair test');
+    expect(String(safeReadFile(ledgerPath))).toBe(ledger);
+    expect(loadMissionOrchestrationReplayPlan(personalRepairMissionId).recovery_required).toBe(
+      false
+    );
 
     const repaired = JSON.parse(
       safeReadFile(`${personalRepairMissionPath}/mission-state.json`, {
@@ -199,6 +219,9 @@ describe('mission lifecycle finish gate', () => {
       }) as string
     );
     expect(repaired.tier).toBe('personal');
+    expect(repaired.history).toContainEqual(
+      expect.objectContaining({ event: 'EXECUTION_LEDGER_RECEIPT_REPAIRED' })
+    );
     expect(repaired.history.at(-1)).toMatchObject({
       event: 'LEGACY_STATE_REPAIRED',
       note: 'personal tier repair test',

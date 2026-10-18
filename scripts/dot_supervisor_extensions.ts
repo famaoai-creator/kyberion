@@ -22,6 +22,7 @@ import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from './front_desk_execution_step.js';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
+import { DOT_CONTINUOUS_OPERATIONS_SUPERVISOR_STEP } from './dot_continuous_operations_step.js';
 import { DOT_ORG_CADENCE_SUPERVISOR_STEP } from './dot_org_cadence_step.js';
 
 const logger = createLogger('dot-supervisor');
@@ -102,6 +103,7 @@ DOT_SUPERVISOR_STEPS.push({
 
 // DL-01 executor: closes at most one delegated WorkItem per dot per sweep
 DOT_SUPERVISOR_STEPS.push(FRONT_DESK_EXECUTION_SUPERVISOR_STEP);
+DOT_SUPERVISOR_STEPS.push(DOT_CONTINUOUS_OPERATIONS_SUPERVISOR_STEP);
 DOT_SUPERVISOR_STEPS.push(DOT_EXECUTOR_SUPERVISOR_STEP);
 
 // DL-04 outcome checks: schedule new done results, evaluate the due ones (each dot isolated)

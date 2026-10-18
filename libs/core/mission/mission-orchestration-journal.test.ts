@@ -45,6 +45,79 @@ function seedMission(
 }
 
 describe('mission-orchestration-journal', () => {
+  it('keeps replay valid when the canonical task writer updates an existing snapshot', async () => {
+    const { writeMissionNextTasks } = await import('./mission-lifecycle-completion.js');
+    const { loadMissionOrchestrationReplayPlan } =
+      await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-TASK-UPDATE-${process.pid}`;
+    const missionPath = seedMission(missionId);
+    writeMissionNextTasks(missionPath, [{ task_id: 'implementation', status: 'planned' }]);
+    writeMissionNextTasks(missionPath, [{ task_id: 'implementation', status: 'completed' }]);
+    expect(loadMissionOrchestrationReplayPlan(missionId).recovery_required).toBe(false);
+  });
+
+  it('receipts append-only text and refuses changed history before appending', async () => {
+    const { appendProvisionedText, findMissingProvisionedEntries, loadProvisionedEntryRecords } =
+      await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-APPEND-${process.pid}`;
+    const missionPath = seedMission(missionId);
+    const file = `${missionPath}/execution-ledger.jsonl`;
+    const append = (content: string) =>
+      appendProvisionedText({
+        missionId,
+        filePath: file,
+        targetPath: 'execution-ledger.jsonl',
+        content,
+      });
+    expect(append('first\n')).toBe(true);
+    // A second initializer may have observed absence before the first writer.
+    // Its empty append must re-read under the lease, never truncate history.
+    expect(append('')).toBe(true);
+    expect(append('second\n')).toBe(true);
+    expect(
+      findMissingProvisionedEntries(missionId, loadProvisionedEntryRecords(missionId))
+    ).toEqual([]);
+    safeWriteFile(file, 'tampered\nsecond\n');
+    expect(() => append('third\n')).toThrow('provisioned_entry_mismatch');
+    expect(String(safeReadFile(file))).toBe('tampered\nsecond\n');
+  });
+
+  it('repairs only the known empty-ledger receipt and preserves all existing bytes', async () => {
+    const {
+      appendProvisionedText,
+      provisionMissionEntry,
+      writeProvisionedText,
+      findMissingProvisionedEntries,
+      loadProvisionedEntryRecords,
+    } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-LEGACY-APPEND-${process.pid}`;
+    const missionPath = seedMission(missionId);
+    const file = `${missionPath}/execution-ledger.jsonl`;
+    writeProvisionedText({
+      missionId,
+      filePath: file,
+      targetPath: 'execution-ledger.jsonl',
+      provisioned: provisionMissionEntry(''),
+    });
+    safeWriteFile(file, 'existing history\n');
+    const repair = () =>
+      appendProvisionedText({
+        missionId,
+        filePath: file,
+        targetPath: 'execution-ledger.jsonl',
+        content: '',
+        repairLegacyEmptyLedger: true,
+      });
+    expect(repair()).toBe(true);
+    expect(String(safeReadFile(file))).toBe('existing history\n');
+    expect(
+      findMissingProvisionedEntries(missionId, loadProvisionedEntryRecords(missionId))
+    ).toEqual([]);
+    expect(repair()).toBe(false);
+    safeWriteFile(file, 'changed after migration\n');
+    expect(repair).toThrow('provisioned_entry_mismatch');
+  });
+
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
   });

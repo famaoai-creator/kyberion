@@ -35,6 +35,19 @@
         ? code
         : null;
     }
+    function scopeErrorCode(result) {
+      var code =
+        result &&
+        !result.ok &&
+        result.status === 400 &&
+        result.body &&
+        result.body.hearing_scope_error;
+      return ['hearing_scope_unavailable', 'hearing_inventory_project_unsupported'].indexOf(
+        code
+      ) !== -1
+        ? code
+        : null;
+    }
     function hearingCompletionHref(value) {
       if (
         typeof value !== 'string' ||
@@ -137,9 +150,11 @@
         if (inventory.failed) {
           statusEl.textContent = vt(
             state.vocab,
-            inventory.conflict
-              ? 'front_desk:hearing_conflict_' + inventory.conflict
-              : 'front_desk:hearing_inventory_failed'
+            inventory.scopeError
+              ? 'front_desk:' + inventory.scopeError
+              : inventory.conflict
+                ? 'front_desk:hearing_conflict_' + inventory.conflict
+                : 'front_desk:hearing_inventory_failed'
           );
           statusEl.classList.remove('hidden');
           return;
@@ -187,9 +202,11 @@
       if (handoff.failed) {
         statusEl.textContent = vt(
           state.vocab,
-          handoff.conflict
-            ? 'front_desk:hearing_conflict_' + handoff.conflict
-            : 'front_desk:hearing_handoff_failed'
+          handoff.scopeError
+            ? 'front_desk:' + handoff.scopeError
+            : handoff.conflict
+              ? 'front_desk:hearing_conflict_' + handoff.conflict
+              : 'front_desk:hearing_handoff_failed'
         );
         statusEl.classList.remove('hidden');
         return;
@@ -1039,7 +1056,7 @@
               ? kind === 'inventory'
                 ? { entryId: id, href: href }
                 : { refId: id, href: href }
-              : { failed: true, action: action };
+              : { failed: true, scopeError: scopeErrorCode(result), action: action };
           } else if (current) {
             var code = conflictCode(result);
             state[field] = code ? { failed: true, conflict: code, action: action } : null;

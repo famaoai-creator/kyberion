@@ -7615,6 +7615,26 @@
     "./xlsx-utils": {
       "types": "./dist/xlsx-utils.d.ts",
       "default": "./dist/xlsx-utils.js"
+    },
+    "./organization/continuous-operations": {
+      "types": "./dist/organization/continuous-operations.d.ts",
+      "default": "./dist/organization/continuous-operations.js"
+    },
+    "./organization/continuous-operations-policy": {
+      "types": "./dist/organization/continuous-operations-policy.d.ts",
+      "default": "./dist/organization/continuous-operations-policy.js"
+    },
+    "./organization/continuous-operations-sources": {
+      "types": "./dist/organization/continuous-operations-sources.d.ts",
+      "default": "./dist/organization/continuous-operations-sources.js"
+    },
+    "./organization/continuous-work-plan": {
+      "types": "./dist/organization/continuous-work-plan.d.ts",
+      "default": "./dist/organization/continuous-work-plan.js"
+    },
+    "./organization/continuous-work-owner": {
+      "types": "./dist/organization/continuous-work-owner.d.ts",
+      "default": "./dist/organization/continuous-work-owner.js"
     }
   },
   "dependencies": {

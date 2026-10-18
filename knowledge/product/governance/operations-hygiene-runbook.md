@@ -488,6 +488,7 @@ Rules:
   Repository scanners (the foundation-io, process-boundary and runtime-child-process boundary
   tests, lint and governance gates) select files by extension and not all of them skip `active/`;
   `.js` entries made every cached `libs/core` module a second, unregistered importer.
+- **Prune runtime floors before source traversal.** Source boundary tests enumerate code roots and exclude `active/`, `knowledge/`, `customer/`, `vault/`, generated output, dependencies and hidden directories before recursively walking. Filtering after a full checkout walk still reads tenant runtime trees and makes a small source check depend on retained data size. The process-boundary governance test enforces this source-only traversal.
 - **Never cache data.** The transpile cache skips `active/`, `knowledge/`, `customer/` and `vault/`
   sources (compared case-insensitively on darwin and win32).
 - **Keep caches fresh across installs.** Managed-tool installers (`voice setup --apply`,
@@ -809,6 +810,28 @@ call fails.
 ---
 
 ## §8 Mission evidence: generated files and recorded deliverables
+
+**Execution-ledger receipts.** Append the ledger bytes and their provisioned/verified
+whole-file receipt under the same fenced writer lease. An initial empty-file receipt
+does not authenticate later rows. Ordinary append and resume must reject a changed
+receipted prefix; never clear receipts or replace the ledger to make replay pass.
+For the legacy writer that recorded only the initial empty ledger, use
+`pnpm mission repair <ID> --note "repair legacy empty-ledger receipt"`, then
+`pnpm mission resume <ID>`. Repair accepts only the sole matching initial empty
+receipt pair and complete JSONL rows with valid mission/scope identity. It retains
+every ledger byte, appends a current receipt, and records the migration in mission
+history; it cannot retroactively authenticate historical appends. Other hash
+mismatches and pending writes remain blocked for investigation.
+The canonical `writeMissionNextTasks` writer must also refresh its receipt on every
+task transition. If an older task file has a stale receipt, re-record the actual
+evidence or independent review through `record-evidence` / `review-task` after
+fixing the writer; never hand-edit task status or rebaseline arbitrary artifacts.
+Replay reads journal, receipts and target hashes under the same mutex as writers,
+without changing the lease fence or metrics, so an active append is not reported
+as corruption.
+Gates: `mission-orchestration-journal.test.ts`, `mission-team-binding.test.ts` and
+`mission-lifecycle.test.ts` cover append integrity, refusal after tampering, explicit
+legacy migration and lifecycle recovery.
 
 Video gates that derive approval scope through strict `findMissionPath` must register
 the caller as `scope-derivation` in `tests/mission-lookup-boundary.test.ts`. Run that
@@ -1341,6 +1364,19 @@ admission/recovery, digest/recovery and inbox suites when changing this path.
 
 ## §14 CLI hook continuation loops
 
+**Build-safe hook startup.** Provider hook commands enter through
+`scripts/provider_hook_entry.mjs`, which has no built-runtime dependency. Canonical
+build cleanup may temporarily remove the entrypoint or an imported dist module.
+During that window, notification events report a bounded diagnostic on stderr and
+end successfully; Claude/Gemini tool-authorization events return a native deny.
+Once loaded, the provider runner retains its own output and exit semantics.
+Regenerate managed commands with `pnpm generate:provider-hooks`; preserve other
+hooks and settings, including permissions. The generator owns only the exact
+Claude settings output in addition to its existing Codex/Gemini outputs.
+Gates: `provider_hook_entry.test.ts`, `generate_provider_hook_configs.test.ts` and
+`claude-hook-wiring-contract.test.ts` cover missing runtime imports, native deny,
+normal stdin forwarding and idempotent wiring migration.
+
 **Rule.** A coordination notification must not start another model turn or reply to itself.
 `Stop` is telemetry only; never emit review instructions or `decision: block` there.
 Exit immediately when `stop_hook_active` is true. Release leases on `SessionEnd`, not per-turn Stop.
@@ -1388,6 +1424,16 @@ The authenticated completion GET proves an existing authorized destination, not 
 
 Regression gate: ask-hearing-handoff-recovery-client.test.ts with completion, decision, receipt, answer and read-recovery suites. Cover both endpoints, hung headers/JSON, ambiguous errors, malformed success, reload/BFCache, duplicate checks, GET timeouts and destination validation, late original callbacks, marker replacement/loss and storage failures. A VM harness does not substitute for rendered-browser QA.
 
+## Automated mission gate advancement
+
+Automated owners use `mission_controller gate-pass <mission> <stored-gate-id> --machine-only`. This path evaluates with `humanConfirmed:false`, rejects missing or failed stored checks and raw `human_override` / `reviewer_approved` assertions, and never falls back to a file or legacy override. A real approval must be verified by its governed evidence check. Gate tests must assert that rejection produces no phase advancement, task completion or activation. Continuous-owner tests additionally pin the alignment brief and prove cancellation stops controller descendants before the owner reports settlement.
+
+The legacy operations-halt API's `rootDir` option is an explicit **flag file path**, not a checkout directory. Callers that operate on an alternate repository root resolve `active/shared/runtime/governance/operations-halt.json` within it before calling the halt reader. Continuous-owner tests exercise the default reader without a stub for both absent and engaged flags; passing a directory must never silently disable the whole owner lane.
+
+**Scratch cleanup is job-scoped.** `pathResolver.rootResolve` accepts one relative-path argument; compose the whole job path before calling it and typecheck that call. Tests remove only the specific files they created, or assert both the exact unique basename and parent before any job-directory cleanup. `safeRmSync` rejects recursive deletion of the shared `active/shared/tmp` root (including normalized aliases) before native removal. The scratch-root guard regression mocks native removal and verifies it is never invoked for root targets.
+
+For the cause analysis and reusable testing procedure, see [testing-scratch-cleanup](./testing-scratch-cleanup.md). The shared tmp floor remains disposable; this guard limits individual cleanup scope rather than promising tmp persistence.
+
 ## Displayed hearing handoff freshness
 
 A handoff must carry the exact decision the operator viewed. Project a versioned semantic snapshot inside the sanitized hearing record and capture it before dispatch; never fetch a newer snapshot at click time or substitute a current server record when the client proof is missing. The validator binds the server-resolved principal, member and source, canonical tenant/organization/project/tier scope, session, scenario, requirements revision/content, and the current decision. It is a freshness validator, not an authorization capability: authenticate every request and authorize completed destinations through the ordinary completion read model.
@@ -1397,3 +1443,21 @@ Every newly accepted decision, including legacy empty-body decide calls, records
 Missing/malformed proof is a pre-write rejection. A stale 409 keeps the existing client no-resend guard; this contract does not turn a completion GET into proof of an exact uncertain attempt. Keep snapshot state separate from navigation-context ownership, and copy the displayed token before storage callbacks or other synchronous reentrancy can change the view.
 
 Regression gates: hearing-handoff-snapshot.test.ts, hearing-write-consistency.test.ts, hearing-mission-routes.test.ts, hearing-routes.test.ts and all hearing client recovery suites. Exercise old view → newer stored decision → click, same-time legacy/versioned redecisions, canvas-only advances, equivalent and changed scope sets, changed actors, authorized and unavailable replay, missing/malformed proof, repeated clicks and late responses. Run real route responses through the client harness and report rendered-browser limitations separately.
+
+## Selected hearing destination scope
+
+Hearing requests use the same authenticated narrowing facade as conversation requests. Tenant, organization and project query values only narrow server authority; reject malformed non-string selections and ambiguous multi-tenant storage namespaces instead of silently picking one. Missing or blank selections retain the server scope. Independent canvas requests and completion links carry the validated singleton selection. Hearing storage remains tenant/session-scoped, so changing the organization or project changes the decision proof and destination visibility, not the stored answers or session namespace.
+
+Before a new handoff, validate the selected organization's tenant, the selected project's exact canonical parent, and its controller-required project-OS scaffold. Carry that hierarchy through the governed mission CLI, child environment, brief and persisted mission proof; revalidate scope after asynchronous inventory preparation. Never widen scope or infer a different destination after validation fails. Work inventory has no project dimension: reject project selection before preparation/reservation, explain that limitation with an actionable localized message, and retain the user's answers and selection. Clearing a selection and reviewing the new scope is an explicit user action. Known pre-write rejection may release only its own pending guard; ambiguous outcomes retain the existing no-resend behavior.
+
+Historical handoffs are not migrated or duplicated on GET. Tenant-only legacy mission/inventory completions remain available in their original authorized tenant-wide view; selecting a narrower organization/project hides a target whose stored metadata cannot prove membership. Clearing that optional selection explicitly restores the original link when the server still authorizes the broader view. Canonical mission project relationships prove membership; conflicting flat or nested claims fail closed. A legacy parentless project relationship with no flat project or nested scope claim stays tenant-visible only; it does not prove a narrower organization/project membership. Existing stored mission IDs, including legacy IDs, remain the completion source; tenant-bound IDs apply only to newly prepared missions.
+
+Regression gates: hearing-selected-scope.test.ts, hearing-request-scope.test.ts, hearing-completion.test.ts, hearing-mission-routes.test.ts, hearing-routes.test.ts and the hearing decision/receipt/handoff client recovery suites. Cover authorized alternative selections, malformed/foreign selections, omitted scope, wrong project parent, scoped canvas URLs, stale snapshots and exact receipts after navigation, historical read-only completion restoration, and zero effects on unsupported inventory scope. Route/store and client-harness proof must be reported separately from rendered-browser evidence.
+
+## First-job mutation response deadlines
+
+Bound the first-job UI wait for intake, revision, approval, rejection and unstarted-recovery mutations, including response-body parsing. Reaching the deadline means an unknown outcome, never server cancellation, confirmed failure or permission to replay. Keep the exact pending intake identity and no-resend guard; release the busy flag so an explicit read-only refresh remains available. Missing or unrelated read results do not prove nonexecution. Late original responses must not change the settled unknown state or overwrite a newer read or access-loss state.
+
+Reuse the same deadline semantics for approval decisions and recovery. Do not abort a mutation to imply cancellation, add automatic retries, invoke an operator tick from a refresh, or weaken authenticated approval checks. On a stalled submission, retain evidence and reconcile the original request through the normal read model; report unresolved state honestly.
+
+Regression gates: first-job-client.test.ts and first-job-approval-client.test.ts. Cover initial and revised intake, approve/reject, stalled headers and JSON, timely success and deadline cleanup, exact stored identities, no replay after repeated clicks or empty reads, read-only refresh, late responses and newer signed-out state. Exercise both controls together so the parent and approval view both unlock their read actions. A client VM harness is not a rendered browser or a live authenticated diagnostic execution; report each verification layer separately.

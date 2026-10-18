@@ -163,8 +163,8 @@ export const claudeCodeHook = defineScript({
     try {
       await main(hookArgv);
     } catch (err) {
-      // Fail closed for PreToolUse so a hook bug cannot bypass the policy.
-      if (hookArgv[2] === 'PreToolUse') {
+      // Both policy entrypoints fail closed, including failures while reading stdin.
+      if (hookArgv[2] === 'PreToolUse' || hookArgv[2] === 'PreToolUseShellDeny') {
         process.stdout.write(
           JSON.stringify({
             hookSpecificOutput: {

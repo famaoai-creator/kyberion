@@ -5,7 +5,7 @@
  *
  * Owns Gemini event groups in `.gemini/settings.json`: SessionStart /
  * BeforeAgent / BeforeTool / SessionEnd are wired to
- * dist/scripts/gemini_cli_hook.js so Gemini CLI sessions join the checkout's
+ * scripts/provider_hook_entry.mjs so Gemini CLI sessions join the checkout's
  * co-session, receive pending handoffs on each prompt, and get denied when
  * writing paths leased by another participant.
  *
@@ -17,8 +17,10 @@
  * Codex wiring lives in `.codex/hooks.json`: SessionStart / UserPromptSubmit /
  * PostToolUse / SessionEnd. Preserve user commands within the same events and
  * never register Stop. Hook trust remains a native CLI /hooks decision.
+ * Existing Kyberion Claude commands in tracked `.claude/settings.json` are
+ * migrated through the same stable bootstrap; all user configuration is kept.
  *
- *   pnpm generate:provider-hooks           — write Gemini + Codex hooks
+ *   pnpm generate:provider-hooks           — write Gemini + Codex + Claude hooks
  *   pnpm generate:provider-hooks -- --check — fail if the file drifted
  */
 
@@ -32,11 +34,12 @@ import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const GEMINI_SETTINGS = '.gemini/settings.json';
 const CODEX_HOOKS = '.codex/hooks.json';
+const CLAUDE_SETTINGS = '.claude/settings.json';
 const OWNED_EVENTS = ['SessionStart', 'BeforeAgent', 'BeforeTool', 'SessionEnd'] as const;
 
 function hookCommand(event: string): string {
-  const script = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'gemini_cli_hook.js');
-  return `node "${script}" ${event}`;
+  const script = path.join(pathResolver.rootDir(), 'scripts', 'provider_hook_entry.mjs');
+  return `node '${script.replaceAll("'", "'\\''")}' gemini ${event}`;
 }
 
 interface GeminiHookGroup {
@@ -77,7 +80,7 @@ export function buildCodexHooks(existing: Record<string, unknown> = {}): Record<
     throw new Error('Codex hooks must be an object; refusing to replace existing configuration');
   }
   const hooks = isRecord(existing.hooks) ? { ...existing.hooks } : {};
-  const script = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'codex_cli_hook.js');
+  const script = path.join(pathResolver.rootDir(), 'scripts', 'provider_hook_entry.mjs');
   // Quote for the command shell, including checkout paths containing $ or `.
   const quoted = `'${script.replaceAll("'", "'\\''")}'`;
   for (const event of ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'SessionEnd']) {
@@ -92,7 +95,8 @@ export function buildCodexHooks(existing: Record<string, unknown> = {}): Record<
           !(
             isRecord(hook) &&
             typeof hook.command === 'string' &&
-            /(?:^|[\\/])codex_cli_hook\.js["']?\s/.test(hook.command)
+            (/(?:^|[\\/])codex_cli_hook\.js["']?\s/.test(hook.command) ||
+              /(?:^|[\\/])provider_hook_entry\.mjs["']?\s+codex\s/.test(hook.command))
           )
       );
       return remaining.length ? [{ ...group, hooks: remaining }] : [];
@@ -103,7 +107,7 @@ export function buildCodexHooks(existing: Record<string, unknown> = {}): Record<
         hooks: [
           {
             type: 'command',
-            command: `node ${quoted} ${event}`,
+            command: `node ${quoted} codex ${event}`,
             timeout: event === 'SessionEnd' ? 3 : 10,
           },
         ],
@@ -127,23 +131,61 @@ export function buildGeminiSettings(
   };
 }
 
+/** Migrate only existing Kyberion commands; never take ownership of user hooks. */
+export function buildClaudeSettings(
+  existing: Record<string, unknown> = {}
+): Record<string, unknown> {
+  if (!isRecord(existing.hooks)) return { ...existing };
+  const hooks = Object.fromEntries(
+    Object.entries(existing.hooks).map(([event, groups]) => [
+      event,
+      Array.isArray(groups)
+        ? groups.map((group: unknown) => {
+            if (!isRecord(group) || !Array.isArray(group.hooks)) return group;
+            return {
+              ...group,
+              hooks: group.hooks.map((hook: unknown) => {
+                if (
+                  !isRecord(hook) ||
+                  typeof hook.command !== 'string' ||
+                  !/^node\s+/.test(hook.command)
+                )
+                  return hook;
+                return {
+                  ...hook,
+                  command: hook.command.replace(
+                    /dist[\\/]scripts[\\/]claude_code_hook\.js(["']?)\s+(SessionStart|UserPromptSubmit|PreToolUse|PreToolUseShellDeny|PostToolUse|Stop|SessionEnd)$/,
+                    'scripts/provider_hook_entry.mjs$1 claude $2'
+                  ),
+                };
+              }),
+            };
+          })
+        : groups,
+    ])
+  );
+  return { ...existing, hooks };
+}
+
 export const runGenerateProviderHookConfigs = defineGenerator({
   id: 'provider-hook-configs',
-  outputs: [GEMINI_SETTINGS, CODEX_HOOKS],
+  outputs: [GEMINI_SETTINGS, CODEX_HOOKS, CLAUDE_SETTINGS],
   executionContext: 'generate_provider_hook_configs',
   render: async () => {
     const hookJs = path.join(pathResolver.rootDir(), 'dist', 'scripts', 'gemini_cli_hook.js');
     if (!safeExistsSync(hookJs)) {
       process.stderr.write(
         '[generate:provider-hooks] warning: dist/scripts/gemini_cli_hook.js does not exist yet — ' +
-          'hook commands target dist/; run `pnpm run build` before relying on the wiring.\n'
+          'hook runtime needs dist/; run `pnpm run build` before relying on the wiring.\n'
       );
     }
     const merged = buildGeminiSettings(loadExistingSettings());
     const codex = buildCodexHooks(loadExistingSettings(CODEX_HOOKS));
+    const claude = buildClaudeSettings(loadExistingSettings(CLAUDE_SETTINGS));
     return [
       { path: GEMINI_SETTINGS, content: `${JSON.stringify(merged, null, 2)}\n` },
       { path: CODEX_HOOKS, content: `${JSON.stringify(codex, null, 2)}\n` },
+      { path: CLAUDE_SETTINGS, content: `${JSON.stringify(claude, null, 2)}\n` },
     ];
   },
 });

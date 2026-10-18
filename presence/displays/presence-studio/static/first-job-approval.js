@@ -295,6 +295,19 @@
       );
     });
   }
+  function submitMutation(url, options) {
+    var timer;
+    // A timeout is unknown outcome, never cancellation or permission to replay.
+    // State callbacks observe only this bounded response, including its JSON body.
+    return new Promise(function (resolve, reject) {
+      timer = window.setTimeout(function () {
+        reject(new Error('mutation_unknown'));
+      }, 15000);
+      fetchJson(url, options).then(resolve, reject);
+    }).finally(function () {
+      window.clearTimeout(timer);
+    });
+  }
   function reflectAccessLoss(result) {
     if ([401, 403].indexOf(result.status) === -1) return;
     state.authStatus = result.status === 401 ? 'authentication_required' : 'access_denied';
@@ -466,7 +479,7 @@
       display_digest: item.display_digest,
       session_id: context.snapshot.sessionId,
     };
-    return fetchJson(
+    return submitMutation(
       '/api/first-job/approvals/' + encodeURIComponent(item.approval_request_id) + '/decision',
       {
         method: 'POST',
@@ -513,9 +526,7 @@
     state.confirmRecovery = null;
     state.error = null;
     render();
-    var timer;
-    // A timeout is unknown outcome, never permission to replay a mutation.
-    var request = fetchJson('/api/first-job/recovery/' + encodeURIComponent(item.request_id), {
+    return submitMutation('/api/first-job/recovery/' + encodeURIComponent(item.request_id), {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -524,12 +535,6 @@
         display_digest: item.display_digest,
         action: 'terminate_unstarted',
       }),
-    });
-    return new Promise(function (resolve, reject) {
-      timer = window.setTimeout(function () {
-        reject(new Error('recovery_unknown'));
-      }, 15000);
-      request.then(resolve, reject);
     })
       .then(function (result) {
         if (generation !== state.generation) return;
@@ -555,7 +560,6 @@
         if (generation === state.generation) state.error = 'recovery_uncertain';
       })
       .finally(function () {
-        window.clearTimeout(timer);
         if (generation !== state.generation) return;
         state.sending = false;
         render();

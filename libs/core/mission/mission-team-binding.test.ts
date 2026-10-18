@@ -9,7 +9,9 @@ import {
   buildMissionTeamBlueprint,
   initializeMissionTeamBindings,
   loadMissionStaffingAssignments,
+  repairLegacyMissionExecutionLedger,
 } from './mission-team-binding.js';
+import { provisionMissionEntry } from './mission-orchestration-journal.js';
 import type {
   MissionTeamOrganizationProfileSummary,
   MissionTeamPlan,
@@ -260,6 +262,98 @@ describe('mission-team-binding', () => {
     // NI-01: ledger entries for staffed agents resolve the durable identity
     // from the mission's staffing assignments on disk.
     expect(parsed.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
+    const updatedReceipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(updatedReceipts.at(-1)).toMatchObject({
+      phase: 'verified',
+      target_path: 'execution-ledger.jsonl',
+      content_hash: provisionMissionEntry(String(safeReadFile(paths.executionLedgerPath)))
+        .content_hash,
+    });
+    safeWriteFile(paths.executionLedgerPath, `${lines[0].replace('task_issued', 'tampered')}\n`);
+    expect(() =>
+      appendMissionExecutionLedgerEntry({
+        mission_id: MISSION_ID,
+        mission_path_hint: TEST_MISSION_DIR,
+        event_type: 'next',
+      })
+    ).toThrow('provisioned_entry_mismatch');
+  });
+
+  it('migrates legacy empty-file receipts without changing ledger history', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const original = `${JSON.stringify({
+      ts: '2026-10-18T09:00:00.000Z',
+      mission_id: MISSION_ID,
+      event_type: 'evidence_recorded',
+      evidence: ['evidence/report.md'],
+    })}\n`;
+    safeWriteFile(paths.executionLedgerPath, original);
+    expect(() =>
+      appendMissionExecutionLedgerEntry({
+        mission_id: MISSION_ID,
+        mission_path_hint: TEST_MISSION_DIR,
+        event_type: 'next',
+      })
+    ).toThrow('provisioned_entry_mismatch');
+    expect(repairLegacyMissionExecutionLedger(MISSION_ID, TEST_MISSION_DIR)).toBe(true);
+    expect(String(safeReadFile(paths.executionLedgerPath))).toBe(original);
+    expect(repairLegacyMissionExecutionLedger(MISSION_ID, TEST_MISSION_DIR)).toBe(false);
+    appendMissionExecutionLedgerEntry({
+      mission_id: MISSION_ID,
+      mission_path_hint: TEST_MISSION_DIR,
+      event_type: 'after_repair',
+    });
+    expect(String(safeReadFile(paths.executionLedgerPath)).startsWith(original)).toBe(true);
+  });
+
+  it('refuses invalid new rows without writing ledger bytes or receipts', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const ledgerBefore = String(safeReadFile(paths.executionLedgerPath));
+    const receiptPath = `${TEST_MISSION_DIR}/coordination/provisioned-entries.jsonl`;
+    const receiptsBefore = String(safeReadFile(receiptPath));
+    expect(() =>
+      appendMissionExecutionLedgerEntry({
+        mission_id: MISSION_ID,
+        mission_path_hint: TEST_MISSION_DIR,
+        event_type: '',
+      })
+    ).toThrow();
+    expect(String(safeReadFile(paths.executionLedgerPath))).toBe(ledgerBefore);
+    expect(String(safeReadFile(receiptPath))).toBe(receiptsBefore);
+  });
+
+  it.each([
+    '{truncated',
+    JSON.stringify({
+      ts: '2026-10-18T09:00:00.000Z',
+      mission_id: 'OTHER',
+      event_type: 'evidence',
+    }) + '\n',
+    JSON.stringify({
+      ts: '2026-10-18T09:00:00.000Z',
+      mission_id: MISSION_ID,
+      event_type: 'evidence',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'other',
+        mission_id: MISSION_ID,
+        scope_kind: 'mission',
+      },
+    }) + '\n',
+  ])('refuses to migrate malformed or out-of-scope legacy ledger rows', (content) => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    safeWriteFile(paths.executionLedgerPath, content);
+    const receipts = String(
+      safeReadFile(`${TEST_MISSION_DIR}/coordination/provisioned-entries.jsonl`)
+    );
+    expect(() => repairLegacyMissionExecutionLedger(MISSION_ID, TEST_MISSION_DIR)).toThrow();
+    expect(String(safeReadFile(paths.executionLedgerPath))).toBe(content);
+    expect(String(safeReadFile(`${TEST_MISSION_DIR}/coordination/provisioned-entries.jsonl`))).toBe(
+      receipts
+    );
   });
 
   it('normalizes legacy staffing artifacts when loading them', () => {

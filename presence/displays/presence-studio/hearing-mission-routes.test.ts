@@ -65,6 +65,8 @@ import {
 } from '@agent/core/governance/approval-store';
 import { registerHearingRoutes } from './hearing-routes.js';
 import * as hearingSecurity from './security.js';
+import * as hearingRequestScope from './hearing-request-scope.js';
+import { boundTenant } from '@agent/core/owner-scope';
 import type { HearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
 import { harness, response as clientResponse, flush } from './ask-client-test-harness.js';
 import { findMissionPath } from '@agent/core/path-resolver';
@@ -143,9 +145,13 @@ function fakeResponse() {
   return res;
 }
 
-function displayedSnapshot(get: Handler, sessionId: string): HearingHandoffSnapshot {
+function displayedSnapshot(
+  get: Handler,
+  sessionId: string,
+  query: Record<string, string> = {}
+): HearingHandoffSnapshot {
   const response = fakeResponse();
-  get(fakeRequest({ params: { session: sessionId } }), response);
+  get(fakeRequest({ params: { session: sessionId }, query }), response);
   expect(response.statusCode).toBe(200);
   const snapshot = (response.body as { record: { handoff_snapshot?: HearingHandoffSnapshot } })
     .record.handoff_snapshot;
@@ -751,7 +757,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     const sessionId = `sess-${randomUUID()}`;
     const record = decidedRecord(sessionId);
     saveHearingRecord(namespace, record);
-    const missionId = hearingMissionId(record);
+    const missionId = hearingMissionId(record, TEST_TENANT);
     const missionDir = pathResolver.sharedTmp(`hearing-mission-routes-test/${missionId}`);
 
     vi.mocked(resolveMemberByPrincipal).mockReturnValue({
@@ -760,7 +766,12 @@ describe('POST /api/hearing/:session/handoff', () => {
       display_name: 'Later Operator',
     });
     vi.mocked(findMissionPath).mockReturnValue(missionDir);
-    vi.mocked(loadState).mockReturnValue({ status: 'planned' } as unknown as MissionState);
+    vi.mocked(loadState).mockReturnValue({
+      mission_id: missionId,
+      tenant_slug: TEST_TENANT,
+      tier: 'confidential',
+      status: 'planned',
+    } as MissionState);
     vi.mocked(safeExecResult).mockImplementation((_command: string, args: string[] = []) => {
       if (args[0] === 'dist/scripts/mission_controller.js') {
         return { stdout: '', stderr: '', status: 0 };
@@ -864,7 +875,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     const sessionId = 'roundtrip-' + randomUUID();
     const record = decidedRecord(sessionId);
     saveHearingRecord(namespace, record);
-    const missionId = hearingMissionId(record);
+    const missionId = hearingMissionId(record, TEST_TENANT);
     const missionRoot = pathResolver.sharedTmp('hearing-mission-routes-test/roundtrip');
     const missionDir = missionRoot + '/' + missionId;
     const approvalId = randomUUID();
@@ -986,6 +997,275 @@ describe('POST /api/hearing/:session/handoff', () => {
       expect(deletedReplay.body).not.toHaveProperty('mission_id');
       expect(safeExecResult).not.toHaveBeenCalled();
     } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(pathResolver.rootResolve(approvalPath), { force: true })
+      );
+    }
+  });
+  it('rejects an unsupported mission hierarchy before reservation or effects', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'preflight-' + randomUUID();
+    saveHearingRecord(namespace, decidedRecord(sessionId));
+    const snapshot = displayedSnapshot(get, sessionId);
+    const preflight = vi
+      .spyOn(hearingRequestScope, 'resolveHearingHandoffScope')
+      .mockImplementation(() => {
+        throw new hearingRequestScope.HearingScopeError('hearing_scope_unavailable');
+      });
+    try {
+      const before = loadHearingRecord(namespace, sessionId);
+      vi.mocked(safeWriteFile).mockClear();
+      const response = fakeResponse();
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        response
+      );
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toMatchObject({ hearing_scope_error: 'hearing_scope_unavailable' });
+      expect(safeExecResult).not.toHaveBeenCalled();
+      expect(safeWriteFile).not.toHaveBeenCalled();
+      expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+    } finally {
+      preflight.mockRestore();
+    }
+  });
+
+  it('propagates selected hierarchy through mission flags, child scope, verification, and configured links', () => {
+    const sessionId = 'selected-' + randomUUID();
+    const record = decidedRecord(sessionId);
+    saveHearingRecord(namespace, record);
+    const missionId = hearingMissionId(record, TEST_TENANT);
+    const missionDir = pathResolver.sharedTmp('hearing-mission-routes-test/' + missionId);
+    const selected = { tenant: TEST_TENANT, organizationId: 'org-one', projectId: 'project-one' };
+    const scope = { tenantSlug: TEST_TENANT, organizationId: 'org-one', projectId: 'project-one' };
+    const preflight = vi
+      .spyOn(hearingRequestScope, 'resolveHearingHandoffScope')
+      .mockReturnValue(scope);
+    const viewer = vi.spyOn(hearingSecurity, 'resolvePresenceStudioViewerContext').mockReturnValue({
+      principalId: 'human:presence-studio-localadmin',
+      source: 'loopback',
+      tenantSlugs: 'all',
+    });
+    const originalTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = 'zz-unrelated-child-context';
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    vi.mocked(findMissionPath).mockImplementation(() => {
+      expect(boundTenant()).toBe(TEST_TENANT);
+      expect(process.env.KYBERION_TENANT).toBe('zz-unrelated-child-context');
+      return missionDir;
+    });
+    vi.mocked(loadState).mockImplementation(() => {
+      expect(boundTenant()).toBe(TEST_TENANT);
+      return {
+        mission_id: missionId,
+        tenant_slug: TEST_TENANT,
+        tier: 'confidential',
+        status: 'planned',
+        organization_id: scope.organizationId,
+        relationships: {
+          project: { project_id: scope.projectId, relationship_type: 'belongs_to' },
+        },
+      } as MissionState;
+    });
+    vi.mocked(safeExecResult).mockImplementation((_command, args = []) => ({
+      stdout:
+        args[0] === 'dist/scripts/mission_alignment_request.js'
+          ? JSON.stringify({ requestId: 'REQ-SELECTED' })
+          : '',
+      stderr: '',
+      status: 0,
+    }));
+    try {
+      const snapshot = displayedSnapshot(get, sessionId, selected);
+      const response = fakeResponse();
+      handoff(
+        fakeRequest({
+          params: { session: sessionId },
+          query: selected,
+          body: { handoff_snapshot: snapshot },
+        }),
+        response
+      );
+      expect(response.statusCode).toBe(200);
+      expect(preflight).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantSlugs: [TEST_TENANT],
+          organizationIds: ['org-one'],
+          projectIds: ['project-one'],
+        }),
+        'mission'
+      );
+      const calls = vi.mocked(safeExecResult).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[0][1]).toEqual(
+        expect.arrayContaining([
+          '--tenant-slug',
+          TEST_TENANT,
+          '--organization-id',
+          'org-one',
+          '--project-id',
+          'project-one',
+        ])
+      );
+      for (const call of calls)
+        expect(call[2]?.env).toMatchObject({
+          KYBERION_TENANT: TEST_TENANT,
+          KYBERION_ORGANIZATION_ID: 'org-one',
+          KYBERION_PROJECT_ID: 'project-one',
+        });
+      const href = new URL((response.body as { next_action: { href: string } }).next_action.href);
+      expect(Object.fromEntries(href.searchParams)).toMatchObject(selected);
+      const brief = JSON.parse(
+        String(safeReadFile(missionDir + '/evidence/mission-brief.json', { encoding: 'utf8' }))
+      );
+      expect(brief).toMatchObject({
+        missionId,
+        projectId: 'project-one',
+        source: { kind: 'hearing', ref: sessionId, tenantSlug: TEST_TENANT },
+      });
+      expect(process.env.KYBERION_TENANT).toBe('zz-unrelated-child-context');
+    } finally {
+      if (originalTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = originalTenant;
+      viewer.mockRestore();
+      preflight.mockRestore();
+    }
+  });
+
+  it.each([
+    'id',
+    'tier',
+    'tenant',
+    'organization',
+    'project',
+    'conflicting-project',
+    'conflicting-nested-scope',
+  ] as const)(
+    'refuses a successful controller exit with wrong %s proof before writing evidence or requesting alignment',
+    (mismatch) => {
+      const sessionId = 'proof-' + randomUUID();
+      const record = decidedRecord(sessionId);
+      saveHearingRecord(namespace, record);
+      const missionId = hearingMissionId(record, TEST_TENANT);
+      const scope = {
+        tenantSlug: TEST_TENANT,
+        organizationId: 'org-one',
+        projectId: 'project-one',
+      };
+      const query = { organizationId: 'org-one', projectId: 'project-one' };
+      const preflight = vi
+        .spyOn(hearingRequestScope, 'resolveHearingHandoffScope')
+        .mockReturnValue(scope);
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+      vi.mocked(findMissionPath).mockReturnValue(
+        pathResolver.sharedTmp('hearing-mission-routes-test/' + missionId)
+      );
+      vi.mocked(loadState).mockReturnValue({
+        mission_id: mismatch === 'id' ? 'MSN-UNRELATED' : missionId,
+        tier: mismatch === 'tier' ? 'public' : 'confidential',
+        tenant_slug: mismatch === 'tenant' ? 'zz-handoff-other' : TEST_TENANT,
+        organization_id: mismatch === 'organization' ? 'org-other' : 'org-one',
+        relationships: {
+          project: {
+            project_id: mismatch === 'project' ? 'project-other' : 'project-one',
+            relationship_type: 'belongs_to',
+          },
+        },
+        ...(mismatch === 'conflicting-project' ? { project_id: 'project-other' } : {}),
+        ...(mismatch === 'conflicting-nested-scope'
+          ? {
+              scope_context: {
+                tier: 'confidential',
+                tenant_slug: 'zz-handoff-other',
+                mission_id: missionId,
+              },
+            }
+          : {}),
+        status: 'planned',
+      } as MissionState);
+      vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
+      try {
+        const snapshot = displayedSnapshot(get, sessionId, query);
+        vi.mocked(safeWriteFile).mockClear();
+        const response = fakeResponse();
+        handoff(
+          fakeRequest({
+            params: { session: sessionId },
+            query,
+            body: { handoff_snapshot: snapshot },
+          }),
+          response
+        );
+        expect(response.statusCode).toBe(409);
+        expect(response.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
+        expect(safeExecResult).toHaveBeenCalledTimes(1);
+        expect(
+          vi
+            .mocked(safeWriteFile)
+            .mock.calls.some(([file]) => String(file).endsWith('/evidence/mission-brief.json'))
+        ).toBe(false);
+        expect(loadHearingRecord(namespace, sessionId)?.handoff_pending?.kind).toBe('mission');
+      } finally {
+        preflight.mockRestore();
+      }
+    }
+  );
+
+  it('replays an authorized legacy completed ID without renaming it or revalidating a new destination', () => {
+    const sessionId = 'legacy-' + randomUUID();
+    const record = decidedRecord(sessionId);
+    const missionId = hearingMissionId(record);
+    const approvalId = randomUUID();
+    const approvalPath = approvalRequestLogicalPath('brief', approvalId);
+    expect(missionId).not.toBe(hearingMissionId(record, TEST_TENANT));
+    expect(approvalPath).toContain('/vitest-approvals/');
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    vi.mocked(loadState).mockReturnValue({
+      mission_id: missionId,
+      tenant_slug: TEST_TENANT,
+      tier: 'confidential',
+      status: 'planned',
+    } as MissionState);
+    writeGovernedArtifactJson('surface_runtime', approvalPath, {
+      id: approvalId,
+      kind: 'mission_gate',
+      status: 'pending',
+      channel: 'brief',
+      storageChannel: 'brief',
+      threadTs: missionId,
+      correlationId: 'mission-alignment-' + missionId,
+      source: { missionId },
+      requestedBy: 'fixture-planner',
+      requestedAt: '2026-10-17T00:00:00Z',
+      title: 'Legacy alignment',
+      summary: 'Existing destination',
+    });
+    saveHearingRecord(namespace, {
+      ...record,
+      mission_id: missionId,
+      approval_request_id: approvalId,
+      handed_off_at: '2026-10-17T00:00:00Z',
+    } as HearingRecordWithMissionHandoff);
+    const preflight = vi.spyOn(hearingRequestScope, 'resolveHearingHandoffScope');
+    try {
+      const snapshot = displayedSnapshot(get, sessionId);
+      const response = fakeResponse();
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        response
+      );
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toMatchObject({
+        mission_id: missionId,
+        approval_request_id: approvalId,
+      });
+      expect(preflight).not.toHaveBeenCalled();
+      expect(safeExecResult).not.toHaveBeenCalled();
+      expect(
+        (loadHearingRecord(namespace, sessionId) as HearingRecordWithMissionHandoff).mission_id
+      ).toBe(missionId);
+    } finally {
+      preflight.mockRestore();
       withExecutionContext('ecosystem_architect', () =>
         safeRmSync(pathResolver.rootResolve(approvalPath), { force: true })
       );
