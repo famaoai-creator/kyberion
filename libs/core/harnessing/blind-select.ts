@@ -72,8 +72,15 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
       produced_files: o.produced_files.length,
       error: outcomes
         .map((x) => x.label)
-        .filter((l) => l.length >= 3)
-        .reduce((t, l) => t.split(l).join('[CANDIDATE]'), o.error)
+        .filter((l) => l.length >= 2)
+        .reduce(
+          (t, l) => t.split(l).join('[CANDIDATE]'),
+          // Single-char labels: mask only whole-token occurrences so the
+          // evidence text isn't garbled into '[CANDIDATE]nnotation'.
+          o.error.replace(/\b([a-zA-Z])\b/g, (w, ch) =>
+            outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
+          )
+        )
         .slice(0, 120),
     });
   });
