@@ -71,7 +71,8 @@ export function loadSurfaceSpec(specPath: string): SurfaceSpec {
     throw new Error('[SURFACE_SPEC] allowed_paths must be a non-empty array');
   }
   for (const p of parsed.allowed_paths) {
-    if (!isValidRelPath(p) && !p.endsWith('/')) {
+    const effective = p.endsWith('/') ? p.slice(0, -1) : p;
+    if (!isValidRelPath(effective) && !p.includes('*')) {
       throw new Error(`[SURFACE_SPEC] invalid allowed_path ${JSON.stringify(p)}`);
     }
   }

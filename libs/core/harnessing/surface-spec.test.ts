@@ -27,7 +27,6 @@ describe('validateOverlay', () => {
   });
   it('rejects off-surface files with reasons', () => {
     safeMkdir(path.join(root, 'ov2'), { recursive: true });
-    write('../x', 'y'); // would escape — write it outside 'ov2' guard below instead
     const target = path.join(root, 'ov2', 'evil/hack.sh');
     safeMkdir(path.dirname(target), { recursive: true });
     safeWriteFile(target, 'rm');
