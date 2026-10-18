@@ -56,6 +56,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   scope_locale_reader: 'worker',
   peer_catalog_reader: 'worker',
   peer_responder_reader: 'worker',
+  peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
   audit_mirror_writer: 'worker',
   service_actuator: 'worker',
@@ -672,6 +673,7 @@ interface PreparedExecutionContext {
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'peer_catalog_reader',
   'peer_responder_reader',
+  'peer_task_artifact_writer',
   'scope_locale_reader',
 ]);
 

@@ -295,9 +295,20 @@
       "tier_access": ["confidential", "public"]
     },
     "peer_catalog_reader": {
-      "description": "Least-privilege reader of a tenant's peer transport catalog (knowledge/confidential/<tenant>/connections/peer-network.json). libs/core/mesh/peer-conversation.ts assumes it, bound to the sending tenant, to resolve the recipient endpoint and HMAC secret, so peer senders whose role cannot read the confidential tier can still send; it grants that single file only and no write (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "description": "Least-privilege reader of a tenant's peer transport catalog (knowledge/confidential/<tenant>/connections/peer-network.json). libs/core/mesh/peer-conversation.ts assumes it, bound to the sending tenant, to resolve the recipient endpoint and HMAC secret, so peer senders whose role cannot read the confidential tier can still send, and libs/core/mesh/peer-task-exchange.ts assumes it to read the recipient's typed peer task catalog (knowledge/confidential/<tenant>/connections/peer-tasks.json) and the tenant profile (knowledge/personal/tenants/<tenant>.json) for the registration check before an accepted task becomes a WorkItem; it grants those three files only and no write (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
       "default_persona": "worker",
       "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal"]
+    },
+    "peer_task_artifact_writer": {
+      "description": "Least-privilege writer for typed peer task results. libs/core/mesh/peer-task-exchange.ts assumes it, bound to the receiving tenant, after the recipient operator accepts a peer task: it writes the task report and output log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's scoped artifact index, and reads only those paths (persona worker). It is tenant-bound (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ],
       "scope_classes": [],
       "allowed_actuators": [],
       "tier_access": ["confidential"]
