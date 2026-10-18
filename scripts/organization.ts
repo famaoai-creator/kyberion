@@ -14,6 +14,13 @@ export async function main(
   args: string[] = currentProcessArgv().slice(2),
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
+  if (args[0] === 'continuous' && args[1] === 'run') {
+    await import('./run_pipeline.js');
+    const { runOrganizationContinuousOperations } =
+      await import('./organization_continuous_operations.js');
+    await runOrganizationContinuousOperations(args.slice(2), print);
+    return;
+  }
   if (args[0] === 'role') {
     await organizationRolesMain(args);
     return;

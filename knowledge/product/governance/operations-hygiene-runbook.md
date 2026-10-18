@@ -488,6 +488,7 @@ Rules:
   Repository scanners (the foundation-io, process-boundary and runtime-child-process boundary
   tests, lint and governance gates) select files by extension and not all of them skip `active/`;
   `.js` entries made every cached `libs/core` module a second, unregistered importer.
+- **Prune runtime floors before source traversal.** Source boundary tests enumerate code roots and exclude `active/`, `knowledge/`, `customer/`, `vault/`, generated output, dependencies and hidden directories before recursively walking. Filtering after a full checkout walk still reads tenant runtime trees and makes a small source check depend on retained data size. The process-boundary governance test enforces this source-only traversal.
 - **Never cache data.** The transpile cache skips `active/`, `knowledge/`, `customer/` and `vault/`
   sources (compared case-insensitively on darwin and win32).
 - **Keep caches fresh across installs.** Managed-tool installers (`voice setup --apply`,
@@ -1387,6 +1388,16 @@ Mission and inventory handoffs need the same bounded wait and no-resend discipli
 The authenticated completion GET proves an existing authorized destination, not the exact handoff attempt. An explicit check may expose that destination read-only, but must retain the unknown marker and block every hearing mutation. Never infer nonexecution from missing results, or confirmation from a generic ready destination. The newer check retires original POST settlement; navigation, scope, conversation and storage changes retire publication. Keep an ordinary-conversation exit available. Displayed-decision revision binding is a separate server contract and is not supplied by these client markers.
 
 Regression gate: ask-hearing-handoff-recovery-client.test.ts with completion, decision, receipt, answer and read-recovery suites. Cover both endpoints, hung headers/JSON, ambiguous errors, malformed success, reload/BFCache, duplicate checks, GET timeouts and destination validation, late original callbacks, marker replacement/loss and storage failures. A VM harness does not substitute for rendered-browser QA.
+
+## Automated mission gate advancement
+
+Automated owners use `mission_controller gate-pass <mission> <stored-gate-id> --machine-only`. This path evaluates with `humanConfirmed:false`, rejects missing or failed stored checks and raw `human_override` / `reviewer_approved` assertions, and never falls back to a file or legacy override. A real approval must be verified by its governed evidence check. Gate tests must assert that rejection produces no phase advancement, task completion or activation. Continuous-owner tests additionally pin the alignment brief and prove cancellation stops controller descendants before the owner reports settlement.
+
+The legacy operations-halt API's `rootDir` option is an explicit **flag file path**, not a checkout directory. Callers that operate on an alternate repository root resolve `active/shared/runtime/governance/operations-halt.json` within it before calling the halt reader. Continuous-owner tests exercise the default reader without a stub for both absent and engaged flags; passing a directory must never silently disable the whole owner lane.
+
+**Scratch cleanup is job-scoped.** `pathResolver.rootResolve` accepts one relative-path argument; compose the whole job path before calling it and typecheck that call. Tests remove only the specific files they created, or assert both the exact unique basename and parent before any job-directory cleanup. `safeRmSync` rejects recursive deletion of the shared `active/shared/tmp` root (including normalized aliases) before native removal. The scratch-root guard regression mocks native removal and verifies it is never invoked for root targets.
+
+For the cause analysis and reusable testing procedure, see [testing-scratch-cleanup](./testing-scratch-cleanup.md). The shared tmp floor remains disposable; this guard limits individual cleanup scope rather than promising tmp persistence.
 
 ## Displayed hearing handoff freshness
 

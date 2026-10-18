@@ -39,6 +39,7 @@ export interface DotActionRecord {
   };
   recovery_receipt?: FrontDeskExecutionRecoveryReceipt;
   front_desk_execution?: FrontDeskExecutionBinding;
+  continuous_work?: DotProposal['continuous_work'];
   action_ref: string;
   dot_id: string;
   actor_id: string;
@@ -315,6 +316,7 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         proposal.title,
         proposal.objective,
         ...(proposal.front_desk_execution ? [proposal.front_desk_execution] : []),
+        ...(proposal.continuous_work ? [proposal.continuous_work] : []),
         proposal.handoff_to ?? '',
         // Appended only when set, so hashes of proposals without these fields
         // (and their dedupe windows) are unchanged.
