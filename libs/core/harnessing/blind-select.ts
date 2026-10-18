@@ -70,22 +70,21 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
       exit_code: o.exit_code,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
-      error: outcomes
-        .map((x) => x.label)
-        .filter((l) => l.length >= 2)
-        .reduce(
-          (t, l) => t.split(l).join('[CANDIDATE]'),
-          // Single-char labels: mask only whole-token occurrences so the
-          // evidence text isn't garbled into '[CANDIDATE]nnotation'.
-          o.error.replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
-            outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
-          )
-        )
-        .slice(0, 120)
-        // Truncation can split a label at the boundary — scrub the visible tail again.
-        .replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
-          outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
-        ),
+      error: (() => {
+        const mask = (t: string) =>
+          outcomes
+            .map((x) => x.label)
+            .filter((l) => l.length >= 2)
+            .reduce(
+              (acc, l) => acc.split(l).join('[CANDIDATE]'),
+              // Single-char labels: whole tokens only, or '[CANDIDATE]nnotation'.
+              t.replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
+                outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
+              )
+            );
+        // Mask after truncation too — a label fragment can survive at the boundary.
+        return mask(mask(o.error).slice(0, 120));
+      })(),
     });
   });
   return { seed, letterToLabel, labelToLetter, rows };

@@ -196,10 +196,13 @@ export async function runRecursiveSession(
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
-  // Declared upfront: each round was budgeted 1 base probe + one probe per
-  // declared candidate. Rejected overlays show up as actual < expected.
-  const expectedProbes =
+  // Declared upfront (informational): each round was budgeted 1 base probe +
+  // one probe per declared candidate. planned_probes tracks what each round
+  // that actually executed was about to run — status compares actual vs
+  // planned so a healthy early halt doesn't read as a shortfall.
+  const declaredProbes =
     spec.rounds * (1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0));
+  let plannedProbes = 0;
   let finalDecision: DecisionReport | null = null;
 
   for (let round = 1; round <= spec.rounds; round++) {
@@ -239,6 +242,7 @@ export async function runRecursiveSession(
         `[BUDGET_IDENTITY] duplicate labels in round ${round}: ${roundLabels.join(', ')}`
       );
     }
+    plannedProbes += candidates.length + (candidates.length ? 1 : 0);
 
     const probeFor = (label: string, overlayDir?: string): RunOutcome =>
       runProbe({
@@ -328,11 +332,12 @@ export async function runRecursiveSession(
   }
 
   const budget = {
-    expected_probes: expectedProbes,
+    expected_probes: declaredProbes,
+    planned_probes: plannedProbes,
     actual_probes: actualProbes,
-    status: (actualProbes === expectedProbes
+    status: (actualProbes === plannedProbes
       ? 'ok'
-      : actualProbes < expectedProbes
+      : actualProbes < plannedProbes
         ? 'short'
         : 'exceeded') as 'ok' | 'short' | 'exceeded',
   };

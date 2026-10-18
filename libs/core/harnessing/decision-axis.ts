@@ -57,6 +57,9 @@ export function classifyProbeSet(
       exit_code: o.exit_code ?? -1,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
+      // Surface the declared metric values a reviewer would otherwise have
+      // to re-derive from raw outcomes.
+      ...Object.fromEntries(metrics.map((m) => [`declared:${m.key}`, metricOf(o, m.key) ?? -1])),
     },
   });
   const decisive = [...(base ? [row(base)] : []), ...candidates.map(row)];
