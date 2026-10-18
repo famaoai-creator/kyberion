@@ -100,8 +100,12 @@ export interface ClaudeAgentQueryParams<T> {
    * `'strict'` runs the sub-agent in SDK isolation mode for untrusted prompts
    * (e.g. peer messages): no filesystem settings (so no repo hooks, CLAUDE.md
    * or permission rules), no MCP servers / plugins / agents / skills, no
-   * session persistence, a fresh scratch `cwd` outside the checkout, and a
-   * minimal env with no KYBERION_* runtime state. Omitted = legacy behaviour.
+   * session persistence, a minimal env with no KYBERION_* runtime state, and
+   * `cwd` set to a fresh, empty scratch dir inside the runtime floor
+   * (`active/shared/runtime/workspaces/<id>/`, i.e. still under the repo
+   * root — `settingSources: []` and the custom `systemPrompt` are what keep
+   * repo context out, not the directory). `extraOptions` is reduced to
+   * {@link STRICT_ISOLATION_EXTRA_OPTION_KEYS}. Omitted = legacy behaviour.
    */
   isolation?: ClaudeAgentIsolation;
 }
@@ -146,6 +150,36 @@ const GOVERNED_EXTRA_OPTION_KEYS = [
   'cwd',
   'env',
 ] as const;
+
+/**
+ * Under strict isolation `extraOptions` is an allowlist, not a denylist: only
+ * these pure model/budget tuning keys pass. Everything else (extraArgs,
+ * executable overrides, projectConfigRoot, managedSettings, resume, …) could
+ * reload settings/hooks/MCP or alter the spawned process.
+ */
+export const STRICT_ISOLATION_EXTRA_OPTION_KEYS = [
+  'maxBudgetUsd',
+  'thinking',
+  'effort',
+  'maxThinkingTokens',
+  'fallbackModel',
+] as const;
+
+function strictIsolationExtraOptions(extraOptions?: Partial<Options>): Partial<Options> {
+  const source = (extraOptions ?? {}) as Record<string, unknown>;
+  const kept: Record<string, unknown> = {};
+  const dropped: string[] = [];
+  for (const [key, value] of Object.entries(source)) {
+    if ((STRICT_ISOLATION_EXTRA_OPTION_KEYS as readonly string[]).includes(key)) kept[key] = value;
+    else dropped.push(key);
+  }
+  if (dropped.length > 0) {
+    logger.debug(
+      `[claude-agent-query] strict isolation dropped extraOptions keys: ${dropped.join(', ')}`
+    );
+  }
+  return kept as Partial<Options>;
+}
 
 function sanitizeClaudeAgentExtraOptions(extraOptions?: Partial<Options>): Partial<Options> {
   const sanitized = { ...(extraOptions ?? {}) } as Record<string, unknown>;
@@ -259,7 +293,9 @@ async function runStructuredQuery<T>(
   isolationOptions: Partial<Options> | undefined
 ): Promise<ClaudeAgentQueryResult<T>> {
   const options: Options = {
-    ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
+    ...(isolationOptions
+      ? strictIsolationExtraOptions(params.extraOptions)
+      : sanitizeClaudeAgentExtraOptions(params.extraOptions)),
     // Isolation fields are applied after sanitization, so extraOptions can
     // never re-introduce settings, MCP servers, cwd or env.
     ...(isolationOptions ?? {}),

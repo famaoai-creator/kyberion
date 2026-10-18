@@ -178,6 +178,27 @@ describe('runClaudeAgentQuery isolation', () => {
     expect(options.env).not.toHaveProperty('KYBERION_PEER_SHARED_SECRET');
   });
 
+  it('strict isolation keeps only allowlisted extraOptions tuning keys', async () => {
+    mocks.query.mockReturnValue(stream([SUCCESS]));
+
+    await runClaudeAgentQuery({
+      systemPrompt: 's',
+      userPrompt: 'u',
+      schema,
+      isolation: 'strict',
+      extraOptions: {
+        extraArgs: { 'setting-sources': 'user,project' },
+        projectConfigRoot: '/x',
+        maxBudgetUsd: 1,
+      } as Record<string, unknown>,
+    });
+
+    const options = capturedOptions();
+    expect(options.maxBudgetUsd).toBe(1);
+    expect(options).not.toHaveProperty('extraArgs');
+    expect(options).not.toHaveProperty('projectConfigRoot');
+  });
+
   it('without isolation the options keep their legacy shape', async () => {
     mocks.query.mockReturnValue(stream([SUCCESS]));
 
