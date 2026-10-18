@@ -5,6 +5,10 @@
  * routes to human_gate — optionally produce a blind-selection recommendation
  * for the human. The report carries the full evidence trail, including a
  * harness2-shaped experience record only on decisive outcomes.
+ *
+ * Run-dir namespace under runRoot: probe dirs use the bare label ('base',
+ * '<candidate>'), propose-stage overlays live under '_proposed/<label>/',
+ * and the session report lands at 'report.json'.
  */
 
 import * as path from 'node:path';
@@ -21,6 +25,7 @@ import {
   type BlindSelector,
 } from './blind-select.js';
 import { proposeCandidates } from './propose.js';
+import { scanOverlayForMarkers } from './leak-tripwire.js';
 
 export interface ContrastiveSessionSpec {
   session_id: string;
@@ -29,9 +34,17 @@ export interface ContrastiveSessionSpec {
   /** Supplied candidate overlays: label -> overlay dir. 'base' runs bare. */
   candidates?: Array<{ label: string; overlayDir: string }>;
   /** LLM propose stage: generate `count` overlays under the surface. */
-  propose?: { brief: string; count: number; labelPrefix?: string };
+  propose?: {
+    brief: string;
+    count: number;
+    labelPrefix?: string;
+    /** Optional experience library: its lessons seed the propose prompt. */
+    library?: { root: string; domain: string };
+  };
   /** Editable surface: every overlay (supplied or proposed) is validated. */
   surface?: SurfaceSpec;
+  /** Extra leak-tripwire content markers (merged with DEFAULT_MARKERS). */
+  markers?: string[];
   /** 'blind' adds an anonymized recommendation when the axis says human_gate. */
   selection?: 'blind';
   /** Seed for the blind letter mapping (default: hash of session_id). */
@@ -117,6 +130,7 @@ export async function runContrastiveSession(
       count: spec.propose.count,
       outDir: path.join(runRoot, '_proposed'),
       labelPrefix: spec.propose.labelPrefix,
+      ...(spec.propose.library ? { library: spec.propose.library } : {}),
     });
     rejected.push(...proposed.rejected);
     propose_meta = {
@@ -144,14 +158,30 @@ export async function runContrastiveSession(
   }
 
   // Surface validation: off-surface overlays are rejected, not probed.
+  // Then the leak tripwire: a marker-bearing overlay is rejected too — it
+  // must never reach a probe or be served as evidence later.
   const eligible = supplied.filter((c) => {
-    if (!spec.surface) return true;
-    const v = validateOverlay(c.overlayDir, spec.surface);
-    if (v.ok) return true;
-    rejected.push(
-      ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
-    );
-    return false;
+    if (spec.surface) {
+      const v = validateOverlay(c.overlayDir, spec.surface);
+      if (!v.ok) {
+        rejected.push(
+          ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
+        );
+        return false;
+      }
+    }
+    const scan = scanOverlayForMarkers(c.overlayDir, spec.markers);
+    if (!scan.clean) {
+      rejected.push(
+        ...scan.hits.map((h) => ({
+          label: c.label,
+          path: h.path,
+          reason: `leak marker: ${h.marker} at ${h.path}:${h.line}`,
+        }))
+      );
+      return false;
+    }
+    return true;
   });
   if (!eligible.length && !rejected.length) {
     throw new Error('[CONTRASTIVE_SESSION] at least one candidate overlay is required');

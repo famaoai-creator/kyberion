@@ -28,6 +28,7 @@ import { runProbe, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
+import { scanOverlayForMarkers } from './leak-tripwire.js';
 import {
   applyBlindSelection,
   metricsFallbackSelector,
@@ -42,8 +43,16 @@ export interface RecursiveSessionSpec {
   /** Per-round candidate overlays (same set each round). */
   candidates?: Array<{ label: string; overlayDir: string }>;
   /** LLM propose per round (requires surface). */
-  propose?: { brief: string; count: number; labelPrefix?: string };
+  propose?: {
+    brief: string;
+    count: number;
+    labelPrefix?: string;
+    /** Optional experience library: its lessons seed the propose prompt. */
+    library?: { root: string; domain: string };
+  };
   surface?: SurfaceSpec;
+  /** Extra leak-tripwire content markers (merged with DEFAULT_MARKERS). */
+  markers?: string[];
   /** Max rounds. 1 = single-shot. */
   rounds: number;
   selection?: 'blind';
@@ -133,24 +142,41 @@ export async function runRecursiveSession(
   }
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
-  // Surface-validate supplied overlays once (rounds reuse them).
+  // Reject an overlay whose marker scan hits — a leak-marked file must never
+  // reach a probe (harness2 leak tripwire).
+  const rejectOnMarkers = (label: string, overlayDir: string): boolean => {
+    const scan = scanOverlayForMarkers(overlayDir, spec.markers);
+    if (scan.clean) return false;
+    rejected.push(
+      ...scan.hits.map((h) => ({
+        label,
+        path: h.path,
+        reason: `leak marker: ${h.marker} at ${h.path}:${h.line}`,
+      }))
+    );
+    return true;
+  };
+  // Surface-validate + tripwire supplied overlays once (rounds reuse them).
   const supplied = (spec.candidates ?? []).filter((c) => {
-    if (!spec.surface) return true;
-    try {
-      const v = validateOverlay(c.overlayDir, spec.surface);
-      if (v.ok) return true;
-      rejected.push(
-        ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
-      );
-      return false;
-    } catch (error) {
-      rejected.push({
-        label: c.label,
-        path: '.',
-        reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
-      });
-      return false;
+    if (spec.surface) {
+      try {
+        const v = validateOverlay(c.overlayDir, spec.surface);
+        if (!v.ok) {
+          rejected.push(
+            ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
+          );
+          return false;
+        }
+      } catch (error) {
+        rejected.push({
+          label: c.label,
+          path: '.',
+          reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
+        });
+        return false;
+      }
     }
+    return !rejectOnMarkers(c.label, c.overlayDir);
   });
 
   const rounds: RoundRecord[] = [];
@@ -173,10 +199,13 @@ export async function runRecursiveSession(
         count: spec.propose.count,
         outDir: path.join(roundRoot, '_proposed'),
         labelPrefix: spec.propose.labelPrefix,
+        ...(spec.propose.library ? { library: spec.propose.library } : {}),
       });
       rejected.push(...proposed.rejected.map((r) => ({ ...r, label: `r${round}:${r.label}` })));
       candidates.push(
-        ...proposed.candidates.map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
+        ...proposed.candidates
+          .filter((c) => !rejectOnMarkers(`r${round}:${c.label}`, c.overlayDir))
+          .map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
       );
       roundProposeMeta = {
         backend_used: proposed.backend_used,
