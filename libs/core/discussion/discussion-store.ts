@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeLstat, safeMkdir, safeReaddir, safeStat } from '../secure-io.js';
+import {
+  safeCreateExclusiveFileSync,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeStat,
+} from '../secure-io.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import type {
@@ -48,6 +55,20 @@ function eventsPath(roomId: string): string {
   const filePath = path.resolve(dir, sanitizeDiscussionId(roomId), 'events.jsonl');
   if (!filePath.startsWith(`${dir}${path.sep}`)) throw new Error('Invalid discussion room path');
   return filePath;
+}
+
+/**
+ * Permanent, create-only provider ownership. Never reclaimed automatically:
+ * a missing/torn event receipt cannot authorize repeating a charged call.
+ * The exclusive primitive fsyncs the file; this is not a claim about full
+ * machine/filesystem crash durability of the separate append-only event log.
+ */
+export function claimDiscussionProviderExecution(roomId: string): void {
+  const claimPath = path.join(path.dirname(eventsPath(roomId)), 'provider-execution.claim');
+  safeCreateExclusiveFileSync(
+    claimPath,
+    'Discussion provider execution reserved; create a new room to run again.\n'
+  );
 }
 
 export function readDiscussionEvents(roomId: string, afterSeq = 0): DiscussionEvent[] {
@@ -155,6 +176,56 @@ export interface CreateDiscussionRoomInput {
   id?: string;
 }
 
+/** Normalize at the core boundary, so callers cannot widen provider budgets through another surface. */
+export function normalizeDiscussionConfig(input: Partial<DiscussionConfig> = {}): DiscussionConfig {
+  const config = { ...DEFAULT_DISCUSSION_CONFIG, ...input };
+  const integer = (value: unknown, fallback: number, min: number, max: number, name: string) => {
+    if (value === undefined) return fallback;
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) {
+      throw new DiscussionUserError('Invalid discussion ' + name);
+    }
+    return Math.min(value, max);
+  };
+  if (!['scripted', 'reasoning', 'auto'].includes(config.speaker))
+    throw new DiscussionUserError('Invalid discussion speaker');
+  if (!['panel', 'dialogue'].includes(config.mode))
+    throw new DiscussionUserError('Invalid discussion mode');
+  if (config.provider !== undefined && config.provider !== 'claude' && config.provider !== 'codex')
+    throw new DiscussionUserError('Invalid discussion provider');
+  if (config.single_pass !== undefined && typeof config.single_pass !== 'boolean')
+    throw new DiscussionUserError('Invalid discussion single_pass');
+  if (config.single_pass && config.mode !== 'panel')
+    throw new DiscussionUserError('Single-pass briefs require panel mode');
+  config.max_rounds = integer(config.max_rounds, 4, 1, 8, 'max_rounds');
+  config.max_messages = integer(config.max_messages, 40, 1, 100, 'max_messages');
+  config.turn_delay_ms = integer(config.turn_delay_ms, 1800, 0, 10000, 'turn_delay_ms');
+  const defaultCalls =
+    config.speaker === 'scripted'
+      ? 0
+      : config.mode === 'dialogue'
+        ? 32
+        : Math.min(32, 3 + 6 * config.max_rounds);
+  config.max_provider_calls = integer(
+    config.max_provider_calls,
+    defaultCalls,
+    config.speaker === 'scripted' ? 0 : 1,
+    32,
+    'max_provider_calls'
+  );
+  config.provider_timeout_ms = integer(
+    config.provider_timeout_ms,
+    60000,
+    1000,
+    60000,
+    'provider_timeout_ms'
+  );
+  if (config.single_pass) {
+    config.max_rounds = 1;
+    config.max_provider_calls = config.speaker === 'scripted' ? 0 : 1;
+  }
+  return config;
+}
+
 export function createDiscussionRoom(input: CreateDiscussionRoomInput): DiscussionRoomState {
   const goal = input.goal.trim();
   if (!goal) throw new DiscussionUserError('A discussion goal is required');
@@ -162,7 +233,7 @@ export function createDiscussionRoom(input: CreateDiscussionRoomInput): Discussi
   const id = sanitizeDiscussionId(input.id ?? `disc-${randomUUID().slice(0, 12)}`);
   if (readDiscussionEvents(id).length > 0)
     throw new DiscussionUserError(`Discussion room already exists: ${id}`);
-  const config: DiscussionConfig = { ...DEFAULT_DISCUSSION_CONFIG, ...input.config };
+  const config = normalizeDiscussionConfig(input.config);
   appendDiscussionEvent(id, {
     type: 'room_created',
     goal,

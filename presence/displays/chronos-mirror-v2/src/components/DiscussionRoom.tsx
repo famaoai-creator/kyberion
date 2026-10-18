@@ -28,6 +28,18 @@ import {
   type MissionOption,
 } from '../lib/discussion-client';
 import { DialogueView } from './DialogueRoom';
+import {
+  DiscussionExecutionStatus,
+  DiscussionProviderPrerequisite,
+} from './DiscussionExecutionStatus';
+import { DiscussionBriefControls } from './DiscussionBriefControls';
+import { DiscussionBriefResult } from './DiscussionBriefResult';
+import { OutcomesCard } from './DiscussionOutcomes';
+import {
+  discussionRunConfig,
+  type DiscussionEngineChoice,
+  type DiscussionRunFormat,
+} from '../lib/discussion-run-contract';
 import { CommandCenter, ConversationPane, RosterPane, SituationPane } from './DiscussionPanes';
 import './discussion-room.css';
 
@@ -113,8 +125,11 @@ function Launcher({
 }) {
   const [goal, setGoal] = React.useState('');
   const [tempo, setTempo] = React.useState<'fast' | 'normal' | 'slow'>('normal');
-  const [speaker, setSpeaker] = React.useState<'auto' | 'scripted' | 'reasoning'>('auto');
-  const [mode, setMode] = React.useState<'panel' | 'dialogue'>('panel');
+  const [speaker, setSpeaker] = React.useState<DiscussionEngineChoice>('scripted');
+  const [format, setFormat] = React.useState<DiscussionRunFormat>('brief');
+  const mode = format === 'dialogue' ? 'dialogue' : 'panel';
+  const runConfig = discussionRunConfig(format, speaker);
+  const submitting = React.useRef(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
@@ -149,17 +164,18 @@ function Launcher({
 
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!goal.trim() || busy) return;
+    if (!goal.trim() || submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     const result = await createDiscussion({
       goal: goal.trim(),
       locale,
-      speaker,
-      mode,
+      ...runConfig,
       turn_delay_ms: TEMPO.find((t) => t.id === tempo)?.ms ?? 1800,
       ...(missionId ? { mission_id: missionId } : {}),
     });
+    submitting.current = false;
     setBusy(false);
     if (!result.ok || !result.data) {
       setError(result.error ?? 'failed');
@@ -201,6 +217,7 @@ function Launcher({
         <div className="dl-modes" role="radiogroup" aria-label={dt('modeTitle', locale)}>
           {(
             [
+              { id: 'brief', icon: Sparkles, title: 'modeBrief', hint: 'modeBriefHint' },
               { id: 'panel', icon: Users, title: 'modePanel', hint: 'modePanelHint' },
               {
                 id: 'dialogue',
@@ -215,9 +232,9 @@ function Launcher({
               key={option.id}
               role="radio"
               className="dl-mode"
-              aria-checked={mode === option.id}
-              aria-pressed={mode === option.id}
-              onClick={() => setMode(option.id)}
+              aria-checked={format === option.id}
+              aria-pressed={format === option.id}
+              onClick={() => setFormat(option.id)}
             >
               <option.icon size={18} aria-hidden />
               <strong>{dt(option.title, locale)}</strong>
@@ -234,11 +251,15 @@ function Launcher({
           onChange={(e) => setGoal(e.target.value)}
           placeholder={dt(mode === 'dialogue' ? 'dlgGoalPlaceholder' : 'goalPlaceholder', locale)}
           rows={3}
+          aria-describedby="dr-source-hint dr-run-bounds"
           maxLength={2000}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void start(e);
           }}
         />
+        <p id="dr-source-hint" className="dr-muted">
+          {dt('inlineSourceHint', locale)}
+        </p>
         <div className="dr-examples">
           <span className="dr-muted">{dt('examples', locale)}</span>
           {DISCUSSION_EXAMPLES[locale].map((example) => (
@@ -280,19 +301,40 @@ function Launcher({
           <label className="dr-field dr-field--inline">
             <span>{dt('engine', locale)}</span>
             <select value={speaker} onChange={(e) => setSpeaker(e.target.value as typeof speaker)}>
-              <option value="auto">{dt('engineAuto', locale)}</option>
               <option value="scripted">{dt('engineScripted', locale)}</option>
-              <option value="reasoning">{dt('engineReasoning', locale)}</option>
+              <option value="claude">{dt('engineClaude', locale)}</option>
+              <option value="codex">{dt('engineCodex', locale)}</option>
             </select>
           </label>
           <button
             type="submit"
             className="dr-btn dr-btn--primary dr-btn--lg"
             disabled={busy || !goal.trim()}
+            aria-describedby="dr-run-bounds"
           >
             <Rocket size={16} aria-hidden />{' '}
-            {busy ? dt('starting', locale) : dt(mode === 'dialogue' ? 'dlgStart' : 'start', locale)}
+            {busy
+              ? dt('starting', locale)
+              : dt(
+                  format === 'brief' ? 'briefStart' : mode === 'dialogue' ? 'dlgStart' : 'start',
+                  locale
+                )}
           </button>
+        </div>
+        <div id="dr-run-bounds" className="dr-note">
+          <strong>{dt('runBounds', locale)}</strong>: {runConfig.max_provider_calls}{' '}
+          {dt('isolatedInvocations', locale)}
+          {speaker !== 'scripted' ? (
+            <>
+              <div>
+                {dt('perInvocation', locale)}: 60s · {dt('noAutomaticRetry', locale)}
+              </div>
+              <DiscussionProviderPrerequisite locale={locale} />
+              <div>{dt('providerRestartHint', locale)}</div>
+              <div>{dt(speaker === 'claude' ? 'claudeTurnLimit' : 'codexTurnLimit', locale)}</div>
+            </>
+          ) : null}
+          {format === 'panel' ? <div>{dt('round', locale)}: 1</div> : null}
         </div>
         {error ? (
           <div className="dr-note" data-tone="danger" role="alert">
@@ -312,12 +354,14 @@ function Launcher({
                 <button type="button" onClick={() => onOpen(room.id)}>
                   <span className="dr-recent__status" data-status={room.status} />
                   <span className="dr-recent__goal">{room.title}</span>
-                  {room.mode === 'dialogue' ? (
+                  {room.single_pass ? (
+                    <span className="dr-pill">{dt('modeBrief', locale)}</span>
+                  ) : room.mode === 'dialogue' ? (
                     <span className="dr-pill">{dt('dialogueBadge', locale)}</span>
                   ) : null}
                   <span className="dr-muted">
-                    {STATUS_LABELS[room.status]?.[locale] ?? room.status} · {room.message_count} ·{' '}
-                    {Math.round(room.consensus * 100)}%
+                    {STATUS_LABELS[room.status]?.[locale] ?? room.status} · {room.message_count}
+                    {room.single_pass ? '' : ' · ' + Math.round(room.consensus * 100) + '%'}
                     {room.has_minutes ? ` · ${dt('minutesShort', locale)}` : ''}
                     {room.work_item_count > 0
                       ? ` · ${dt('workItemsShort', locale)} ${room.work_item_count}`
@@ -383,37 +427,64 @@ function RoomView({
   }
   if (room.config.mode === 'dialogue') {
     return (
-      <DialogueView
-        room={room}
-        locale={roomLocale}
-        canSteer={access}
-        connection={connection}
-        onRoom={(next: DiscussionRoomState) => setRoom(next)}
-        onOpen={onOpen}
-        onNew={onBack}
-        onBack={onBack}
-      />
+      <>
+        <DiscussionExecutionStatus room={room} locale={roomLocale} />
+        <DialogueView
+          room={room}
+          locale={roomLocale}
+          canSteer={access && room.status !== 'failed'}
+          connection={connection}
+          onRoom={(next: DiscussionRoomState) => setRoom(next)}
+          onOpen={onOpen}
+          onNew={onBack}
+          onBack={onBack}
+        />
+      </>
     );
   }
   return (
     <div className="dr-room" data-status={room.status}>
       <TopBar room={room} locale={roomLocale} connection={connection} onBack={onBack} />
+      <DiscussionExecutionStatus room={room} locale={roomLocale} />
       <div className="dr-grid">
         <RosterPane room={room} locale={roomLocale} />
-        <ConversationPane room={room} locale={roomLocale} />
+        {room.config.single_pass ? (
+          <DiscussionBriefResult room={room} locale={roomLocale} />
+        ) : (
+          <ConversationPane room={room} locale={roomLocale} />
+        )}
         <div className="dr-side">
-          <SituationPane
-            room={room}
-            locale={roomLocale}
-            canSteer={access}
-            onRoom={(next: DiscussionRoomState) => setRoom(next)}
-          />
-          <CommandCenter
-            room={room}
-            locale={roomLocale}
-            canSteer={access}
-            onRoom={(next: DiscussionRoomState) => setRoom(next)}
-          />
+          {room.config.single_pass ? (
+            <>
+              <DiscussionBriefControls
+                room={room}
+                locale={roomLocale}
+                canSteer={access}
+                onRoom={setRoom}
+              />
+              <OutcomesCard
+                room={room}
+                locale={roomLocale}
+                canSteer={access && room.status !== 'failed'}
+                onRoom={setRoom}
+              />
+            </>
+          ) : (
+            <>
+              <SituationPane
+                room={room}
+                locale={roomLocale}
+                canSteer={access && room.status !== 'failed'}
+                onRoom={setRoom}
+              />
+              <CommandCenter
+                room={room}
+                locale={roomLocale}
+                canSteer={access && room.status !== 'failed'}
+                onRoom={setRoom}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -466,26 +537,30 @@ function TopBar({
         </div>
       </div>
 
-      <ol className="dr-steps" aria-label="phase">
-        {PHASE_STEPS.map((step, index) => (
-          <li
-            key={step.id}
-            data-state={
-              index < phaseIndex || done ? 'done' : index === phaseIndex ? 'current' : 'todo'
-            }
-          >
-            <span className="dr-steps__mark">
-              {index < phaseIndex || done ? <Check size={11} aria-hidden /> : index + 1}
-            </span>
-            <span className="dr-steps__label">
-              {pickByLocale(locale, { en: step.en, ja: step.ja })}
-              {step.id === 'exploring' && room.round > 0
-                ? ` ${room.round}/${room.config.max_rounds}`
-                : ''}
-            </span>
-          </li>
-        ))}
-      </ol>
+      {room.config.single_pass ? (
+        <span className="dr-pill">{dt('modeBrief', locale)}</span>
+      ) : (
+        <ol className="dr-steps" aria-label="phase">
+          {PHASE_STEPS.map((step, index) => (
+            <li
+              key={step.id}
+              data-state={
+                index < phaseIndex || done ? 'done' : index === phaseIndex ? 'current' : 'todo'
+              }
+            >
+              <span className="dr-steps__mark">
+                {index < phaseIndex || done ? <Check size={11} aria-hidden /> : index + 1}
+              </span>
+              <span className="dr-steps__label">
+                {pickByLocale(locale, { en: step.en, ja: step.ja })}
+                {step.id === 'exploring' && room.round > 0
+                  ? ` ${room.round}/${room.config.max_rounds}`
+                  : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <div className="dr-top__right">
         <span className="dr-status" data-status={room.status}>
@@ -495,7 +570,7 @@ function TopBar({
         <span
           className="dr-live"
           data-connection={connection}
-          title={dt('engineMode', locale) + ': ' + room.config.speaker}
+          title={dt('engineMode', locale) + ': ' + (room.execution?.actual_mode ?? 'unknown')}
         >
           <Radio size={12} aria-hidden />
           {connection === 'live'

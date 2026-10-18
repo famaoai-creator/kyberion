@@ -1,10 +1,26 @@
+import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
-import { safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeLstat,
+  safeReadFileSnapshot,
+  safeWriteFile,
+} from '../secure-io.js';
 import { logger } from '../core.js';
-import { createArtifactRecord, saveArtifactRecord } from '../workforce/artifact-record.js';
+import {
+  createArtifactRecord,
+  loadArtifactRecord,
+  saveArtifactRecord,
+  type ArtifactRecord,
+} from '../workforce/artifact-record.js';
 import { renderDiscussionBriefHtml } from './discussion-brief.js';
 import { createWorkItem } from '../workforce/work-coordination.js';
-import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
+import {
+  discussionExecutionSummary,
+  discussionRoleLabel,
+  fillCopy,
+  loadDiscussionCopy,
+} from './discussion-copy.js';
 import {
   appendDiscussionEvent,
   DiscussionUserError,
@@ -34,24 +50,49 @@ function clip(text: string, max: number): string {
 /** Decision-support minutes: everything a reader needs without opening the room. */
 export function renderDiscussionMinutes(room: DiscussionRoomState): string {
   const locale = room.config.locale;
-  const { minutes: copy } = loadDiscussionCopy();
+  const { minutes: copy, execution: executionCopy } = loadDiscussionCopy();
+  const execution = discussionExecutionSummary(room);
   const decision = room.decision;
   const lines: string[] = [];
   const bullets = (items: string[]) =>
     items.length ? items.map((item) => `- ${item}`) : [`- ${copy.none[locale]}`];
 
-  lines.push(`# ${fillCopy(copy.title[locale], { title: room.title })}`, '');
+  lines.push(
+    `# ${fillCopy(room.config.single_pass ? executionCopy.single_pass_record[locale] : copy.title[locale], { title: room.title })}`,
+    ''
+  );
   lines.push(`**${copy.goal[locale]}**: ${room.goal}`);
   lines.push(
-    `**${copy.status[locale]}**: ${room.status} · **${copy.consensus[locale]}**: ${Math.round(room.consensus * 100)}%`
+    `**${copy.status[locale]}**: ${room.status}` +
+      (room.config.single_pass
+        ? ''
+        : ` · **${copy.consensus[locale]}**: ${Math.round(room.consensus * 100)}%`)
+  );
+  lines.push(
+    '',
+    `## ${execution.heading}`,
+    '',
+    execution.notice,
+    '',
+    ...execution.entries.map(([label, value]) => `- **${label}**: ${value}`)
   );
   lines.push('', `## ${copy.team[locale]}`, '');
   for (const p of room.participants) {
     lines.push(`- ${discussionRoleLabel(p.role, locale)} — ${p.name}`);
   }
   if (decision) {
-    lines.push('', `## ${copy.decision[locale]}`, '', decision.summary);
-    lines.push('', `### ${copy.agreements[locale]}`, '', ...bullets(decision.agreements));
+    lines.push(
+      '',
+      `## ${room.config.single_pass ? executionCopy.draft[locale] : copy.decision[locale]}`,
+      '',
+      decision.summary
+    );
+    lines.push(
+      '',
+      `### ${room.config.single_pass ? executionCopy.rationale[locale] : copy.agreements[locale]}`,
+      '',
+      ...bullets(decision.agreements)
+    );
     lines.push('', `### ${copy.dissent[locale]}`, '', ...bullets(decision.dissent));
     lines.push('', `### ${copy.next_steps[locale]}`, '');
     lines.push(
@@ -106,13 +147,243 @@ export function buildWorkProposals(room: DiscussionRoomState): DiscussionWorkPro
   }));
 }
 
+export const MAX_SAVED_DISCUSSION_ARTIFACT_BYTES = 5 * 1024 * 1024;
+
+type SavedArtifactSlot = 'minutes' | 'brief';
+
+export class SavedDiscussionArtifactError extends Error {
+  constructor(
+    public readonly code: 'unverified' | 'integrity_mismatch' | 'unavailable' | 'too_large',
+    message: string,
+    public readonly status: 409 | 413 = 409
+  ) {
+    super(message);
+    this.name = 'SavedDiscussionArtifactError';
+  }
+}
+
+function validSavedId(value: string, max: number): boolean {
+  return value.length <= max && /^[A-Za-z0-9._-]+$/u.test(value) && value !== '.' && value !== '..';
+}
+
+function artifactSpec(room: DiscussionRoomState, slot: SavedArtifactSlot) {
+  return slot === 'minutes'
+    ? { path: minutesLogicalPath(room.id), kind: 'markdown' as const, name: 'minutes.md' }
+    : { path: briefLogicalPath(room.id), kind: 'html' as const, name: 'brief.html' };
+}
+
+/** Bind the room event and ownership record before any artifact filesystem probe. */
+function boundArtifactRecord(room: DiscussionRoomState, artifactId: string) {
+  if (!validSavedId(room.id, 96) || !validSavedId(artifactId, 160)) return null;
+  const matches = (['minutes', 'brief'] as const).filter(
+    (slot) => room.outcomes[slot]?.artifact_id === artifactId
+  );
+  if (matches.length !== 1) return null;
+  const slot = matches[0];
+  const reference = room.outcomes[slot]!;
+  const spec = artifactSpec(room, slot);
+  if (reference.path !== spec.path) return null;
+  if (slot === 'minutes' && room.outcomes.minutes?.kind !== spec.kind) return null;
+  const record = loadArtifactRecord(artifactId);
+  if (
+    !record ||
+    record.artifact_id !== artifactId ||
+    record.storage_class !== 'repo' ||
+    record.path !== spec.path ||
+    record.kind !== spec.kind ||
+    record.external_ref !== undefined ||
+    record.tenant_slug !== room.scope.tenant_slug ||
+    record.organization_id !== room.scope.organization_id ||
+    record.project_id !== (room.scope.project_id ?? FALLBACK_PROJECT_ID) ||
+    record.mission_id !== room.scope.mission_id ||
+    record.metadata?.source !== 'discussion_room' ||
+    record.metadata?.discussion_id !== room.id ||
+    record.metadata?.tier !== (room.scope.tier ?? 'confidential')
+  )
+    return null;
+  return { record, slot, ...spec };
+}
+
 /**
- * After a decision: write the minutes (markdown, for machines and diffs) and
- * the decision brief (interactive HTML, for people), register both as
- * deliverables (visible in the Deliverables inbox under the room's tenant /
- * organization / project / mission) and offer the follow-ups as WorkItem
- * proposals. Idempotent; calling it again refreshes the files.
+ * Read only the exact saved bytes owned by an already-authorized room. The HTTP
+ * caller must resolve its viewer and authorize the room AND tier first. This
+ * function adds immutable room/record/path binding, never a broader path grant.
  */
+export function readSavedDiscussionArtifact(
+  room: DiscussionRoomState,
+  artifactId: string
+): {
+  name: string;
+  kind: 'markdown' | 'html';
+  bytes: Buffer;
+  sha256: string;
+} | null {
+  const bound = boundArtifactRecord(room, artifactId);
+  if (!bound) return null;
+  const sha256 = bound.record.metadata?.content_sha256;
+  const expectedBytes = bound.record.metadata?.content_bytes;
+  if (sha256 === undefined && expectedBytes === undefined) {
+    throw new SavedDiscussionArtifactError(
+      'unverified',
+      'This saved artifact has no integrity evidence. Use the current brief view or regenerate the discussion deliverables.'
+    );
+  }
+  if (
+    typeof sha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/u.test(sha256) ||
+    typeof expectedBytes !== 'number' ||
+    !Number.isSafeInteger(expectedBytes) ||
+    expectedBytes < 0
+  ) {
+    throw new SavedDiscussionArtifactError(
+      'integrity_mismatch',
+      'Saved artifact integrity evidence is invalid.'
+    );
+  }
+  if (expectedBytes > MAX_SAVED_DISCUSSION_ARTIFACT_BYTES) {
+    throw new SavedDiscussionArtifactError(
+      'too_large',
+      'Saved artifact exceeds the size limit.',
+      413
+    );
+  }
+  let bytes: Buffer;
+  try {
+    const file = assertSafeRepositoryPath(pathResolver.rootResolve(bound.path));
+    const stat = safeLstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new SavedDiscussionArtifactError(
+        'unavailable',
+        'Saved artifact is not a safe regular file.'
+      );
+    }
+    if (stat.size > MAX_SAVED_DISCUSSION_ARTIFACT_BYTES) {
+      throw new SavedDiscussionArtifactError(
+        'too_large',
+        'Saved artifact exceeds the size limit.',
+        413
+      );
+    }
+    // This primitive checks every component, pins the inode, rejects symlinks,
+    // non-regular files and concurrent changes, and bounds allocation + reads.
+    bytes = safeReadFileSnapshot(file, MAX_SAVED_DISCUSSION_ARTIFACT_BYTES);
+  } catch (error) {
+    if (error instanceof SavedDiscussionArtifactError) throw error;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new SavedDiscussionArtifactError(
+      'unavailable',
+      'Saved artifact could not be read safely.'
+    );
+  }
+  if (
+    bytes.length !== expectedBytes ||
+    createHash('sha256').update(bytes).digest('hex') !== sha256
+  ) {
+    throw new SavedDiscussionArtifactError(
+      'integrity_mismatch',
+      'Saved artifact differs from its integrity evidence. Regenerate the discussion deliverables.'
+    );
+  }
+  return { name: bound.name, kind: bound.kind, bytes, sha256 };
+}
+
+function saveDiscussionArtifact(room: DiscussionRoomState, slot: SavedArtifactSlot): void {
+  const spec = artifactSpec(room, slot);
+  const reference = room.outcomes[slot];
+  const existing = reference ? boundArtifactRecord(room, reference.artifact_id) : null;
+  if (reference && !existing) throw new Error('Saved discussion artifact ownership is unavailable');
+  const bytes = Buffer.from(
+    slot === 'minutes'
+      ? renderDiscussionMinutes(room)
+      : renderDiscussionBriefHtml(room, { mode: 'view' }),
+    'utf8'
+  );
+  if (bytes.length > MAX_SAVED_DISCUSSION_ARTIFACT_BYTES) {
+    throw new SavedDiscussionArtifactError(
+      'too_large',
+      'Saved artifact exceeds the size limit.',
+      413
+    );
+  }
+  const execution = room.execution;
+  const metadata = {
+    ...existing?.record.metadata,
+    source: 'discussion_room',
+    tier: room.scope.tier ?? 'confidential',
+    discussion_id: room.id,
+    title: room.title,
+    consensus: room.consensus,
+    content_sha256: createHash('sha256').update(bytes).digest('hex'),
+    content_bytes: bytes.length,
+    discussion_execution: execution
+      ? {
+          requested_mode: execution.requested_mode,
+          actual_mode: execution.actual_mode,
+          requested_provider: execution.requested_provider,
+          provider: execution.provider,
+          model: execution.model,
+          calls_used: execution.attempts.length,
+          call_budget: execution.call_budget,
+          timeout_ms: execution.timeout_ms,
+          internal_turn_limit: execution.internal_turn_limit,
+        }
+      : { actual_mode: 'unknown', provider: null, model: null },
+    ...(slot === 'brief' ? { view: 'decision_brief' } : {}),
+  };
+  const input: Omit<ArtifactRecord, 'artifact_id'> = {
+    ...(existing?.record ?? {}),
+    storage_class: 'repo',
+    ...(room.scope.tenant_slug ? { tenant_slug: room.scope.tenant_slug } : {}),
+    ...(room.scope.organization_id ? { organization_id: room.scope.organization_id } : {}),
+    project_id: room.scope.project_id ?? FALLBACK_PROJECT_ID,
+    ...(room.scope.mission_id ? { mission_id: room.scope.mission_id } : {}),
+    kind: spec.kind,
+    path: spec.path,
+    preview_text: clip(room.decision?.summary ?? room.goal, 400),
+    metadata,
+  };
+  const record = existing
+    ? { ...input, artifact_id: existing.record.artifact_id }
+    : createArtifactRecord(input);
+  // Each update preserves its identity and recomputes the evidence. A failure
+  // between file and record writes leaves a mismatch, which retrieval rejects.
+  safeWriteFile(pathResolver.rootResolve(spec.path), bytes);
+  saveArtifactRecord(record);
+  if (!reference) {
+    if (slot === 'minutes')
+      appendDiscussionEvent(room.id, {
+        type: 'minutes_published',
+        artifact_id: record.artifact_id,
+        path: spec.path,
+        kind: spec.kind,
+      });
+    else
+      appendDiscussionEvent(room.id, {
+        type: 'brief_published',
+        artifact_id: record.artifact_id,
+        path: spec.path,
+      });
+  }
+}
+
+const PUBLICATION_FAILURE =
+  'Decision generated but saved artifact publication failed; no model retry performed.';
+
+function recordPublicationFailure(roomId: string): void {
+  logger.warn(
+    '[discussion] saved artifact publication failed — room=' +
+      roomId +
+      ' | next=inspect storage and refresh deliverables; no model retry'
+  );
+  try {
+    appendDiscussionEvent(roomId, { type: 'error', message: PUBLICATION_FAILURE });
+  } catch {
+    // If even the room log is unavailable, propagate only a fixed safe message.
+    throw new Error(PUBLICATION_FAILURE);
+  }
+}
+
+/** Publish saved minutes and brief with integrity evidence; refresh existing IDs. */
 export function publishDiscussionOutcomes(roomId: string): void {
   const room = readDiscussionRoom(roomId);
   if (!room?.decision) return;
@@ -122,85 +393,22 @@ export function publishDiscussionOutcomes(roomId: string): void {
   }
   try {
     const fresh = readDiscussionRoom(roomId) as DiscussionRoomState;
-    const minutesPath = minutesLogicalPath(fresh.id);
-    safeWriteFile(pathResolver.rootResolve(minutesPath), renderDiscussionMinutes(fresh));
-    const briefPath = briefLogicalPath(fresh.id);
-    safeWriteFile(
-      pathResolver.rootResolve(briefPath),
-      renderDiscussionBriefHtml(fresh, { mode: 'view' })
-    );
-    const common = {
-      storage_class: 'repo' as const,
-      ...(fresh.scope.tenant_slug ? { tenant_slug: fresh.scope.tenant_slug } : {}),
-      ...(fresh.scope.organization_id ? { organization_id: fresh.scope.organization_id } : {}),
-      project_id: fresh.scope.project_id ?? FALLBACK_PROJECT_ID,
-      ...(fresh.scope.mission_id ? { mission_id: fresh.scope.mission_id } : {}),
-    };
-    const metadata = {
-      source: 'discussion_room',
-      // Deliverables fail closed without a tier; discussions default to confidential.
-      tier: fresh.scope.tier ?? 'confidential',
-      discussion_id: fresh.id,
-      title: fresh.title,
-      consensus: fresh.consensus,
-    };
-    const preview = clip(fresh.decision?.summary ?? fresh.goal, 400);
-    if (!fresh.outcomes.minutes) {
-      const record = createArtifactRecord({
-        ...common,
-        kind: 'markdown',
-        path: minutesPath,
-        preview_text: preview,
-        metadata,
-      });
-      saveArtifactRecord(record);
-      appendDiscussionEvent(fresh.id, {
-        type: 'minutes_published',
-        artifact_id: record.artifact_id,
-        path: minutesPath,
-        kind: record.kind,
-      });
-    }
-    if (!fresh.outcomes.brief) {
-      const record = createArtifactRecord({
-        ...common,
-        kind: 'html',
-        path: briefPath,
-        preview_text: preview,
-        metadata: { ...metadata, view: 'decision_brief' },
-      });
-      saveArtifactRecord(record);
-      appendDiscussionEvent(fresh.id, {
-        type: 'brief_published',
-        artifact_id: record.artifact_id,
-        path: briefPath,
-      });
-    }
-  } catch (error) {
-    // The decision stands even if the deliverables could not be registered.
-    logger.warn(
-      `[discussion] outcomes were not published for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
-    );
+    saveDiscussionArtifact(fresh, 'minutes');
+    saveDiscussionArtifact(fresh, 'brief');
+  } catch {
+    recordPublicationFailure(room.id);
   }
 }
 
-/** Rewrite the stored brief and minutes after the room changed (edits, review). */
+/** Refresh files AND evidence after edits/review without replacing artifact IDs. */
 export function refreshDiscussionDeliverables(roomId: string): void {
   const room = readDiscussionRoom(roomId);
   if (!room?.decision) return;
   try {
-    safeWriteFile(
-      pathResolver.rootResolve(minutesLogicalPath(room.id)),
-      renderDiscussionMinutes(room)
-    );
-    safeWriteFile(
-      pathResolver.rootResolve(briefLogicalPath(room.id)),
-      renderDiscussionBriefHtml(room, { mode: 'view' })
-    );
-  } catch (error) {
-    logger.warn(
-      `[discussion] deliverables were not refreshed for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
-    );
+    saveDiscussionArtifact(room, 'minutes');
+    saveDiscussionArtifact(room, 'brief');
+  } catch {
+    recordPublicationFailure(room.id);
   }
 }
 
