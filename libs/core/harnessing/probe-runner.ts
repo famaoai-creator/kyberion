@@ -9,6 +9,7 @@
 
 import * as path from 'node:path';
 import {
+  assertGovernedExec,
   assertSafeRepositoryPath,
   safeCopyFileSync,
   safeRmSync,
@@ -91,6 +92,8 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   if (!spec.command.length) {
     throw new Error('[PROBE_SPEC] command must be a non-empty argv array');
   }
+  // Command policy violations are spec errors, not rollout evidence.
+  assertGovernedExec(spec.command[0], spec.command.slice(1));
   // expectOutputs paths are checked INSIDE the run dir — a traversal entry
   // like '../../x' would escape it and let an unrelated file fake delivered.
   for (const rel of spec.expectOutputs ?? []) {

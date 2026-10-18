@@ -70,7 +70,11 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
       exit_code: o.exit_code,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
-      error: o.error.split(label).join('[CANDIDATE]').slice(0, 120),
+      error: outcomes
+        .map((x) => x.label)
+        .filter((l) => l.length >= 3)
+        .reduce((t, l) => t.split(l).join('[CANDIDATE]'), o.error)
+        .slice(0, 120),
     });
   });
   return { seed, letterToLabel, labelToLetter, rows };
