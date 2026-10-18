@@ -859,6 +859,142 @@
     "providerPrerequisite": {
       "en": "Provider readiness is not verified here. Browser rooms use confidential scope. Real generation requires an existing tenant with this provider approved for zero-retention egress and a working login/runtime. Ask the workspace administrator to verify that setup before starting. Pasting public text or selecting a provider does not change scope or grant access; the server checks policy before any model invocation.",
       "ja": "プロバイダーの準備状況はここでは未確認です。ブラウザーのルームは機密扱いです。実生成には、既存テナントでの当該プロバイダーへの送信・ゼロ保持の承認と、利用可能なログイン・実行環境が必要です。開始前に管理者へ既存設定の確認を依頼してください。公開資料の貼り付けやプロバイダー選択では範囲・権限は変わらず、モデル呼び出し前にサーバーが方針を確認します。"
+    },
+    "readinessTitle": {
+      "en": "Provider setup check",
+      "ja": "プロバイダーの設定確認"
+    },
+    "readinessChecking": {
+      "en": "Checking existing setup…",
+      "ja": "既存の設定を確認中…"
+    },
+    "readinessFailed": {
+      "en": "The setup check could not be confirmed. Generation is disabled.",
+      "ja": "設定確認の結果を確認できませんでした。生成は開始できません。"
+    },
+    "readinessBlockers": {
+      "en": "Resolve the listed blockers before attempting generation.",
+      "ja": "生成を試す前に、以下の阻害要因を解消してください。"
+    },
+    "readinessInspected": {
+      "en": "Static checks returned. Live execution remains unverified.",
+      "ja": "静的な確認結果を取得しました。実行の成功は未確認です。"
+    },
+    "readinessNoCalls": {
+      "en": "Readiness check: 0 provider calls. Goal text is not sent.",
+      "ja": "設定確認でのプロバイダー呼び出しは0回です。目的の本文は送信しません。"
+    },
+    "readinessLimits": {
+      "en": "Checked means static inspection only. Login, provider reachability, CLI version, command execution and runtime writes remain unverified.",
+      "ja": "「確認済み」は静的な確認のみを意味します。ログイン、プロバイダーへの接続、CLIのバージョン、コマンドの実行、実行時の書き込みは未確認です。"
+    },
+    "readinessAccessRequired": {
+      "en": "This check requires localadmin access and an allowed confidential scope. Ask the workspace administrator to verify your existing access and selected scope, then retry.",
+      "ja": "この確認にはlocaladmin権限と、利用可能な機密スコープが必要です。管理者に現在のアクセス権限と選択したスコープの確認を依頼し、再確認してください。"
+    },
+    "readinessRetryHint": {
+      "en": "Retry the check. If it still fails, ask the workspace administrator to inspect the Discussion service.",
+      "ja": "再確認してください。失敗が続く場合は、管理者にDiscussionサービスの確認を依頼してください。"
+    },
+    "readinessChecked": {
+      "en": "Checked (static)",
+      "ja": "確認済み（静的）"
+    },
+    "readinessBlocked": {
+      "en": "Blocked",
+      "ja": "開始不可"
+    },
+    "readinessUnverified": {
+      "en": "Unverified",
+      "ja": "未確認"
+    },
+    "readinessScopeChecked": {
+      "en": "An existing tenant scope was resolved. Browser rooms remain confidential.",
+      "ja": "既存のテナントスコープを解決しました。ブラウザーのルームは機密扱いです。"
+    },
+    "readinessTenantRequired": {
+      "en": "No eligible tenant scope was resolved. Select a mission you can access or ask the administrator to verify the existing tenant context.",
+      "ja": "利用可能なテナントスコープを解決できませんでした。アクセス可能なミッションを選ぶか、管理者に既存のテナント情報の確認を依頼してください。"
+    },
+    "readinessAdapterDeclared": {
+      "en": "An isolated-generation adapter is declared for this provider.",
+      "ja": "このプロバイダーの隔離生成アダプターが定義されています。"
+    },
+    "readinessAdapterUnavailable": {
+      "en": "No supported isolated-generation adapter was found. Choose a supported provider or ask the administrator to inspect the installation.",
+      "ja": "対応する隔離生成アダプターが見つかりません。対応するプロバイダーを選ぶか、管理者にインストール状況の確認を依頼してください。"
+    },
+    "readinessEgressAllowed": {
+      "en": "Existing confidential-scope egress policy permits this provider. This check does not grant access or change policy.",
+      "ja": "既存の機密スコープの送信方針で、このプロバイダーが許可されています。この確認は権限を付与せず、方針を変更しません。"
+    },
+    "readinessEgressDenied": {
+      "en": "Existing egress policy blocks this provider. Ask the administrator to review confidential-scope and zero-retention requirements, or choose another provider and recheck. No policy is changed here.",
+      "ja": "既存の送信方針がこのプロバイダーを拒否しています。管理者に機密スコープとゼロ保持の要件の確認を依頼するか、別のプロバイダーを選んで再確認してください。ここでは方針を変更しません。"
+    },
+    "readinessEgressUnverified": {
+      "en": "Egress policy was not checked because a scope or adapter prerequisite is blocked. Resolve that blocker and retry.",
+      "ja": "スコープまたはアダプターの前提条件が満たされないため、送信方針は未確認です。阻害要因を解消して再確認してください。"
+    },
+    "readinessExecutablePresent": {
+      "en": "The configured CLI was found as a regular file. Executability and successful launch were not tested.",
+      "ja": "設定されたCLIが通常ファイルとして見つかりました。実行権限と起動の成功は検証していません。"
+    },
+    "readinessExecutableMissing": {
+      "en": "The configured CLI file was not found. Ask the administrator to verify the CLI installation and configured command, then retry.",
+      "ja": "設定されたCLIファイルが見つかりません。管理者にCLIのインストールとコマンド設定の確認を依頼し、再確認してください。"
+    },
+    "readinessExecutableInspectionUnavailable": {
+      "en": "CLI metadata could not be inspected. Ask the administrator to verify the configured CLI; any launch remains unverified.",
+      "ja": "CLIのメタデータを確認できませんでした。管理者に設定されたCLIの確認を依頼してください。起動の可否は未確認です。"
+    },
+    "readinessExecutableUnverified": {
+      "en": "Claude’s SDK-managed native executable was not inspected. A PATH CLI or configured shell command does not verify this transport. Ask the administrator to inspect the installed SDK runtime; launch remains unverified.",
+      "ja": "ClaudeのSDKが管理するネイティブ実行ファイルは未確認です。PATH上のCLIやシェルのコマンド設定では、この実行経路を確認できません。管理者にインストール済みSDKの実行環境の確認を依頼してください。起動の可否は未確認です。"
+    },
+    "readinessArtifactParentInspected": {
+      "en": "The governed artifact destination’s parent directory was inspected. No directory or artifact was created, and write success is unverified.",
+      "ja": "管理対象の成果物保存先の親ディレクトリを確認しました。ディレクトリや成果物は作成しておらず、書き込みの成功は未確認です。"
+    },
+    "readinessArtifactDirectoryInspected": {
+      "en": "The governed artifact destination directory was inspected. No artifact was written, and write success is unverified.",
+      "ja": "管理対象の成果物保存先ディレクトリを確認しました。成果物は書き込んでおらず、書き込みの成功は未確認です。"
+    },
+    "readinessArtifactUnavailable": {
+      "en": "The governed artifact destination could not be safely inspected. Ask the administrator to verify its existing scope and directory metadata, then retry. This does not establish that it is unwritable.",
+      "ja": "管理対象の成果物保存先を安全に確認できませんでした。管理者に既存のスコープとディレクトリ情報の確認を依頼し、再確認してください。書き込み不可と判定したわけではありません。"
+    },
+    "readinessLiveUnverified": {
+      "en": "No live generation was attempted. Login, provider reachability, CLI version and runtime writes are unverified.",
+      "ja": "実際の生成は試していません。ログイン、プロバイダーへの接続、CLIのバージョン、実行時の書き込みは未確認です。"
+    },
+    "readinessUnknownCheck": {
+      "en": "This check is not recognized. Retry before attempting generation.",
+      "ja": "この確認項目を認識できません。生成を試す前に再確認してください。"
+    },
+    "readinessAttemptHint": {
+      "en": "You may explicitly attempt generation. The server rechecks policy before execution; this result does not guarantee success or start a run.",
+      "ja": "明示的に生成を試すことができます。サーバーは実行前に方針を再確認します。この結果は成功を保証せず、自動で実行を開始しません。"
+    },
+    "readinessRetry": {
+      "en": "Retry check",
+      "ja": "再確認"
+    },
+    "briefAttempt": {
+      "en": "Attempt generation and save",
+      "ja": "生成と保存を試す"
+    },
+    "readinessMissionUnavailable": {
+      "en": "The linked mission is unavailable in your confidential scope. Select another visible confidential mission or clear the mission link, then retry.",
+      "ja": "紐づけたミッションは現在の機密スコープでは利用できません。参照可能な別の機密ミッションを選ぶか、ミッションの紐づけを解除して再確認してください。"
+    },
+    "briefCreateUncertainty": {
+      "en": "Before explicitly choosing any new generation, inspect Recent rooms. A lost create response does not prove that no run started. Retry check repeats only the read-only setup check; it does not retry generation.",
+      "ja": "新たな生成を明示的に選ぶ前に、「過去のルーム」を確認してください。作成の応答が失われても、実行が開始されなかったとは限りません。「再確認」は読み取り専用の設定確認だけを繰り返し、生成を再実行しません。"
+    },
+    "readinessScopeNotice": {
+      "en": "Browser rooms remain confidential, including pasted public text. Existing tenant/provider zero-retention and egress authorization are required.",
+      "ja": "公開文書を貼り付けても、ブラウザーのルームは機密扱いです。既存のテナント・プロバイダーのゼロ保持設定と外部送信の許可が必要です。"
     }
   },
   "role_labels": {

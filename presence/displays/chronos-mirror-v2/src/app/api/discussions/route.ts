@@ -8,16 +8,16 @@ import {
   DiscussionUserError,
 } from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
-import {
-  isDiscussionVisibleToViewer,
-  resolveDiscussionCreateScope,
-} from '../../../lib/discussion-access';
+import { isDiscussionVisibleToViewer } from '../../../lib/discussion-access';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
-import { buildMissionHistoryItems } from '../../../lib/su-surface-data';
+import {
+  DiscussionMissionScopeError,
+  resolveDiscussionRequestScope,
+} from '../../../lib/discussion-request-scope';
+import { inspectDiscussionReadiness } from '@agent/core/discussion/discussion-readiness';
 import { readDiscussionExecutionConfig } from '../../../lib/discussion-run-contract';
 import {
   resolveViewerContextForRequest,
-  strictViewerScopeTenantSlugs,
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
@@ -72,50 +72,28 @@ export async function POST(req: NextRequest) {
     const body = parsed.body;
     const goal = typeof body.goal === 'string' ? body.goal.trim() : '';
     if (!goal) return NextResponse.json({ ok: false, error: 'goal is required' }, { status: 400 });
-    const missionId = typeof body.mission_id === 'string' ? body.mission_id.trim() : '';
-    let missionScope: {
-      tenant?: string;
-      project?: string;
-      mission?: string;
-      tier?: 'public' | 'confidential' | 'personal';
-    } = {};
-    if (missionId) {
-      // A room may only attach to a mission the viewer can already see; the
-      // mission then supplies the tenant / project of the room's context chain.
-      const mission = withViewerExecutionContext(viewer, () =>
-        buildMissionHistoryItems({
-          missionId,
-          tier: 'confidential',
-          tenantSlugs: strictViewerScopeTenantSlugs(viewer),
-          limit: 1,
-        })
-      ).find((entry) => entry.missionId.toUpperCase() === missionId.toUpperCase());
-      if (!mission) {
+    const scope = resolveDiscussionRequestScope(viewer, body);
+    const executionConfig = readDiscussionExecutionConfig(body);
+    if (
+      executionConfig.single_pass &&
+      executionConfig.speaker !== 'scripted' &&
+      executionConfig.provider
+    ) {
+      const readiness = withViewerExecutionContext(viewer, () =>
+        inspectDiscussionReadiness(executionConfig.provider!, scope)
+      );
+      if (readiness.checks.some((check) => check.status === 'blocked')) {
         return NextResponse.json(
-          { ok: false, error: 'mission not found in your scope' },
-          { status: 404 }
+          {
+            ok: false,
+            error:
+              'Discussion prerequisites are blocked. Recheck prerequisites before starting a new brief.',
+            readiness,
+          },
+          { status: 409 }
         );
       }
-      missionScope = {
-        tenant: mission.tenantSlug,
-        project: mission.projectId,
-        mission: mission.missionId,
-        tier: mission.tier,
-      };
     }
-    const scope = resolveDiscussionCreateScope(
-      viewer,
-      missionScope.tenant ??
-        (typeof body.tenant === 'string' ? body.tenant.trim() || undefined : undefined),
-      typeof body.organization_id === 'string'
-        ? body.organization_id.trim() || undefined
-        : undefined,
-      missionScope.project ??
-        (typeof body.project_id === 'string' ? body.project_id.trim() || undefined : undefined)
-    );
-    if (missionScope.mission) scope.mission_id = missionScope.mission;
-    if (missionScope.tier) scope.tier = missionScope.tier;
-    const executionConfig = readDiscussionExecutionConfig(body);
     const room = withViewerExecutionContext(viewer, () => {
       const created = createDiscussionRoom({
         goal,
@@ -140,6 +118,8 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, room }, { status: 201 });
   } catch (error) {
+    if (error instanceof DiscussionMissionScopeError)
+      return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
     if (error instanceof DiscussionUserError) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }

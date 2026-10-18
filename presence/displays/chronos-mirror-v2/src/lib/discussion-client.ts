@@ -7,6 +7,7 @@ import type {
   DiscussionRoomSummary,
 } from '@agent/core/discussion/discussion-types';
 import copy from './discussion-copy.json';
+import type { ReadinessProvider } from './discussion-readiness-state';
 
 export type { DiscussionCommand, DiscussionRoomState, DiscussionRoomSummary };
 
@@ -79,6 +80,19 @@ export function fetchDiscussionRooms(
   return call<{ rooms: DiscussionRoomSummary[]; accessRole?: string }>(
     `/api/discussions${query ? `?${query}` : ''}`
   );
+}
+
+/** No goal or source text is transmitted by this metadata-only check. */
+export function fetchDiscussionReadiness(
+  provider: ReadinessProvider,
+  missionId: string,
+  signal?: AbortSignal
+) {
+  const params = new URLSearchParams({ provider });
+  if (missionId) params.set('mission_id', missionId);
+  return call<{ readiness?: unknown }>(`/api/discussions/readiness?${params.toString()}`, {
+    signal,
+  });
 }
 
 export function createDiscussion(body: {
