@@ -247,9 +247,11 @@ function probeAudioPermission(
   const hostApp = native?.host_app;
   const data = hostApp ? { host_app: hostApp } : undefined;
   if (native?.microphone === 'granted') {
+    // The grant belongs to the probing host app; without it we cannot tell
+    // whether the capture process shares that grant.
     return item(
       'audio.permission',
-      'pass',
+      hostApp ? 'pass' : 'warn',
       `macOS microphone permission is granted${hostApp ? ` to ${hostApp}` : ''}`,
       'none',
       { data }

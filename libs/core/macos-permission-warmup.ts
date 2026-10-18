@@ -41,6 +41,12 @@ function state(value: unknown): PermissionWarmupState {
     : 'unknown';
 }
 
+// Screen recording only takes effect after enabling the host app in System Settings
+// (and restarting it), so any non-granted result points there.
+function needsSettings(kind: PermissionWarmupKind, after: PermissionWarmupState): boolean {
+  return after === 'denied' || (kind === 'screen_recording' && after !== 'granted');
+}
+
 export function warmupMacOSPermissions(
   kinds: readonly PermissionWarmupKind[] = DEFAULT_PERMISSION_WARMUP_KINDS
 ): PermissionWarmupResult {
@@ -61,7 +67,7 @@ export function warmupMacOSPermissions(
       results[kind] = {
         before: state(entry?.before),
         after,
-        ...(after === 'denied' ? { remedy: PERMISSION_SETTINGS_PANE[kind] } : {}),
+        ...(needsSettings(kind, after) ? { remedy: PERMISSION_SETTINGS_PANE[kind] } : {}),
       };
     }
     return { supported: true, results };

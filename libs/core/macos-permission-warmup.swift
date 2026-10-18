@@ -3,7 +3,8 @@ import AVFoundation
 import CoreGraphics
 // Explicit, operator-invoked permission warm-up. Kept apart from
 // macos-native-automation.swift so that probe never requests anything.
-// Only kinds that are still undetermined are requested; granted/denied are left alone.
+// Microphone/camera are requested only while undetermined; granted/denied are left alone.
+// Screen recording cannot tell undetermined from denied, so it is requested whenever not granted.
 func emit(_ value: [String: Any]) {
   guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), let text = String(data: data, encoding: .utf8) else { exit(1) }
   print(text)
@@ -27,10 +28,10 @@ func warmCapture(_ type: AVMediaType) -> [String: String] {
 }
 func warmScreen() -> [String: String] {
   guard #available(macOS 10.15, *) else { return ["before": "unsupported", "after": "unsupported"] }
-  let before = CGPreflightScreenCaptureAccess() ? "granted" : "denied"
-  if before == "granted" { return ["before": before, "after": before] }
+  // Preflight is boolean: false covers both undetermined and denied, so report "unknown".
+  if CGPreflightScreenCaptureAccess() { return ["before": "granted", "after": "granted"] }
   _ = CGRequestScreenCaptureAccess()
-  return ["before": before, "after": CGPreflightScreenCaptureAccess() ? "granted" : "denied"]
+  return ["before": "unknown", "after": CGPreflightScreenCaptureAccess() ? "granted" : "unknown"]
 }
 guard CommandLine.arguments.count == 2, let data = CommandLine.arguments[1].data(using: .utf8), let p = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let kinds = p["kinds"] as? [String] else { emit(["ok": false]); exit(1) }
 var result: [String: Any] = [:]
