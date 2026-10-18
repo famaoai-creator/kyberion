@@ -1110,6 +1110,13 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Provider health snapshot, rewritten in place — self-bounded. Surfaced uncovered in the 2026-10-15 janitor report."
+    },
+    {
+      "path": "active/shared/runtime/terminal-daemon",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "terminal_session_cli.ts daemon state — Unix socket, pidfile, and startup log for the persistent terminal-actuator bridge. Files are recreated on daemon start; leftovers from a dead daemon are stale and safe to delete (same lifecycle as heartbeats)."
     }
   ]
 }

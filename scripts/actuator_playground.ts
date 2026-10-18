@@ -3,6 +3,7 @@ import {
   safeExistsSync,
   safeExec,
   safeLstat,
+  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
@@ -11,10 +12,12 @@ import {
   type ActuatorManifestFile,
 } from '@agent/core/actuator-manifest-index';
 import {
+  ACTUATOR_PIPELINE_STEP_TYPES,
   actuatorManifestAcceptsPipeline,
   buildSingleOpPipelinePayload,
   planActuatorDryRun,
   resolveCliActionKind,
+  type ActuatorPipelineStepType,
 } from '@agent/core/actuator/actuator-sdk';
 import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -81,13 +84,73 @@ export function parsePlaygroundParams(raw: string, label = '--params'): Record<s
 
 export function buildPlaygroundPayload(
   operation: string,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  flat = false
 ): Record<string, unknown> {
+  if (flat) {
+    // Flat contracts (build ops, `pipeline` envelopes) declare op fields at the
+    // top level; keep the `params` bag nested otherwise.
+    return { action: operation, op: operation, ...params };
+  }
   return {
     action: operation,
     op: operation,
     params,
   };
+}
+
+/**
+ * True when the contract schema declares op fields flat at the top level
+ * (e.g. build-pipeline `{op, project_dir, ...}` or `pipeline` envelopes
+ * `{action, steps, ...}`) instead of a nested `params` object. oneOf/anyOf
+ * per-action schemas keep the nested convention.
+ */
+export function contractSchemaUsesFlatParams(contractSchemaPath?: string): boolean {
+  if (!contractSchemaPath) return false;
+  try {
+    const raw = safeReadFile(pathResolver.rootResolve(contractSchemaPath));
+    const schema = JSON.parse(String(raw));
+    if (schema?.oneOf || schema?.anyOf) return false;
+    const props = schema?.properties;
+    if (!props || typeof props !== 'object') return false;
+    if ('params' in props) return false;
+    return 'steps' in props || 'op' in props;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Contract schemas disagree on the discriminator key: newer authored schemas
+ * require `{op, params}` while legacy handlers read `action`, and some schemas
+ * (e.g. working-memory) declare op fields flat at the top level. Try the wire
+ * payload first, then normalized variants, so the compatibility shim keys do
+ * not fail strict `additionalProperties` schemas.
+ */
+export function buildContractValidationCandidates(
+  payload: Record<string, unknown>
+): Array<Record<string, unknown>> {
+  const params =
+    payload.params && typeof payload.params === 'object' && !Array.isArray(payload.params)
+      ? (payload.params as Record<string, unknown>)
+      : {};
+  const candidates: Array<Record<string, unknown>> = [payload];
+  const push = (candidate: Record<string, unknown>) => {
+    const key = JSON.stringify(candidate);
+    if (!candidates.some((existing) => JSON.stringify(existing) === key)) {
+      candidates.push(candidate);
+    }
+  };
+  for (const [field, value] of [
+    ['op', payload.op],
+    ['action', payload.action],
+  ] as const) {
+    if (typeof value !== 'string' || value === '') continue;
+    push({ [field]: value, params });
+    push({ [field]: value, ...params });
+    push({ [field]: value });
+  }
+  return candidates;
 }
 
 /**
@@ -183,9 +246,15 @@ export function evaluatePlaygroundDryRun(args: {
   contractSchemaPath?: string;
   inputSchema?: Record<string, unknown>;
   params?: Record<string, unknown>;
+  /** Discovery-registry kind; when absent the payload heuristic decides. */
+  kind?: string;
   mode?: 'dry-run' | 'check';
 }): Record<string, unknown> {
-  const kind = resolveCliActionKind(args.payload);
+  const kind = (
+    args.kind && (ACTUATOR_PIPELINE_STEP_TYPES as readonly string[]).includes(args.kind)
+      ? args.kind
+      : resolveCliActionKind(args.payload)
+  ) as ActuatorPipelineStepType;
   const plan = planActuatorDryRun({ kind, dryRun: true });
   let validated = true;
   let error: string | undefined;
@@ -216,7 +285,14 @@ export function evaluatePlaygroundDryRun(args: {
       const ajv = createAjv();
       const schemaPath = pathResolver.rootResolve(args.contractSchemaPath);
       const validate = compileSchemaFromPath(ajv, schemaPath);
-      if (!validate(args.payload)) {
+      let matched = false;
+      for (const candidate of buildContractValidationCandidates(args.payload)) {
+        if (validate(candidate)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
         validated = false;
         error = (validate.errors || [])
           .map((item) => `${item.instancePath || '/'} ${item.message || 'is invalid'}`)
@@ -398,7 +474,7 @@ export async function runPlayground(
       rl.close();
       throw new ScriptExitError(
         1,
-        'Machine mode requires --actuator, --op, and --params; omit them only for interactive mode.'
+        'Machine mode requires --actuator and --op; omit them only for interactive mode.'
       );
     }
     log(chalk.white('Available Actuators:'));
@@ -477,11 +553,7 @@ export async function runPlayground(
       rl.close();
       throw new ScriptExitError(1, `Failed to parse --params JSON: ${err.message}`);
     }
-  } else {
-    if (machineOutput) {
-      rl.close();
-      throw new ScriptExitError(1, 'Machine mode requires --params with a JSON object.');
-    }
+  } else if (!machineOutput) {
     log(chalk.white('\nHow would you like to provide the operation parameters?'));
     log(chalk.cyan('  1. Interactive Wizard (key-value prompting)'));
     log(chalk.cyan('  2. Paste Raw JSON block'));
@@ -520,22 +592,26 @@ export async function runPlayground(
   // try-out matches production. Actuators without a `pipeline` entry
   // (agent/secret/…) dispatch single actions directly and stay bare.
   const isManifestOp = (manifest.capabilities || []).some((entry) => entry.op === op);
-  const discoveryKind = isManifestOp
-    ? null
-    : lookupDiscoveryOpKind(manifest.actuator_id, op, selectedActuator.id);
-  const isPipelineWrapped = discoveryKind !== null && actuatorAcceptsPipeline(manifest);
-  const payload = isPipelineWrapped
-    ? buildPipelineWrappedPayload(op, paramsObject, discoveryKind as string)
-    : buildPlaygroundPayload(op, paramsObject);
   const detail = loadDiscoveryOpDetailsForActuator(manifest.actuator_id, selectedActuator.id).find(
     (entry) => entry.op === op
   );
+  const discoveryKind = detail?.kind ?? null;
+  const isPipelineWrapped =
+    !isManifestOp && discoveryKind !== null && actuatorAcceptsPipeline(manifest);
+  const useFlatParams =
+    !isPipelineWrapped && isManifestOp && contractSchemaUsesFlatParams(manifest.contract_schema);
+  const payload = isPipelineWrapped
+    ? buildPipelineWrappedPayload(op, paramsObject, discoveryKind as string)
+    : buildPlaygroundPayload(op, paramsObject, useFlatParams);
+  const resolvedKind =
+    (discoveryKind as ActuatorPipelineStepType | null) ?? resolveCliActionKind(payload);
   const plan = evaluatePlaygroundDryRun({
     actuatorId: manifest.actuator_id,
     operation: op,
     payload,
     inputSchema: detail?.input_schema,
     params: paramsObject,
+    kind: discoveryKind ?? undefined,
     contractSchemaPath: isManifestOp ? manifest.contract_schema : undefined,
     mode: options.check === true ? 'check' : 'dry-run',
   });
@@ -653,9 +729,9 @@ export async function runPlayground(
       mode: options.dryRun === true ? 'dry-run' : 'execute',
       actuator_id: manifest.actuator_id,
       operation: op,
-      kind: resolveCliActionKind(payload),
+      kind: resolvedKind,
       dry_run: options.dryRun === true,
-      handler: resolveCliActionKind(payload),
+      handler: resolvedKind,
       handler_invoked: true,
       input_path: tempPath,
       executable_path: execPath,

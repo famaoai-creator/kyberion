@@ -20,52 +20,124 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "attendees": { "type": "array", "items": { "type": "string" } },
-        "backend": { "type": "string" },
-        "backends": { "type": "array", "items": { "type": "string" } },
-        "calendar_id": { "type": "string" },
-        "calendar_names": { "type": "array", "items": { "type": "string" } },
+        "attendees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "backend": {
+          "type": "string"
+        },
+        "backends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "calendar_id": {
+          "type": "string"
+        },
+        "calendar_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "calendar_targets": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "backend": { "type": "string" },
-              "calendar_id": { "type": "string" },
-              "calendar_name": { "type": "string" }
+              "backend": {
+                "type": "string"
+              },
+              "calendar_id": {
+                "type": "string"
+              },
+              "calendar_name": {
+                "type": "string"
+              }
             }
           }
         },
-        "conference_request_id": { "type": "string" },
-        "description": { "type": "string" },
-        "end_date": { "type": "string", "format": "date-time" },
-        "location": { "type": "string" },
-        "query": { "type": "string" },
-        "start_date": { "type": "string", "format": "date-time" },
-        "time_zone": { "type": "string" },
-        "title": { "type": "string" },
-        "with_meet": { "type": "boolean" },
-        "event_id": { "type": "string", "minLength": 1 },
-        "reminder_minutes_before_start": { "type": "integer", "minimum": 0 },
-        "send_updates": { "enum": ["all", "externalOnly", "none"] },
-        "duration_minutes": { "type": "integer", "minimum": 1 },
-        "slot_step_minutes": { "type": "integer", "minimum": 1 },
-        "business_calendar": { "enum": ["none", "japanese_bank"] },
+        "conference_request_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "location": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "time_zone": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "with_meet": {
+          "type": "boolean"
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reminder_minutes_before_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "send_updates": {
+          "enum": ["all", "externalOnly", "none"]
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "slot_step_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "business_calendar": {
+          "enum": ["none", "japanese_bank"]
+        },
         "working_hours": {
           "type": "object",
           "required": ["start", "end"],
           "properties": {
-            "start": { "type": "string" },
-            "end": { "type": "string" },
+            "start": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            },
             "weekdays": {
               "type": "array",
-              "items": { "type": "integer", "minimum": 0, "maximum": 6 }
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
             }
           },
           "additionalProperties": false
         }
       }
+    },
+    "action": {
+      "type": "string"
     }
   }
 }

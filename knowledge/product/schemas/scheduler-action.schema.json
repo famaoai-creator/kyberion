@@ -12,11 +12,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "cron": { "type": "string", "minLength": 1 },
-        "payload": { "type": "object" },
-        "enabled": { "type": "boolean" }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cron": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
       }
+    },
+    "action": {
+      "type": "string"
     }
   }
 }

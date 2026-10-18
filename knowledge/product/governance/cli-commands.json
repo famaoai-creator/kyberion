@@ -3698,6 +3698,17 @@
       "native_help": true
     },
     {
+      "id": "script.terminal",
+      "script": "terminal",
+      "command": "terminal default",
+      "noun": "terminal",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_terminal",
+      "group": "operate",
+      "long_running": true
+    },
+    {
       "id": "script.test",
       "script": "test",
       "command": "test default",
