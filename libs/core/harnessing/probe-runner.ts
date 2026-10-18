@@ -8,10 +8,12 @@
  */
 
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   assertGovernedExec,
   assertSafeRepositoryPath,
   safeCopyFileSync,
+  safeReadFile,
   safeRmSync,
   safeExecResult,
   safeExistsSync,
@@ -58,6 +60,10 @@ export interface RunOutcome {
    *  the live overlayDir may have changed since the probe ran. Absent when
    *  the probe had no overlay (base run) or failed before staging. */
   staged_snapshot?: string;
+  /** sha256 manifest of staged_snapshot captured AT STAGE TIME. The snapshot
+   *  dir is reachable by the scenario (sibling of run dir, no fs sandbox),
+   *  so adoption must re-verify this manifest before trusting the bytes. */
+  snapshot_manifest?: Record<string, string>;
   error: string;
   recorded_at: string;
 }
@@ -84,6 +90,22 @@ function listFiles(dir: string, prefix = ''): string[] {
     else if (stat.isFile()) out.push(rel);
   }
   return out;
+}
+
+/** Content manifest of every file under root: relpath → sha256 hex. */
+export function treeManifest(root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rel of listFiles(root)) {
+    out[rel] = createHash('sha256')
+      .update(safeReadFile(path.join(root, rel)))
+      .digest('hex');
+  }
+  return out;
+}
+
+export function manifestsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
 }
 
 function assertLabelSafe(label: string): void {
@@ -135,6 +157,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     );
   }
   const recorded_at = nowIso();
+  // Declared before `fail` so failure outcomes still report what was staged
+  // (a partial/absent manifest signals an unverified snapshot).
+  let overlay: string | null = null;
+  let snapshotDir: string | null = null;
+  let snapshotManifest: Record<string, string> | null = null;
   const fail = (error: string): RunOutcome => ({
     label: spec.label,
     run_dir: runDir,
@@ -144,14 +171,14 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
+    ...(snapshotDir ? { staged_snapshot: snapshotDir } : {}),
+    ...(snapshotManifest ? { snapshot_manifest: snapshotManifest } : {}),
     error,
     recorded_at,
   });
 
   // All overlay validation happens BEFORE the first write — a rejected
   // overlay must not leave a partial run-dir tree inside the caller's input.
-  let overlay: string | null = null;
-  let snapshotDir: string | null = null;
   if (spec.overlayDir) {
     overlay = assertSafeRepositoryPath(spec.overlayDir);
     if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
@@ -167,10 +194,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
         `overlay dir ${spec.overlayDir} and run dir ${runDir} nest inside each other — copyTree would recurse or delete input`
       );
     }
-    // Frozen byte record of what this probe staged. Sibling of the run dir —
-    // inside it the scenario could tamper; outside runRoot it would escape
-    // the repo-scoped path contract. runDir-vs-overlay nesting above already
-    // covers this dir too (same runRoot tree).
+    // Frozen byte record of what this probe staged. Kept OUTSIDE the run dir
+    // but inside runRoot (repo-scoped path contract). A sibling is still
+    // reachable by the scenario via ../ or absolute paths — integrity comes
+    // from the manifest below, verified again at adoption time, not from
+    // placement alone.
     snapshotDir = path.join(runRoot, '.snapshots', spec.label);
     const resolvedSnapshot = path.resolve(snapshotDir);
     if (
@@ -181,6 +209,15 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       return fail(
         `overlay dir ${spec.overlayDir} and snapshot dir nest inside each other — copyTree would recurse`
       );
+    }
+    // Spec error, not outcome: scenarioDir = runRoot/.snapshots[/label] would
+    // be deleted-and-rewritten by staging — input destruction, not evidence.
+    if (
+      resolvedSnapshot === scen ||
+      resolvedSnapshot.startsWith(`${scen}${path.sep}`) ||
+      scen.startsWith(`${resolvedSnapshot}${path.sep}`)
+    ) {
+      throw new Error('[PROBE_SPEC] snapshot dir and scenarioDir must not nest inside each other');
     }
   }
 
@@ -196,6 +233,10 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       if (safeExistsSync(snapshotDir)) safeRmSync(snapshotDir);
       copyTree(overlay, snapshotDir);
       copyTree(snapshotDir, runDir);
+      // Hash the staged bytes now — the scenario runs with cwd=runDir and no
+      // fs sandbox, so a post-stage tamper of ../.snapshots must be detectable
+      // at adoption time, not silently materialized.
+      snapshotManifest = treeManifest(snapshotDir);
     }
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
@@ -251,6 +292,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     produced_files: after.filter((f) => !stagedBefore.has(f)),
     staged_expected,
     ...(snapshotDir ? { staged_snapshot: snapshotDir } : {}),
+    ...(snapshotManifest ? { snapshot_manifest: snapshotManifest } : {}),
     error: delivered
       ? ''
       : (allStaged ? 'all_expected_staged ' : '') +
