@@ -622,6 +622,26 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh/peer-task-exchange.ts#appendRecord (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mesh/peer-task-exchange.ts#executeAcceptedPeerTask",
+      "roles": ["peer_catalog_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mesh/peer-task-exchange.ts#loadPeerTaskCatalog",
+      "roles": ["peer_catalog_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mesh/peer-task-exchange.ts#writePeerTaskArtifact",
+      "roles": ["peer_task_artifact_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/metrics.ts#aggregateMetricsForEnforcement",
       "roles": ["metrics_cap_reader"],
       "unresolved": []
@@ -4629,6 +4649,7 @@
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
+        "peer_task_artifact_writer",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime"
@@ -5738,6 +5759,7 @@
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
+        "peer_task_artifact_writer",
         "scope_locale_reader",
         "slack_bridge"
       ]
@@ -7042,7 +7064,8 @@
         "metrics_cap_reader",
         "organization_operator",
         "peer_catalog_reader",
-        "peer_responder_reader"
+        "peer_responder_reader",
+        "peer_task_artifact_writer"
       ]
     },
     "system_configurator": {

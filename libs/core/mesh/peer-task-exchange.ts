@@ -29,9 +29,9 @@ import { withExecutionContext } from '../authority.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
-import { readJsonLines } from '../foundation/json.js';
+import { readJson, readJsonLines } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
-import { safeExecResultAsync, safeExistsSync, safeReadFile } from '../secure-io.js';
+import { safeExecResultAsync, safeExistsSync } from '../secure-io.js';
 import { appendGovernedArtifactJsonl, writeScopedArtifact } from '../workforce/artifact-store.js';
 import { createWorkItemIfAbsent, updateWorkItem } from '../workforce/work-coordination.js';
 import { peerRuntimeLogicalPath, type PeerMessageEnvelope } from './peer-messaging.js';
@@ -187,7 +187,7 @@ export function loadPeerTaskCatalog(
   const read = (logicalPath: string): PeerTaskCatalog => {
     const resolved = pathResolver.resolve(logicalPath);
     if (!safeExistsSync(resolved)) return { version: 1, tasks: [] };
-    const raw = JSON.parse(String(safeReadFile(resolved, { encoding: 'utf8' })));
+    const raw = readJson<unknown>(resolved);
     const parsed = PeerTaskCatalogSchema.safeParse(raw);
     if (!parsed.success) throw new Error(`invalid_peer_task_catalog:${parsed.error.message}`);
     return parsed.data;
@@ -910,7 +910,7 @@ export async function deliverPeerTaskResult(input: {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.warn(
-      `result for ${record.task_id} not delivered — ${message} | next: pnpm peer:task resend-result --task-id ${record.task_id}`
+      `result for ${record.task_id} not delivered — ${message} | next: pnpm kyberion peer task resend-result --task-id ${record.task_id}`
     );
     return appendRecord({
       ...record,
