@@ -12,6 +12,7 @@ import {
   safeWriteFile,
   safeReaddir,
   safeLstat,
+  safeAppendFileSync,
 } from '../secure-io.js';
 import { loadMissionOrchestrationEvent } from './mission-orchestration-event-loader.js';
 import type {
@@ -24,7 +25,11 @@ import {
   type EventScope,
   type EventScopeInput,
 } from '../event-scope.js';
-import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../writer-lease.js';
+import {
+  withFencedWriterLeaseSync,
+  withWriterLeaseSnapshotSync,
+  writerLeaseResourceId,
+} from '../writer-lease.js';
 import { resolveMissionDir, tryResolveOwnerScope, type OwnerScopeHint } from '../owner-scope.js';
 
 export type MissionOrchestrationJournalStatus = 'enqueued' | 'completed' | 'failed';
@@ -598,6 +603,85 @@ export function writeProvisionedText(input: {
   });
 }
 
+/** Append bytes and their whole-file receipt under the same writer lease. */
+export function appendProvisionedText(input: {
+  missionId: string;
+  filePath: string;
+  targetPath: string;
+  content: string;
+  missionPathHint?: string;
+  scope?: EventScope;
+  /** Explicit operator repair only; the old writer receipted an empty ledger once. */
+  repairLegacyEmptyLedger?: boolean;
+  validateContent?: (content: string) => void;
+}): boolean {
+  const writeDir = writeJournalDir(input.missionId, input.scope, input.missionPathHint);
+  const recordPath = nodePath.join(writeDir, 'provisioned-entries.jsonl');
+  const leasePath = nodePath.join(writeDir, 'writer-lease.json');
+  const file = artifactPath(input.filePath);
+  const expected = nodePath.resolve(writeDir, '..', input.targetPath);
+  if (
+    file !== expected ||
+    !expected.startsWith(`${nodePath.resolve(writeDir, '..')}${nodePath.sep}`)
+  ) {
+    throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_scope');
+  }
+  return withFencedWriterLeaseSync({
+    resourceId: writerLeaseResourceId(leasePath),
+    ownerId: `process:${process.pid}`,
+    leasePath,
+    fn: () => {
+      const records = safeExistsSync(recordPath)
+        ? readJsonLines<ProvisionedEntryRecord>(recordPath, {
+            map: (value, line) => loadProvisionedEntryRecordAtLine(value, `${recordPath}:${line}`),
+            onMalformed: () => {
+              throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_record');
+            },
+          }).filter((record) => record.target_path === input.targetPath)
+        : [];
+      if (findUnverifiedProvisionedEntries(records).length) {
+        throw new Error('MISSION_LOG_CORRUPT:unverified_provisioned_entries');
+      }
+      const current = safeExistsSync(file) ? readTextFile(assertRegularArtifactPath(file)) : '';
+      input.validateContent?.(current + input.content);
+      const latest = records.at(-1);
+      const matches = latest?.content_hash === provisionedEntryHash(current);
+      const legacyEmpty =
+        input.repairLegacyEmptyLedger &&
+        input.targetPath === 'execution-ledger.jsonl' &&
+        records.length === 2 &&
+        records[0].phase === 'provisioned' &&
+        records[1].phase === 'verified' &&
+        records[0].entry_id === records[1].entry_id &&
+        records.every((record) => record.content_hash === provisionedEntryHash(''));
+      if (latest && !matches && !legacyEmpty) {
+        throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_mismatch:${latest.entry_id}`);
+      }
+      if (!latest && current) throw new Error('MISSION_LOG_CORRUPT:unreceipted_text');
+      if (input.repairLegacyEmptyLedger && (matches || !legacyEmpty)) return false;
+      const provisioned = provisionMissionEntry(current + input.content);
+      writeProvisionedEntryRecord(recordPath, {
+        missionId: input.missionId,
+        entry: provisioned,
+        targetPath: input.targetPath,
+        phase: 'provisioned',
+      });
+      safeMkdir(nodePath.dirname(file), { recursive: true });
+      safeAppendFileSync(file, input.content);
+      if (readTextFile(assertRegularArtifactPath(file)) !== provisioned.content) {
+        throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_mismatch');
+      }
+      writeProvisionedEntryRecord(recordPath, {
+        missionId: input.missionId,
+        entry: provisioned,
+        targetPath: input.targetPath,
+        phase: 'verified',
+      });
+      return true;
+    },
+  });
+}
+
 function outcomeForStatus(status: MissionOrchestrationJournalStatus): MissionOperationOutcome {
   return {
     status: status === 'enqueued' ? 'pending' : status === 'completed' ? 'completed' : 'failed',
@@ -860,14 +944,21 @@ export function loadMissionOrchestrationReplayPlan(
   }
   events.sort((left, right) => left.created_at.localeCompare(right.created_at));
 
-  const journalEntries = loadMissionOrchestrationJournal(missionId, scope);
-  const reduced = reduceMissionState(journalEntries);
-  const provisionedRecords = loadProvisionedEntryRecords(missionId, scope);
-  const unverifiedProvisionedEntries = findUnverifiedProvisionedEntries(provisionedRecords);
-  const missingProvisionedEntries =
-    unverifiedProvisionedEntries.length > 0
-      ? []
-      : findMissingProvisionedEntries(missionId, provisionedRecords, scope);
+  const readSnapshot = () => {
+    const journalEntries = loadMissionOrchestrationJournal(missionId, scope);
+    const reduced = reduceMissionState(journalEntries);
+    const provisionedRecords = loadProvisionedEntryRecords(missionId, scope);
+    const unverifiedProvisionedEntries = findUnverifiedProvisionedEntries(provisionedRecords);
+    const missingProvisionedEntries =
+      unverifiedProvisionedEntries.length > 0
+        ? []
+        : findMissingProvisionedEntries(missionId, provisionedRecords, scope);
+    return { reduced, unverifiedProvisionedEntries, missingProvisionedEntries };
+  };
+  const directory = readJournalDir(missionId, scope);
+  const { reduced, unverifiedProvisionedEntries, missingProvisionedEntries } = directory
+    ? withWriterLeaseSnapshotSync(nodePath.join(directory, 'writer-lease.json'), readSnapshot)
+    : readSnapshot();
   const recoveryRequired =
     unverifiedProvisionedEntries.length > 0 || missingProvisionedEntries.length > 0;
 

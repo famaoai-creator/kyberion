@@ -27,6 +27,7 @@ import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-di
 import type { MissionState } from './mission-types.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readSupervisorEvents } from '../agent/agent-runtime-events.js';
+import { prepareMissionWorkflowReuse, type WorkflowReuseResult } from './mission-workflow-reuse.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -770,6 +771,7 @@ export interface MissionRetrospectiveResult {
   stats: MissionExecutionStats;
   proposals: ProcessImprovementProposal[];
   report_path: string;
+  workflow_reuse?: WorkflowReuseResult;
 }
 
 /**
@@ -885,6 +887,12 @@ export async function runMissionRetrospective(
     enqueueProposal(proposal);
   }
 
+  // Preparation is part of ordinary completion, rather than an operator remembering
+  // a second command. Its egress and review gates are independent of process proposals.
+  const workflowReuse = missionPath
+    ? await prepareMissionWorkflowReuse(missionId, missionPath)
+    : undefined;
+
   // Human-readable report next to the mission evidence.
   const reportLines = [
     `# Mission Retrospective — ${missionId}`,
@@ -917,6 +925,9 @@ export async function runMissionRetrospective(
       : [`- ${t('mission_ops:retro_none')}${llmNote ? ` (${llmNote})` : ''}`]),
     '',
     t('mission_ops:retro_queue_footer', { path: IMPROVEMENT_QUEUE_PATH }),
+    ...(workflowReuse
+      ? ['', `Workflow reuse: ${workflowReuse.status} — ${workflowReuse.report_path}`]
+      : []),
   ];
   // The generated report gets its own file name. `evidence/retrospective.md`
   // is the hand-written deliverable of the template's retrospective task
@@ -931,7 +942,7 @@ export async function runMissionRetrospective(
   if (missionPath) {
     safeWriteFile(
       safeMissionArtifactPath(missionPath, 'evidence/retrospective.json'),
-      JSON.stringify({ stats, proposals }, null, 2)
+      JSON.stringify({ stats, proposals, workflow_reuse: workflowReuse }, null, 2)
     );
   }
 
@@ -950,5 +961,5 @@ export async function runMissionRetrospective(
   logger.info(
     `[mission-retrospective] ${missionId}: stats collected, ${proposals.length} proposal(s) queued → ${reportPath}`
   );
-  return { stats, proposals, report_path: reportPath };
+  return { stats, proposals, report_path: reportPath, workflow_reuse: workflowReuse };
 }
