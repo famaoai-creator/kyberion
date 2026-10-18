@@ -93,6 +93,9 @@ export interface RoundRecord {
    *  probes may have run against different bytes than the base probe saw.
    *  Recorded on every round; on auto_advance it additionally halts adoption. */
   base_drifted?: boolean;
+  /** Post-probe manifest of the base — lets resumeRecursiveSession verify
+   *  the halt→resume window against recorded bytes. */
+  base_end_manifest?: Record<string, string>;
   propose_meta?: { backend_used: boolean; error?: string };
   /** Set when this round produced a reusable lesson: an auto_advance winner
    *  whose probed bytes were materialized into the next base, or a final-
@@ -473,8 +476,10 @@ async function runSessionLoop(
     // silently skew every later probe's comparability. Detect + record drift
     // on EVERY round, not only when adoption needs it.
     let baseDrifted = false;
+    let baseEndManifest: Record<string, string> | null = null;
     try {
-      baseDrifted = !baseManifest || !manifestsEqual(treeManifest(currentBase), baseManifest);
+      baseEndManifest = treeManifest(currentBase);
+      baseDrifted = !baseManifest || !manifestsEqual(baseEndManifest, baseManifest);
     } catch {
       baseDrifted = true;
     }
@@ -501,6 +506,9 @@ async function runSessionLoop(
       outcomes,
       rejected: [...rejected],
       ...(baseDrifted ? { base_drifted: true } : {}),
+      // Post-probe manifest of the base — lets a resume verify the
+      // halt→resume window against recorded bytes, not just trust the dir.
+      ...(baseEndManifest ? { base_end_manifest: baseEndManifest } : {}),
       ...(roundProposeMeta ? { propose_meta: roundProposeMeta } : {}),
     });
 
@@ -693,7 +701,9 @@ async function runSessionLoop(
           resumed_after_round: init.resume.haltedRound,
           // A human's pick, never an axis verdict — kept visibly distinct
           // from auto_advance adoptions (labelled 'resume:r<N>:<label>').
-          adopted_via: 'human_gate_resume',
+          // Omitted when the resume adoption itself failed verification —
+          // claiming a route that never landed would be dishonest.
+          ...(!init.resumeFailure ? { adopted_via: 'human_gate_resume' as const } : {}),
         }
       : {}),
     budget,
@@ -746,6 +756,8 @@ interface HaltedSessionReport {
   rounds?: Array<{
     round?: unknown;
     base_dir?: unknown;
+    base_drifted?: unknown;
+    base_end_manifest?: Record<string, string>;
     outcomes?: RunOutcome[];
   }>;
 }
@@ -859,18 +871,26 @@ export async function resumeRecursiveSession(
   }
 
   // Materialize haltedBase + verified snapshot — the same integrity
-  // contract as the in-loop adoption: the recorded manifest re-verifies
-  // against the live snapshot bytes, and the materialized tree must equal
-  // base-manifest overridden by snapshot-manifest. A drifted snapshot is a
-  // refusal (materialization_error), never a pick of whatever bytes happen
-  // to be there now.
+  // contract as the in-loop adoption: a base already drifted at halt time
+  // is refused, the recorded post-probe manifest re-verifies the halted
+  // base AND the live snapshot bytes, and the materialized tree must equal
+  // base-manifest overridden by snapshot-manifest.
   let resumeFailure: string | null = null;
   let verifiedManifest: Record<string, string> | null = null;
   try {
+    if (lastRound.base_drifted === true) {
+      throw new Error('halted base already drifted during probes — refusing adoption');
+    }
+    const haltedBaseManifest = treeManifest(haltedBase);
+    if (
+      lastRound.base_end_manifest &&
+      !manifestsEqual(haltedBaseManifest, lastRound.base_end_manifest)
+    ) {
+      throw new Error('halted base mutated between halt and resume');
+    }
     if (!manifestsEqual(treeManifest(snapshot), outcome.snapshot_manifest)) {
       throw new Error('adopted candidate snapshot drifted after the halted probe');
     }
-    const haltedBaseManifest = treeManifest(haltedBase);
     if (safeExistsSync(nextBase)) safeRmSync(nextBase);
     copyTree(haltedBase, nextBase);
     copyTree(snapshot, nextBase);
