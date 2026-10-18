@@ -114,10 +114,22 @@ describe('pnpm kyberion read', () => {
     );
   });
 
-  it('refuses unsupported types and prints usage without a file', async () => {
+  it('reads csv/json text-native files and refuses unknown types', async () => {
     const csv = path.join(workDir, 'data.csv');
-    safeWriteFile(csv, 'a,b');
-    await expect(runReadCommand([csv], () => {})).rejects.toThrow(/unsupported file type/);
+    safeWriteFile(csv, 'Name,Score\nAlpha,10\n');
+    const csvOut: string[] = [];
+    await runReadCommand([csv], (text) => csvOut.push(text));
+    expect(csvOut.join('\n')).toContain('| Alpha | 10 |');
+
+    const json = path.join(workDir, 'payload.json');
+    safeWriteFile(json, '{"ok":true}');
+    const jsonOut: string[] = [];
+    await runReadCommand([json], (text) => jsonOut.push(text));
+    expect(jsonOut.join('\n')).toContain('"ok": true');
+
+    const unknown = path.join(workDir, 'blob.bin');
+    safeWriteFile(unknown, 'x');
+    await expect(runReadCommand([unknown], () => {})).rejects.toThrow(/unsupported file type/);
     await expect(runReadCommand([], () => {})).rejects.toThrow(/Usage: pnpm kyberion read/);
     const output: string[] = [];
     await runReadCommand(['--help'], (text) => output.push(text));

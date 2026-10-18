@@ -6584,9 +6584,9 @@
         "qps-ploc": "⟦  şėȧřƈħ <ɋůėřẏ>       Şėȧřƈħ ȧƈŧůȧŧőřş ƀẏ ñȧɱė, ḓėşƈřïṗŧïőñ, őř ṗȧŧħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_help_read": {
-        "en": "  read <file> [--ocr]  Read a pdf/pptx/docx/xlsx as Markdown via the native engines (--json, --out)",
-        "ja": "  read <file> [--ocr]  pdf/pptx/docx/xlsx をネイティブエンジンで Markdown として読む(--json, --out)",
-        "qps-ploc": "⟦  řėȧḓ <ƒïŀė> [--őƈř]  Řėȧḓ ȧ ṗḓƒ/ṗṗŧẋ/ḓőƈẋ/ẋŀşẋ ȧş Ɱȧřķḓőẇñ ṽïȧ ŧħė ñȧŧïṽė ėñɠïñėş (--ĵşőñ, --őůŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+        "en": "  read <file> [--ocr]  Read pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml as Markdown (--json, --out)",
+        "ja": "  read <file> [--ocr]  pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml を Markdown として読む(--json, --out)",
+        "qps-ploc": "⟦  řėȧḓ <ƒïŀė> [--őƈř]  Řėȧḓ ṗḓƒ/ṗṗŧẋ/ḓőƈẋ/ẋŀşẋ/ħŧɱŀ/ɱḓ/ŧẋŧ/ƈşṽ/ĵşőñ/ẏȧɱŀ ȧş Ɱȧřķḓőẇñ (--ĵşőñ, --őůŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "cli_help_write": {
         "en": "  write <brief.json>   Turn a semantic brief into pptx/docx/xlsx/pdf via the design layer (--out, --to)",
@@ -7209,9 +7209,9 @@
         "qps-ploc": "⟦Ṗřėṽïėẇ őř řůñ ėẋṗőřŧ-ŧħėñ-ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ ŧėñȧñŧ őř ṗřőĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "cli_cmd_operator_cli_read": {
-        "en": "Read a document (pdf, pptx, docx, xlsx, html, md) as Markdown",
-        "ja": "文書 (pdf/pptx/docx/xlsx/html/md) を Markdown で読む",
-        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+        "en": "Read a document (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown",
+        "ja": "文書 (pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml) を Markdown で読む",
+        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ, ŧẋŧ, ƈşṽ, ĵşőñ, ẏȧɱŀ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "cli_cmd_operator_cli_write": {
         "en": "Author a document from a semantic brief",
