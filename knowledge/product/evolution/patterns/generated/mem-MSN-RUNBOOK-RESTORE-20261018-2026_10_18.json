@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-RUNBOOK-RESTORE-20261018-2026_10_18",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Verify retained guidance after merging shared operational documents",
+  "summary": "Concurrent edits to an append-heavy runbook can silently remove approved sections while duplicating newer guidance. Compare the actual merged document against both the approved baseline and the latest additions, then restore only the lost content with byte-level provenance.",
+  "candidate_id": "mem-MSN-RUNBOOK-RESTORE-20261018-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-RUNBOOK-RESTORE-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-RUNBOOK-RESTORE-20261018/evidence/test-report.md",
+    "active/missions/public/MSN-RUNBOOK-RESTORE-20261018/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-RUNBOOK-RESTORE-20261018/evidence/publication-authorization-and-provenance.json"
+  ],
+  "created_at": "2026-10-18T12:37:22.661Z",
+  "applicability": ["mission", "mission:MSN-RUNBOOK-RESTORE-20261018"],
+  "reusable_steps": [
+    "Concurrent edits to an append-heavy runbook can silently remove approved sections while duplicating newer guidance",
+    "Compare the actual merged document against both the approved baseline and the latest additions, then restore only the lost content with byte-level provenance"
+  ],
+  "expected_outcome": "## Problem\n\nA later merge of the shared operations runbook removed three previously approved sections: Codex read-only permission propagation, workflow reuse completion assessment, and first-job mutation response deadlines. The same merge duplicated the ledger-receipt guidance. Runtime code and tests were retained, so green CI alone could not establish documentation completeness.\n\n## Reusable procedure\n\n1. Refresh the actual main ref and inspect the merged file, rather than relying on PR status or an older local checkout. Pause a proposed repair if the user reports a newer addition until that ref is checked.\n2. Compare three inputs: the last approved complete document, the current merged document, and the proposed repair. Identify lost sections by exact heading and full section bytes. Preserve unrelated new additions.\n3. Restore the approved sections verbatim and deduplicate only the repeated block. Verify each required heading occurs once, section hashes match their approved provenance, and the whole result equals the approved document plus the retained new guidance.\n4. Have an independent reviewer confirm scope and provenance. Run formatting, knowledge catalog/scope checks, and PR readiness on the final integration base. Existing CI validates executable behavior but is not a semantic retention check for shared documentation.\n5. Publish the minimal product change, then derive the lesson from that actual published commit and branch. Recheck the final PR diff and actual postmerge content before claiming all guidance is retained.\n\n## Evidence and limits\n\nThe repair restored three exact sections from approved commit 702c6268411398cf00694304eb1acfdcf2e6e69c and retained the new ledger-receipt section exactly once. The result was a one-file documentation change of 31 added and 4 removed lines. Independent review, formatting, package/repository builds, catalog/scope checks and 48 PR-readiness gates passed on the original repair base; fresh main 238ec7da left the runbook unchanged and was integrated before publication. Final exact-head gates and CI are recorded separately. This work restores documentation and records a procedure; it does not add an automated semantic-retention gate or change runtime behavior.",
+  "source_branch": "fix/restore-merged-runbook-20261018",
+  "source_commit": "6b7ba11b78cc62f2f7707b482aa765f4fe796a37"
+}
