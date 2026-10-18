@@ -132,6 +132,16 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
         return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
       }
+      const resolvedRun = path.resolve(runDir);
+      const resolvedOverlay = path.resolve(overlay);
+      if (
+        resolvedRun === resolvedOverlay ||
+        resolvedRun.startsWith(`${resolvedOverlay}${path.sep}`)
+      ) {
+        return fail(
+          `overlay dir ${spec.overlayDir} contains the run dir — copyTree would recurse into itself`
+        );
+      }
       copyTree(overlay, runDir);
     }
   } catch (error) {
