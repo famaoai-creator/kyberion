@@ -65,7 +65,7 @@ export interface ContrastiveSessionResult {
   } | null;
 }
 
-function sessionSeed(sessionId: string): number {
+export function sessionSeed(sessionId: string): number {
   let h = 2166136261;
   for (const ch of sessionId) {
     h ^= ch.charCodeAt(0);
