@@ -21,7 +21,7 @@ import {
 } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { copyTree, runProbe, type RunOutcome } from './probe-runner.js';
+import { copyTree, runProbe, validateProbeSpec, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
@@ -101,6 +101,9 @@ export async function runRecursiveSession(
     );
   }
   safeMkdir(runRoot, { recursive: true });
+  // Validate the probe spec at entry, before the round-1 propose stage can
+  // spend backend calls on a session that could never probe.
+  validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
   if (!Number.isInteger(spec.rounds) || spec.rounds < 1 || spec.rounds > 10) {
     throw new Error('[RECURSIVE_SESSION] rounds must be an integer 1..10');
   }
@@ -308,7 +311,6 @@ export async function runRecursiveSession(
     });
 
     if (decision.decision === 'auto_advance' && decision.winner) {
-      adopted.push(`r${round}:${decision.winner}`);
       if (round === spec.rounds) {
         halted = 'auto_advance_final';
         break;
@@ -331,6 +333,7 @@ export async function runRecursiveSession(
         if (safeExistsSync(nextBase)) safeRmSync(nextBase);
         copyTree(currentBase, nextBase);
         copyTree(winner.overlayDir, nextBase);
+        adopted.push(`r${round}:${decision.winner}`);
       } catch (error) {
         // Fail soft — the rounds already probed are evidence; don't lose them.
         rejected.push({
@@ -357,11 +360,15 @@ export async function runRecursiveSession(
     expected_probes: declaredProbes,
     planned_probes: plannedProbes,
     actual_probes: actualProbes,
-    status: (actualProbes === plannedProbes
+    // planned vs declared: rejected overlays and degraded propose runs show
+    // as 'short'; actual vs planned exposes lost probes. Early halts are
+    // fine — a halted session plans only what it executed.
+    status: (plannedProbes === declaredProbes
       ? 'ok'
-      : actualProbes < plannedProbes
+      : plannedProbes < declaredProbes
         ? 'short'
         : 'exceeded') as 'ok' | 'short' | 'exceeded',
+    actual_matches_plan: actualProbes === plannedProbes,
   };
   const report = {
     session_id: spec.session_id,
