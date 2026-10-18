@@ -235,7 +235,12 @@ export function formatScenarioSummary(summary: ScenarioRunSummary): string {
     .join(', ');
   lines.push(`[scenario] ${summary.scenarios.length} scenario(s): ${counts}`);
   const dirs = summary.scenarios.flatMap((entry) => (entry.report_dir ? [entry.report_dir] : []));
-  if (dirs.length > 0) lines.push(`[scenario] reports: ${path.dirname(dirs[0]!)}/<run-id>/`);
+  if (dirs.length === 1) {
+    lines.push(`[scenario] report: ${dirs[0]}/`);
+  } else if (dirs.length > 1) {
+    lines.push(`[scenario] reports:`);
+    for (const dir of dirs) lines.push(`  ${dir}/`);
+  }
   return lines.join('\n');
 }
 
