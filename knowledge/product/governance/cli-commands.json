@@ -2765,6 +2765,17 @@
       "native_help": true
     },
     {
+      "id": "script.peer.task",
+      "script": "peer:task",
+      "command": "peer task",
+      "noun": "peer",
+      "verb": "task",
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_task",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.peer.migrate-tenant-runtime",
       "script": "peer:migrate-tenant-runtime",
       "command": "peer migrate-tenant-runtime",

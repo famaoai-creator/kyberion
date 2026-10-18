@@ -110,6 +110,7 @@
     "peer:conversation": "node --import ./scripts/ts-loader.mjs scripts/peer_conversation.ts",
     "peer:conversation-server": "node --import ./scripts/ts-loader.mjs scripts/peer_conversation_server.ts",
     "peer:migrate-tenant-runtime": "node --import ./scripts/ts-loader.mjs scripts/migrate_peer_tenant_runtime.ts",
+    "peer:task": "node --import ./scripts/ts-loader.mjs scripts/peer_task.ts",
     "peer:register": "node --import ./scripts/ts-loader.mjs scripts/peer_network_register.ts",
     "peer:runtime-recovery": "node --import ./scripts/ts-loader.mjs scripts/peer_runtime_recovery.ts",
     "pipeline": "node scripts/run_built.mjs dist/scripts/run_pipeline.bundle.js",
