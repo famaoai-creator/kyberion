@@ -10,10 +10,10 @@
 import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
+  loadJson,
   safeExistsSync,
   safeLstat,
   safeReaddir,
-  safeReadFile,
 } from '../secure-io.js';
 
 export interface SurfaceSpec {
@@ -66,7 +66,7 @@ export function isValidRelPath(rel: string): boolean {
 
 export function loadSurfaceSpec(specPath: string): SurfaceSpec {
   const resolved = assertSafeRepositoryPath(specPath);
-  const parsed = JSON.parse(String(safeReadFile(resolved))) as SurfaceSpec;
+  const parsed = loadJson<SurfaceSpec>(resolved);
   if (!Array.isArray(parsed.allowed_paths) || parsed.allowed_paths.length === 0) {
     throw new Error('[SURFACE_SPEC] allowed_paths must be a non-empty array');
   }
