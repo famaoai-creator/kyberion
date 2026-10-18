@@ -48,6 +48,7 @@ export function dotWorkItemInput(
       work_shape: 'routine_operation',
     },
     metadata: {
+      ...(record.continuous_work ? { continuous_work: record.continuous_work } : {}),
       ...(record.front_desk_execution ? { front_desk_execution: record.front_desk_execution } : {}),
       dot_id: charter.dot_id,
       actor_id: actor,
