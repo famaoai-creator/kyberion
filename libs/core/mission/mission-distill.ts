@@ -98,7 +98,46 @@ export function resolveWisdomOutputPath(outputDir: string, wisdomFileName: strin
   });
 }
 
-const WISDOM_SCHEMA = z.object({
+/**
+ * Change-attribution verdicts, imported from the harness2 experience contract:
+ * `confounded` is preferred — not avoided — whenever several components changed
+ * at once or a single observation is all that backs the claimed difference. A
+ * lesson resting only on confounded rows is a guess and must be narrowed or
+ * declined (experience omitted entirely), never promoted as-is.
+ */
+export const DISTILL_EDIT_ROW_VERDICTS = [
+  'helped',
+  'hurt',
+  'no_observed_effect',
+  'confounded',
+] as const;
+
+const DISTILL_EDIT_ROW_SCHEMA = z.object({
+  /** The harness/knowledge component the change touched, named as it appears. */
+  component: z.string().min(1),
+  /** What the change actually did. */
+  change: z.string().min(1),
+  /** The observed difference in execution, citing where it was seen. */
+  observed: z.string().min(1),
+  verdict: z.enum(DISTILL_EDIT_ROW_VERDICTS),
+});
+
+/**
+ * The transferable lesson record. All three evidence fields are required when
+ * the object is present — an experience without its evidence basis is a guess
+ * and fails validation rather than entering the promotion queue.
+ */
+const DISTILL_EXPERIENCE_SCHEMA = z.object({
+  /** The shape of situation the lesson applies to — the pattern, not this task's facts. */
+  cue: z.string().min(1),
+  /** The transferable operation, naming the component it concerns. */
+  lesson: z.string().min(1),
+  /** The edit rows / ledger events the lesson rests on. */
+  evidence: z.string().min(1),
+  confidence: z.enum(['high', 'medium', 'low']),
+});
+
+export const WISDOM_SCHEMA = z.object({
   title: z.string(),
   category: z.enum(['Evolution', 'Incident', 'Operations']),
   tags: z.array(z.string()),
@@ -110,6 +149,8 @@ const WISDOM_SCHEMA = z.object({
     failures_and_recoveries: z.array(z.string()),
     reusable_artifacts: z.array(z.string()),
   }),
+  experience: DISTILL_EXPERIENCE_SCHEMA.optional(),
+  edit_rows: z.array(DISTILL_EDIT_ROW_SCHEMA).optional(),
 });
 
 export function gatherDistillContext(
@@ -245,6 +286,26 @@ export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
   if (sections.reusable_artifacts?.length && sections.reusable_artifacts[0] !== 'None identified') {
     lines.push(`## ${distillPolicy.section_titles.reusable_artifacts}`);
     for (const a of sections.reusable_artifacts) lines.push(`- ${a}`);
+    lines.push('');
+  }
+
+  if (wisdom.edit_rows?.length) {
+    lines.push(`## ${distillPolicy.section_titles.change_attribution ?? 'Change Attribution'}`);
+    for (const row of wisdom.edit_rows) {
+      lines.push(
+        `- **${row.component}** (${row.verdict}): ${row.change} — observed: ${row.observed}`
+      );
+    }
+    lines.push('');
+  }
+
+  if (wisdom.experience) {
+    lines.push(`## ${distillPolicy.section_titles.transferable_lesson ?? 'Transferable Lesson'}`);
+    for (const field of ['cue', 'lesson', 'evidence', 'confidence'] as const) {
+      if (wisdom.experience[field]) {
+        lines.push(`- **${field}**: ${wisdom.experience[field]}`);
+      }
+    }
     lines.push('');
   }
 
@@ -387,6 +448,13 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
             : 'heuristic',
       summary: wisdom.sections.summary || `Distilled wisdom from mission ${upperId}`,
       knowledge_domain: 'unclassified',
+      // Harness2 experience contract: a distillation that produced no
+      // cue/lesson/evidence record is marked declined so the review surface can
+      // flag it — the edit rows are still kept on the mission's distillation.
+      // Only an actual LLM run can "decline": a structural fallback means the
+      // record was never inspected, which is unknown, not declined.
+      ...(wisdom.experience ? { distill_experience: wisdom.experience } : {}),
+      ...(llmUsed ? { distill_experience_declined: !wisdom.experience } : {}),
       evidence_refs: listMissionEvidenceRefs(wisdomDirPath, rootDir),
       ...(state.tenant_slug
         ? {
