@@ -337,6 +337,11 @@ describe('meeting_preflight', () => {
       expect(entry.data).toEqual({ host_app: 'com.apple.Terminal' });
     });
 
+    it('only warns on a granted microphone when the host app is unknown', async () => {
+      const entry = await audioItem({ available: true, microphone: 'granted' });
+      expect(entry.status).toBe('warn');
+    });
+
     it('asks for the warm-up command when the microphone is not determined', async () => {
       const entry = await audioItem({ available: true, microphone: 'not_determined' });
       expect(entry.status).toBe('operator_action_required');
