@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
+  readiness: vi.fn(() => ({
+    provider: 'claude',
+    execution: 'unverified',
+    provider_calls: 0,
+    checked_at: '2026-10-18T00:00:00.000Z',
+    checks: [] as Array<{ id: string; status: string; code: string }>,
+  })),
   create: vi.fn((input) => ({ id: 'disc-fixture', ...input })),
   run: vi.fn(async () => undefined),
   read: vi.fn(() => null as unknown),
@@ -10,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   guard: vi.fn(() => null),
   access: vi.fn(() => null),
   scope: vi.fn(() => ({ tenant_slug: 'fixture-tenant' })),
+}));
+vi.mock('@agent/core/discussion/discussion-readiness', () => ({
+  inspectDiscussionReadiness: mocks.readiness,
 }));
 vi.mock('@agent/core/discussion/discussion-engine', () => ({ ensureDiscussionRunning: mocks.run }));
 vi.mock('@agent/core/discussion/discussion-review', () => ({ reviewDiscussion: mocks.review }));
@@ -38,6 +48,9 @@ vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: vi.fn(() => ({
     context: { role: 'localadmin', principalId: 'fixture-viewer' },
   })),
+  strictViewerTier: vi.fn((_viewer, tier) => tier),
+  strictViewerScopeOrganizationIds: vi.fn(() => 'all'),
+  strictViewerScopeProjectIds: vi.fn(() => 'all'),
   strictViewerScopeTenantSlugs: vi.fn(() => ['fixture-tenant']),
   withViewerExecutionContext: vi.fn((_viewer, fn) => fn()),
   viewerErrorResponse: vi.fn((error, status = 500) =>
@@ -52,6 +65,13 @@ const request = (body: unknown) => ({ json: async () => body }) as NextRequest;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.read.mockReturnValue(null);
+  mocks.readiness.mockReturnValue({
+    provider: 'claude',
+    execution: 'unverified',
+    provider_calls: 0,
+    checked_at: '2026-10-18T00:00:00.000Z',
+    checks: [],
+  });
 });
 
 describe('Discussion HTTP execution bounds (mocked authority and engine)', () => {
@@ -176,4 +196,20 @@ describe('Discussion HTTP execution bounds (mocked authority and engine)', () =>
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.run).not.toHaveBeenCalled();
   });
+});
+
+it('rechecks a known prerequisite blocker before creating a room or consuming its execution claim', async () => {
+  mocks.readiness.mockReturnValue({
+    provider: 'claude',
+    execution: 'unverified',
+    provider_calls: 0,
+    checked_at: '2026-10-18T00:00:00.000Z',
+    checks: [{ id: 'egress_policy', status: 'blocked', code: 'egress_denied' }],
+  });
+  const response = await POST(
+    request({ goal: 'fixture', speaker: 'reasoning', provider: 'claude', single_pass: true })
+  );
+  expect(response.status).toBe(409);
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
 });
