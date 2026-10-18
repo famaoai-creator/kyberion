@@ -22,7 +22,12 @@ function parseArgs(argv: string[]): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (!a.startsWith('--')) continue;
+    if (!a.startsWith('--')) {
+      throw new ScriptExitError(
+        2,
+        `unexpected positional argument ${JSON.stringify(a)} — quote multi-word values`
+      );
+    }
     const key = a.slice(2);
     if (key.includes('=')) {
       throw new ScriptExitError(
@@ -121,12 +126,12 @@ export const runContrastiveProbe = defineScript({
     const proposeCount = args['propose']?.[0] ? Number(args['propose'][0]) : 0;
     if (
       args['propose']?.[0] &&
-      (!Number.isFinite(proposeCount) || proposeCount < 1 || !Number.isInteger(proposeCount))
+      (!Number.isFinite(proposeCount) ||
+        proposeCount < 1 ||
+        proposeCount > 10 ||
+        !Number.isInteger(proposeCount))
     ) {
-      throw new ScriptExitError(
-        2,
-        `--propose expects a positive integer, got ${args['propose'][0]}`
-      );
+      throw new ScriptExitError(2, `--propose expects an integer 1..10, got ${args['propose'][0]}`);
     }
     if (proposeCount > 0 && !args['brief']?.[0]) {
       throw new ScriptExitError(2, '--propose requires --brief <text>');
