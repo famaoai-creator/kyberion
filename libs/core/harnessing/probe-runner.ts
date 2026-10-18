@@ -88,10 +88,7 @@ function assertLabelSafe(label: string): void {
   }
 }
 
-export function runProbe(spec: ProbeSpec): RunOutcome {
-  assertLabelSafe(spec.label);
-  const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
-  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+export function validateProbeSpec(spec: Pick<ProbeSpec, 'command' | 'expectOutputs'>): void {
   if (!spec.command.length) {
     throw new Error('[PROBE_SPEC] command must be a non-empty argv array');
   }
@@ -104,6 +101,13 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       throw new Error(`[PROBE_SPEC] invalid expectOutputs path ${JSON.stringify(rel)}`);
     }
   }
+}
+
+export function runProbe(spec: ProbeSpec): RunOutcome {
+  assertLabelSafe(spec.label);
+  const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  validateProbeSpec(spec);
   const scen = path.resolve(spec.scenarioDir);
   const resolvedRoot = path.resolve(runRoot);
   if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
@@ -187,7 +191,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   // An overlay that stages the expected outputs satisfies `delivered`
   // without the command producing anything — surface that honestly.
   const staged_expected = (spec.expectOutputs ?? []).filter((rel) => stagedBefore.has(rel));
-  const delivered = exit_code === 0 && missing.length === 0;
+  // A candidate that merely staged every expected output earned nothing —
+  // count it as not delivered so the axis can't auto_advance on the sham.
+  const allStaged =
+    (spec.expectOutputs?.length ?? 0) > 0 && staged_expected.length === spec.expectOutputs!.length;
+  const delivered = exit_code === 0 && missing.length === 0 && !allStaged;
   logger.debug?.(
     `[probe:${spec.label}] exit=${exit_code} delivered=${delivered} wall=${wall_ms}ms`
   );

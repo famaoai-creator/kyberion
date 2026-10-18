@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { runProbe, type ProbeSpec, type RunOutcome } from './probe-runner.js';
+import { runProbe, validateProbeSpec, type ProbeSpec, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import {
@@ -91,6 +91,9 @@ export async function runContrastiveSession(
   spec: ContrastiveSessionSpec
 ): Promise<ContrastiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  // Validate the probe spec before any backend spend — a bad command or
+  // traversal expectOutputs must not surface only after LLM proposals ran.
+  validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
   safeMkdir(runRoot, { recursive: true });
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];

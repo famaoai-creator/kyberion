@@ -91,7 +91,13 @@ export function loadSurfaceSpec(specPath: string): SurfaceSpec {
       );
     }
     const effective = p.endsWith('/') ? p.slice(0, -1) : p;
-    if (!isValidRelPath(effective) && !p.includes('*')) {
+    if (p.includes('*')) {
+      // Glob: validate the literal segments around '*' — '../x*' must not pass.
+      const literal = effective.split('*').join('x');
+      if (!literal.split('/').every((seg) => seg && seg !== '..' && seg !== '')) {
+        throw new Error(`[SURFACE_SPEC] invalid glob allowed_path ${JSON.stringify(p)}`);
+      }
+    } else if (!isValidRelPath(effective)) {
       throw new Error(`[SURFACE_SPEC] invalid allowed_path ${JSON.stringify(p)}`);
     }
   }
