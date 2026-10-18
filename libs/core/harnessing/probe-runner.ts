@@ -49,6 +49,10 @@ export interface RunOutcome {
   exit_code: number | null;
   wall_ms: number;
   produced_files: string[];
+  /** Expected outputs that existed BEFORE the command ran (staged by the
+   *  overlay OR shipped in the base scenario) — a non-empty list means
+   *  `delivered` may not be earned by the command itself. */
+  staged_expected: string[];
   error: string;
   recorded_at: string;
 }
@@ -85,10 +89,7 @@ function assertLabelSafe(label: string): void {
   }
 }
 
-export function runProbe(spec: ProbeSpec): RunOutcome {
-  assertLabelSafe(spec.label);
-  const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
-  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+export function validateProbeSpec(spec: Pick<ProbeSpec, 'command' | 'expectOutputs'>): void {
   if (!spec.command.length) {
     throw new Error('[PROBE_SPEC] command must be a non-empty argv array');
   }
@@ -101,13 +102,40 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       throw new Error(`[PROBE_SPEC] invalid expectOutputs path ${JSON.stringify(rel)}`);
     }
   }
+}
+
+export function runProbe(spec: ProbeSpec): RunOutcome {
+  assertLabelSafe(spec.label);
+  const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  validateProbeSpec(spec);
+  const scen = path.resolve(spec.scenarioDir);
+  const resolvedRoot = path.resolve(runRoot);
+  if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[PROBE_SPEC] runRoot must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   const runDir = path.join(runRoot, spec.label);
+  const resolvedRunDir = path.resolve(runDir);
+  // Staging onto (or inside) the scenario would recurse the copy into itself
+  // — or worse, safeRmSync a live scenario. Deterministic spec error, not evidence.
+  if (
+    resolvedRunDir === scen ||
+    resolvedRunDir.startsWith(`${scen}${path.sep}`) ||
+    scen.startsWith(`${resolvedRunDir}${path.sep}`)
+  ) {
+    throw new Error(
+      '[PROBE_SPEC] run dir and scenarioDir must not nest inside each other (copyTree would recurse or delete input)'
+    );
+  }
   const recorded_at = nowIso();
   const fail = (error: string): RunOutcome => ({
     label: spec.label,
     run_dir: runDir,
     ok: false,
     delivered: false,
+    staged_expected: [],
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
@@ -115,23 +143,42 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     recorded_at,
   });
 
+  // All overlay validation happens BEFORE the first write — a rejected
+  // overlay must not leave a partial run-dir tree inside the caller's input.
+  let overlay: string | null = null;
+  if (spec.overlayDir) {
+    overlay = assertSafeRepositoryPath(spec.overlayDir);
+    if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
+      return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
+    }
+    const resolvedOverlay = path.resolve(overlay);
+    if (
+      resolvedRunDir === resolvedOverlay ||
+      resolvedRunDir.startsWith(`${resolvedOverlay}${path.sep}`) ||
+      resolvedOverlay.startsWith(`${resolvedRunDir}${path.sep}`)
+    ) {
+      return fail(
+        `overlay dir ${spec.overlayDir} and run dir ${runDir} nest inside each other — copyTree would recurse or delete input`
+      );
+    }
+  }
+
   try {
     // A rerun of the same label must start empty: stale files from a prior
     // probe (including declared expectOutputs) would fake delivered=true.
     if (safeExistsSync(runDir)) safeRmSync(runDir);
     copyTree(scenarioDir, runDir);
-    if (spec.overlayDir) {
-      const overlay = assertSafeRepositoryPath(spec.overlayDir);
-      if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
-        return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
-      }
-      copyTree(overlay, runDir);
-    }
+    if (overlay) copyTree(overlay, runDir);
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
   }
 
   const stagedBefore = new Set(listFiles(runDir));
+  // Per-entry snapshot including directories — listFiles only returns files,
+  // so a staged 'out/' dir would evade the staged_expected honesty check.
+  const expectedPreStaged = (spec.expectOutputs ?? []).filter((rel) =>
+    safeExistsSync(path.join(runDir, rel))
+  );
   const started = Date.now();
   let result;
   try {
@@ -155,7 +202,14 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   const missing = (spec.expectOutputs ?? []).filter(
     (rel) => !safeExistsSync(path.join(runDir, rel))
   );
-  const delivered = exit_code === 0 && missing.length === 0;
+  // An overlay that stages the expected outputs satisfies `delivered`
+  // without the command producing anything — surface that honestly.
+  const staged_expected = expectedPreStaged;
+  // A candidate that merely staged every expected output earned nothing —
+  // count it as not delivered so the axis can't auto_advance on the sham.
+  const allStaged =
+    (spec.expectOutputs?.length ?? 0) > 0 && staged_expected.length === spec.expectOutputs!.length;
+  const delivered = exit_code === 0 && missing.length === 0 && !allStaged;
   logger.debug?.(
     `[probe:${spec.label}] exit=${exit_code} delivered=${delivered} wall=${wall_ms}ms`
   );
@@ -167,9 +221,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     exit_code,
     wall_ms,
     produced_files: after.filter((f) => !stagedBefore.has(f)),
+    staged_expected,
     error: delivered
       ? ''
-      : `exit=${exit_code}` +
+      : (allStaged ? 'all_expected_staged ' : '') +
+        `exit=${exit_code}` +
         (missing.length ? ` missing=${missing.join(',')}` : '') +
         spawnError +
         (stderrTail ? ` stderr_tail=${stderrTail}` : ''),
