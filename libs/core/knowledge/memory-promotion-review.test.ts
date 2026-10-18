@@ -314,3 +314,55 @@ describe('memory-promotion-review', () => {
     expect(reviewMemoryPromotionCandidate(base.candidate_id)).toHaveLength(2);
   });
 });
+
+describe('memory-promotion-review distill experience flags', () => {
+  const queuePath = memoryPromotionQueuePath();
+
+  beforeEach(() => {
+    if (safeExistsSync(queuePath)) safeRmSync(queuePath);
+  });
+
+  it('flags a declined distill experience for the steward', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-DISTILL-DECLINED',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-DISTILL-DECLINED',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Mission candidate whose distiller emitted no lesson.',
+      evidenceRefs: ['artifact:ART-REVIEW-DISTILL-1'],
+      sensitivityTier: 'public',
+    });
+    enqueueMemoryPromotionCandidate({ ...candidate, distill_experience_declined: true });
+
+    const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
+    expect(review.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('no transferable lesson')])
+    );
+  });
+
+  it('flags a low-confidence distilled lesson', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-DISTILL-LOW',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-DISTILL-LOW',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Mission candidate with a weakly-supported lesson.',
+      evidenceRefs: ['artifact:ART-REVIEW-DISTILL-2'],
+      sensitivityTier: 'public',
+    });
+    enqueueMemoryPromotionCandidate({
+      ...candidate,
+      distill_experience: {
+        cue: 'vague situation',
+        lesson: 'unverified operation',
+        evidence: 'edit_rows[0] (confounded)',
+        confidence: 'low',
+      },
+    });
+
+    const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
+    expect(review.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('confidence is low')])
+    );
+  });
+});
