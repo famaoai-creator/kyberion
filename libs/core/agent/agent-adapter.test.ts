@@ -568,6 +568,53 @@ describe('CodexAppServerAdapter', () => {
     expect(requests.map((request) => request.method)).toEqual(['turn/start', 'turn/interrupt']);
   });
 
+  it('still cancels the turn when the abort lands before turn/start resolves', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
+    type JsonRpcRequest = { id: number | string; method: string };
+    type AdapterInternals = {
+      child: unknown;
+      threadId: string | null;
+      handleMessage(message: Record<string, unknown>): void;
+    };
+    const internals = adapter as unknown as AdapterInternals;
+    const requests: JsonRpcRequest[] = [];
+    let resolveStartWritten: () => void = () => undefined;
+    const turnStartWritten = new Promise<void>((resolve) => {
+      resolveStartWritten = resolve;
+    });
+    const fakeChild = {
+      stdin: {
+        writable: true,
+        write(payload: string): boolean {
+          const request = JSON.parse(payload) as JsonRpcRequest;
+          requests.push(request);
+          if (request.method === 'turn/start') {
+            resolveStartWritten();
+          } else if (request.method === 'turn/interrupt') {
+            internals.handleMessage({ id: request.id, result: {} });
+          }
+          return true;
+        },
+      },
+    };
+    internals.child = fakeChild;
+    internals.threadId = 'thread-root';
+    const controller = new AbortController();
+    const pending = adapter.ask('cancel this', { subagent: true, signal: controller.signal });
+
+    await turnStartWritten;
+    controller.abort();
+    const turnStart = requests.find((request) => request.method === 'turn/start');
+    if (!turnStart) throw new Error('turn/start was not sent');
+    internals.handleMessage({
+      id: turnStart.id,
+      result: { turn: { id: 'turn-cancel-late' } },
+    });
+
+    await expect(pending).rejects.toThrow('cancelled');
+    expect(requests.map((request) => request.method)).toEqual(['turn/start', 'turn/interrupt']);
+  });
+
   it('forks a completed parent rollout into a native child thread on the same process', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
     const requests: any[] = [];
