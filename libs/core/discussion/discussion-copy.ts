@@ -1,6 +1,10 @@
 import { pathResolver } from '../path-resolver.js';
 import { readJson } from '../foundation/json.js';
-import type { DiscussionPerformative, DiscussionStance } from './discussion-types.js';
+import type {
+  DiscussionPerformative,
+  DiscussionStance,
+  DiscussionRoomState,
+} from './discussion-types.js';
 
 export type Locale = 'ja' | 'en';
 export type Localized = { ja: string; en: string };
@@ -56,6 +60,7 @@ export interface DiscussionCopy {
   >;
   work_proposal: { description: Localized };
   brief: Record<string, Localized>;
+  execution: Record<string, Localized>;
   mission_request: Record<'title' | 'summary' | 'details' | 'reopen_agenda', Localized>;
   dialogue: {
     questions: Record<
@@ -102,4 +107,45 @@ export function fillCopy(template: string, vars: Record<string, string | number>
 
 export function discussionRoleLabel(role: string, locale: Locale): string {
   return loadDiscussionCopy().role_labels[role]?.[locale] ?? role;
+}
+
+/** Shared visible provenance for saved Markdown and both HTML rendering modes. */
+export function discussionExecutionSummary(room: DiscussionRoomState): {
+  heading: string;
+  notice: string;
+  entries: Array<[string, string]>;
+} {
+  const copy = loadDiscussionCopy().execution;
+  const t = (key: string) => copy[key][room.config.locale];
+  const execution = room.execution;
+  const actual = execution?.actual_mode ?? 'unknown';
+  return {
+    heading:
+      room.config.single_pass && actual === 'reasoning' ? t('single_pass_title') : t('heading'),
+    notice:
+      actual === 'scripted'
+        ? t('scripted_notice')
+        : actual === 'unknown'
+          ? t('unknown_notice')
+          : room.config.single_pass
+            ? t('single_pass_notice')
+            : t('reasoning_notice'),
+    entries: [
+      [t('requested_mode'), t('mode_' + (execution?.requested_mode ?? room.config.speaker))],
+      [t('actual_mode'), t('mode_' + actual)],
+      [t('requested_provider'), execution?.requested_provider ?? t('not_selected')],
+      [t('provider'), execution?.provider ?? t('unknown')],
+      [t('model'), t('model_unknown')],
+      [
+        t('calls'),
+        execution ? execution.attempts.length + ' / ' + execution.call_budget : t('unknown'),
+      ],
+      [
+        t('turns'),
+        execution?.internal_turn_limit == null
+          ? t('unknown')
+          : String(execution.internal_turn_limit),
+      ],
+    ],
+  };
 }
