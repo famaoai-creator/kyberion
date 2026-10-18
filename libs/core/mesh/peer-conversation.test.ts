@@ -165,7 +165,7 @@ describe('peer conversation', () => {
 
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async (_input: any, init?: RequestInit) => {
+      .mockImplementation(async (_input: unknown, init?: RequestInit) => {
         const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<
           typeof server.processEnvelope
         >[0];
@@ -229,7 +229,7 @@ describe('peer conversation', () => {
     const envelopeIds: string[] = [];
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async (_input: any, init?: RequestInit) => {
+      .mockImplementation(async (_input: unknown, init?: RequestInit) => {
         const envelope = JSON.parse(String(init?.body || '{}'));
         envelopeIds.push(envelope.message_id);
         const result = await server.processEnvelope(envelope);
@@ -317,13 +317,15 @@ describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
       sharedSecret: SHARED_SECRET,
       responder: createPeerConversationResponder({ peerId: 'peer-b-test', tenantId: tenant }),
     });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: any, init?: RequestInit) => {
-      const result = await server.processEnvelope(JSON.parse(String(init?.body || '{}')));
-      return new Response(JSON.stringify(result.body), {
-        status: result.status,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      });
-    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: unknown, init?: RequestInit) => {
+        const result = await server.processEnvelope(JSON.parse(String(init?.body || '{}')));
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+    );
 
     const outcome = await sendPeerConversationMessageToPeer({
       senderPeerId: 'peer-a-test',
