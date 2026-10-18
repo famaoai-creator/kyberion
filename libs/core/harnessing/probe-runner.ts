@@ -106,9 +106,13 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   const scen = path.resolve(scenarioDir);
   // Staging onto (or inside) the scenario would recurse the copy into itself
   // — or worse, safeRmSync a live scenario. Deterministic spec error, not evidence.
-  if (resolvedRunDir === scen || resolvedRunDir.startsWith(`${scen}${path.sep}`)) {
+  if (
+    resolvedRunDir === scen ||
+    resolvedRunDir.startsWith(`${scen}${path.sep}`) ||
+    scen.startsWith(`${resolvedRunDir}${path.sep}`)
+  ) {
     throw new Error(
-      '[PROBE_SPEC] run dir must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+      '[PROBE_SPEC] run dir and scenarioDir must not nest inside each other (copyTree would recurse or delete input)'
     );
   }
   const recorded_at = nowIso();
@@ -124,28 +128,32 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     recorded_at,
   });
 
+  // All overlay validation happens BEFORE the first write — a rejected
+  // overlay must not leave a partial run-dir tree inside the caller's input.
+  let overlay: string | null = null;
+  if (spec.overlayDir) {
+    overlay = assertSafeRepositoryPath(spec.overlayDir);
+    if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
+      return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
+    }
+    const resolvedOverlay = path.resolve(overlay);
+    if (
+      resolvedRunDir === resolvedOverlay ||
+      resolvedRunDir.startsWith(`${resolvedOverlay}${path.sep}`) ||
+      resolvedOverlay.startsWith(`${resolvedRunDir}${path.sep}`)
+    ) {
+      return fail(
+        `overlay dir ${spec.overlayDir} and run dir ${runDir} nest inside each other — copyTree would recurse or delete input`
+      );
+    }
+  }
+
   try {
     // A rerun of the same label must start empty: stale files from a prior
     // probe (including declared expectOutputs) would fake delivered=true.
     if (safeExistsSync(runDir)) safeRmSync(runDir);
     copyTree(scenarioDir, runDir);
-    if (spec.overlayDir) {
-      const overlay = assertSafeRepositoryPath(spec.overlayDir);
-      if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
-        return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
-      }
-      const resolvedRun = path.resolve(runDir);
-      const resolvedOverlay = path.resolve(overlay);
-      if (
-        resolvedRun === resolvedOverlay ||
-        resolvedRun.startsWith(`${resolvedOverlay}${path.sep}`)
-      ) {
-        return fail(
-          `overlay dir ${spec.overlayDir} contains the run dir — copyTree would recurse into itself`
-        );
-      }
-      copyTree(overlay, runDir);
-    }
+    if (overlay) copyTree(overlay, runDir);
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
   }
