@@ -255,10 +255,16 @@ describe('peer auto-reply', () => {
         ?.metadata
     ).toEqual({ ack: true, reply_job: 'queued' });
 
-    // Per-session sent count: two auto replies already sent in a new session.
+    // Per-session cap is counted from the ledger, not the (truncatable) transcript:
+    // transcript-only auto entries do not count, two reply jobs in the session do.
     const session2 = 'PCS-AUTO-REPLY-2';
     recordOutboundAuto('one', session2);
     recordOutboundAuto('two', session2);
+    for (const id of ['M-S1', 'M-S2']) {
+      expect(
+        autoReply.handleInbound(inbound({ messageId: id, sessionId: session2 }))?.reply?.metadata
+      ).toEqual({ ack: true, reply_job: 'queued' });
+    }
     const sentCapped = autoReply.handleInbound(
       inbound({
         messageId: 'M-C',
@@ -592,6 +598,214 @@ describe('peer auto-reply', () => {
     expect(remoteReplies).toHaveLength(1);
   });
 
+  it('rejects a third peer injecting into another pair session and never feeds it to history', async () => {
+    const responder = createPeerConversationResponder({ peerId: LOCAL, tenantId: TENANT });
+    const envelopeFrom = (sender: string, text: string) =>
+      buildPeerConversationEnvelope({
+        tenantId: TENANT,
+        senderPeerId: sender,
+        recipientPeerId: LOCAL,
+        sharedSecret: SHARED_SECRET,
+        sessionId: SESSION,
+        topic: 'auto-reply-topic',
+        text,
+      });
+    await responder({ peerId: LOCAL, envelope: envelopeFrom(REMOTE, 'legit line') });
+    await expect(
+      responder({ peerId: LOCAL, envelope: envelopeFrom(OTHER, 'INJECTED by C') })
+    ).rejects.toThrow(`peer_conversation_session_peer_mismatch:${SESSION}`);
+    const session = loadPeerConversationSession(TENANT, LOCAL, SESSION)!;
+    expect(session.remote_peer_id).toBe(REMOTE);
+    expect(session.transcript.some((entry) => entry.text.includes('INJECTED'))).toBe(false);
+    // A new session from the third peer is still fine.
+    await expect(
+      responder({
+        peerId: LOCAL,
+        envelope: buildPeerConversationEnvelope({
+          tenantId: TENANT,
+          senderPeerId: OTHER,
+          recipientPeerId: LOCAL,
+          sharedSecret: SHARED_SECRET,
+          sessionId: 'PCS-AUTO-REPLY-C',
+          topic: 'auto-reply-topic',
+          text: 'hello from C',
+        }),
+      })
+    ).resolves.toBeDefined();
+
+    // Defence in depth: even an entry written into the session by another
+    // path is dropped unless it belongs to the {local, remote} pair.
+    appendPeerConversationTranscript({
+      tenantId: TENANT,
+      sessionId: SESSION,
+      localPeerId: LOCAL,
+      remotePeerId: OTHER,
+      kind: 'message',
+      direction: 'inbound',
+      text: 'INJECTED via storage',
+    });
+    const context = inbound({ messageId: 'M-AFTER', text: 'question' });
+    const job = {
+      tenant_id: TENANT,
+      local_peer_id: LOCAL,
+      sender_peer_id: REMOTE,
+      session_id: SESSION,
+      message_id: 'M-AFTER',
+    };
+    const history = selectPeerAutoReplyHistory(context.session, job);
+    expect(history.map((entry) => entry.text)).toEqual([
+      'legit line',
+      `Received by ${LOCAL}: legit line`,
+    ]);
+    const { autoReply, generate } = setup();
+    autoReply.handleInbound(context);
+    await autoReply.runOnce();
+    expect(generate.mock.calls[0][0].userPrompt).not.toContain('INJECTED');
+  });
+
+  it('enforces a rolling per-peer hourly budget across sessions', () => {
+    let clock = Date.parse('2026-10-18T00:00:00.000Z');
+    const { autoReply } = setup({ budgetPerHour: 2, now: () => clock });
+    const send = (id: string) =>
+      autoReply.handleInbound(inbound({ messageId: id, sessionId: `PCS-BUDGET-${id}` }))?.reply
+        ?.metadata;
+    expect(send('B1')).toEqual({ ack: true, reply_job: 'queued' });
+    expect(send('B2')).toEqual({ ack: true, reply_job: 'queued' });
+    // Rotating session ids does not escape the budget.
+    expect(send('B3')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(autoReply.listJobs().find((job) => job.message_id === 'B3')).toMatchObject({
+      status: 'skipped',
+      reason: 'peer_budget_exhausted',
+    });
+    clock += 60 * 60 * 1000 + 1;
+    expect(send('B4')).toEqual({ ack: true, reply_job: 'queued' });
+  });
+
+  it('recovers stale leases on every pass and fails exhausted generations', async () => {
+    let clock = Date.parse('2026-10-18T00:10:00.000Z');
+    const base = {
+      tenant_id: TENANT,
+      local_peer_id: LOCAL,
+      sender_peer_id: REMOTE,
+      session_id: SESSION,
+      topic: 'auto-reply-topic',
+      inbound_auto_turn: 0,
+      enqueued_at: '2026-10-18T00:00:00.000Z',
+      updated_at: '2026-10-18T00:00:00.000Z',
+    };
+    inbound({ messageId: 'M-LATER', text: 'later' });
+    const ledger = peerRuntimeLogicalPath(TENANT, LOCAL, 'reply-jobs.jsonl');
+    const rows: PeerReplyJob[] = [
+      {
+        ...base,
+        key: peerReplyJobKey(REMOTE, 'M-LATER'),
+        message_id: 'M-LATER',
+        inbound_text: 'later',
+        status: 'generating',
+        lease_at: '2026-10-18T00:09:30.000Z',
+        generation: { attempts: 1 },
+      },
+      {
+        ...base,
+        key: peerReplyJobKey(REMOTE, 'M-EXHAUSTED'),
+        message_id: 'M-EXHAUSTED',
+        inbound_text: 'exhausted',
+        status: 'generating',
+        lease_at: '2026-10-18T00:00:00.000Z',
+        generation: { attempts: 2 },
+      },
+    ];
+    for (const row of rows) appendGovernedArtifactJsonl('infrastructure_sentinel', ledger, row);
+    const { autoReply, generate } = setup({ staleLeaseMs: 60_000, now: () => clock });
+
+    await autoReply.runOnce();
+    const first = new Map(autoReply.listJobs().map((job) => [job.message_id, job]));
+    expect(first.get('M-EXHAUSTED')).toMatchObject({
+      status: 'generation_failed',
+      generation: { error_code: 'attempts_exhausted' },
+    });
+    expect(first.get('M-LATER')?.status).toBe('generating');
+    expect(generate).not.toHaveBeenCalled();
+
+    clock += 60_000;
+    await autoReply.runOnce();
+    expect(autoReply.listJobs().find((job) => job.message_id === 'M-LATER')).toMatchObject({
+      status: 'delivered',
+      generation: { attempts: 2 },
+    });
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('stop() aborts in-flight generation and requeues the job without delivering', async () => {
+    const generate = vi.fn(
+      (input: PeerAutoReplyGenerateInput) =>
+        new Promise<string>(() => {
+          // Never settles on its own; ignores nothing but proves stop does not wait for it.
+          void input;
+        })
+    );
+    const { autoReply, deliver } = setup({ generate });
+    autoReply.handleInbound(inbound({ messageId: 'M-STOP-GEN' }));
+    const pass = autoReply.runOnce();
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+    expect(generate.mock.calls[0][0].signal.aborted).toBe(false);
+    await autoReply.stop();
+    expect(generate.mock.calls[0][0].signal.aborted).toBe(true);
+    await pass;
+    expect(autoReply.listJobs()[0]).toMatchObject({
+      status: 'queued',
+      reason: 'requeued_on_stop',
+    });
+    expect(autoReply.listJobs()[0].generation).toBeUndefined();
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('stop() during delivery backoff requeues with the generated reply and delivers nothing more', async () => {
+    let releaseSleep: () => void = () => undefined;
+    const deliver = vi.fn(async () => {
+      throw new Error('peer down');
+    });
+    const { autoReply, generate } = setup({
+      deliver,
+      deliveryBackoffMs: 10,
+      sleep: () => new Promise<void>((resolve) => (releaseSleep = resolve)),
+    });
+    autoReply.handleInbound(inbound({ messageId: 'M-STOP-DEL' }));
+    const pass = autoReply.runOnce();
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    const stopping = autoReply.stop();
+    releaseSleep();
+    await stopping;
+    await pass;
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(autoReply.listJobs()[0]).toMatchObject({
+      status: 'queued',
+      reason: 'requeued_on_stop',
+      reply_text: 'generated reply',
+      delivery: { attempts: 1 },
+    });
+    expect(await autoReply.runOnce()).toEqual([]);
+  });
+
+  it('keeps an in-memory index: loaded once, updated on its own appends', () => {
+    const { autoReply } = setup();
+    autoReply.handleInbound(inbound({ messageId: 'M-IDX-1' }));
+    // A row written by another (unsupported) writer is not re-read per call.
+    appendGovernedArtifactJsonl(
+      'infrastructure_sentinel',
+      peerRuntimeLogicalPath(TENANT, LOCAL, 'reply-jobs.jsonl'),
+      {
+        key: peerReplyJobKey(REMOTE, 'M-IDX-EXTERNAL'),
+        status: 'queued',
+        message_id: 'M-IDX-EXTERNAL',
+      }
+    );
+    expect(autoReply.listJobs().map((job) => job.message_id)).toEqual(['M-IDX-1']);
+    expect(listPeerReplyJobs(TENANT, LOCAL)).toHaveLength(2);
+    expect(setup().autoReply.listJobs()).toHaveLength(2);
+  });
+
   it('fails open to no knowledge when retrieval throws', async () => {
     const { autoReply, generate } = setup({
       retrieveKnowledge: vi.fn(async () => {
@@ -611,6 +825,7 @@ describe('peer auto-reply', () => {
       expect(params.abortController).toBeInstanceOf(AbortController);
       expect(params.systemPrompt).toBe('system');
       expect(params.userPrompt).toBe('user');
+      expect(params.isolation).toBe('strict');
       return {
         parsed: { reply: 'hi there' },
         raw: {},

@@ -114,6 +114,11 @@ async function main(
       default: 5,
       description: 'Tenant knowledge excerpts injected into an auto-reply prompt',
     })
+    .option('auto-reply-budget-per-hour', {
+      type: 'number',
+      default: 30,
+      description: 'Rolling hourly cap on auto-reply jobs per remote peer',
+    })
     .parseSync();
 
   const peerId = String(argv['peer-id']);
@@ -150,6 +155,7 @@ async function main(
     concurrency: Number(argv['auto-reply-concurrency']),
     max_attempts: Number(argv['auto-reply-max-attempts']),
     knowledge_limit: Number(argv['auto-reply-knowledge-limit']),
+    budget_per_hour: Number(argv['auto-reply-budget-per-hour']),
   };
   if (
     !Number.isInteger(autoReplyOptions.max_turns) ||
@@ -161,7 +167,9 @@ async function main(
     !Number.isInteger(autoReplyOptions.max_attempts) ||
     autoReplyOptions.max_attempts < 1 ||
     !Number.isInteger(autoReplyOptions.knowledge_limit) ||
-    autoReplyOptions.knowledge_limit < 0
+    autoReplyOptions.knowledge_limit < 0 ||
+    !Number.isInteger(autoReplyOptions.budget_per_hour) ||
+    autoReplyOptions.budget_per_hour < 1
   ) {
     throw new Error('invalid_peer_auto_reply_options');
   }
@@ -199,6 +207,7 @@ async function main(
     concurrency: autoReplyOptions.concurrency,
     maxDeliveryAttempts: autoReplyOptions.max_attempts,
     knowledgeLimit: autoReplyOptions.knowledge_limit,
+    budgetPerHour: autoReplyOptions.budget_per_hour,
   });
 
   const server = createPeerMessagingServer({
