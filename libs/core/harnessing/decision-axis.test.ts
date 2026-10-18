@@ -10,6 +10,7 @@ const out = (label: string, delivered: boolean, wall_ms = 100): RunOutcome => ({
   exit_code: delivered ? 0 : 1,
   wall_ms,
   produced_files: delivered ? ['out.txt'] : [],
+  staged_expected: [],
   error: delivered ? '' : 'exit=1',
   recorded_at: 't',
 });
@@ -70,6 +71,7 @@ describe('classifyProbeSet — round-2 edge cases', () => {
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
+    staged_expected: [],
     error: 'spawn',
     recorded_at: 't',
   });
