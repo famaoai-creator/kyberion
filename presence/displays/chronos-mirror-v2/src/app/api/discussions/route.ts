@@ -14,6 +14,7 @@ import {
 } from '../../../lib/discussion-access';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { buildMissionHistoryItems } from '../../../lib/su-surface-data';
+import { readDiscussionExecutionConfig } from '../../../lib/discussion-run-contract';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
@@ -114,8 +115,7 @@ export async function POST(req: NextRequest) {
     );
     if (missionScope.mission) scope.mission_id = missionScope.mission;
     if (missionScope.tier) scope.tier = missionScope.tier;
-    const speaker =
-      body.speaker === 'scripted' || body.speaker === 'reasoning' ? body.speaker : 'auto';
+    const executionConfig = readDiscussionExecutionConfig(body);
     const room = withViewerExecutionContext(viewer, () => {
       const created = createDiscussionRoom({
         goal,
@@ -124,7 +124,6 @@ export async function POST(req: NextRequest) {
         created_by: viewer.principalId ?? viewer.role,
         config: {
           locale: coerceLocale(body.locale, ['en', 'ja'] as const, 'ja'),
-          speaker,
           mode: body.mode === 'dialogue' ? 'dialogue' : 'panel',
           ...(clampNumber(body.max_rounds, 1, 8)
             ? { max_rounds: clampNumber(body.max_rounds, 1, 8)! }
@@ -132,6 +131,7 @@ export async function POST(req: NextRequest) {
           ...(clampNumber(body.turn_delay_ms, 0, 10_000) !== undefined
             ? { turn_delay_ms: clampNumber(body.turn_delay_ms, 0, 10_000)! }
             : {}),
+          ...executionConfig,
         },
       });
       // The engine is the room's single owner; it runs detached from this request.

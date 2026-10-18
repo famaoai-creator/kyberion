@@ -84,6 +84,19 @@ export function reviewDiscussion(roomId: string, actor: string, input: ReviewInp
     throw new DiscussionUserError('The discussion has no decision to review yet');
   if (room.outcomes.review)
     throw new DiscussionUserError('This decision has already been reviewed');
+  // Real-provider rooms carry a permanent one-session claim. Reject before
+  // proposal edits or reopen events can discard the still-valid decision.
+  if (
+    input.verdict === 'request-changes' &&
+    (room.config.speaker !== 'scripted' ||
+      room.execution?.actual_mode === 'reasoning' ||
+      room.execution?.provider != null ||
+      (room.execution?.attempts.length ?? 0) > 0)
+  ) {
+    throw new DiscussionUserError(
+      'This bounded provider room cannot be reopened. Start a new room with the revised goal; the current decision is preserved.'
+    );
+  }
   const note = input.note?.trim().slice(0, NOTE_MAX) || undefined;
   if (input.verdict === 'request-changes' && !note) {
     throw new DiscussionUserError('A comment is required to send the decision back');
