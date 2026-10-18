@@ -232,8 +232,8 @@
       );
     }
 
-    // This marker is a local no-resend guard, not a server receipt. GET can
-    // restore a destination but cannot correlate this particular decide POST.
+    // A marker is only a no-resend guard. Version 2 carries the exact operation
+    // needed for authenticated receipt lookup; legacy markers never become proof.
     var decisions = Object.create(null);
     var decisionGeneration = 0;
     var decisionHidden = false;
@@ -264,6 +264,59 @@
       }
       return local.marker !== null || local.failed;
     }
+    function operationValid(value) {
+      return Boolean(
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.keys(value).length === 4 &&
+        value.version === 1 &&
+        typeof value.operation_id === 'string' &&
+        /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(value.operation_id) &&
+        typeof value.scenario_id === 'string' &&
+        /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(value.scenario_id) &&
+        Number.isSafeInteger(value.requirements_revision) &&
+        value.requirements_revision >= 0
+      );
+    }
+    function exactMarker(raw) {
+      try {
+        var value = JSON.parse(raw);
+        return value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          Object.keys(value).length === 4 &&
+          value.version === 2 &&
+          operationValid(value.operation) &&
+          ['conversationId', 'scope'].every(function (key) {
+            return (
+              typeof value[key] === 'string' && value[key].length > 0 && value[key].length <= 4096
+            );
+          })
+          ? value
+          : null;
+      } catch (err) {
+        return null;
+      }
+    }
+    function markerMatches(value) {
+      return Boolean(
+        value &&
+        value.conversationId === state.conversationId &&
+        value.scope === scopedUrl('/api/conversation') &&
+        value.operation.scenario_id === state.hearingScenarioId
+      );
+    }
+    function recoveryUsable() {
+      return (
+        state.hearingMode &&
+        !decisionHidden &&
+        state.draftShellReady &&
+        !state.shellBlockedMessage &&
+        state.historyState === 'ready' &&
+        state.conversationId
+      );
+    }
     function decisionCurrent(action) {
       return (
         !decisionHidden && action.generation === decisionGeneration && hearingActionCurrent(action)
@@ -279,15 +332,36 @@
         local.active.waiting &&
         decisionCurrent(local.active)
       );
+      var saved = exactMarker(local.marker);
+      var checking = Boolean(
+        local.recovery && local.recovery.waiting && decisionCurrent(local.recovery)
+      );
+      busy = busy || checking;
       var phase = local.failed
         ? 'storage'
-        : busy
-          ? 'pending'
-          : locked
-            ? 'unknown'
-            : local.rejected
-              ? 'rejected'
-              : null;
+        : checking
+          ? 'checking'
+          : busy
+            ? 'pending'
+            : locked
+              ? !saved
+                ? 'legacy'
+                : !markerMatches(saved)
+                  ? 'scope'
+                  : local.superseded && decisionCurrent(local.superseded)
+                    ? 'superseded'
+                    : 'unknown'
+              : local.rejected
+                ? 'rejected'
+                : local.recovered &&
+                    decisionCurrent(local.recovered) &&
+                    currentDecision(
+                      { ok: true, body: { ok: true, record: state.hearingRecord } },
+                      local.recovered.proof,
+                      local.recovered
+                    )
+                  ? 'recovered'
+                  : null;
       var host = document.getElementById('hearing-decision-status');
       if (host) {
         host.hidden = !state.hearingMode || !phase;
@@ -298,6 +372,13 @@
       if (phase === 'unknown' && local.conflict && decisionCurrent(local.conflict.action))
         label += ' ' + vt(state.vocab, 'front_desk:hearing_conflict_' + local.conflict.code);
       if (text && label) text.textContent = label;
+      var check = document.getElementById('hearing-decision-check');
+      if (check) {
+        check.hidden = !locked || local.failed || !saved || !markerMatches(saved);
+        check.disabled = busy || !recoveryUsable();
+        var checkLabel = vt(state.vocab, 'front_desk:hearing_decision_check');
+        if (checkLabel) check.textContent = checkLabel;
+      }
       var exit = document.getElementById('hearing-decision-continue');
       if (exit) {
         exit.hidden = !locked;
@@ -377,12 +458,176 @@
         })
       );
     }
+    function exactProof(result, action) {
+      var proof =
+        result &&
+        result.ok &&
+        result.body &&
+        result.body.ok === true &&
+        result.body.decision_receipt;
+      var receipt = proof && proof.receipt;
+      var identity = receipt && receipt.identity;
+      var expected = action.operation;
+      var operation = receipt && receipt.operation;
+      // The endpoint authenticates principal + scope + member + source against the
+      // stored receipt. Never infer an actor or authorization from client scope text.
+      if (
+        !proof ||
+        ['current', 'superseded'].indexOf(proof.status) === -1 ||
+        !receipt ||
+        !operationValid(operation) ||
+        !expected ||
+        ['version', 'operation_id', 'scenario_id', 'requirements_revision'].some(function (key) {
+          return operation[key] !== expected[key];
+        }) ||
+        receipt.session_id !== action.sessionId ||
+        typeof receipt.namespace !== 'string' ||
+        !receipt.namespace ||
+        !Number.isSafeInteger(receipt.record_revision) ||
+        receipt.record_revision < 1 ||
+        typeof receipt.decided_at !== 'string' ||
+        !Number.isFinite(Date.parse(receipt.decided_at)) ||
+        !identity ||
+        ['principal_id', 'scope_key', 'member_id'].some(function (key) {
+          return typeof identity[key] !== 'string' || !identity[key].trim();
+        }) ||
+        ['loopback', 'token'].indexOf(identity.source) === -1
+      )
+        return null;
+      return proof;
+    }
+    function currentDecision(result, proof, action) {
+      if (!proof || proof.status !== 'current' || !validDecision(result, action)) return false;
+      var record = result.body.record;
+      var receipt = proof.receipt;
+      return (
+        Number.isSafeInteger(record.requirements_revision) &&
+        record.requirements_revision === action.operation.requirements_revision &&
+        Number.isSafeInteger(record.record_revision) &&
+        record.record_revision >= receipt.record_revision &&
+        record.decided_at === receipt.decided_at &&
+        record.decided_by.id === 'user:' + receipt.identity.member_id
+      );
+    }
+    function recoveryCurrent(action) {
+      var local = decisions[action.key];
+      return (
+        decisionCurrent(action) &&
+        recoveryUsable() &&
+        local &&
+        !local.failed &&
+        local.recovery === action &&
+        local.marker === action.marker &&
+        action.waiting &&
+        window.sessionStorage.getItem(action.key) === action.marker &&
+        markerMatches(exactMarker(action.marker))
+      );
+    }
+    function checkDecision() {
+      decisionBlocked();
+      var local = decisionState();
+      var saved = exactMarker(local.marker);
+      if (
+        !recoveryUsable() ||
+        local.failed ||
+        !markerMatches(saved) ||
+        (local.active && local.active.waiting && decisionCurrent(local.active)) ||
+        (local.recovery && local.recovery.waiting && decisionCurrent(local.recovery))
+      )
+        return;
+      // A newer read owns settlement now. A delayed POST response may contain
+      // proof that was current before the read observed a superseding decision.
+      if (local.active) {
+        local.active.recoveryRetired = true;
+        local.active.waiting = false;
+        window.clearTimeout(local.active.timer);
+        local.active = null;
+      }
+      decisionGeneration += 1;
+      var action = hearingActionContext();
+      action.generation = decisionGeneration;
+      action.sessionId = state.sessionId;
+      action.scenarioId = state.hearingScenarioId;
+      action.key = decisionKey();
+      action.marker = local.marker;
+      action.operation = saved.operation;
+      action.waiting = true;
+      local.recovery = action;
+      local.superseded = null;
+      if (hearingRecovery) hearingRecovery.beginCompletion();
+      publishDecision();
+      var recordResult;
+      // Read current requirements first, then verify that this exact operation is
+      // still current. A generic record or destination is never proof by itself.
+      Promise.resolve()
+        .then(function () {
+          if (!recoveryCurrent(action)) throw new Error('Decision context changed');
+          return options.fetchReadJson(
+            scopedUrl(
+              '/api/hearing/' +
+                encodeURIComponent(action.sessionId) +
+                '?locale=' +
+                encodeURIComponent(state.locale) +
+                '&scenario_id=' +
+                encodeURIComponent(action.scenarioId)
+            )
+          );
+        })
+        .then(function (result) {
+          if (!recoveryCurrent(action)) throw new Error('Decision context changed');
+          recordResult = result;
+          if (!result || !result.ok || !result.body || result.body.ok !== true) return null;
+          return options.fetchReadJson(
+            scopedUrl(
+              '/api/hearing/' +
+                encodeURIComponent(action.sessionId) +
+                '/decision-receipts/' +
+                encodeURIComponent(action.operation.operation_id) +
+                '?version=1&scenario_id=' +
+                encodeURIComponent(action.operation.scenario_id) +
+                '&requirements_revision=' +
+                action.operation.requirements_revision
+            )
+          );
+        })
+        .then(function (result) {
+          if (!recoveryCurrent(action)) return;
+          var proof = exactProof(result, action);
+          if (proof && proof.status === 'superseded') local.superseded = action;
+          if (currentDecision(recordResult, proof, action) && clearOwnDecision(action)) {
+            state.hearingRecord = recordResult.body.record;
+            state.hearingCompletion =
+              recordResult.body.completion == null ? null : recordResult.body.completion;
+            state.hearingHandoff = null;
+            state.hearingInventory = null;
+            action.proof = proof;
+            local.recovered = action;
+            local.conflict = null;
+          }
+        })
+        .catch(function () {
+          // Missing, denied, timed-out, corrupt or foreign proof remains unknown.
+        })
+        .finally(function () {
+          action.waiting = false;
+          if (local.recovery !== action) return;
+          local.recovery = null;
+          if (decisionCurrent(action)) {
+            if (hearingRecovery) hearingRecovery.endCompletion();
+            publishDecision();
+          }
+        });
+    }
     function mountDecision() {
       if (decisionMounted) return;
       decisionMounted = true;
+      var check = document.getElementById('hearing-decision-check');
+      if (check) check.addEventListener('click', checkDecision);
       function retire() {
         decisionGeneration += 1;
         Object.keys(decisions).forEach(function (key) {
+          var recovery = decisions[key].recovery;
+          if (recovery) recovery.waiting = false;
           var active = decisions[key].active;
           if (active) {
             active.waiting = false;
@@ -432,11 +677,21 @@
       action.scenarioId = state.hearingScenarioId;
       action.key = decisionKey();
       try {
+        action.operation = {
+          version: 1,
+          operation_id: options.randomId(),
+          scenario_id: state.hearingScenarioId,
+          requirements_revision:
+            state.hearingRecord.requirements_revision == null
+              ? 0
+              : state.hearingRecord.requirements_revision,
+        };
+        if (!operationValid(action.operation)) throw new Error('Invalid hearing revision');
         action.marker = JSON.stringify({
-          requestId: options.randomId(),
+          version: 2,
+          operation: action.operation,
           conversationId: state.conversationId,
           scope: scopedUrl('/api/conversation'),
-          scenarioId: state.hearingScenarioId,
         });
         local.marker = action.marker;
         window.sessionStorage.setItem(action.key, action.marker);
@@ -466,21 +721,31 @@
         if (!decisionCurrent(action) || window.sessionStorage.getItem(action.key) !== action.marker)
           throw new Error('Decision context changed');
         request = fetchJson(
-          '/api/hearing/' +
-            encodeURIComponent(action.sessionId) +
-            '/decide?locale=' +
-            encodeURIComponent(state.locale),
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+          scopedUrl(
+            '/api/hearing/' +
+              encodeURIComponent(action.sessionId) +
+              '/decide?locale=' +
+              encodeURIComponent(state.locale)
+          ),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(action.operation),
+          }
         );
       } catch (err) {
         request = Promise.reject(err);
       }
       Promise.resolve(request)
         .then(function (result) {
+          if (action.recoveryRetired) return;
           var code = conflictCode(result);
           if (code && decisionCurrent(action) && local.marker === action.marker)
             local.conflict = { code: code, action: action };
-          var success = validDecision(result, action);
+          var proof = exactProof(result, action);
+          var success = currentDecision(result, proof, action);
+          if (proof && proof.status === 'superseded' && decisionCurrent(action))
+            local.superseded = action;
           var rejected = result && !result.ok && [400, 401, 403].indexOf(result.status) !== -1;
           // A retired success cannot refresh the current record safely: retain its
           // guard rather than unlock a stale GET. A pre-write rejection may
