@@ -78,3 +78,9 @@ describe('loadProbeScenario', () => {
     expect(() => loadProbeScenario(withBlank)).toThrow(/argv/);
   });
 });
+
+describe('spec validation (round-3)', () => {
+  it('rejects a non-object spec file', () => {
+    expect(() => loadProbeScenario(specFile('nullobj', null))).toThrow(/EVAL_SCENARIO/);
+  });
+});

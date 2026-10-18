@@ -91,6 +91,9 @@ export function loadProbeScenario(specPath: string): LoadedProbeScenario {
       throw new Error(`[EVAL_SCENARIO] invalid expect_outputs path ${JSON.stringify(rel)}`);
     }
   }
+  if (parsed.description !== undefined && typeof parsed.description !== 'string') {
+    throw new Error('[EVAL_SCENARIO] description must be a string when present');
+  }
   return {
     name: parsed.name,
     scenarioDir,

@@ -86,6 +86,8 @@ export function lookupLessons(opts: {
   if (!safeExistsSync(file)) return [];
   // Cue query: token-set overlap (word boundaries, not substrings — 'art'
   // must not hit 'start'). Stopwords are dropped or they match everything.
+  // ASCII-only tokens: non-ASCII (e.g. Japanese) cue text tokenizes to an
+  // empty set and matches nothing — a known limitation, documented here.
   const STOPWORDS = new Set([
     'the',
     'and',
