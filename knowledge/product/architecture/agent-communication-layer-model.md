@@ -106,6 +106,8 @@ Passing one check does not imply passing the next. A valid HMAC proves possessio
 
 Opt-in conversation auto replies are the one recipient-local behaviour accepted in advance: when the recipient operator lists a peer in `--auto-reply-peers`, that peer's conversation `message` / `reply` texts are answered with a tool-free LLM text reply, generated outside the receive path and bounded by a per-session turn cap and a per-peer budget. The opt-in is the recipient's acceptance for that text reply only; it never accepts a proposal, runs tools or actuators, or changes WorkItems or missions. See the [Peer Network Catalog](../orchestration/peer-network.md#conversation-auto-replies-opt-in) and the 2026-10-18 amendment of the [Mesh Hub v1 ADR](./decisions/2026-06-24-mesh-hub-v1-boundaries.md).
 
+Typed peer tasks are how a peer asks for execution: the proposer names a task type, the recipient's own catalog (`connections/peer-tasks.json`) fixes the executor and the allowed proposers, receipt only records a pending task, and the recipient operator's local `accept` runs it as a `source: peer` WorkItem. The result returns artifact references (path, sha256, size) while the artifacts stay on the recipient; transport receipt, acceptance, execution and result delivery remain distinct recorded states. See [Typed peer tasks](../orchestration/peer-network.md#typed-peer-tasks).
+
 For v1 Peer / Mesh, keep same-tenant enrollment, explicit peer selection, request-kind allowlists, recipient validation, data-tier restrictions, expiry / replay protection, and local acceptance. A new cross-tenant or network-exposed control plane requires a new security and operations decision record.
 
 ## 6. Operational procedure

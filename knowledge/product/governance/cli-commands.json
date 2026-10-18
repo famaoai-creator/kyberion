@@ -2766,7 +2766,7 @@
     },
     {
       "id": "script.peer.task",
-      "script": "peer:task",
+      "module": "scripts/peer_task.ts",
       "command": "peer task",
       "noun": "peer",
       "verb": "task",

@@ -146,6 +146,46 @@ For `--auto-reply-backend codex` the same two gates apply to provider `codex`: a
 
 Enabling a peer shares tenant knowledge excerpts with every holder of this server's shared secret, because the opt-in list is keyed by the authenticated `sender_peer_id`. Enable only peers you would show that knowledge to. Auto replies never run tools, change WorkItems, or touch missions; `handoff` messages keep the proposal-and-accept path.
 
+## Typed peer tasks
+
+A peer can ask another peer to _run_ something only through a typed peer task. The proposer names a task type; the recipient's own catalog decides what that type runs and who may ask for it. The proposal carries no parameters, so peer text never reaches an argv, a pipeline input or a prompt.
+
+Recipient catalog — `knowledge/confidential/<tenant>/connections/peer-tasks.json` (read under the tenant-bound `peer_catalog_reader`; missing file = nothing offered):
+
+```json
+{
+  "version": 1,
+  "tasks": [
+    {
+      "task_type": "baseline.check",
+      "description": "Run the baseline health check on this peer",
+      "executor": { "kind": "pipeline", "pipeline": "pipelines/baseline-check.json" },
+      "allowed_from_peers": ["kyberion-peer-b"],
+      "timeout_ms": 600000
+    },
+    {
+      "task_type": "test.peer-task-exchange",
+      "description": "Run one fixed test file",
+      "executor": {
+        "kind": "pnpm_script",
+        "script": "exec",
+        "args": ["vitest", "run", "libs/core/mesh/peer-task-exchange.test.ts"]
+      },
+      "allowed_from_peers": ["kyberion-peer-b"]
+    }
+  ]
+}
+```
+
+Flow (`pnpm kyberion peer task`, all commands take `--peer-id <this peer> --tenant-id <tenant>`):
+
+1. **Propose** — `propose --to-peer <id> --task-type <type> --summary "<why>"` sends a `handoff` conversation message with `metadata.peer_task_request`. The recipient server records it and replies `pending local acceptance`; an unknown type, a peer not in `allowed_from_peers` or an expired proposal is rejected on receipt. Nothing runs on the receive path.
+2. **Accept / reject** — the recipient operator runs `list --state pending`, then `accept --task-id <id> --actor-id <who> --reason "<why>"` (or `reject`). Acceptance creates a WorkItem (`source: peer`, `sourceRef: peer-task:<id>`, deterministic id), runs the catalog executor (`pnpm -s pipeline --input <pipeline>` or `pnpm -s <script> <args…>`) with the allowlisted exec environment, stores `report.json` and `output.log` under `active/shared/artifacts/confidential/<tenant>/report/peer-tasks/<task-id>/` (written by the tenant-bound `peer_task_artifact_writer`), and closes the WorkItem `done` (exit 0) or `blocked`.
+3. **Result** — a `status` message with `metadata.peer_task_result` goes back to the proposer: status, a short output excerpt, the WorkItem id and artifact references (`ref`, `sha256`, `bytes`, `media_type`, `location: recipient_local`). The artifacts stay on the recipient. The result message id is stable, so `resend-result --task-id <id>` is idempotent; the proposer accepts a result only from the peer it asked.
+4. **Recover** — an accepted task that stopped before recording its result (executor crash, artifact write failure) is re-run on the same WorkItem with `resume --task-id <id>`.
+
+Both sides keep the state in `active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<local>/task-exchange.jsonl` (latest row per `<direction>:<task_id>`); `show --task-id` prints both directions and `offered` prints the local catalog. Auto replies never see or act on tasks: task messages are routed before the auto-reply worker, and `status` entries are excluded from reply history.
+
 ## Envelope rules
 
 - Every message is HMAC-signed with the sender/recipient shared secret.

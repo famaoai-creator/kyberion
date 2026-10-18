@@ -1341,7 +1341,7 @@ function ledgerRoleReadGrant(
  * case-insensitively and on its resolved spellings.
  */
 function roleDenyReadDecision(
-  policy: any,
+  policy: { authority_role_permissions?: Record<string, { deny_read?: unknown } | undefined> },
   relativePath: string,
   identity: ReturnType<typeof resolvePolicyIdentityContext>
 ): { allowed: false; reason: string } | undefined {
