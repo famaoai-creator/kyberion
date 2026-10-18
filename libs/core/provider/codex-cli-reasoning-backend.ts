@@ -145,6 +145,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
+    const profile = resolveCliTaskPermissionProfile(options);
     const schema = z.object({ answer: z.string() });
     const result = (await runCodexCliQuery({
       systemPrompt:
@@ -153,7 +154,8 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         .filter(Boolean)
         .join('\n\n'),
       schema,
-      mode: 'workspace-write',
+      mode: profile && profile !== 'implementer' ? 'read-only' : 'workspace-write',
+      ...(profile ? { profile } : {}),
       options: {
         ...this.options,
         ...(options?.model
@@ -314,6 +316,40 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
   }
+}
+
+/** Preserve legacy defaults; explicit call constraints may only narrow them. */
+function resolveCliTaskPermissionProfile(
+  options?: ReasoningCallOptions
+): ProviderPermissionProfileName | undefined {
+  const permissionMode = options?.permission_mode;
+  if (permissionMode !== undefined && permissionMode !== 'readonly' && permissionMode !== 'edit') {
+    throw new Error('[codex-cli] unsupported permission mode: ' + permissionMode);
+  }
+  if (
+    options?.profile !== undefined &&
+    options.capability_profile !== undefined &&
+    options.profile !== options.capability_profile
+  ) {
+    throw new Error('[codex-cli] conflicting capability profiles');
+  }
+  const name = options?.capability_profile ?? options?.profile;
+  let requested =
+    name === undefined
+      ? undefined
+      : (getSubagentCapabilityProfile(name).name as ProviderPermissionProfileName);
+  if (permissionMode === 'readonly' && requested !== 'planner') requested = 'explorer';
+  if (permissionMode === 'edit' && requested === undefined) requested = 'implementer';
+  const profile = resolveEffectiveProviderPermissionProfile('codex', requested);
+  if (profile) {
+    const resolution = resolveProviderPermissionArgs(profile, 'codex');
+    if (resolution.kind === 'refused') {
+      throw new Error(
+        '[codex-cli] permission profile "' + profile + '" refused: ' + resolution.reason
+      );
+    }
+  }
+  return profile;
 }
 
 function normalizeCodexModelId(model?: string): string | undefined {
