@@ -10,7 +10,7 @@
  *    the authenticated viewer, never from the request body.
  */
 
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   FirstRunError,
   claimFirstRun,
@@ -29,7 +29,12 @@ import {
   resolveOidcLoginConfig,
   resolveOidcRedirectOrigin,
 } from '@agent/core/surface/oidc-browser-login';
+import { startSurfaceIdentityLink } from '@agent/core/surface/surface-auth-routes';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
+import {
+  conciergeFrontDeskRoleForTenant,
+  resolveConciergeFrontDeskRole,
+} from './front-desk-member';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import type { ConciergeViewerContext } from './viewer-context';
 
@@ -129,6 +134,71 @@ export function viewerIsInstanceOwner(viewer: Viewer): boolean {
   } catch {
     return false;
   }
+}
+
+export type IdentityLinkStart =
+  | { ok: true; location: string; setCookies: string[] }
+  | { ok: false; status: 403 | 409 | 503; error: string };
+
+/**
+ * Start "link my IdP account" for the authenticated viewer. The member is the
+ * one the viewer resolves to server-side; nothing in the request selects it.
+ *
+ * A bound IdP identity carries the member's ENTIRE scope and outlives the
+ * credential that created it, so — exactly like `PATCH /api/members`
+ * identity binding — the viewer must be owner on every tenant the member
+ * belongs to, within the viewer's own (possibly narrowed) scope. A loopback
+ * viewer without a credential is refused: local-only authority must not mint
+ * a persistent remote sign-in.
+ */
+export async function startIdentityLinkForViewer(
+  viewer: ConciergeViewerContext,
+  request: { requestOrigin: string; loopback: boolean; next?: string | null }
+): Promise<IdentityLinkStart> {
+  if (viewer.source === 'loopback') return { ok: false, status: 403, error: 'credential_required' };
+  let decision: { memberId?: string; error?: 'member_required' | 'owner_required' };
+  try {
+    decision = withExecutionContext('sovereign_concierge', () => {
+      const member = resolveMemberByPrincipal({
+        principalId: viewer.principalId,
+        source: viewer.source,
+        registrationLabel: viewer.registrationLabel,
+        memberId: viewer.memberId,
+      });
+      if (member?.status !== 'active') return { error: 'member_required' as const };
+      const ownerEverywhere =
+        member.memberships.length > 0
+          ? member.memberships.every(
+              (m) => conciergeFrontDeskRoleForTenant(viewer, m.tenant_slug) === 'owner'
+            )
+          : resolveConciergeFrontDeskRole(viewer) === 'owner';
+      return ownerEverywhere
+        ? { memberId: member.member_id }
+        : { error: 'owner_required' as const };
+    });
+  } catch {
+    decision = { error: 'member_required' };
+  }
+  if (!decision.memberId) {
+    return { ok: false, status: 403, error: decision.error ?? 'member_required' };
+  }
+  const memberId = decision.memberId;
+  const linkMemberId = memberId;
+  const started = await withExecutionContextAsync('sovereign_concierge', () =>
+    startSurfaceIdentityLink({
+      surfaceId: 'concierge',
+      requestOrigin: request.requestOrigin,
+      loopback: request.loopback,
+      linkMemberId,
+      next: request.next,
+    })
+  );
+  if (started.ok === false) {
+    return started.view.kind === 'unconfigured'
+      ? { ok: false, status: 409, error: 'sso_not_configured' }
+      : { ok: false, status: 503, error: 'link_unavailable' };
+  }
+  return started;
 }
 
 /** Redirect URIs to register at the IdP, one per login surface (deduplicated). */

@@ -541,6 +541,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
         void this.interruptTurn(targetThreadId, turnId);
         reject(new Error('Codex app-server turn cancelled.'));
       };
+      if (options?.signal?.aborted) {
+        void this.interruptTurn(targetThreadId, turnId);
+        reject(new Error('Codex app-server turn cancelled.'));
+        return;
+      }
       timeout = setTimeout(() => {
         if (this.pendingTurn?.turnId !== turnId) return;
         this.pendingTurn = null;
