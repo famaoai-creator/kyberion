@@ -333,10 +333,23 @@ export async function runRecursiveSession(
         halted = 'auto_advance_final';
         break;
       }
-      // Materialize: next base = current base + winner overlay.
-      const winner = candidates.find((c) => c.label === decision.winner)!;
+      // Materialize: next base = current base + winner overlay — sourced from
+      // the probe's staged snapshot, never the live overlayDir. The window
+      // between probe and adoption is untrusted: bytes adopted must be the
+      // bytes probed (R7-04).
+      const winnerOutcome = outcomes.find((o) => o.label === decision.winner);
+      const adoptionSource = winnerOutcome?.staged_snapshot;
+      if (!adoptionSource || !safeExistsSync(adoptionSource)) {
+        rejected.push({
+          label: `r${round}:${decision.winner}`,
+          path: '.',
+          reason: 'materialization failed: probed-bytes snapshot unavailable',
+        });
+        halted = 'materialization_error';
+        break;
+      }
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
-      const resolvedWinner = path.resolve(assertSafeRepositoryPath(winner.overlayDir));
+      const resolvedWinner = path.resolve(assertSafeRepositoryPath(adoptionSource));
       const resolvedNext = path.resolve(nextBase);
       const resolvedCurrent = path.resolve(currentBase);
       if (
@@ -352,7 +365,7 @@ export async function runRecursiveSession(
       try {
         if (safeExistsSync(nextBase)) safeRmSync(nextBase);
         copyTree(currentBase, nextBase);
-        copyTree(winner.overlayDir, nextBase);
+        copyTree(adoptionSource, nextBase);
         adopted.push(`r${round}:${decision.winner}`);
       } catch (error) {
         // Fail soft — the rounds already probed are evidence; don't lose them.
