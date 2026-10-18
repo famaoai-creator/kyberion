@@ -145,7 +145,17 @@ export async function runRecursiveSession(
   // Reject an overlay whose marker scan hits — a leak-marked file must never
   // reach a probe (harness2 leak tripwire).
   const rejectOnMarkers = (label: string, overlayDir: string): boolean => {
-    const scan = scanOverlayForMarkers(overlayDir, spec.markers);
+    let scan;
+    try {
+      scan = scanOverlayForMarkers(overlayDir, spec.markers);
+    } catch (error) {
+      rejected.push({
+        label,
+        path: '.',
+        reason: `overlay scan failed: ${error instanceof Error ? error.message : error}`,
+      });
+      return true;
+    }
     if (scan.clean) return false;
     rejected.push(
       ...scan.hits.map((h) => ({
@@ -156,7 +166,9 @@ export async function runRecursiveSession(
     );
     return true;
   };
-  // Surface-validate + tripwire supplied overlays once (rounds reuse them).
+  // Surface-validate + tripwire supplied overlays once — supplied overlay
+  // dirs are assumed session-immutable; a mid-session mutation is not
+  // re-scanned (proposed overlays ARE scanned per round).
   const supplied = (spec.candidates ?? []).filter((c) => {
     if (spec.surface) {
       try {

@@ -78,6 +78,9 @@ export async function proposeCandidates(opts: {
 }): Promise<ProposeResult> {
   const result: ProposeResult = { backend_used: false, candidates: [], rejected: [], error: '' };
   const outDir = assertSafeRepositoryPath(opts.outDir, { allowMissingLeaf: true });
+  if (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > 10) {
+    throw new Error('[PROPOSE] count must be an integer 1..10');
+  }
   const prefix = opts.labelPrefix ?? 'llm';
   // The prefix becomes part of probe labels — it must satisfy the same charset
   // or it could escape the _proposed dir (e.g. '../x').

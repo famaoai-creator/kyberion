@@ -77,11 +77,15 @@ export function anonymizeOutcomes(outcomes: RunOutcome[], seed: number): BlindMa
           (t, l) => t.split(l).join('[CANDIDATE]'),
           // Single-char labels: mask only whole-token occurrences so the
           // evidence text isn't garbled into '[CANDIDATE]nnotation'.
-          o.error.replace(/\b([a-zA-Z])\b/g, (w, ch) =>
+          o.error.replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
             outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
           )
         )
-        .slice(0, 120),
+        .slice(0, 120)
+        // Truncation can split a label at the boundary — scrub the visible tail again.
+        .replace(/\b([a-zA-Z0-9])\b/g, (w, ch) =>
+          outcomes.some((x) => x.label === ch) ? '[CANDIDATE]' : w
+        ),
     });
   });
   return { seed, letterToLabel, labelToLetter, rows };

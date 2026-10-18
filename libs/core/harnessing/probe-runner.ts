@@ -101,6 +101,13 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       throw new Error(`[PROBE_SPEC] invalid expectOutputs path ${JSON.stringify(rel)}`);
     }
   }
+  const scen = path.resolve(spec.scenarioDir);
+  const resolvedRoot = path.resolve(runRoot);
+  if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[PROBE_SPEC] runRoot must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   const runDir = path.join(runRoot, spec.label);
   const recorded_at = nowIso();
   const fail = (error: string): RunOutcome => ({
