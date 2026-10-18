@@ -12,7 +12,7 @@
  */
 
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
 import { runProbe, validateProbeSpec, type ProbeSpec, type RunOutcome } from './probe-runner.js';
@@ -94,6 +94,10 @@ export async function runContrastiveSession(
   // Validate the probe spec before any backend spend — a bad command or
   // traversal expectOutputs must not surface only after LLM proposals ran.
   validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  if (!safeLstat(scenarioDir).isDirectory()) {
+    throw new Error('[CONTRASTIVE_SESSION] scenarioDir must be a directory');
+  }
   const scen = path.resolve(spec.scenarioDir);
   const resolvedRoot = path.resolve(runRoot);
   if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {

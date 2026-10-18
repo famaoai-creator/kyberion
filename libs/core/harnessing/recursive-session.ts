@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
@@ -114,6 +115,10 @@ export async function runRecursiveSession(
   // Validate the probe spec at entry, before the round-1 propose stage can
   // spend backend calls on a session that could never probe.
   validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  if (!safeLstat(scenarioDir).isDirectory()) {
+    throw new Error('[RECURSIVE_SESSION] scenarioDir must be a directory');
+  }
   if (!Number.isInteger(spec.rounds) || spec.rounds < 1 || spec.rounds > 10) {
     throw new Error('[RECURSIVE_SESSION] rounds must be an integer 1..10');
   }
@@ -220,6 +225,7 @@ export async function runRecursiveSession(
   // planned so a healthy early halt doesn't read as a shortfall.
   const declaredProbes =
     spec.rounds * (1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0));
+  const declaredPerRound = 1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0);
   let plannedProbes = 0;
   let finalDecision: DecisionReport | null = null;
 
@@ -336,8 +342,10 @@ export async function runRecursiveSession(
       if (
         resolvedNext === resolvedWinner ||
         resolvedNext.startsWith(`${resolvedWinner}${path.sep}`) ||
+        resolvedWinner.startsWith(`${resolvedNext}${path.sep}`) ||
         resolvedNext === resolvedCurrent ||
-        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`)
+        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`) ||
+        resolvedCurrent.startsWith(`${resolvedNext}${path.sep}`)
       ) {
         throw new Error(`[RECURSIVE_SESSION] next base dir would nest inside its copy sources`);
       }
@@ -372,13 +380,12 @@ export async function runRecursiveSession(
     expected_probes: declaredProbes,
     planned_probes: plannedProbes,
     actual_probes: actualProbes,
-    // 'ok': executed everything declared. 'rejected_shortfall': overlay
-    // rejections or a degraded propose consumed declared capacity.
-    // 'probe_loss': a planned probe never produced an outcome.
-    // Early halts are fine — halted sessions only plan what they executed.
+    // Compare planned vs declared capacity of EXECUTED rounds only — a
+    // healthy early halt is 'ok'; rejections/degrades that shrank a round's
+    // candidate set read as 'rejected_shortfall'; a lost probe is 'probe_loss'.
     status: (actualProbes < plannedProbes
       ? 'probe_loss'
-      : plannedProbes < declaredProbes
+      : plannedProbes < declaredPerRound * rounds.length
         ? 'rejected_shortfall'
         : 'ok') as 'ok' | 'rejected_shortfall' | 'probe_loss',
     actual_matches_plan: actualProbes === plannedProbes,
