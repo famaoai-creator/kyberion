@@ -44,7 +44,7 @@ describe('runRecursiveSession', () => {
       metrics: [{ key: 'produced_files', direction: 'higher' }],
     });
     expect(r.rounds).toHaveLength(2);
-    expect(r.adopted_overlays).toEqual(['win']);
+    expect(r.adopted_overlays).toEqual(['r1:win']);
     expect(r.halted_by).toBe('keep_base');
     // round-2 base delivered (winner applied) — candidates no longer win.
     const r2Base = r.rounds[1].decision.decisive_evidence.find((e) => e.label === 'base')!;
@@ -89,5 +89,47 @@ describe('runRecursiveSession', () => {
         rounds: 1,
       })
     ).rejects.toThrow(/reserved|invalid/i);
+  });
+});
+
+describe('honesty + edge cases', () => {
+  it('custom selector labels method heuristic_blind, never llm', async () => {
+    const r = await runRecursiveSession({
+      ...base(),
+      session_id: 'rec-method',
+      runRoot: path.join(ROOT, 'run-method'),
+      candidates: [
+        { label: 'a', overlayDir: overlay('m1', { pass_marker: '1' }) },
+        { label: 'b', overlayDir: overlay('m2', { pass_marker: '1' }) },
+      ],
+      rounds: 1,
+      selection: 'blind',
+      selector: () => 'A',
+    });
+    expect(r.rounds[0].selection?.method).toBe('heuristic_blind');
+  });
+  it('throws when propose lacks a surface', async () => {
+    await expect(
+      runRecursiveSession({
+        ...base(),
+        session_id: 'rec-nosurface',
+        runRoot: path.join(ROOT, 'run-nosurface'),
+        propose: { brief: 'x', count: 1 },
+        rounds: 1,
+      })
+    ).rejects.toThrow(/requires a surface/);
+  });
+  it('reports propose_meta when a propose stage ran', async () => {
+    const r = await runRecursiveSession({
+      ...base(),
+      session_id: 'rec-meta',
+      runRoot: path.join(ROOT, 'run-meta'),
+      propose: { brief: 'x', count: 1 },
+      surface: { allowed_paths: ['config/'] },
+      candidates: [{ label: 'c1', overlayDir: overlay('pm', { pass_marker: '1' }) }],
+      rounds: 1,
+    });
+    expect(r.rounds[0].propose_meta).toBeDefined();
+    expect(r.rounds[0].propose_meta!.backend_used).toBeDefined();
   });
 });
