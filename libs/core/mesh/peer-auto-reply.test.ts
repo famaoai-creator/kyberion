@@ -1,13 +1,21 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
-const { runClaudeAgentQueryMock, getReasoningBackendSpy } = vi.hoisted(() => ({
-  runClaudeAgentQueryMock: vi.fn(),
-  getReasoningBackendSpy: vi.fn(),
-}));
+const { runClaudeAgentQueryMock, runCodexIsolatedQueryMock, getReasoningBackendSpy } = vi.hoisted(
+  () => ({
+    runClaudeAgentQueryMock: vi.fn(),
+    runCodexIsolatedQueryMock: vi.fn(),
+    getReasoningBackendSpy: vi.fn(),
+  })
+);
 
 vi.mock('../provider/claude-agent-query.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../provider/claude-agent-query.js')>()),
   runClaudeAgentQuery: runClaudeAgentQueryMock,
+}));
+
+vi.mock('../provider/codex-isolated-query.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../provider/codex-isolated-query.js')>()),
+  runCodexIsolatedQuery: runCodexIsolatedQueryMock,
 }));
 
 vi.mock('../reasoning/reasoning-backend.js', async (importOriginal) => {
@@ -46,6 +54,7 @@ import {
 } from './peer-auto-reply.js';
 import { peerRuntimeLogicalPath } from './peer-messaging.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
+import { CodexIsolatedQueryError } from '../provider/codex-isolated-query.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -875,5 +884,59 @@ describe('peer auto-reply', () => {
     // tenant-bound responder role, never the caller's ambient role.
     expect(observedExecution).toEqual({ role: 'peer_responder_reader', tenant: TENANT });
     expect(getReasoningBackendSpy).not.toHaveBeenCalled();
+  });
+  it('default generate with backend codex runs runCodexIsolatedQuery in the same role and scope', async () => {
+    let observedScope: unknown;
+    let observedExecution: { role?: string; tenant?: string } = {};
+    runCodexIsolatedQueryMock.mockImplementation(async (params: Record<string, unknown>) => {
+      observedScope = getReasoningPayloadScope();
+      const execution = currentExecutionScope();
+      observedExecution = { role: execution?.assumedRole, tenant: execution?.tenantSlug };
+      expect(params.abortController).toBeInstanceOf(AbortController);
+      expect(params.systemPrompt).toBe('system');
+      expect(params.userPrompt).toBe('user');
+      expect(params.allowUntestedVersion).toBe(true);
+      expect(params.timeoutMs).toBe(1234);
+      return { parsed: { reply: 'codex says hi' } };
+    });
+    const reply = await defaultPeerAutoReplyGenerate(
+      {
+        tenantId: TENANT,
+        localPeerId: LOCAL,
+        remotePeerId: REMOTE,
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        signal: new AbortController().signal,
+      },
+      { backend: 'codex', codexAllowUntestedVersion: true, timeoutMs: 1234 }
+    );
+    expect(reply).toBe('codex says hi');
+    expect(runClaudeAgentQueryMock).not.toHaveBeenCalled();
+    expect(observedScope).toEqual({
+      tier: 'confidential',
+      tenant_slug: TENANT,
+      purpose: 'peer-conversation:auto-reply',
+      training_use: 'zero_retention',
+    });
+    expect(observedExecution).toEqual({ role: 'peer_responder_reader', tenant: TENANT });
+    expect(getReasoningBackendSpy).not.toHaveBeenCalled();
+  });
+
+  it('records a codex tool attempt as generation_failed / tool_attempt_detected', async () => {
+    runCodexIsolatedQueryMock.mockRejectedValue(
+      new CodexIsolatedQueryError('[CODEX_TOOL_ATTEMPT] discarded', 'CODEX_TOOL_ATTEMPT')
+    );
+    const { autoReply, deliver } = setup({ generate: undefined, backend: 'codex' });
+    autoReply.handleInbound(inbound({ messageId: 'M-TOOL' }));
+    await autoReply.runOnce();
+    expect(runCodexIsolatedQueryMock).toHaveBeenCalledTimes(1);
+    expect(runClaudeAgentQueryMock).not.toHaveBeenCalled();
+    expect(
+      listPeerReplyJobs(TENANT, LOCAL).find((job) => job.message_id === 'M-TOOL')
+    ).toMatchObject({
+      status: 'generation_failed',
+      generation: { attempts: 1, error_code: 'tool_attempt_detected' },
+    });
+    expect(deliver).not.toHaveBeenCalled();
   });
 });
