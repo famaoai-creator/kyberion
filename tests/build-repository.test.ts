@@ -133,15 +133,33 @@ function stageRuntime() {
 }
 
 describe('compiler stage shutdown', () => {
-  it('executes the native Windows pnpm executable without a shell', async () => {
+  it('executes the Windows pnpm JS entrypoint through Node without a shell', async () => {
     const { runtime, child } = stageRuntime();
     runtime.windows = true;
+    runtime.packageManagerEntrypoint = 'C:\\setup-pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs';
     const pending = runBuildStage(
       { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] },
       runtime
     );
     expect(runtime.spawn).toHaveBeenCalledWith(
-      'pnpm.exe',
+      process.execPath,
+      [runtime.packageManagerEntrypoint, 'run', 'build:ui'],
+      expect.objectContaining({ detached: false })
+    );
+    child.emit('close', 0, null);
+    await pending;
+  });
+
+  it('executes a standalone Windows pnpm executable directly without a shell', async () => {
+    const { runtime, child } = stageRuntime();
+    runtime.windows = true;
+    runtime.packageManagerEntrypoint = 'C:\\pnpm\\pnpm.exe';
+    const pending = runBuildStage(
+      { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] },
+      runtime
+    );
+    expect(runtime.spawn).toHaveBeenCalledWith(
+      'C:\\pnpm\\pnpm.exe',
       ['run', 'build:ui'],
       expect.objectContaining({ detached: false })
     );
@@ -149,9 +167,25 @@ describe('compiler stage shutdown', () => {
     await pending;
   });
 
-  it('uses the native Windows pnpm executable', () => {
+  it('resolves the Windows pnpm command from the lifecycle entrypoint', () => {
     const stage = { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] };
-    expect(resolveBuildCommand(stage, true)).toEqual({ ...stage, command: 'pnpm.exe' });
+    for (const entrypoint of [
+      'C:\\setup-pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs',
+      'C:\\pnpm\\pnpm.mjs',
+    ]) {
+      expect(resolveBuildCommand(stage, true, entrypoint)).toEqual({
+        ...stage,
+        command: process.execPath,
+        args: [entrypoint, 'run', 'build:ui'],
+      });
+    }
+    expect(resolveBuildCommand(stage, true, 'C:\\pnpm\\pnpm.exe')).toEqual({
+      ...stage,
+      command: 'C:\\pnpm\\pnpm.exe',
+    });
+    for (const entry of [undefined, 'pnpm.cjs', 'C:\\pnpm.cmd', 'C:\\pnpm\\pnpm.ps1']) {
+      expect(() => resolveBuildCommand(stage, true, entry)).toThrow('run pnpm build');
+    }
     expect(resolveBuildCommand(stage, false)).toBe(stage);
   });
   it('forwards termination to the process group, retains the build lock until close, and stops later stages', async () => {
