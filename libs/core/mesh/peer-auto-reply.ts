@@ -589,15 +589,34 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       return fail('session_mismatch', errorMessage(error));
     }
 
+    // Registered before retrieval so stop() can interrupt this job at any
+    // await; a stopped job is requeued and never reaches generate().
+    const controller = new AbortController();
+    controllers.set(job.key, controller);
+    const stoppedBeforeGeneration = () => {
+      controllers.delete(job.key);
+      return requeue(current, 'requeued_on_stop', { generation: priorGeneration });
+    };
+    const aborted = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener('abort', () => reject(new Error('generation aborted')), {
+        once: true,
+      });
+    });
+    aborted.catch(() => undefined);
+
     let knowledge: TenantKnowledgeHit[] = [];
     if (knowledgeLimit > 0) {
       try {
-        knowledge = await retrieveKnowledge({
-          tenantId,
-          topic: job.inbound_text.slice(0, KNOWLEDGE_TOPIC_MAX_CHARS),
-          limit: knowledgeLimit,
-        });
+        knowledge = await Promise.race([
+          retrieveKnowledge({
+            tenantId,
+            topic: job.inbound_text.slice(0, KNOWLEDGE_TOPIC_MAX_CHARS),
+            limit: knowledgeLimit,
+          }),
+          aborted,
+        ]);
       } catch (error) {
+        if (stopped) return stoppedBeforeGeneration();
         log.warn(
           `knowledge retrieval failed for job ${job.key} — ${errorMessage(error)} | continuing without knowledge | role=${PEER_RESPONDER_READER_ROLE}`
         );
@@ -618,8 +637,7 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       inboundText: job.inbound_text,
     });
 
-    const controller = new AbortController();
-    controllers.set(job.key, controller);
+    if (stopped) return stoppedBeforeGeneration();
     const timeoutError = Object.assign(
       new Error(`generation timed out after ${generationTimeoutMs}ms`),
       { code: 'timeout' }
