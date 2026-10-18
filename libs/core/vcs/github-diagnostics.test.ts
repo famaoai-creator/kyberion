@@ -45,6 +45,18 @@ describe('GitHub CLI diagnostics', () => {
   });
 
   it.each([
+    ['token'.repeat(100_000), 'command_failure'],
+    ['invalid'.repeat(100_000), 'command_failure'],
+    ['token'.repeat(100_000) + ' invalid', 'credential_unverified'],
+    ['invalid'.repeat(100_000) + ' credential', 'credential_unverified'],
+    ['token\ninvalid', 'command_failure'],
+    ['invalid\rcredential', 'command_failure'],
+    ['AUTHENTICATION unverified', 'credential_unverified'],
+  ])('handles long repeated markers and line boundaries (case %#)', (stderr, status) => {
+    expect(diagnoseGhResult({ status: 1, stdout: '', stderr }).status).toBe(status);
+  });
+
+  it.each([
     ['no pull requests found for branch secret-branch', 'missing_resource'],
     ['GraphQL: Resource not accessible by integration (repository)', 'permission_denied'],
     ['HTTP 403: Forbidden', 'permission_denied'],

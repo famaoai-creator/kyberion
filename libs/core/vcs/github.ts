@@ -104,12 +104,7 @@ export function diagnoseGhResult(
   ) {
     status = 'invalid_arguments';
     next = 'Check the arguments supported by this GitHub CLI operation.';
-  } else if (
-    context.authProbe ||
-    /(?:token|credential|authentication).*(?:invalid|failed|unverified)|invalid.*(?:token|credential)/i.test(
-      message
-    )
-  ) {
+  } else if (context.authProbe || hasUnverifiedCredentialEvidence(message)) {
     status = 'credential_unverified';
     next =
       'Credential validity is unverified; compare DNS and OS credential access with a normal host terminal before resetting authentication.';
@@ -119,6 +114,25 @@ export function diagnoseGhResult(
       'Review this operation in a normal host terminal; the failure does not establish an authentication or network problem.';
   }
   return { status, next, connector_status: 'not_probed' };
+}
+
+function hasUnverifiedCredentialEvidence(message: string): boolean {
+  // A fixed number of literal scans per line keeps repeated token/invalid
+  // prefixes linear, unlike an unanchored marker.*marker regex.
+  return message
+    .toLowerCase()
+    .split(/[\r\n\u2028\u2029]/)
+    .some((line) => {
+      const ordered = (starts: string[], ends: string[]): boolean =>
+        starts.some((start) => {
+          const index = line.indexOf(start);
+          return index >= 0 && ends.some((end) => line.indexOf(end, index + start.length) >= 0);
+        });
+      return (
+        ordered(['token', 'credential', 'authentication'], ['invalid', 'failed', 'unverified']) ||
+        ordered(['invalid'], ['token', 'credential'])
+      );
+    });
 }
 
 /**

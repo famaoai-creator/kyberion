@@ -66,6 +66,9 @@ children before starting another build. PID-based stale-lock recovery cannot ide
 orphans on its own.
 
 **GitHub CLI diagnosis.** Run the existing `gh_status` operation before resetting authentication.
+For ordered diagnostic markers in uncontrolled CLI output, use a fixed number of literal
+searches per line rather than unanchored `marker.*marker` regexes. Cover repeated-marker
+inputs and line boundaries in `github-diagnostics.test.ts` to prevent polynomial scanning.
 DNS and network failures take precedence over generic auth wording. `gh auth status` saying
 that a token is invalid does not establish API rejection: only explicit HTTP 401 / Bad credentials
 does. Credential-store access failures need a comparison with the operator's normal host
