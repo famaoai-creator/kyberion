@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
-import { runRecursiveSession } from './recursive-session.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { runRecursiveSession, resumeRecursiveSession } from './recursive-session.js';
 import { copyTreeHashed, manifestsEqual, runProbe, treeManifest } from './probe-runner.js';
+import { lookupLessons } from './experience-library.js';
 
 const ROOT = path.join(process.cwd(), 'active/shared/tmp/harnessing-recursive-test');
 
@@ -403,5 +404,251 @@ describe('integrity hardening (R3 review)', () => {
       true
     );
     expect(poolSize).toBe(2);
+  });
+});
+
+describe('experience write-back (experienceSink)', () => {
+  it('emits a per-round experience on a landed adoption and persists it', async () => {
+    const lib = path.join(ROOT, 'lib-rec');
+    safeRmSync(lib);
+    const r = await runRecursiveSession({
+      ...base(),
+      session_id: 'rec-exp',
+      runRoot: path.join(ROOT, 'run-exp'),
+      candidates: [
+        { label: 'win', overlayDir: overlay('winexp', { pass_marker: '1' }) },
+        { label: 'none', overlayDir: overlay('noneexp', {}) },
+      ],
+      rounds: 2,
+      metrics: [{ key: 'produced_files', direction: 'higher' }],
+      work_shape: 'shape-rec',
+      experienceSink: { root: lib, domain: 'dom' },
+    });
+    // r1 auto_advance lands; r2 keep_base emits nothing.
+    expect(r.rounds[0].experience).toBeDefined();
+    expect(r.rounds[0].experience!.lesson).toContain("'win'");
+    expect(r.rounds[0].experience!.evidence).toContain("adopted 'r1:win'");
+    expect(r.rounds[0].experience!.evidence).toContain('report.json');
+    expect(r.rounds[1].experience).toBeUndefined();
+    const seen = lookupLessons({ libraryRoot: lib, domain: 'dom' });
+    expect(seen).toHaveLength(1);
+    expect(seen[0].cue).toBe('shape-rec');
+  });
+
+  it('emits a decided-not-materialized experience on auto_advance_final', async () => {
+    const lib = path.join(ROOT, 'lib-final');
+    safeRmSync(lib);
+    const r = await runRecursiveSession({
+      ...base(),
+      session_id: 'rec-exp-final',
+      runRoot: path.join(ROOT, 'run-exp-final'),
+      candidates: [{ label: 'win', overlayDir: overlay('winfin', { pass_marker: '1' }) }],
+      rounds: 1,
+      experienceSink: { root: lib, domain: 'dom' },
+    });
+    expect(r.halted_by).toBe('auto_advance_final');
+    expect(r.rounds[0].experience).toBeDefined();
+    expect(r.rounds[0].experience!.evidence).toContain('not materialized');
+    // The final-round winner still qualifies — the contrast was decisive.
+    expect(lookupLessons({ libraryRoot: lib, domain: 'dom' })).toHaveLength(1);
+  });
+
+  it('emits no experience and persists nothing on human_gate', async () => {
+    const lib = path.join(ROOT, 'lib-hgate');
+    safeRmSync(lib);
+    const r = await runRecursiveSession({
+      ...base(),
+      session_id: 'rec-exp-gate',
+      runRoot: path.join(ROOT, 'run-exp-gate'),
+      candidates: [
+        { label: 'a', overlayDir: overlay('ga', { pass_marker: '1' }) },
+        { label: 'b', overlayDir: overlay('gb', { pass_marker: '1' }) },
+      ],
+      rounds: 3,
+      experienceSink: { root: lib, domain: 'dom' },
+    });
+    expect(r.halted_by).toBe('human_gate');
+    expect(r.rounds[0].experience).toBeUndefined();
+    expect(lookupLessons({ libraryRoot: lib, domain: 'dom' })).toEqual([]);
+  });
+
+  it('persists nothing when adoption fails (materialization_error)', async () => {
+    const lib = path.join(ROOT, 'lib-materr');
+    safeRmSync(lib);
+    const scenDir = path.join(ROOT, 'scenario-tamper2');
+    const ovDir = path.join(ROOT, 'ov', 'win-tamper2');
+    safeMkdir(scenDir, { recursive: true });
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo TAMPER > "../.snapshots/win/pass_marker"\n`
+    );
+    overlay('win-tamper2', { pass_marker: 'ORIG', iam_win: '1' });
+    const r = await runRecursiveSession({
+      session_id: 'rec-exp-materr',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-exp-materr'),
+      candidates: [
+        { label: 'win', overlayDir: ovDir },
+        { label: 'none', overlayDir: overlay('none-t2', {}) },
+      ],
+      rounds: 2,
+      experienceSink: { root: lib, domain: 'dom' },
+    });
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.rounds[0].experience).toBeUndefined();
+    expect(lookupLessons({ libraryRoot: lib, domain: 'dom' })).toEqual([]);
+  });
+});
+
+describe('resumeRecursiveSession (human_gate resume)', () => {
+  /** Halts at round 1: base fails, two candidates deliver -> human_gate. */
+  const haltSpec = (runRoot: string, ovA: string, ovB: string) => ({
+    ...base(),
+    session_id: `halt-${path.basename(runRoot)}`,
+    runRoot,
+    candidates: [
+      { label: 'a', overlayDir: ovA },
+      { label: 'b', overlayDir: ovB },
+    ],
+    rounds: 3,
+    metrics: [{ key: 'produced_files', direction: 'higher' as const }],
+  });
+
+  it('adopts the picked candidate verified bytes, then runs remaining rounds', async () => {
+    const scenDir = scenario();
+    const ovA = overlay('res-a', { pass_marker: '1', tag_a: 'A' });
+    const ovB = overlay('res-b', { pass_marker: '1', tag_b: 'B' });
+    const halted = await runRecursiveSession(
+      haltSpec(path.join(ROOT, 'run-resume-halt'), ovA, ovB)
+    );
+    expect(halted.halted_by).toBe('human_gate');
+    // Mutate the LIVE overlay after the halt — the resume must adopt the
+    // probed snapshot bytes ('A'), never the post-halt mutation.
+    safeWriteFile(path.join(ovA, 'tag_a'), 'MUTATED');
+    const resumed = await resumeRecursiveSession(
+      {
+        ...haltSpec(path.join(ROOT, 'run-resumed'), ovA, ovB),
+        session_id: 'rec-resumed',
+        scenarioDir: scenDir,
+      },
+      { fromReport: halted.report_path, adopt: 'a' }
+    );
+    // The resume adoption is labelled distinctly — never 'r1:a' auto_advance.
+    expect(resumed.adopted_overlays[0]).toBe('resume:r1:a');
+    expect(resumed.resume).toEqual({
+      from: halted.report_path,
+      adopt: 'a',
+      halted_round: 1,
+    });
+    // Materialized round-2 base carries the PROBED bytes, not 'MUTATED'.
+    const adoptedTag = path.join(ROOT, 'run-resumed', 'bases', 'round-2', 'tag_a');
+    expect(String(safeReadFile(adoptedTag)).trim()).toBe('A');
+    // Remaining rounds ran with continuing round numbers; the adopted base
+    // delivers now, so round 2 resolves keep_base (nothing dominates it).
+    expect(resumed.rounds.map((x) => x.round)).toEqual([2]);
+    expect(resumed.halted_by).toBe('keep_base');
+    const report = JSON.parse(String(safeReadFile(resumed.report_path)));
+    expect(report.resumed_from).toBe(halted.report_path);
+    expect(report.resumed_adopt).toBe('a');
+    expect(report.adopted_via).toBe('human_gate_resume');
+    expect(report.resumed_after_round).toBe(1);
+    expect(report.declared_rounds).toBe(2); // remaining budget, honestly declared
+  });
+
+  it('refuses with materialization_error when the adopted snapshot was tampered', async () => {
+    const ovA = overlay('tamp-a', { pass_marker: '1', tag_a: 'A' });
+    const ovB = overlay('tamp-b', { pass_marker: '1', tag_b: 'B' });
+    const halted = await runRecursiveSession(haltSpec(path.join(ROOT, 'run-tamp-halt'), ovA, ovB));
+    expect(halted.halted_by).toBe('human_gate');
+    // Tamper the SNAPSHOT (not the live overlay) — manifest verify must fail.
+    const snap = halted.rounds[0].outcomes.find((o) => o.label === 'a')!.staged_snapshot!;
+    safeWriteFile(path.join(snap, 'tag_a'), 'TAMPER');
+    const r = await resumeRecursiveSession(
+      {
+        ...haltSpec(path.join(ROOT, 'run-tamp-resumed'), ovA, ovB),
+        session_id: 'rec-tamp-resumed',
+      },
+      { fromReport: halted.report_path, adopt: 'a' }
+    );
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.rounds).toHaveLength(0);
+    expect(r.adopted_overlays).toEqual([]);
+    const report = JSON.parse(String(safeReadFile(r.report_path)));
+    expect(report.materialization_error).toMatch(/drifted|materialization failed/);
+  });
+
+  it('refuses a missing or non-delivered adopt label — never auto-picks', async () => {
+    const ovA = overlay('np-a', { pass_marker: '1' });
+    const ovB = overlay('np-b', { pass_marker: '1' });
+    const ovC = overlay('np-c', { tag_c: 'C' }); // no pass_marker -> not delivered
+    const halted = await runRecursiveSession({
+      ...base(),
+      session_id: 'halt-np',
+      runRoot: path.join(ROOT, 'run-np-halt'),
+      candidates: [
+        { label: 'a', overlayDir: ovA },
+        { label: 'b', overlayDir: ovB },
+        { label: 'c', overlayDir: ovC },
+      ],
+      rounds: 3,
+    });
+    expect(halted.halted_by).toBe('human_gate');
+    const spec = {
+      ...base(),
+      session_id: 'rec-np',
+      runRoot: path.join(ROOT, 'run-np-resumed'),
+      candidates: [
+        { label: 'a', overlayDir: ovA },
+        { label: 'b', overlayDir: ovB },
+        { label: 'c', overlayDir: ovC },
+      ],
+      rounds: 3,
+    };
+    await expect(
+      resumeRecursiveSession(spec, { fromReport: halted.report_path, adopt: 'zzz' })
+    ).rejects.toThrow(/no candidate/);
+    await expect(
+      resumeRecursiveSession(spec, { fromReport: halted.report_path, adopt: 'c' })
+    ).rejects.toThrow(/did not deliver/);
+  });
+
+  it('rejects resuming a report that did not halt on human_gate', async () => {
+    const done = await runRecursiveSession({
+      ...base(),
+      session_id: 'halt-none',
+      runRoot: path.join(ROOT, 'run-done'),
+      candidates: [{ label: 'w', overlayDir: overlay('done-w', { pass_marker: '1' }) }],
+      rounds: 2,
+      metrics: [{ key: 'produced_files', direction: 'higher' }],
+    });
+    expect(done.halted_by).not.toBe('human_gate');
+    await expect(
+      resumeRecursiveSession(
+        {
+          ...base(),
+          session_id: 'rec-nonresume',
+          runRoot: path.join(ROOT, 'run-nonresume'),
+          candidates: [{ label: 'w', overlayDir: overlay('done-w', { pass_marker: '1' }) }],
+          rounds: 2,
+        },
+        { fromReport: done.report_path, adopt: 'w' }
+      )
+    ).rejects.toThrow(/human_gate/);
+  });
+
+  it('rejects a runRoot equal to the halted session root (report is evidence)', async () => {
+    const ovA = overlay('ow-a', { pass_marker: '1' });
+    const ovB = overlay('ow-b', { pass_marker: '1' });
+    const runRoot = path.join(ROOT, 'run-overwrite');
+    const halted = await runRecursiveSession(haltSpec(runRoot, ovA, ovB));
+    expect(halted.halted_by).toBe('human_gate');
+    await expect(
+      resumeRecursiveSession(
+        { ...haltSpec(runRoot, ovA, ovB), session_id: 'rec-overwrite' },
+        { fromReport: halted.report_path, adopt: 'a' }
+      )
+    ).rejects.toThrow(/runRoot must differ/);
   });
 });
