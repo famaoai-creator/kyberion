@@ -962,9 +962,9 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_button')");
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_pending')");
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_done')");
-    // Conflict-specific copy and the ordinary fallback share one vocabulary lookup.
+    // Scope-specific copy, conflicts and the ordinary fallback share one vocabulary lookup.
     expect(askJs).toMatch(
-      /vt\(\s*state\.vocab,\s*handoff\.conflict\s*\? 'front_desk:hearing_conflict_' \+ handoff\.conflict\s*:\s*'front_desk:hearing_handoff_failed'\s*\)/
+      /vt\(\s*state\.vocab,\s*handoff\.scopeError\s*\? 'front_desk:' \+ handoff\.scopeError\s*:\s*handoff\.conflict\s*\? 'front_desk:hearing_conflict_' \+ handoff\.conflict\s*:\s*'front_desk:hearing_handoff_failed'\s*\)/
     );
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_mission_label')");
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_open_decide')");
