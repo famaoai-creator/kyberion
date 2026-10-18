@@ -15,7 +15,14 @@ import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { runProbe, validateProbeSpec, type ProbeSpec, type RunOutcome } from './probe-runner.js';
+import {
+  manifestsEqual,
+  runProbe,
+  treeManifest,
+  validateProbeSpec,
+  type ProbeSpec,
+  type RunOutcome,
+} from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import {
@@ -248,6 +255,16 @@ export async function runContrastiveSession(
       ...(spec.markers ? { markers: spec.markers } : {}),
     } satisfies ProbeSpec);
 
+  // Baseline manifest before any probe — the unsandboxed scenario can
+  // mutate scenarioDir mid-session, making later probes incomparable to
+  // the base's. Recorded on the report as base_drifted.
+  let baseManifest: Record<string, string> | null = null;
+  try {
+    baseManifest = treeManifest(spec.scenarioDir);
+  } catch {
+    // An unreadable base shows up in the base outcome — no extra signal here.
+  }
+
   // When every candidate was rejected there is nothing to contrast — skip the
   // base probe entirely and classify the empty set as missing evidence.
   const base = eligible.length ? probeFor('base') : null;
@@ -255,9 +272,15 @@ export async function runContrastiveSession(
   // Marker hits at stage time mean the probe refused to run — mirror them
   // into the rejection trail like a pre-probe rejection.
   for (const o of outcomes) {
-    if (/^leak marker:/.test(o.error) || /marker scan failed/.test(o.error)) {
+    if (o.probe_refused) {
       rejected.push({ label: o.label, path: '.', reason: `probe refused: ${o.error}` });
     }
+  }
+  let baseDrifted = false;
+  try {
+    baseDrifted = !baseManifest || !manifestsEqual(treeManifest(spec.scenarioDir), baseManifest);
+  } catch {
+    baseDrifted = true;
   }
   const decision = classifyProbeSet(base, outcomes, spec.metrics ?? []);
 
@@ -265,7 +288,8 @@ export async function runContrastiveSession(
   const selection =
     spec.selection === 'blind' && decision.decision === 'human_gate'
       ? applyBlindSelection(
-          [...(base ? [base] : []), ...outcomes],
+          // Never-executed outcomes have no artifacts to judge.
+          [...(base ? [base] : []), ...outcomes].filter((o) => o.ok),
           spec.seed ?? sessionSeed(spec.session_id),
           spec.selector ?? metricsFallbackSelector,
           undefined
@@ -279,7 +303,7 @@ export async function runContrastiveSession(
           lesson: base.delivered
             ? `apply the '${decision.winner}' overlay; it dominated the base on the declared metrics`
             : `apply the '${decision.winner}' overlay; it delivered while the base failed the same scenario`,
-          evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}`,
+          evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}; adopt staged_snapshot of the winner outcome (verified probed bytes), not the live overlayDir`,
           // Dominance over a delivering base is the stronger evidence;
           // a single delivery over a dead base may just be a broken baseline.
           confidence: base.delivered ? ('high' as const) : ('medium' as const),
@@ -305,6 +329,10 @@ export async function runContrastiveSession(
     command: spec.command,
     decision,
     selection,
+    // True when the scenario input changed across the session — later probes
+    // may not be comparable to the base's. Comparative verdicts (especially
+    // auto_advance) must be read against this flag.
+    base_drifted: baseDrifted,
     rejected_overlays: rejected,
     propose_meta,
     outcomes,

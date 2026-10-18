@@ -20,6 +20,7 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeWriteFile,
 } from '../secure-io.js';
 import { logger } from '../core.js';
 import { isValidRelPath } from './surface-spec.js';
@@ -65,10 +66,14 @@ export interface RunOutcome {
    *  the live overlayDir may have changed since the probe ran. Absent when
    *  the probe had no overlay (base run) or failed before staging. */
   staged_snapshot?: string;
-  /** sha256 manifest of staged_snapshot captured AT STAGE TIME. The snapshot
-   *  dir is reachable by the scenario (sibling of run dir, no fs sandbox),
-   *  so adoption must re-verify this manifest before trusting the bytes. */
+  /** sha256 manifest of the snapshot bytes AS READ into the run dir — i.e.
+   *  the exact probed bytes. The snapshot dir is reachable by the scenario
+   *  (sibling of run dir, no fs sandbox), so adoption must re-verify this
+   *  manifest before trusting the bytes. */
   snapshot_manifest?: Record<string, string>;
+  /** Set when the probe refused to run the command at stage time
+   *  (marker hit or scan failure on the staged snapshot). */
+  probe_refused?: 'leak_marker' | 'scan_failed';
   error: string;
   recorded_at: string;
 }
@@ -82,6 +87,33 @@ export function copyTree(src: string, dst: string): void {
     if (stat.isDirectory()) copyTree(s, d);
     else if (stat.isFile()) safeCopyFileSync(s, d);
   }
+}
+
+/**
+ * copyTree that returns a sha256 manifest of the bytes AS READ. Use this
+ * when the manifest must describe the bytes a run consumed — hashing the
+ * source afterwards is a second read a concurrent writer can slip between.
+ */
+export function copyTreeHashed(src: string, dst: string): Record<string, string> {
+  const manifest: Record<string, string> = {};
+  const walk = (s: string, d: string, prefix: string): void => {
+    safeMkdir(d, { recursive: true });
+    for (const entry of safeReaddir(s)) {
+      const sp = path.join(s, entry);
+      const dp = path.join(d, entry);
+      const stat = safeLstat(sp);
+      const rel = prefix ? `${prefix}/${entry}` : entry;
+      if (stat.isDirectory()) {
+        walk(sp, dp, rel);
+      } else if (stat.isFile()) {
+        const buf = safeReadFile(sp, { encoding: null });
+        safeWriteFile(dp, buf);
+        manifest[rel] = createHash('sha256').update(buf).digest('hex');
+      }
+    }
+  };
+  walk(src, dst, '');
+  return manifest;
 }
 
 function listFiles(dir: string, prefix = ''): string[] {
@@ -169,7 +201,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   let overlay: string | null = null;
   let snapshotDir: string | null = null;
   let snapshotManifest: Record<string, string> | null = null;
-  const fail = (error: string): RunOutcome => ({
+  const fail = (error: string, refused?: RunOutcome['probe_refused']): RunOutcome => ({
     label: spec.label,
     run_dir: runDir,
     ok: false,
@@ -180,6 +212,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     produced_files: [],
     ...(snapshotDir ? { staged_snapshot: snapshotDir } : {}),
     ...(snapshotManifest ? { snapshot_manifest: snapshotManifest } : {}),
+    ...(refused ? { probe_refused: refused } : {}),
     error,
     recorded_at,
   });
@@ -239,11 +272,11 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       // A later overlayDir mutation cannot retro-edit what the probe ran.
       if (safeExistsSync(snapshotDir)) safeRmSync(snapshotDir);
       copyTree(overlay, snapshotDir);
-      copyTree(snapshotDir, runDir);
-      // Hash the staged bytes now — the scenario runs with cwd=runDir and no
-      // fs sandbox, so a post-stage tamper of ../.snapshots must be detectable
-      // at adoption time, not silently materialized.
-      snapshotManifest = treeManifest(snapshotDir);
+      // The manifest must describe the bytes the run CONSUMED — hash them
+      // while copying into runDir (single read). Hashing the snapshot after
+      // the copy would be a second read a concurrent writer could slip into,
+      // making manifest==adopted but neither == probed.
+      snapshotManifest = copyTreeHashed(snapshotDir, runDir);
     }
   } catch (error) {
     return fail(`could not stage run dir: ${error instanceof Error ? error.message : error}`);
@@ -252,18 +285,23 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   if (overlay && snapshotDir) {
     // Tripwire the exact bytes about to be probed — a mutation between a
     // caller's session-start scan and this stage cannot smuggle marker
-    // content into the run dir or a later adoption.
+    // content into the run dir or a later adoption. The run dir keeps the
+    // scanned bytes on refusal: quarantined evidence, never executed.
     let scan;
     try {
       scan = scanOverlayForMarkers(snapshotDir, spec.markers);
     } catch (error) {
       return fail(
-        `staged-snapshot marker scan failed: ${error instanceof Error ? error.message : error}`
+        `staged-snapshot marker scan failed: ${error instanceof Error ? error.message : error}`,
+        'scan_failed'
       );
     }
     if (!scan.clean) {
       const h = scan.hits[0];
-      return fail(`leak marker: ${h.marker} at ${h.path}:${h.line} (staged snapshot)`);
+      return fail(
+        `leak marker: ${h.marker} at ${h.path}:${h.line} (staged snapshot)`,
+        'leak_marker'
+      );
     }
   }
 
