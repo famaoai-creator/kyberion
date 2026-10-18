@@ -11,13 +11,8 @@
 import * as path from 'node:path';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { logger } from '../core.js';
-import {
-  assertSafeRepositoryPath,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-} from '../secure-io.js';
+import { appendJsonLine } from '../foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 
 export interface LessonInput {
@@ -73,7 +68,7 @@ export function appendLesson(opts: {
   safeMkdir(root, { recursive: true });
   const file = domainFilePath(opts.libraryRoot, opts.domain);
   const row: ExperienceEntry = { ...entry, recorded_at: nowIso() };
-  safeAppendFileSync(file, `${JSON.stringify(row)}\n`);
+  appendJsonLine(file, row);
   return file;
 }
 
