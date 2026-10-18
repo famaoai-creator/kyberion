@@ -573,7 +573,11 @@
       "allow_write": []
     },
     "peer_catalog_reader": {
-      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json"],
+      "allow_read": [
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json",
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-tasks.json",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json"
+      ],
       "allow_write": []
     },
     "peer_responder_reader": {
@@ -584,6 +588,16 @@
       ],
       "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
       "allow_write": []
+    },
+    "peer_task_artifact_writer": {
+      "allow_read": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ],
+      "allow_write": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ]
     },
     "metrics_cap_reader": {
       "allow_read": [

@@ -4,6 +4,10 @@ import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
 import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
 import { createPeerConversationResponder } from '@agent/core/mesh/peer-conversation';
 import {
+  handleInboundPeerTaskMessage,
+  isPeerTaskMessage,
+} from '@agent/core/mesh/peer-task-exchange';
+import {
   createPeerAutoReply,
   DEFAULT_PEER_AUTO_REPLY_BACKEND,
 } from '@agent/core/mesh/peer-auto-reply';
@@ -261,6 +265,19 @@ async function main(
       tenantId,
       onMessage: (context) => {
         const { message, envelope } = context;
+        // Typed peer tasks are recorded for local acceptance (or rejected by
+        // the local task catalog); nothing runs on the receive path.
+        if (isPeerTaskMessage(message)) {
+          return {
+            reply: handleInboundPeerTaskMessage({
+              tenantId,
+              localPeerId: peerId,
+              sessionId: context.session.session_id,
+              message,
+              envelope,
+            }),
+          };
+        }
         const candidate = message.metadata?.collaboration_request as MeshRequest | undefined;
         if (!candidate || message.kind !== 'handoff') return autoReply.handleInbound(context);
         if (!tenantId) throw new Error('mesh_collaboration_requires_tenant_id');

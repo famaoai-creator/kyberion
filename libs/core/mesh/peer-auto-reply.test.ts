@@ -59,6 +59,7 @@ import { ClaudeAgentQueryError } from '../provider/claude-agent-query.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { readJsonLines } from '../foundation/json.js';
 
 const TENANT = 'tenant-peer-autoreply';
 const LOCAL = 'peer-autoreply-local';
@@ -692,6 +693,52 @@ describe('peer auto-reply', () => {
     });
     clock += 60 * 60 * 1000 + 1;
     expect(send('B4')).toEqual({ ack: true, reply_job: 'queued' });
+  });
+
+  it('coalesces skipped rows per (sender, session, reason) per hour and stays idempotent', async () => {
+    let clock = Date.parse('2026-10-18T00:05:00.000Z');
+    const { autoReply, generate } = setup({ budgetPerHour: 1, now: () => clock });
+    const send = (id: string, sessionId = 'PCS-FLOOD') =>
+      autoReply.handleInbound(inbound({ messageId: id, sessionId }))?.reply?.metadata;
+    const ledgerRows = () =>
+      readJsonLines<Record<string, unknown>>(
+        pathResolver.resolve(peerRuntimeLogicalPath(TENANT, LOCAL, 'reply-jobs.jsonl'))
+      ).filter((row) => row.status === 'skipped');
+
+    expect(send('F0')).toEqual({ ack: true, reply_job: 'queued' });
+    // A flood over budget in one session: every message is skipped, one row.
+    for (const id of ['F1', 'F2', 'F3', 'F4', 'F5']) {
+      expect(send(id)).toEqual({ ack: true, reply_job: 'skipped' });
+    }
+    expect(ledgerRows().map((row) => row.message_id)).toEqual(['F1']);
+    expect(autoReply.listJobs()).toHaveLength(2);
+
+    // Another session is a separate coalescing bucket.
+    expect(send('G1', 'PCS-FLOOD-2')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(send('G2', 'PCS-FLOOD-2')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(ledgerRows().map((row) => row.message_id)).toEqual(['F1', 'G1']);
+
+    // Re-delivery of a coalesced message stays skipped even once budget frees up.
+    clock += 60 * 60 * 1000;
+    expect(send('F3')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(send('F1')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(ledgerRows()).toHaveLength(2);
+    await autoReply.runOnce();
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(autoReply.listJobs().filter((job) => job.status !== 'skipped')).toHaveLength(1);
+
+    // The next window gets its own row for the same bucket.
+    expect(send('F6')).toEqual({ ack: true, reply_job: 'queued' });
+    expect(send('F7')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(send('F8')).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(ledgerRows().map((row) => row.message_id)).toEqual(['F1', 'G1', 'F7']);
+
+    // A restarted instance still answers the recorded skip idempotently.
+    const restarted = setup({ budgetPerHour: 1, now: () => clock }).autoReply;
+    expect(
+      restarted.handleInbound(inbound({ messageId: 'F7', sessionId: 'PCS-FLOOD' }))?.reply?.metadata
+    ).toEqual({ ack: true, reply_job: 'skipped' });
+    expect(ledgerRows()).toHaveLength(3);
   });
 
   it('recovers stale leases on every pass and fails exhausted generations', async () => {

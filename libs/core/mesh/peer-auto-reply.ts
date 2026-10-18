@@ -12,6 +12,9 @@
  * `metadata.auto_turn` cap, a per-(sender, session) cap on reply jobs counted
  * from the ledger, and a rolling per-remote-peer hourly generation budget
  * (which also bounds a peer that rotates session ids to dodge the session cap).
+ * Messages refused by a cap or the budget are coalesced into at most one
+ * `skipped` row per (sender, session, reason) per hour, so a flooding peer
+ * cannot grow the ledger without bound.
  *
  * Single-writer assumption: exactly one auto-reply instance (one peer
  * conversation server process) owns the ledger of a given local peer. The
@@ -65,6 +68,15 @@ const INBOUND_MAX_CHARS = 4000;
 const KNOWLEDGE_TOPIC_MAX_CHARS = 500;
 const DELIVERY_TIMEOUT_MS = 10_000;
 const BUDGET_WINDOW_MS = 60 * 60 * 1000;
+/**
+ * Skipped inbound messages are coalesced into at most one ledger row per
+ * (sender, session, reason) per fixed window of this length, so a peer that
+ * keeps hitting a cap cannot grow the ledger (and the in-memory index) without
+ * bound.
+ */
+const SKIP_COALESCE_WINDOW_MS = 60 * 60 * 1000;
+/** Bound on the in-memory set that keeps coalesced skips idempotent. */
+const COALESCED_SKIP_KEYS_MAX = 4096;
 /** Job states that represent a reply sent or on its way (session cap). */
 const SESSION_CAP_STATUSES = new Set<PeerReplyJobStatus>([
   'queued',
@@ -538,6 +550,13 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
 
   /** In-memory latest-per-key index (single writer per local peer; see header). */
   let index: Map<string, PeerReplyJob> | undefined;
+  /**
+   * Keys of skipped messages coalesced into an earlier skipped row (no ledger
+   * row of their own), so a re-delivery in this process is answered the same
+   * way. Insertion-ordered and bounded; after a restart a re-delivered
+   * coalesced message is re-evaluated and, while its cap holds, coalesced again.
+   */
+  const coalescedSkipKeys = new Set<string>();
   const controllers = new Map<string, AbortController>();
   const inflight = new Set<string>();
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -882,6 +901,9 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
         `Already ${existing.status} for reply by ${localPeerId}`
       );
     }
+    if (coalescedSkipKeys.has(key)) {
+      return ackReply(context, 'skipped', `Already skipped for reply by ${localPeerId}`);
+    }
 
     const sessionId = context.session.session_id;
     const inboundAutoTurn = autoTurnOf(message.metadata);
@@ -897,19 +919,35 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
       enqueued_at: at,
       updated_at: at,
     };
+    // Counted from the durable ledger, not the (truncated) transcript.
+    const senderJobs = Array.from(jobs().values()).filter((job) => job.sender_peer_id === sender);
     const skip = (reason: string) => {
-      append({
-        ...base,
-        inbound_text: '',
-        inbound_auto_turn: inboundAutoTurn,
-        status: 'skipped',
-        reason,
-      });
+      const windowIndex = Math.floor(now() / SKIP_COALESCE_WINDOW_MS);
+      const coalesced = senderJobs.some(
+        (job) =>
+          job.status === 'skipped' &&
+          job.session_id === sessionId &&
+          job.reason === reason &&
+          Math.floor(Date.parse(job.enqueued_at) / SKIP_COALESCE_WINDOW_MS) === windowIndex
+      );
+      if (coalesced) {
+        coalescedSkipKeys.add(key);
+        if (coalescedSkipKeys.size > COALESCED_SKIP_KEYS_MAX) {
+          const oldest = coalescedSkipKeys.values().next().value;
+          if (oldest !== undefined) coalescedSkipKeys.delete(oldest);
+        }
+      } else {
+        append({
+          ...base,
+          inbound_text: '',
+          inbound_auto_turn: inboundAutoTurn,
+          status: 'skipped',
+          reason,
+        });
+      }
       return ackReply(context, 'skipped', `Auto-reply limit reached for ${localPeerId}`);
     };
 
-    // Counted from the durable ledger, not the (truncated) transcript.
-    const senderJobs = Array.from(jobs().values()).filter((job) => job.sender_peer_id === sender);
     const sessionReplies = senderJobs.filter(
       (job) => job.session_id === sessionId && SESSION_CAP_STATUSES.has(job.status)
     ).length;
