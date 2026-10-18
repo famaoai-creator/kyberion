@@ -12,7 +12,8 @@ func emit(_ value: [String: Any]) {
 func captureState(_ type: AVMediaType) -> String {
   switch AVCaptureDevice.authorizationStatus(for: type) {
   case .authorized: return "granted"
-  case .denied, .restricted: return "denied"
+  case .denied: return "denied"
+  case .restricted: return "restricted" // MDM / Screen Time: not changeable by the operator
   case .notDetermined: return "not_determined"
   @unknown default: return "unsupported"
   }

@@ -266,6 +266,15 @@ function probeAudioPermission(
       { reasonCode: 'MICROPHONE_PERMISSION_NOT_DETERMINED', data }
     );
   }
+  if (native?.microphone === 'restricted') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone access is restricted by a device policy${hostApp ? ` for ${hostApp}` : ''}`,
+      'Ask the device administrator to allow microphone access (MDM profile or Screen Time); System Settings cannot change it',
+      { reasonCode: 'MICROPHONE_PERMISSION_RESTRICTED', data }
+    );
+  }
   if (native?.microphone === 'denied') {
     return item(
       'audio.permission',

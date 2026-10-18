@@ -16,7 +16,7 @@ import type { FocusedInputState } from './apple-event-bridge.js';
 import type { MouseOperation } from './virtual/os-automation-platform.js';
 
 export type MacOSPermissionState =
-  'granted' | 'denied' | 'not_determined' | 'unsupported' | 'unknown';
+  'granted' | 'denied' | 'restricted' | 'not_determined' | 'unsupported' | 'unknown';
 export interface MacOSNativeAutomationAvailability {
   available: boolean;
   automation: MacOSPermissionState;
@@ -175,7 +175,7 @@ export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability 
       throw new Error('native_response_invalid');
     const capture = (key: 'microphone' | 'camera'): MacOSPermissionState =>
       typeof value[key] === 'string' &&
-      ['granted', 'denied', 'not_determined', 'unsupported', 'unknown'].includes(
+      ['granted', 'denied', 'restricted', 'not_determined', 'unsupported', 'unknown'].includes(
         value[key] as string
       )
         ? (value[key] as MacOSPermissionState)
