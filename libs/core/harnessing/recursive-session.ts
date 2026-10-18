@@ -62,7 +62,9 @@ export interface RoundRecord {
   decision: DecisionReport;
   selection: BlindRecommendation | null;
   outcomes: RunOutcome[];
+  /** Cumulative — includes rejections from earlier rounds (session-level trail). */
   rejected: Array<{ label: string; path: string; reason: string }>;
+  propose_meta?: { backend_used: boolean; error?: string };
 }
 
 export interface RecursiveSessionResult {
@@ -70,8 +72,18 @@ export interface RecursiveSessionResult {
   rounds: RoundRecord[];
   final_decision: DecisionReport;
   adopted_overlays: string[];
+  /** 'budget' is the defensive default — every in-loop path currently sets a concrete halt before break, so it should never appear in a real report. */
   halted_by: 'budget' | 'human_gate' | 'keep_base' | 'decline' | 'auto_advance_final';
   budget: { expected_probes: number; actual_probes: number; status: 'ok' | 'short' | 'exceeded' };
+}
+
+function sessionHash(id: string): number {
+  let h = 2166136261;
+  for (const ch of id) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
 function copyTreeInto(src: string, dst: string): void {
@@ -104,6 +116,20 @@ export async function runRecursiveSession(
   }
   if (!labels.length && !spec.propose) {
     throw new Error('[RECURSIVE_SESSION] candidates or --propose required');
+  }
+  if (spec.propose && !spec.surface) {
+    throw new Error('[RECURSIVE_SESSION] --propose requires a surface spec');
+  }
+  // Predict proposed labels and reject collisions before spending backend calls.
+  if (spec.propose) {
+    const predicted = Array.from(
+      { length: spec.propose.count },
+      (_, i) => `${spec.propose!.labelPrefix ?? 'llm'}${i + 1}`
+    );
+    const all = [...labels, ...predicted];
+    if (new Set(all).size !== all.length) {
+      throw new Error('[RECURSIVE_SESSION] supplied label collides with predicted proposed labels');
+    }
   }
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
@@ -138,6 +164,7 @@ export async function runRecursiveSession(
   for (let round = 1; round <= spec.rounds; round++) {
     const roundRoot = path.join(runRoot, `round-${round}`);
     // Round-scoped run dirs: no cross-round or cross-session contamination.
+    let roundProposeMeta: RoundRecord['propose_meta'];
     const candidates = [...supplied];
     if (spec.propose && spec.surface) {
       const proposed = await proposeCandidates({
@@ -151,6 +178,10 @@ export async function runRecursiveSession(
       candidates.push(
         ...proposed.candidates.map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
       );
+      roundProposeMeta = {
+        backend_used: proposed.backend_used,
+        ...(proposed.error ? { error: proposed.error } : {}),
+      };
     }
 
     // Budget identity: check duplicate labels BEFORE counting probes.
@@ -182,6 +213,7 @@ export async function runRecursiveSession(
         selection: null,
         outcomes: [],
         rejected: [...rejected],
+        ...(roundProposeMeta ? { propose_meta: roundProposeMeta } : {}),
       });
       halted = 'decline';
       break;
@@ -197,9 +229,8 @@ export async function runRecursiveSession(
       spec.selection === 'blind' && decision.decision === 'human_gate'
         ? applyBlindSelection(
             [base, ...outcomes],
-            (spec.seed ?? 0) + round,
-            spec.selector ?? metricsFallbackSelector,
-            spec.selector ? 'llm_blind' : 'metrics_fallback'
+            (spec.seed ?? sessionHash(spec.session_id)) + round,
+            spec.selector ?? metricsFallbackSelector
           )
         : null;
 
@@ -210,10 +241,11 @@ export async function runRecursiveSession(
       selection,
       outcomes,
       rejected: [...rejected],
+      ...(roundProposeMeta ? { propose_meta: roundProposeMeta } : {}),
     });
 
     if (decision.decision === 'auto_advance' && decision.winner) {
-      adopted.push(decision.winner);
+      adopted.push(`r${round}:${decision.winner}`);
       if (round === spec.rounds) {
         halted = 'auto_advance_final';
         break;
@@ -253,6 +285,7 @@ export async function runRecursiveSession(
     adopted_overlays: adopted,
     halted_by: halted,
     budget,
+    ...(spec.work_shape ? { work_shape: spec.work_shape } : {}),
   };
   const reportPath = assertSafeRepositoryPath(path.join(runRoot, 'report.json'), {
     allowMissingLeaf: true,

@@ -28,7 +28,7 @@ const USAGE =
   'Usage: contrastive_probe --scenario <dir> --run-root <dir> --command "<argv>" ' +
   '[--candidate <label>=<dir> | --propose <n> --brief <text> --surface <spec.json>] ' +
   '[--expect <rel>] [--metric <key>:lower|higher] [--select blind] ' +
-  '[--seed <n>] [--work-shape <name>]';
+  '[--seed <n>] [--rounds <n>] [--work-shape <name>]';
 
 function parseSeed(raw: string): number {
   const n = Number(raw);
