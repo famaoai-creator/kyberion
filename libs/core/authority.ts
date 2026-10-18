@@ -55,6 +55,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_token_registry_reader: 'worker',
   scope_locale_reader: 'worker',
   peer_catalog_reader: 'worker',
+  peer_responder_reader: 'worker',
   metrics_cap_reader: 'worker',
   audit_mirror_writer: 'worker',
   service_actuator: 'worker',
