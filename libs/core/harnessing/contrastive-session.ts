@@ -269,6 +269,7 @@ export async function runContrastiveSession(
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
+    staged_expected: [],
     error: 'no eligible candidates — base probe skipped',
     recorded_at: '',
   };

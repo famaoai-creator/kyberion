@@ -17,7 +17,11 @@ export interface DecisionReport {
   decision: ProbeDecision;
   winner: string | null;
   rationale: string;
-  decisive_evidence: Array<{ label: string; delivered: boolean; metrics: Record<string, number> }>;
+  decisive_evidence: Array<{
+    label: string;
+    delivered: boolean;
+    metrics: Record<string, number | null>;
+  }>;
   auto_advance_allowed: boolean;
   /** Declared metrics that resolved to null on every outcome — the axis
    *  judged nothing with them, so the report must not imply it did. */

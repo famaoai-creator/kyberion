@@ -81,7 +81,12 @@ export interface RecursiveSessionResult {
   adopted_overlays: string[];
   /** 'budget' is the defensive default — every in-loop path currently sets a concrete halt before break, so it should never appear in a real report. */
   halted_by: 'budget' | 'human_gate' | 'keep_base' | 'decline' | 'auto_advance_final';
-  budget: { expected_probes: number; actual_probes: number; status: 'ok' | 'short' | 'exceeded' };
+  budget: {
+    expected_probes: number;
+    planned_probes: number;
+    actual_probes: number;
+    status: 'ok' | 'short' | 'exceeded';
+  };
 }
 
 export async function runRecursiveSession(
@@ -224,6 +229,11 @@ export async function runRecursiveSession(
         ...(spec.propose.library ? { library: spec.propose.library } : {}),
       });
       rejected.push(...proposed.rejected.map((r) => ({ ...r, label: `r${round}:${r.label}` })));
+      // Mirror contrastive-session: a degraded empty propose run is recorded
+      // in the rejection trail, not only in propose_meta.
+      if (proposed.error && !proposed.candidates.length) {
+        rejected.push({ label: `r${round}:propose`, path: '.', reason: proposed.error });
+      }
       candidates.push(
         ...proposed.candidates
           .filter((c) => !rejectOnMarkers(`r${round}:${c.label}`, c.overlayDir))
@@ -308,17 +318,29 @@ export async function runRecursiveSession(
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
       const resolvedWinner = path.resolve(assertSafeRepositoryPath(winner.overlayDir));
       const resolvedNext = path.resolve(nextBase);
+      const resolvedCurrent = path.resolve(currentBase);
       if (
         resolvedNext === resolvedWinner ||
-        resolvedNext.startsWith(`${resolvedWinner}${path.sep}`)
+        resolvedNext.startsWith(`${resolvedWinner}${path.sep}`) ||
+        resolvedNext === resolvedCurrent ||
+        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`)
       ) {
-        throw new Error(
-          `[RECURSIVE_SESSION] winner overlay ${JSON.stringify(winner.overlayDir)} contains the next base dir`
-        );
+        throw new Error(`[RECURSIVE_SESSION] next base dir would nest inside its copy sources`);
       }
-      if (safeExistsSync(nextBase)) safeRmSync(nextBase);
-      copyTree(currentBase, nextBase);
-      copyTree(winner.overlayDir, nextBase);
+      try {
+        if (safeExistsSync(nextBase)) safeRmSync(nextBase);
+        copyTree(currentBase, nextBase);
+        copyTree(winner.overlayDir, nextBase);
+      } catch (error) {
+        // Fail soft — the rounds already probed are evidence; don't lose them.
+        rejected.push({
+          label: `r${round}:${decision.winner}`,
+          path: '.',
+          reason: `materialization failed: ${error instanceof Error ? error.message : error}`,
+        });
+        halted = 'decline';
+        break;
+      }
       currentBase = nextBase;
       continue;
     }
