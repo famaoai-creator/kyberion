@@ -2,10 +2,11 @@
  * `pnpm kyberion read <file> [--ocr] [--json] [--out <file>]`
  *
  * The one-line way for any agent (Claude, Codex, Gemini, …) to read a
- * pdf / pptx / docx / xlsx / html / markdown / text file through the actuator
- * stack instead of writing its own unzip / pdftotext / python script. Delegates to the shared document
- * reader (@agent/core/document-reader) — the same path media:document_digest
- * and the ingest ceremony use — and prints Markdown (or JSON) to stdout.
+ * pdf / pptx / docx / xlsx / html / markdown / text / csv / tsv / json / yaml
+ * file through the actuator stack instead of writing its own unzip /
+ * pdftotext / python script. Delegates to the shared document reader
+ * (@agent/core/document-reader) — the same path media:document_digest and the
+ * ingest ceremony use — and prints Markdown (or JSON) to stdout.
  *
  * Inputs must live inside the repository (the sandbox boundary is not
  * widened): a file elsewhere is refused with the copy-in instruction. URLs are
@@ -25,7 +26,8 @@ import { ScriptExitError } from './lib/harness.js';
 export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
 
 Reads a ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(' / ')} file with the native engines and prints Markdown.
-HTML is converted to Markdown (<title> as the heading; scripts/styles dropped); Markdown / text are printed as-is.
+HTML → Markdown (<title> as heading; scripts/styles dropped). Markdown / text / yaml as-is.
+JSON is pretty-printed when valid. Small csv/tsv become Markdown tables (large ones stay as-is).
   --ocr         Also OCR embedded images (slides/pages/pictures; pdf/pptx/docx); local_only is the default
   --tier <tier> Classify OCR input as public, confidential, or personal (PII may remain in that tier)
   --tenant <slug> Tenant owning classified input; required for approved external egress
@@ -149,7 +151,7 @@ export async function runReadCommand(
       1,
       `[read] unsupported file type "${path.extname(absolute) || '(none)'}". ` +
         `Readable: ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(', ')}. ` +
-        'Other text formats (source code, JSON, CSV, …) can be read directly.'
+        'Source code and other text can be opened with the editor; binary formats need a dedicated verb (see / listen / watch).'
     );
   }
   if (args.images && !isInsideRepository(pathResolver.rootResolve(args.images))) {

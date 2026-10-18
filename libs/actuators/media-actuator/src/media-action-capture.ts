@@ -670,8 +670,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         const markdown = safeReadFile(filePath, { encoding: 'utf8' });
         return { ...ctx, [exportKey]: markdown };
       }
-      // pdf / pptx / docx / xlsx / html (and .markdown): the shared document
-      // reader — the same path as `pnpm kyberion read` and the ingest ceremony.
+      // pdf / pptx / docx / xlsx / html / markdown / csv / json / yaml: the
+      // shared document reader — same path as `pnpm kyberion read` / ingest.
       const format = inferDocumentFormat(filePath);
       if (!format) throw new Error(`document_digest: unsupported format "${ext}"`);
       const ocr = pdfOcrOptions(params);

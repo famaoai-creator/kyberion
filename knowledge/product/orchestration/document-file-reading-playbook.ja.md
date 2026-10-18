@@ -4,14 +4,14 @@ category: Orchestration
 tags: [orchestration, media-actuator, ingest-actuator, pdf, pptx, xlsx, docx, ocr, ingest]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-25
+last_updated: 2026-10-18
 role_affinity: [ecosystem_architect, knowledge_steward, researcher, analyst, mission_controller]
 phase_affinity: [alignment, execution]
 ---
 
 # ドキュメントファイル読み取りプレイブック
 
-エージェントが Office 文書や PDF を**読む**とき（質問に答える・要約する・`knowledge/` に取り込む）に、どのエンジンを使うか。そして誤った手段を選んだときに時間を失う罠をまとめる。`read` は `.html` / `.htm` / `.md` / `.txt` も読む（URL は拒否。先に `network:fetch` で保存する）。画像・音声・動画には専用コマンド（`see` / `listen` / `watch`）がある — [perception-playbook.ja.md](./perception-playbook.ja.md) を参照。正本は英語版 [document-file-reading-playbook.md](./document-file-reading-playbook.md)。
+エージェントが Office 文書や PDF を**読む**とき（質問に答える・要約する・`knowledge/` に取り込む）に、どのエンジンを使うか。そして誤った手段を選んだときに時間を失う罠をまとめる。`read` は `.html` / `.htm` / `.md` / `.txt` / `.csv` / `.tsv` / `.json` / `.yaml` / `.yml` も読む（URL は拒否。先に `network:fetch` で保存する）。テキスト由来の形式は読みやすいテキストのまま扱う（md/txt/yaml はそのまま、JSON は妥当なら整形、小さな csv/tsv は Markdown 表、大きいものは原文＋警告）。画像・音声・動画には専用コマンド（`see` / `listen` / `watch`）がある — [perception-playbook.ja.md](./perception-playbook.ja.md) を参照。正本は英語版 [document-file-reading-playbook.md](./document-file-reading-playbook.md)。
 
 ## 1. まず目的を決める
 
