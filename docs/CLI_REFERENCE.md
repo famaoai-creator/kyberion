@@ -23,34 +23,34 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 ### Inspect
 
-| Command                                 | pnpm script | What it does                                                  |
-| --------------------------------------- | ----------- | ------------------------------------------------------------- |
-| `pnpm kyberion artifact`                |             | Inspect a generated artifact                                  |
-| `pnpm kyberion calendar agenda`         |             | Show upcoming agenda                                          |
-| `pnpm kyberion calendar freebusy`       |             | Show free/busy slots                                          |
-| `pnpm kyberion calendar list-calendars` |             | List available calendars                                      |
-| `pnpm kyberion calendar status`         |             | Show calendar connection status                               |
-| `pnpm kyberion deals`                   |             | List deals and inspect captured requirements                  |
-| `pnpm kyberion diff`                    |             | Compare the design of two documents                           |
-| `pnpm kyberion email latest-draft`      |             | Show the latest email draft                                   |
-| `pnpm kyberion email status`            |             | Show email connection and workflow status                     |
-| `pnpm kyberion examples`                |             | Show runnable actuator examples                               |
-| `pnpm kyberion improvements`            |             | Review improvement candidates                                 |
-| `pnpm kyberion inbox`                   |             | Review and accept deliverables in the inbox                   |
-| `pnpm kyberion info`                    |             | Show details for one actuator                                 |
-| `pnpm kyberion list`                    |             | List actuators (--check probes runtime capability)            |
-| `pnpm kyberion listen`                  |             | Transcribe audio                                              |
-| `pnpm kyberion memory`                  |             | Inspect or capture operator memory                            |
-| `pnpm kyberion mobile-profiles`         |             | List or inspect shared mobile app profiles                    |
-| `pnpm kyberion open-artifact`           |             | Open a generated artifact in the OS viewer                    |
-| `pnpm kyberion preview`                 |             | Validate a pipeline JSON and show its step tree               |
-| `pnpm kyberion read`                    |             | Read a document (pdf, pptx, docx, xlsx, html, md) as Markdown |
-| `pnpm kyberion recording`               |             | Inspect the intent and steps reconstructed from a recording   |
-| `pnpm kyberion schedule list`           |             | List scheduled pipelines                                      |
-| `pnpm kyberion search`                  |             | Search actuators by keyword                                   |
-| `pnpm kyberion see`                     |             | Describe an image                                             |
-| `pnpm kyberion watch`                   |             | Summarize a video                                             |
-| `pnpm kyberion web-profiles`            |             | List or inspect shared web app profiles                       |
+| Command                                 | pnpm script | What it does                                                                        |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| `pnpm kyberion artifact`                |             | Inspect a generated artifact                                                        |
+| `pnpm kyberion calendar agenda`         |             | Show upcoming agenda                                                                |
+| `pnpm kyberion calendar freebusy`       |             | Show free/busy slots                                                                |
+| `pnpm kyberion calendar list-calendars` |             | List available calendars                                                            |
+| `pnpm kyberion calendar status`         |             | Show calendar connection status                                                     |
+| `pnpm kyberion deals`                   |             | List deals and inspect captured requirements                                        |
+| `pnpm kyberion diff`                    |             | Compare the design of two documents                                                 |
+| `pnpm kyberion email latest-draft`      |             | Show the latest email draft                                                         |
+| `pnpm kyberion email status`            |             | Show email connection and workflow status                                           |
+| `pnpm kyberion examples`                |             | Show runnable actuator examples                                                     |
+| `pnpm kyberion improvements`            |             | Review improvement candidates                                                       |
+| `pnpm kyberion inbox`                   |             | Review and accept deliverables in the inbox                                         |
+| `pnpm kyberion info`                    |             | Show details for one actuator                                                       |
+| `pnpm kyberion list`                    |             | List actuators (--check probes runtime capability)                                  |
+| `pnpm kyberion listen`                  |             | Transcribe audio                                                                    |
+| `pnpm kyberion memory`                  |             | Inspect or capture operator memory                                                  |
+| `pnpm kyberion mobile-profiles`         |             | List or inspect shared mobile app profiles                                          |
+| `pnpm kyberion open-artifact`           |             | Open a generated artifact in the OS viewer                                          |
+| `pnpm kyberion preview`                 |             | Validate a pipeline JSON and show its step tree                                     |
+| `pnpm kyberion read`                    |             | Read a document (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown |
+| `pnpm kyberion recording`               |             | Inspect the intent and steps reconstructed from a recording                         |
+| `pnpm kyberion schedule list`           |             | List scheduled pipelines                                                            |
+| `pnpm kyberion search`                  |             | Search actuators by keyword                                                         |
+| `pnpm kyberion see`                     |             | Describe an image                                                                   |
+| `pnpm kyberion watch`                   |             | Summarize a video                                                                   |
+| `pnpm kyberion web-profiles`            |             | List or inspect shared web app profiles                                             |
 
 ### Operate
 
