@@ -630,7 +630,7 @@ function receiptRejection(
   const pending = listPeerTasks(context.tenantId, context.localPeerId, {
     direction: 'inbound',
     state: 'pending',
-  }).filter((task) => task.remote_peer_id === remotePeerId);
+  }).filter((task) => task.remote_peer_id === remotePeerId && !isExpired(task, now));
   if (pending.length >= MAX_PENDING_PER_PEER) return 'too_many_pending';
   return undefined;
 }
@@ -818,14 +818,25 @@ function executionOwner(entry: PeerTaskCatalogEntry): NonNullable<PeerTaskRecord
 }
 
 /**
- * Whether another runner may still be executing this task: its process is
- * alive on this host, or (other host / unknown) its deadline has not passed.
+ * Whether another runner may still be executing this task. A runner on this
+ * host is live while its process is alive; its executor child is not
+ * detached but can outlive a killed parent, so a dead parent before the
+ * deadline is still treated as possibly live (resume needs --force).
  */
 function executionMayBeLive(record: PeerTaskRecord, now = Date.now()): boolean {
   const execution = record.execution;
   if (!execution) return false;
-  if (execution.host === os.hostname()) return isPidAlive(execution.pid);
+  if (execution.host === os.hostname() && isPidAlive(execution.pid)) return true;
   return Date.parse(execution.deadline_at) > now;
+}
+
+/** Whether `resume --force` may take over a possibly-live runner. */
+function forceTakeoverAllowed(record: PeerTaskRecord, now = Date.now()): boolean {
+  const execution = record.execution;
+  if (!execution) return true;
+  if (Date.parse(execution.deadline_at) <= now) return true;
+  // Before the deadline only a runner whose process is gone may be taken over.
+  return execution.host === os.hostname() && !isPidAlive(execution.pid);
 }
 
 /**
@@ -919,9 +930,7 @@ export async function resumePeerTask(
       throw new Error(`peer_task_not_resumable:${record.task_id}:${record.state}`);
     }
     if (executionMayBeLive(record)) {
-      const pastDeadline =
-        record.execution && Date.parse(record.execution.deadline_at) <= Date.now();
-      if (!(input.force && pastDeadline)) {
+      if (!(input.force && forceTakeoverAllowed(record))) {
         throw new Error(
           `peer_task_still_running:${record.task_id} — pid ${record.execution?.pid} on ${record.execution?.host} until ${record.execution?.deadline_at}`
         );
