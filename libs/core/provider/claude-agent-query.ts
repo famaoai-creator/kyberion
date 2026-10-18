@@ -24,7 +24,17 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES } from './claude-native-subagent.js';
+import {
+  buildProviderChildEnv,
+  PROVIDER_ENV_ALLOWLIST_ESCAPE_HATCH_VAR,
+} from './provider-permission-profiles.js';
+import { logger } from '../core.js';
 import { metrics } from '../metrics.js';
+import { childDelegationEnv } from '../operation-policy-gate.js';
+import {
+  createScratchWorkspace,
+  deleteRegisteredWorkspace,
+} from '../workforce/workspace-ledger.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 
@@ -86,7 +96,18 @@ export interface ClaudeAgentQueryParams<T> {
   extraOptions?: Partial<Options>;
   /** Metrics component label for usage attribution. Default 'reasoning:claude-agent'. */
   metricsLabel?: string;
+  /**
+   * `'strict'` runs the sub-agent in SDK isolation mode for untrusted prompts
+   * (e.g. peer messages): no filesystem settings (so no repo hooks, CLAUDE.md
+   * or permission rules), no MCP servers / plugins / agents / skills, no
+   * session persistence, a fresh scratch `cwd` outside the checkout, and a
+   * minimal env with no KYBERION_* runtime state. Omitted = legacy behaviour.
+   */
+  isolation?: ClaudeAgentIsolation;
 }
+
+/** Isolation level for {@link runClaudeAgentQuery}. */
+export type ClaudeAgentIsolation = 'strict';
 
 export interface ClaudeAgentQueryResult<T> {
   parsed: T;
@@ -132,6 +153,72 @@ function sanitizeClaudeAgentExtraOptions(extraOptions?: Partial<Options>): Parti
   return sanitized as Partial<Options>;
 }
 
+/** Env prefixes dropped under strict isolation (Kyberion runtime state, mission authority). */
+const STRICT_ISOLATION_DROPPED_ENV_PREFIXES = ['KYBERION_', 'MISSION_'] as const;
+
+/**
+ * Minimal env for a strictly isolated sub-agent. Starts from the same XP-02
+ * allowlist the claude-cli backend spawns with (`buildProviderChildEnv`:
+ * PATH/HOME/USER/locale/shell/tmp/proxy+CA plumbing and only claude's own
+ * `ANTHROPIC_API_KEY`; HOME/USER keep the CLI's OAuth keychain/credentials
+ * reachable), ignores the full-inheritance escape hatch, then drops every
+ * KYBERION_* / MISSION_* var — the isolated child is not Kyberion-aware, and
+ * those vars (peer shared secrets, mission/session ids, co-session state)
+ * would let it find or act on the operator session. Only the delegation
+ * depth is re-added so recursion guards still see the hop.
+ */
+export function buildClaudeAgentIsolatedEnv(
+  baseEnv: NodeJS.ProcessEnv = process.env
+): Record<string, string> {
+  const base = { ...baseEnv };
+  delete base[PROVIDER_ENV_ALLOWLIST_ESCAPE_HATCH_VAR];
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(
+    buildProviderChildEnv({ provider: 'claude', baseEnv: base })
+  )) {
+    if (value === undefined) continue;
+    if (STRICT_ISOLATION_DROPPED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+    env[key] = value;
+  }
+  return { ...env, ...childDelegationEnv() };
+}
+
+interface IsolationScope {
+  options: Partial<Options>;
+  release(): void;
+}
+
+function openIsolationScope(isolation: ClaudeAgentIsolation | undefined): IsolationScope | null {
+  if (isolation !== 'strict') return null;
+  const workspace = createScratchWorkspace({});
+  let released = false;
+  return {
+    options: {
+      settingSources: [],
+      mcpServers: {},
+      strictMcpConfig: true,
+      plugins: [],
+      hooks: {},
+      agents: {},
+      skills: [],
+      persistSession: false,
+      cwd: workspace.path,
+      env: buildClaudeAgentIsolatedEnv(),
+    },
+    release: () => {
+      if (released) return;
+      released = true;
+      try {
+        deleteRegisteredWorkspace(workspace.id);
+      } catch (error) {
+        logger.warn(
+          `[claude-agent-query] isolated scratch cleanup failed — ${(error as Error).message} | next: workspace reclaim sweeps it | evidence: ${workspace.path}`
+        );
+      }
+    },
+  };
+}
+
 export class ClaudeAgentQueryError extends Error {
   constructor(
     message: string,
@@ -158,8 +245,24 @@ export async function runClaudeAgentQuery<T>(
   // object; drop the $schema header to keep the surface minimal.
   if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
 
+  const isolation = openIsolationScope(params.isolation);
+  try {
+    return await runStructuredQuery(params, jsonSchema, isolation?.options);
+  } finally {
+    isolation?.release();
+  }
+}
+
+async function runStructuredQuery<T>(
+  params: ClaudeAgentQueryParams<T>,
+  jsonSchema: Record<string, unknown>,
+  isolationOptions: Partial<Options> | undefined
+): Promise<ClaudeAgentQueryResult<T>> {
   const options: Options = {
     ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
+    // Isolation fields are applied after sanitization, so extraOptions can
+    // never re-introduce settings, MCP servers, cwd or env.
+    ...(isolationOptions ?? {}),
     systemPrompt: params.systemPrompt,
     model: params.model ?? resolveRuntimeModelId('anthropic-default'),
     tools: [],
