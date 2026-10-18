@@ -302,6 +302,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "peer_responder_reader": {
+      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, and writes nothing (persona worker).",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal"]
+    },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
       "default_persona": "qa_lead",
