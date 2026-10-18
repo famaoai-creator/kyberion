@@ -15,6 +15,38 @@ codebase's registration ceremonies, platform traps, and verification order.
 
 ---
 
+## Extension boundaries — keep policy out of mechanism
+
+Use the boundary vocabulary precisely:
+
+- A **seam** is the typed contract the stable caller depends on. It names the
+  capability and its inputs/outputs without selecting an implementation.
+- An **adapter** implements that contract for one external system, provider,
+  or host platform. Environment-specific commands, protocols, and lifecycle
+  behavior belong here.
+- A **resolver/registry** selects an eligible adapter at the composition
+  boundary. Adding a supported implementation may require registration here;
+  it must not add provider/platform conditionals to the core orchestration
+  loop.
+- A **facade** gives callers a stable, domain-level operation and hides
+  composition and lower-level coordination. It is not a substitute name for
+  every interface or adapter.
+
+When extending a capability, first look for an existing seam and follow its
+resolver and registration ceremony. Keep orchestration expressed in terms of
+the seam. A new implementation should normally add an adapter and its
+registration, while the caller remains unchanged. Prefer data-driven
+capability declarations when implementations can be described as data; use
+typed adapters when behavior or lifecycle differs. Do not create a registry
+solely to disguise a conditional if there is only one invariant
+implementation.
+
+For example, `scripts/continuous_owner_process.ts` supervises a process through
+the `ContinuousOwnerPlatformAdapter` seam. POSIX process-group handling and the
+Windows Job Object wrapper live in platform adapters; the resolver maps the
+host platform to an adapter. Supporting another platform requires an adapter
+and a resolver entry, not edits to the supervision loop.
+
 ## 1. Registration ceremonies — additions are not done until registered
 
 This repo guards its boundaries with contract tests. Adding code without the

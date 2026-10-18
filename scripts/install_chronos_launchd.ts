@@ -11,8 +11,7 @@
  *
  * Platform support goes through libs/core/daemon/service-manager.ts:
  * macOS → launchd LaunchAgent, Linux → systemd --user unit (+ .timer for
- * interval jobs). Windows has no user-daemon story here — DEPLOYMENT.md
- * routes Windows daemons through the surface commands instead.
+ * interval jobs), Windows → per-user Task Scheduler task.
  *
  * Modes:
  *   pnpm kyberion scheduler install                 # dry-run: print unit + exact steps
