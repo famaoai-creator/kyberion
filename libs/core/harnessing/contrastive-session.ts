@@ -94,7 +94,17 @@ export async function runContrastiveSession(
   // Validate the probe spec before any backend spend — a bad command or
   // traversal expectOutputs must not surface only after LLM proposals ran.
   validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
+  const scen = path.resolve(spec.scenarioDir);
+  const resolvedRoot = path.resolve(runRoot);
+  if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[CONTRASTIVE_SESSION] runRoot must not equal or be nested inside scenarioDir (workspace would be polluted before the first probe)'
+    );
+  }
   safeMkdir(runRoot, { recursive: true });
+  // Freeze the library horizon at session start — mid-run appends must not
+  // change proposals (retain causal order = reproducibility).
+  const libraryAsOf = nowIso();
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
   let propose_meta: { backend_used: boolean; error?: string } | undefined;
@@ -139,7 +149,7 @@ export async function runContrastiveSession(
       count: spec.propose.count,
       outDir: path.join(runRoot, '_proposed'),
       labelPrefix: spec.propose.labelPrefix,
-      ...(spec.propose.library ? { library: spec.propose.library } : {}),
+      ...(spec.propose.library ? { library: { ...spec.propose.library, asOf: libraryAsOf } } : {}),
     });
     rejected.push(...proposed.rejected);
     // A degraded/empty propose run still yields evidence — record it as a
