@@ -101,6 +101,12 @@ export async function runRecursiveSession(
   spec: RecursiveSessionSpec
 ): Promise<RecursiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  const scen = path.resolve(spec.scenarioDir);
+  if (path.resolve(runRoot).startsWith(`${scen}/`)) {
+    throw new Error(
+      '[RECURSIVE_SESSION] runRoot must not be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   safeMkdir(runRoot, { recursive: true });
   if (!Number.isInteger(spec.rounds) || spec.rounds < 1 || spec.rounds > 10) {
     throw new Error('[RECURSIVE_SESSION] rounds must be an integer 1..10');

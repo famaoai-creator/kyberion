@@ -32,7 +32,7 @@ recursion levels: task-level (refine the harness for the task at hand) and harne
 
 ### 1. Propose–Probe–Compose (task-level recursion)
 
-> **Imported (MSN-PPC-PROBE-20261018 + MSN-PPC-LOOP-20261018)** — `libs/core/harnessing/`: `probe-runner` (isolated overlays), `decision-axis` (auto_advance/human_gate/keep_base/decline), `surface-spec` (editable-surface validation), `blind-select` (seeded anonymized recommendation for human_gate — recommend only), `propose` (LLM overlay generation, surface-validated). CLI: `scripts/contrastive_probe.ts`. Blind selection is a recommendation for the human gate, never a decision — the axis stays the sole auto_advance authority. Recursive multi-round + eval-scenario seam are now implemented (recursive-session.ts, eval-scenario.ts). Remaining below.
+> **Imported (MSN-PPC-PROBE-20261018 + MSN-PPC-LOOP-20261018)** — `libs/core/harnessing/`: `probe-runner` (isolated overlays), `decision-axis` (auto_advance/human_gate/keep_base/decline), `surface-spec` (editable-surface validation), `blind-select` (seeded anonymized recommendation for human_gate — recommend only), `propose` (LLM overlay generation, surface-validated). CLI: `scripts/contrastive_probe.ts`. Blind selection is a recommendation for the human gate, never a decision — the axis stays the sole auto_advance authority. Recursive multi-round is now implemented (recursive-session.ts). Remaining below.
 
 harness2 runs a task under the base harness, lets an editor propose candidate edits on two
 independent dimensions — **INV** (how the agent works: procedure, tool use, completion) and
