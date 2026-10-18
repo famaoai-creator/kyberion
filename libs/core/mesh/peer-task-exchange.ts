@@ -581,7 +581,7 @@ export const runPeerTaskExecutor: PeerTaskExecutorRunner = async (entry, context
   const result = await safeExecResultAsync('pnpm', peerTaskExecutorArgv(entry.executor), {
     cwd: pathResolver.rootDir(),
     timeoutMs: entry.timeout_ms,
-    env: { KYBERION_TENANT: context.tenantId },
+    env: { KYBERION_TENANT: context.tenantId, NO_COLOR: '1' },
   });
   return {
     exit_code: result.status,
@@ -599,16 +599,28 @@ export type PeerTaskArtifactWriter = (input: {
   content: string;
 }) => string;
 
-/** Tenant-scoped report artifact (`active/shared/artifacts/confidential/<tenant>/report/...`). */
+/**
+ * Narrow tenant-bound writer for task results: only
+ * `active/shared/artifacts/confidential/<tenant>/report/peer-tasks/` and that
+ * tenant's artifact index (security-policy.json).
+ */
+export const PEER_TASK_ARTIFACT_WRITER_ROLE = 'peer_task_artifact_writer';
+
+/** Tenant-scoped report artifact (`active/shared/artifacts/confidential/<tenant>/report/peer-tasks/...`). */
 export const writePeerTaskArtifact: PeerTaskArtifactWriter = ({ tenantId, name, content }) =>
-  writeScopedArtifact({
-    scope: { tenant: tenantId },
-    artifact_class: 'report',
-    name,
-    content,
-    format: 'text',
-    role: LEDGER_ROLE,
-  }).repo_relative_path;
+  withExecutionContext(
+    PEER_TASK_ARTIFACT_WRITER_ROLE,
+    () =>
+      writeScopedArtifact({
+        scope: { tenant: tenantId },
+        artifact_class: 'report',
+        name,
+        content,
+        format: 'text',
+      }).repo_relative_path,
+    undefined,
+    tenantId
+  );
 
 export interface DecidePeerTaskInput {
   tenantId: string;
@@ -661,28 +673,52 @@ export async function decidePeerTask(input: DecidePeerTaskInput): Promise<PeerTa
   if ('rejected' in entry)
     throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
 
-  const workItem = createWorkItemIfAbsent({
-    itemId: peerTaskWorkItemId(record.task_id),
-    title: `Peer task ${record.task_type} from ${record.remote_peer_id}`,
-    description: `${record.summary}\n\nPeer task ${record.task_id}; accepted by ${actorId}: ${reason}`,
-    status: 'in_progress',
-    source: 'peer',
-    sourceRef: `peer-task:${record.task_id}`,
-    assigneePeerId: record.local_peer_id,
-    labels: ['peer-task', record.task_type],
-    context: { tenant_slug: input.tenantId, work_shape: 'service_operation' },
-    metadata: {
-      peer_task_id: record.task_id,
-      remote_peer_id: record.remote_peer_id,
-      executor: entry.executor,
-    },
-  });
   record = appendRecord({
     ...record,
     state: 'running',
     decision: { decision: 'accepted', actor_id: actorId, reason, decided_at: decidedAt },
-    work_item_id: workItem.item_id,
   });
+  record = await executeAcceptedPeerTask(input, record, entry);
+  return input.deliver === false ? record : deliverPeerTaskResult({ ...input, record });
+}
+
+/**
+ * Run an accepted task: create (or replay) its WorkItem, run the catalog
+ * executor, store the artifacts, close the WorkItem and record the result.
+ * Idempotent up to the executor run, so an interrupted task can be resumed.
+ */
+async function executeAcceptedPeerTask(
+  input: Omit<DecidePeerTaskInput, 'decision' | 'actorId' | 'reason' | 'deliver'>,
+  accepted: PeerTaskRecord,
+  entry: PeerTaskCatalogEntry
+): Promise<PeerTaskRecord> {
+  let record = accepted;
+  // The tenant registration check runs under the caller's authority; the
+  // tenant-bound catalog reader also grants this tenant's profile, so a plain
+  // operator shell can accept without a broader role.
+  const workItem = withExecutionContext(
+    PEER_CATALOG_READER_ROLE,
+    () =>
+      createWorkItemIfAbsent({
+        itemId: peerTaskWorkItemId(record.task_id),
+        title: `Peer task ${record.task_type} from ${record.remote_peer_id}`,
+        description: `${record.summary}\n\nPeer task ${record.task_id}; accepted by ${record.decision!.actor_id}: ${record.decision!.reason}`,
+        status: 'in_progress',
+        source: 'peer',
+        sourceRef: `peer-task:${record.task_id}`,
+        assigneePeerId: record.local_peer_id,
+        labels: ['peer-task', record.task_type],
+        context: { tenant_slug: input.tenantId, work_shape: 'service_operation' },
+        metadata: {
+          peer_task_id: record.task_id,
+          remote_peer_id: record.remote_peer_id,
+          executor: entry.executor,
+        },
+      }),
+    undefined,
+    input.tenantId
+  );
+  record = appendRecord({ ...record, state: 'running', work_item_id: workItem.item_id });
 
   const output = await (input.runner || runPeerTaskExecutor)(entry, { tenantId: input.tenantId });
   const status = output.exit_code === 0 ? 'completed' : 'failed';
@@ -714,7 +750,30 @@ export async function decidePeerTask(input: DecidePeerTaskInput): Promise<PeerTa
       output.exit_code
     ),
   });
-  return input.deliver === false ? record : deliverPeerTaskResult({ ...input, record });
+  return record;
+}
+
+/**
+ * Resume an accepted task that stopped before recording a result (executor
+ * crash, artifact write failure), then deliver the result.
+ */
+export async function resumePeerTask(
+  input: Omit<DecidePeerTaskInput, 'decision' | 'actorId' | 'reason'>
+): Promise<PeerTaskRecord> {
+  const record = getPeerTask(input.tenantId, input.localPeerId, 'inbound', input.taskId);
+  if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
+  if (record.state !== 'running' || record.decision?.decision !== 'accepted' || record.result) {
+    throw new Error(`peer_task_not_resumable:${record.task_id}:${record.state}`);
+  }
+  const entry = catalogEntryFor(
+    loadPeerTaskCatalog(input.tenantId, { catalogPath: input.taskCatalogPath }),
+    record.task_type,
+    record.remote_peer_id
+  );
+  if ('rejected' in entry)
+    throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
+  const done = await executeAcceptedPeerTask(input, record, entry);
+  return input.deliver === false ? done : deliverPeerTaskResult({ ...input, record: done });
 }
 
 function buildResult(
@@ -738,8 +797,11 @@ function buildResult(
   });
 }
 
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE_PATTERN = /\u001b\[[0-9;]*[A-Za-z]/g;
+
 function tail(text: string, maxChars: number): string {
-  const trimmed = text.trim();
+  const trimmed = text.replace(ANSI_ESCAPE_PATTERN, '').trim();
   return trimmed.length <= maxChars ? trimmed : `…${trimmed.slice(trimmed.length - maxChars + 1)}`;
 }
 

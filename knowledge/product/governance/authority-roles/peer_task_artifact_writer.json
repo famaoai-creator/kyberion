@@ -1,0 +1,12 @@
+{
+  "role": "peer_task_artifact_writer",
+  "description": "Least-privilege writer for typed peer task results. libs/core/mesh/peer-task-exchange.ts assumes it, bound to the receiving tenant, after the recipient operator accepts a peer task: it writes the task report and output log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's scoped artifact index, and reads only those paths (persona worker). It is tenant-bound (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+    "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+  ],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}
