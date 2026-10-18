@@ -80,6 +80,28 @@ export async function runContrastiveSession(
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
   const supplied = [...(spec.candidates ?? [])];
 
+  // Label integrity BEFORE any probe or backend call — 'base' is reserved,
+  // dupes corrupt run dirs, and a collision with a predicted proposed label
+  // must be caught before spending propose calls.
+  const predicted = spec.propose
+    ? Array.from(
+        { length: spec.propose.count },
+        (_, i) => `${spec.propose!.labelPrefix ?? 'llm'}${i + 1}`
+      )
+    : [];
+  const allLabels = [...supplied.map((c) => c.label), ...predicted];
+  if (allLabels.includes('base')) {
+    throw new Error("[CONTRASTIVE_SESSION] 'base' is a reserved probe label");
+  }
+  if (new Set(allLabels).size !== allLabels.length) {
+    throw new Error(`[CONTRASTIVE_SESSION] duplicate candidate labels: ${allLabels.join(', ')}`);
+  }
+  for (const label of allLabels) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
+      throw new Error(`[CONTRASTIVE_SESSION] invalid candidate label ${JSON.stringify(label)}`);
+    }
+  }
+
   // Propose stage: LLM overlays written under runRoot/_proposed/<label>.
   if (spec.propose) {
     if (!spec.surface) {
@@ -138,7 +160,9 @@ export async function runContrastiveSession(
       timeoutMs: spec.timeoutMs,
     } satisfies ProbeSpec);
 
-  const base = probeFor('base');
+  // When every candidate was rejected there is nothing to contrast — skip the
+  // base probe entirely and classify the empty set as missing evidence.
+  const base = eligible.length ? probeFor('base') : null;
   const outcomes = eligible.map((c) => probeFor(c.label, c.overlayDir));
   const decision = classifyProbeSet(base, outcomes, spec.metrics ?? []);
 
@@ -158,10 +182,10 @@ export async function runContrastiveSession(
       ? {
           cue: spec.work_shape || `contrastive probe on ${path.basename(spec.scenarioDir)}`,
           lesson: `apply the '${decision.winner}' overlay; it dominated the base under the same scenario`,
-          evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}`,
+          evidence: `base delivered=${base!.delivered}, winner delivered=true; outcomes in ${runRoot}`,
           // Dominance over a delivering base is the stronger evidence;
           // a single delivery over a dead base may just be a broken baseline.
-          confidence: base.delivered ? ('high' as const) : ('medium' as const),
+          confidence: base!.delivered ? ('high' as const) : ('medium' as const),
         }
       : null;
 
@@ -193,7 +217,17 @@ export async function runContrastiveSession(
     report_path: reportPath,
     decision,
     outcomes,
-    base,
+    base: base ?? {
+      label: 'base',
+      run_dir: '',
+      ok: false,
+      delivered: false,
+      exit_code: null,
+      wall_ms: 0,
+      produced_files: [],
+      error: 'no eligible candidates — base probe skipped',
+      recorded_at: '',
+    },
     rejected_overlays: rejected,
     selection,
     experience,
