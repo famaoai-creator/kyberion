@@ -17,6 +17,7 @@ import {
   peerTaskExecutorArgv,
   peerTaskResultMessageId,
   proposePeerTask,
+  resendPeerTaskProposal,
   resumePeerTask,
   type PeerTaskArtifactWriter,
   type PeerTaskExecutorRunner,
@@ -27,6 +28,8 @@ import {
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
 import { withExecutionContext } from '../authority.js';
+import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
+import { peerRuntimeLogicalPath } from './peer-messaging.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -70,6 +73,13 @@ function writeCatalogs(): void {
           executor: { kind: 'pipeline', pipeline: 'pipelines/baseline-check.json' },
           allowed_from_peers: [PROPOSER],
           timeout_ms: 60_000,
+          share_output_excerpt: true,
+        },
+        {
+          task_type: 'quiet.check',
+          description: 'Same check, output stays local',
+          executor: { kind: 'pipeline', pipeline: 'pipelines/baseline-check.json' },
+          allowed_from_peers: [PROPOSER],
         },
       ],
     })
@@ -314,7 +324,23 @@ describe('peer task exchange', () => {
     ).rejects.toThrow(/executor crashed/);
     const stuck = getPeerTask(TENANT, RECIPIENT, 'inbound', proposed.request.task_id)!;
     expect(stuck).toMatchObject({ state: 'running', decision: { decision: 'accepted' } });
+    expect(stuck.execution).toMatchObject({ pid: process.pid });
 
+    // The recorded runner (this process) is alive: resume must not run it twice,
+    // and --force does not help before the runner's deadline.
+    const runner = vi.fn(okRunner);
+    await expect(resumePeerTask({ ...base, runner })).rejects.toThrow(/peer_task_still_running/);
+    await expect(resumePeerTask({ ...base, runner, force: true })).rejects.toThrow(
+      /peer_task_still_running/
+    );
+    expect(runner).not.toHaveBeenCalled();
+
+    // The runner died (pid gone): resume takes over on the same WorkItem.
+    appendGovernedArtifactJsonl(
+      'infrastructure_sentinel',
+      peerRuntimeLogicalPath(TENANT, RECIPIENT, 'task-exchange.jsonl'),
+      { ...stuck, execution: { ...stuck.execution!, pid: 999_999 } }
+    );
     const done = await resumePeerTask({ ...base, runner: okRunner });
     expect(done).toMatchObject({ state: 'completed', work_item_id: stuck.work_item_id });
     expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
@@ -325,19 +351,180 @@ describe('peer task exchange', () => {
     );
   });
 
+  it('lets only one of two concurrent accepts run the task', async () => {
+    wirePeers();
+    const proposed = await propose();
+    const runner = vi.fn(okRunner);
+    const accept = () =>
+      decidePeerTask({
+        tenantId: TENANT,
+        localPeerId: RECIPIENT,
+        taskId: proposed.request.task_id,
+        decision: 'accepted',
+        actorId: 'operator:test',
+        reason: 'race',
+        taskCatalogPath: TASK_CATALOG,
+        peerCatalogPath: PEER_CATALOG,
+        runner,
+        writeArtifact,
+      });
+    const outcomes = await Promise.allSettled([accept(), accept()]);
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+    expect(
+      String((outcomes.find((o) => o.status === 'rejected') as PromiseRejectedResult).reason)
+    ).toMatch(/peer_task_already_decided/);
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps task output on the recipient unless the catalog opts in to an excerpt', async () => {
+    wirePeers();
+    const proposed = await propose('quiet.check');
+    const done = await decidePeerTask({
+      tenantId: TENANT,
+      localPeerId: RECIPIENT,
+      taskId: proposed.request.task_id,
+      decision: 'accepted',
+      actorId: 'operator:test',
+      reason: 'check',
+      taskCatalogPath: TASK_CATALOG,
+      peerCatalogPath: PEER_CATALOG,
+      runner: async () => ({
+        ...(await okRunner({} as never, { tenantId: TENANT })),
+        stdout: 'SECRET-LINE',
+      }),
+      writeArtifact,
+    });
+    expect(done.result!.summary).toBe('quiet.check completed (exit 0)');
+    const outbound = getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!;
+    expect(JSON.stringify(outbound)).not.toContain('SECRET-LINE');
+    // The full output is still in the recipient's log artifact.
+    const log = done.result!.artifacts.find((artifact) => artifact.ref.endsWith('output.log'))!;
+    expect(String(safeReadFile(pathResolver.resolve(log.ref), { encoding: 'utf8' }))).toContain(
+      'SECRET-LINE'
+    );
+  });
+
+  it('expires an unaccepted task for both sides and tells the proposer', async () => {
+    wirePeers();
+    const proposed = await proposePeerTask({
+      tenantId: TENANT,
+      senderPeerId: PROPOSER,
+      recipientPeerId: RECIPIENT,
+      taskType: 'baseline.check',
+      summary: 'short-lived',
+      ttlMs: 50,
+      peerCatalogPath: PEER_CATALOG,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    // Unanswered past expiry, the proposer already sees it as expired.
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
+      'expired'
+    );
+    const runner = vi.fn(okRunner);
+    await expect(
+      decidePeerTask({
+        tenantId: TENANT,
+        localPeerId: RECIPIENT,
+        taskId: proposed.request.task_id,
+        decision: 'accepted',
+        actorId: 'operator:test',
+        reason: 'late',
+        taskCatalogPath: TASK_CATALOG,
+        peerCatalogPath: PEER_CATALOG,
+        runner,
+      })
+    ).rejects.toThrow(/peer_task_expired/);
+    expect(runner).not.toHaveBeenCalled();
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)).toMatchObject({
+      state: 'rejected',
+      result: { status: 'rejected' },
+    });
+  });
+
+  it('refuses proposals with an unbounded lifetime or a future request time', () => {
+    const now = Date.now();
+    const request = (overrides: Record<string, string>) => ({
+      message_id: 'M-TTL',
+      kind: 'handoff' as const,
+      direction: 'inbound' as const,
+      sender_peer_id: PROPOSER,
+      recipient_peer_id: RECIPIENT,
+      text: 'x',
+      created_at: new Date(now).toISOString(),
+      metadata: {
+        peer_task_request: {
+          kind: 'peer-task-request',
+          version: 1,
+          task_id: `PTK-TTL-${overrides.id}`,
+          task_type: 'baseline.check',
+          summary: 'x',
+          tenant_id: TENANT,
+          sender_peer_id: PROPOSER,
+          recipient_peer_id: RECIPIENT,
+          requested_at: overrides.requested_at,
+          expires_at: overrides.expires_at,
+        },
+      },
+    });
+    const reply = (overrides: Record<string, string>) =>
+      handleInboundPeerTaskMessage({
+        tenantId: TENANT,
+        localPeerId: RECIPIENT,
+        sessionId: 'PCS-TTL',
+        message: request(overrides),
+        envelope: { tenant_id: TENANT, sender_peer_id: PROPOSER } as never,
+        taskCatalogPath: TASK_CATALOG,
+      });
+    expect(
+      reply({
+        id: '00000001',
+        requested_at: new Date(now).toISOString(),
+        expires_at: '9999-12-31T00:00:00.000Z',
+      }).payload
+    ).toMatchObject({ peer_task_status: 'rejected', reason: 'ttl_too_long' });
+    expect(
+      reply({
+        id: '00000002',
+        requested_at: new Date(now + 3_600_000).toISOString(),
+        expires_at: new Date(now + 7_200_000).toISOString(),
+      }).payload
+    ).toMatchObject({ peer_task_status: 'rejected', reason: 'requested_in_future' });
+  });
+
+  it('resends a proposal whose delivery failed with the same task id', async () => {
+    const { sent } = wirePeers();
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const route = fetchSpy.getMockImplementation()!;
+    fetchSpy.mockImplementationOnce(async () => {
+      throw new TypeError('fetch failed');
+    });
+    await expect(propose()).rejects.toThrow(/peer_task_proposal_not_delivered/);
+    const [pending] = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' });
+    expect(pending).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+    fetchSpy.mockImplementation(route);
+    const resent = await resendPeerTaskProposal({
+      tenantId: TENANT,
+      localPeerId: PROPOSER,
+      taskId: pending.task_id,
+      peerCatalogPath: PEER_CATALOG,
+    });
+    expect(resent.record).toMatchObject({
+      task_id: pending.task_id,
+      proposal_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
+    expect(sent.map((envelope) => envelope.message_id)).toEqual([pending.request_message_id]);
+  });
+
   it('rejects task types the recipient does not offer, and peers it does not allow, on receipt', async () => {
     wirePeers();
     const unknown = await propose('shell.anything');
     expect(unknown.record.state).toBe('rejected');
-    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', unknown.request.task_id)).toMatchObject({
-      state: 'rejected',
-      decision: { reason: 'task_type_not_offered' },
-    });
+    expect(unknown.reply_text).toContain('task_type_not_offered');
     const stranger = await propose('baseline.check', STRANGER);
-    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', stranger.request.task_id)).toMatchObject({
-      state: 'rejected',
-      decision: { reason: 'peer_not_allowed' },
-    });
+    expect(stranger.reply_text).toContain('peer_not_allowed');
+    // Refusals leave no inbound ledger row, so they cannot grow the ledger.
+    expect(listPeerTasks(TENANT, RECIPIENT, { direction: 'inbound' })).toEqual([]);
   });
 
   it('lets the operator reject a pending task and tells the proposer', async () => {
@@ -470,7 +657,7 @@ describe('peer task exchange', () => {
   });
 
   it('validates the recipient catalog and builds a fixed argv', () => {
-    expect(loadPeerTaskCatalog(TENANT, { catalogPath: TASK_CATALOG }).tasks).toHaveLength(1);
+    expect(loadPeerTaskCatalog(TENANT, { catalogPath: TASK_CATALOG }).tasks).toHaveLength(2);
     expect(
       peerTaskExecutorArgv({ kind: 'pipeline', pipeline: 'pipelines/baseline-check.json' })
     ).toEqual(['-s', 'pipeline', '--input', 'pipelines/baseline-check.json']);

@@ -6,6 +6,7 @@ import {
   listPeerTasks,
   loadPeerTaskCatalog,
   proposePeerTask,
+  resendPeerTaskProposal,
   resumePeerTask,
   type PeerTaskDirection,
   type PeerTaskState,
@@ -43,6 +44,11 @@ async function main(
     )
     .command('reject', 'Reject a pending inbound task and tell the proposer', () => undefined)
     .command(
+      'resend-proposal',
+      'Resend a pending outbound proposal with its original task id',
+      () => undefined
+    )
+    .command(
       'resume',
       'Resume an accepted inbound task that stopped before its result',
       () => undefined
@@ -69,6 +75,11 @@ async function main(
     })
     .option('actor-id', { type: 'string', description: 'accept/reject: who decided' })
     .option('reason', { type: 'string', description: 'accept/reject: why' })
+    .option('force', {
+      type: 'boolean',
+      default: false,
+      description: 'resume: take over a task whose runner passed its deadline',
+    })
     .option('timeout-ms', { type: 'number', default: 10_000 })
     .demandCommand(1)
     .parseSync();
@@ -124,10 +135,21 @@ async function main(
       if (previewOnly) return { dry_run: true, operation: `peer-task.${command}`, ...input };
       return decidePeerTask(input);
     }
+    case 'resend-proposal': {
+      const taskId = required(argv['task-id'], 'task-id', command);
+      if (previewOnly)
+        return { dry_run: true, operation: 'peer-task.resend-proposal', task_id: taskId };
+      return resendPeerTaskProposal({
+        tenantId,
+        localPeerId: peerId,
+        taskId,
+        timeoutMs: Number(argv['timeout-ms']),
+      });
+    }
     case 'resume': {
       const taskId = required(argv['task-id'], 'task-id', command);
       if (previewOnly) return { dry_run: true, operation: 'peer-task.resume', task_id: taskId };
-      return resumePeerTask({ tenantId, localPeerId: peerId, taskId });
+      return resumePeerTask({ tenantId, localPeerId: peerId, taskId, force: argv.force === true });
     }
     case 'resend-result': {
       const taskId = required(argv['task-id'], 'task-id', command);
