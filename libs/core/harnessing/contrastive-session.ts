@@ -245,12 +245,20 @@ export async function runContrastiveSession(
       ...(spec.expectOutputs ? { expectOutputs: spec.expectOutputs } : {}),
       runRoot,
       timeoutMs: spec.timeoutMs,
+      ...(spec.markers ? { markers: spec.markers } : {}),
     } satisfies ProbeSpec);
 
   // When every candidate was rejected there is nothing to contrast — skip the
   // base probe entirely and classify the empty set as missing evidence.
   const base = eligible.length ? probeFor('base') : null;
   const outcomes = eligible.map((c) => probeFor(c.label, c.overlayDir));
+  // Marker hits at stage time mean the probe refused to run — mirror them
+  // into the rejection trail like a pre-probe rejection.
+  for (const o of outcomes) {
+    if (/^leak marker:/.test(o.error) || /marker scan failed/.test(o.error)) {
+      rejected.push({ label: o.label, path: '.', reason: `probe refused: ${o.error}` });
+    }
+  }
   const decision = classifyProbeSet(base, outcomes, spec.metrics ?? []);
 
   // Blind selection is a recommendation for the human gate — never a decision.

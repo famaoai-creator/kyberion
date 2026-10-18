@@ -280,3 +280,75 @@ describe('snapshot integrity verification (R1 review)', () => {
     ).toThrow(/nest inside each other/);
   });
 });
+
+describe('manifest edge cases (R2 review)', () => {
+  it('halts materialization_error on binary tamper invisible to utf8 hashing', async () => {
+    // 0x80 -> 0x81 would collide under utf8-string hashing (both decode to
+    // U+FFFD). Byte-level hashing must see the drift.
+    const scenDir = path.join(ROOT, 'scenario-bintamper');
+    safeMkdir(scenDir, { recursive: true });
+    const ovDir = path.join(ROOT, 'ov', 'win-bin');
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && printf '\\201' > "../.snapshots/win/payload.bin"\n`
+    );
+    safeWriteFile(path.join(ovDir, 'payload.bin'), Buffer.from([0x80]));
+    safeWriteFile(path.join(ovDir, 'pass_marker'), '1');
+    safeWriteFile(path.join(ovDir, 'iam_win'), '1');
+    const r = await runRecursiveSession({
+      session_id: 'rec-bintamper',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-bintamper'),
+      candidates: [{ label: 'win', overlayDir: ovDir }],
+      rounds: 2,
+    });
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.adopted_overlays).toEqual([]);
+    expect(r.rounds[0].rejected.some((x) => /snapshot drifted/.test(x.reason))).toBe(true);
+  });
+  it('halts materialization_error when the snapshot dir is swapped for a file', async () => {
+    const scenDir = path.join(ROOT, 'scenario-dirswap');
+    safeMkdir(scenDir, { recursive: true });
+    const ovDir = path.join(ROOT, 'ov', 'win-swap');
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && rm -rf "../.snapshots/win" && echo x > "../.snapshots/win"\n`
+    );
+    safeWriteFile(path.join(ovDir, 'pass_marker'), '1');
+    safeWriteFile(path.join(ovDir, 'iam_win'), '1');
+    const r = await runRecursiveSession({
+      session_id: 'rec-dirswap',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-dirswap'),
+      candidates: [{ label: 'win', overlayDir: ovDir }],
+      rounds: 2,
+    });
+    expect(r.halted_by).toBe('materialization_error');
+    expect(r.rounds[0].rejected.some((x) => /manifest unreadable/.test(x.reason))).toBe(true);
+  });
+  it('runProbe refuses to execute when staged bytes carry a marker', () => {
+    const scenDir = scenario();
+    const ovDir = overlay('mark', {
+      pass_marker: '1',
+      'notes.txt': 'the rubric says expected_answer is 42',
+    });
+    const outcome = runProbe({
+      label: 'm',
+      scenarioDir: scenDir,
+      overlayDir: ovDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-mark'),
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.error).toMatch(/leak marker:/);
+    // The snapshot+manifest are still recorded honestly — the refusal is
+    // evidence, and the staged bytes are auditable.
+    expect(outcome.staged_snapshot).toBeDefined();
+    expect(outcome.snapshot_manifest).toBeDefined();
+  });
+});
