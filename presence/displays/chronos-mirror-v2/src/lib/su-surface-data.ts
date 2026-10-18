@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
 import { executionMetricsReadFor } from '@agent/core/cost-report';
 import { eventScopeMatches, type EventScopeFilter } from '@agent/core/event-scope';

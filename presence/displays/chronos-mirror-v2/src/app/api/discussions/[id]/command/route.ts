@@ -100,7 +100,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (!room)
       return NextResponse.json({ ok: false, error: 'discussion not found' }, { status: 404 });
     assertDiscussionVisible(viewer, room.scope);
-    if (room.status === 'concluded' || room.status === 'stopped') {
+    if (room.config?.single_pass && command.kind !== 'stop') {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'A single-model brief accepts only Stop while running. Start a new room for another request.',
+        },
+        { status: 409 }
+      );
+    }
+    if (room.status === 'concluded' || room.status === 'stopped' || room.status === 'failed') {
       return NextResponse.json(
         { ok: false, error: `discussion already ${room.status}` },
         { status: 409 }
