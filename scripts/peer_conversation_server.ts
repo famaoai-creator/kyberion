@@ -3,7 +3,14 @@ import { logger } from '@agent/core/core';
 import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
 import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
 import { createPeerConversationResponder } from '@agent/core/mesh/peer-conversation';
-import { createPeerAutoReply, type PeerAutoReplyBackend } from '@agent/core/mesh/peer-auto-reply';
+import {
+  createPeerAutoReply,
+  DEFAULT_PEER_AUTO_REPLY_BACKEND,
+} from '@agent/core/mesh/peer-auto-reply';
+import {
+  listIsolatedTextGenerators,
+  resolveIsolatedTextGenerator,
+} from '@agent/core/provider/isolated-text-generator';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
@@ -121,16 +128,17 @@ async function main(
     })
     .option('auto-reply-backend', {
       type: 'string',
-      choices: ['claude', 'codex'] as const,
-      default: 'claude',
-      description:
-        'Auto-reply generator: claude (Agent SDK, strict isolation) or codex (isolated codex CLI, tools disabled)',
+      choices: listIsolatedTextGenerators().map((generator) => generator.id),
+      default: DEFAULT_PEER_AUTO_REPLY_BACKEND,
+      description: `Isolated auto-reply generator: ${listIsolatedTextGenerators()
+        .map((generator) => `${generator.id} (${generator.isolation})`)
+        .join(', ')}`,
     })
-    .option('auto-reply-codex-allow-untested', {
+    .option('auto-reply-allow-untested', {
       type: 'boolean',
       default: false,
       description:
-        'Codex backend only: run on a codex-cli version the isolation probe has not verified',
+        'Version-gated generators only (e.g. codex): run on a CLI version the isolation probe has not verified',
     })
     .parseSync();
 
@@ -169,8 +177,8 @@ async function main(
     max_attempts: Number(argv['auto-reply-max-attempts']),
     knowledge_limit: Number(argv['auto-reply-knowledge-limit']),
     budget_per_hour: Number(argv['auto-reply-budget-per-hour']),
-    backend: (argv['auto-reply-backend'] === 'codex' ? 'codex' : 'claude') as PeerAutoReplyBackend,
-    codex_allow_untested: argv['auto-reply-codex-allow-untested'] === true,
+    backend: String(argv['auto-reply-backend'] || DEFAULT_PEER_AUTO_REPLY_BACKEND),
+    allow_untested: argv['auto-reply-allow-untested'] === true,
   };
   if (
     !Number.isInteger(autoReplyOptions.max_turns) ||
@@ -188,6 +196,20 @@ async function main(
   ) {
     throw new Error('invalid_peer_auto_reply_options');
   }
+  // Fails closed on an unknown or descriptor-undeclared generator: the server
+  // refuses to start rather than send peer text to an unvetted backend.
+  const generator = resolveIsolatedTextGenerator(autoReplyOptions.backend);
+  const backendSummary = {
+    id: generator.id,
+    reasoning_backend: generator.reasoningBackend,
+    isolation: generator.isolation,
+    version_gated: generator.versionGated,
+  };
+  if (autoReplyOptions.allow_untested && !generator.versionGated) {
+    logger.warn(
+      `[peer-conversation-server] --auto-reply-allow-untested ignored — backend ${generator.id} has no version gate | next: drop the flag`
+    );
+  }
   if (options.dryRun === true || options.check === true) {
     return {
       dry_run: true,
@@ -202,6 +224,7 @@ async function main(
         enabled: autoReplyPeers.length > 0,
         peers: autoReplyPeers,
         ...autoReplyOptions,
+        backend_isolation: backendSummary,
       },
     };
   }
@@ -223,8 +246,8 @@ async function main(
     maxDeliveryAttempts: autoReplyOptions.max_attempts,
     knowledgeLimit: autoReplyOptions.knowledge_limit,
     budgetPerHour: autoReplyOptions.budget_per_hour,
-    backend: autoReplyOptions.backend,
-    codexAllowUntestedVersion: autoReplyOptions.codex_allow_untested,
+    backend: generator.id,
+    allowUntestedVersion: autoReplyOptions.allow_untested,
   });
 
   const server = createPeerMessagingServer({
@@ -355,7 +378,7 @@ async function main(
   if (autoReply.enabled) {
     autoReply.start();
     logger.info(
-      `[peer-conversation-server] auto reply enabled for peers: ${autoReplyPeers.join(', ')} (backend=${autoReplyOptions.backend}${autoReplyOptions.codex_allow_untested ? ', codex_allow_untested=true' : ''})`
+      `[peer-conversation-server] auto reply enabled for peers: ${autoReplyPeers.join(', ')} (backend=${generator.id}, isolation=${generator.isolation}${autoReplyOptions.allow_untested && generator.versionGated ? ', allow_untested=true' : ''})`
     );
   }
 

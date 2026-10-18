@@ -99,25 +99,43 @@ KYBERION_PEER_SHARED_SECRET=... pnpm peer:conversation-server \
   --auto-reply-peers <remote-peer>[,<remote-peer>]
 ```
 
-| Flag                                | Default     | Meaning                                                                           |
-| ----------------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| `--auto-reply-peers`                | empty (off) | Remote peers whose `message` / `reply` messages get an LLM reply                  |
-| `--auto-reply-max-turns`            | 6           | Per-session cap on automatic replies; stops two auto-responders from looping      |
-| `--auto-reply-budget-per-hour`      | 30          | Rolling per-peer generation budget (bounds session-rotation abuse and spend)      |
-| `--auto-reply-timeout-ms`           | 60000       | Generation timeout                                                                |
-| `--auto-reply-concurrency`          | 1           | Worker concurrency                                                                |
-| `--auto-reply-max-attempts`         | 3           | Delivery attempts per reply                                                       |
-| `--auto-reply-knowledge-limit`      | 5           | Tenant knowledge excerpts used to ground a reply                                  |
-| `--auto-reply-backend`              | `claude`    | Generator: `claude` (Agent SDK, strict isolation) or `codex` (isolated Codex CLI) |
-| `--auto-reply-codex-allow-untested` | false       | `codex` only: run on a codex-cli version the isolation probe has not verified     |
+| Flag                           | Default     | Meaning                                                                                      |
+| ------------------------------ | ----------- | -------------------------------------------------------------------------------------------- |
+| `--auto-reply-peers`           | empty (off) | Remote peers whose `message` / `reply` messages get an LLM reply                             |
+| `--auto-reply-max-turns`       | 6           | Per-session cap on automatic replies; stops two auto-responders from looping                 |
+| `--auto-reply-budget-per-hour` | 30          | Rolling per-peer generation budget (bounds session-rotation abuse and spend)                 |
+| `--auto-reply-timeout-ms`      | 60000       | Generation timeout                                                                           |
+| `--auto-reply-concurrency`     | 1           | Worker concurrency                                                                           |
+| `--auto-reply-max-attempts`    | 3           | Delivery attempts per reply                                                                  |
+| `--auto-reply-knowledge-limit` | 5           | Tenant knowledge excerpts used to ground a reply                                             |
+| `--auto-reply-backend`         | `claude`    | Isolated text generator id (see the backend table below)                                     |
+| `--auto-reply-allow-untested`  | false       | Version-gated backends only (`codex`): run on a version the isolation probe has not verified |
 
 How it works:
 
 - The HTTP receive path only records a reply job in `active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<local-peer>/reply-jobs.jsonl` (keyed by `sender:message_id`, so redelivery never answers twice) and returns a `status` ACK. One server process owns that ledger per local peer.
-- A worker generates the reply with Claude through `runClaudeAgentQuery` in strict isolation (no tools, no settings/hooks/MCP, scratch working directory, minimal environment) — never through the reasoning failover chain, whose other CLIs run with tools. Peer text and knowledge excerpts are framed as untrusted data.
-- With `--auto-reply-backend codex` (for hosts that have the Codex CLI but no Claude), the worker runs `runCodexIsolatedQuery`: `codex exec` with user config, rules and session persistence ignored, a read-only sandbox, approvals `never`, web search off, no MCP servers and every tool-bearing feature disabled, in an empty scratch directory with only `PATH`/`HOME`/`USER`/`LANG`/`TMPDIR` (+ `CODEX_HOME`) in the environment. This is weaker than the Claude path in one honest respect: the Codex model still **sees** some tool definitions (exec, apply_patch, spawn_agent, MCP resource readers); they cannot execute — attempts fail closed inside the CLI — and any observed tool attempt (a `tools::router` stderr line or a non-message `--json` item) discards the reply, recorded as `generation_failed` / `tool_attempt_detected`. Because that guarantee was verified per CLI version, only isolation-tested codex-cli versions run (currently `0.163`); others fail with `CODEX_ISOLATION_UNTESTED` unless `--auto-reply-codex-allow-untested` is passed.
+- A worker generates the reply through an isolated text generator (`@agent/core/provider/isolated-text-generator`), resolved once at startup; an unknown backend id or one its reasoning-provider descriptor does not declare stops the server from starting (`ISOLATED_GENERATOR_UNKNOWN` / `ISOLATED_GENERATOR_UNDECLARED`). The dry run and the startup log show the backend id and its isolation level.
+- With the default `claude` backend the worker runs `runClaudeAgentQuery` in strict isolation (no tools, no settings/hooks/MCP, scratch working directory, minimal environment) — never through the reasoning failover chain, whose other CLIs run with tools. Peer text and knowledge excerpts are framed as untrusted data.
+- With `--auto-reply-backend codex` (for hosts that have the Codex CLI but no Claude), the worker runs `runCodexIsolatedQuery`: `codex exec` with user config, rules and session persistence ignored, a read-only sandbox, approvals `never`, web search off, no MCP servers and every tool-bearing feature disabled, in an empty scratch directory with only `PATH`/`HOME`/`USER`/`LANG`/`TMPDIR` (+ `CODEX_HOME`) in the environment. This is weaker than the Claude path in one honest respect: the Codex model still **sees** some tool definitions (exec, apply_patch, spawn_agent, MCP resource readers); they cannot execute — attempts fail closed inside the CLI — and any observed tool attempt (a `tools::router` stderr line or a non-message `--json` item) discards the reply, recorded as `generation_failed` / `tool_attempt_detected`. Because that guarantee was verified per CLI version, only isolation-tested codex-cli versions run (currently `0.163`); others fail with `CODEX_ISOLATION_UNTESTED` unless `--auto-reply-allow-untested` is passed.
 - The prompt uses only this session's transcript between the two peers and up to N excerpts from the tenant's confidential knowledge, read under the least-privilege role `peer_responder_reader` (never `connections/`).
 - The reply goes back as `kind: reply` with `reply_to_message_id` and metadata `auto_generated` / `auto_turn`; retries reuse one message id, so the receiver deduplicates them. Generation and delivery failures are recorded separately in the ledger.
+
+| Backend  | Reasoning provider (descriptor) | Isolation               | Version gate                  |
+| -------- | ------------------------------- | ----------------------- | ----------------------------- |
+| `claude` | `claude-agent`                  | `structural`            | none                          |
+| `codex`  | `codex-cli`                     | `fail_closed_detection` | tested codex-cli `0.163` only |
+
+`structural` means the transport exposes no tools to the model at all (a strictly isolated Claude query additionally discards any tool_use other than the SDK's structured-output tool). `fail_closed_detection` means tools stay visible but disabled and every observed tool attempt discards the reply. Any generator's tool attempt is recorded as `tool_attempt_detected`.
+
+### Adding a generation backend
+
+Backends are in-process code, never loaded from configuration, and a new one is usable only when all of these hold:
+
+1. **Adapter** — implement `IsolatedTextGenerator` (`id`, `reasoningBackend`, `isolation`, `versionGated`, `describe()`, `generate()`) as a thin adapter over a provider-specific isolated query in `libs/core/provider/isolated-text-generator.ts`, and register it with `registerIsolatedTextGenerator`. The query must assert reasoning egress before any transport, run in an empty scratch working directory that is removed afterwards, pass an exact minimal environment (no `KYBERION_*` / `MISSION_*`, no peer secrets), honour the abort controller and `timeoutMs`, validate the schema, and throw an error whose `code` ends in `TOOL_ATTEMPT` on any tool attempt.
+2. **Descriptor declaration** — add `"isolated_text_generation": { "isolation": "<structural|fail_closed_detection>" }` to the provider's `knowledge/product/governance/reasoning-providers/<mode>.json`. Resolution fails closed unless the declared level equals the generator's own `isolation`, so code alone cannot plug in a generator.
+3. **Conformance suite** — call `describeIsolatedTextGeneratorConformance` (`libs/core/provider/__tests__/isolated-text-generator-conformance.ts`) with a harness that fakes the transport, as `isolated-text-generator.test.ts` does for `claude` and `codex`; the registry test asserts the registered generators equal the declared providers.
+4. **Live isolation probe (CLI providers)** — run the real CLI with the isolation flags against prompts that ask for tool use, and record which tools the model sees and how attempts surface; detection must cover every observed signal.
+5. **Tested-version gate (CLI providers)** — refuse CLI versions the probe has not verified (set `versionGated: true`); operators may override with `--auto-reply-allow-untested`.
 
 Prerequisites, because the reply sends tenant-confidential material to an external provider:
 

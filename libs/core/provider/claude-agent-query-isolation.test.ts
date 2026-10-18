@@ -150,6 +150,29 @@ describe('runClaudeAgentQuery isolation', () => {
     expect(safeExistsSync(cwdDuringQuery)).toBe(false);
   });
 
+  it('strict isolation fails closed on a non-structured-output tool_use', async () => {
+    const toolUse = (name: string) => ({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 't1', name, input: {} }] },
+    });
+    mocks.query.mockReturnValue(stream([toolUse('Bash'), SUCCESS]));
+    await expect(
+      runClaudeAgentQuery({ systemPrompt: 's', userPrompt: 'u', schema, isolation: 'strict' })
+    ).rejects.toMatchObject({ code: 'tool_attempt' });
+
+    // The synthetic structured-output tool is the expected path, not an attempt.
+    mocks.query.mockReturnValue(stream([toolUse('StructuredOutput'), SUCCESS]));
+    await expect(
+      runClaudeAgentQuery({ systemPrompt: 's', userPrompt: 'u', schema, isolation: 'strict' })
+    ).resolves.toMatchObject({ parsed: { answer: 'ok' } });
+
+    // Legacy (non-isolated) queries keep their behaviour.
+    mocks.query.mockReturnValue(stream([toolUse('Bash'), SUCCESS]));
+    await expect(
+      runClaudeAgentQuery({ systemPrompt: 's', userPrompt: 'u', schema })
+    ).resolves.toMatchObject({ parsed: { answer: 'ok' } });
+  });
+
   it('extraOptions cannot override isolation fields', async () => {
     vi.stubEnv('KYBERION_PEER_SHARED_SECRET', 'secret-value');
     mocks.query.mockReturnValue(stream([SUCCESS]));
