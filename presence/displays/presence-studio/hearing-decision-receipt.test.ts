@@ -82,6 +82,7 @@ describe('exact durable hearing decision receipts', () => {
       actor,
       '2026-10-18T00:00:00.000Z'
     );
+    expect(first.decision_revision).toBe(first.record_revision);
     expect(again).toEqual(first);
     expect(
       hearingDecisionReceipt(loadHearingRecord(namespace, session), namespace, operation, identity)
@@ -152,6 +153,7 @@ describe('exact durable hearing decision receipts', () => {
     decideHearingRecord(namespace, session, operation, identity, actor, now);
     const legacy = decideHearingRecord(namespace, session, null, identity, actor, now);
     expect(legacy.decision_receipts).toHaveLength(1);
+    expect(legacy.decision_revision).toBe(legacy.record_revision);
     expect(hearingDecisionReceipt(legacy, namespace, operation, identity)?.status).toBe(
       'superseded'
     );
