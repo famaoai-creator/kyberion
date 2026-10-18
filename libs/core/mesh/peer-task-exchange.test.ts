@@ -17,6 +17,7 @@ import {
   peerTaskExecutorArgv,
   peerTaskResultMessageId,
   proposePeerTask,
+  resumePeerTask,
   type PeerTaskArtifactWriter,
   type PeerTaskExecutorRunner,
 } from './peer-task-exchange.js';
@@ -135,12 +136,16 @@ const writeArtifact: PeerTaskArtifactWriter = ({ name, content }) => {
 };
 
 beforeEach(() => {
+  // Tenant-bound roles follow the process tenant; pin it so an operator's
+  // KYBERION_TENANT (or a peer task run of this file) cannot leak in.
+  vi.stubEnv('KYBERION_TENANT', TENANT);
   setWorkCoordinationNamespace(`peer-task-test-${process.pid}`);
   writeCatalogs();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   for (const peer of [PROPOSER, RECIPIENT, STRANGER]) {
     clearPeerRuntime(TENANT, peer);
     clearPeerConversationRuntime(TENANT, peer);
@@ -282,6 +287,41 @@ describe('peer task exchange', () => {
     expect(getWorkItem(done.work_item_id!)!.status).toBe('blocked');
     expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
       'failed'
+    );
+  });
+
+  it('resumes an accepted task that stopped before its result, on the same WorkItem', async () => {
+    wirePeers();
+    const proposed = await propose();
+    const base = {
+      tenantId: TENANT,
+      localPeerId: RECIPIENT,
+      taskId: proposed.request.task_id,
+      taskCatalogPath: TASK_CATALOG,
+      peerCatalogPath: PEER_CATALOG,
+      writeArtifact,
+    };
+    await expect(
+      decidePeerTask({
+        ...base,
+        decision: 'accepted',
+        actorId: 'operator:test',
+        reason: 'check',
+        runner: async () => {
+          throw new Error('executor crashed');
+        },
+      })
+    ).rejects.toThrow(/executor crashed/);
+    const stuck = getPeerTask(TENANT, RECIPIENT, 'inbound', proposed.request.task_id)!;
+    expect(stuck).toMatchObject({ state: 'running', decision: { decision: 'accepted' } });
+
+    const done = await resumePeerTask({ ...base, runner: okRunner });
+    expect(done).toMatchObject({ state: 'completed', work_item_id: stuck.work_item_id });
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
+      'completed'
+    );
+    await expect(resumePeerTask({ ...base, runner: okRunner })).rejects.toThrow(
+      /peer_task_not_resumable/
     );
   });
 
