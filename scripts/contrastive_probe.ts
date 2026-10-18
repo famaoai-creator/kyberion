@@ -39,7 +39,7 @@ function parseSeed(raw: string): number {
 
 export const runContrastiveProbe = defineScript({
   name: 'contrastive_probe',
-  run: async (context: { argv: string[] }) => {
+  run: async (context: { argv: string[]; print: (line: string) => void }) => {
     const args = parseArgs(context.argv);
     const scenario = args['scenario']?.[0];
     const runRoot = args['run-root']?.[0];

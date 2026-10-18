@@ -33,7 +33,7 @@ export interface ContrastiveSessionSpec {
   /** Editable surface: every overlay (supplied or proposed) is validated. */
   surface?: SurfaceSpec;
   /** 'blind' adds an anonymized recommendation when the axis says human_gate. */
-  selection?: 'metrics' | 'blind';
+  selection?: 'blind';
   /** Seed for the blind letter mapping (default: hash of session_id). */
   seed?: number;
   /** Override for the blind selector (tests / LLM wiring). */
@@ -170,7 +170,7 @@ export async function runContrastiveSession(
   const selection =
     spec.selection === 'blind' && decision.decision === 'human_gate'
       ? applyBlindSelection(
-          [base, ...outcomes],
+          [...(base ? [base] : []), ...outcomes],
           spec.seed ?? sessionSeed(spec.session_id),
           spec.selector ?? metricsFallbackSelector,
           undefined
@@ -178,17 +178,30 @@ export async function runContrastiveSession(
       : null;
 
   const experience =
-    decision.decision === 'auto_advance' && decision.winner
+    decision.decision === 'auto_advance' && decision.winner && base
       ? {
           cue: spec.work_shape || `contrastive probe on ${path.basename(spec.scenarioDir)}`,
-          lesson: `apply the '${decision.winner}' overlay; it dominated the base under the same scenario`,
-          evidence: `base delivered=${base!.delivered}, winner delivered=true; outcomes in ${runRoot}`,
+          lesson: base.delivered
+            ? `apply the '${decision.winner}' overlay; it dominated the base on the declared metrics`
+            : `apply the '${decision.winner}' overlay; it delivered while the base failed the same scenario`,
+          evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}`,
           // Dominance over a delivering base is the stronger evidence;
           // a single delivery over a dead base may just be a broken baseline.
-          confidence: base!.delivered ? ('high' as const) : ('medium' as const),
+          confidence: base.delivered ? ('high' as const) : ('medium' as const),
         }
       : null;
 
+  const baseResult: RunOutcome = base ?? {
+    label: 'base',
+    run_dir: '',
+    ok: false,
+    delivered: false,
+    exit_code: null,
+    wall_ms: 0,
+    produced_files: [],
+    error: 'no eligible candidates — base probe skipped',
+    recorded_at: '',
+  };
   const report = {
     session_id: spec.session_id,
     recorded_at: nowIso(),
@@ -198,7 +211,7 @@ export async function runContrastiveSession(
     selection,
     rejected_overlays: rejected,
     outcomes,
-    base,
+    base: baseResult,
     experience,
   };
   const reportPath = assertSafeRepositoryPath(path.join(runRoot, 'report.json'), {
@@ -210,24 +223,14 @@ export async function runContrastiveSession(
     decision: decision.decision,
     winner: decision.winner,
     recommended: selection?.recommended_winner ?? null,
-    probes: outcomes.length + 1,
+    probes: outcomes.length + (base ? 1 : 0),
     rejected: rejected.length,
   });
   return {
     report_path: reportPath,
     decision,
     outcomes,
-    base: base ?? {
-      label: 'base',
-      run_dir: '',
-      ok: false,
-      delivered: false,
-      exit_code: null,
-      wall_ms: 0,
-      produced_files: [],
-      error: 'no eligible candidates — base probe skipped',
-      recorded_at: '',
-    },
+    base: baseResult,
     rejected_overlays: rejected,
     selection,
     experience,

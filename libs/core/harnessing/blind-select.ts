@@ -25,7 +25,9 @@ export interface BlindMap {
 }
 
 export interface BlindRecommendation {
-  method: 'llm_blind' | 'metrics_fallback';
+  /** Who judged: an LLM call, the deterministic metrics fallback, or a
+   *  caller-supplied heuristic selector. Never claim llm for a lambda. */
+  method: 'llm_blind' | 'heuristic_blind' | 'metrics_fallback';
   recommended_winner: string;
   letter: string;
   map: BlindMap;
@@ -96,7 +98,8 @@ export function applyBlindSelection(
   if (!recommended) return null;
   const chosen = outcomes.find((o) => o.label === recommended)!;
   return {
-    method: method ?? (selector === metricsFallbackSelector ? 'metrics_fallback' : 'llm_blind'),
+    method:
+      method ?? (selector === metricsFallbackSelector ? 'metrics_fallback' : 'heuristic_blind'),
     recommended_winner: recommended,
     letter,
     map,

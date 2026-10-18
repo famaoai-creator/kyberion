@@ -19,6 +19,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { logger } from '../core.js';
+import { isValidRelPath } from './surface-spec.js';
 import { nowIso } from '../foundation/time.js';
 
 export interface ProbeSpec {
@@ -89,6 +90,13 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
   if (!spec.command.length) {
     throw new Error('[PROBE_SPEC] command must be a non-empty argv array');
+  }
+  // expectOutputs paths are checked INSIDE the run dir — a traversal entry
+  // like '../../x' would escape it and let an unrelated file fake delivered.
+  for (const rel of spec.expectOutputs ?? []) {
+    if (!isValidRelPath(rel)) {
+      throw new Error(`[PROBE_SPEC] invalid expectOutputs path ${JSON.stringify(rel)}`);
+    }
   }
   const runDir = path.join(runRoot, spec.label);
   const recorded_at = nowIso();

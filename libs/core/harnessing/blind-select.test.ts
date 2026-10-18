@@ -50,7 +50,7 @@ describe('applyBlindSelection', () => {
       return 'A';
     })!;
     expect(sawLabels).toBe(false);
-    expect(rec.method).toBe('llm_blind');
+    expect(rec.method).toBe('heuristic_blind');
     expect(rec.recommended_winner).toBeDefined();
   });
 });
