@@ -18,6 +18,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { isValidRelPath, validateOverlay, type SurfaceSpec } from './surface-spec.js';
+import { lookupLessons, seedPromptFromLessons } from './experience-library.js';
 
 export interface ProposedFile {
   path: string;
@@ -34,7 +35,8 @@ export interface ProposeResult {
 const PROPOSE_INSTRUCTION = (
   brief: string,
   spec: SurfaceSpec,
-  index: number
+  index: number,
+  seedBlock = ''
 ) => `${STRUCTURED_DELEGATION_PROMPT_HEADER}
 
 Schema: [{"path": "<relative file path>", "content": "<file text>"}] — a JSON array only.
@@ -42,7 +44,7 @@ Schema: [{"path": "<relative file path>", "content": "<file text>"}] — a JSON 
 You are proposing ONE candidate overlay for a contrastive harness-tuning probe.
 
 Brief: ${brief}
-
+${seedBlock ? `\n${seedBlock}\n` : ''}
 Editable surface — you may ONLY propose files under these paths:
 ${spec.allowed_paths.map((p) => `- ${p}`).join('\n')}
 
@@ -70,9 +72,15 @@ export async function proposeCandidates(opts: {
   /** Directory where candidate overlay dirs land (repo-scoped). */
   outDir: string;
   labelPrefix?: string;
+  /** Optional experience library: the domain's prior lessons seed the
+   *  propose prompt (looked up once, before the loop). */
+  library?: { root: string; domain: string; asOf?: string };
 }): Promise<ProposeResult> {
   const result: ProposeResult = { backend_used: false, candidates: [], rejected: [], error: '' };
   const outDir = assertSafeRepositoryPath(opts.outDir, { allowMissingLeaf: true });
+  if (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > 10) {
+    throw new Error('[PROPOSE] count must be an integer 1..10');
+  }
   const prefix = opts.labelPrefix ?? 'llm';
   // The prefix becomes part of probe labels — it must satisfy the same charset
   // or it could escape the _proposed dir (e.g. '../x').
@@ -101,12 +109,39 @@ export async function proposeCandidates(opts: {
     return result;
   }
 
+  // Experience-library seeding (harness2 retain): a proposer sees the
+  // domain's prior lessons so candidates build on recorded evidence. The
+  // lookup runs once — every candidate shares the same evidence window —
+  // and only when a real backend is active (the stub early-return is
+  // above). A lookup failure degrades to an unseeded prompt, not a crash.
+  let seedBlock = '';
+  if (opts.library) {
+    try {
+      seedBlock = seedPromptFromLessons(
+        lookupLessons({
+          libraryRoot: opts.library.root,
+          domain: opts.library.domain,
+          ...(opts.library.asOf ? { asOf: opts.library.asOf } : {}),
+          cue: opts.brief,
+        })
+      );
+    } catch (error) {
+      logger.warn(
+        `[propose] experience-library lookup failed; continuing unseeded: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
+  }
+
   for (let i = 0; i < opts.count; i++) {
     const label = `${prefix}${i + 1}`;
     const overlayDir = path.join(outDir, label);
     let files: ProposedFile[];
     try {
-      const raw = await backend.delegateTask(PROPOSE_INSTRUCTION(opts.brief, opts.surface, i));
+      const raw = await backend.delegateTask(
+        PROPOSE_INSTRUCTION(opts.brief, opts.surface, i, seedBlock)
+      );
       files = extractJsonArray(raw);
     } catch (error) {
       result.rejected.push({

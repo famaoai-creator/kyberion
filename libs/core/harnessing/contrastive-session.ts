@@ -5,13 +5,17 @@
  * routes to human_gate — optionally produce a blind-selection recommendation
  * for the human. The report carries the full evidence trail, including a
  * harness2-shaped experience record only on decisive outcomes.
+ *
+ * Run-dir namespace under runRoot: probe dirs use the bare label ('base',
+ * '<candidate>'), propose-stage overlays live under '_proposed/<label>/',
+ * and the session report lands at 'report.json'.
  */
 
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { runProbe, type ProbeSpec, type RunOutcome } from './probe-runner.js';
+import { runProbe, validateProbeSpec, type ProbeSpec, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import {
@@ -21,6 +25,7 @@ import {
   type BlindSelector,
 } from './blind-select.js';
 import { proposeCandidates } from './propose.js';
+import { scanOverlayForMarkers } from './leak-tripwire.js';
 
 export interface ContrastiveSessionSpec {
   session_id: string;
@@ -29,9 +34,17 @@ export interface ContrastiveSessionSpec {
   /** Supplied candidate overlays: label -> overlay dir. 'base' runs bare. */
   candidates?: Array<{ label: string; overlayDir: string }>;
   /** LLM propose stage: generate `count` overlays under the surface. */
-  propose?: { brief: string; count: number; labelPrefix?: string };
+  propose?: {
+    brief: string;
+    count: number;
+    labelPrefix?: string;
+    /** Optional experience library: its lessons seed the propose prompt. */
+    library?: { root: string; domain: string };
+  };
   /** Editable surface: every overlay (supplied or proposed) is validated. */
   surface?: SurfaceSpec;
+  /** Extra leak-tripwire content markers (merged with DEFAULT_MARKERS). */
+  markers?: string[];
   /** 'blind' adds an anonymized recommendation when the axis says human_gate. */
   selection?: 'blind';
   /** Seed for the blind letter mapping (default: hash of session_id). */
@@ -78,7 +91,24 @@ export async function runContrastiveSession(
   spec: ContrastiveSessionSpec
 ): Promise<ContrastiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  // Validate the probe spec before any backend spend — a bad command or
+  // traversal expectOutputs must not surface only after LLM proposals ran.
+  validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  if (!safeLstat(scenarioDir).isDirectory()) {
+    throw new Error('[CONTRASTIVE_SESSION] scenarioDir must be a directory');
+  }
+  const scen = path.resolve(spec.scenarioDir);
+  const resolvedRoot = path.resolve(runRoot);
+  if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[CONTRASTIVE_SESSION] runRoot must not equal or be nested inside scenarioDir (workspace would be polluted before the first probe)'
+    );
+  }
   safeMkdir(runRoot, { recursive: true });
+  // Freeze the library horizon at session start — mid-run appends must not
+  // change proposals (retain causal order = reproducibility).
+  const libraryAsOf = nowIso();
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
   let propose_meta: { backend_used: boolean; error?: string } | undefined;
@@ -87,6 +117,12 @@ export async function runContrastiveSession(
   // Label integrity BEFORE any probe or backend call — 'base' is reserved,
   // dupes corrupt run dirs, and a collision with a predicted proposed label
   // must be caught before spending propose calls.
+  if (
+    spec.propose &&
+    (!Number.isInteger(spec.propose.count) || spec.propose.count < 1 || spec.propose.count > 10)
+  ) {
+    throw new Error('[CONTRASTIVE_SESSION] propose.count must be an integer 1..10');
+  }
   const predicted = spec.propose
     ? Array.from(
         { length: spec.propose.count },
@@ -117,8 +153,15 @@ export async function runContrastiveSession(
       count: spec.propose.count,
       outDir: path.join(runRoot, '_proposed'),
       labelPrefix: spec.propose.labelPrefix,
+      ...(spec.propose.library ? { library: { ...spec.propose.library, asOf: libraryAsOf } } : {}),
     });
     rejected.push(...proposed.rejected);
+    // A degraded/empty propose run still yields evidence — record it as a
+    // rejection so the decline report carries the reason instead of the
+    // 'at least one candidate' throw misstating the cause.
+    if (proposed.error && !proposed.candidates.length) {
+      rejected.push({ label: 'propose', path: '.', reason: proposed.error });
+    }
     propose_meta = {
       backend_used: proposed.backend_used,
       error: proposed.error || undefined,
@@ -144,14 +187,50 @@ export async function runContrastiveSession(
   }
 
   // Surface validation: off-surface overlays are rejected, not probed.
+  // Then the leak tripwire: a marker-bearing overlay is rejected too — it
+  // must never reach a probe or be served as evidence later.
   const eligible = supplied.filter((c) => {
-    if (!spec.surface) return true;
-    const v = validateOverlay(c.overlayDir, spec.surface);
-    if (v.ok) return true;
-    rejected.push(
-      ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
-    );
-    return false;
+    if (spec.surface) {
+      let v: ReturnType<typeof validateOverlay>;
+      try {
+        v = validateOverlay(c.overlayDir, spec.surface);
+      } catch (error) {
+        rejected.push({
+          label: c.label,
+          path: '.',
+          reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
+        });
+        return false;
+      }
+      if (!v.ok) {
+        rejected.push(
+          ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
+        );
+        return false;
+      }
+    }
+    let scan;
+    try {
+      scan = scanOverlayForMarkers(c.overlayDir, spec.markers);
+    } catch (error) {
+      rejected.push({
+        label: c.label,
+        path: '.',
+        reason: `overlay scan failed: ${error instanceof Error ? error.message : error}`,
+      });
+      return false;
+    }
+    if (!scan.clean) {
+      rejected.push(
+        ...scan.hits.map((h) => ({
+          label: c.label,
+          path: h.path,
+          reason: `leak marker: ${h.marker} at ${h.path}:${h.line}`,
+        }))
+      );
+      return false;
+    }
+    return true;
   });
   if (!eligible.length && !rejected.length) {
     throw new Error('[CONTRASTIVE_SESSION] at least one candidate overlay is required');
@@ -207,6 +286,7 @@ export async function runContrastiveSession(
     exit_code: null,
     wall_ms: 0,
     produced_files: [],
+    staged_expected: [],
     error: 'no eligible candidates — base probe skipped',
     recorded_at: '',
   };

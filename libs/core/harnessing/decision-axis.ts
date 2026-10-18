@@ -17,7 +17,11 @@ export interface DecisionReport {
   decision: ProbeDecision;
   winner: string | null;
   rationale: string;
-  decisive_evidence: Array<{ label: string; delivered: boolean; metrics: Record<string, number> }>;
+  decisive_evidence: Array<{
+    label: string;
+    delivered: boolean;
+    metrics: Record<string, number | null>;
+  }>;
   auto_advance_allowed: boolean;
   /** Declared metrics that resolved to null on every outcome — the axis
    *  judged nothing with them, so the report must not imply it did. */
@@ -57,6 +61,9 @@ export function classifyProbeSet(
       exit_code: o.exit_code ?? -1,
       wall_ms: o.wall_ms,
       produced_files: o.produced_files.length,
+      // Surface the declared metric values a reviewer would otherwise have
+      // to re-derive from raw outcomes.
+      ...Object.fromEntries(metrics.map((m) => [`declared:${m.key}`, metricOf(o, m.key)])),
     },
   });
   const decisive = [...(base ? [row(base)] : []), ...candidates.map(row)];
