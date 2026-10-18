@@ -9,7 +9,7 @@
     },
     {
       "id": "libs/core/plugin/skill-wrapper.ts",
-      "reason": "Documented extension point: docs/developer/EXTENSION_POINTS.md §2.4 (Skill Format, Beta) declares the runSkill(name, fn) / runAsyncSkill(name, fn) signatures as the contract for external skills, published as @agent/core/skill-wrapper and via the barrel. No in-repo caller imports it; core.test.ts covers it."
+      "reason": "Documented extension point: docs/developer/EXTENSION_POINTS.md \u00a72.4 (Skill Format, Beta) declares the runSkill(name, fn) / runAsyncSkill(name, fn) signatures as the contract for external skills, published as @agent/core/skill-wrapper and via the barrel. No in-repo caller imports it; core.test.ts covers it."
     },
     {
       "id": "libs/core/reasoning/judgment-callsite-eval.ts",
@@ -61,17 +61,21 @@
     },
     {
       "id": "libs/core/mission/mission-class-eval.ts",
-      "reason": "Mission-class evaluation harness (evaluateMissionClassCorpus / formatMissionClassEvalReport): scores the utterance → intent → class → workflow → team → review-gate chain against knowledge/product/governance/mission-class-eval-corpus.json. Its intended consumers are mission-class-eval.test.ts (the CI quality floor) and by-hand improvement runs documented in mission-class-operating-guide.md §4; no production module calls it."
+      "reason": "Mission-class evaluation harness (evaluateMissionClassCorpus / formatMissionClassEvalReport): scores the utterance \u2192 intent \u2192 class \u2192 workflow \u2192 team \u2192 review-gate chain against knowledge/product/governance/mission-class-eval-corpus.json. Its intended consumers are mission-class-eval.test.ts (the CI quality floor) and by-hand improvement runs documented in mission-class-operating-guide.md \u00a74; no production module calls it."
     },
     {
       "id": "libs/core/intent/intent-resolution-eval.ts",
-      "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance → selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md §4.3; no production module calls it."
+      "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance \u2192 selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md \u00a74.3; no production module calls it."
     }
   ],
   "scripts": [
     {
       "id": "scripts/dev_oidc_idp.ts",
       "reason": "Operator-run local dev tool: a loopback-only throw-away OIDC IdP for trying the surface /login flow without a Google or Entra client. Started by hand per docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md (no package script, to stay under the SX-05 script ratchet); unit-tested by scripts/dev_oidc_idp.test.ts."
+    },
+    {
+      "id": "scripts/contrastive_probe.ts",
+      "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it \u2014 unit-tested via libs/core/harnessing tests."
     }
   ],
   "pipelines": [],
@@ -90,15 +94,15 @@
     },
     {
       "id": "pipelines/chaos-actuator-down.json",
-      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (actuator failure → fallback); intentionally not scheduled."
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (actuator failure \u2192 fallback); intentionally not scheduled."
     },
     {
       "id": "pipelines/chaos-network-partition.json",
-      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (network partition → retry/circuit-breaker); intentionally not scheduled."
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (network partition \u2192 retry/circuit-breaker); intentionally not scheduled."
     },
     {
       "id": "pipelines/chaos-secret-missing.json",
-      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (missing secret → secret-guard error path); intentionally not scheduled."
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (missing secret \u2192 secret-guard error path); intentionally not scheduled."
     },
     {
       "id": "pipelines/cloudflare-os-validation.json",
@@ -134,7 +138,7 @@
     },
     {
       "id": "pipelines/media-produce-and-review.json",
-      "reason": "MP-01..07 deck flow (brief → protocol → preflight → render → review → delivery gate) run by hand per pipelines/README.md with --context overrides."
+      "reason": "MP-01..07 deck flow (brief \u2192 protocol \u2192 preflight \u2192 render \u2192 review \u2192 delivery gate) run by hand per pipelines/README.md with --context overrides."
     },
     {
       "id": "pipelines/media-review-fix-validation.json",
@@ -166,7 +170,7 @@
     },
     {
       "id": "pipelines/platform-onboarding.json",
-      "reason": "Organization-integration artifact flow (discovery transcript → requirements → design → test plan → task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding, then knowledge/product/pipeline-templates/execute-task-plan.json executes the plan."
+      "reason": "Organization-integration artifact flow (discovery transcript \u2192 requirements \u2192 design \u2192 test plan \u2192 task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding, then knowledge/product/pipeline-templates/execute-task-plan.json executes the plan."
     },
     {
       "id": "pipelines/project-management-validation.json",
@@ -182,7 +186,7 @@
     },
     {
       "id": "pipelines/source-to-engineering-artifacts.json",
-      "reason": "Source analysis → design doc / test inventory / proposal-only IaC, run by hand per pipelines/README.md and docs/developer/SOURCE_ENGINEERING_ARTIFACTS.ja.md."
+      "reason": "Source analysis \u2192 design doc / test inventory / proposal-only IaC, run by hand per pipelines/README.md and docs/developer/SOURCE_ENGINEERING_ARTIFACTS.ja.md."
     },
     {
       "id": "pipelines/surface-capability-check.json",
@@ -288,11 +292,11 @@
     },
     {
       "id": "service:mcp",
-      "reason": "MCP apply op of service-actuator (executeMcp); advertised in the op catalog but no ADF or dispatch test uses it — reachable only through hand-written service ADFs. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "MCP apply op of service-actuator (executeMcp); advertised in the op catalog but no ADF or dispatch test uses it \u2014 reachable only through hand-written service ADFs. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:audit_speaker_fairness",
-      "reason": "Forwarding alias wisdom → meeting:audit_speaker_fairness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:audit_speaker_fairness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 meeting:audit_speaker_fairness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:audit_speaker_fairness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:conduct_1on1",
@@ -300,55 +304,55 @@
     },
     {
       "id": "wisdom:conduct_1on_1",
-      "reason": "Forwarding alias wisdom → meeting:conduct_1on_1 (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:conduct_1on_1. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 meeting:conduct_1on_1 (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:conduct_1on_1. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_architecture_ready",
-      "reason": "Forwarding alias wisdom → modeling:evaluate_architecture_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_architecture_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 modeling:evaluate_architecture_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_architecture_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_customer_signoff",
-      "reason": "Forwarding alias wisdom → modeling:evaluate_customer_signoff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_customer_signoff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 modeling:evaluate_customer_signoff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_customer_signoff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_decision_rights_approval",
-      "reason": "Forwarding alias wisdom → approval:evaluate_decision_rights (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use approval:evaluate_decision_rights. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 approval:evaluate_decision_rights (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use approval:evaluate_decision_rights. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_qa_ready",
-      "reason": "Forwarding alias wisdom → modeling:evaluate_qa_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_qa_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 modeling:evaluate_qa_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_qa_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_requirements_completeness",
-      "reason": "Forwarding alias wisdom → modeling:evaluate_requirements_completeness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_requirements_completeness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 modeling:evaluate_requirements_completeness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_requirements_completeness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:evaluate_task_plan_ready",
-      "reason": "Forwarding alias wisdom → orchestrator:evaluate_task_plan_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:evaluate_task_plan_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 orchestrator:evaluate_task_plan_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:evaluate_task_plan_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:execute_task_plan",
-      "reason": "Forwarding alias wisdom → orchestrator:execute_task_plan (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:execute_task_plan. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 orchestrator:execute_task_plan (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:execute_task_plan. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:extract_action_items",
-      "reason": "Forwarding alias wisdom → meeting:extract_action_items (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:extract_action_items. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 meeting:extract_action_items (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:extract_action_items. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:find_slides_by_owner",
-      "reason": "Forwarding alias wisdom → media:find_slides_by_owner (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:find_slides_by_owner. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 media:find_slides_by_owner (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:find_slides_by_owner. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:generate_facilitation_script",
-      "reason": "Forwarding alias wisdom → meeting:generate_facilitation_script (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_facilitation_script. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 meeting:generate_facilitation_script (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_facilitation_script. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:generate_reminder_message",
-      "reason": "Forwarding alias wisdom → meeting:generate_reminder_message (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_reminder_message. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 meeting:generate_reminder_message (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_reminder_message. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:pptx_diff",
-      "reason": "Forwarding alias wisdom → media:pptx_diff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:pptx_diff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 media:pptx_diff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:pptx_diff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:propose_tool_calls",
@@ -360,11 +364,11 @@
     },
     {
       "id": "wisdom:read_json",
-      "reason": "Forwarding alias wisdom → file:read_json (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:read_json. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 file:read_json (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:read_json. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:reasoning_loop",
-      "reason": "Agent-callable reasoning loop advertised in the op catalog and implemented in decision-ops.ts; only catalog-shape tests (contract-boundary.test.ts) reference it — no pipeline or dispatch test exercises it yet. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Agent-callable reasoning loop advertised in the op catalog and implemented in decision-ops.ts; only catalog-shape tests (contract-boundary.test.ts) reference it \u2014 no pipeline or dispatch test exercises it yet. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:regex_extract",
@@ -372,11 +376,11 @@
     },
     {
       "id": "wisdom:task_plan_to_next_tasks",
-      "reason": "Forwarding alias wisdom → orchestrator:task_plan_to_next_tasks (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:task_plan_to_next_tasks. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 orchestrator:task_plan_to_next_tasks (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:task_plan_to_next_tasks. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:write_artifact",
-      "reason": "Forwarding alias wisdom → file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     }
   ]
 }
