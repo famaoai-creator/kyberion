@@ -1116,6 +1116,35 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     evaluateStoredMissionGate,
     markPhaseTasksCompleted,
   } = await import('./refactor/mission-process-planning.js');
+  if (activeMissionControllerArgs.includes('--machine-only')) {
+    const { runMachineOnlyMissionGate } = await import('./mission_machine_gate.js');
+    await runMachineOnlyMissionGate(
+      { missionId: missionId || '', gateId: gateFile },
+      {
+        evaluateStored: evaluateStoredMissionGate,
+        advance: advanceCurrentPhase,
+        markCompleted: markPhaseTasksCompleted,
+        activate: activateMissionOnGateProgress,
+        recordEvaluation: (upperId, gateId, stored) => {
+          auditChain.record({
+            agentId: registeredEnv('KYBERION_PERSONA') || 'mission_controller',
+            action: stored.evaluation?.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
+            operation: `gate-pass:${gateId}`,
+            result: 'completed',
+            metadata: {
+              mission_id: upperId,
+              gate_id: gateId,
+              machine_only: true,
+              verdict: stored.evaluation?.verdict,
+              reasons: stored.evaluation?.reasons,
+              evidence_path: stored.evaluation?.evidence_path,
+            },
+          });
+        },
+      }
+    );
+    return;
+  }
   if (!missionId) {
     logger.error(
       'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
@@ -1353,7 +1382,9 @@ async function mainImpl(
     return;
   }
 
-  const earlyPositionalArgs = extractMissionControllerPositionalArgs(args);
+  const earlyPositionalArgs = extractMissionControllerPositionalArgs(
+    args.filter((arg) => arg !== '--machine-only')
+  );
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
   if (earlyPositionalArgs[1]) {
     setRegisteredEnv('MISSION_ID', earlyPositionalArgs[1].toUpperCase());
@@ -1378,7 +1409,9 @@ async function mainImpl(
   }
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
-  const positionalArgs = extractMissionControllerPositionalArgs(args);
+  const positionalArgs = extractMissionControllerPositionalArgs(
+    args.filter((arg) => arg !== '--machine-only')
+  );
 
   const action = positionalArgs[0];
   const arg1 = positionalArgs[1];

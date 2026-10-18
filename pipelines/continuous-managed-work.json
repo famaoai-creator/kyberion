@@ -1,0 +1,16 @@
+{
+  "action": "pipeline",
+  "name": "continuous-managed-work",
+  "version": "1.0.0",
+  "description": "Owner-only managed work marker. Actual execution uses the verified continuous owner port, never a dot worker.",
+  "steps": [
+    {
+      "id": "owner_only",
+      "role": "source",
+      "op": "system:log",
+      "params": {
+        "message": "Managed work requires the continuous owner supervisor surface; this marker does not execute lifecycle effects."
+      }
+    }
+  ]
+}

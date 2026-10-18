@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "name": "continuous-operations",
+  "version": "1.0.0",
+  "description": "Scoped snapshot observation, objective analysis and deduplicated dot admission. Run as a bound organization operation; disabled example configuration creates no work.",
+  "schedule": {
+    "id": "continuous-operations",
+    "cron": "*/30 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "inventory",
+      "role": "source",
+      "op": "core:continuous_operations",
+      "params": {
+        "config_ref": "knowledge/product/governance/continuous-operations/example.json",
+        "apply": false
+      },
+      "produces": {
+        "channel": "continuous_operations",
+        "type": "ContinuousOperationsReport",
+        "sensitive": true
+      }
+    }
+  ]
+}
