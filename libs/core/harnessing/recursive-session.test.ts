@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { runRecursiveSession } from './recursive-session.js';
-import { runProbe } from './probe-runner.js';
+import { copyTreeHashed, manifestsEqual, runProbe, treeManifest } from './probe-runner.js';
 
 const ROOT = path.join(process.cwd(), 'active/shared/tmp/harnessing-recursive-test');
 
@@ -345,10 +345,62 @@ describe('manifest edge cases (R2 review)', () => {
       runRoot: path.join(ROOT, 'run-mark'),
     });
     expect(outcome.ok).toBe(false);
+    expect(outcome.probe_refused).toBe('leak_marker');
     expect(outcome.error).toMatch(/leak marker:/);
     // The snapshot+manifest are still recorded honestly — the refusal is
     // evidence, and the staged bytes are auditable.
     expect(outcome.staged_snapshot).toBeDefined();
     expect(outcome.snapshot_manifest).toBeDefined();
+  });
+});
+
+describe('integrity hardening (R3 review)', () => {
+  it('copyTreeHashed manifests the bytes it copied, detectable post-copy', () => {
+    const src = path.join(ROOT, 'hashed-src');
+    const dst = path.join(ROOT, 'hashed-dst');
+    safeWriteFile(path.join(src, 'a.txt'), 'alpha');
+    safeWriteFile(path.join(src, 'sub', 'b.bin'), Buffer.from([0x80, 0x81]));
+    const manifest = copyTreeHashed(src, dst);
+    expect(Object.keys(manifest).sort()).toEqual(['a.txt', 'sub/b.bin']);
+    // Same bytes as landed in dst — verifiable independently.
+    expect(manifestsEqual(treeManifest(dst), manifest)).toBe(true);
+    safeWriteFile(path.join(dst, 'a.txt'), 'changed');
+    expect(manifestsEqual(treeManifest(dst), manifest)).toBe(false);
+  });
+  it('blind selection excludes never-executed outcomes', async () => {
+    // base delivers (scenario ships pass_marker); ok1 delivers; mark is
+    // stage-refused. Pool must be exactly the two executed rows.
+    const scenDir = path.join(ROOT, 'scenario-pool');
+    safeWriteFile(path.join(scenDir, 'pass_marker'), '1');
+    safeWriteFile(
+      path.join(scenDir, 'run.sh'),
+      '#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\n'
+    );
+    let poolSize = -1;
+    const r = await runRecursiveSession({
+      session_id: 'rec-pool',
+      scenarioDir: scenDir,
+      command: ['sh', 'run.sh'],
+      expectOutputs: ['out.txt'],
+      runRoot: path.join(ROOT, 'run-pool'),
+      candidates: [
+        { label: 'ok1', overlayDir: overlay('pool-ok', { extra: '1' }) },
+        {
+          label: 'mark',
+          overlayDir: overlay('pool-mark', { 'n.txt': 'rubric eval_score' }),
+        },
+      ],
+      rounds: 1,
+      selection: 'blind',
+      selector: (rows) => {
+        poolSize = rows.length;
+        return 'A';
+      },
+    });
+    expect(r.rounds[0].decision.decision).toBe('human_gate');
+    // 'mark' refused at the session's live-dir scan first — check the
+    // rejection trail rather than pool presence.
+    expect(r.rounds[0].rejected.some((x) => /leak marker/.test(x.reason))).toBe(true);
+    expect(poolSize).toBe(2);
   });
 });
