@@ -8063,6 +8063,11 @@
         "ja": "ピア協働を実行",
         "qps-ploc": "⟦Řůñ ȧ ṗėėř ƈőŀŀȧƀőřȧŧïőñ ŀőřėɱ ï⟧"
       },
+      "cli_cmd_script_peer_task": {
+        "en": "Propose, accept and track typed peer tasks",
+        "ja": "ピアへの型付き作業依頼を提案・受理・追跡",
+        "qps-ploc": "⟦Ṗřőṗőşė, ȧƈƈėṗŧ ȧñḓ ŧřȧƈķ ŧẏṗėḓ ṗėėř ŧȧşķş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "cli_cmd_script_peer_send": {
         "en": "Send a peer message",
         "ja": "ピアにメッセージを送信",

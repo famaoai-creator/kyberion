@@ -149,6 +149,23 @@ KYBERION_PEER_SHARED_SECRET="$PEER_A_SECRET" pnpm peer:conversation-server \
 - Claude がなく Codex CLI だけがある端末では `--auto-reply-backend codex` を付けます。Codex はツールを無効にした隔離状態（読み取り専用、承認なし、MCP なし、空の作業フォルダ、最小限の環境変数）で返事を書きます。ただしモデルにはツールの定義が見えたままです。実行はできず、ツールを使おうとした返事は破棄され `tool_attempt_detected` として記録されます。動作確認済みの codex-cli のバージョン（現在 0.163）以外では止まります（`--auto-reply-allow-untested` で明示的に許可できます）。この場合の provider 証明は `--provider codex`、送信許可は `api.openai.com` です。
 - 自動返事を有効にした相手には、この受け口の共有 secret を持つ全員に tenant の knowledge の抜粋が見える可能性があります。knowledge を見せてよい相手だけを指定してください。
 
+## 6. 作業を依頼する（任意）
+
+相手 peer に「実行」を頼むときは、会話ではなく型付きの作業依頼を使います。依頼側は作業の種類の名前だけを送り、何を実行するか（固定のパイプラインか、固定引数の `pnpm` スクリプト）と誰から受けるかは、受け手の `knowledge/confidential/<tenant>/connections/peer-tasks.json` が決めます。
+
+```bash
+# 依頼側
+pnpm kyberion peer task propose --peer-id <自分> --tenant-id <tenant> --to-peer <相手> \
+  --task-type baseline.check --summary "引き継ぎ前に健全性を確認したい"
+
+# 受け手側（届いた依頼を確認して受理）
+pnpm kyberion peer task list --peer-id <自分> --tenant-id <tenant> --state pending
+pnpm kyberion peer task accept --peer-id <自分> --tenant-id <tenant> --task-id <ID> \
+  --actor-id <自分の名前> --reason "<受理理由>"
+```
+
+受理すると WorkItem として実行され、報告とログは受け手側に成果物として残り、依頼側には sha256 付きの参照だけが返ります。届いた時点では何も実行されません。途中で止まった依頼は `resume`、結果の再送は `resend-result` を使います。詳細は [Peer Network Catalog](./peer-network.md#typed-peer-tasks) を参照してください。
+
 ## つまずいたときの判断
 
 ```text
@@ -169,6 +186,6 @@ peers に出るが送れない
 - runtime の Mesh Hub JSONL を手で編集しない
 - 異なる tenant-id の peer を同じ discovery として扱わない
 - `mesh-hub:inspect peers` に出ていない peer を無理に宛先にしない
-- collaboration の受信を mission lifecycle や任意 actuator の自動実行と解釈しない
+- collaboration や作業依頼の受信を mission lifecycle や任意 actuator の自動実行と解釈しない（作業依頼は受け手が受理したときだけ、受け手の catalog にある固定の処理が動く）
 
 詳細な transport、proposal、LAN 設定は [Peer Network Catalog](./peer-network.md) を参照してください。

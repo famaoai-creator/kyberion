@@ -3036,6 +3036,10 @@
       "types": "./dist/mesh/peer-auto-reply.d.ts",
       "default": "./dist/mesh/peer-auto-reply.js"
     },
+    "./mesh/peer-task-exchange": {
+      "types": "./dist/mesh/peer-task-exchange.d.ts",
+      "default": "./dist/mesh/peer-task-exchange.js"
+    },
     "./mesh/peer-conversation": {
       "types": "./dist/mesh/peer-conversation.d.ts",
       "default": "./dist/mesh/peer-conversation.js"

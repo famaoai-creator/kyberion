@@ -245,6 +245,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion peer register`                 | `pnpm peer:register`                | Register this runtime with the peer network                                                                           |
 | `pnpm kyberion peer runtime-recovery`         | `pnpm peer:runtime-recovery`        | Recover the peer runtime                                                                                              |
 | `pnpm kyberion peer send`                     |                                     | Send a peer message                                                                                                   |
+| `pnpm kyberion peer task`                     |                                     | Propose, accept and track typed peer tasks                                                                            |
 | `pnpm kyberion personal-workbench server`     |                                     | Start the personal workbench                                                                                          |
 | `pnpm kyberion pipeline`                      | `pnpm pipeline`                     | Run a governed pipeline                                                                                               |
 | `pnpm kyberion pipeline dry-run`              |                                     | Dry-run a pipeline: validate and plan its steps without side effects.                                                 |

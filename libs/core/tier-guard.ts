@@ -8,7 +8,7 @@ import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js'
 import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives.js';
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger, emitConsoleLine } from './logger.js';
@@ -281,6 +281,75 @@ function policyPathMatches(
 ): boolean {
   const expanded = expandPolicyPath(pattern, missionId, tenantSlug);
   return expanded !== null && pathStartsWith(relativePath, expanded);
+}
+
+/**
+ * Comparison key for a `deny_read` carve-out: Unicode-NFC and case-folded.
+ * The default APFS/NTFS volumes are case- and normalization-insensitive, so
+ * `.../Connections/x` opens the same file as `.../connections/x`; a deny that
+ * only matched the literal spelling would let a broader allow grant reach the
+ * carved-out file. Folding both sides over-denies on case-sensitive volumes,
+ * which is the fail-closed direction. Never use this for allow matching.
+ */
+function denyComparisonKey(value: string): string {
+  return normalizePath(value).normalize('NFC').toLowerCase();
+}
+
+/**
+ * Project-relative spellings a deny carve-out must be checked against: the
+ * lexically resolved path (`..` already collapsed by `path.resolve`) and, when
+ * the path or an ancestor exists, its physical location (symlinks resolved via
+ * the nearest existing ancestor). The project root is realpath'd as well so a
+ * symlinked checkout does not make every physical path look outside the root.
+ */
+function denyCandidatePaths(relativePath: string): string[] {
+  const candidates = [relativePath];
+  const root = projectRoot();
+  let physicalRoot = root;
+  try {
+    physicalRoot = rawRealpathSync(root);
+  } catch {
+    // Unresolvable root: the lexical candidate is the only one available.
+  }
+  let existing = path.resolve(root, relativePath);
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      const real = rawRealpathSync(existing);
+      const physical = path.join(real, ...rest);
+      for (const base of new Set([physicalRoot, root])) {
+        const rel = normalizePath(path.relative(base, physical));
+        if (!isOutsideProjectRoot(rel) && !path.isAbsolute(rel)) candidates.push(rel);
+      }
+      break;
+    } catch {
+      const parent = path.dirname(existing);
+      if (parent === existing) break;
+      rest.unshift(path.basename(existing));
+      existing = parent;
+    }
+  }
+  return [...new Set(candidates)];
+}
+
+/**
+ * Does a role `deny_read` pattern cover this path? Matched case-insensitively
+ * on every resolved spelling of the path (see denyCandidatePaths): a deny
+ * carve-out must hold however the caller spells the path.
+ */
+function denyPatternMatches(
+  candidates: readonly string[],
+  pattern: string,
+  missionId?: string,
+  tenantSlug?: string
+): boolean {
+  const expanded = expandPolicyPath(pattern, missionId, tenantSlug);
+  if (expanded === null) return false;
+  const p = denyComparisonKey(expanded);
+  return candidates.some((candidate) => {
+    const t = denyComparisonKey(candidate);
+    return t === p || t.startsWith(p + '/');
+  });
 }
 
 /**
@@ -1114,6 +1183,10 @@ export function validateReadPermission(
           { kind: 'read', role: identity.role }
         );
         if (denial) return denial;
+        // The ledger allow decisions below judge a knowledge mirror path; the
+        // role's deny_read carve-outs must still see the real ledger path.
+        const roleDenial = roleDenyReadDecision(loaded.policy, relativePath, identity);
+        if (roleDenial) return roleDenial;
         const ledgerTier = partitionedRuntimeTier(protectedMatch.prefix);
         if (!ledgerTier) return { allowed: true };
         // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
@@ -1260,6 +1333,40 @@ function ledgerRoleReadGrant(
 }
 
 /**
+ * A role's `deny_read` carves paths out of its own read grants (e.g. a
+ * tenant-knowledge reader that must never see the tenant's connection
+ * secrets). It wins over every grant, SUDO included: the role is a
+ * least-privilege assumption, so nothing reached through it may widen it.
+ * Always evaluated on the real path being read (never a permission mirror),
+ * case-insensitively and on its resolved spellings.
+ */
+function roleDenyReadDecision(
+  policy: { authority_role_permissions?: Record<string, { deny_read?: unknown } | undefined> },
+  relativePath: string,
+  identity: ReturnType<typeof resolvePolicyIdentityContext>
+): { allowed: false; reason: string } | undefined {
+  const currentRole = identity.role;
+  if (!currentRole) return undefined;
+  const deniedPatterns: unknown = policy.authority_role_permissions?.[currentRole]?.deny_read;
+  if (!Array.isArray(deniedPatterns) || deniedPatterns.length === 0) return undefined;
+  const currentMission = resolveProjectScope().missionId;
+  const candidates = denyCandidatePaths(relativePath);
+  if (
+    deniedPatterns.some(
+      (pattern) =>
+        typeof pattern === 'string' &&
+        denyPatternMatches(candidates, pattern, currentMission, identity.tenantSlug)
+    )
+  ) {
+    return {
+      allowed: false,
+      reason: `[ROLE_VIOLATION] role '${currentRole}' may not read ${relativePath} — the path is carved out of its grants (security-policy.json authority_role_permissions.${currentRole}.deny_read) | read it under a role that owns it | role=${currentRole}`,
+    };
+  }
+  return undefined;
+}
+
+/**
  * The persona/role/authority half of a protected-tier read decision (after the
  * tenant check): the role's deny_read carve-outs, SUDO scope, authority
  * grants, role grants, persona grants, project scope, then the tier
@@ -1280,26 +1387,8 @@ function personaTierReadDecision(
     tenantSlug,
   } = identity;
   const currentMission = resolveProjectScope().missionId;
-  // A role's `deny_read` carves paths out of its own read grants (e.g. a
-  // tenant-knowledge reader that must never see the tenant's connection
-  // secrets). It wins over every grant, SUDO included: the role is a
-  // least-privilege assumption, so nothing reached through it may widen it.
-  const deniedPatterns: unknown = currentRole
-    ? policy.authority_role_permissions?.[currentRole]?.deny_read
-    : undefined;
-  if (
-    Array.isArray(deniedPatterns) &&
-    deniedPatterns.some(
-      (pattern) =>
-        typeof pattern === 'string' &&
-        policyPathMatches(relativePath, pattern, currentMission, tenantSlug)
-    )
-  ) {
-    return {
-      allowed: false,
-      reason: `[ROLE_VIOLATION] role '${currentRole}' may not read ${relativePath} — the path is carved out of its grants (security-policy.json authority_role_permissions.${currentRole}.deny_read) | read it under a role that owns it | role=${currentRole}`,
-    };
-  }
+  const roleDenial = roleDenyReadDecision(policy, relativePath, identity);
+  if (roleDenial) return roleDenial;
   const projectTier = relativePath.match(
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
