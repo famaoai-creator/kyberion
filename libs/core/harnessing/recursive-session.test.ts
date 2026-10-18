@@ -245,7 +245,9 @@ describe('snapshot integrity verification (R1 review)', () => {
     safeMkdir(scenDir, { recursive: true });
     safeWriteFile(
       path.join(scenDir, 'run.sh'),
-      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo EVIL > "${injected}"\n`
+      // Append, not overwrite — a leftover injected.txt from a previous run
+      // would otherwise hash identically and the drift would go unseen.
+      `#!/bin/sh\ntest -f pass_marker && echo ok > out.txt\ntest -f iam_win && echo EVIL >> "${injected}"\n`
     );
     const r = await runRecursiveSession({
       session_id: 'rec-basedrift',
@@ -375,6 +377,9 @@ describe('integrity hardening (R3 review)', () => {
     // and the ok-filter must keep it out of the blind pool (3 rows if not).
     const scenDir = path.join(ROOT, 'scenario-pool');
     const markDir = path.join(ROOT, 'ov', 'pool-mark');
+    // A leftover injected marker file from a previous run would trip the
+    // session-START scan instead of the in-stage refusal under test.
+    safeRmSync(markDir);
     safeWriteFile(path.join(scenDir, 'pass_marker'), '1');
     safeWriteFile(
       path.join(scenDir, 'run.sh'),
