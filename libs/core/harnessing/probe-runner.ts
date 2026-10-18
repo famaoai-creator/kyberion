@@ -9,8 +9,10 @@
 
 import * as path from 'node:path';
 import {
+  assertGovernedExec,
   assertSafeRepositoryPath,
   safeCopyFileSync,
+  safeRmSync,
   safeExecResult,
   safeExistsSync,
   safeLstat,
@@ -18,6 +20,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { logger } from '../core.js';
+import { isValidRelPath } from './surface-spec.js';
 import { nowIso } from '../foundation/time.js';
 
 export interface ProbeSpec {
@@ -89,6 +92,15 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   if (!spec.command.length) {
     throw new Error('[PROBE_SPEC] command must be a non-empty argv array');
   }
+  // Command policy violations are spec errors, not rollout evidence.
+  assertGovernedExec(spec.command[0], spec.command.slice(1));
+  // expectOutputs paths are checked INSIDE the run dir — a traversal entry
+  // like '../../x' would escape it and let an unrelated file fake delivered.
+  for (const rel of spec.expectOutputs ?? []) {
+    if (!isValidRelPath(rel)) {
+      throw new Error(`[PROBE_SPEC] invalid expectOutputs path ${JSON.stringify(rel)}`);
+    }
+  }
   const runDir = path.join(runRoot, spec.label);
   const recorded_at = nowIso();
   const fail = (error: string): RunOutcome => ({
@@ -104,6 +116,9 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   });
 
   try {
+    // A rerun of the same label must start empty: stale files from a prior
+    // probe (including declared expectOutputs) would fake delivered=true.
+    if (safeExistsSync(runDir)) safeRmSync(runDir);
     copyTree(scenarioDir, runDir);
     if (spec.overlayDir) {
       const overlay = assertSafeRepositoryPath(spec.overlayDir);
