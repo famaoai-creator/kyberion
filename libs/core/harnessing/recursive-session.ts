@@ -22,7 +22,14 @@ import {
 } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { copyTree, runProbe, validateProbeSpec, type RunOutcome } from './probe-runner.js';
+import {
+  copyTree,
+  manifestsEqual,
+  runProbe,
+  treeManifest,
+  validateProbeSpec,
+  type RunOutcome,
+} from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
@@ -72,6 +79,10 @@ export interface RoundRecord {
   outcomes: RunOutcome[];
   /** Cumulative — includes rejections from earlier rounds (session-level trail). */
   rejected: Array<{ label: string; path: string; reason: string }>;
+  /** The base dir's bytes differ from the round-start manifest — later
+   *  probes may have run against different bytes than the base probe saw.
+   *  Recorded on every round; on auto_advance it additionally halts adoption. */
+  base_drifted?: boolean;
   propose_meta?: { backend_used: boolean; error?: string };
 }
 
@@ -216,6 +227,16 @@ export async function runRecursiveSession(
 
   const rounds: RoundRecord[] = [];
   const adopted: string[] = [];
+  // Per-label manifest of the last probed snapshot — a SUPPLIED overlay
+  // whose bytes change between rounds is surfaced, not silently re-probed.
+  // Proposed overlays share labels across rounds but legitimately regenerate
+  // — they have no cross-round identity to compare, so they are excluded.
+  const overlayManifests = new Map<string, string>();
+  const suppliedLabels = new Set(supplied.map((c) => c.label));
+  // Verified manifest of the last materialized base, carried into the next
+  // round — a detached writer hitting the verify→next-manifest window must
+  // not silently re-baseline into unverified bytes.
+  let pendingBaseManifest: Record<string, string> | null = null;
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
@@ -231,6 +252,35 @@ export async function runRecursiveSession(
 
   for (let round = 1; round <= spec.rounds; round++) {
     const roundRoot = path.join(runRoot, `round-${round}`);
+    // Manifest of the base BEFORE this round's probes — the scenario runs
+    // unsandboxed and could write into bases/round-N or the scenario input;
+    // a drift must fail adoption, not ride into the next base. A manifest
+    // failure here is recorded, not thrown: the probes below fail soft
+    // individually and their outcomes are evidence.
+    let baseManifest: Record<string, string> | null = null;
+    try {
+      baseManifest = treeManifest(currentBase);
+    } catch (error) {
+      rejected.push({
+        label: `r${round}:base`,
+        path: '.',
+        reason: `base manifest failed: ${error instanceof Error ? error.message : error} — drift unverifiable this round`,
+      });
+    }
+    if (pendingBaseManifest) {
+      if (baseManifest && !manifestsEqual(baseManifest, pendingBaseManifest)) {
+        rejected.push({
+          label: `r${round}:base`,
+          path: '.',
+          reason: 'base mutated between rounds — verified manifest kept as drift baseline',
+        });
+        // Keep the last VERIFIED state as the baseline: this round's probes
+        // run against mutated bytes (base_drifted will record it) and any
+        // adoption must still verify against the known-good manifest.
+        baseManifest = pendingBaseManifest;
+      }
+      pendingBaseManifest = null;
+    }
     // Round-scoped run dirs: no cross-round or cross-session contamination.
     let roundProposeMeta: RoundRecord['propose_meta'];
     const candidates = [...supplied];
@@ -284,6 +334,7 @@ export async function runRecursiveSession(
         ...(spec.expectOutputs ? { expectOutputs: spec.expectOutputs } : {}),
         runRoot: roundRoot,
         timeoutMs: spec.timeoutMs,
+        ...(spec.markers ? { markers: spec.markers } : {}),
       });
 
     if (!candidates.length) {
@@ -303,14 +354,59 @@ export async function runRecursiveSession(
 
     const base = probeFor('base');
     const outcomes = candidates.map((c) => probeFor(c.label, c.overlayDir));
-    actualProbes += outcomes.length + 1;
+    // Count commands actually executed — a stage-refused or staging-failed
+    // outcome ran nothing; counting it as a probe would inflate the budget.
+    actualProbes += outcomes.filter((o) => o.ok).length + (base.ok ? 1 : 0);
+    // A marker caught at stage time means the probe REFUSED to run — mirror
+    // it into the rejection trail so the audit reads the same as a pre-probe
+    // rejection (it is one: the command never executed).
+    for (const o of outcomes) {
+      if (o.probe_refused) {
+        rejected.push({
+          label: `r${round}:${o.label}`,
+          path: '.',
+          reason: `probe refused: ${o.error}`,
+        });
+      }
+      // Cross-round honesty: same label, different bytes than last round —
+      // the supplied overlay mutated under the session's immutability
+      // assumption. Surface it; don't pretend the probes were comparable.
+      if (o.snapshot_manifest && suppliedLabels.has(o.label)) {
+        const canon = JSON.stringify(
+          Object.keys(o.snapshot_manifest)
+            .sort()
+            .map((k) => [k, o.snapshot_manifest![k]])
+        );
+        const prev = overlayManifests.get(o.label);
+        if (prev !== undefined && prev !== canon) {
+          rejected.push({
+            label: `r${round}:${o.label}`,
+            path: '.',
+            reason: 'supplied overlay bytes changed between rounds',
+          });
+        }
+        overlayManifests.set(o.label, canon);
+      }
+    }
     const decision = classifyProbeSet(base, outcomes, spec.metrics ?? []);
     finalDecision = decision;
+    // The scenario is unsandboxed: a probe can mutate the base mid-round and
+    // silently skew every later probe's comparability. Detect + record drift
+    // on EVERY round, not only when adoption needs it.
+    let baseDrifted = false;
+    try {
+      baseDrifted = !baseManifest || !manifestsEqual(treeManifest(currentBase), baseManifest);
+    } catch {
+      baseDrifted = true;
+    }
 
     const selection =
       spec.selection === 'blind' && decision.decision === 'human_gate'
         ? applyBlindSelection(
-            [base, ...outcomes],
+            // Never-executed outcomes (stage-refused, staging-failed) have no
+            // artifacts to judge — keep them out of the anonymized pool so a
+            // recommendation can't name bytes that never ran.
+            [base, ...outcomes].filter((o) => o.ok),
             // Per-round variation: +round makes each round's letter mapping
             // differ — deliberate, unlike the single-shot session's raw seed.
             (spec.seed ?? sessionSeed(spec.session_id)) + round,
@@ -325,6 +421,7 @@ export async function runRecursiveSession(
       selection,
       outcomes,
       rejected: [...rejected],
+      ...(baseDrifted ? { base_drifted: true } : {}),
       ...(roundProposeMeta ? { propose_meta: roundProposeMeta } : {}),
     });
 
@@ -333,10 +430,51 @@ export async function runRecursiveSession(
         halted = 'auto_advance_final';
         break;
       }
-      // Materialize: next base = current base + winner overlay.
-      const winner = candidates.find((c) => c.label === decision.winner)!;
+      // Materialize: next base = current base + winner overlay — sourced from
+      // the probe's staged snapshot, never the live overlayDir. The window
+      // between probe and adoption is untrusted: bytes adopted must be the
+      // bytes probed (R7-04).
+      const winnerOutcome = outcomes.find((o) => o.label === decision.winner);
+      const adoptionSource = winnerOutcome?.staged_snapshot;
+      const adoptionManifest = winnerOutcome?.snapshot_manifest;
+      // adopted bytes == probed bytes, verified — the scenario is
+      // unsandboxed, so BOTH the winner snapshot and the current base can
+      // drift during this round's probes.
+      // treeManifest on a tampered path (dir swapped for a file, etc.) throws
+      // — that IS drift, so convert it to a halt instead of crashing the
+      // session and losing the probed evidence.
+      let driftReason: string | null;
+      try {
+        driftReason = !adoptionSource
+          ? 'probed-bytes snapshot unavailable'
+          : !adoptionManifest
+            ? 'snapshot manifest unavailable — bytes unverifiable'
+            : !baseManifest
+              ? 'base manifest unavailable — drift unverifiable'
+              : !manifestsEqual(treeManifest(adoptionSource), adoptionManifest)
+                ? 'winner snapshot drifted after probe'
+                : !manifestsEqual(treeManifest(currentBase), baseManifest)
+                  ? 'base dir drifted during round probes'
+                  : null;
+      } catch {
+        driftReason = 'manifest unreadable — drifted';
+      }
+      if (driftReason || !adoptionSource) {
+        const rejection = {
+          label: `r${round}:${decision.winner}`,
+          path: '.',
+          reason: `materialization failed: ${driftReason ?? 'probed-bytes snapshot unavailable'}`,
+        };
+        rejected.push(rejection);
+        // The round record was already pushed with a snapshot of `rejected` —
+        // reflect the materialization failure into it or the report loses the
+        // reason entirely (only halted_by would remain).
+        rounds[rounds.length - 1].rejected.push(rejection);
+        halted = 'materialization_error';
+        break;
+      }
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
-      const resolvedWinner = path.resolve(assertSafeRepositoryPath(winner.overlayDir));
+      const resolvedWinner = path.resolve(assertSafeRepositoryPath(adoptionSource));
       const resolvedNext = path.resolve(nextBase);
       const resolvedCurrent = path.resolve(currentBase);
       if (
@@ -352,15 +490,28 @@ export async function runRecursiveSession(
       try {
         if (safeExistsSync(nextBase)) safeRmSync(nextBase);
         copyTree(currentBase, nextBase);
-        copyTree(winner.overlayDir, nextBase);
+        copyTree(adoptionSource, nextBase);
+        // A detached writer could land bytes in the verify→copy window;
+        // re-hash the materialized tree and require it to equal exactly
+        // base-manifest overridden by snapshot-manifest (overlay wins on
+        // collision, same as the copy order above).
+        const expected = { ...baseManifest, ...adoptionManifest };
+        if (!manifestsEqual(treeManifest(nextBase), expected)) {
+          safeRmSync(nextBase);
+          throw new Error('materialized base failed post-copy integrity check');
+        }
         adopted.push(`r${round}:${decision.winner}`);
+        // Carry the verified state into the next round's baseline check.
+        pendingBaseManifest = expected;
       } catch (error) {
         // Fail soft — the rounds already probed are evidence; don't lose them.
-        rejected.push({
+        const rejection = {
           label: `r${round}:${decision.winner}`,
           path: '.',
           reason: `materialization failed: ${error instanceof Error ? error.message : error}`,
-        });
+        };
+        rejected.push(rejection);
+        rounds[rounds.length - 1].rejected.push(rejection);
         halted = 'materialization_error';
         break;
       }
@@ -400,6 +551,15 @@ export async function runRecursiveSession(
     command: spec.command,
     declared_rounds: spec.rounds,
     halted_by: halted,
+    // final_decision still says auto_advance+winner on this halt path —
+    // without the reason here a consumer keyed on final_decision alone would
+    // see an adopted winner that never landed.
+    ...(halted === 'materialization_error'
+      ? {
+          materialization_error:
+            rounds[rounds.length - 1]?.rejected.at(-1)?.reason ?? 'materialization failed',
+        }
+      : {}),
     budget,
     ...(spec.work_shape ? { work_shape: spec.work_shape } : {}),
   };
