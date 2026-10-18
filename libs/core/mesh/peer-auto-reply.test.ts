@@ -554,17 +554,19 @@ describe('peer auto-reply', () => {
     });
     const sentIds: string[] = [];
     let calls = 0;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: any, init?: RequestInit) => {
-      const envelope = JSON.parse(String(init?.body || '{}'));
-      sentIds.push(envelope.message_id);
-      calls += 1;
-      if (calls === 1) throw new TypeError('fetch failed');
-      const result = await remote.processEnvelope(envelope);
-      return new Response(JSON.stringify(result.body), {
-        status: result.status,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      });
-    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: unknown, init?: RequestInit) => {
+        const envelope = JSON.parse(String(init?.body || '{}'));
+        sentIds.push(envelope.message_id);
+        calls += 1;
+        if (calls === 1) throw new TypeError('fetch failed');
+        const result = await remote.processEnvelope(envelope);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+    );
 
     const deliver = vi.fn((input: PeerAutoReplyDeliverInput) =>
       deliverPeerAutoReply(input, { catalogPath: CATALOG_PATH })
