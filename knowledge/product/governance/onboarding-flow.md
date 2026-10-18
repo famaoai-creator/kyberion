@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-10-11
+last_updated: 2026-10-18
 kind: governance
 scope: repository
 authority: standard
@@ -89,6 +89,10 @@ tenant JSON は表示・契約上の facet になり得るが、tenant registry 
 ## 3. 標準手順
 
 ### Step 0: baseline を確認する
+
+LLM CLI のプロンプトから始める場合は [会話経路の手順](../orchestration/prompt-first-onboarding.md)に従う。
+依存・baseline の実行成果物がまだない新規 clone は先に Step 1 の共通土台を準備してから
+baseline を実行する。実行可能な pipeline の fatal_error や circuit breaker を回避する例外ではない。
 
 セッション開始時は次を実行し、結果の `status` に従う。
 
