@@ -15,16 +15,13 @@ import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
-  safeLstat,
   safeMkdir,
-  safeReaddir,
-  safeCopyFileSync,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { runProbe, type RunOutcome } from './probe-runner.js';
+import { copyTree, runProbe, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
@@ -35,6 +32,7 @@ import {
   type BlindRecommendation,
   type BlindSelector,
 } from './blind-select.js';
+import { sessionSeed } from './contrastive-session.js';
 
 export interface RecursiveSessionSpec {
   session_id: string;
@@ -86,30 +84,17 @@ export interface RecursiveSessionResult {
   budget: { expected_probes: number; actual_probes: number; status: 'ok' | 'short' | 'exceeded' };
 }
 
-function sessionHash(id: string): number {
-  let h = 2166136261;
-  for (const ch of id) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function copyTreeInto(src: string, dst: string): void {
-  safeMkdir(dst, { recursive: true });
-  for (const entry of safeReaddir(src)) {
-    const s = path.join(src, entry);
-    const d = path.join(dst, entry);
-    const stat = safeLstat(s);
-    if (stat.isDirectory()) copyTreeInto(s, d);
-    else if (stat.isFile()) safeCopyFileSync(s, d);
-  }
-}
-
 export async function runRecursiveSession(
   spec: RecursiveSessionSpec
 ): Promise<RecursiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  const scen = path.resolve(spec.scenarioDir);
+  const resolvedRoot = path.resolve(runRoot);
+  if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[RECURSIVE_SESSION] runRoot must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   safeMkdir(runRoot, { recursive: true });
   if (!Number.isInteger(spec.rounds) || spec.rounds < 1 || spec.rounds > 10) {
     throw new Error('[RECURSIVE_SESSION] rounds must be an integer 1..10');
@@ -131,10 +116,25 @@ export async function runRecursiveSession(
   }
   // Predict proposed labels and reject collisions before spending backend calls.
   if (spec.propose) {
-    const predicted = Array.from(
-      { length: spec.propose.count },
-      (_, i) => `${spec.propose!.labelPrefix ?? 'llm'}${i + 1}`
-    );
+    if (
+      !Number.isInteger(spec.propose.count) ||
+      spec.propose.count < 1 ||
+      spec.propose.count > 10
+    ) {
+      throw new Error('[RECURSIVE_SESSION] propose.count must be an integer 1..10');
+    }
+    const prefix = spec.propose.labelPrefix ?? 'llm';
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(prefix)) {
+      throw new Error('[RECURSIVE_SESSION] invalid propose.labelPrefix charset');
+    }
+    const predicted = Array.from({ length: spec.propose.count }, (_, i) => `${prefix}${i + 1}`);
+    for (const label of predicted) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
+        throw new Error(
+          `[RECURSIVE_SESSION] predicted label ${JSON.stringify(label)} is not a valid label`
+        );
+      }
+    }
     const all = [...labels, ...predicted];
     if (new Set(all).size !== all.length) {
       throw new Error('[RECURSIVE_SESSION] supplied label collides with predicted proposed labels');
@@ -184,7 +184,10 @@ export async function runRecursiveSession(
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
-  let expectedProbes = 0;
+  // Declared upfront: each round was budgeted 1 base probe + one probe per
+  // declared candidate. Rejected overlays show up as actual < expected.
+  const expectedProbes =
+    spec.rounds * (1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0));
   let finalDecision: DecisionReport | null = null;
 
   for (let round = 1; round <= spec.rounds; round++) {
@@ -193,8 +196,12 @@ export async function runRecursiveSession(
     let roundProposeMeta: RoundRecord['propose_meta'];
     const candidates = [...supplied];
     if (spec.propose && spec.surface) {
+      const roundBrief =
+        adopted.length || round > 1
+          ? `${spec.propose.brief} (round ${round} of ${spec.rounds}; adopted so far: ${adopted.join(', ') || 'none'})`
+          : spec.propose.brief;
       const proposed = await proposeCandidates({
-        brief: spec.propose.brief,
+        brief: roundBrief,
         surface: spec.surface,
         count: spec.propose.count,
         outDir: path.join(roundRoot, '_proposed'),
@@ -220,7 +227,6 @@ export async function runRecursiveSession(
         `[BUDGET_IDENTITY] duplicate labels in round ${round}: ${roundLabels.join(', ')}`
       );
     }
-    expectedProbes += candidates.length + (candidates.length ? 1 : 0);
 
     const probeFor = (label: string, overlayDir?: string): RunOutcome =>
       runProbe({
@@ -258,7 +264,9 @@ export async function runRecursiveSession(
       spec.selection === 'blind' && decision.decision === 'human_gate'
         ? applyBlindSelection(
             [base, ...outcomes],
-            (spec.seed ?? sessionHash(spec.session_id)) + round,
+            // Per-round variation: +round makes each round's letter mapping
+            // differ — deliberate, unlike the single-shot session's raw seed.
+            (spec.seed ?? sessionSeed(spec.session_id)) + round,
             spec.selector ?? metricsFallbackSelector
           )
         : null;
@@ -283,8 +291,8 @@ export async function runRecursiveSession(
       const winner = candidates.find((c) => c.label === decision.winner)!;
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
       if (safeExistsSync(nextBase)) safeRmSync(nextBase);
-      copyTreeInto(currentBase, nextBase);
-      copyTreeInto(winner.overlayDir, nextBase);
+      copyTree(currentBase, nextBase);
+      copyTree(winner.overlayDir, nextBase);
       currentBase = nextBase;
       continue;
     }
@@ -312,6 +320,9 @@ export async function runRecursiveSession(
     rounds,
     final_decision: finalDecision,
     adopted_overlays: adopted,
+    scenario_dir: spec.scenarioDir,
+    command: spec.command,
+    declared_rounds: spec.rounds,
     halted_by: halted,
     budget,
     ...(spec.work_shape ? { work_shape: spec.work_shape } : {}),
