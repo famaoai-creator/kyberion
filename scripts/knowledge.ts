@@ -16,6 +16,11 @@ import { withExecutionContext } from '@agent/core/authority';
 import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
+const USAGE =
+  'Usage: pnpm knowledge place --level <tenant|organization|project|mission|task|session|common|product|public> --slug <name> --title <title> --body <text> [--apply]\n       pnpm knowledge feedback --path <path> --verdict <useful|stale|wrong|not_useful>' +
+  '\n       pnpm knowledge weights recalculate --tenant <tenant-slug> [--min-events <n>] [--no-persist]' +
+  '\n       pnpm knowledge weights apply --proposal <path> --approval-ref <ref> --approved-by <principal> [--dry-run]';
+
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
@@ -26,6 +31,10 @@ export const main = defineScript({
   flags: ['dry-run'],
   run(context) {
     const args = context.positional;
+    if (args.length === 0 || args[0] === '--help' || args[0] === '-h' || args[0] === 'help') {
+      context.print(USAGE);
+      return;
+    }
     if (args[0] === 'weights' && args[1] === 'recalculate') {
       const current = currentScope();
       const tenant = flag(args, '--tenant') || current.tenant_slug;
@@ -101,11 +110,7 @@ export const main = defineScript({
       return;
     }
     if (args[0] !== 'place') {
-      throw new Error(
-        'Usage: pnpm knowledge place --level <tenant|organization|project|mission|task|session|common|product|public> --slug <name> --title <title> --body <text> [--apply]\n       pnpm knowledge feedback --path <path> --verdict <useful|stale|wrong|not_useful>' +
-          '\n       pnpm knowledge weights recalculate --tenant <tenant-slug> [--min-events <n>] [--no-persist]' +
-          '\n       pnpm knowledge weights apply --proposal <path> --approval-ref <ref> --approved-by <principal> [--dry-run]'
-      );
+      throw new Error(USAGE);
     }
     const level = flag(args, '--level') as Parameters<typeof knowledgeWritePathFor>[1] | undefined;
     const slug = flag(args, '--slug');
