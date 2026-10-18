@@ -21,7 +21,7 @@ function hookCommands(groups: HookGroup[] | undefined): string[] {
  * The kyberion hooks must fire whether the operator installed the
  * kyberion-claude-code plugin or not. The tracked `.claude/settings.json` is
  * the always-on wiring; the plugin's hooks.json is the installable copy.
- * Both must drive the same events into `dist/scripts/claude_code_hook.js`.
+ * Both must drive the same events through the build-independent bootstrap.
  */
 describe('Claude Code hook wiring contract', () => {
   const settings = readJson('.claude/settings.json') as {
@@ -40,18 +40,23 @@ describe('Claude Code hook wiring contract', () => {
     }
   });
 
-  it('routes the same hook events to dist/scripts/claude_code_hook.js', () => {
+  it('routes the same hook events through the stable provider bootstrap', () => {
     for (const [event, groups] of Object.entries(plugin.hooks)) {
       const pluginTargets = new Set(
         hookCommands(groups)
-          .filter((command) => command.includes('claude_code_hook'))
+          .filter(
+            (command) => command.includes('provider_hook_entry.mjs') && command.includes(' claude ')
+          )
           .map((command) => command.split(' ').pop())
       );
       const settingsTargets = new Set(
         hookCommands(settings.hooks[event])
-          .filter((command) => command.includes('claude_code_hook.js'))
+          .filter(
+            (command) => command.includes('provider_hook_entry.mjs') && command.includes(' claude ')
+          )
           .map((command) => command.split(' ').pop())
       );
+      expect(pluginTargets.size).toBeGreaterThan(0);
       for (const target of pluginTargets) {
         expect(
           settingsTargets.has(target ?? ''),
@@ -74,7 +79,9 @@ describe('Claude Code hook wiring contract', () => {
       'cloud bootstrap session-start.sh must remain wired'
     ).toBe(true);
     expect(
-      sessionStart.some((command) => command.includes('claude_code_hook.js')),
+      sessionStart.some(
+        (command) => command.includes('provider_hook_entry.mjs') && command.includes(' claude ')
+      ),
       'kyberion SessionStart hook must be wired'
     ).toBe(true);
   });
