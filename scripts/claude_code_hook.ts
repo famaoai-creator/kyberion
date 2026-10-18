@@ -19,6 +19,7 @@
  */
 
 import {
+  buildPostCompactionContext,
   buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
@@ -133,6 +134,19 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         // usage capture is best-effort; never block session close
       }
       buildStopContext(payload);
+      return;
+    }
+    case 'PostCompaction': {
+      // Devin-only event today; dormant under Claude Code. Re-injects a
+      // compact governance reminder and refreshes co-session presence.
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PostCompaction',
+            additionalContext: buildPostCompactionContext(payload),
+          },
+        })
+      );
       return;
     }
     case 'SessionEnd': {

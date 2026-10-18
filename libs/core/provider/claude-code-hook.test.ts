@@ -52,6 +52,7 @@ import {
   setCoSessionNamespace,
 } from '../co-session.js';
 import {
+  buildPostCompactionContext,
   buildSessionEndContext,
   buildSessionStartContext,
   buildStopContext,
@@ -241,6 +242,49 @@ describe('claude-code-hook — Devin tool aliasing and output shape', () => {
     expect(res.recorded).toBe(true);
     expect(recordSpy.mock.calls[0][0]).toMatchObject({ operation: 'Bash' });
     expect(recordPostToolUse({ tool_name: 'read', tool_input: {} }).recorded).toBe(false);
+  });
+
+  it('extracts apply_patch targets from patch text so patches cannot bypass the tier gate', () => {
+    const denied = evaluatePreToolUse({
+      tool_name: 'apply_patch',
+      tool_input: {
+        patch:
+          '*** Begin Patch\n*** Update File: knowledge/personal/secret.md\n@@ -1 +1 @@\n*** End Patch',
+      },
+    });
+    expect(denied.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('personal tier');
+
+    const diffDenied = evaluatePreToolUse({
+      tool_name: 'apply_patch',
+      tool_input: { patch: '--- a/libs/x.ts\n+++ b/knowledge/personal/y.md\n' },
+    });
+    expect(diffDenied.hookSpecificOutput.permissionDecision).toBe('deny');
+
+    const allowed = evaluatePreToolUse({
+      tool_name: 'apply_patch',
+      tool_input: { patch: '*** Begin Patch\n*** Update File: libs/core/foo.ts\n*** End Patch' },
+    });
+    expect(allowed.hookSpecificOutput.permissionDecision).toBe('allow');
+  });
+
+  it('audits write_to_process under its own name without capturing payload text', () => {
+    recordSpy.mockClear();
+    const res = recordPostToolUse({
+      tool_name: 'write_to_process',
+      tool_input: { shell_id: 's1', text_input: 'super-secret-input' },
+    });
+    expect(res.recorded).toBe(true);
+    const entry = recordSpy.mock.calls[0][0];
+    expect(entry).toMatchObject({ operation: 'write_to_process' });
+    expect(entry.metadata).toMatchObject({ shell_id: 's1', input_kind: 'text' });
+    expect(JSON.stringify(entry)).not.toContain('super-secret-input');
+  });
+
+  it('re-injects a governance reminder and re-joins presence on PostCompaction', () => {
+    const ctx = buildPostCompactionContext({ session_id: 'compact-1' });
+    expect(ctx).toContain('remains active after compaction');
+    expect(ctx).toContain('/ky-review');
   });
 
   it('emits top-level decision/reason for Devin denies but not under Claude', () => {

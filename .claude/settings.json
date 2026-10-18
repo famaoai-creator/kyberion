@@ -63,7 +63,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "^(Write|Edit|MultiEdit|NotebookEdit|Bash|write|edit|apply_patch|notebook_edit|exec)$",
+        "matcher": "^(Write|Edit|MultiEdit|NotebookEdit|Bash|write|edit|apply_patch|notebook_edit|exec|write_to_process)$",
         "hooks": [
           {
             "type": "command",
@@ -88,6 +88,16 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js\" SessionEnd"
+          }
+        ]
+      }
+    ],
+    "PostCompaction": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/provider_hook_entry.mjs\" claude PostCompaction"
           }
         ]
       }
