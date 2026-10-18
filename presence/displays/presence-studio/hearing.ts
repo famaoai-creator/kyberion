@@ -104,6 +104,8 @@ export interface HearingRecord {
   /** Missing revisions are legacy zero; timestamps are never a concurrency fence. */
   record_revision?: number;
   requirements_revision?: number;
+  /** Last accepted decision commit; absent pre-upgrade records use zero. */
+  decision_revision?: number;
   handoff_pending?: {
     token: string;
     kind: 'mission' | 'inventory';

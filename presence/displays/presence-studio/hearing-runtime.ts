@@ -122,6 +122,8 @@ export function loadHearingRecord(namespace: string, sessionId: string): Hearing
   }
   hearingRevision(parsed.record_revision);
   hearingRevision(parsed.requirements_revision);
+  if (hearingRevision(parsed.decision_revision) > hearingRevision(parsed.record_revision))
+    throw new Error('[HEARING_RECORD_INVALID] decision revision exceeds record revision');
   if (parsed.handoff_pending !== undefined) {
     const pending = parsed.handoff_pending;
     if (
@@ -218,6 +220,8 @@ export function assertHearingDecisionSnapshot(
     hearingRevision(current.requirements_revision) !==
       hearingRevision(expected.requirements_revision) ||
     hearingRequirementsKey(current) !== hearingRequirementsKey(expected) ||
+    hearingRevision(current.decision_revision) !== hearingRevision(expected.decision_revision) ||
+    current.current_decision_operation_id !== expected.current_decision_operation_id ||
     current.decided_at !== expected.decided_at ||
     JSON.stringify(current.decided_by) !== JSON.stringify(expected.decided_by)
   ) {
@@ -284,6 +288,7 @@ export function updateHearingRecord(
         if (current && changed) {
           delete committed.decided_at;
           delete committed.decided_by;
+          delete committed.decision_revision;
           delete committed.current_decision_operation_id;
         }
         validateDecisionReceipts(committed, namespace);
@@ -635,6 +640,7 @@ export function decideHearingRecord(
         ...current,
         decided_by: decidedBy,
         decided_at: now,
+        decision_revision: hearingRevision(current.record_revision) + 1,
         updated_at: now,
       };
       delete next.current_decision_operation_id;
