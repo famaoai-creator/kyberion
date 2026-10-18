@@ -132,7 +132,9 @@
         }
         if (inventory.entryId) {
           statusEl.textContent =
-            vt(state.vocab, 'front_desk:hearing_inventory_done') +
+            (completionBlocked()
+              ? vt(state.vocab, 'front_desk:hearing_completion_existing')
+              : vt(state.vocab, 'front_desk:hearing_inventory_done')) +
             ' ' +
             formatTemplate(vt(state.vocab, 'front_desk:hearing_inventory_entry_label'), {
               id: inventory.entryId,
@@ -180,7 +182,9 @@
       }
       if (handoff.refId) {
         statusEl.textContent =
-          vt(state.vocab, 'front_desk:hearing_handoff_done') +
+          (completionBlocked()
+            ? vt(state.vocab, 'front_desk:hearing_completion_existing')
+            : vt(state.vocab, 'front_desk:hearing_handoff_done')) +
           ' ' +
           formatTemplate(vt(state.vocab, 'front_desk:hearing_mission_label'), {
             id: handoff.refId,
@@ -208,19 +212,6 @@
         ]),
         shell: window.FrontDeskRail && window.FrontDeskRail.ready,
       };
-    }
-    function settleRetiredHearingFailure(action, kind, result) {
-      var value = state[kind];
-      // A settled rejection can release its own guard without publishing an old payload.
-      // GET absence alone never proves that an outstanding mutation failed.
-      if (
-        value &&
-        value.action === action &&
-        result &&
-        !result.ok &&
-        [400, 401, 403].indexOf(result.status) !== -1
-      )
-        state[kind] = null;
     }
     function hearingActionCurrent(action) {
       var current = hearingActionContext();
@@ -323,6 +314,7 @@
       );
     }
     function renderDecision() {
+      renderCompletion();
       var locked = decisionBlocked();
       var local = decisionState();
       var busy = Boolean(
@@ -623,8 +615,11 @@
       decisionMounted = true;
       var check = document.getElementById('hearing-decision-check');
       if (check) check.addEventListener('click', checkDecision);
+      var completionCheck = document.getElementById('hearing-completion-check');
+      if (completionCheck) completionCheck.addEventListener('click', checkCompletion);
       function retire() {
         decisionGeneration += 1;
+        retireCompletions();
         Object.keys(decisions).forEach(function (key) {
           var recovery = decisions[key].recovery;
           if (recovery) recovery.waiting = false;
@@ -649,6 +644,7 @@
         });
         window.addEventListener('popstate', retire);
         window.addEventListener('storage', function () {
+          retireCompletions(true);
           publishDecision();
         });
       }
@@ -771,123 +767,377 @@
         });
     }
 
-    // HT-03 (2nd half): "confirm and hand off as a request" — carries the
-    // decided hearing record into the governed request/approval flow behind
-    // `POST /api/hearing/:session/handoff`. Idempotent server-side: a second
-    // click after success returns the same ids instead of registering twice.
-    function handoffHearing() {
+    // Completion markers are local no-resend guards, not server receipts. A
+    // session destination GET can recover navigation, never prove this attempt.
+    var completions = Object.create(null);
+    function completionKey() {
+      return 'kyberion.ask.hearing.completion.' + state.sessionId;
+    }
+    function completionState() {
+      var key = completionKey();
+      if (!completions[key]) completions[key] = { marker: null, failed: false };
+      return completions[key];
+    }
+    function completionBlocked() {
+      if (!state.hearingMode) return false;
+      var local = completionState();
+      try {
+        if (
+          !state.sessionId ||
+          window.sessionStorage.getItem('kyberion.ask.session_id') !== state.sessionId
+        )
+          throw new Error('Completion session was not retained');
+        var raw = window.sessionStorage.getItem(completionKey());
+        if (raw === null && local.marker !== null)
+          throw new Error('Completion correlation was lost');
+        if (raw !== null) local.marker = raw;
+      } catch (err) {
+        local.failed = true;
+      }
+      return local.marker !== null || local.failed;
+    }
+    function completionMarker(raw) {
+      try {
+        var value = JSON.parse(raw);
+        return value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          Object.keys(value).length === 6 &&
+          value.version === 1 &&
+          ['mission', 'inventory'].indexOf(value.kind) !== -1 &&
+          ['operationId', 'scenarioId', 'conversationId', 'scope'].every(function (key) {
+            return (
+              typeof value[key] === 'string' && value[key].length > 0 && value[key].length <= 4096
+            );
+          })
+          ? value
+          : null;
+      } catch (err) {
+        return null;
+      }
+    }
+    function completionMatches(value) {
+      return Boolean(
+        value &&
+        value.scenarioId === state.hearingScenarioId &&
+        value.conversationId === state.conversationId &&
+        value.scope === scopedUrl('/api/conversation') &&
+        value.kind === (isWorkInventoryScenario(state.hearingRecord) ? 'inventory' : 'mission')
+      );
+    }
+    function completionOwned(action) {
+      var local = completions[action.key];
+      try {
+        return Boolean(
+          local &&
+          !local.failed &&
+          local.marker === action.marker &&
+          window.sessionStorage.getItem(action.key) === action.marker
+        );
+      } catch (err) {
+        if (local) local.failed = true;
+        return false;
+      }
+    }
+    function clearCompletion(action) {
+      if (!completionOwned(action)) return false;
+      var local = completions[action.key];
+      try {
+        window.sessionStorage.removeItem(action.key);
+        if (window.sessionStorage.getItem(action.key) !== null)
+          throw new Error('Completion guard retained');
+        local.marker = null;
+        return true;
+      } catch (err) {
+        local.failed = true;
+        return false;
+      }
+    }
+    function completionCurrent(action) {
+      return !action.retired && decisionCurrent(action) && completionOwned(action);
+    }
+    function completionField(kind) {
+      return kind === 'inventory' ? 'hearingInventory' : 'hearingHandoff';
+    }
+    function renderCompletion() {
+      var locked = completionBlocked();
+      var local = completionState();
+      var marker = completionMarker(local.marker);
+      var checking = Boolean(local.read && local.read.waiting && completionCurrent(local.read));
+      var pending = Boolean(local.post && local.post.waiting && completionCurrent(local.post));
+      var phase = local.failed
+        ? 'storage'
+        : !marker
+          ? 'storage'
+          : !completionMatches(marker)
+            ? 'scope'
+            : checking
+              ? 'checking'
+              : pending
+                ? 'pending'
+                : 'unknown';
+      var host = document.getElementById('hearing-completion-status');
+      if (host) {
+        host.hidden = !locked;
+        host.setAttribute('aria-busy', String(checking || pending));
+      }
+      var text = document.getElementById('hearing-completion-text');
+      var label = vt(state.vocab, 'front_desk:hearing_completion_' + phase);
+      if (text && label) text.textContent = label;
+      var check = document.getElementById('hearing-completion-check');
+      if (check) {
+        check.hidden = !locked || local.failed || !completionMatches(marker);
+        check.disabled = checking || pending || !recoveryUsable() || decisionBlocked();
+        var checkLabel = vt(state.vocab, 'front_desk:hearing_completion_check');
+        if (checkLabel) check.textContent = checkLabel;
+      }
+      var exit = document.getElementById('hearing-completion-continue');
+      if (exit) {
+        exit.hidden = !locked;
+        exit.setAttribute('href', scopedUrl('/ask'));
+        var exitLabel = vt(state.vocab, 'front_desk:hearing_decision_continue');
+        if (exitLabel) exit.textContent = exitLabel;
+      }
+    }
+    function retireCompletions(retireSettlement) {
+      var hadActive = false;
+      Object.keys(completions).forEach(function (key) {
+        var local = completions[key];
+        if (local.marker !== null) hadActive = true;
+        [local.post, local.read].forEach(function (action) {
+          if (!action) return;
+          if (retireSettlement) action.retired = true;
+          if (action.waiting) hadActive = true;
+          action.waiting = false;
+          window.clearTimeout(action.timer);
+          var field = completionField(action.kind);
+          if (state[field] && state[field].action === action) state[field] = null;
+          // Definitive pre-write rejections can release their own retired guard;
+          // an explicit newer check instead retires all original settlement.
+        });
+      });
+      if (hadActive && hearingRecovery) hearingRecovery.endCompletion();
+    }
+    function submitCompletion(kind) {
+      if (hearingBlocked()) {
+        publishDecision();
+        return;
+      }
       if (
         !state.hearingMode ||
         !state.hearingRecord ||
+        !state.hearingRecord.decided_at ||
         state.sending ||
         hearingBlocked() ||
-        state.hearingCompletion
+        state.hearingCompletion ||
+        !recoveryUsable()
       )
         return;
-      if (state.hearingHandoff && state.hearingHandoff.pending) return;
-      if (completionConflictBlocked(state.hearingHandoff)) return;
-      if (hearingRecovery) hearingRecovery.beginCompletion();
+      var field = completionField(kind);
+      if (completionConflictBlocked(state[field])) return;
+      var local = completionState();
       var action = hearingActionContext();
-      state.hearingHandoff = { pending: true, action: action };
-      renderHearing();
-      fetchJson(
-        '/api/hearing/' +
-          encodeURIComponent(state.sessionId) +
-          '/handoff?locale=' +
-          encodeURIComponent(state.locale),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
+      action.generation = decisionGeneration;
+      action.key = completionKey();
+      action.kind = kind;
+      action.sessionId = state.sessionId;
+      try {
+        action.marker = JSON.stringify({
+          version: 1,
+          kind: kind,
+          operationId: options.randomId(),
+          scenarioId: state.hearingScenarioId,
+          conversationId: state.conversationId,
+          scope: scopedUrl('/api/conversation'),
+        });
+        if (!completionMatches(completionMarker(action.marker)))
+          throw new Error('Invalid completion correlation');
+        local.marker = action.marker;
+        window.sessionStorage.setItem(action.key, action.marker);
+        if (!completionOwned(action)) throw new Error('Completion correlation was not retained');
+      } catch (err) {
+        local.failed = true;
+        publishDecision();
+        return;
+      }
+      if (hearingRecovery) hearingRecovery.beginCompletion();
+      local.post = action;
+      action.waiting = true;
+      state[field] = { pending: true, action: action };
+      action.timer = window.setTimeout(function () {
+        action.waiting = false;
+        if (local.post === action && decisionCurrent(action)) {
+          if (state[field] && state[field].action === action) state[field] = null;
+          // Keep ordinary polling paused until explicit checking retires this POST.
+          publishDecision();
         }
-      )
+      }, 60000);
+      publishDecision();
+      var request;
+      try {
+        if (!completionCurrent(action)) throw new Error('Completion context changed');
+        request = fetchJson(
+          scopedUrl(
+            '/api/hearing/' +
+              encodeURIComponent(action.sessionId) +
+              (kind === 'inventory' ? '/inventory?locale=' : '/handoff?locale=') +
+              encodeURIComponent(state.locale)
+          ),
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+        );
+      } catch (err) {
+        request = Promise.reject(err);
+      }
+      Promise.resolve(request)
         .then(function (result) {
-          if (!hearingActionCurrent(action)) {
-            settleRetiredHearingFailure(action, 'hearingHandoff', result);
-            return;
+          if (action.retired) return;
+          var body = result && result.body;
+          var id = body && body[kind === 'inventory' ? 'entry_id' : 'mission_id'];
+          var next = body && body[kind === 'inventory' ? 'next' : 'next_action'];
+          var href = hearingCompletionHref(next && next.href);
+          var success = Boolean(
+            result &&
+            result.ok &&
+            body &&
+            body.ok === true &&
+            typeof id === 'string' &&
+            /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id) &&
+            href
+          );
+          var rejected = result && !result.ok && [400, 401, 403].indexOf(result.status) !== -1;
+          var current = completionCurrent(action);
+          if (((success && current) || rejected) && clearCompletion(action)) {
+            if (!current) {
+              if (state[field] && state[field].action === action) state[field] = null;
+              return;
+            }
+            state[field] = success
+              ? kind === 'inventory'
+                ? { entryId: id, href: href }
+                : { refId: id, href: href }
+              : { failed: true, action: action };
+          } else if (current) {
+            var code = conflictCode(result);
+            state[field] = code ? { failed: true, conflict: code, action: action } : null;
           }
-          if (result.ok && result.body && result.body.ok) {
-            state.hearingHandoff = {
-              refId: result.body.mission_id,
-              href: result.body.next_action && result.body.next_action.href,
-            };
-          } else {
-            state.hearingHandoff = { failed: true, conflict: conflictCode(result), action: action };
-          }
-          if (hearingRecovery) hearingRecovery.endCompletion();
-          renderHearing();
         })
         .catch(function () {
-          if (!hearingActionCurrent(action)) return;
-          state.hearingHandoff = { failed: true };
-          if (hearingRecovery) hearingRecovery.endCompletion();
-          renderHearing();
+          if (completionCurrent(action)) state[field] = null;
+        })
+        .finally(function () {
+          action.waiting = false;
+          window.clearTimeout(action.timer);
+          if (local.post === action) local.post = null;
+          if (!action.retired && decisionCurrent(action)) {
+            if (local.marker === null && !local.failed && hearingRecovery)
+              hearingRecovery.endCompletion();
+            publishDecision();
+          }
         });
     }
-
-    // WI-08: "save to the work inventory" — the `work_inventory` scenario's
-    // equivalent of `handoffHearing()` above, confirming a decided record into
-    // a work-inventory entry via `POST /api/hearing/:session/inventory`.
-    // Idempotent server-side: a second click after success returns the same
-    // `entry_id` instead of writing a second entry.
-    function saveWorkInventory() {
+    function checkCompletion() {
+      completionBlocked();
+      var local = completionState();
+      var saved = completionMarker(local.marker);
       if (
-        !state.hearingMode ||
-        !state.hearingRecord ||
-        state.sending ||
-        hearingBlocked() ||
-        state.hearingCompletion
+        !recoveryUsable() ||
+        decisionBlocked() ||
+        local.failed ||
+        !completionMatches(saved) ||
+        (local.post && local.post.waiting && completionCurrent(local.post)) ||
+        (local.read && local.read.waiting && completionCurrent(local.read))
       )
         return;
-      if (state.hearingInventory && state.hearingInventory.pending) return;
-      if (completionConflictBlocked(state.hearingInventory)) return;
-      if (hearingRecovery) hearingRecovery.beginCompletion();
+      if (local.post) {
+        local.post.retired = true;
+        window.clearTimeout(local.post.timer);
+        local.post = null;
+      }
       var action = hearingActionContext();
-      state.hearingInventory = { pending: true, action: action };
-      renderHearing();
-      fetchJson(
-        '/api/hearing/' +
-          encodeURIComponent(state.sessionId) +
-          '/inventory?locale=' +
-          encodeURIComponent(state.locale),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
+      action.generation = decisionGeneration;
+      action.key = completionKey();
+      action.marker = local.marker;
+      action.waiting = true;
+      local.read = action;
+      state.hearingHandoff = null;
+      state.hearingInventory = null;
+      state.hearingCompletion = null;
+      if (hearingRecovery) hearingRecovery.beginCompletion();
+      publishDecision();
+      function currentRead() {
+        return (
+          local.read === action && action.waiting && completionCurrent(action) && recoveryUsable()
+        );
+      }
+      function finish() {
+        action.waiting = false;
+        window.clearTimeout(action.timer);
+        if (local.read !== action) return;
+        local.read = null;
+        if (decisionCurrent(action)) {
+          if (hearingRecovery) hearingRecovery.endCompletion();
+          publishDecision();
         }
-      )
-        .then(function (result) {
-          if (!hearingActionCurrent(action)) {
-            settleRetiredHearingFailure(action, 'hearingInventory', result);
-            return;
-          }
-          if (result.ok && result.body && result.body.ok) {
-            state.hearingInventory = {
-              entryId: result.body.entry_id,
-              href: result.body.next && result.body.next.href,
-            };
-          } else {
-            state.hearingInventory = {
-              failed: true,
-              conflict: conflictCode(result),
-              action: action,
-            };
-          }
-          if (hearingRecovery) hearingRecovery.endCompletion();
-          renderHearing();
+      }
+      action.timer = window.setTimeout(finish, 20000);
+      Promise.resolve()
+        .then(function () {
+          if (!currentRead()) throw new Error('Completion context changed');
+          return options.fetchReadJson(
+            scopedUrl(
+              '/api/hearing/' +
+                encodeURIComponent(state.sessionId) +
+                '?locale=' +
+                encodeURIComponent(state.locale) +
+                '&scenario_id=' +
+                encodeURIComponent(state.hearingScenarioId)
+            )
+          );
         })
-        .catch(function () {
-          if (!hearingActionCurrent(action)) return;
-          state.hearingInventory = { failed: true };
-          if (hearingRecovery) hearingRecovery.endCompletion();
-          renderHearing();
-        });
+        .then(function (result) {
+          if (!currentRead()) return;
+          var body = result && result.body;
+          var record = body && body.record;
+          if (
+            !result ||
+            !result.ok ||
+            !body ||
+            body.ok !== true ||
+            !record ||
+            record.session_id !== state.sessionId ||
+            record.scenario !== saved.scenarioId ||
+            !Array.isArray(record.requirements) ||
+            !record.requirements.every(function (item) {
+              return (
+                item &&
+                typeof item === 'object' &&
+                (item.answer == null || typeof item.answer === 'string')
+              );
+            })
+          )
+            return;
+          state.hearingRecord = record;
+          var completion = body.completion;
+          if (completion && completion.kind === saved.kind) state.hearingCompletion = completion;
+          // No receipt exists for this attempt: retain its marker even when the
+          // existing destination is ready. Never unlock another POST from a GET.
+        })
+        .catch(function () {})
+        .finally(finish);
+    }
+    function handoffHearing() {
+      submitCompletion('mission');
+    }
+    function saveWorkInventory() {
+      submitCompletion('inventory');
     }
 
     return {
       render: renderHearingHandoff,
       renderDecision: renderDecision,
-      blocked: decisionBlocked,
+      blocked: function () {
+        return decisionBlocked() || completionBlocked();
+      },
       mount: mountDecision,
       decide: decideHearing,
       handoff: handoffHearing,

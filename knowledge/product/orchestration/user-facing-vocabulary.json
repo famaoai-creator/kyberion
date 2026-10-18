@@ -26688,6 +26688,41 @@
         "en": "Continue in ordinary conversation",
         "ja": "通常の会話を続ける",
         "qps-ploc": "⟦Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "hearing_completion_pending": {
+        "en": "Sending the handoff. Waiting for confirmation…",
+        "ja": "引き継ぎを送信しました。確認を待っています…",
+        "qps-ploc": "⟦Şėñḓïñɠ ŧħė ħȧñḓőƒƒ. Ẇȧïŧïñɠ ƒőř ƈőñƒïřɱȧŧïőñ… ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "hearing_completion_unknown": {
+        "en": "The handoff result is unknown. Check the saved destination without submitting again, or continue in ordinary conversation.",
+        "ja": "引き継ぎ結果を確認できていません。再登録せずに保存済みの引き継ぎ先を確認するか、通常の会話を続けてください。",
+        "qps-ploc": "⟦Ŧħė ħȧñḓőƒƒ řėşůŀŧ ïş ůñķñőẇñ. Ƈħėƈķ ŧħė şȧṽėḓ ḓėşŧïñȧŧïőñ ẇïŧħőůŧ şůƀɱïŧŧïñɠ ȧɠȧïñ, őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "hearing_completion_checking": {
+        "en": "Checking the saved destination without resending…",
+        "ja": "再送せずに保存済みの引き継ぎ先を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė şȧṽėḓ ḓėşŧïñȧŧïőñ ẇïŧħőůŧ řėşėñḓïñɠ… ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "hearing_completion_check": {
+        "en": "Check saved destination",
+        "ja": "保存済みの引き継ぎ先を確認",
+        "qps-ploc": "⟦Ƈħėƈķ şȧṽėḓ ḓėşŧïñȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "hearing_completion_storage": {
+        "en": "The handoff reference could not be retained safely. Further hearing changes are paused. Continue in ordinary conversation.",
+        "ja": "引き継ぎの参照情報を安全に保持できません。追加の要件変更は停止しています。通常の会話を続けてください。",
+        "qps-ploc": "⟦Ŧħė ħȧñḓőƒƒ řėƒėřėñƈė ƈőůŀḓ ñőŧ ƀė řėŧȧïñėḓ şȧƒėŀẏ. Ƒůřŧħėř ħėȧřïñɠ ƈħȧñɠėş ȧřė ṗȧůşėḓ. Ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "hearing_completion_scope": {
+        "en": "This handoff reference belongs to another conversation or view. Return to the original view to check it, or continue in ordinary conversation.",
+        "ja": "この引き継ぎの参照情報は別の会話または表示範囲のものです。元の表示に戻って確認するか、通常の会話を続けてください。",
+        "qps-ploc": "⟦Ŧħïş ħȧñḓőƒƒ řėƒėřėñƈė ƀėŀőñɠş ŧő ȧñőŧħėř ƈőñṽėřşȧŧïőñ őř ṽïėẇ. Řėŧůřñ ŧő ŧħė őřïɠïñȧŀ ṽïėẇ ŧő ƈħėƈķ ïŧ, őř ƈőñŧïñůė ïñ őřḓïñȧřẏ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "hearing_completion_existing": {
+        "en": "A saved destination is available. This does not confirm the latest handoff attempt.",
+        "ja": "保存済みの引き継ぎ先があります。直前の引き継ぎ操作の完了を示すものではありません。",
+        "qps-ploc": "⟦Ȧ şȧṽėḓ ḓėşŧïñȧŧïőñ ïş ȧṽȧïŀȧƀŀė. Ŧħïş ḓőėş ñőŧ ƈőñƒïřɱ ŧħė ŀȧŧėşŧ ħȧñḓőƒƒ ȧŧŧėɱṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       }
     },
     "operator": {
