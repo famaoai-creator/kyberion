@@ -662,6 +662,12 @@ interface PreparedExecutionContext {
  * than governance data so the check cannot disappear with a missing or
  * malformed policy file. metrics_cap_reader is deliberately absent: its grant
  * names no tenant placeholder and its caller binds the active tenant itself.
+ *
+ * A process that runs AS one of these roles through SYSTEM_ROLE / MISSION_ROLE
+ * env is bound to its own process tenant (KYBERION_TENANT / project scope).
+ * An outer scope bound to an empty tenant is an explicit system (tenant-less)
+ * scope, so it has no active tenant and the requested binding stands, the
+ * same as a process without a tenant.
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'peer_catalog_reader',
