@@ -516,6 +516,36 @@
       "group": "inspect"
     },
     {
+      "id": "operator-cli.permissions",
+      "command": "permissions",
+      "noun": "permissions",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_permissions",
+      "group": "inspect"
+    },
+    {
+      "id": "operator-cli.permissions.status",
+      "command": "permissions status",
+      "noun": "permissions",
+      "verb": "status",
+      "entry": "operator-cli",
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_permissions_status",
+      "group": "inspect"
+    },
+    {
+      "id": "operator-cli.permissions.warmup",
+      "command": "permissions warmup",
+      "noun": "permissions",
+      "verb": "warmup",
+      "entry": "operator-cli",
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_permissions_warmup",
+      "group": "inspect"
+    },
+    {
       "id": "operator-cli.watch",
       "command": "watch",
       "noun": "watch",
@@ -858,6 +888,9 @@
         "diff",
         "see",
         "listen",
+        "permissions",
+        "permissions status",
+        "permissions warmup",
         "watch",
         "speak",
         "draw",

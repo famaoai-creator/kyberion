@@ -57,6 +57,24 @@ describe('macos-automation-bridge', () => {
     expect(safeExec).not.toHaveBeenCalled();
   });
 
+  it('surfaces microphone/camera without changing availability or the reason', async () => {
+    nativeProbe.mockReturnValue({
+      ...granted,
+      microphone: 'not_determined',
+      camera: 'denied',
+      host_app: 'com.apple.Terminal',
+    });
+    const { macosAutomationBridge } = await import('./macos-automation-bridge.js');
+    const probe = macosAutomationBridge.probe();
+    expect(probe).toMatchObject({
+      available: true,
+      host_app: 'com.apple.Terminal',
+      permissions: { microphone: 'not_determined', camera: 'denied' },
+    });
+    expect(probe.reason).toBeUndefined();
+    expect(probe.sourceAvailability).toMatchObject({ active_window: true, screen_frame: true });
+  });
+
   it('does not infer Accessibility from an Apple Events grant', async () => {
     nativeProbe.mockReturnValue({
       ...granted,

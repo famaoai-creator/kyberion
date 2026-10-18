@@ -10,18 +10,34 @@ import {
   safeMoveSync,
   safeRmSync,
 } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import type { MouseOperation } from './virtual/os-automation-platform.js';
 
-export type MacOSPermissionState = 'granted' | 'denied' | 'unsupported' | 'unknown';
+export type MacOSPermissionState =
+  'granted' | 'denied' | 'restricted' | 'not_determined' | 'unsupported' | 'unknown';
 export interface MacOSNativeAutomationAvailability {
   available: boolean;
   automation: MacOSPermissionState;
   browser_automation: MacOSPermissionState;
   accessibility: MacOSPermissionState;
   screen_recording: MacOSPermissionState;
+  /** Capture-device state of the probing host app (never prompts). Absent on older helpers. */
+  microphone?: MacOSPermissionState;
+  camera?: MacOSPermissionState;
+  /** The terminal host that macOS attributes these grants to (best effort). */
+  host_app?: string;
   reason?: string;
+}
+
+/** Responsible app for TCC grants: the terminal host in the process tree (best effort). */
+export function resolveMacOSHostApp(env?: Record<string, string | undefined>): string | undefined {
+  const opts = env ? { env } : {};
+  const bundle = getRegisteredEnvText('__CFBundleIdentifier', opts)?.trim();
+  if (bundle) return bundle;
+  const term = getRegisteredEnvText('TERM_PROGRAM', opts)?.trim();
+  return term || undefined;
 }
 const emptyInput = (): FocusedInputState => ({
   application: '',
@@ -43,7 +59,11 @@ export function _resetMacOSNativeCompilerCacheForTests(): void {
   compilerVersion = undefined;
 }
 function ensureBinary(): string {
-  const source = rootResolve('libs/core/macos-native-automation.swift');
+  return ensureMacOSSwiftBinary('libs/core/macos-native-automation.swift', 'automation-');
+}
+/** Compile (cached by source digest) a repo Swift source into the macos-automation cache floor. */
+export function ensureMacOSSwiftBinary(sourceRelativePath: string, binaryPrefix: string): string {
+  const source = rootResolve(sourceRelativePath);
   if (!compilerVersion) {
     const compiler = safeExecResult('/usr/bin/swiftc', ['--version'], {
       timeoutMs: 5000,
@@ -66,7 +86,7 @@ function ensureBinary(): string {
     'cache',
     SYSTEM_PARTITION,
     'macos-automation',
-    'automation-' + digest
+    binaryPrefix + digest
   );
   if (regularExecutable(binary)) return binary;
   return withLockSync(
@@ -107,14 +127,12 @@ function ensureBinary(): string {
     125000
   );
 }
-function run(
-  command: 'probe' | 'mouse' | 'windows' | 'focused' | 'screen',
-  payload: unknown = {}
+export function runMacOSNativeBinary(
+  binary: string,
+  args: string[],
+  timeoutMs: number
 ): Record<string, unknown> {
-  const result = safeExecResult(ensureBinary(), [command, JSON.stringify(payload)], {
-    timeoutMs: 5000,
-    maxOutputMB: 1,
-  });
+  const result = safeExecResult(binary, args, { timeoutMs, maxOutputMB: 1 });
   if (result.error || result.status !== 0) throw new Error('native_execution_failed');
   const line = result.stdout.trim().split('\n').at(-1) || '';
   let parsed: unknown;
@@ -127,6 +145,12 @@ function run(
     throw new Error('native_response_invalid');
   return parsed as Record<string, unknown>;
 }
+function run(
+  command: 'probe' | 'mouse' | 'windows' | 'focused' | 'screen',
+  payload: unknown = {}
+): Record<string, unknown> {
+  return runMacOSNativeBinary(ensureBinary(), [command, JSON.stringify(payload)], 5000);
+}
 export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability {
   if (process.platform !== 'darwin')
     return {
@@ -135,6 +159,8 @@ export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability 
       browser_automation: 'unsupported',
       accessibility: 'unsupported',
       screen_recording: 'unsupported',
+      microphone: 'unsupported',
+      camera: 'unsupported',
       reason: 'macos_only_capability',
     };
   try {
@@ -147,12 +173,23 @@ export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability 
       )
     )
       throw new Error('native_response_invalid');
+    const capture = (key: 'microphone' | 'camera'): MacOSPermissionState =>
+      typeof value[key] === 'string' &&
+      ['granted', 'denied', 'restricted', 'not_determined', 'unsupported', 'unknown'].includes(
+        value[key] as string
+      )
+        ? (value[key] as MacOSPermissionState)
+        : 'unknown';
+    const hostApp = resolveMacOSHostApp();
     return {
       available: true,
       automation: value.automation as MacOSPermissionState,
       browser_automation: value.browser_automation as MacOSPermissionState,
       accessibility: value.accessibility as MacOSPermissionState,
       screen_recording: value.screen_recording as MacOSPermissionState,
+      microphone: capture('microphone'),
+      camera: capture('camera'),
+      ...(hostApp ? { host_app: hostApp } : {}),
     };
   } catch (error) {
     const known = [
@@ -171,6 +208,8 @@ export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability 
       browser_automation: 'unknown',
       accessibility: 'unknown',
       screen_recording: 'unknown',
+      microphone: 'unknown',
+      camera: 'unknown',
       reason,
     };
   }

@@ -2488,6 +2488,14 @@
       "types": "./dist/macos-automation-bridge.d.ts",
       "default": "./dist/macos-automation-bridge.js"
     },
+    "./macos-native-automation": {
+      "types": "./dist/macos-native-automation.d.ts",
+      "default": "./dist/macos-native-automation.js"
+    },
+    "./macos-permission-warmup": {
+      "types": "./dist/macos-permission-warmup.d.ts",
+      "default": "./dist/macos-permission-warmup.js"
+    },
     "./managed-process": {
       "types": "./dist/managed-process.d.ts",
       "default": "./dist/managed-process.js"
