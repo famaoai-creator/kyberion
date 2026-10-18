@@ -23,6 +23,7 @@ describe('onboarding runbook skill (QM-08)', () => {
     const skill = String(safeReadFile(result.skillPath, { encoding: 'utf8' }));
     expect(skill).toContain('pnpm pipeline vital-check --format=json');
     expect(skill).toContain('Human approval remains required');
+    expect(skill).toContain('knowledge/product/orchestration/prompt-first-onboarding.md');
     expect(skill).not.toMatch(/(?:api[_-]?key|token|password)\s*[:=]\s*\S+/iu);
     expect(
       JSON.parse(String(safeReadFile(result.provenancePath, { encoding: 'utf8' })))
