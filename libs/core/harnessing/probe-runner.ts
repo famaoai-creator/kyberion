@@ -132,7 +132,7 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
   // overlay must not leave a partial run-dir tree inside the caller's input.
   let overlay: string | null = null;
   if (spec.overlayDir) {
-    overlay = assertSafeRepositoryPath(spec.overlayDir);
+    overlay = assertSafeRepositoryPath(spec.overlayDir, { allowMissingLeaf: true });
     if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
       return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
     }
