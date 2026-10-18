@@ -3210,7 +3210,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/ux-vocabulary.ts",
         "presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts",
         "presence/displays/chronos-mirror-v2/src/lib/workitems-response.ts",
-        "presence/displays/chronos-mirror-v2/src/middleware.ts"
+        "presence/displays/chronos-mirror-v2/src/proxy.ts"
       ],
       "reviewed_infeasible": [],
       "child_process_entries": [
@@ -4058,7 +4058,7 @@
         "presence/displays/concierge/src/lib/voice-hub.ts",
         "presence/displays/concierge/src/lib/voice-types.ts",
         "presence/displays/concierge/src/lib/work-inventory-member.ts",
-        "presence/displays/concierge/src/middleware.ts"
+        "presence/displays/concierge/src/proxy.ts"
       ],
       "reviewed_infeasible": [],
       "child_process_entries": [
@@ -5834,7 +5834,7 @@
         "presence/displays/operator-surface/src/lib/table-rows.ts",
         "presence/displays/operator-surface/src/lib/view.ts",
         "presence/displays/operator-surface/src/lib/viewer-context.ts",
-        "presence/displays/operator-surface/src/middleware.ts"
+        "presence/displays/operator-surface/src/proxy.ts"
       ],
       "reviewed_infeasible": [],
       "child_process_entries": [
