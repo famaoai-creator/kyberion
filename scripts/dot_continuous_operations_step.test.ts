@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import { randomUUID } from 'node:crypto';
 import { safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
@@ -123,7 +124,7 @@ describe('continuous resident cadence', () => {
   });
   it('isolates malformed configuration while running valid loops and pending owners', async () => {
     const rootDir = path.join(
-      process.cwd(),
+      pathResolver.rootDir(),
       'active/shared/tmp',
       `continuous-discovery-${randomUUID()}`
     );
