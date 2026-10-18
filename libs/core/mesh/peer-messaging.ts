@@ -118,6 +118,8 @@ export interface PeerMessageDispatchReceipt {
   ok: boolean;
   status: number;
   accepted?: boolean;
+  /** The recipient had already processed this sender:message_id. */
+  duplicate?: boolean;
   message_id: string;
   processing_mode?: 'synchronous_on_receive';
   processed_at?: string;
@@ -639,6 +641,16 @@ function runtimeLogicalPath(tenantId: string, peerId: string, segment: string): 
   const logicalPath = `${DEFAULT_RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/${segment}`;
   safePeerStoragePath(logicalPath);
   return logicalPath;
+}
+
+/**
+ * Logical path of a per-peer runtime file
+ * (`active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<peer>/<segment>`).
+ * Validates tenant, peer and segment so sibling runtime writers (e.g. the
+ * auto-reply job ledger) share this storage contract instead of re-deriving it.
+ */
+export function peerRuntimeLogicalPath(tenantId: string, peerId: string, segment: string): string {
+  return runtimeLogicalPath(tenantId, peerId, segment);
 }
 
 function observabilityLogicalPath(tenantId: string, peerId: string, segment: string): string {
@@ -1263,6 +1275,7 @@ export async function sendPeerMessage<TPayload>(
       ok: response.ok,
       status: response.status,
       accepted: Boolean(payload?.accepted),
+      ...(payload?.duplicate === true ? { duplicate: true } : {}),
       message_id: envelope.message_id,
       processing_mode:
         payload?.processing_mode === 'synchronous_on_receive'

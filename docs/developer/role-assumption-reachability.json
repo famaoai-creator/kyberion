@@ -485,6 +485,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh/peer-auto-reply.ts#appendJobRow (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mesh/peer-auto-reply.ts#defaultRetrieveKnowledge",
+      "roles": ["peer_responder_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/peer-conversation.ts#clearPeerConversationRuntime",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -4579,6 +4589,7 @@
         "metrics_cap_reader",
         "organization_operator",
         "peer_catalog_reader",
+        "peer_responder_reader",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime"
@@ -5688,6 +5699,7 @@
         "metrics_cap_reader",
         "organization_operator",
         "peer_catalog_reader",
+        "peer_responder_reader",
         "scope_locale_reader",
         "slack_bridge"
       ]
@@ -7003,7 +7015,8 @@
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
-        "peer_catalog_reader"
+        "peer_catalog_reader",
+        "peer_responder_reader"
       ]
     },
     "system_configurator": {

@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **Opt-in LLM auto replies for peer conversations** — `pnpm peer:conversation-server --auto-reply-peers <ids>` lets a peer answer inbound conversation messages from those peers with a Claude reply grounded in the session transcript and the tenant's confidential knowledge. The receive path only enqueues (durable `reply-jobs.jsonl`, deduplicated by `sender:message_id`) and returns a status ACK; a worker generates through `runClaudeAgentQuery` (no tools, no failover chain) inside a confidential `zero_retention` payload scope, frames all peer text and knowledge as untrusted, and sends a `kind: reply` with `reply_to_message_id`, `auto_generated` and `auto_turn`. Agent-to-agent exchanges stop at `--auto-reply-max-turns` (default 6); generation and delivery failures are recorded separately with bounded attempts, timeout and concurrency. Delivery retries reuse one stable message id (`sendPeerConversationMessageToPeer` gains `messageId`), so the receiver dedups them. Knowledge is read under the new least-privilege role `peer_responder_reader` (the bound tenant's profile, `knowledge/confidential/<tenant>/` and `customer/<tenant>/`, read-only).
