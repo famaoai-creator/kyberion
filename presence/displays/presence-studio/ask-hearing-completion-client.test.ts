@@ -166,6 +166,7 @@ it.each(['mission', 'inventory'] as const)(
       scenario,
       requirements: [{ answer: 'Done' }],
       decided_at: '2026-10-17T00:00:00Z',
+      handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
     };
     const completion = {
       kind,
@@ -226,6 +227,7 @@ it.each(['mission', 'inventory'] as const)(
                 scenario,
                 requirements: [{ answer: 'Done' }],
                 decided_at: '2026-10-17T00:00:00Z',
+                handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
               },
             }),
     });
@@ -263,6 +265,7 @@ it.each(['mission', 'inventory'] as const)(
         scenario,
         requirements: [{ answer: 'Done' }],
         decided_at: '2026-10-17T00:00:00Z',
+        handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
         canvas_generation: 'pending',
       };
       const h = harness({
@@ -312,6 +315,7 @@ it.each(['mission', 'inventory'] as const)(
         scenario,
         requirements: [{ answer: 'Done' }],
         decided_at: '2026-10-17T00:00:00Z',
+        handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
       };
       const h = harness({
         query: '?mode=hearing&scenario=' + scenario,
@@ -360,6 +364,7 @@ it('does not release an unresolved completion solely on a missing GET result aft
                 scenario: 'web_app_build',
                 requirements: [{ answer: 'Done' }],
                 decided_at: '2026-10-17T00:00:00Z',
+                handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
               },
             }),
     });
@@ -399,6 +404,7 @@ it('preserves an ambiguous retired server error guard despite GET absence', asyn
             scenario: 'work_inventory',
             requirements: [{ answer: 'Done' }],
             decided_at: '2026-10-17T00:00:00Z',
+            handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
           },
         });
       },
@@ -455,6 +461,7 @@ describe('completion conflict explanations', () => {
                     scenario,
                     requirements: [{ answer: 'Done' }],
                     decided_at: '2026-10-17T00:00:00Z',
+                    handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
                   },
                 }),
         });
@@ -465,18 +472,150 @@ describe('completion conflict explanations', () => {
           'front_desk:hearing_conflict_' + code
         );
         expect(h.elements.get('hearing-handoff-link')!.attributes.href ?? '').toBe('');
-        if (code !== 'stale_snapshot') {
-          expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
-          // Invoke even a disabled button's handler to verify dispatch is guarded.
-          h.elements.get('hearing-handoff')!.fire('click');
-          await flush();
-        }
+        expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
+        // Even stale snapshots retain the no-resend guard after a dispatched POST.
+        h.elements.get('hearing-handoff')!.fire('click');
+        await flush();
         expect(
           h.fetch.mock.calls.filter(
             ([url, init]) => url.includes('/' + endpoint) && init?.method === 'POST'
           )
         ).toHaveLength(1);
       }
+    }
+  );
+});
+
+describe.each(['mission', 'inventory'] as const)('%s displayed handoff snapshot', (kind) => {
+  const scenario = kind === 'inventory' ? 'work_inventory' : 'web_app_build';
+  const endpoint = kind === 'inventory' ? 'inventory' : 'handoff';
+  const key = 'kyberion.ask.hearing.completion.' + SESSION;
+  const query = '?mode=hearing&scenario=' + scenario;
+  const record = {
+    session_id: SESSION,
+    scenario,
+    requirements: [{ answer: 'Displayed answer' }],
+    decided_at: '2026-10-17T00:00:00Z',
+  };
+  const posts = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+  const reads = (h: ReturnType<typeof harness>) =>
+    h.fetch.mock.calls.filter(
+      ([url, init]) => url.startsWith('/api/hearing/') && init?.method !== 'POST'
+    );
+
+  it('posts exactly the displayed proof without fetching a newer server view at click', async () => {
+    const displayed = { version: 1, token: 'd'.repeat(64) };
+    let serverRecord = { ...record, handoff_snapshot: displayed };
+    const h = harness({
+      query,
+      storage: new Map([['kyberion.ask.session_id', SESSION]]),
+      hearing: async (_url, init) =>
+        init?.method === 'POST'
+          ? new Promise(() => {})
+          : response({ ok: true, record: serverRecord }),
+    });
+    await flush();
+    expect(h.elements.get('hearing-handoff')!.disabled).toBe(false);
+    expect(reads(h)).toHaveLength(1);
+    serverRecord = {
+      ...record,
+      requirements: [{ answer: 'A newer server-only answer' }],
+      handoff_snapshot: { version: 1, token: 'b'.repeat(64) },
+    };
+    h.elements.get('hearing-handoff')!.fire('click');
+    h.elements.get('hearing-handoff')!.fire('click');
+    await flush();
+    expect(reads(h)).toHaveLength(1);
+    expect(posts(h)).toHaveLength(1);
+    expect(posts(h)[0][0]).toContain('/' + endpoint + '?');
+    expect(JSON.parse(posts(h)[0][1]!.body!)).toEqual({ handoff_snapshot: displayed });
+    expect(h.storage.has(key)).toBe(true);
+    expect(h.storage.get(key)).not.toContain(displayed.token);
+    h.browserEvent('pagehide');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['array', []],
+    ['string', 'a'.repeat(64)],
+    ['boolean', true],
+    ['empty object', {}],
+    ['missing version', { token: 'a'.repeat(64) }],
+    ['wrong version', { version: 2, token: 'a'.repeat(64) }],
+    ['string version', { version: '1', token: 'a'.repeat(64) }],
+    ['missing token', { version: 1 }],
+    ['numeric token', { version: 1, token: 1 }],
+    ['empty token', { version: 1, token: '' }],
+    ['short token', { version: 1, token: 'a'.repeat(63) }],
+    ['long token', { version: 1, token: 'a'.repeat(65) }],
+    ['uppercase token', { version: 1, token: 'A'.repeat(64) }],
+    ['non-hex token', { version: 1, token: 'g'.repeat(64) }],
+    ['extra field', { version: 1, token: 'a'.repeat(64), other: true }],
+  ])(
+    'keeps %s proof disabled without writing a marker or dispatching a POST',
+    async (_name, snapshot) => {
+      const h = harness({
+        query,
+        storage: new Map([['kyberion.ask.session_id', SESSION]]),
+        hearing: async () =>
+          response({
+            ok: true,
+            record: snapshot === undefined ? record : { ...record, handoff_snapshot: snapshot },
+          }),
+      });
+      await flush();
+      const write = vi.spyOn(h.window.sessionStorage, 'setItem');
+      expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
+      h.elements.get('hearing-handoff')!.fire('click');
+      h.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      expect(h.elements.get('hearing-handoff')!.disabled).toBe(true);
+      expect(posts(h)).toHaveLength(0);
+      expect(reads(h)).toHaveLength(1);
+      expect(h.storage.has(key)).toBe(false);
+      expect(write.mock.calls.some(([writtenKey]) => writtenKey === key)).toBe(false);
+    }
+  );
+
+  it.each(['snapshot object', 'record snapshot', 'both'])(
+    'copies the proof before marker persistence changes the %s',
+    async (changed) => {
+      const displayed = { version: 1, token: 'a'.repeat(64) };
+      const displayedRecord = { ...record, handoff_snapshot: displayed };
+      const h = harness({
+        query,
+        storage: new Map([['kyberion.ask.session_id', SESSION]]),
+        hearing: async (_url, init) =>
+          init?.method === 'POST'
+            ? new Promise(() => {})
+            : response({ ok: true, record: displayedRecord }),
+      });
+      await flush();
+      const setItem = h.window.sessionStorage.setItem;
+      h.window.sessionStorage.setItem = (writtenKey, value) => {
+        const result = setItem(writtenKey, value);
+        if (writtenKey === key) {
+          if (changed !== 'record snapshot') displayed.token = 'b'.repeat(64);
+          if (changed !== 'snapshot object')
+            displayedRecord.handoff_snapshot = { version: 1, token: 'c'.repeat(64) };
+        }
+        return result;
+      };
+      h.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      expect(displayedRecord.handoff_snapshot.token).not.toBe('a'.repeat(64));
+      expect(posts(h)).toHaveLength(1);
+      expect(JSON.parse(posts(h)[0][1]!.body!)).toEqual({
+        handoff_snapshot: { version: 1, token: 'a'.repeat(64) },
+      });
+      expect(h.storage.has(key)).toBe(true);
+      expect(reads(h)).toHaveLength(1);
+      h.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      expect(posts(h)).toHaveLength(1);
+      h.browserEvent('pagehide');
     }
   );
 });

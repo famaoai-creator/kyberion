@@ -59,8 +59,13 @@ import {
 import { generateHearingCanvas } from './hearing-canvas.js';
 import { renderWorkInventoryCanvasHtml } from './hearing-work-inventory.js';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
-import { loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
+import { loadHearingRecord, saveHearingRecord, updateHearingRecord } from './hearing-runtime.js';
 import { registerHearingRoutes } from './hearing-routes.js';
+import {
+  harness,
+  response as clientResponse,
+  flush as flushClient,
+} from './ask-client-test-harness.js';
 
 const TENANT = 'zz-hearing-write-consistency';
 const NOW = '2026-10-17T10:00:00.000Z';
@@ -149,6 +154,13 @@ describe('hearing writer consistency across async boundaries', () => {
   const answer = handlers.get('POST /api/hearing/:session/answer')!;
   const decide = handlers.get('POST /api/hearing/:session/decide')!;
   const inventory = handlers.get('POST /api/hearing/:session/inventory')!;
+  function viewedHandoffRequest(session: string) {
+    const viewed = response();
+    handlers.get('GET /api/hearing/:session')!(request(session), viewed);
+    const body = viewed.body as { record: { handoff_snapshot?: unknown } };
+    return request(session, { handoff_snapshot: body.record.handoff_snapshot });
+  }
+
   beforeEach(() => {
     previousTenant = process.env.KYBERION_TENANT;
     process.env.KYBERION_TENANT = TENANT;
@@ -224,13 +236,101 @@ describe('hearing writer consistency across async boundaries', () => {
     expect(stored?.decided_at).toBeUndefined();
   });
 
+  it('rejects an older displayed decision when a new decision already exists before the click', async () => {
+    const session = 'old-view-' + randomUUID();
+    seed(session, 'work_inventory', true);
+    const viewed = response();
+    await handlers.get('GET /api/hearing/:session')!(request(session), viewed);
+    const oldView = viewed.body as { record: { handoff_snapshot?: unknown } };
+    await answer(request(session, edit('newer answer from another tab')), response());
+    const newer = response();
+    await decide(request(session), newer);
+    expect(newer.statusCode).toBe(200);
+    const entry = createWorkInventoryEntry({
+      title: 'newer answer from another tab',
+      scope: { tenant_slug: TENANT },
+      trigger: { kind: 'ad_hoc', description: 'test' },
+    });
+    vi.mocked(proposeWorkDecomposition).mockResolvedValue({
+      entry,
+      warnings: [],
+      source: 'heuristic',
+    });
+    const result = response();
+    await inventory(
+      request(session, { handoff_snapshot: oldView.record.handoff_snapshot }),
+      result
+    );
+    expect(result.statusCode).toBe(409);
+    expect(result.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(proposeWorkDecomposition).not.toHaveBeenCalled();
+    expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+    expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('handoff_pending');
+  });
+
+  it('keeps a real stale inventory route response guarded in the client with the unsent draft intact', async () => {
+    const session = 'client-stale-' + randomUUID();
+    seed(session, 'work_inventory', true);
+    let postStatus = 0;
+    let displayed: unknown;
+    const h = harness({
+      query: '?mode=hearing&scenario=work_inventory&tenant=' + TENANT,
+      storage: new Map([['kyberion.ask.session_id', session]]),
+      hearing: async (_url, init) => {
+        const result = response();
+        if (init?.method === 'POST') {
+          await inventory(request(session, JSON.parse(init.body!)), result);
+          postStatus = result.statusCode;
+        } else {
+          await handlers.get('GET /api/hearing/:session')!(request(session), result);
+          displayed = (result.body as { record: { handoff_snapshot?: unknown } }).record
+            .handoff_snapshot;
+        }
+        return clientResponse(result.body, result.statusCode);
+      },
+    });
+    await flushClient();
+    const oldSnapshot = structuredClone(displayed);
+    expect(oldSnapshot).toBeDefined();
+    await answer(request(session, edit('Changed in tab B')), response());
+    const newer = response();
+    await decide(request(session), newer);
+    expect(newer.statusCode).toBe(200);
+    h.input.value = 'Unsent next thought';
+    h.input.fire('input');
+    h.elements.get('hearing-handoff')!.fire('click');
+    await flushClient();
+    expect(postStatus).toBe(409);
+    const posts = () => h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(posts()).toHaveLength(1);
+    expect(JSON.parse(posts()[0][1]!.body!)).toEqual({ handoff_snapshot: oldSnapshot });
+    expect(h.input.value).toBe('Unsent next thought');
+    expect(h.elements.get('hearing-handoff-status')!.textContent).toBe(
+      'front_desk:hearing_conflict_stale_snapshot'
+    );
+    const markerKey = 'kyberion.ask.hearing.completion.' + session;
+    const marker = h.storage.get(markerKey);
+    expect(marker).toBeTruthy();
+    h.elements.get('hearing-handoff')!.fire('click');
+    h.form.fire('submit');
+    h.elements.get('hearing-completion-check')!.fire('click');
+    await flushClient();
+    expect(posts()).toHaveLength(1);
+    expect(h.storage.get(markerKey)).toBe(marker);
+    expect(h.input.value).toBe('Unsent next thought');
+    expect(proposeWorkDecomposition).not.toHaveBeenCalled();
+    expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+    expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('handoff_pending');
+    h.browserEvent('pagehide');
+  });
+
   it('rejects stale inventory decomposition before creating an orphan entry or restoring a decision', async () => {
     const session = 'inventory-' + randomUUID();
     seed(session, 'work_inventory', true);
     const decomposition = deferred<Awaited<ReturnType<typeof proposeWorkDecomposition>>>();
     vi.mocked(proposeWorkDecomposition).mockReturnValueOnce(decomposition.promise);
     const result = response();
-    const pending = inventory(request(session), result);
+    const pending = inventory(viewedHandoffRequest(session), result);
     await answer(request(session, edit('changed during decomposition')), response());
     const entry = createWorkInventoryEntry({
       title: 'stale',
@@ -245,6 +345,77 @@ describe('hearing writer consistency across async boundaries', () => {
     expect(stored?.requirements[0].answer).toBe('changed during decomposition');
     expect(stored?.decided_by).toBeUndefined();
     expect(stored).not.toHaveProperty('work_inventory_entry_id');
+  });
+
+  it.each(['legacy', 'versioned'] as const)(
+    'rejects a same-actor same-timestamp %s redecision during decomposition',
+    async (mode) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(NOW));
+      const session = 'same-decision-' + randomUUID();
+      seed(session, 'work_inventory');
+      const decisionBody = () =>
+        mode === 'legacy'
+          ? {}
+          : {
+              version: 1,
+              operation_id: 'op-' + randomUUID(),
+              scenario_id: 'work_inventory',
+              requirements_revision: loadHearingRecord(TENANT, session)!.requirements_revision,
+            };
+      const firstDecision = response();
+      await decide(request(session, decisionBody()), firstDecision);
+      expect(firstDecision.statusCode).toBe(200);
+      const before = loadHearingRecord(TENANT, session)!;
+      const viewedRequest = viewedHandoffRequest(session);
+      const decomposition = deferred<Awaited<ReturnType<typeof proposeWorkDecomposition>>>();
+      vi.mocked(proposeWorkDecomposition).mockReturnValueOnce(decomposition.promise);
+      const result = response();
+      const pending = inventory(viewedRequest, result);
+      const nextDecision = response();
+      await decide(request(session, decisionBody()), nextDecision);
+      expect(nextDecision.statusCode).toBe(200);
+      const after = loadHearingRecord(TENANT, session)!;
+      expect(after.decided_at).toBe(before.decided_at);
+      expect(after.decided_by).toEqual(before.decided_by);
+      expect(after.decision_revision).toBeGreaterThan(before.decision_revision!);
+      const entry = createWorkInventoryEntry({
+        title: 'stale',
+        scope: { tenant_slug: TENANT },
+        trigger: { kind: 'ad_hoc', description: 'test' },
+      });
+      decomposition.resolve({ entry, warnings: [], source: 'heuristic' });
+      await pending;
+      expect(result.statusCode).toBe(409);
+      expect(result.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+      expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+      expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('handoff_pending');
+    }
+  );
+
+  it('accepts the same displayed decision after canvas-only metadata advances', async () => {
+    const session = 'canvas-only-' + randomUUID();
+    seed(session, 'work_inventory', true);
+    const viewedRequest = viewedHandoffRequest(session);
+    updateHearingRecord(TENANT, session, (current) => ({
+      ...current!,
+      canvas_generation: 'generated',
+      updated_at: '2026-10-18T00:00:00Z',
+    }));
+    const entry = createWorkInventoryEntry({
+      title: 'current',
+      scope: { tenant_slug: TENANT },
+      trigger: { kind: 'ad_hoc', description: 'test' },
+    });
+    vi.mocked(proposeWorkDecomposition).mockResolvedValue({
+      entry,
+      warnings: [],
+      source: 'heuristic',
+    });
+    const result = response();
+    await inventory(viewedRequest, result);
+    expect(result.statusCode).toBe(200);
+    expect(saveWorkInventoryEntry).toHaveBeenCalledTimes(1);
   });
 
   it('discards stale model canvas even when both answers have identical timestamps', async () => {
@@ -354,7 +525,7 @@ describe('hearing writer consistency across async boundaries', () => {
     const decomposition = deferred<Awaited<ReturnType<typeof proposeWorkDecomposition>>>();
     vi.mocked(proposeWorkDecomposition).mockReturnValueOnce(decomposition.promise);
     const result = response();
-    const pending = inventory(request(session), result);
+    const pending = inventory(viewedHandoffRequest(session), result);
     const decision = response();
     await decide(request(session), decision);
     expect(decision.statusCode).toBe(200);
@@ -370,12 +541,42 @@ describe('hearing writer consistency across async boundaries', () => {
     expect(loadHearingRecord(TENANT, session)?.decided_by?.id).toBe('user:current-decider');
   });
 
+  it.each(['removed', 'remapped'] as const)(
+    'rejects an actor %s during inventory preparation before reservation',
+    async (mode) => {
+      const session = 'changed-actor-' + randomUUID();
+      seed(session, 'work_inventory', true);
+      const viewedRequest = viewedHandoffRequest(session);
+      const originalMember = resolveMemberByPrincipal({ principalId: 'test', source: 'loopback' })!;
+      const decomposition = deferred<Awaited<ReturnType<typeof proposeWorkDecomposition>>>();
+      vi.mocked(proposeWorkDecomposition).mockReturnValueOnce(decomposition.promise);
+      const result = response();
+      const pending = inventory(viewedRequest, result);
+      expect(proposeWorkDecomposition).toHaveBeenCalledTimes(1);
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(
+        mode === 'removed' ? null : { ...originalMember, member_id: 'remapped-member' }
+      );
+      const entry = createWorkInventoryEntry({
+        title: 'uncommitted',
+        scope: { tenant_slug: TENANT },
+        trigger: { kind: 'ad_hoc', description: 'test' },
+      });
+      decomposition.resolve({ entry, warnings: [], source: 'heuristic' });
+      await pending;
+      expect(result.statusCode).toBe(409);
+      expect(result.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+      expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
+      expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('handoff_pending');
+      expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('work_inventory_entry_id');
+    }
+  );
+
   it('does not hold the write lock during a pending decomposition for another session', async () => {
     const session = 'inventory-parallel-' + randomUUID();
     seed(session, 'work_inventory', true);
     const decomposition = deferred<Awaited<ReturnType<typeof proposeWorkDecomposition>>>();
     vi.mocked(proposeWorkDecomposition).mockReturnValueOnce(decomposition.promise);
-    const pending = inventory(request(session), response());
+    const pending = inventory(viewedHandoffRequest(session), response());
     const other = 'parallel-' + randomUUID();
     const answerResult = response();
     await answer(request(other, { text: 'independent answer' }), answerResult);
@@ -419,10 +620,10 @@ describe('hearing writer consistency across async boundaries', () => {
     });
     vi.mocked(loadWorkInventoryEntry).mockReturnValue({ ...entry, status: 'confirmed' });
     const first = response();
-    await inventory(request(session), first);
+    await inventory(viewedHandoffRequest(session), first);
     expect(first.statusCode).toBe(200);
     const repeat = response();
-    await inventory(request(session), repeat);
+    await inventory(viewedHandoffRequest(session), repeat);
     expect(repeat.statusCode).toBe(200);
     expect(proposeWorkDecomposition).toHaveBeenCalledTimes(1);
     expect(saveWorkInventoryEntry).toHaveBeenCalledTimes(1);
@@ -493,6 +694,32 @@ describe('hearing writer consistency across async boundaries', () => {
       expect(() => loadHearingRecord(TENANT, session)).toThrow('HEARING_REVISION_INVALID');
     }
   );
+  it.each([-1, '1', 1.5, null, 99])(
+    'fails closed on invalid persisted decision revision %s',
+    (revision) => {
+      const session = 'bad-decision-revision-' + randomUUID();
+      const record = seed(session, 'work_inventory', true);
+      safeWriteFile(
+        pathResolver.rootResolve(
+          'active/shared/runtime/hearing/confidential/' +
+            TENANT +
+            '/' +
+            TENANT +
+            '/' +
+            session +
+            '/' +
+            session +
+            '.json'
+        ),
+        JSON.stringify({ ...record, decision_revision: revision })
+      );
+      expect(() => loadHearingRecord(TENANT, session)).toThrow(
+        /HEARING_(?:REVISION|RECORD)_INVALID/u
+      );
+      expect(proposeWorkDecomposition).not.toHaveBeenCalled();
+    }
+  );
+
   it('does not create an inventory entry when reservation persistence fails', async () => {
     const session = 'reserve-failure-' + randomUUID();
     seed(session, 'work_inventory', true);
@@ -509,7 +736,7 @@ describe('hearing writer consistency across async boundaries', () => {
     writeFault.session = session;
     writeFault.phase = 'reserve';
     const res = response();
-    await inventory(request(session), res);
+    await inventory(viewedHandoffRequest(session), res);
     expect(res.statusCode).toBe(500);
     expect(saveWorkInventoryEntry).not.toHaveBeenCalled();
     expect(loadHearingRecord(TENANT, session)).not.toHaveProperty('handoff_pending');
@@ -532,7 +759,7 @@ describe('hearing writer consistency across async boundaries', () => {
     writeFault.session = session;
     writeFault.phase = 'finish';
     const first = response();
-    await inventory(request(session), first);
+    await inventory(viewedHandoffRequest(session), first);
     expect(first.statusCode).toBe(409);
     expect(saveWorkInventoryEntry).toHaveBeenCalledTimes(1);
     const stored = loadHearingRecord(TENANT, session)!;
@@ -547,7 +774,7 @@ describe('hearing writer consistency across async boundaries', () => {
     expect((reload.body as { record: HearingRecord }).record).not.toHaveProperty('handoff_pending');
     expect(JSON.stringify(reload.body)).not.toContain(token);
     const repeat = response();
-    await inventory(request(session), repeat);
+    await inventory(viewedHandoffRequest(session), repeat);
     expect(repeat.statusCode).toBe(409);
     const edited = response();
     await answer(request(session, edit('must remain frozen')), edited);
@@ -572,8 +799,8 @@ describe('hearing writer consistency across async boundaries', () => {
       .mockReturnValueOnce(b.promise);
     const first = response();
     const second = response();
-    const firstPending = inventory(request(session), first);
-    const secondPending = inventory(request(session), second);
+    const firstPending = inventory(viewedHandoffRequest(session), first);
+    const secondPending = inventory(viewedHandoffRequest(session), second);
     expect(proposeWorkDecomposition).toHaveBeenCalledTimes(2);
     const entry = createWorkInventoryEntry({
       title: 'one-effect',
@@ -620,7 +847,7 @@ describe('hearing writer consistency across async boundaries', () => {
       };
       saveHearingRecord(TENANT, replayRecord);
       const res = response();
-      await inventory(request(session), res);
+      await inventory(viewedHandoffRequest(session), res);
       expect(res.statusCode).toBe(409);
       expect(res.body).toMatchObject({
         hearing_conflict: mode === 'pending' ? 'handoff_unresolved' : 'completion_locked',
