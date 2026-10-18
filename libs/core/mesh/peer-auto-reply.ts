@@ -32,6 +32,7 @@ import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { runClaudeAgentQuery } from '../provider/claude-agent-query.js';
+import { runCodexIsolatedQuery } from '../provider/codex-isolated-query.js';
 import {
   queryTenantKnowledge,
   type TenantKnowledgeHit,
@@ -71,6 +72,19 @@ const SESSION_CAP_STATUSES = new Set<PeerReplyJobStatus>([
 ]);
 const AUTO_REPLY_KINDS = new Set(['message', 'reply']);
 const AUTO_REPLY_SCOPE_PURPOSE = 'peer-conversation:auto-reply';
+/** Error code thrown by the codex backend when the model tried to use a tool. */
+const CODEX_TOOL_ATTEMPT_CODE = 'CODEX_TOOL_ATTEMPT';
+
+/** Generation backend: Claude Agent SDK (strict isolation) or isolated Codex CLI. */
+export type PeerAutoReplyBackend = 'claude' | 'codex';
+
+export interface PeerAutoReplyGenerateOptions {
+  backend?: PeerAutoReplyBackend;
+  /** Codex only: allow a codex-cli version the isolation probe has not verified. */
+  codexAllowUntestedVersion?: boolean;
+  /** Codex only: wall-clock budget for the CLI run. */
+  timeoutMs?: number;
+}
 
 export type PeerReplyJobStatus =
   | 'queued'
@@ -166,6 +180,10 @@ export interface PeerAutoReplyConfig {
   maxGenerationAttempts?: number;
   /** Rolling hourly cap on reply jobs per remote peer (beyond it: skipped). */
   budgetPerHour?: number;
+  /** Default generator backend (ignored when `generate` is supplied). Default 'claude'. */
+  backend?: PeerAutoReplyBackend;
+  /** Codex backend only: allow an isolation-untested codex-cli version. Default false. */
+  codexAllowUntestedVersion?: boolean;
   generate?: (input: PeerAutoReplyGenerateInput) => Promise<string>;
   retrieveKnowledge?: (input: {
     tenantId: string;
@@ -354,17 +372,22 @@ const AUTO_REPLY_SCHEMA = z.object({ reply: z.string() });
 /**
  * Tool-less one-shot generation. Deliberately not the reasoning-backend
  * failover chain: other CLIs in that chain run with tools enabled.
- * `runClaudeAgentQuery` asserts reasoning egress against the payload scope.
- * It runs under the tenant-bound responder role so the egress gate can read
- * the tenant's own egress overlay (knowledge/confidential/<tenant>/) with no
- * broader authority than knowledge retrieval has.
+ * `backend: 'claude'` (default) runs `runClaudeAgentQuery` under strict
+ * isolation; `backend: 'codex'` runs `runCodexIsolatedQuery` (tools visible
+ * to the model but disabled; any tool attempt discards the reply). Both
+ * assert reasoning egress against the payload scope and run under the
+ * tenant-bound responder role so the egress gate can read the tenant's own
+ * egress overlay (knowledge/confidential/<tenant>/) with no broader authority
+ * than knowledge retrieval has.
  */
 export async function defaultPeerAutoReplyGenerate(
-  input: PeerAutoReplyGenerateInput
+  input: PeerAutoReplyGenerateInput,
+  options: PeerAutoReplyGenerateOptions = {}
 ): Promise<string> {
   const abortController = new AbortController();
   if (input.signal.aborted) abortController.abort();
   else input.signal.addEventListener('abort', () => abortController.abort(), { once: true });
+  const backend = options.backend ?? 'claude';
   const result = await withExecutionContextAsync(
     PEER_RESPONDER_READER_ROLE,
     () =>
@@ -376,15 +399,25 @@ export async function defaultPeerAutoReplyGenerate(
           training_use: 'zero_retention',
         },
         () =>
-          runClaudeAgentQuery({
-            systemPrompt: input.systemPrompt,
-            userPrompt: input.userPrompt,
-            schema: AUTO_REPLY_SCHEMA,
-            abortController,
-            metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
-            // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
-            isolation: 'strict',
-          })
+          backend === 'codex'
+            ? runCodexIsolatedQuery({
+                systemPrompt: input.systemPrompt,
+                userPrompt: input.userPrompt,
+                schema: AUTO_REPLY_SCHEMA,
+                abortController,
+                metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
+                ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+                allowUntestedVersion: options.codexAllowUntestedVersion === true,
+              })
+            : runClaudeAgentQuery({
+                systemPrompt: input.systemPrompt,
+                userPrompt: input.userPrompt,
+                schema: AUTO_REPLY_SCHEMA,
+                abortController,
+                metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
+                // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
+                isolation: 'strict',
+              })
       ),
     undefined,
     input.tenantId
@@ -443,6 +476,7 @@ export async function deliverPeerAutoReply(
 
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
+  if (code === CODEX_TOOL_ATTEMPT_CODE) return 'tool_attempt_detected';
   if (typeof code === 'string' && code) return code;
   return error instanceof Error ? error.name : 'unknown';
 }
@@ -481,7 +515,15 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
   );
   const deliveryBackoffMs = positiveInt(config.deliveryBackoffMs, 1000, 0);
   const pollIntervalMs = positiveInt(config.pollIntervalMs, 1000);
-  const generate = config.generate ?? defaultPeerAutoReplyGenerate;
+  const backend: PeerAutoReplyBackend = config.backend ?? 'claude';
+  const generate =
+    config.generate ??
+    ((input: PeerAutoReplyGenerateInput) =>
+      defaultPeerAutoReplyGenerate(input, {
+        backend,
+        codexAllowUntestedVersion: config.codexAllowUntestedVersion === true,
+        timeoutMs: generationTimeoutMs,
+      }));
   const retrieveKnowledge = config.retrieveKnowledge ?? defaultRetrieveKnowledge;
   const deliver = config.deliver ?? ((input) => deliverPeerAutoReply(input));
   const now = config.now ?? Date.now;

@@ -99,20 +99,23 @@ KYBERION_PEER_SHARED_SECRET=... pnpm peer:conversation-server \
   --auto-reply-peers <remote-peer>[,<remote-peer>]
 ```
 
-| Flag                           | Default     | Meaning                                                                      |
-| ------------------------------ | ----------- | ---------------------------------------------------------------------------- |
-| `--auto-reply-peers`           | empty (off) | Remote peers whose `message` / `reply` messages get an LLM reply             |
-| `--auto-reply-max-turns`       | 6           | Per-session cap on automatic replies; stops two auto-responders from looping |
-| `--auto-reply-budget-per-hour` | 30          | Rolling per-peer generation budget (bounds session-rotation abuse and spend) |
-| `--auto-reply-timeout-ms`      | 60000       | Generation timeout                                                           |
-| `--auto-reply-concurrency`     | 1           | Worker concurrency                                                           |
-| `--auto-reply-max-attempts`    | 3           | Delivery attempts per reply                                                  |
-| `--auto-reply-knowledge-limit` | 5           | Tenant knowledge excerpts used to ground a reply                             |
+| Flag                                | Default     | Meaning                                                                           |
+| ----------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `--auto-reply-peers`                | empty (off) | Remote peers whose `message` / `reply` messages get an LLM reply                  |
+| `--auto-reply-max-turns`            | 6           | Per-session cap on automatic replies; stops two auto-responders from looping      |
+| `--auto-reply-budget-per-hour`      | 30          | Rolling per-peer generation budget (bounds session-rotation abuse and spend)      |
+| `--auto-reply-timeout-ms`           | 60000       | Generation timeout                                                                |
+| `--auto-reply-concurrency`          | 1           | Worker concurrency                                                                |
+| `--auto-reply-max-attempts`         | 3           | Delivery attempts per reply                                                       |
+| `--auto-reply-knowledge-limit`      | 5           | Tenant knowledge excerpts used to ground a reply                                  |
+| `--auto-reply-backend`              | `claude`    | Generator: `claude` (Agent SDK, strict isolation) or `codex` (isolated Codex CLI) |
+| `--auto-reply-codex-allow-untested` | false       | `codex` only: run on a codex-cli version the isolation probe has not verified     |
 
 How it works:
 
 - The HTTP receive path only records a reply job in `active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<local-peer>/reply-jobs.jsonl` (keyed by `sender:message_id`, so redelivery never answers twice) and returns a `status` ACK. One server process owns that ledger per local peer.
 - A worker generates the reply with Claude through `runClaudeAgentQuery` in strict isolation (no tools, no settings/hooks/MCP, scratch working directory, minimal environment) — never through the reasoning failover chain, whose other CLIs run with tools. Peer text and knowledge excerpts are framed as untrusted data.
+- With `--auto-reply-backend codex` (for hosts that have the Codex CLI but no Claude), the worker runs `runCodexIsolatedQuery`: `codex exec` with user config, rules and session persistence ignored, a read-only sandbox, approvals `never`, web search off, no MCP servers and every tool-bearing feature disabled, in an empty scratch directory with only `PATH`/`HOME`/`USER`/`LANG`/`TMPDIR` (+ `CODEX_HOME`) in the environment. This is weaker than the Claude path in one honest respect: the Codex model still **sees** some tool definitions (exec, apply_patch, spawn_agent, MCP resource readers); they cannot execute — attempts fail closed inside the CLI — and any observed tool attempt (a `tools::router` stderr line or a non-message `--json` item) discards the reply, recorded as `generation_failed` / `tool_attempt_detected`. Because that guarantee was verified per CLI version, only isolation-tested codex-cli versions run (currently `0.163`); others fail with `CODEX_ISOLATION_UNTESTED` unless `--auto-reply-codex-allow-untested` is passed.
 - The prompt uses only this session's transcript between the two peers and up to N excerpts from the tenant's confidential knowledge, read under the least-privilege role `peer_responder_reader` (never `connections/`).
 - The reply goes back as `kind: reply` with `reply_to_message_id` and metadata `auto_generated` / `auto_turn`; retries reuse one message id, so the receiver deduplicates them. Generation and delivery failures are recorded separately in the ledger.
 
@@ -120,6 +123,8 @@ Prerequisites, because the reply sends tenant-confidential material to an extern
 
 1. Record a provider attestation for the tenant (`training_use: none`, human approval): `pnpm onboarding llm attest --tenant <tenant> --provider claude --training-use none ... --request-approval`, approve with `pnpm kyberion approvals --approve <id>`, then apply with the printed command. The reasoning gate allows the confidential `zero_retention` send only with this valid attestation, and only when the tenant's `allowed_reasoning_backends` (if set) and the provider declaration permit it.
 2. Allow the provider's endpoint in the tenant egress policy (tenant domain grant for `api.anthropic.com`).
+
+For `--auto-reply-backend codex` the same two gates apply to provider `codex`: attest with `--provider codex`, and grant the endpoint the codex-cli provider declaration names (`api.openai.com`) in the tenant egress overlay; if the tenant sets `allowed_reasoning_backends`, it must permit codex as well. The Codex CLI must already be logged in on that host (`codex login`).
 
 Enabling a peer shares tenant knowledge excerpts with every holder of this server's shared secret, because the opt-in list is keyed by the authenticated `sender_peer_id`. Enable only peers you would show that knowledge to. Auto replies never run tools, change WorkItems, or touch missions; `handoff` messages keep the proposal-and-accept path.
 

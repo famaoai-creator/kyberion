@@ -3,7 +3,7 @@ import { logger } from '@agent/core/core';
 import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
 import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
 import { createPeerConversationResponder } from '@agent/core/mesh/peer-conversation';
-import { createPeerAutoReply } from '@agent/core/mesh/peer-auto-reply';
+import { createPeerAutoReply, type PeerAutoReplyBackend } from '@agent/core/mesh/peer-auto-reply';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
@@ -119,6 +119,19 @@ async function main(
       default: 30,
       description: 'Rolling hourly cap on auto-reply jobs per remote peer',
     })
+    .option('auto-reply-backend', {
+      type: 'string',
+      choices: ['claude', 'codex'] as const,
+      default: 'claude',
+      description:
+        'Auto-reply generator: claude (Agent SDK, strict isolation) or codex (isolated codex CLI, tools disabled)',
+    })
+    .option('auto-reply-codex-allow-untested', {
+      type: 'boolean',
+      default: false,
+      description:
+        'Codex backend only: run on a codex-cli version the isolation probe has not verified',
+    })
     .parseSync();
 
   const peerId = String(argv['peer-id']);
@@ -156,6 +169,8 @@ async function main(
     max_attempts: Number(argv['auto-reply-max-attempts']),
     knowledge_limit: Number(argv['auto-reply-knowledge-limit']),
     budget_per_hour: Number(argv['auto-reply-budget-per-hour']),
+    backend: (argv['auto-reply-backend'] === 'codex' ? 'codex' : 'claude') as PeerAutoReplyBackend,
+    codex_allow_untested: argv['auto-reply-codex-allow-untested'] === true,
   };
   if (
     !Number.isInteger(autoReplyOptions.max_turns) ||
@@ -208,6 +223,8 @@ async function main(
     maxDeliveryAttempts: autoReplyOptions.max_attempts,
     knowledgeLimit: autoReplyOptions.knowledge_limit,
     budgetPerHour: autoReplyOptions.budget_per_hour,
+    backend: autoReplyOptions.backend,
+    codexAllowUntestedVersion: autoReplyOptions.codex_allow_untested,
   });
 
   const server = createPeerMessagingServer({
@@ -338,7 +355,7 @@ async function main(
   if (autoReply.enabled) {
     autoReply.start();
     logger.info(
-      `[peer-conversation-server] auto reply enabled for peers: ${autoReplyPeers.join(', ')}`
+      `[peer-conversation-server] auto reply enabled for peers: ${autoReplyPeers.join(', ')} (backend=${autoReplyOptions.backend}${autoReplyOptions.codex_allow_untested ? ', codex_allow_untested=true' : ''})`
     );
   }
 

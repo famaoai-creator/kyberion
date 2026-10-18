@@ -20,6 +20,9 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/governance/audit-forwarder.ts',
   'libs/core/provider/claude-cli-session-adapter.ts',
   'libs/core/provider/codex-cli-query.ts',
+  // Isolated tool-less codex runs for untrusted prompts: needs an exact
+  // minimal env that safeSpawn's buildSafeExecEnv cannot express.
+  'libs/core/provider/codex-isolated-query.ts',
   'libs/core/actuator/deployment-adapter.ts',
   'libs/core/actuator/deployment-adapters/mobile-beta.ts',
   'libs/core/virtual/desktop-event-feed.ts',

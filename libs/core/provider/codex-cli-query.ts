@@ -322,7 +322,11 @@ function extractJsonPayload(raw: string): string {
   return trimmed;
 }
 
-function normalizeCodexSchema(schema: Record<string, unknown>): Record<string, unknown> {
+/**
+ * Codex `--output-schema` (OpenAI strict structured output) requires every
+ * property to be listed in `required`; optional zod fields become nullable.
+ */
+export function normalizeCodexSchema(schema: Record<string, unknown>): Record<string, unknown> {
   const clone = structuredClone(schema);
   normalizeSchemaNode(clone);
   return clone;
