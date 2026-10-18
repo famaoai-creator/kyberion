@@ -24,6 +24,8 @@ export * from './claude-task-runner.js';
 export * from './claude-task-session-executor.js';
 export * from './codex-cli-intent-extractor.js';
 export * from './codex-cli-query.js';
+export * from './codex-isolated-query.js';
+export * from './isolated-text-generator.js';
 export * from './codex-cli-reasoning-backend.js';
 export * from './codex-cli-voice-bridge.js';
 export * from './codex-profile.js';

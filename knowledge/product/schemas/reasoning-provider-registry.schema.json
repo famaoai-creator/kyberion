@@ -161,6 +161,15 @@
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
           },
+          "isolated_text_generation": {
+            "description": "Declares that an in-process isolated text generator (libs/core/provider/isolated-text-generator.ts) may run on this provider for UNTRUSTED prompts. 'structural' = the transport exposes no tools to the model; 'fail_closed_detection' = tools stay visible but disabled and any tool attempt discards the output. A generator resolves only when its declared isolation equals this value. Omit = unsupported.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "isolation": { "enum": ["structural", "fail_closed_detection"] }
+            },
+            "required": ["isolation"]
+          },
           "cli": {
             "type": "object",
             "additionalProperties": false,
