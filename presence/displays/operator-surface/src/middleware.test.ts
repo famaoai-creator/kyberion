@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextRequest as RealNextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOOPBACK_HEADER } from './lib/peer.js';
-import { middleware, config } from './middleware.js';
+import { proxy as middleware, config } from './proxy.js';
 
 const FUTURE = Math.floor(Date.now() / 1000) + 3600;
 const PAST = Math.floor(Date.now() / 1000) - 3600;
