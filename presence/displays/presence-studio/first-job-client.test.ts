@@ -417,6 +417,96 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
     expect(JSON.parse(h.storage.get(storageKey)!).pending).toBeNull();
   });
 
+  it.each([
+    ['start', 'fetch'],
+    ['start', 'body'],
+    ['revise', 'fetch'],
+    ['revise', 'body'],
+  ])(
+    'bounds a stalled %s intake %s response without replay or late success',
+    async (action, stage) => {
+      const pending = deferred<ReturnType<typeof reply>>();
+      const pendingBody = deferred<unknown>();
+      const initial = snapshot({
+        ...(action === 'revise'
+          ? {
+              tasks: [{ id: first, executionStatus: 'work_completed', artifact: artifact() }],
+              messages: [
+                {
+                  id: first + '-secretary',
+                  role: 'secretary',
+                  artifact: artifact({ canRevise: true }),
+                },
+              ],
+            }
+          : {}),
+      });
+      let current = initial;
+      const h = harness({
+        get: () => reply(current),
+        post: () =>
+          stage === 'fetch'
+            ? pending.promise
+            : Promise.resolve({ ok: true, status: 200, json: () => pendingBody.promise }),
+      });
+      await flush();
+      if (action === 'start') h.get('start').fire();
+      else
+        h.get('history')
+          .descendants()
+          .find((item) => item.tagName === 'button')!
+          .fire();
+      await flush();
+      expect(h.posts()).toHaveLength(1);
+      const original = JSON.parse(h.storage.get(storageKey)!).pending.body;
+      expect(original.action).toBe(action);
+      expect(h.get('refresh').disabled).toBe(true);
+      await h.advance(14999);
+      expect(h.get('refresh').disabled).toBe(true);
+      await h.advance(1);
+      expect(h.get('error').textContent).toContain('uncertain');
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.get('start').disabled).toBe(true);
+      expect(h.get('retry').hidden).toBe(true);
+      expect(JSON.parse(h.storage.get(storageKey)!).pending).toMatchObject({
+        body: original,
+        retrySafe: false,
+      });
+      h.get('start').fire();
+      h.get('retry').fire();
+      h.get('refresh').fire();
+      await flush();
+      expect(JSON.parse(h.storage.get(storageKey)!).pending.body).toEqual(original);
+      expect(h.posts()).toHaveLength(1);
+      const observed = snapshot({
+        tasks: [
+          {
+            id: original.request_id,
+            executionStatus: 'awaiting_approval',
+            artifact: artifact({
+              requestId: original.request_id,
+              verification: 'pending',
+              currentness: 'requested_pending',
+            }),
+          },
+        ],
+      });
+      pending.resolve(reply(observed));
+      pendingBody.resolve(observed);
+      await flush();
+      expect(JSON.parse(h.storage.get(storageKey)!).pending.body).toEqual(original);
+      expect(h.get('error').textContent).toContain('uncertain');
+      current = observed;
+      h.get('refresh').fire();
+      await flush();
+      expect(JSON.parse(h.storage.get(storageKey)!).pending).toBeNull();
+      expect(h.posts()).toHaveLength(1);
+      await h.advance(30000);
+      expect(h.posts()).toHaveLength(1);
+      expect(h.get('error').textContent).not.toContain('uncertain');
+    }
+  );
+
   it('never replays a lost-response request on reload and clears uncertainty only after observing its saved task', async () => {
     const storage = new Map<string, string>();
     const h = harness({
@@ -2344,6 +2434,74 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
     expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
     expect(h.get('setup-browser_user').textContent).not.toContain('browser_user_verified');
   });
+
+  it.each(['approved', 'rejected'])(
+    'unlocks both read controls after a stalled %s decision without replay',
+    async (decision) => {
+      const pending = deferred<ReturnType<typeof reply>>();
+      const approvalId = '33333333-3333-4333-8333-333333333333';
+      const expires = new Date(Date.now() + 60_000).toISOString();
+      let signedOut = false;
+      const h = harness({
+        realApproval: true,
+        get: () =>
+          reply(snapshot({ setup: setup(), scope: { tenant: 'test-tenant', tier: 'public' } })),
+        approvalGet: () =>
+          reply({
+            ok: true,
+            auth: { status: signedOut ? 'authentication_required' : 'ready' },
+            readiness: {
+              ready: !signedOut,
+              status: signedOut ? 'authentication_required' : 'ready',
+            },
+            approvals: signedOut
+              ? []
+              : [
+                  {
+                    approval_request_id: approvalId,
+                    request_id: first,
+                    revision: 1,
+                    display_digest: sha256,
+                    payload_hash: sha256,
+                    effect_binding: 'first-job:' + sha256,
+                    tenant: 'test-tenant',
+                    receipt_format: 'pretty',
+                    expires_at: expires,
+                    execution_deadline_at: expires,
+                  },
+                ],
+          }),
+        approvalPost: () => pending.promise,
+      });
+      await flush();
+      const buttons = h
+        .get('approval-items')
+        .descendants()
+        .filter((item) => item.tagName === 'button');
+      buttons[decision === 'approved' ? 0 : 1].fire();
+      await flush();
+      expect(h.get('refresh').disabled).toBe(true);
+      expect(h.get('approval-refresh').disabled).toBe(true);
+      await h.advance(15000);
+      expect(h.get('approval-error').textContent).toContain('approval_uncertain');
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.get('approval-refresh').disabled).toBe(false);
+      expect(h.get('start').disabled).toBe(true);
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+      expect(h.posts()).toHaveLength(1);
+      expect(h.reads()).toHaveLength(1);
+      signedOut = true;
+      h.get('refresh').fire();
+      await flush();
+      expect(h.reads()).toHaveLength(2);
+      pending.resolve(reply({ ok: true, approval_request_id: approvalId, status: decision }));
+      await flush();
+      expect(h.get('approval-readiness').textContent).toContain('approval_auth_needed');
+      expect(h.get('approval-status').textContent).not.toContain('approval_recorded');
+      expect(h.get('start').disabled).toBe(true);
+      expect(h.posts()).toHaveLength(1);
+    }
+  );
 
   it.each([200, 403])(
     'preserves an in-flight approval callback through suspension and settles %s',
