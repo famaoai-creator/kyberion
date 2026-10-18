@@ -55,7 +55,7 @@
       },
       {
         "op": "document_digest",
-        "note": "Read pdf/pptx/xlsx/docx/html/txt/md into LLM-ready Markdown through the shared document reader (@agent/core/document-reader — same output as `pnpm kyberion read` and ingest) (tables, headings, line breaks; docx pictures as _[image: media/x.png]_ markers). params.ocr OCRs embedded images of pdf/pptx/docx; reader warnings land in <export_as>_warnings."
+        "note": "Read pdf/pptx/xlsx/docx/html/txt/md/csv/tsv/json/yaml into LLM-ready Markdown through the shared document reader (@agent/core/document-reader — same output as `pnpm kyberion read` and ingest) (tables, headings, line breaks; docx pictures as _[image: media/x.png]_ markers; small csv/tsv as tables; json pretty-printed). params.ocr OCRs embedded images of pdf/pptx/docx; reader warnings land in <export_as>_warnings."
       },
       {
         "op": "docx_extract",
