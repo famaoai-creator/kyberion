@@ -1313,13 +1313,16 @@ function _aggregateByDocument(ranked: KnowledgeHint[]): KnowledgeHint[] {
 
 const SPACELESS_SCRIPT_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const KANA_ONLY_PATTERN = /^[\p{Script=Hiragana}ー]+$/u;
+const HAN_PATTERN = /^\p{Script=Han}+$/u;
 
 /**
  * Query terms for lexical matching. Whitespace-separated words keep their
  * historical form; a word in a spaceless script (Japanese, Chinese) is
  * segmented with the shared `segmentWords` (Intl.Segmenter) instead of
  * staying one sentence-long token that never matches. Kana-only segments
- * (particles, auxiliaries) and one-character terms are dropped.
+ * (particles, auxiliaries) and one-character non-kanji segments are dropped;
+ * a single kanji is meaningful and kept. When segmentation leaves no term
+ * (e.g. a kana-only word such as まとめ), the whole word is kept.
  */
 export function knowledgeQueryWords(topic: string): string[] {
   const words: string[] = [];
@@ -1328,9 +1331,11 @@ export function knowledgeQueryWords(topic: string): string[] {
       if (word.length > 1) words.push(word);
       continue;
     }
-    for (const term of segmentWords(word)) {
-      if (term.length > 1 && !KANA_ONLY_PATTERN.test(term)) words.push(term);
-    }
+    const terms = segmentWords(word).filter(
+      (term) => HAN_PATTERN.test(term) || (term.length > 1 && !KANA_ONLY_PATTERN.test(term))
+    );
+    if (terms.length > 0) words.push(...terms);
+    else if (word.length > 1) words.push(word);
   }
   return [...new Set(words)];
 }

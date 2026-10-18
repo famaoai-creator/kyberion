@@ -24,7 +24,11 @@
 import * as crypto from 'node:crypto';
 import { z } from 'zod';
 
+import * as os from 'node:os';
+
 import { createLogger } from '../logger.js';
+import { withLock } from '../foundation/lock-utils.js';
+import { isPidAlive } from '../workforce/workspace-process-identity.js';
 import { withExecutionContext } from '../authority.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
@@ -53,6 +57,12 @@ const SUMMARY_MAX_CHARS = 1000;
 const RESULT_EXCERPT_MAX_CHARS = 1500;
 const LOG_MAX_CHARS = 1_000_000;
 const DELIVERY_TIMEOUT_MS = 10_000;
+/** Clock skew tolerated on a peer's requested_at / expires_at. */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+/** Pending inbound tasks kept per remote peer; more are refused without a ledger row. */
+const MAX_PENDING_PER_PEER = 20;
+/** Grace after an execution's timeout before `resume --force` may take it over. */
+const EXECUTION_GRACE_MS = 60 * 1000;
 
 const TASK_TYPE_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
 const TASK_ID_PATTERN = /^PTK-[A-Za-z0-9-]{8,80}$/;
@@ -148,6 +158,12 @@ const PeerTaskCatalogEntrySchema = z
     executor: PeerTaskExecutorSchema,
     allowed_from_peers: z.array(z.string().regex(PEER_ID_PATTERN)).min(1),
     timeout_ms: z.number().int().positive().max(MAX_TIMEOUT_MS).default(DEFAULT_TIMEOUT_MS),
+    /**
+     * Send an excerpt of the task output to the proposer. Off by default: the
+     * output stays in the recipient's artifacts and only status, exit code and
+     * artifact references leave the host.
+     */
+    share_output_excerpt: z.boolean().default(false),
   })
   .strict();
 export type PeerTaskCatalogEntry = z.infer<typeof PeerTaskCatalogEntrySchema>;
@@ -240,6 +256,10 @@ export interface PeerTaskRecord {
     decided_at: string;
   };
   work_item_id?: string;
+  /** Who is running an accepted task (single-runner guard for accept/resume). */
+  execution?: { host: string; pid: number; started_at: string; deadline_at: string };
+  /** Outbound only: whether the proposal reached the recipient. */
+  proposal_delivery?: { status: 'sent' | 'failed'; at: string; error?: string };
   result?: PeerTaskResult;
   result_message_id?: string;
   result_delivery?: { status: 'sent' | 'failed'; at: string; error?: string };
@@ -271,7 +291,14 @@ export function listPeerTasks(
   );
   const latest = new Map<string, PeerTaskRecord>();
   for (const row of rows) if (row) latest.set(recordKey(row), row);
+  const now = Date.now();
   return Array.from(latest.values())
+    .map((record) =>
+      // A proposal nobody answered before its expiry is expired for the proposer too.
+      record.direction === 'outbound' && record.state === 'pending' && isExpired(record, now)
+        ? { ...record, state: 'expired' as const }
+        : record
+    )
     .filter((record) => !filter.direction || record.direction === filter.direction)
     .filter((record) => !filter.state || record.state === filter.state)
     .sort((left, right) => left.requested_at.localeCompare(right.requested_at));
@@ -356,22 +383,11 @@ export async function proposePeerTask(input: ProposePeerTaskInput): Promise<{
     requested_at: requestedAt.toISOString(),
     expires_at: new Date(requestedAt.getTime() + ttlMs).toISOString(),
   });
-  const messageId = stableId('PCM-PTQ', request.task_id);
-  const sent = await sendPeerConversationMessageToPeer({
-    tenantId: input.tenantId,
-    senderPeerId: input.senderPeerId,
-    recipientPeerId: input.recipientPeerId,
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-    messageId,
-    messageKind: 'handoff',
-    topic: `peer-task:${request.task_type}`,
-    text: `Task proposal ${request.task_type} (${request.task_id}): ${request.summary}`,
-    metadata: { peer_task_request: request },
-    ...(input.peerCatalogPath ? { catalogPath: input.peerCatalogPath } : {}),
-    timeoutMs: input.timeoutMs ?? DELIVERY_TIMEOUT_MS,
-  });
-  const reply = extractReply(sent.receipt);
-  const rejection = reply?.payload?.peer_task_status === 'rejected';
+  const sessionId =
+    input.sessionId ||
+    `PCS-${requestedAt.getTime().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  // Recorded before sending, so a proposal whose reply was lost can be resent
+  // with the same task id instead of duplicated.
   const record = appendRecord({
     task_id: request.task_id,
     direction: 'outbound',
@@ -380,14 +396,85 @@ export async function proposePeerTask(input: ProposePeerTaskInput): Promise<{
     remote_peer_id: input.recipientPeerId,
     task_type: request.task_type,
     summary: request.summary,
-    session_id: sent.session.session_id,
-    request_message_id: messageId,
+    session_id: sessionId,
+    request_message_id: stableId('PCM-PTQ', request.task_id),
     requested_at: request.requested_at,
     expires_at: request.expires_at,
-    state: rejection ? 'rejected' : 'pending',
+    state: 'pending',
     updated_at: request.requested_at,
   });
+  return sendPeerTaskProposal(record, input);
+}
+
+function requestFromRecord(record: PeerTaskRecord): PeerTaskRequest {
+  return parsePeerTaskRequest({
+    kind: PEER_TASK_REQUEST_KIND,
+    version: 1,
+    task_id: record.task_id,
+    task_type: record.task_type,
+    summary: record.summary,
+    tenant_id: record.tenant_id,
+    sender_peer_id: record.local_peer_id,
+    recipient_peer_id: record.remote_peer_id,
+    requested_at: record.requested_at,
+    expires_at: record.expires_at,
+  });
+}
+
+async function sendPeerTaskProposal(
+  outbound: PeerTaskRecord,
+  options: { peerCatalogPath?: string; timeoutMs?: number }
+): Promise<{ request: PeerTaskRequest; record: PeerTaskRecord; reply_text?: string }> {
+  const request = requestFromRecord(outbound);
+  let sent: Awaited<ReturnType<typeof sendPeerConversationMessageToPeer>>;
+  try {
+    sent = await sendPeerConversationMessageToPeer({
+      tenantId: outbound.tenant_id,
+      senderPeerId: outbound.local_peer_id,
+      recipientPeerId: outbound.remote_peer_id,
+      sessionId: outbound.session_id,
+      messageId: outbound.request_message_id,
+      messageKind: 'handoff',
+      topic: `peer-task:${request.task_type}`,
+      text: `Task proposal ${request.task_type} (${request.task_id}): ${request.summary}`,
+      metadata: { peer_task_request: request },
+      ...(options.peerCatalogPath ? { catalogPath: options.peerCatalogPath } : {}),
+      timeoutMs: options.timeoutMs ?? DELIVERY_TIMEOUT_MS,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    appendRecord({
+      ...outbound,
+      proposal_delivery: { status: 'failed', at: nowIso(), error: message.slice(0, 500) },
+    });
+    throw new Error(
+      `peer_task_proposal_not_delivered:${outbound.task_id} — ${message} | next: pnpm kyberion peer task resend-proposal --task-id ${outbound.task_id}`
+    );
+  }
+  const reply = extractReply(sent.receipt);
+  const rejection = reply?.payload?.peer_task_status === 'rejected';
+  const record = appendRecord({
+    ...outbound,
+    state: rejection ? 'rejected' : outbound.state,
+    proposal_delivery: { status: 'sent', at: nowIso() },
+  });
   return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+/** Resend a recorded proposal with its original task id and message id. Idempotent. */
+export async function resendPeerTaskProposal(input: {
+  tenantId: string;
+  localPeerId: string;
+  taskId: string;
+  peerCatalogPath?: string;
+  timeoutMs?: number;
+}): Promise<{ request: PeerTaskRequest; record: PeerTaskRecord; reply_text?: string }> {
+  const record = getPeerTask(input.tenantId, input.localPeerId, 'outbound', input.taskId);
+  if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
+  if (record.state !== 'pending') {
+    throw new Error(`peer_task_not_resendable:${record.task_id}:${record.state}`);
+  }
+  return sendPeerTaskProposal(record, input);
 }
 
 function extractReply(receipt: unknown): PeerConversationTranscriptEntry | undefined {
@@ -433,7 +520,11 @@ export function handleInboundPeerTaskMessage(
   if (message.kind === 'status') {
     const result = parsePeerTaskResult(message.metadata?.peer_task_result);
     const outbound = getPeerTask(context.tenantId, context.localPeerId, 'outbound', result.task_id);
-    if (!outbound || outbound.remote_peer_id !== remotePeerId) {
+    if (
+      !outbound ||
+      outbound.remote_peer_id !== remotePeerId ||
+      outbound.task_type !== result.task_type
+    ) {
       throw new Error(`peer_task_unknown:${result.task_id}`);
     }
     if (!outbound.result) {
@@ -490,29 +581,20 @@ export function handleInboundPeerTaskMessage(
     state: 'pending',
     updated_at: request.requested_at,
   };
-  const entry = isExpired(base)
-    ? { rejected: 'expired' }
-    : catalogEntryFor(
-        loadPeerTaskCatalog(context.tenantId, { catalogPath: context.taskCatalogPath }),
-        request.task_type,
-        remotePeerId
-      );
-  if ('rejected' in entry) {
-    const record = appendRecord({
-      ...base,
-      state: 'rejected',
-      decision: {
-        decision: 'rejected',
-        actor_id: `peer:${context.localPeerId}`,
-        reason: entry.rejected,
-        decided_at: nowIso(),
-      },
-    });
-    return transportReply(context, replyId, 'reply', describeInboundState(record), {
-      peer_task_id: record.task_id,
-      peer_task_status: 'rejected',
-      reason: entry.rejected,
-    });
+  const rejection = receiptRejection(context, request, remotePeerId);
+  if (rejection) {
+    // No ledger row: a refused proposal changes no local state, so a peer
+    // cannot grow the ledger by sending proposals that are never offered.
+    log.info(
+      `task ${request.task_id} (${request.task_type}) from ${remotePeerId} refused: ${rejection}`
+    );
+    return transportReply(
+      context,
+      replyId,
+      'reply',
+      `Task ${request.task_id} (${request.task_type}) is rejected on ${context.localPeerId} (${rejection}).`,
+      { peer_task_id: request.task_id, peer_task_status: 'rejected', reason: rejection }
+    );
   }
   const record = appendRecord(base);
   log.info(
@@ -522,6 +604,35 @@ export function handleInboundPeerTaskMessage(
     peer_task_id: record.task_id,
     peer_task_status: 'pending',
   });
+}
+
+/** Why a proposal is refused on receipt, or undefined when it may wait for acceptance. */
+function receiptRejection(
+  context: PeerTaskInboundContext,
+  request: PeerTaskRequest,
+  remotePeerId: string
+): string | undefined {
+  const now = Date.now();
+  const requestedAt = Date.parse(request.requested_at);
+  const expiresAt = Date.parse(request.expires_at);
+  // The proposer picks both times; bound them so a task cannot wait forever.
+  if (requestedAt > now + CLOCK_SKEW_MS) return 'requested_in_future';
+  if (expiresAt <= now) return 'expired';
+  if (expiresAt - requestedAt > MAX_TTL_MS || expiresAt > now + MAX_TTL_MS + CLOCK_SKEW_MS) {
+    return 'ttl_too_long';
+  }
+  const entry = catalogEntryFor(
+    loadPeerTaskCatalog(context.tenantId, { catalogPath: context.taskCatalogPath }),
+    request.task_type,
+    remotePeerId
+  );
+  if ('rejected' in entry) return entry.rejected;
+  const pending = listPeerTasks(context.tenantId, context.localPeerId, {
+    direction: 'inbound',
+    state: 'pending',
+  }).filter((task) => task.remote_peer_id === remotePeerId);
+  if (pending.length >= MAX_PENDING_PER_PEER) return 'too_many_pending';
+  return undefined;
 }
 
 function describeInboundState(record: PeerTaskRecord): string {
@@ -645,41 +756,76 @@ export async function decidePeerTask(input: DecidePeerTaskInput): Promise<PeerTa
   const actorId = input.actorId.trim();
   const reason = input.reason.trim();
   if (!actorId || !reason) throw new Error('peer_task_decision_requires_actor_and_reason');
-  let record = getPeerTask(input.tenantId, input.localPeerId, 'inbound', input.taskId);
-  if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
-  if (record.state !== 'pending')
-    throw new Error(`peer_task_already_decided:${record.task_id}:${record.state}`);
-  const decidedAt = nowIso();
-
-  if (input.decision === 'accepted' && isExpired(record)) {
-    record = appendRecord({ ...record, state: 'expired' });
-    throw new Error(`peer_task_expired:${record.task_id}`);
-  }
-  if (input.decision === 'rejected') {
+  // The pending → decided transition is fenced, so two accepts (two operators,
+  // a double invocation) cannot both claim the task.
+  const claimed = await withTaskLock(input, async () => {
+    let record = getPeerTask(input.tenantId, input.localPeerId, 'inbound', input.taskId);
+    if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
+    if (record.state !== 'pending')
+      throw new Error(`peer_task_already_decided:${record.task_id}:${record.state}`);
+    const decidedAt = nowIso();
+    if (input.decision === 'rejected' || isExpired(record)) {
+      const expired = input.decision === 'accepted';
+      const why = expired ? 'expired before acceptance' : reason;
+      record = appendRecord({
+        ...record,
+        state: expired ? 'expired' : 'rejected',
+        decision: { decision: 'rejected', actor_id: actorId, reason: why, decided_at: decidedAt },
+        result: buildResult(record, 'rejected', `Rejected by ${record.local_peer_id}: ${why}`, []),
+      });
+      return { record, entry: undefined };
+    }
+    const entry = catalogEntryFor(
+      loadPeerTaskCatalog(input.tenantId, { catalogPath: input.taskCatalogPath }),
+      record.task_type,
+      record.remote_peer_id
+    );
+    if ('rejected' in entry)
+      throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
     record = appendRecord({
       ...record,
-      state: 'rejected',
-      decision: { decision: 'rejected', actor_id: actorId, reason, decided_at: decidedAt },
-      result: buildResult(record, 'rejected', `Rejected by ${record.local_peer_id}: ${reason}`, []),
+      state: 'running',
+      decision: { decision: 'accepted', actor_id: actorId, reason, decided_at: decidedAt },
+      execution: executionOwner(entry),
     });
-    return input.deliver === false ? record : deliverPeerTaskResult({ ...input, record });
-  }
-
-  const entry = catalogEntryFor(
-    loadPeerTaskCatalog(input.tenantId, { catalogPath: input.taskCatalogPath }),
-    record.task_type,
-    record.remote_peer_id
-  );
-  if ('rejected' in entry)
-    throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
-
-  record = appendRecord({
-    ...record,
-    state: 'running',
-    decision: { decision: 'accepted', actor_id: actorId, reason, decided_at: decidedAt },
+    return { record, entry };
   });
-  record = await executeAcceptedPeerTask(input, record, entry);
-  return input.deliver === false ? record : deliverPeerTaskResult({ ...input, record });
+  let record = claimed.record;
+  if (claimed.entry) record = await executeAcceptedPeerTask(input, record, claimed.entry);
+  if (input.deliver !== false) record = await deliverPeerTaskResult({ ...input, record });
+  if (record.state === 'expired') throw new Error(`peer_task_expired:${record.task_id}`);
+  return record;
+}
+
+function withTaskLock<T>(
+  input: { tenantId: string; localPeerId: string; taskId: string },
+  fn: () => Promise<T>
+): Promise<T> {
+  return withLock(
+    `peer-task-${stableId('lock', `${input.tenantId}/${input.localPeerId}/${input.taskId}`)}`,
+    fn
+  );
+}
+
+function executionOwner(entry: PeerTaskCatalogEntry): NonNullable<PeerTaskRecord['execution']> {
+  const startedAt = Date.now();
+  return {
+    host: os.hostname(),
+    pid: process.pid,
+    started_at: new Date(startedAt).toISOString(),
+    deadline_at: new Date(startedAt + entry.timeout_ms + EXECUTION_GRACE_MS).toISOString(),
+  };
+}
+
+/**
+ * Whether another runner may still be executing this task: its process is
+ * alive on this host, or (other host / unknown) its deadline has not passed.
+ */
+function executionMayBeLive(record: PeerTaskRecord, now = Date.now()): boolean {
+  const execution = record.execution;
+  if (!execution) return false;
+  if (execution.host === os.hostname()) return isPidAlive(execution.pid);
+  return Date.parse(execution.deadline_at) > now;
 }
 
 /**
@@ -702,7 +848,7 @@ async function executeAcceptedPeerTask(
       createWorkItemIfAbsent({
         itemId: peerTaskWorkItemId(record.task_id),
         title: `Peer task ${record.task_type} from ${record.remote_peer_id}`,
-        description: `${record.summary}\n\nPeer task ${record.task_id}; accepted by ${record.decision!.actor_id}: ${record.decision!.reason}`,
+        description: `Peer-supplied summary (untrusted): ${record.summary}\n\nPeer task ${record.task_id}; accepted by ${record.decision!.actor_id}: ${record.decision!.reason}`,
         status: 'in_progress',
         source: 'peer',
         sourceRef: `peer-task:${record.task_id}`,
@@ -718,6 +864,10 @@ async function executeAcceptedPeerTask(
     undefined,
     input.tenantId
   );
+  // A resumed task may find its WorkItem already closed by the interrupted run.
+  if (workItem.status !== 'in_progress') {
+    updateWorkItem({ itemId: workItem.item_id, status: 'in_progress' });
+  }
   record = appendRecord({ ...record, state: 'running', work_item_id: workItem.item_id });
 
   const output = await (input.runner || runPeerTaskExecutor)(entry, { tenantId: input.tenantId });
@@ -755,24 +905,38 @@ async function executeAcceptedPeerTask(
 
 /**
  * Resume an accepted task that stopped before recording a result (executor
- * crash, artifact write failure), then deliver the result.
+ * crash, artifact write failure), then deliver the result. Refused while the
+ * original runner may still be executing; `force` takes over only once its
+ * deadline (timeout + grace) has passed.
  */
 export async function resumePeerTask(
-  input: Omit<DecidePeerTaskInput, 'decision' | 'actorId' | 'reason'>
+  input: Omit<DecidePeerTaskInput, 'decision' | 'actorId' | 'reason'> & { force?: boolean }
 ): Promise<PeerTaskRecord> {
-  const record = getPeerTask(input.tenantId, input.localPeerId, 'inbound', input.taskId);
-  if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
-  if (record.state !== 'running' || record.decision?.decision !== 'accepted' || record.result) {
-    throw new Error(`peer_task_not_resumable:${record.task_id}:${record.state}`);
-  }
-  const entry = catalogEntryFor(
-    loadPeerTaskCatalog(input.tenantId, { catalogPath: input.taskCatalogPath }),
-    record.task_type,
-    record.remote_peer_id
-  );
-  if ('rejected' in entry)
-    throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
-  const done = await executeAcceptedPeerTask(input, record, entry);
+  const claimed = await withTaskLock(input, async () => {
+    const record = getPeerTask(input.tenantId, input.localPeerId, 'inbound', input.taskId);
+    if (!record) throw new Error(`peer_task_not_found:${input.taskId}`);
+    if (record.state !== 'running' || record.decision?.decision !== 'accepted' || record.result) {
+      throw new Error(`peer_task_not_resumable:${record.task_id}:${record.state}`);
+    }
+    if (executionMayBeLive(record)) {
+      const pastDeadline =
+        record.execution && Date.parse(record.execution.deadline_at) <= Date.now();
+      if (!(input.force && pastDeadline)) {
+        throw new Error(
+          `peer_task_still_running:${record.task_id} — pid ${record.execution?.pid} on ${record.execution?.host} until ${record.execution?.deadline_at}`
+        );
+      }
+    }
+    const entry = catalogEntryFor(
+      loadPeerTaskCatalog(input.tenantId, { catalogPath: input.taskCatalogPath }),
+      record.task_type,
+      record.remote_peer_id
+    );
+    if ('rejected' in entry)
+      throw new Error(`peer_task_not_offered:${record.task_id}:${entry.rejected}`);
+    return { record: appendRecord({ ...record, execution: executionOwner(entry) }), entry };
+  });
+  const done = await executeAcceptedPeerTask(input, claimed.record, claimed.entry);
   return input.deliver === false ? done : deliverPeerTaskResult({ ...input, record: done });
 }
 
@@ -811,6 +975,7 @@ function summarizeOutput(
   status: 'completed' | 'failed'
 ): string {
   const head = `${entry.task_type} ${status} (exit ${output.exit_code ?? 'none'})`;
+  if (!entry.share_output_excerpt) return head;
   const excerpt = tail(
     status === 'completed' ? output.stdout : output.stderr || output.stdout,
     RESULT_EXCERPT_MAX_CHARS
@@ -864,7 +1029,11 @@ function writeTaskArtifacts(
     2
   )}\n`;
   const write = (name: string, content: string, mediaType: string): PeerTaskArtifactRef => {
-    const ref = writeArtifact({ tenantId, name: `peer-tasks/${record.task_id}/${name}`, content });
+    const ref = writeArtifact({
+      tenantId,
+      name: `peer-tasks/${record.task_id.toLowerCase()}/${name}`,
+      content,
+    });
     return artifactRef(ref, content, mediaType);
   };
   return [
