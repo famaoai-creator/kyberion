@@ -100,6 +100,12 @@ export async function runContrastiveSession(
   // Label integrity BEFORE any probe or backend call — 'base' is reserved,
   // dupes corrupt run dirs, and a collision with a predicted proposed label
   // must be caught before spending propose calls.
+  if (
+    spec.propose &&
+    (!Number.isInteger(spec.propose.count) || spec.propose.count < 1 || spec.propose.count > 10)
+  ) {
+    throw new Error('[CONTRASTIVE_SESSION] propose.count must be an integer 1..10');
+  }
   const predicted = spec.propose
     ? Array.from(
         { length: spec.propose.count },
@@ -123,13 +129,6 @@ export async function runContrastiveSession(
   if (spec.propose) {
     if (!spec.surface) {
       throw new Error('[CONTRASTIVE_SESSION] --propose requires a surface spec (--surface)');
-    }
-    if (
-      !Number.isInteger(spec.propose.count) ||
-      spec.propose.count < 1 ||
-      spec.propose.count > 10
-    ) {
-      throw new Error('[CONTRASTIVE_SESSION] propose.count must be an integer 1..10');
     }
     const proposed = await proposeCandidates({
       brief: spec.propose.brief,
@@ -187,7 +186,17 @@ export async function runContrastiveSession(
         return false;
       }
     }
-    const scan = scanOverlayForMarkers(c.overlayDir, spec.markers);
+    let scan;
+    try {
+      scan = scanOverlayForMarkers(c.overlayDir, spec.markers);
+    } catch (error) {
+      rejected.push({
+        label: c.label,
+        path: '.',
+        reason: `overlay scan failed: ${error instanceof Error ? error.message : error}`,
+      });
+      return false;
+    }
     if (!scan.clean) {
       rejected.push(
         ...scan.hits.map((h) => ({

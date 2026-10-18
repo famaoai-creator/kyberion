@@ -67,10 +67,24 @@ export function isValidRelPath(rel: string): boolean {
 export function loadSurfaceSpec(specPath: string): SurfaceSpec {
   const resolved = assertSafeRepositoryPath(specPath);
   const parsed = loadJson<SurfaceSpec>(resolved);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('[SURFACE_SPEC] spec must be a JSON object');
+  }
   if (!Array.isArray(parsed.allowed_paths) || parsed.allowed_paths.length === 0) {
     throw new Error('[SURFACE_SPEC] allowed_paths must be a non-empty array');
   }
+  if (
+    (parsed.max_files !== undefined &&
+      (!Number.isInteger(parsed.max_files) || parsed.max_files < 1)) ||
+    (parsed.max_file_bytes !== undefined &&
+      (!Number.isInteger(parsed.max_file_bytes) || parsed.max_file_bytes < 1))
+  ) {
+    throw new Error('[SURFACE_SPEC] max_files/max_file_bytes must be integers >= 1 when present');
+  }
   for (const p of parsed.allowed_paths) {
+    if (typeof p !== 'string') {
+      throw new Error(`[SURFACE_SPEC] allowed_paths entries must be strings, got ${typeof p}`);
+    }
     const effective = p.endsWith('/') ? p.slice(0, -1) : p;
     if (!isValidRelPath(effective) && !p.includes('*')) {
       throw new Error(`[SURFACE_SPEC] invalid allowed_path ${JSON.stringify(p)}`);
