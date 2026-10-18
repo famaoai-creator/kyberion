@@ -60,6 +60,7 @@ vi.mock('../foundation/text.js', async (importOriginal) => {
 import {
   buildKnowledgeIndex,
   buildScopedIndex,
+  knowledgeQueryWords,
   queryKnowledge,
   queryKnowledgeHybrid,
   KnowledgeHintIndex,
@@ -282,6 +283,30 @@ describe('knowledge-index', () => {
       ]);
       const results = queryKnowledge(tied, 'shared query', { scope: 'global' });
       expect(results[0].source).toBe('governance.md');
+    });
+
+    it('matches a sentence-long Japanese query by its content words', () => {
+      const ja = new KnowledgeHintIndex([
+        {
+          topic: 'Peer handoff confirmation template',
+          hint: '引き継ぎ確認の5項目（この順で答える）: 1.受け取った作業 2.完了条件',
+          source: 'peer-handoff-template.md',
+          confidence: 0.8,
+          tags: ['handoff'],
+        },
+      ]);
+      const query =
+        '引き継ぎ確認をお願いします。作業: Air の baseline.check 結果を Mac へ返す試験。テンプレートの5項目で答えてください。';
+      expect(knowledgeQueryWords(query)).toEqual(
+        expect.arrayContaining(['確認', '項目', 'テンプレート', 'air', 'baseline.check', 'mac'])
+      );
+      // Kana-only fragments (particles, okurigana) are not terms.
+      expect(knowledgeQueryWords(query)).not.toContain('します');
+      expect(queryKnowledge(ja, query).map((hint) => hint.source)).toEqual([
+        'peer-handoff-template.md',
+      ]);
+      // Space-separated Latin queries keep their historical terms.
+      expect(knowledgeQueryWords('Browser  automation x')).toEqual(['browser', 'automation']);
     });
 
     it('returns empty array for unmatched topic', () => {

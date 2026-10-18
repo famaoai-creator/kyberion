@@ -40,6 +40,7 @@ import {
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
+import { segmentWords } from '../locale-normalize.js';
 
 /**
  * Reactive Knowledge Index v3.0
@@ -1310,16 +1311,37 @@ function _aggregateByDocument(ranked: KnowledgeHint[]): KnowledgeHint[] {
 
 // ─── Query (lexical) ─────────────────────────────────────────────────────────
 
+const SPACELESS_SCRIPT_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const KANA_ONLY_PATTERN = /^[\p{Script=Hiragana}ー]+$/u;
+
+/**
+ * Query terms for lexical matching. Whitespace-separated words keep their
+ * historical form; a word in a spaceless script (Japanese, Chinese) is
+ * segmented with the shared `segmentWords` (Intl.Segmenter) instead of
+ * staying one sentence-long token that never matches. Kana-only segments
+ * (particles, auxiliaries) and one-character terms are dropped.
+ */
+export function knowledgeQueryWords(topic: string): string[] {
+  const words: string[] = [];
+  for (const word of topic.toLowerCase().split(/\s+/)) {
+    if (!SPACELESS_SCRIPT_PATTERN.test(word)) {
+      if (word.length > 1) words.push(word);
+      continue;
+    }
+    for (const term of segmentWords(word)) {
+      if (term.length > 1 && !KANA_ONLY_PATTERN.test(term)) words.push(term);
+    }
+  }
+  return [...new Set(words)];
+}
+
 export function queryKnowledge(
   index: KnowledgeHintIndex,
   topic: string,
   options: KnowledgeQueryOptions = {}
 ): KnowledgeHint[] {
   const maxResults = options.maxResults ?? 5;
-  const queryWords = topic
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 1);
+  const queryWords = knowledgeQueryWords(topic);
 
   if (queryWords.length === 0) return [];
 
@@ -1385,10 +1407,7 @@ export async function queryKnowledgeHybrid(
   options: KnowledgeQueryOptions = {}
 ): Promise<KnowledgeHint[]> {
   const maxResults = options.maxResults ?? 5;
-  const queryWords = topic
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 1);
+  const queryWords = knowledgeQueryWords(topic);
 
   if (queryWords.length === 0) return [];
 
