@@ -130,6 +130,9 @@ describe('honesty + edge cases', () => {
       rounds: 1,
     });
     expect(r.rounds[0].propose_meta).toBeDefined();
-    expect(r.rounds[0].propose_meta!.backend_used).toBeDefined();
+    // No reasoning backend is registered in tests — the stub must be
+    // reported honestly, not as a real backend.
+    expect(r.rounds[0].propose_meta!.backend_used).toBe(false);
+    expect(r.rounds[0].propose_meta!.error).toMatch(/degraded/);
   });
 });
