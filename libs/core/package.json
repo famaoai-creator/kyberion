@@ -1812,6 +1812,18 @@
       "types": "./dist/harnessing/decision-axis.d.ts",
       "import": "./dist/harnessing/decision-axis.js"
     },
+    "./harnessing/eval-scenario": {
+      "types": "./dist/harnessing/eval-scenario.d.ts",
+      "import": "./dist/harnessing/eval-scenario.js"
+    },
+    "./harnessing/experience-library": {
+      "types": "./dist/harnessing/experience-library.d.ts",
+      "import": "./dist/harnessing/experience-library.js"
+    },
+    "./harnessing/leak-tripwire": {
+      "types": "./dist/harnessing/leak-tripwire.d.ts",
+      "import": "./dist/harnessing/leak-tripwire.js"
+    },
     "./harnessing/propose": {
       "types": "./dist/harnessing/propose.d.ts",
       "import": "./dist/harnessing/propose.js"

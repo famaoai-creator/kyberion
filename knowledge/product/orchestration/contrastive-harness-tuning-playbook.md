@@ -32,7 +32,7 @@ recursion levels: task-level (refine the harness for the task at hand) and harne
 
 ### 1. Propose–Probe–Compose (task-level recursion)
 
-> **Imported (MSN-PPC-PROBE-20261018 + MSN-PPC-LOOP-20261018)** — `libs/core/harnessing/`: `probe-runner` (isolated overlays), `decision-axis` (auto_advance/human_gate/keep_base/decline), `surface-spec` (editable-surface validation), `blind-select` (seeded anonymized recommendation for human_gate — recommend only), `propose` (LLM overlay generation, surface-validated). CLI: `scripts/contrastive_probe.ts`. Blind selection is a recommendation for the human gate, never a decision — the axis stays the sole auto_advance authority. Remaining below: the multi-round recursion and eval-seam wiring.
+> **Imported (MSN-PPC-PROBE-20261018 + MSN-PPC-LOOP-20261018 + MSN-PPC-ECO-20261018)** — `libs/core/harnessing/`: `probe-runner` (isolated overlays), `decision-axis` (auto_advance/human_gate/keep_base/decline), `surface-spec` (editable-surface validation), `blind-select` (seeded anonymized recommendation for human_gate — recommend only), `propose` (LLM overlay generation, surface-validated), `recursive-session` (multi-round recursion, auto_advance winner materialized into the next base), `eval-scenario` (ProbeScenarioSpec seam: wraps an eval fixture as `{workspace_dir, command, expect_outputs}` — e.g. `command` pointing at `pnpm scenario run <fixture>` or `pnpm pipeline --input <fixture>`). CLI: `scripts/contrastive_probe.ts` (`--scenario-spec`, `--library`/`--domain`, `--markers`). Blind selection is a recommendation for the human gate, never a decision — the axis stays the sole auto_advance authority. The run-dir namespace convention (bare-label probe dirs, `_proposed/<label>/`, `report.json`) is documented in the `contrastive-session.ts` file header.
 
 harness2 runs a task under the base harness, lets an editor propose candidate edits on two
 independent dimensions — **INV** (how the agent works: procedure, tool use, completion) and
@@ -80,13 +80,21 @@ wherever workers write run artifacts.
 
 ### 5. Per-domain, causally-ordered experience library
 
+> **Imported (MSN-PPC-ECO-20261018)** — `libs/core/harnessing/experience-library.ts`:
+> `appendLesson` writes cue/lesson/evidence/confidence rows as JSONL under
+> `<libraryRoot>/<domain>.jsonl`; `lookupLessons({asOf})` returns only entries with
+> `recorded_at <= asOf` (the `retain` causal-order rule); `seedPromptFromLessons` renders a
+> prompt block that `propose` injects into the Brief section when `propose.library` is set —
+> looked up once, before the candidate loop, and skipped entirely on the stub backend.
+
 Each domain keeps `INDEX.md` + full adopted harnesses + `EXPERIENCE.md`; tasks run in stream
 order and read **only entries earlier than themselves** (`retain`). Retrieval is by
 construction — a domain directory physically contains only same-domain entries.
 
 Kyberion landing zone: `knowledge/` + `intent-domain-ontology.json` for domain scoping; the
 causal-ordering rule maps onto context-pack generation (a worker sees only knowledge promoted
-before its mission started).
+before its mission started). The harnessing-loop instance landed as above; extending the
+retain semantics to context-pack generation remains open.
 
 ### 6. Evidence-as-files + pointer mission
 
@@ -100,6 +108,13 @@ Kyberion landing zone: context packs for `delegateTask` and review sessions — 
 directly adoptable.
 
 ### 7. Leak tripwires at the read boundary, both directions
+
+> **Partially imported (MSN-PPC-ECO-20261018)** — `libs/core/harnessing/leak-tripwire.ts`:
+> `scanOverlayForMarkers` content-scans every candidate overlay for grader-verdict markers
+> (`DEFAULT_MARKERS`, extendable per call) and fails closed on unreadable input. Wired into
+> `contrastive-session` (all supplied + proposed overlays) and `recursive-session`; hits are
+> rejected as `leak marker: <marker> at <path>:<line>` before any probe runs. The inbound
+> direction (markers on evidence read paths) and the `knowledge/` store gate remain deferred.
 
 Declared answer-key globs are refused before evidence reaches a model, and grader-verdict
 markers are scanned by name **and content** on both inbound evidence and agent-authored files
