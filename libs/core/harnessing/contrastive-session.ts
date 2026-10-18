@@ -33,6 +33,12 @@ import {
 } from './blind-select.js';
 import { proposeCandidates } from './propose.js';
 import { scanOverlayForMarkers } from './leak-tripwire.js';
+import {
+  buildExperienceRecord,
+  persistExperience,
+  type ExperienceSink,
+  type ExperienceWriteback,
+} from './experience-writeback.js';
 
 export interface ContrastiveSessionSpec {
   session_id: string;
@@ -64,6 +70,9 @@ export interface ContrastiveSessionSpec {
   runRoot: string;
   /** The work shape this session tunes — used as the experience cue. */
   work_shape?: string;
+  /** Governed write-back: a qualifying experience record is appended to this
+   *  library (quality-gated + deduped; see experience-writeback). */
+  experienceSink?: ExperienceSink;
   timeoutMs?: number;
 }
 
@@ -83,6 +92,8 @@ export interface ContrastiveSessionResult {
     evidence: string;
     confidence: 'high' | 'medium' | 'low';
   } | null;
+  /** Set only when experienceSink was given: what the write-back did. */
+  experience_writeback?: ExperienceWriteback;
 }
 
 export function sessionSeed(sessionId: string): number {
@@ -296,18 +307,20 @@ export async function runContrastiveSession(
         )
       : null;
 
+  const reportPath = assertSafeRepositoryPath(path.join(runRoot, 'report.json'), {
+    allowMissingLeaf: true,
+  });
   const experience =
     decision.decision === 'auto_advance' && decision.winner && base
-      ? {
-          cue: spec.work_shape || `contrastive probe on ${path.basename(spec.scenarioDir)}`,
-          lesson: base.delivered
-            ? `apply the '${decision.winner}' overlay; it dominated the base on the declared metrics`
-            : `apply the '${decision.winner}' overlay; it delivered while the base failed the same scenario`,
-          evidence: `base delivered=${base.delivered}, winner delivered=true; outcomes in ${runRoot}; adopt staged_snapshot of the winner outcome (verified probed bytes), not the live overlayDir`,
-          // Dominance over a delivering base is the stronger evidence;
-          // a single delivery over a dead base may just be a broken baseline.
-          confidence: base.delivered ? ('high' as const) : ('medium' as const),
-        }
+      ? buildExperienceRecord({
+          workShape: spec.work_shape,
+          scenarioDir: spec.scenarioDir,
+          base,
+          winner: decision.winner,
+          adoptedLabel: decision.winner,
+          reportPath,
+          materialized: false,
+        })
       : null;
 
   const baseResult: RunOutcome = base ?? {
@@ -322,6 +335,18 @@ export async function runContrastiveSession(
     error: 'no eligible candidates — base probe skipped',
     recorded_at: '',
   };
+  // Governed write-back — quality-gated and deduped; a non-qualifying
+  // session leaves the library untouched.
+  const experience_writeback = spec.experienceSink
+    ? experience
+      ? persistExperience(spec.experienceSink, experience, {
+          decision: decision.decision,
+          winner: decision.winner,
+          winnerOutcome: outcomes.find((o) => o.label === decision.winner),
+          base_drifted: baseDrifted,
+        })
+      : 'rejected'
+    : undefined;
   const report = {
     session_id: spec.session_id,
     recorded_at: nowIso(),
@@ -338,10 +363,8 @@ export async function runContrastiveSession(
     outcomes,
     base: baseResult,
     experience,
+    ...(experience_writeback ? { experience_writeback } : {}),
   };
-  const reportPath = assertSafeRepositoryPath(path.join(runRoot, 'report.json'), {
-    allowMissingLeaf: true,
-  });
   safeWriteFile(reportPath, JSON.stringify(report, null, 2));
   ledger.record('CONTRASTIVE_SESSION', {
     session_id: spec.session_id,
@@ -360,5 +383,6 @@ export async function runContrastiveSession(
     ...(propose_meta ? { propose_meta } : {}),
     selection,
     experience,
+    ...(experience_writeback ? { experience_writeback } : {}),
   };
 }
