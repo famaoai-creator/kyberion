@@ -329,6 +329,28 @@
       "notes": "Current Claude model balancing speed and intelligence."
     },
     {
+      "model_id": "anthropic:claude-haiku-5-5",
+      "provider": "anthropic",
+      "family": "claude-haiku",
+      "status": "approved",
+      "tier": "small",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["fast_iteration", "low_latency", "structured_output"],
+      "notes": "Claude Haiku 5.5 (released 2026-10-07): successor to claude-haiku-4-5-20251001 with a 1M-token context and up to 128K output. Base price $0.10 / $0.50 per MTok (cache read $0.01, write $0.125); the cost registry records the base rate only. Third-party sources also list a >100K-token prompt tier at $0.50 / $2.50 per MTok; not yet confirmed against Anthropic's pricing page, so it is not encoded. The backend skips output_config.effort for every haiku id, so effort is not sent to this model until its support is verified."
+    },
+    {
       "model_id": "anthropic:claude-haiku-4-5-20251001",
       "provider": "anthropic",
       "family": "claude-haiku",
