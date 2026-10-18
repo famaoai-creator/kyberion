@@ -305,6 +305,9 @@ describe('knowledge-index', () => {
       expect(queryKnowledge(ja, query).map((hint) => hint.source)).toEqual([
         'peer-handoff-template.md',
       ]);
+      // Single kanji carry meaning; kana-only words fall back to themselves.
+      expect(knowledgeQueryWords('雨の日')).toEqual(['雨', '日']);
+      expect(knowledgeQueryWords('まとめ')).toEqual(['まとめ']);
       // Space-separated Latin queries keep their historical terms.
       expect(knowledgeQueryWords('Browser  automation x')).toEqual(['browser', 'automation']);
     });
