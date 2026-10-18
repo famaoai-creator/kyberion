@@ -385,6 +385,25 @@
       "tools_enabled": true,
       "allowed_tools": ["read_file", "list_directory"]
     },
+    "gemini-api-argon": {
+      "mode": "gemini-api",
+      "model_ref": "gemini:gemini-4-argon",
+      "capabilities": ["text", "structured_output", "tools", "vision", "streaming"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "gemini-cli-argon": {
+      "mode": "gemini-cli",
+      "model_ref": "gemini:gemini-4-argon",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "agy-argon": {
+      "mode": "agy-cli",
+      "model_ref": "gemini:gemini-4-argon",
+      "capabilities": ["text", "structured_output", "tools"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
     "openrouter-default": {
       "mode": "openrouter",
       "capabilities": ["text", "structured_output", "tools"]

@@ -194,6 +194,19 @@ describe('agy-cli-backend', () => {
     );
   });
 
+  it('supports explicit gemini-4-argon in backend constructor options', async () => {
+    const backend = new AgyCliBackend({ model: 'gemini-4-argon' });
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+
+    await backend.prompt('test run');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'agy',
+      expect.arrayContaining(['--model', 'gemini-4-argon']),
+      expect.anything()
+    );
+  });
+
   it('streams AGY agent_response deltas and suppresses the final duplicate', async () => {
     const stream = [
       {

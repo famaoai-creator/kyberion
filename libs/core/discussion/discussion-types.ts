@@ -78,6 +78,34 @@ export interface DiscussionCommand {
   attachments?: string[];
 }
 
+export type DiscussionProvider = 'claude' | 'codex';
+
+export interface DiscussionProviderAttempt {
+  id: string;
+  operation: string;
+  provider: DiscussionProvider;
+  status: 'started' | 'succeeded' | 'failed' | 'aborted' | 'timed_out';
+  started_at: string;
+  finished_at?: string;
+  error_code?: string;
+}
+
+/** Durable room-lifetime execution provenance; never inferred from global backend state. */
+export interface DiscussionExecution {
+  requested_mode: 'auto' | 'scripted' | 'reasoning';
+  actual_mode: 'unknown' | 'scripted' | 'reasoning';
+  requested_provider: DiscussionProvider | null;
+  /** Confirmed by a successful isolated transport, not merely configuration. */
+  provider: DiscussionProvider | null;
+  /** The isolated facade does not return the observed model identity. */
+  model: null;
+  call_budget: number;
+  timeout_ms: number;
+  /** Logical invocation bound is not a bound on provider-internal API requests. */
+  internal_turn_limit: number | null;
+  attempts: DiscussionProviderAttempt[];
+}
+
 export interface DiscussionConfig {
   max_rounds: number;
   max_messages: number;
@@ -85,8 +113,14 @@ export interface DiscussionConfig {
   /** Delay between turns so the surface can animate (ms). 0 in tests. */
   turn_delay_ms: number;
   locale: 'ja' | 'en';
-  /** `auto` uses the reasoning backend when one is registered, else scripted. */
+  /** Both auto and reasoning require an explicitly selected isolated provider. */
   speaker: 'auto' | 'scripted' | 'reasoning';
+  provider?: DiscussionProvider;
+  /** Maximum logical provider invocations across the entire room lifetime. */
+  max_provider_calls?: number;
+  provider_timeout_ms?: number;
+  /** A facilitator-only brief: one conclusion invocation, no invented panel conversation. */
+  single_pass?: boolean;
   /**
    * `panel`: agents discuss among themselves, the human steers.
    * `dialogue`: the human converses with the facilitator, who asks, records
@@ -123,6 +157,14 @@ export type DiscussionEvent = EventBase &
         gaps: string[];
         /** Who chose the discretionary seats: fixed rules or the reasoning backend. */
         roster_source?: 'rules' | 'llm';
+      }
+    | { type: 'execution_initialized'; execution: Omit<DiscussionExecution, 'attempts'> }
+    | { type: 'provider_call_started'; id: string; operation: string; provider: DiscussionProvider }
+    | {
+        type: 'provider_call_finished';
+        id: string;
+        status: Exclude<DiscussionProviderAttempt['status'], 'started'>;
+        error_code?: string;
       }
     | { type: 'agenda_set'; agenda: DiscussionAgendaItem[] }
     | { type: 'phase_changed'; phase: DiscussionPhase; round: number; note?: string }
@@ -380,6 +422,8 @@ export interface DiscussionRoomState {
   participants: DiscussionParticipant[];
   staffing_gaps: string[];
   roster_source: 'rules' | 'llm';
+  /** null means historical execution provenance is unknown. */
+  execution: DiscussionExecution | null;
   agenda: DiscussionAgendaItem[];
   messages: DiscussionMessageView[];
   /** Participant currently composing (turn_started with no message yet). */
@@ -421,6 +465,8 @@ export interface DiscussionRoomSummary {
   work_item_count: number;
   has_minutes: boolean;
   mode: 'panel' | 'dialogue';
+  /** Distinguishes a single-model brief from a multi-agent panel in room lists. */
+  single_pass?: boolean;
   archived: boolean;
   readiness: number;
   last_message_preview: string;

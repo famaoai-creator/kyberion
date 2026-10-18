@@ -85,6 +85,11 @@ export function createDiscussion(body: {
   goal: string;
   locale: DiscussionLocale;
   speaker: 'auto' | 'scripted' | 'reasoning';
+  provider?: 'claude' | 'codex';
+  single_pass?: boolean;
+  max_rounds?: number;
+  max_provider_calls?: number;
+  provider_timeout_ms?: number;
   turn_delay_ms: number;
   tenant?: string;
   mission_id?: string;
