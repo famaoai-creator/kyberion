@@ -5,7 +5,7 @@ scope: repository
 authority: runbook
 phase: [onboarding, execution, review]
 tags: [peer, mesh-hub, same-tenant, quickstart, conversation]
-last_updated: 2026-08-03
+last_updated: 2026-10-18
 ---
 
 # 同一 tenant の Kyberion peer をつなぐ最短手順
@@ -132,6 +132,21 @@ pnpm peer:conversation send-message \
 ```
 
 この通常メッセージは相手 peer の conversation responder が同期的に処理し、ACK を返します。Mesh Hub の collaboration request を送る場合は、`handoff` メッセージに型付き `collaboration_request` を付けます。受信側では proposal になり、`pnpm kyberion peer collaboration accept` を実行するまで mission や actuator は動きません。
+
+## 5. 自動返事を有効にする（任意）
+
+相手 peer からのメッセージに LLM が返事をするには、受け口サーバに相手の peer-id を明示的に渡します。指定しない限り自動返事は動かず、手動の会話はこれまでどおり使えます。
+
+```bash
+KYBERION_PEER_SHARED_SECRET="$PEER_A_SECRET" pnpm peer:conversation-server \
+  --peer-id kyberion-local-a --host <LAN の IP> --port 4100 --tenant-id demo \
+  --auto-reply-peers kyberion-local-b
+```
+
+- 自動の往復は 1 会話あたり `--auto-reply-max-turns`（既定 6）で止まり、相手ごとの生成回数も 1 時間あたりの上限で抑えられます。
+- 返事は Claude がツールなし・設定なしの隔離状態で書き、使う材料はその会話の記録と tenant の knowledge の抜粋だけです。mission や actuator は動きません。
+- tenant の confidential な内容を外部の LLM に送るので、事前に tenant の provider 証明（`training_use: none`、人の承認が 1 回必要）と、`api.anthropic.com` への送信許可が要ります。手順は [Peer Network Catalog](./peer-network.md) の「Conversation auto replies」を参照してください。
+- 自動返事を有効にした相手には、この受け口の共有 secret を持つ全員に tenant の knowledge の抜粋が見える可能性があります。knowledge を見せてよい相手だけを指定してください。
 
 ## つまずいたときの判断
 

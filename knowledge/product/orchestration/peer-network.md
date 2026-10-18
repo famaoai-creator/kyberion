@@ -84,10 +84,44 @@ embedded WorkItem/A2A proposal.
 
 ## LAN workflow
 
-1. Bind the peer listener to `0.0.0.0` or the machine's LAN address.
-2. Register the peer's LAN `base_url` in the catalog.
-3. Set `allow_local_network: true`.
-4. Use the same `kyberion peer send` command and point it at the LAN peer ID.
+1. Bind the peer listener to the machine's LAN address (`--host 192.168.x.y`). Binding to `0.0.0.0` also listens on the LAN, but the Mesh enrollment then records `127.0.0.1` as the endpoint.
+2. Register the peer's LAN `base_url` in the catalog (`pnpm peer:register ... --exposure same_lan`).
+3. Set `allow_local_network: true` (`same_lan` sets it).
+4. Use the same `kyberion peer send` / `pnpm peer:conversation send-message` command and point it at the LAN peer ID. Each direction is verified with the receiver's own shared secret, so a two-way link needs a listener and a catalog entry on both sides.
+
+## Conversation auto replies (opt-in)
+
+A conversation server can answer inbound conversation messages with an LLM-generated reply, so two peers can hold a bounded autonomous conversation. It is off unless the operator names the remote peers:
+
+```bash
+KYBERION_PEER_SHARED_SECRET=... pnpm peer:conversation-server \
+  --peer-id <local-peer> --host <lan-ip> --port 4100 --tenant-id <tenant> \
+  --auto-reply-peers <remote-peer>[,<remote-peer>]
+```
+
+| Flag                           | Default     | Meaning                                                                      |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------- |
+| `--auto-reply-peers`           | empty (off) | Remote peers whose `message` / `reply` messages get an LLM reply             |
+| `--auto-reply-max-turns`       | 6           | Per-session cap on automatic replies; stops two auto-responders from looping |
+| `--auto-reply-budget-per-hour` | 30          | Rolling per-peer generation budget (bounds session-rotation abuse and spend) |
+| `--auto-reply-timeout-ms`      | 60000       | Generation timeout                                                           |
+| `--auto-reply-concurrency`     | 1           | Worker concurrency                                                           |
+| `--auto-reply-max-attempts`    | 3           | Delivery attempts per reply                                                  |
+| `--auto-reply-knowledge-limit` | 5           | Tenant knowledge excerpts used to ground a reply                             |
+
+How it works:
+
+- The HTTP receive path only records a reply job in `active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<local-peer>/reply-jobs.jsonl` (keyed by `sender:message_id`, so redelivery never answers twice) and returns a `status` ACK. One server process owns that ledger per local peer.
+- A worker generates the reply with Claude through `runClaudeAgentQuery` in strict isolation (no tools, no settings/hooks/MCP, scratch working directory, minimal environment) — never through the reasoning failover chain, whose other CLIs run with tools. Peer text and knowledge excerpts are framed as untrusted data.
+- The prompt uses only this session's transcript between the two peers and up to N excerpts from the tenant's confidential knowledge, read under the least-privilege role `peer_responder_reader` (never `connections/`).
+- The reply goes back as `kind: reply` with `reply_to_message_id` and metadata `auto_generated` / `auto_turn`; retries reuse one message id, so the receiver deduplicates them. Generation and delivery failures are recorded separately in the ledger.
+
+Prerequisites, because the reply sends tenant-confidential material to an external provider:
+
+1. Record a provider attestation for the tenant (`training_use: none`, human approval): `pnpm onboarding llm attest --tenant <tenant> --provider claude --training-use none ... --request-approval`, approve with `pnpm kyberion approvals --approve <id>`, then apply with the printed command. The reasoning gate allows the confidential `zero_retention` send only with this valid attestation, and only when the tenant's `allowed_reasoning_backends` (if set) and the provider declaration permit it.
+2. Allow the provider's endpoint in the tenant egress policy (tenant domain grant for `api.anthropic.com`).
+
+Enabling a peer shares tenant knowledge excerpts with every holder of this server's shared secret, because the opt-in list is keyed by the authenticated `sender_peer_id`. Enable only peers you would show that knowledge to. Auto replies never run tools, change WorkItems, or touch missions; `handoff` messages keep the proposal-and-accept path.
 
 ## Envelope rules
 
