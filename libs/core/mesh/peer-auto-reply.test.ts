@@ -17,6 +17,7 @@ vi.mock('../reasoning/reasoning-backend.js', async (importOriginal) => {
 });
 
 import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 import {
   clearPeerRuntime,
   createPeerMessagingServer,
@@ -837,8 +838,11 @@ describe('peer auto-reply', () => {
 
   it('default generate runs runClaudeAgentQuery inside the confidential zero_retention scope', async () => {
     let observedScope: unknown;
+    let observedExecution: { role?: string; tenant?: string } = {};
     runClaudeAgentQueryMock.mockImplementation(async (params: Record<string, unknown>) => {
       observedScope = getReasoningPayloadScope();
+      const execution = currentExecutionScope();
+      observedExecution = { role: execution?.assumedRole, tenant: execution?.tenantSlug };
       expect(params.abortController).toBeInstanceOf(AbortController);
       expect(params.systemPrompt).toBe('system');
       expect(params.userPrompt).toBe('user');
@@ -867,6 +871,9 @@ describe('peer auto-reply', () => {
       purpose: 'peer-conversation:auto-reply',
       training_use: 'zero_retention',
     });
+    // The egress gate reads the tenant's own egress overlay under the
+    // tenant-bound responder role, never the caller's ambient role.
+    expect(observedExecution).toEqual({ role: 'peer_responder_reader', tenant: TENANT });
     expect(getReasoningBackendSpy).not.toHaveBeenCalled();
   });
 });

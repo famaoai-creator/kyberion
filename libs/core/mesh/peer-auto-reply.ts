@@ -355,6 +355,9 @@ const AUTO_REPLY_SCHEMA = z.object({ reply: z.string() });
  * Tool-less one-shot generation. Deliberately not the reasoning-backend
  * failover chain: other CLIs in that chain run with tools enabled.
  * `runClaudeAgentQuery` asserts reasoning egress against the payload scope.
+ * It runs under the tenant-bound responder role so the egress gate can read
+ * the tenant's own egress overlay (knowledge/confidential/<tenant>/) with no
+ * broader authority than knowledge retrieval has.
  */
 export async function defaultPeerAutoReplyGenerate(
   input: PeerAutoReplyGenerateInput
@@ -362,23 +365,29 @@ export async function defaultPeerAutoReplyGenerate(
   const abortController = new AbortController();
   if (input.signal.aborted) abortController.abort();
   else input.signal.addEventListener('abort', () => abortController.abort(), { once: true });
-  const result = await withReasoningPayloadScope(
-    {
-      tier: 'confidential',
-      tenant_slug: input.tenantId,
-      purpose: AUTO_REPLY_SCOPE_PURPOSE,
-      training_use: 'zero_retention',
-    },
+  const result = await withExecutionContextAsync(
+    PEER_RESPONDER_READER_ROLE,
     () =>
-      runClaudeAgentQuery({
-        systemPrompt: input.systemPrompt,
-        userPrompt: input.userPrompt,
-        schema: AUTO_REPLY_SCHEMA,
-        abortController,
-        metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
-        // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
-        isolation: 'strict',
-      })
+      withReasoningPayloadScope(
+        {
+          tier: 'confidential',
+          tenant_slug: input.tenantId,
+          purpose: AUTO_REPLY_SCOPE_PURPOSE,
+          training_use: 'zero_retention',
+        },
+        () =>
+          runClaudeAgentQuery({
+            systemPrompt: input.systemPrompt,
+            userPrompt: input.userPrompt,
+            schema: AUTO_REPLY_SCHEMA,
+            abortController,
+            metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
+            // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
+            isolation: 'strict',
+          })
+      ),
+    undefined,
+    input.tenantId
   );
   return result.parsed.reply;
 }
