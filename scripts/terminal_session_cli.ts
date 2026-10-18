@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-/* eslint-disable no-restricted-imports -- The serve daemon runs as a detached child process whose stdout/stderr are the daemon log itself; appendFileSync there cannot re-enter the tier-guard stack it is logging for. Registered in governance-import-baseline.json. */
 /**
  * terminal_session_cli.ts — persistent terminal-actuator bridge.
  *
@@ -17,15 +16,14 @@
  * storage-layout policy. Sessions survive only while the daemon runs.
  */
 import {
-  appendFileSync,
-  closeSync,
-  existsSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+  safeExistsSync as existsSync,
+  safeMkdir as mkdirSync,
+  safeReadFile,
+  safeUnlinkSync as unlinkSync,
+  safeWriteFile as writeFileSync,
+  withSafeAppendFile,
+} from '@agent/core/secure-io';
+// eslint-disable-next-line no-restricted-imports -- Detached terminal bridge owns child lifetime; registered in governance-import-baseline.json.
 import { spawn, type ChildProcess } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
@@ -76,11 +74,8 @@ function sleep(ms: number): Promise<void> {
 
 function logLine(message: string): void {
   const line = `[terminal-daemon] ${nowIso()} ${message}\n`;
-  try {
-    appendFileSync(LOGFILE, line);
-  } catch {
-    /* logging must never crash the daemon */
-  }
+  // The detached daemon already redirects stderr into LOGFILE. Foreground
+  // serve writes to its caller's stderr, avoiding a second file logger.
   process.stderr.write(line);
 }
 
@@ -323,7 +318,7 @@ async function pingDaemon(timeoutMs = 3000): Promise<boolean> {
 
 function readPid(): number | null {
   try {
-    const pid = Number(readFileSync(PIDFILE, 'utf8').trim());
+    const pid = Number((safeReadFile(PIDFILE, { encoding: 'utf8' }) as string).trim());
     return Number.isInteger(pid) && pid > 0 ? pid : null;
   } catch {
     return null;
@@ -356,7 +351,7 @@ function cleanupDaemonFiles(): void {
 
 function readLogTail(lines = 20): string {
   try {
-    const content = readFileSync(LOGFILE, 'utf8').trimEnd();
+    const content = (safeReadFile(LOGFILE, { encoding: 'utf8' }) as string).trimEnd();
     return content.split('\n').slice(-lines).join('\n');
   } catch {
     return '';
@@ -381,13 +376,13 @@ async function ensureDaemon(): Promise<void> {
   }
   cleanupDaemonFiles();
 
-  const logFd = openSync(LOGFILE, 'a');
-  const child = spawn(
-    process.execPath,
-    ['--import', pathToFileURL(TS_LOADER).href, SELF, 'serve'],
-    { cwd: ROOT, detached: true, stdio: ['ignore', logFd, logFd] }
+  const child = withSafeAppendFile(LOGFILE, (logFd) =>
+    spawn(process.execPath, ['--import', pathToFileURL(TS_LOADER).href, SELF, 'serve'], {
+      cwd: ROOT,
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+    })
   );
-  closeSync(logFd);
   let childExit: number | null = null;
   let childError: string | null = null;
   child.on('exit', (code) => {
