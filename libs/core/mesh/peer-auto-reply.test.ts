@@ -762,6 +762,21 @@ describe('peer auto-reply', () => {
     expect(deliver).not.toHaveBeenCalled();
   });
 
+  it('stop() during a slow knowledge retrieval never calls generate and requeues', async () => {
+    const retrieveKnowledge = vi.fn(() => new Promise<never>(() => undefined));
+    const { autoReply, generate, deliver } = setup({ retrieveKnowledge });
+    autoReply.handleInbound(inbound({ messageId: 'M-STOP-KN' }));
+    const pass = autoReply.runOnce();
+    await vi.waitFor(() => expect(retrieveKnowledge).toHaveBeenCalledTimes(1));
+    await autoReply.stop();
+    await pass;
+    expect(generate).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+    const [job] = autoReply.listJobs();
+    expect(job).toMatchObject({ status: 'queued', reason: 'requeued_on_stop' });
+    expect(job.generation).toBeUndefined();
+  });
+
   it('stop() during delivery backoff requeues with the generated reply and delivers nothing more', async () => {
     let releaseSleep: () => void = () => undefined;
     const deliver = vi.fn(async () => {
