@@ -53,6 +53,9 @@ export interface ContrastiveSessionResult {
   outcomes: RunOutcome[];
   base: RunOutcome;
   rejected_overlays: Array<{ label: string; path: string; reason: string }>;
+  /** Propose-stage provenance — stub-degraded or backend-less proposals must
+   *  reach the caller, not only the report file. */
+  propose_meta?: { backend_used: boolean; error?: string };
   selection: BlindRecommendation | null;
   experience: {
     cue: string;
@@ -238,6 +241,7 @@ export async function runContrastiveSession(
     outcomes,
     base: baseResult,
     rejected_overlays: rejected,
+    ...(propose_meta ? { propose_meta } : {}),
     selection,
     experience,
   };
