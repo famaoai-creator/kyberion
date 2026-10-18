@@ -60,6 +60,10 @@ export function classifyProbeSet(
     },
   });
   const decisive = [...(base ? [row(base)] : []), ...candidates.map(row)];
+  const allOutcomes = [...(base ? [base] : []), ...candidates];
+  const unresolved_metrics = metrics
+    .map((m) => m.key)
+    .filter((key) => allOutcomes.length > 0 && allOutcomes.every((o) => metricOf(o, key) === null));
   const report = (
     decision: ProbeDecision,
     winner: string | null,
@@ -70,6 +74,7 @@ export function classifyProbeSet(
     rationale,
     decisive_evidence: decisive,
     auto_advance_allowed: decision === 'auto_advance',
+    unresolved_metrics,
   });
 
   const delivered = candidates.filter((c) => c.ok && c.delivered);

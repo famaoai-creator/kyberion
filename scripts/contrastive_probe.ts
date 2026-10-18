@@ -101,14 +101,14 @@ export const runContrastiveProbe = defineScript({
       runRoot,
       work_shape: args['work-shape']?.[0],
     });
-    console.log(
+    context.print(
       JSON.stringify(
         { decision: result.decision, selection: result.selection?.recommended_winner ?? null },
         null,
         2
       )
     );
-    console.log(`report: ${result.report_path}`);
+    context.print(`report: ${result.report_path}`);
   },
 });
 

@@ -94,7 +94,11 @@ export async function proposeCandidates(opts: {
   // failover composite can still serve a stub candidate).
   result.backend_used = backend.name !== 'stub';
   if (!result.backend_used) {
-    result.error = `degraded: only the stub backend is active (name=${backend.name}); proposals will be rejected`;
+    // Do not run the loop at all: stub output would either fail JSON parsing
+    // (wasted calls) or, if it ever parsed, produce overlays with no real
+    // reasoning behind them. Degrading empty is the honest outcome.
+    result.error = `degraded: only the stub backend is active (name=${backend.name}); propose skipped`;
+    return result;
   }
 
   for (let i = 0; i < opts.count; i++) {
@@ -154,13 +158,21 @@ export async function proposeCandidates(opts: {
     logger.info(`[propose:${label}] accepted ${validation.accepted_files.length} file(s)`);
     result.candidates.push({ label, overlayDir, files: validation.accepted_files });
   }
-  // Any delegateTask served by the stub during this call taints the batch.
+  // Any delegateTask served by the stub mid-loop (failover) taints the batch —
+  // purge the affected candidates so stub-authored overlays can't reach a probe.
   const stubServed = getStubServedOps()
     .slice(stubServedBefore)
     .some((r) => r.op === 'delegateTask');
   if (stubServed) {
     result.backend_used = false;
     result.error = result.error || 'degraded: stub backend served one or more proposals';
+    for (const c of result.candidates.splice(0)) {
+      result.rejected.push({
+        label: c.label,
+        path: '.',
+        reason: 'candidate discarded: stub-served backend',
+      });
+    }
   }
   return result;
 }
