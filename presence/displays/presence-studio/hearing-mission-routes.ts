@@ -45,9 +45,11 @@ import {
 import {
   assertHearingEditable,
   HearingConflictError,
+  HearingOperationError,
   assertHearingHandoffReplay,
 } from './hearing-runtime.js';
 import { hearingStorageForViewer } from './hearing-storage-access.js';
+import { assertHearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
 import type { HearingDecidedBy, HearingRecord } from './hearing.js';
 import {
   buildHearingMissionCreateArgs,
@@ -93,7 +95,7 @@ function hearingMissionResponseError(req: Request, res: Response, error: unknown
   const status =
     error instanceof HearingConflictError
       ? 409
-      : error instanceof HearingMissionRequestError
+      : error instanceof HearingMissionRequestError || error instanceof HearingOperationError
         ? error.status
         : error instanceof PresenceStudioViewerError
           ? error.status
@@ -221,6 +223,11 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       // Idempotent: a session already handed off returns the same ids
       // instead of minting a second mission or a second approval request.
       assertHearingHandoffReplay(record, 'mission');
+      assertHearingHandoffSnapshot(
+        presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'hearing handoff'),
+        record,
+        viewer
+      );
       if (record.mission_id && record.approval_request_id) {
         res.status(200).json({
           ok: true,

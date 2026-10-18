@@ -15,16 +15,18 @@ import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
 import { ledger } from '../ledger.js';
 import { nowIso } from '../foundation/time.js';
-import { copyTree, runProbe, type RunOutcome } from './probe-runner.js';
+import { copyTree, runProbe, validateProbeSpec, type RunOutcome } from './probe-runner.js';
 import { classifyProbeSet, type DecisionReport, type MetricSpec } from './decision-axis.js';
 import { validateOverlay, type SurfaceSpec } from './surface-spec.js';
 import { proposeCandidates } from './propose.js';
+import { scanOverlayForMarkers } from './leak-tripwire.js';
 import {
   applyBlindSelection,
   metricsFallbackSelector,
@@ -40,8 +42,16 @@ export interface RecursiveSessionSpec {
   /** Per-round candidate overlays (same set each round). */
   candidates?: Array<{ label: string; overlayDir: string }>;
   /** LLM propose per round (requires surface). */
-  propose?: { brief: string; count: number; labelPrefix?: string };
+  propose?: {
+    brief: string;
+    count: number;
+    labelPrefix?: string;
+    /** Optional experience library: its lessons seed the propose prompt. */
+    library?: { root: string; domain: string };
+  };
   surface?: SurfaceSpec;
+  /** Extra leak-tripwire content markers (merged with DEFAULT_MARKERS). */
+  markers?: string[];
   /** Max rounds. 1 = single-shot. */
   rounds: number;
   selection?: 'blind';
@@ -71,14 +81,29 @@ export interface RecursiveSessionResult {
   final_decision: DecisionReport;
   adopted_overlays: string[];
   /** 'budget' is the defensive default — every in-loop path currently sets a concrete halt before break, so it should never appear in a real report. */
-  halted_by: 'budget' | 'human_gate' | 'keep_base' | 'decline' | 'auto_advance_final';
-  budget: { expected_probes: number; actual_probes: number; status: 'ok' | 'short' | 'exceeded' };
+  halted_by:
+    | 'budget'
+    | 'human_gate'
+    | 'keep_base'
+    | 'decline'
+    | 'auto_advance_final'
+    | 'materialization_error';
+  budget: {
+    expected_probes: number;
+    planned_probes: number;
+    actual_probes: number;
+    status: 'ok' | 'rejected_shortfall' | 'probe_loss';
+    actual_matches_plan: boolean;
+  };
 }
 
 export async function runRecursiveSession(
   spec: RecursiveSessionSpec
 ): Promise<RecursiveSessionResult> {
   const runRoot = assertSafeRepositoryPath(spec.runRoot, { allowMissingLeaf: true });
+  // Freeze the library horizon at session start — lessons appended mid-run
+  // must not change later rounds (retain causal order = reproducibility).
+  const libraryAsOf = nowIso();
   const scen = path.resolve(spec.scenarioDir);
   const resolvedRoot = path.resolve(runRoot);
   if (resolvedRoot === scen || resolvedRoot.startsWith(`${scen}${path.sep}`)) {
@@ -87,6 +112,13 @@ export async function runRecursiveSession(
     );
   }
   safeMkdir(runRoot, { recursive: true });
+  // Validate the probe spec at entry, before the round-1 propose stage can
+  // spend backend calls on a session that could never probe.
+  validateProbeSpec({ command: spec.command, expectOutputs: spec.expectOutputs });
+  const scenarioDir = assertSafeRepositoryPath(spec.scenarioDir);
+  if (!safeLstat(scenarioDir).isDirectory()) {
+    throw new Error('[RECURSIVE_SESSION] scenarioDir must be a directory');
+  }
   if (!Number.isInteger(spec.rounds) || spec.rounds < 1 || spec.rounds > 10) {
     throw new Error('[RECURSIVE_SESSION] rounds must be an integer 1..10');
   }
@@ -133,24 +165,53 @@ export async function runRecursiveSession(
   }
 
   const rejected: Array<{ label: string; path: string; reason: string }> = [];
-  // Surface-validate supplied overlays once (rounds reuse them).
-  const supplied = (spec.candidates ?? []).filter((c) => {
-    if (!spec.surface) return true;
+  // Reject an overlay whose marker scan hits — a leak-marked file must never
+  // reach a probe (harness2 leak tripwire).
+  const rejectOnMarkers = (label: string, overlayDir: string): boolean => {
+    let scan;
     try {
-      const v = validateOverlay(c.overlayDir, spec.surface);
-      if (v.ok) return true;
-      rejected.push(
-        ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
-      );
-      return false;
+      scan = scanOverlayForMarkers(overlayDir, spec.markers);
     } catch (error) {
       rejected.push({
-        label: c.label,
+        label,
         path: '.',
-        reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
+        reason: `overlay scan failed: ${error instanceof Error ? error.message : error}`,
       });
-      return false;
+      return true;
     }
+    if (scan.clean) return false;
+    rejected.push(
+      ...scan.hits.map((h) => ({
+        label,
+        path: h.path,
+        reason: `leak marker: ${h.marker} at ${h.path}:${h.line}`,
+      }))
+    );
+    return true;
+  };
+  // Surface-validate + tripwire supplied overlays once — supplied overlay
+  // dirs are assumed session-immutable; a mid-session mutation is not
+  // re-scanned (proposed overlays ARE scanned per round).
+  const supplied = (spec.candidates ?? []).filter((c) => {
+    if (spec.surface) {
+      try {
+        const v = validateOverlay(c.overlayDir, spec.surface);
+        if (!v.ok) {
+          rejected.push(
+            ...v.rejected_files.map((r) => ({ label: c.label, path: r.path, reason: r.reason }))
+          );
+          return false;
+        }
+      } catch (error) {
+        rejected.push({
+          label: c.label,
+          path: '.',
+          reason: `overlay invalid: ${error instanceof Error ? error.message : error}`,
+        });
+        return false;
+      }
+    }
+    return !rejectOnMarkers(c.label, c.overlayDir);
   });
 
   const rounds: RoundRecord[] = [];
@@ -158,10 +219,14 @@ export async function runRecursiveSession(
   let currentBase = spec.scenarioDir;
   let halted: RecursiveSessionResult['halted_by'] = 'budget';
   let actualProbes = 0;
-  // Declared upfront: each round was budgeted 1 base probe + one probe per
-  // declared candidate. Rejected overlays show up as actual < expected.
-  const expectedProbes =
+  // Declared upfront (informational): each round was budgeted 1 base probe +
+  // one probe per declared candidate. planned_probes tracks what each round
+  // that actually executed was about to run — status compares actual vs
+  // planned so a healthy early halt doesn't read as a shortfall.
+  const declaredProbes =
     spec.rounds * (1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0));
+  const declaredPerRound = 1 + (spec.candidates?.length ?? 0) + (spec.propose?.count ?? 0);
+  let plannedProbes = 0;
   let finalDecision: DecisionReport | null = null;
 
   for (let round = 1; round <= spec.rounds; round++) {
@@ -180,10 +245,20 @@ export async function runRecursiveSession(
         count: spec.propose.count,
         outDir: path.join(roundRoot, '_proposed'),
         labelPrefix: spec.propose.labelPrefix,
+        ...(spec.propose.library
+          ? { library: { ...spec.propose.library, asOf: libraryAsOf } }
+          : {}),
       });
       rejected.push(...proposed.rejected.map((r) => ({ ...r, label: `r${round}:${r.label}` })));
+      // Mirror contrastive-session: a degraded empty propose run is recorded
+      // in the rejection trail, not only in propose_meta.
+      if (proposed.error && !proposed.candidates.length) {
+        rejected.push({ label: `r${round}:propose`, path: '.', reason: proposed.error });
+      }
       candidates.push(
-        ...proposed.candidates.map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
+        ...proposed.candidates
+          .filter((c) => !rejectOnMarkers(`r${round}:${c.label}`, c.overlayDir))
+          .map((c) => ({ label: c.label, overlayDir: c.overlayDir }))
       );
       roundProposeMeta = {
         backend_used: proposed.backend_used,
@@ -198,6 +273,7 @@ export async function runRecursiveSession(
         `[BUDGET_IDENTITY] duplicate labels in round ${round}: ${roundLabels.join(', ')}`
       );
     }
+    plannedProbes += candidates.length + (candidates.length ? 1 : 0);
 
     const probeFor = (label: string, overlayDir?: string): RunOutcome =>
       runProbe({
@@ -253,7 +329,6 @@ export async function runRecursiveSession(
     });
 
     if (decision.decision === 'auto_advance' && decision.winner) {
-      adopted.push(`r${round}:${decision.winner}`);
       if (round === spec.rounds) {
         halted = 'auto_advance_final';
         break;
@@ -261,9 +336,34 @@ export async function runRecursiveSession(
       // Materialize: next base = current base + winner overlay.
       const winner = candidates.find((c) => c.label === decision.winner)!;
       const nextBase = path.join(runRoot, 'bases', `round-${round + 1}`);
-      if (safeExistsSync(nextBase)) safeRmSync(nextBase);
-      copyTree(currentBase, nextBase);
-      copyTree(winner.overlayDir, nextBase);
+      const resolvedWinner = path.resolve(assertSafeRepositoryPath(winner.overlayDir));
+      const resolvedNext = path.resolve(nextBase);
+      const resolvedCurrent = path.resolve(currentBase);
+      if (
+        resolvedNext === resolvedWinner ||
+        resolvedNext.startsWith(`${resolvedWinner}${path.sep}`) ||
+        resolvedWinner.startsWith(`${resolvedNext}${path.sep}`) ||
+        resolvedNext === resolvedCurrent ||
+        resolvedNext.startsWith(`${resolvedCurrent}${path.sep}`) ||
+        resolvedCurrent.startsWith(`${resolvedNext}${path.sep}`)
+      ) {
+        throw new Error(`[RECURSIVE_SESSION] next base dir would nest inside its copy sources`);
+      }
+      try {
+        if (safeExistsSync(nextBase)) safeRmSync(nextBase);
+        copyTree(currentBase, nextBase);
+        copyTree(winner.overlayDir, nextBase);
+        adopted.push(`r${round}:${decision.winner}`);
+      } catch (error) {
+        // Fail soft — the rounds already probed are evidence; don't lose them.
+        rejected.push({
+          label: `r${round}:${decision.winner}`,
+          path: '.',
+          reason: `materialization failed: ${error instanceof Error ? error.message : error}`,
+        });
+        halted = 'materialization_error';
+        break;
+      }
       currentBase = nextBase;
       continue;
     }
@@ -277,13 +377,18 @@ export async function runRecursiveSession(
   }
 
   const budget = {
-    expected_probes: expectedProbes,
+    expected_probes: declaredProbes,
+    planned_probes: plannedProbes,
     actual_probes: actualProbes,
-    status: (actualProbes === expectedProbes
-      ? 'ok'
-      : actualProbes < expectedProbes
-        ? 'short'
-        : 'exceeded') as 'ok' | 'short' | 'exceeded',
+    // Compare planned vs declared capacity of EXECUTED rounds only — a
+    // healthy early halt is 'ok'; rejections/degrades that shrank a round's
+    // candidate set read as 'rejected_shortfall'; a lost probe is 'probe_loss'.
+    status: (actualProbes < plannedProbes
+      ? 'probe_loss'
+      : plannedProbes < declaredPerRound * rounds.length
+        ? 'rejected_shortfall'
+        : 'ok') as 'ok' | 'rejected_shortfall' | 'probe_loss',
+    actual_matches_plan: actualProbes === plannedProbes,
   };
   const report = {
     session_id: spec.session_id,
