@@ -584,6 +584,11 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       // whichever write carries the lesson must not be dropped by the merge.
       // A row holding an experience is never "declined" — a stale declined flag
       // from an earlier empty write must not outlive the lesson itself.
+      // When neither row carries an experience, declined resolves
+      // current-first (current ?? incoming): an earlier declined=false masks a
+      // later declined=true. Current-wins is the merge policy here; the real
+      // ordering (distill writes the flag, finish re-enqueues without it) is
+      // consistent with it.
       ...(current.distill_experience || normalizedCandidate.distill_experience
         ? {
             distill_experience:

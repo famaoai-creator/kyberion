@@ -285,8 +285,12 @@ function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unkn
     memory_candidate_source_ref: candidate.source_ref,
     memory_candidate_kind: candidate.proposed_memory_kind,
     memory_ratification_required: candidate.ratification_required,
-    // Preserve the distill-time evidence basis so the promoted record keeps
-    // its cue/lesson/evidence/confidence after the queue row is done with it.
+    // Preserve the distill-time evidence basis on the runtime
+    // DistillCandidateRecord (active/shared/runtime/distill-candidates/) so the
+    // candidate record keeps its cue/lesson/evidence/confidence after the queue
+    // row is done with it. The durable promoted .md/.json artifact is built
+    // from a fixed field whitelist in promoted-memory.ts and does not carry the
+    // structured lesson — the durable link is evidence_refs -> distillation.md.
     ...(candidate.distill_experience ? { distill_experience: candidate.distill_experience } : {}),
     ...(candidate.distill_experience_declined !== undefined
       ? { distill_experience_declined: candidate.distill_experience_declined }
