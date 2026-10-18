@@ -63,6 +63,7 @@ import {
   CODEX_ISOLATED_EXEC_FLAGS,
   CodexIsolatedQueryError,
   detectCodexToolAttempt,
+  parseCodexCliMajorMinor,
   runCodexIsolatedQuery,
 } from './codex-isolated-query.js';
 
@@ -172,6 +173,21 @@ function scratchDirs(): string[] {
   const root = path.join(mocks.base, 'workspaces');
   return calls.map((call) => call.options.cwd).filter((dir) => dir.startsWith(root));
 }
+
+describe('parseCodexCliMajorMinor', () => {
+  it('reads major.minor from codex --version output', () => {
+    expect(parseCodexCliMajorMinor('codex-cli 0.163.0\n')).toBe('0.163');
+    expect(parseCodexCliMajorMinor('codex-cli v1.2')).toBe('1.2');
+    expect(parseCodexCliMajorMinor('codex-cli nightly')).toBeUndefined();
+  });
+
+  it('stays linear on long digit runs (no regex backtracking)', () => {
+    const hostile = `codex-cli ${'0'.repeat(100_000)}x`;
+    const started = Date.now();
+    expect(parseCodexCliMajorMinor(hostile)).toBeUndefined();
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+});
 
 describe('runCodexIsolatedQuery', () => {
   beforeEach(() => {
