@@ -24,7 +24,7 @@ vi.mock('@agent/core/organization/member-registry', async () => {
 vi.mock('@agent/core/secure-io', async () => {
   const actual =
     await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
-  return { ...actual, safeExecResult: vi.fn() };
+  return { ...actual, safeExecResult: vi.fn(), safeWriteFile: vi.fn(actual.safeWriteFile) };
 });
 
 vi.mock('@agent/core/path-resolver', async () => {
@@ -48,8 +48,14 @@ vi.mock('@agent/core/governance/approval-store', async () => {
   return { ...actual, listApprovalRequests: vi.fn() };
 });
 
+vi.mock('./hearing-canvas.js', async () => {
+  const actual = await vi.importActual<typeof import('./hearing-canvas.js')>('./hearing-canvas.js');
+  return { ...actual, generateHearingCanvas: vi.fn() };
+});
+
+import { generateHearingCanvas } from './hearing-canvas.js';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
-import { safeExecResult } from '@agent/core/secure-io';
+import { safeExecResult, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { writeMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 import { writeGovernedArtifactJson } from '@agent/core/workforce/artifact-store';
@@ -58,6 +64,9 @@ import {
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import { registerHearingRoutes } from './hearing-routes.js';
+import * as hearingSecurity from './security.js';
+import type { HearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
+import { harness, response as clientResponse, flush } from './ask-client-test-harness.js';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission/mission-state';
 import type { MissionState } from '@agent/core/mission/mission-types';
@@ -94,12 +103,13 @@ function createFakeApp(): { app: express.Express; handlers: Map<string, Handler>
 function fakeRequest(overrides: {
   params?: Record<string, string>;
   query?: Record<string, string>;
+  body?: unknown;
 }) {
   const urlPath = '/api/hearing/test/handoff';
   return {
     params: overrides.params || {},
     query: overrides.query || {},
-    body: {},
+    body: overrides.body,
     headers: {},
     socket: { remoteAddress: '127.0.0.1' },
     path: urlPath,
@@ -131,6 +141,16 @@ function fakeResponse() {
     },
   };
   return res;
+}
+
+function displayedSnapshot(get: Handler, sessionId: string): HearingHandoffSnapshot {
+  const response = fakeResponse();
+  get(fakeRequest({ params: { session: sessionId } }), response);
+  expect(response.statusCode).toBe(200);
+  const snapshot = (response.body as { record: { handoff_snapshot?: HearingHandoffSnapshot } })
+    .record.handoff_snapshot;
+  expect(snapshot).toEqual({ version: 1, token: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  return snapshot!;
 }
 
 const TEST_TENANT = 'zz-hearing-mission-route-test';
@@ -243,6 +263,10 @@ describe('POST /api/hearing/:session/handoff', () => {
   let savedTenant: string | undefined;
   const { app, handlers } = createFakeApp();
   registerHearingMissionRoutes(app);
+  registerHearingRoutes(app);
+  const get = handlers.get('GET /api/hearing/:session')!;
+  const decide = handlers.get('POST /api/hearing/:session/decide')!;
+  const answer = handlers.get('POST /api/hearing/:session/answer')!;
   const handoff = handlers.get('POST /api/hearing/:session/handoff')!;
   const namespace = hearingNamespace([TEST_TENANT]);
 
@@ -254,6 +278,12 @@ describe('POST /api/hearing/:session/handoff', () => {
     vi.mocked(findMissionPath).mockReset();
     vi.mocked(loadState).mockReset();
     vi.mocked(listApprovalRequests).mockReset();
+    vi.mocked(safeWriteFile).mockClear();
+    vi.mocked(generateHearingCanvas).mockReset();
+    vi.mocked(generateHearingCanvas).mockResolvedValue({
+      source: 'template',
+      html: '<html><head></head><body>fixture</body></html>',
+    });
   });
 
   afterEach(() => {
@@ -264,6 +294,17 @@ describe('POST /api/hearing/:session/handoff', () => {
       { recursive: true, force: true }
     );
     safeRmSync(pathResolver.sharedTmp(`hearing/${TEST_TENANT}`), { recursive: true, force: true });
+    safeRmSync(
+      pathResolver.rootResolve('active/shared/runtime/hearing/confidential/zz-handoff-other'),
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+    safeRmSync(pathResolver.sharedTmp('hearing/zz-handoff-other'), {
+      recursive: true,
+      force: true,
+    });
     safeRmSync(pathResolver.sharedTmp('hearing-mission-routes-test'), {
       recursive: true,
       force: true,
@@ -308,9 +349,341 @@ describe('POST /api/hearing/:session/handoff', () => {
     saveHearingRecord(namespace, fullyAnsweredRecord(sessionId));
 
     const res = fakeResponse();
-    handoff(fakeRequest({ params: { session: sessionId } }), res);
+    handoff(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { handoff_snapshot: { version: 1, token: '0'.repeat(64) } },
+      }),
+      res
+    );
     expect(res.statusCode).toBe(409);
     expect(safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('rejects displayed decision A after requirements are edited and decided as B, before any effect', async () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'stale-' + randomUUID();
+    saveHearingRecord(namespace, decidedRecord(sessionId));
+    const snapshotA = displayedSnapshot(get, sessionId);
+    const edited = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: {
+          text: 'A different clinic workflow',
+          request_id: 'edit-problem',
+          intent_resolution: { missing_inputs: ['problem'] },
+        },
+      }),
+      edited
+    );
+    expect(edited.statusCode).toBe(200);
+    await new Promise((resolve) => setImmediate(resolve));
+    const decided = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), decided);
+    expect(decided.statusCode).toBe(200);
+    const snapshotB = displayedSnapshot(get, sessionId);
+    expect(snapshotB).not.toEqual(snapshotA);
+    const before = loadHearingRecord(namespace, sessionId);
+    vi.mocked(safeWriteFile).mockClear();
+    vi.mocked(generateHearingCanvas).mockClear();
+
+    const response = fakeResponse();
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshotA } }),
+      response
+    );
+
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(safeExecResult).not.toHaveBeenCalled();
+    expect(generateHearingCanvas).not.toHaveBeenCalled();
+    expect(safeWriteFile).not.toHaveBeenCalled();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+  });
+
+  it('keeps a real stale mission click guarded in the browser without resending or replacing the draft', async () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'browser-stale-' + randomUUID();
+    saveHearingRecord(namespace, fullyAnsweredRecord(sessionId));
+    const firstDecision = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), firstDecision);
+    expect(firstDecision.statusCode).toBe(200);
+    const snapshotA = (
+      firstDecision.body as { record: { handoff_snapshot: HearingHandoffSnapshot } }
+    ).record.handoff_snapshot;
+    const storage = new Map([['kyberion.ask.session_id', sessionId]]);
+    const outcomes: Array<ReturnType<typeof fakeResponse>> = [];
+    const browser = harness({
+      storage,
+      query: '?mode=hearing&scenario=web_app_build&tenant=' + TEST_TENANT,
+      hearing: async (url, init) => {
+        const parsed = new URL(url, 'http://localhost');
+        expect(decodeURIComponent(parsed.pathname.split('/')[3])).toBe(sessionId);
+        const response = fakeResponse();
+        const request = fakeRequest({
+          params: { session: sessionId },
+          query: Object.fromEntries(parsed.searchParams),
+          ...(init?.body ? { body: JSON.parse(init.body) } : {}),
+        });
+        if (init?.method === 'POST') {
+          expect(parsed.pathname.endsWith('/handoff')).toBe(true);
+          handoff(request, response);
+          outcomes.push(response);
+        } else {
+          get(request, response);
+        }
+        return clientResponse(response.body, response.statusCode);
+      },
+    });
+    try {
+      await flush();
+      expect(browser.elements.get('hearing-handoff')!.disabled).toBe(false);
+      browser.input.value = 'Keep this unsent private draft';
+      browser.input.selectionStart = 5;
+      browser.input.selectionEnd = 9;
+      browser.input.fire('input');
+
+      // A separate tab changes and redecides the actual durable session while
+      // this browser continues displaying the original GET response.
+      const edited = fakeResponse();
+      await answer(
+        fakeRequest({
+          params: { session: sessionId },
+          body: {
+            text: 'Newer server-side clinic workflow',
+            request_id: 'other-tab-edit',
+            intent_resolution: { missing_inputs: ['problem'] },
+          },
+        }),
+        edited
+      );
+      expect(edited.statusCode).toBe(200);
+      await new Promise((resolve) => setImmediate(resolve));
+      const secondDecision = fakeResponse();
+      decide(fakeRequest({ params: { session: sessionId } }), secondDecision);
+      expect(secondDecision.statusCode).toBe(200);
+      const snapshotB = (
+        secondDecision.body as { record: { handoff_snapshot: HearingHandoffSnapshot } }
+      ).record.handoff_snapshot;
+      expect(snapshotB).not.toEqual(snapshotA);
+      const before = loadHearingRecord(namespace, sessionId);
+      vi.mocked(safeWriteFile).mockClear();
+      vi.mocked(generateHearingCanvas).mockClear();
+
+      browser.elements.get('hearing-handoff')!.fire('click');
+      await flush();
+      const posts = () => browser.fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+      const reads = () =>
+        browser.fetch.mock.calls.filter(
+          ([url, init]) => url.startsWith('/api/hearing/') && init?.method !== 'POST'
+        );
+      expect(posts()).toHaveLength(1);
+      expect(reads()).toHaveLength(1);
+      expect(JSON.parse(posts()[0][1]!.body!)).toEqual({ handoff_snapshot: snapshotA });
+      expect(outcomes[0].statusCode).toBe(409);
+      expect(outcomes[0].body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+      expect(browser.elements.get('hearing-handoff-status')!.textContent).toBe(
+        'front_desk:hearing_conflict_stale_snapshot'
+      );
+      const markerKey = 'kyberion.ask.hearing.completion.' + sessionId;
+      const marker = storage.get(markerKey);
+      expect(marker).toBeTruthy();
+      expect(marker).not.toContain(snapshotA.token);
+      expect(marker).not.toContain('clinic');
+      expect(browser.input.value).toBe('Keep this unsent private draft');
+      expect(browser.input.selectionStart).toBe(5);
+      expect(browser.input.selectionEnd).toBe(9);
+
+      browser.elements.get('hearing-handoff')!.fire('click');
+      browser.elements.get('hearing-decide')!.fire('click');
+      browser.form.fire('submit');
+      await flush();
+      expect(posts()).toHaveLength(1);
+      expect(browser.elements.get('hearing-handoff')!.disabled).toBe(true);
+      expect(browser.elements.get('hearing-decide')!.disabled).toBe(true);
+      expect(browser.elements.get('ask-send')!.disabled).toBe(true);
+      expect(storage.get(markerKey)).toBe(marker);
+      expect(browser.input.value).toBe('Keep this unsent private draft');
+      expect(safeExecResult).not.toHaveBeenCalled();
+      expect(generateHearingCanvas).not.toHaveBeenCalled();
+      expect(safeWriteFile).not.toHaveBeenCalled();
+      expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+    } finally {
+      browser.browserEvent('pagehide');
+    }
+  });
+
+  it.each(['legacy', 'versioned'] as const)(
+    'invalidates a prior token on a same-actor, same-timestamp %s redecision',
+    (mode) => {
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+      const sessionId = 'redecide-' + randomUUID();
+      saveHearingRecord(namespace, fullyAnsweredRecord(sessionId));
+      const requirementsRevision = loadHearingRecord(namespace, sessionId)!.requirements_revision;
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-17T10:00:00.000Z'));
+      try {
+        const decision = (operationId: string) => {
+          const response = fakeResponse();
+          decide(
+            fakeRequest({
+              params: { session: sessionId },
+              body:
+                mode === 'legacy'
+                  ? {}
+                  : {
+                      version: 1,
+                      operation_id: operationId,
+                      scenario_id: 'web_app_build',
+                      requirements_revision: requirementsRevision,
+                    },
+            }),
+            response
+          );
+          expect(response.statusCode).toBe(200);
+          return (
+            response.body as {
+              record: HearingRecord & { handoff_snapshot: HearingHandoffSnapshot };
+            }
+          ).record;
+        };
+        const first = decision('operation-a');
+        const second = decision('operation-b');
+        expect(second.decided_at).toBe(first.decided_at);
+        expect(second.decided_by).toEqual(first.decided_by);
+        expect(second.decision_revision).toBeGreaterThan(first.decision_revision!);
+        expect(second.handoff_snapshot).not.toEqual(first.handoff_snapshot);
+        const before = loadHearingRecord(namespace, sessionId);
+        vi.mocked(safeWriteFile).mockClear();
+        const response = fakeResponse();
+        handoff(
+          fakeRequest({
+            params: { session: sessionId },
+            body: { handoff_snapshot: first.handoff_snapshot },
+          }),
+          response
+        );
+        expect(response.statusCode).toBe(409);
+        expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+        expect(safeExecResult).not.toHaveBeenCalled();
+        expect(safeWriteFile).not.toHaveBeenCalled();
+        expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('rejects missing, malformed and extra-field bodies before reservation or subprocess work', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'invalid-' + randomUUID();
+    saveHearingRecord(namespace, decidedRecord(sessionId));
+    const snapshot = displayedSnapshot(get, sessionId);
+    const before = loadHearingRecord(namespace, sessionId);
+    vi.mocked(safeWriteFile).mockClear();
+    for (const body of [
+      undefined,
+      null,
+      {},
+      [],
+      'not-json',
+      { handoff_snapshot: null },
+      { handoff_snapshot: { version: 2, token: snapshot.token } },
+      { handoff_snapshot: { version: 1, token: 'invalid' } },
+      { handoff_snapshot: { version: 1, token: 1 } },
+      { handoff_snapshot: { ...snapshot, ignored: true } },
+      { handoff_snapshot: snapshot, tenant: TEST_TENANT },
+    ]) {
+      const response = fakeResponse();
+      handoff(fakeRequest({ params: { session: sessionId }, body }), response);
+      expect(response.statusCode).toBe(400);
+      expect(response.body).not.toHaveProperty('mission_id');
+    }
+    expect(safeExecResult).not.toHaveBeenCalled();
+    expect(safeWriteFile).not.toHaveBeenCalled();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+  });
+
+  it('binds the displayed snapshot to the currently resolved member', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'actor-' + randomUUID();
+    saveHearingRecord(namespace, decidedRecord(sessionId));
+    const snapshot = displayedSnapshot(get, sessionId);
+    const before = loadHearingRecord(namespace, sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue({
+      ...fixtureMember(),
+      member_id: 'other-member',
+    });
+    vi.mocked(safeWriteFile).mockClear();
+    const response = fakeResponse();
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      response
+    );
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(safeExecResult).not.toHaveBeenCalled();
+    expect(safeWriteFile).not.toHaveBeenCalled();
+    expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+  });
+
+  it.each(['principal', 'source', 'organizationIds', 'projectIds'] as const)(
+    'refuses a displayed snapshot after the server-resolved %s changes',
+    (field) => {
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+      const sessionId = 'scope-' + randomUUID();
+      saveHearingRecord(namespace, decidedRecord(sessionId));
+      const snapshot = displayedSnapshot(get, sessionId);
+      const before = loadHearingRecord(namespace, sessionId);
+      const current = hearingSecurity.resolvePresenceStudioViewerContext(fakeRequest({}));
+      const viewer = vi
+        .spyOn(hearingSecurity, 'resolvePresenceStudioViewerContext')
+        .mockReturnValue({
+          ...current,
+          ...(field === 'principal'
+            ? { principalId: 'human:other-principal' }
+            : field === 'source'
+              ? { source: 'token' as const }
+              : { [field]: ['changed-scope'] }),
+        });
+      try {
+        vi.mocked(safeWriteFile).mockClear();
+        const response = fakeResponse();
+        handoff(
+          fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+          response
+        );
+        expect(response.statusCode).toBe(field === 'source' ? 403 : 409);
+        expect(safeExecResult).not.toHaveBeenCalled();
+        expect(safeWriteFile).not.toHaveBeenCalled();
+        expect(loadHearingRecord(namespace, sessionId)).toEqual(before);
+      } finally {
+        viewer.mockRestore();
+      }
+    }
+  );
+
+  it('rejects a token from a different tenant even for an identical session and decision', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    const sessionId = 'tenant-' + randomUUID();
+    const record = decidedRecord(sessionId);
+    saveHearingRecord(namespace, record);
+    const snapshot = displayedSnapshot(get, sessionId);
+    saveHearingRecord('zz-handoff-other', record);
+    process.env.KYBERION_TENANT = 'zz-handoff-other';
+    const before = loadHearingRecord('zz-handoff-other', sessionId);
+    vi.mocked(safeWriteFile).mockClear();
+    const response = fakeResponse();
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      response
+    );
+    expect(response.statusCode).toBe(409);
+    expect(response.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(safeExecResult).not.toHaveBeenCalled();
+    expect(safeWriteFile).not.toHaveBeenCalled();
+    expect(loadHearingRecord('zz-handoff-other', sessionId)).toEqual(before);
   });
 
   it('retains an unresolved reservation when controller success cannot be verified, without retrying effects', () => {
@@ -322,8 +695,12 @@ describe('POST /api/hearing/:session/handoff', () => {
     const sessionId = `sess-${randomUUID()}`;
     saveHearingRecord(namespace, decidedRecord(sessionId));
 
+    const snapshot = displayedSnapshot(get, sessionId);
     const res = fakeResponse();
-    handoff(fakeRequest({ params: { session: sessionId } }), res);
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res
+    );
     expect(res.statusCode).toBe(409);
     expect(res.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
     const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithMissionHandoff;
@@ -331,7 +708,10 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(persisted.handoff_pending?.kind).toBe('mission');
     expect(safeExecResult).toHaveBeenCalledTimes(1);
     const retry = fakeResponse();
-    handoff(fakeRequest({ params: { session: sessionId } }), retry);
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      retry
+    );
     expect(retry.statusCode).toBe(409);
     expect(retry.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
     expect(safeExecResult).toHaveBeenCalledTimes(1);
@@ -348,7 +728,11 @@ describe('POST /api/hearing/:session/handoff', () => {
       const sessionId = `sess-${randomUUID()}`;
       saveHearingRecord(namespace, decidedRecord(sessionId));
 
-      handoff(fakeRequest({ params: { session: sessionId } }), fakeResponse());
+      const snapshot = displayedSnapshot(get, sessionId);
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        fakeResponse()
+      );
       const [, args, options] = vi.mocked(safeExecResult).mock.calls[0] ?? [];
       expect(args?.[0]).toBe('dist/scripts/mission_controller.js');
       // SYSTEM_ROLE is inherited (it outranks MISSION_ROLE), so the role is delegated.
@@ -363,14 +747,18 @@ describe('POST /api/hearing/:session/handoff', () => {
     }
   });
 
-  it('creates the mission, writes the brief evidence, opens the alignment request, and is idempotent on a second call', () => {
+  it('creates the mission and brief but refuses replay when the destination cannot be verified', () => {
     const sessionId = `sess-${randomUUID()}`;
     const record = decidedRecord(sessionId);
     saveHearingRecord(namespace, record);
     const missionId = hearingMissionId(record);
     const missionDir = pathResolver.sharedTmp(`hearing-mission-routes-test/${missionId}`);
 
-    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue({
+      ...fixtureMember('owner'),
+      member_id: 'later-handoff-member',
+      display_name: 'Later Operator',
+    });
     vi.mocked(findMissionPath).mockReturnValue(missionDir);
     vi.mocked(loadState).mockReturnValue({ status: 'planned' } as unknown as MissionState);
     vi.mocked(safeExecResult).mockImplementation((_command: string, args: string[] = []) => {
@@ -390,8 +778,12 @@ describe('POST /api/hearing/:session/handoff', () => {
       };
     });
 
+    const snapshot = displayedSnapshot(get, sessionId);
     const res = fakeResponse();
-    handoff(fakeRequest({ params: { session: sessionId } }), res);
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res
+    );
 
     expect(res.statusCode).toBe(200);
     const body = res.body as {
@@ -452,12 +844,17 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(persisted.approval_request_id).toBe('REQ-ALIGN-1');
     expect(typeof persisted.handed_off_at).toBe('string');
 
-    // Idempotent: a second call returns the same ids without spawning again.
+    // Raw persisted IDs alone never authorize a replay: this fixture has no
+    // readable, scoped mission/approval pair. The real-reader test below does.
     vi.mocked(safeExecResult).mockClear();
     const res2 = fakeResponse();
-    handoff(fakeRequest({ params: { session: sessionId } }), res2);
-    expect(res2.statusCode).toBe(200);
-    expect((res2.body as { mission_id: string }).mission_id).toBe(missionId);
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res2
+    );
+    expect(res2.statusCode).toBe(409);
+    expect(res2.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+    expect(res2.body).not.toHaveProperty('mission_id');
     expect(safeExecResult).not.toHaveBeenCalled();
   });
   it('restores a POST-persisted handoff through real mission and approval readers, and fails closed after deletion', async () => {
@@ -521,8 +918,12 @@ describe('POST /api/hearing/:session/handoff', () => {
       return { stdout: JSON.stringify({ requestId: approvalId }), stderr: '', status: 0 };
     });
     try {
+      const snapshot = displayedSnapshot(get, sessionId);
       const submitted = fakeResponse();
-      handoff(fakeRequest({ params: { session: sessionId } }), submitted);
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        submitted
+      );
       expect(submitted.statusCode).toBe(200);
       expect(submitted.body).toMatchObject({
         mission_id: missionId,
@@ -535,10 +936,10 @@ describe('POST /api/hearing/:session/handoff', () => {
       });
       const cold = createFakeApp();
       registerHearingRoutes(cold.app);
-      const get = cold.handlers.get('GET /api/hearing/:session')!;
+      const coldGet = cold.handlers.get('GET /api/hearing/:session')!;
       const reload = () => {
         const response = fakeResponse();
-        get(fakeRequest({ params: { session: sessionId } }), response);
+        coldGet(fakeRequest({ params: { session: sessionId } }), response);
         expect(response.statusCode).toBe(200);
         return response.body as {
           record: Record<string, unknown>;
@@ -555,11 +956,34 @@ describe('POST /api/hearing/:session/handoff', () => {
       expect(new URL(recovered.completion.next!.href).searchParams.get('tenant')).toBe(TEST_TENANT);
       expect(recovered.record).not.toHaveProperty('mission_id');
       expect(recovered.record).not.toHaveProperty('approval_request_id');
+      expect(recovered.record.handoff_snapshot).toEqual(snapshot);
+      expect(safeExecResult).not.toHaveBeenCalled();
+      const replay = fakeResponse();
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        replay
+      );
+      expect(replay.statusCode).toBe(200);
+      expect(replay.body).toMatchObject({ mission_id: missionId, approval_request_id: approvalId });
+      const malformedReplay = fakeResponse();
+      handoff(fakeRequest({ params: { session: sessionId } }), malformedReplay);
+      expect(malformedReplay.statusCode).toBe(400);
+      expect(malformedReplay.body).not.toHaveProperty('mission_id');
       expect(safeExecResult).not.toHaveBeenCalled();
       withExecutionContext('ecosystem_architect', () =>
         safeRmSync(missionDir + '/mission-state.json', { force: true })
       );
-      expect(reload().completion).toEqual({ kind: 'mission', status: 'unavailable' });
+      const unavailable = reload();
+      expect(unavailable.completion).toEqual({ kind: 'mission', status: 'unavailable' });
+      expect(unavailable.record).not.toHaveProperty('handoff_snapshot');
+      const deletedReplay = fakeResponse();
+      handoff(
+        fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+        deletedReplay
+      );
+      expect(deletedReplay.statusCode).toBe(409);
+      expect(deletedReplay.body).toMatchObject({ hearing_conflict: 'stale_snapshot' });
+      expect(deletedReplay.body).not.toHaveProperty('mission_id');
       expect(safeExecResult).not.toHaveBeenCalled();
     } finally {
       withExecutionContext('ecosystem_architect', () =>

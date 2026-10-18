@@ -1909,6 +1909,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/hearing-handoff-snapshot.ts#hearingHandoffSnapshot",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
       "roles": ["ecosystem_architect", "mission_controller"],
       "unresolved": []
