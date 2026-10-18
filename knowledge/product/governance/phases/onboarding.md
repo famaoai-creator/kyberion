@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-10-09
+last_updated: 2026-10-18
 runtime_stages: [intake, classification]
 ---
 
@@ -14,6 +14,12 @@ runtime_stages: [intake, classification]
 
 手順の順序の正本は [オンボーディング標準フロー](../onboarding-flow.md) である。この文書は
 lifecycle phase から参照する短い runbook で、各項目の番号は標準フローの Step に対応する。
+
+## LLM CLI からの依頼
+
+clone 後に「初期設定して」と頼まれたら、[プロンプト経由オンボーディング](../../orchestration/prompt-first-onboarding.md)に従う。
+未ビルドの新規 clone は先に共通土台を準備する。会話で回答を集め、reviewed JSON を
+使う onboarding apply へ渡し、実行ツール越しに対話ウィザードを入力待ちにしない。
 
 ## ルートを決める
 
