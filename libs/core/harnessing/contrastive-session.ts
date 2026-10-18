@@ -124,6 +124,13 @@ export async function runContrastiveSession(
     if (!spec.surface) {
       throw new Error('[CONTRASTIVE_SESSION] --propose requires a surface spec (--surface)');
     }
+    if (
+      !Number.isInteger(spec.propose.count) ||
+      spec.propose.count < 1 ||
+      spec.propose.count > 10
+    ) {
+      throw new Error('[CONTRASTIVE_SESSION] propose.count must be an integer 1..10');
+    }
     const proposed = await proposeCandidates({
       brief: spec.propose.brief,
       surface: spec.surface,
