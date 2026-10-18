@@ -1,0 +1,18 @@
+{
+  "record_id": "mem-MSN-PPC-RECURSE-20261018-2026_10_18",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Multi-round contrastive recursion needs provenance hygiene at every hop",
+  "summary": "Recursive PPC rounds materialize each auto_advance winner onto a copied base; judgment (human_gate) must never auto-progress.",
+  "candidate_id": "mem-MSN-PPC-RECURSE-20261018-2026_10_18",
+  "evidence_refs": ["active/missions/public/MSN-PPC-RECURSE-20261018/evidence/distillation.md"],
+  "created_at": "2026-10-18T04:54:46.273Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Multi-round recursion: auto_advance winner materializes onto a copy of the base (never mutate scenarioDir) and becomes next round base; keep_base/decline stop; human_gate halts with blind recommendation — judgment never auto-progresses. Budget identity: declared rounds -> expected probes; unique labels BEFORE counting. Review lessons: label a selector by what it is (lambda=heuristic not llm); surface propose_meta per round or stub degradation is invisible; round-prefix adopted labels; predict proposed labels upfront; document cumulative rejected semantics."
+  ],
+  "recommended_refs": ["active/missions/public/MSN-PPC-RECURSE-20261018/evidence/distillation.md"],
+  "source_branch": "feat/ppc-recurse-20261018",
+  "source_commit": "956e142ff1b69ab1bc2cf6b414899ff890775f50"
+}
