@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import {
+  DiscussionProviderError,
+  initializeDiscussionExecution,
+  safeDiscussionError,
+} from './discussion-provider.js';
+import {
   appendDiscussionEvent,
   readDiscussionRoom,
   sanitizeDiscussionId,
@@ -63,13 +68,39 @@ export function ensureDiscussionRunning(
   const id = sanitizeDiscussionId(roomId);
   const existing = registry().get(id);
   if (existing) return existing;
-  const run = new DiscussionEngine(id, options)
-    .run()
+  // Construction may resolve a provider and fail. Keep it inside the durable
+  // error boundary instead of leaving a room stuck in its pending state.
+  const run = Promise.resolve()
+    .then(() => {
+      const room = readDiscussionRoom(id);
+      if (room && TERMINAL.has(room.status)) return;
+      return new DiscussionEngine(id, options).run();
+    })
     .catch((error: unknown) => {
-      appendDiscussionEvent(id, {
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      if (
+        error instanceof DiscussionProviderError &&
+        error.code === 'DISCUSSION_PROVIDER_ABORTED'
+      ) {
+        const stops =
+          readDiscussionRoom(id)?.pending_commands.filter(
+            (pending) => pending.command.kind === 'stop'
+          ) ?? [];
+        if (stops.length > 0) {
+          for (const stop of stops)
+            appendDiscussionEvent(id, {
+              type: 'command_ack',
+              command_id: stop.id,
+              outcome: 'applied',
+            });
+          appendDiscussionEvent(id, {
+            type: 'status_changed',
+            status: 'stopped',
+            reason: 'Stopped by the operator; no automatic retry.',
+          });
+          return;
+        }
+      }
+      appendDiscussionEvent(id, { type: 'error', message: safeDiscussionError(error) });
     })
     .finally(() => {
       registry().delete(id);
@@ -110,7 +141,7 @@ class DiscussionEngine {
   ) {
     const room = this.room();
     this.options = options;
-    this.speaker = options.speaker ?? resolveDiscussionSpeaker(room.config.speaker);
+    this.speaker = options.speaker ?? resolveDiscussionSpeaker(room.config.speaker, room);
     this.sleep = options.sleep ?? realSleep;
   }
 
@@ -127,12 +158,44 @@ class DiscussionEngine {
   async run(): Promise<void> {
     let room = this.room();
     if (TERMINAL.has(room.status)) return;
+    initializeDiscussionExecution(room, this.speaker.mode);
+    const stop = room.pending_commands.find((pending) => pending.command.kind === 'stop');
+    if (stop) {
+      await this.applyCommand(stop.id, stop.actor, stop.command);
+      return;
+    }
+
+    if (room.config.single_pass) {
+      if (room.participants.length === 0) {
+        const plan = composeDiscussionTeam(room.goal);
+        const facilitator = plan.participants.find(
+          (participant) => participant.role === 'facilitator'
+        );
+        if (!facilitator) throw new Error('No facilitator is available');
+        appendDiscussionEvent(this.roomId, {
+          type: 'team_formed',
+          participants: [facilitator],
+          gaps: [],
+          roster_source: 'rules',
+        });
+      }
+      room = this.room();
+      const facilitator = this.facilitator(room);
+      if (!facilitator) throw new Error('No facilitator is available');
+      appendDiscussionEvent(this.roomId, { type: 'phase_changed', phase: 'converging', round: 1 });
+      appendDiscussionEvent(this.roomId, { type: 'status_changed', status: 'running' });
+      appendDiscussionEvent(this.roomId, { type: 'turn_started', speaker: facilitator.id });
+      await this.conclude(facilitator);
+      return;
+    }
 
     if (room.participants.length === 0) {
       const extraRoles = this.speaker.proposeRoles
-        ? await this.speaker
-            .proposeRoles(room.goal, discussionRosterCandidates(), room.config.locale)
-            .catch(() => [])
+        ? await this.speaker.proposeRoles(
+            room.goal,
+            discussionRosterCandidates(),
+            room.config.locale
+          )
         : [];
       const plan = composeDiscussionTeam(room.goal, { extra_roles: extraRoles });
       appendDiscussionEvent(this.roomId, {

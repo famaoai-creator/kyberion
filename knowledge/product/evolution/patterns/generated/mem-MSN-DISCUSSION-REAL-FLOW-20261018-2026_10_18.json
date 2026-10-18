@@ -1,0 +1,25 @@
+{
+  "record_id": "mem-MSN-DISCUSSION-REAL-FLOW-20261018-2026_10_18",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bounded model flows need transport receipts and exact saved-byte evidence",
+  "summary": "A terminal UI status alone proves neither model execution nor successful publication. Record the selected transport and observed response separately, and verify saved bytes before claiming publication succeeded.",
+  "candidate_id": "mem-MSN-DISCUSSION-REAL-FLOW-20261018-2026_10_18",
+  "evidence_refs": [
+    "active/missions/public/MSN-DISCUSSION-REAL-FLOW-20261018/evidence/implementation-report.md",
+    "active/missions/public/MSN-DISCUSSION-REAL-FLOW-20261018/evidence/test-report.md",
+    "active/missions/public/MSN-DISCUSSION-REAL-FLOW-20261018/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-DISCUSSION-REAL-FLOW-20261018/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-DISCUSSION-REAL-FLOW-20261018/evidence/demo-checklist.md"
+  ],
+  "created_at": "2026-10-18T15:06:38.303Z",
+  "applicability": ["mission", "mission:MSN-DISCUSSION-REAL-FLOW-20261018"],
+  "reusable_steps": [
+    "A terminal UI status alone proves neither model execution nor successful publication",
+    "Record the selected transport and observed response separately, and verify saved bytes before claiming publication succeeded"
+  ],
+  "expected_outcome": "# Bounded model flows need transport receipts and exact saved-byte evidence\n\nA room reaching a terminal status is not sufficient evidence of model execution or artifact publication.\n\n- Keep scripted behavior explicit and visibly offline. Never substitute it after a real-provider request fails.\n- Resolve one governed isolated adapter, preserve the room's tenant/tier egress policy, and disclose unresolved runtime prerequisites before launch. Pasted public text does not change the room's data tier or authorize a provider.\n- Count logical provider invocations separately from internal model turns and API requests. A single-model brief can use one structured generation followed by deterministic assembly; do not present it as panel consensus.\n- Persist requested and observed provenance, attempts and terminal failures. Leave exact model identity unknown when the transport does not report it.\n- Reserve execution durably before invoking the provider. Do not automatically resend an uncertain or interrupted call; document the availability cost of requiring a new explicit room.\n- Treat generation success and publication success as separate outcomes. If generation succeeds but saving fails, preserve the generated decision, report partial failure, and never rerun the model to conceal the storage failure.\n- Retrieve saved outputs through the authorized room and canonical artifact record. Reject scope, path, symlink, size and digest mismatches; distinguish exact saved bytes from a freshly generated review view.\n- Exercise production behavior with mocked boundary failures and governed filesystem round trips. State explicitly that those tests and SSR assertions do not prove a live browser/provider journey.\n- Run the application-specific TypeScript check when a framework build skips it or the repository-level check excludes that application.\n\nThis pattern was locally validated with mocked provider/authority boundaries and storage readback tests. The associated implementation did not establish live model or rendered-browser execution.",
+  "source_branch": "fix/discussion-real-flow-20261018",
+  "source_commit": "9f145b73d8dff9439cbfe57f8f74aa0257c51d1f"
+}
