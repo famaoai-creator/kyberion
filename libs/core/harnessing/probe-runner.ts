@@ -102,6 +102,15 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
     }
   }
   const runDir = path.join(runRoot, spec.label);
+  const resolvedRunDir = path.resolve(runDir);
+  const scen = path.resolve(scenarioDir);
+  // Staging onto (or inside) the scenario would recurse the copy into itself
+  // — or worse, safeRmSync a live scenario. Deterministic spec error, not evidence.
+  if (resolvedRunDir === scen || resolvedRunDir.startsWith(`${scen}${path.sep}`)) {
+    throw new Error(
+      '[PROBE_SPEC] run dir must not equal or be nested inside scenarioDir (copyTree would recurse into itself)'
+    );
+  }
   const recorded_at = nowIso();
   const fail = (error: string): RunOutcome => ({
     label: spec.label,
@@ -124,6 +133,16 @@ export function runProbe(spec: ProbeSpec): RunOutcome {
       const overlay = assertSafeRepositoryPath(spec.overlayDir);
       if (!safeExistsSync(overlay) || !safeLstat(overlay).isDirectory()) {
         return fail(`overlay dir missing or not a directory: ${spec.overlayDir}`);
+      }
+      const resolvedRun = path.resolve(runDir);
+      const resolvedOverlay = path.resolve(overlay);
+      if (
+        resolvedRun === resolvedOverlay ||
+        resolvedRun.startsWith(`${resolvedOverlay}${path.sep}`)
+      ) {
+        return fail(
+          `overlay dir ${spec.overlayDir} contains the run dir — copyTree would recurse into itself`
+        );
       }
       copyTree(overlay, runDir);
     }
