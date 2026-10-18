@@ -13,7 +13,7 @@ const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
  * `libs/core/foundation/env.ts`.
  */
 const EDGE_RUNTIME_ENV_READ_ALLOWLIST: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map([
-  ['presence/displays/chronos-mirror-v2/src/middleware.ts', new Map([['KYBERION_TRUST_PROXY', 1]])],
+  ['presence/displays/chronos-mirror-v2/src/proxy.ts', new Map([['KYBERION_TRUST_PROXY', 1]])],
 ]);
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
