@@ -1160,6 +1160,10 @@
       "types": "./dist/storage-janitor.d.ts",
       "default": "./dist/storage-janitor.js"
     },
+    "./build-coordination": {
+      "types": "./dist/build-coordination.d.ts",
+      "default": "./dist/build-coordination.js"
+    },
     "./baseline-check-cache": {
       "types": "./dist/baseline-check-cache.d.ts",
       "default": "./dist/baseline-check-cache.js"

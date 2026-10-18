@@ -51,6 +51,20 @@ function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCa
 }
 
 describe('run_baseline_check', () => {
+  it('defers L2 during a compiler build without requesting automated recovery', () => {
+    expect(
+      deriveBaselineStatus(
+        { success: false, failedLayer: 'L2', deferred: true },
+        { submitted: false, pending: false, reason: null }
+      )
+    ).toBe('needs_attention');
+    expect(
+      deriveBaselineStatus(
+        { success: false, failedLayer: 'L2' },
+        { submitted: false, pending: false, reason: null }
+      )
+    ).toBe('needs_recovery');
+  });
   it('uses the canonical readiness loader for the runtime config', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'));
     expect(source).toContain('loadServiceConnectionReadinessConfig()');

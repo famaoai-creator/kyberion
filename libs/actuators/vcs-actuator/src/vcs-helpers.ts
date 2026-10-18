@@ -5,6 +5,8 @@ import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { safeExecResult } from '@agent/core/secure-io';
 import {
   ghAuthStatus,
+  diagnoseGhResult,
+  sanitizeGhOutput,
   gitAddAll,
   gitBranch,
   gitCommit,
@@ -319,9 +321,12 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
         op: valid.op,
         cwd,
         result: {
-          version: version.stdout.trim().split('\n')[0] || '',
+          version: sanitizeGhOutput(version.stdout.trim().split('\n')[0] || ''),
           auth_ok: auth.status === 0 && !auth.error,
-          auth_output: (auth.stdout || auth.stderr || '').trim(),
+          auth_output: sanitizeGhOutput((auth.stdout || auth.stderr || '').trim()),
+          diagnostic: diagnoseGhResult(version.error || version.status !== 0 ? version : auth, {
+            authProbe: !version.error && version.status === 0,
+          }),
         },
       };
     }

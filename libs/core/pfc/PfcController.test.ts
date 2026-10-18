@@ -1,3 +1,5 @@
+import { getSecret } from '../secret/secret-guard.js';
+import { getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -111,5 +113,153 @@ describe('PfcController - State Management', () => {
     fs.mkdirSync(STATE_FILE, { recursive: true });
 
     expect(() => loadPfcStateAtPath(STATE_FILE)).toThrow('state must be a regular file');
+  });
+  it('keeps repeated observations out of the repair budget and persists diagnostic evidence', async () => {
+    const controller = new PfcController(STATE_FILE);
+    for (let i = 0; i < 5; i++) {
+      expect(
+        await controller.runLayer(
+          'L2',
+          async () => ({
+            passed: false,
+            reason: 'missing dist',
+            fingerprint: 'dist-a',
+            evidence: ['dist/core.js'],
+          }),
+          { countFailure: false }
+        )
+      ).toEqual({ passed: false, circuit_broken: false });
+    }
+    expect(loadPfcStateAtPath(STATE_FILE).layers.L2).toMatchObject({
+      attempt_count: 0,
+      budget_source: 'recovery',
+      last_observation: {
+        reason: 'missing dist',
+        fingerprint: 'dist-a',
+        evidence: ['dist/core.js'],
+      },
+    });
+  });
+
+  it('counts actual recovery attempts once, preserves them during deferred probes, and resets on recovery', async () => {
+    const controller = new PfcController(STATE_FILE);
+    for (const id of ['a', 'b', 'c']) controller.recordRecoveryAttempt('L2', { id, passed: false });
+    controller.recordRecoveryAttempt('L2', { id: 'c', passed: false });
+    expect(controller.getState().layers.L2.attempt_count).toBe(3);
+    expect(
+      await controller.runLayer(
+        'L2',
+        async () => ({ passed: false, deferred: true, reason: 'building' }),
+        { countFailure: false }
+      )
+    ).toEqual({ passed: false, circuit_broken: true, deferred: true });
+    expect(controller.getState().layers.L2.attempt_count).toBe(3);
+    controller.recordRecoveryAttempt('L2', { id: 'd', passed: true });
+    expect(controller.getState().layers.L2.attempt_count).toBe(0);
+  });
+
+  it('migrates legacy observation counts without retaining a false repair circuit', async () => {
+    fs.writeFileSync(
+      STATE_FILE,
+      JSON.stringify({ layers: { L2: { status: 'failed', attempt_count: 3 } } })
+    );
+    const controller = new PfcController(STATE_FILE);
+    expect(await controller.runLayer('L2', async () => false, { countFailure: false })).toEqual({
+      passed: false,
+      circuit_broken: false,
+    });
+    expect(controller.getState().layers.L2).toMatchObject({
+      attempt_count: 0,
+      legacy_observation_attempt_count: 3,
+    });
+  });
+
+  it('merges concurrent controllers after their asynchronous probes without losing unrelated layers', async () => {
+    const first = new PfcController(STATE_FILE);
+    const second = new PfcController(STATE_FILE);
+    let release!: () => void;
+    const pending = first.runLayer('L0', async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return true;
+    });
+    await second.runLayer('L1', async () => false);
+    second.recordRecoveryAttempt('L2', { id: 'build-a', passed: false });
+    release();
+    await pending;
+    const state = loadPfcStateAtPath(STATE_FILE);
+    expect(state.layers.L0.status).toBe('passed');
+    expect(state.layers.L1.attempt_count).toBe(1);
+    expect(state.layers.L2.attempt_count).toBe(1);
+  });
+
+  it('does not let a stale successful probe erase a recovery failure committed during the probe', async () => {
+    const observer = new PfcController(STATE_FILE);
+    const builder = new PfcController(STATE_FILE);
+    let release!: () => void;
+    const pending = observer.runLayer(
+      'L2',
+      async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return true;
+      },
+      { countFailure: false }
+    );
+    builder.recordRecoveryAttempt('L2', { id: 'new-build', passed: false });
+    release();
+    expect(await pending).toMatchObject({ passed: false, deferred: true });
+    expect(observer.getState().layers.L2.attempt_count).toBe(1);
+  });
+
+  it('records thrown probe errors as diagnostic reasons', async () => {
+    const controller = new PfcController(STATE_FILE);
+    await controller.runLayer(
+      'L2',
+      async () => {
+        throw new Error('artifact read failed');
+      },
+      { countFailure: false }
+    );
+    expect(controller.getState().layers.L2.last_observation?.reason).toBe('artifact read failed');
+  });
+  it('keeps a genuine repair budget until full readiness is restored', () => {
+    const controller = new PfcController(STATE_FILE);
+    for (const id of ['a', 'b', 'c']) controller.recordRecoveryAttempt('L2', { id, passed: false });
+    controller.recordRecoveryAttempt('L2', { id: 'packages-only', passed: true, restored: false });
+    expect(controller.getState().layers.L2).toMatchObject({ status: 'failed', attempt_count: 3 });
+    controller.recordRecoveryAttempt('L2', { id: 'fully-ready', passed: true, restored: true });
+    expect(controller.getState().layers.L2).toMatchObject({ status: 'passed', attempt_count: 0 });
+  });
+
+  it('redacts registered secrets and bounds persisted diagnostic output', async () => {
+    const secret = 'pfc-test-secret-value-20261018';
+    const previous = getRegisteredEnvText('OPENAI_API_KEY');
+    setRegisteredEnv('OPENAI_API_KEY', secret);
+    try {
+      expect(getSecret('OPENAI_API_KEY')).toBe(secret);
+      const controller = new PfcController(STATE_FILE);
+      const huge = secret + 'x'.repeat(10000);
+      controller.recordRecoveryAttempt('L2', { id: 'build', passed: false, reason: huge });
+      await controller.runLayer(
+        'L2',
+        async () => ({
+          passed: false,
+          reason: huge,
+          fingerprint: huge,
+          evidence: Array.from({ length: 100 }, () => huge),
+        }),
+        { countFailure: false }
+      );
+      const state = loadPfcStateAtPath(STATE_FILE).layers.L2;
+      expect(fs.readFileSync(STATE_FILE, 'utf8')).not.toContain(secret);
+      expect(state.last_recovery?.reason?.length).toBeLessThanOrEqual(2048);
+      expect(state.last_observation?.evidence).toHaveLength(25);
+      expect(state.last_observation?.fingerprint?.length).toBeLessThanOrEqual(128);
+    } finally {
+      setRegisteredEnv('OPENAI_API_KEY', previous);
+    }
   });
 });
