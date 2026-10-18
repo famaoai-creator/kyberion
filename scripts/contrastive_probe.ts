@@ -11,7 +11,12 @@ import { runRecursiveSession } from '@agent/core/harnessing/recursive-session';
 import type { MetricSpec } from '@agent/core/harnessing/decision-axis';
 import { loadSurfaceSpec } from '@agent/core/harnessing/surface-spec';
 import { loadProbeScenario } from '@agent/core/harnessing/eval-scenario';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string[]> {
   const out: Record<string, string[]> = {};
@@ -19,6 +24,12 @@ function parseArgs(argv: string[]): Record<string, string[]> {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
+    if (key.includes('=')) {
+      throw new ScriptExitError(
+        2,
+        `--${key}: --flag=value form is not supported; pass the value as a separate argument`
+      );
+    }
     const val = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : null;
     if (val === null) {
       throw new ScriptExitError(2, `--${key} requires a value`);
@@ -47,7 +58,7 @@ function parseSeed(raw: string): number {
 export const runContrastiveProbe = defineScript({
   name: 'contrastive_probe',
   run: async (context: { argv: string[]; print: (line: string) => void }) => {
-    const args = parseArgs(context.argv);
+    const args = parseArgs(stripSharedScriptFlags(context.argv));
     const scenario = args['scenario']?.[0];
     const scenarioSpecPath = args['scenario-spec']?.[0];
     const runRoot = args['run-root']?.[0];
