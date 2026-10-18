@@ -31,8 +31,10 @@ import { isRecord } from '../foundation/text.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
-import { runClaudeAgentQuery } from '../provider/claude-agent-query.js';
-import { runCodexIsolatedQuery } from '../provider/codex-isolated-query.js';
+import {
+  isIsolatedToolAttemptError,
+  resolveIsolatedTextGenerator,
+} from '../provider/isolated-text-generator.js';
 import {
   queryTenantKnowledge,
   type TenantKnowledgeHit,
@@ -72,17 +74,20 @@ const SESSION_CAP_STATUSES = new Set<PeerReplyJobStatus>([
 ]);
 const AUTO_REPLY_KINDS = new Set(['message', 'reply']);
 const AUTO_REPLY_SCOPE_PURPOSE = 'peer-conversation:auto-reply';
-/** Error code thrown by the codex backend when the model tried to use a tool. */
-const CODEX_TOOL_ATTEMPT_CODE = 'CODEX_TOOL_ATTEMPT';
-
-/** Generation backend: Claude Agent SDK (strict isolation) or isolated Codex CLI. */
-export type PeerAutoReplyBackend = 'claude' | 'codex';
+const DEFAULT_GENERATION_TIMEOUT_MS = 60_000;
+/** Default isolated text generator id (see provider/isolated-text-generator.ts). */
+export const DEFAULT_PEER_AUTO_REPLY_BACKEND = 'claude';
 
 export interface PeerAutoReplyGenerateOptions {
-  backend?: PeerAutoReplyBackend;
-  /** Codex only: allow a codex-cli version the isolation probe has not verified. */
-  codexAllowUntestedVersion?: boolean;
-  /** Codex only: wall-clock budget for the CLI run. */
+  /**
+   * Isolated text generator id, resolved through the governed registry on
+   * every call (never a caller-supplied generator object). Default
+   * {@link DEFAULT_PEER_AUTO_REPLY_BACKEND}.
+   */
+  backend?: string;
+  /** Version-gated generators only: allow a version the isolation probe has not verified. */
+  allowUntestedVersion?: boolean;
+  /** Wall-clock budget for one generation. Default 60s. */
   timeoutMs?: number;
 }
 
@@ -180,10 +185,13 @@ export interface PeerAutoReplyConfig {
   maxGenerationAttempts?: number;
   /** Rolling hourly cap on reply jobs per remote peer (beyond it: skipped). */
   budgetPerHour?: number;
-  /** Default generator backend (ignored when `generate` is supplied). Default 'claude'. */
-  backend?: PeerAutoReplyBackend;
-  /** Codex backend only: allow an isolation-untested codex-cli version. Default false. */
-  codexAllowUntestedVersion?: boolean;
+  /**
+   * Isolated text generator id (ignored when `generate` is supplied). Resolved
+   * at creation; unknown or descriptor-undeclared ids throw. Default 'claude'.
+   */
+  backend?: string;
+  /** Version-gated generators only: allow an isolation-untested version. Default false. */
+  allowUntestedVersion?: boolean;
   generate?: (input: PeerAutoReplyGenerateInput) => Promise<string>;
   retrieveKnowledge?: (input: {
     tenantId: string;
@@ -370,15 +378,13 @@ export function buildPeerAutoReplyUserPrompt(input: {
 const AUTO_REPLY_SCHEMA = z.object({ reply: z.string() });
 
 /**
- * Tool-less one-shot generation. Deliberately not the reasoning-backend
- * failover chain: other CLIs in that chain run with tools enabled.
- * `backend: 'claude'` (default) runs `runClaudeAgentQuery` under strict
- * isolation; `backend: 'codex'` runs `runCodexIsolatedQuery` (tools visible
- * to the model but disabled; any tool attempt discards the reply). Both
- * assert reasoning egress against the payload scope and run under the
- * tenant-bound responder role so the egress gate can read the tenant's own
- * egress overlay (knowledge/confidential/<tenant>/) with no broader authority
- * than knowledge retrieval has.
+ * Tool-less one-shot generation through a governed isolated text generator
+ * (provider/isolated-text-generator.ts). Deliberately not the
+ * reasoning-backend failover chain: other CLIs in that chain run with tools
+ * enabled. Every generator asserts reasoning egress against the payload scope
+ * and runs under the tenant-bound responder role so the egress gate can read
+ * the tenant's own egress overlay (knowledge/confidential/<tenant>/) with no
+ * broader authority than knowledge retrieval has.
  */
 export async function defaultPeerAutoReplyGenerate(
   input: PeerAutoReplyGenerateInput,
@@ -387,7 +393,9 @@ export async function defaultPeerAutoReplyGenerate(
   const abortController = new AbortController();
   if (input.signal.aborted) abortController.abort();
   else input.signal.addEventListener('abort', () => abortController.abort(), { once: true });
-  const backend = options.backend ?? 'claude';
+  const generator = resolveIsolatedTextGenerator(
+    options.backend ?? DEFAULT_PEER_AUTO_REPLY_BACKEND
+  );
   const result = await withExecutionContextAsync(
     PEER_RESPONDER_READER_ROLE,
     () =>
@@ -399,30 +407,20 @@ export async function defaultPeerAutoReplyGenerate(
           training_use: 'zero_retention',
         },
         () =>
-          backend === 'codex'
-            ? runCodexIsolatedQuery({
-                systemPrompt: input.systemPrompt,
-                userPrompt: input.userPrompt,
-                schema: AUTO_REPLY_SCHEMA,
-                abortController,
-                metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
-                ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
-                allowUntestedVersion: options.codexAllowUntestedVersion === true,
-              })
-            : runClaudeAgentQuery({
-                systemPrompt: input.systemPrompt,
-                userPrompt: input.userPrompt,
-                schema: AUTO_REPLY_SCHEMA,
-                abortController,
-                metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
-                // Peer text is untrusted: run the sub-agent in the wrapper's strict isolation.
-                isolation: 'strict',
-              })
+          generator.generate({
+            systemPrompt: input.systemPrompt,
+            userPrompt: input.userPrompt,
+            schema: AUTO_REPLY_SCHEMA,
+            abortController,
+            timeoutMs: options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS,
+            metricsLabel: AUTO_REPLY_SCOPE_PURPOSE,
+            allowUntestedVersion: options.allowUntestedVersion === true,
+          })
       ),
     undefined,
     input.tenantId
   );
-  return result.parsed.reply;
+  return result.reply;
 }
 
 async function defaultRetrieveKnowledge(input: {
@@ -476,7 +474,7 @@ export async function deliverPeerAutoReply(
 
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
-  if (code === CODEX_TOOL_ATTEMPT_CODE) return 'tool_attempt_detected';
+  if (isIsolatedToolAttemptError(error)) return 'tool_attempt_detected';
   if (typeof code === 'string' && code) return code;
   return error instanceof Error ? error.name : 'unknown';
 }
@@ -503,7 +501,10 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
   const localPeerId = config.localPeerId;
   const enabledPeers = new Set(config.enabledPeers.map((peer) => peer.trim()).filter(Boolean));
   const maxTurns = positiveInt(config.maxTurns, 6, 0);
-  const generationTimeoutMs = positiveInt(config.generationTimeoutMs, 60_000);
+  const generationTimeoutMs = positiveInt(
+    config.generationTimeoutMs,
+    DEFAULT_GENERATION_TIMEOUT_MS
+  );
   const concurrency = positiveInt(config.concurrency, 1);
   const maxDeliveryAttempts = positiveInt(config.maxDeliveryAttempts, 3);
   const maxGenerationAttempts = positiveInt(config.maxGenerationAttempts, 2);
@@ -515,13 +516,17 @@ export function createPeerAutoReply(config: PeerAutoReplyConfig): PeerAutoReply 
   );
   const deliveryBackoffMs = positiveInt(config.deliveryBackoffMs, 1000, 0);
   const pollIntervalMs = positiveInt(config.pollIntervalMs, 1000);
-  const backend: PeerAutoReplyBackend = config.backend ?? 'claude';
+  // Resolve once, up front: an unknown or descriptor-undeclared backend fails
+  // here (the server refuses to start), never per job on untrusted input.
+  const generator = config.generate
+    ? undefined
+    : resolveIsolatedTextGenerator(config.backend ?? DEFAULT_PEER_AUTO_REPLY_BACKEND);
   const generate =
     config.generate ??
     ((input: PeerAutoReplyGenerateInput) =>
       defaultPeerAutoReplyGenerate(input, {
-        backend,
-        codexAllowUntestedVersion: config.codexAllowUntestedVersion === true,
+        backend: generator?.id,
+        allowUntestedVersion: config.allowUntestedVersion === true,
         timeoutMs: generationTimeoutMs,
       }));
   const retrieveKnowledge = config.retrieveKnowledge ?? defaultRetrieveKnowledge;

@@ -146,7 +146,7 @@ KYBERION_PEER_SHARED_SECRET="$PEER_A_SECRET" pnpm peer:conversation-server \
 - 自動の往復は 1 会話あたり `--auto-reply-max-turns`（既定 6）で止まり、相手ごとの生成回数も 1 時間あたりの上限で抑えられます。
 - 返事は Claude がツールなし・設定なしの隔離状態で書き、使う材料はその会話の記録と tenant の knowledge の抜粋だけです。mission や actuator は動きません。
 - tenant の confidential な内容を外部の LLM に送るので、事前に tenant の provider 証明（`training_use: none`、人の承認が 1 回必要）と、`api.anthropic.com` への送信許可が要ります。手順は [Peer Network Catalog](./peer-network.md) の「Conversation auto replies」を参照してください。
-- Claude がなく Codex CLI だけがある端末では `--auto-reply-backend codex` を付けます。Codex はツールを無効にした隔離状態（読み取り専用、承認なし、MCP なし、空の作業フォルダ、最小限の環境変数）で返事を書きます。ただしモデルにはツールの定義が見えたままです。実行はできず、ツールを使おうとした返事は破棄され `tool_attempt_detected` として記録されます。動作確認済みの codex-cli のバージョン（現在 0.163）以外では止まります（`--auto-reply-codex-allow-untested` で明示的に許可できます）。この場合の provider 証明は `--provider codex`、送信許可は `api.openai.com` です。
+- Claude がなく Codex CLI だけがある端末では `--auto-reply-backend codex` を付けます。Codex はツールを無効にした隔離状態（読み取り専用、承認なし、MCP なし、空の作業フォルダ、最小限の環境変数）で返事を書きます。ただしモデルにはツールの定義が見えたままです。実行はできず、ツールを使おうとした返事は破棄され `tool_attempt_detected` として記録されます。動作確認済みの codex-cli のバージョン（現在 0.163）以外では止まります（`--auto-reply-allow-untested` で明示的に許可できます）。この場合の provider 証明は `--provider codex`、送信許可は `api.openai.com` です。
 - 自動返事を有効にした相手には、この受け口の共有 secret を持つ全員に tenant の knowledge の抜粋が見える可能性があります。knowledge を見せてよい相手だけを指定してください。
 
 ## つまずいたときの判断

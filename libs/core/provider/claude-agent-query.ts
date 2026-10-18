@@ -253,10 +253,34 @@ function openIsolationScope(isolation: ClaudeAgentIsolation | undefined): Isolat
   };
 }
 
+/**
+ * The only tool a strictly isolated one-shot query may call: the SDK's
+ * synthetic structured-output tool (`outputFormat: json_schema`). The
+ * sub-agent runs with `tools: []`, so any other tool_use is unexpected.
+ */
+export const CLAUDE_STRUCTURED_OUTPUT_TOOL_NAME = 'StructuredOutput';
+
+/**
+ * Defence in depth for strict isolation: evidence when an assistant message
+ * carries a tool_use other than {@link CLAUDE_STRUCTURED_OUTPUT_TOOL_NAME}.
+ */
+export function detectClaudeStrictToolAttempt(message: unknown): string | undefined {
+  const envelope = message as { type?: unknown; message?: { content?: unknown } } | null;
+  if (envelope?.type !== 'assistant') return undefined;
+  const content = envelope.message?.content;
+  if (!Array.isArray(content)) return undefined;
+  for (const block of content as { type?: unknown; name?: unknown }[]) {
+    if (block?.type !== 'tool_use') continue;
+    if (block.name === CLAUDE_STRUCTURED_OUTPUT_TOOL_NAME) continue;
+    return `tool_use ${typeof block.name === 'string' ? block.name.slice(0, 100) : '<unnamed>'}`;
+  }
+  return undefined;
+}
+
 export class ClaudeAgentQueryError extends Error {
   constructor(
     message: string,
-    readonly code: 'no_result' | 'parse_failed' | 'agent_error',
+    readonly code: 'no_result' | 'parse_failed' | 'agent_error' | 'tool_attempt',
     readonly detail?: unknown
   ) {
     super(message);
@@ -320,8 +344,14 @@ async function runStructuredQuery<T>(
   let numTurns = 0;
   let lastError: unknown;
   let resultMessage: unknown;
+  let toolAttempt: string | undefined;
 
   for await (const message of iterator) {
+    if (isolationOptions) {
+      toolAttempt = detectClaudeStrictToolAttempt(message);
+      // Leaving the loop closes the SDK query; nothing after the attempt is used.
+      if (toolAttempt) break;
+    }
     if (message.type === 'result') {
       resultMessage = message;
       if (message.subtype === 'success') {
@@ -343,10 +373,18 @@ async function runStructuredQuery<T>(
     params.metricsLabel ?? 'reasoning:claude-agent',
     String(options.model ?? resolveRuntimeModelId('anthropic-default')),
     Date.now() - startedAt,
-    lastError ? 'error' : 'success',
+    lastError || toolAttempt ? 'error' : 'success',
     resultMessage,
     totalCostUsd
   );
+
+  if (toolAttempt) {
+    throw new ClaudeAgentQueryError(
+      `[claude-agent-query] strictly isolated sub-agent attempted a tool — output discarded | next: inspect the prompt; never relax strict isolation | evidence: ${toolAttempt}`,
+      'tool_attempt',
+      { evidence: toolAttempt }
+    );
+  }
 
   if (lastError) {
     throw new ClaudeAgentQueryError(

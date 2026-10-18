@@ -36,6 +36,7 @@
       "model_vendor": "anthropic",
       "endpoint": "https://api.anthropic.com",
       "egress_provider_id": "claude",
+      "isolated_text_generation": { "isolation": "structural" },
       "runtime_instructions": [
         "Provider note: treat Kyberion secure-io and mission contracts as authoritative; do not use direct filesystem APIs.",
         "Provider note: keep tool effects within the declared work-item scope and return evidence for every completed action."

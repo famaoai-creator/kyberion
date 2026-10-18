@@ -55,6 +55,7 @@ import {
 import { peerRuntimeLogicalPath } from './peer-messaging.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { CodexIsolatedQueryError } from '../provider/codex-isolated-query.js';
+import { ClaudeAgentQueryError } from '../provider/claude-agent-query.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -908,7 +909,7 @@ describe('peer auto-reply', () => {
         userPrompt: 'user',
         signal: new AbortController().signal,
       },
-      { backend: 'codex', codexAllowUntestedVersion: true, timeoutMs: 1234 }
+      { backend: 'codex', allowUntestedVersion: true, timeoutMs: 1234 }
     );
     expect(reply).toBe('codex says hi');
     expect(runClaudeAgentQueryMock).not.toHaveBeenCalled();
@@ -938,5 +939,29 @@ describe('peer auto-reply', () => {
       generation: { attempts: 1, error_code: 'tool_attempt_detected' },
     });
     expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('maps any generator tool attempt (claude strict isolation) to tool_attempt_detected', async () => {
+    runClaudeAgentQueryMock.mockRejectedValue(
+      new ClaudeAgentQueryError('[claude-agent-query] tool attempt', 'tool_attempt')
+    );
+    const { autoReply, deliver } = setup({ generate: undefined, backend: 'claude' });
+    autoReply.handleInbound(inbound({ messageId: 'M-TOOL-CLAUDE' }));
+    await autoReply.runOnce();
+    expect(
+      listPeerReplyJobs(TENANT, LOCAL).find((job) => job.message_id === 'M-TOOL-CLAUDE')
+    ).toMatchObject({
+      status: 'generation_failed',
+      generation: { attempts: 1, error_code: 'tool_attempt_detected' },
+    });
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('refuses to create an auto reply for an unknown generator backend', () => {
+    expect(() => setup({ generate: undefined, backend: 'gpt-with-tools' })).toThrow(
+      /\[ISOLATED_GENERATOR_UNKNOWN\].*registered: claude, codex/
+    );
+    expect(runClaudeAgentQueryMock).not.toHaveBeenCalled();
+    expect(runCodexIsolatedQueryMock).not.toHaveBeenCalled();
   });
 });

@@ -233,6 +233,26 @@ describe('reasoning provider registry is the single source of truth (RS-01)', ()
     expect(explainReasoningProviderDescriptor(syntheticDescriptor())).toHaveProperty('descriptor');
   });
 
+  it('types isolated_text_generation and rejects unknown isolation levels', () => {
+    const accepted = explainReasoningProviderDescriptor(
+      syntheticDescriptor({ isolated_text_generation: { isolation: 'fail_closed_detection' } })
+    );
+    expect(accepted).toMatchObject({
+      descriptor: { isolated_text_generation: { isolation: 'fail_closed_detection' } },
+    });
+    for (const invalid of [
+      { isolation: 'best_effort' },
+      { isolation: 'structural', tools: 'off' },
+      'structural',
+    ]) {
+      expect(
+        explainReasoningProviderDescriptor(
+          syntheticDescriptor({ isolated_text_generation: invalid })
+        )
+      ).toEqual({ reason: expect.stringMatching(/isolated_text_generation\.isolation/) });
+    }
+  });
+
   it('ignores registry overrides under NODE_ENV=production (S3)', () => {
     seedRegistry(syntheticDescriptor());
     expect(getReasoningProviderDescriptor(SYNTHETIC_MODE)).toBeDefined();

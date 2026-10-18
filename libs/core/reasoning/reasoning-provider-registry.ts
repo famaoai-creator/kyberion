@@ -145,6 +145,21 @@ export interface ReasoningProviderCli {
   install_path_markers?: readonly string[];
 }
 
+/**
+ * Isolation level an isolated text generator built on this provider provides
+ * for UNTRUSTED prompts (e.g. peer auto replies):
+ *   - `structural`: the transport exposes no tools to the model at all.
+ *   - `fail_closed_detection`: tools stay visible but disabled; every tool
+ *     attempt is detected and the output discarded.
+ */
+export const ISOLATED_TEXT_GENERATION_LEVELS = ['structural', 'fail_closed_detection'] as const;
+export type IsolatedTextGenerationLevel = (typeof ISOLATED_TEXT_GENERATION_LEVELS)[number];
+
+/** Descriptor declaration that a provider may back an isolated text generator. */
+export interface ReasoningProviderIsolatedTextGeneration {
+  isolation: IsolatedTextGenerationLevel;
+}
+
 export interface ReasoningProviderDescriptor {
   mode: ReasoningBackendMode;
   provider: string;
@@ -165,6 +180,8 @@ export interface ReasoningProviderDescriptor {
   model_env_keys?: readonly string[];
   setup_hint?: string;
   runtime_instructions?: readonly string[];
+  /** Declares support for isolated (tool-free) text generation; absent = unsupported. */
+  isolated_text_generation?: ReasoningProviderIsolatedTextGeneration;
   cli?: ReasoningProviderCli;
 }
 
@@ -691,6 +708,20 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
   if (value.runtime_instructions !== undefined && !isStringArray(value.runtime_instructions)) {
     return { reason: 'runtime_instructions must be non-empty strings' };
   }
+  let isolatedTextGeneration: ReasoningProviderIsolatedTextGeneration | undefined;
+  if (value.isolated_text_generation !== undefined) {
+    const raw = value.isolated_text_generation;
+    if (
+      !isRecord(raw) ||
+      Object.keys(raw).some((key) => key !== 'isolation') ||
+      !ISOLATED_TEXT_GENERATION_LEVELS.includes(raw.isolation as IsolatedTextGenerationLevel)
+    ) {
+      return {
+        reason: `isolated_text_generation.isolation must be one of ${ISOLATED_TEXT_GENERATION_LEVELS.join(', ')}`,
+      };
+    }
+    isolatedTextGeneration = { isolation: raw.isolation as IsolatedTextGenerationLevel };
+  }
   const descriptor: ReasoningProviderDescriptor = {
     mode: value.mode as ReasoningBackendMode,
     provider: value.provider.trim(),
@@ -719,6 +750,7 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
     ...(value.runtime_instructions
       ? { runtime_instructions: [...(value.runtime_instructions as string[])] }
       : {}),
+    ...(isolatedTextGeneration ? { isolated_text_generation: isolatedTextGeneration } : {}),
     ...(cli ? { cli } : {}),
   };
   // The prompt-reconstruction invariant is documented until PI-05 supplies
