@@ -225,13 +225,15 @@ jobs:
         # On pull requests and in the merge queue pr-validation.yml runs the
         # Linux core shards; this workflow adds the macOS coverage only.
         if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
-        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
+        shell: bash
+        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Governance boundary tests
         # pr-validation.yml test-extra runs these on Linux for pull requests
         # and in the merge queue.
         if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
-        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
+        shell: bash
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Meeting participation dry-run
         run: pnpm test -- --suite meeting-dry-run
@@ -263,6 +265,14 @@ jobs:
 
       - name: Contract semver baseline check
         run: pnpm run check:contract-semver
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: ${{ matrix.os }} / Node ${{ matrix.node-version }} / shard ${{ matrix.shard }}/${{ matrix.total }}
 
   windows-native:
     needs: changes

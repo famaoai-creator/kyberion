@@ -1549,6 +1549,18 @@
       "long_running": true
     },
     {
+      "id": "script.ci.triage",
+      "module": "scripts/ci_failure_triage.ts",
+      "command": "ci triage",
+      "noun": "ci",
+      "verb": "triage",
+      "audience": "dev",
+      "description": "cli_cmd_script_ci_triage",
+      "group": "dev",
+      "long_running": true,
+      "native_help": true
+    },
+    {
       "id": "script.clipboard-inbox.server",
       "module": "scripts/clipboard-inbox/server.ts",
       "command": "clipboard-inbox server",
