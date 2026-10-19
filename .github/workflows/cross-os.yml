@@ -113,10 +113,12 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Build
-        run: pnpm run build
+        shell: bash
+        run: pnpm run build 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Type check
-        run: pnpm run typecheck
+        shell: bash
+        run: pnpm run typecheck 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Contract schemas
         run: pnpm run check -- --scope full --only contract-schemas
@@ -132,10 +134,12 @@ jobs:
         # On pull requests pr-validation.yml runs the Linux core shards; this
         # workflow adds the macOS coverage only.
         if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
-        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
+        shell: bash
+        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Unit tests (Windows native)
         if: runner.os == 'Windows'
+        shell: bash
         run: >-
           pnpm exec vitest run
           libs/core/windows-local-assist-bridge.test.ts
@@ -145,7 +149,7 @@ jobs:
           libs/core/platform.test.ts
           libs/core/virtual/os-accessibility-detector.test.ts
           libs/core/windows-os-automation.test.ts
-          scripts/check_stale_dist.test.ts
+          scripts/check_stale_dist.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       # Live UI Automation smoke: launches Notepad and a WPF window on the
       # runner's interactive desktop, focuses them and checks that
@@ -165,7 +169,8 @@ jobs:
       - name: Governance boundary tests
         # pr-validation.yml test-extra runs these on Linux for pull requests.
         if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
-        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
+        shell: bash
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Meeting participation dry-run
         if: runner.os != 'Windows'
@@ -202,3 +207,11 @@ jobs:
 
       - name: Contract semver baseline check
         run: pnpm run check:contract-semver
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: ${{ matrix.os }} / Node ${{ matrix.node-version }} / shard ${{ matrix.shard }}/${{ matrix.total }}

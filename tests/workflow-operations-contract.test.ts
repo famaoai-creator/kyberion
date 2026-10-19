@@ -118,6 +118,34 @@ describe('Workflow operations contract', () => {
     expect(windowsStep).toContain('scripts/check_stale_dist.test.ts');
   });
 
+  it('ends the main CI jobs with the failure-triage summary over their captured output', () => {
+    const tee = '2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"';
+    for (const [file, jobs] of [
+      ['.github/workflows/ci.yml', 2],
+      ['.github/workflows/pr-validation.yml', 4],
+      ['.github/workflows/cross-os.yml', 1],
+    ] as const) {
+      const workflow = read(file);
+      expect(workflow, file).toContain(tee);
+      expect(workflow.split('uses: ./.github/actions/ci-failure-triage').length - 1, file).toBe(
+        jobs
+      );
+    }
+    const action = read('.github/actions/ci-failure-triage/action.yml');
+    expect(action).toContain('scripts/ci_failure_triage.ts');
+    expect(action).toContain('$GITHUB_STEP_SUMMARY');
+
+    const mainTriage = read('.github/workflows/main-failure-triage.yml');
+    expect(mainTriage).toContain('workflow_run:');
+    expect(mainTriage).toContain('workflows: [CI, Cross-OS Smoke]');
+    expect(mainTriage).toContain('permissions: {}');
+    expect(mainTriage).toContain('--log-failed');
+    expect(mainTriage).toContain('ci-triage-signature');
+    expect(mainTriage).toContain('--label ci-main-red');
+    // Event payload fields reach the script only through env, never inline.
+    expect(mainTriage).not.toMatch(/run: [^\n]*\$\{\{ github\.event/u);
+  });
+
   it('keeps the CI failure investigation template wired to GitHub Actions run listing', () => {
     const template = read('knowledge/product/pipeline-templates/cicd-failure-investigation.json');
     expect(template).toContain('CI Failure Investigation');
