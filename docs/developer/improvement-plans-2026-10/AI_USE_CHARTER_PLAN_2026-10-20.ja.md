@@ -94,6 +94,7 @@ AI による外部操作:
 - processorのCharter許可は非学習/保持attestationの代替にならない。purpose/categoriesはモデル出力ではなく信頼済み呼び出し側の明示値が必要で、現時点ではすべてのreasoning呼び出しにpurpose/categoryを補っていない。
 - processor許可はprovider descriptorのendpoint originに束縛し、Charterのstanding stop tripwireを推論egressでも確認する。新Charterのrecipient actionはrecipient factsを必須とし、processor factsで代用できない。
 - legacy Charter（information_flowなし）は既存の受諾済み権限を維持する。新規Charterはprocessor未選択を空リストとして記録し、外部processor利用を閉じる。
+- 帰結として、新規Charterで `send_message_external` / `publish_public` を委任しても、呼び出し側が信頼できるrecipient factsを渡さない限り人へ戻る。`charter-decision-vocabulary` の `meeting_scheduling` なども該当し、語彙entryへ recipient/purpose/category のfacts宣言を追加するまでは自律実行されない（fail-closed）。これは既存の受諾済み `delegated_decisions` を広げず、各入口のfacts接続を次の作業として残す。
 - 既存の日次Accountability Reportに支出・拒否・停止・Charter amendment候補の通知がある。情報フロー拒否を理由付きで集計しCharterの狭域化/停止提案へ戻す運用接続は未実装。
 - 支払上限の原子的消費も別途未実装。
 - Phase 4 は監査結果に基づく自律度の縮小・停止・通知をつなぐ。実行失敗、再送、支出予約の競合を確認するまでは、金銭委任のトランザクション性を保証済みと表現しない。
