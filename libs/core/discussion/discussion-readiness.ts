@@ -130,7 +130,7 @@ export function inspectDiscussionReadiness(
           tier,
           tenant_slug: scope.tenant_slug,
           purpose: 'discussion:decision',
-          training_use: tier === 'public' ? 'training_eligible' : 'zero_retention',
+          training_use: tier === 'public' ? 'training_eligible' : 'no_training',
         },
         () => assertReasoningEgressAllowed(backend)
       );
