@@ -98,16 +98,22 @@ diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.t
 
 1. **One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of core (sharded),
    actuators, boundary tests, lint, typecheck and format. Other workflows skip their copy on
-   `pull_request` events at step level (`if: ... github.event_name != 'pull_request'`), so check
-   names stay stable for branch protection. See `.github/workflows/README.md`.
-2. **Do not depend on step order between workflows.** Example: a test that `mkdtemp`s under
+   `pull_request` and `merge_group` events at step level, so check names stay stable for branch
+   protection. See `.github/workflows/README.md`.
+2. **No skip cascade.** A test or smoke job never `needs` a lint/validate job — only the shared
+   `build-artifacts` job — and independent check steps inside one job run with
+   `if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}`, so one push reports every
+   failing signal. Path-based skipping lives in a `changes` job plus an always-running result
+   job (`cross-os-result`), never in a workflow-level `paths:` filter (required checks would stay
+   pending). Every workflow with required checks also triggers on `merge_group`.
+3. **Do not depend on step order between workflows.** Example: a test that `mkdtemp`s under
    `active/shared/tmp/` must create that directory itself. Once cross-os stopped running the core
    shards first, such a test failed on CI.
-3. **Grep `tests/` for pinned workflow text** (`grep -rn "actions/" tests`).
+4. **Grep `tests/` for pinned workflow text** (`grep -rn "actions/" tests`).
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
-4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
+5. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
-5. **Keep a new test or check step triageable.** Pipe its output into the job's capture log
+6. **Keep a new test or check step triageable.** Pipe its output into the job's capture log
    (`shell: bash` and `2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"`; `shell: bash` turns
    on `pipefail`, so the step still fails). End the job with the `Triage failure` step
    (`if: failure()`, `uses: ./.github/actions/ci-failure-triage`).
