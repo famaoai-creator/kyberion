@@ -3198,6 +3198,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/discussion-artifact-url.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-client.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-create-recovery.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/discussion-launcher-draft.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-readiness-state.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-request-context.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-request-scope.ts",
