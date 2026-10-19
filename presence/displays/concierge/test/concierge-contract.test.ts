@@ -9,6 +9,26 @@ import { safeReadFile } from '@agent/core/secure-io';
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('concierge surface contract', () => {
+  it('keeps approval errors safe without changing decision dispatch or retrying', () => {
+    const page = safeReadFile(path.join(appDir, 'src/app/page.tsx')).toString();
+    const decision = page.slice(
+      page.indexOf('const decideApproval ='),
+      page.indexOf('const [changeFormId')
+    );
+    expect(decision).toContain(
+      'if (!response.ok) throw await readApprovalResponseFailure(response)'
+    );
+    expect(decision).toContain('formatApprovalFailure(error, locale)');
+    expect(decision).not.toContain('error.message');
+    expect(decision).not.toContain('String(error)');
+    expect(decision.match(/await fetch\(/g)).toHaveLength(1);
+    expect(decision.match(/await decideWithPasskey\(/g)).toHaveLength(1);
+    expect(decision.match(/presentedDigest: item.presented_digest/g)).toHaveLength(2);
+    expect(decision).toContain("if (item.min_assurance === 'A3')");
+    expect(decision).toContain('finally {\n        setBusyId(null);');
+    expect(decision).not.toMatch(/setTimeout|setInterval/);
+  });
+
   it('declares its role tagline in the layout header', () => {
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
     const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
@@ -447,10 +467,9 @@ describe('concierge surface contract', () => {
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain("t('setup.readiness_title')");
     expect(setupPage).toContain('createSettingsNavigation');
-    const navigation = safeReadFile(
-      path.join(appDir, 'src/app/settings/settings-navigation.ts'),
-      { encoding: 'utf8' }
-    );
+    const navigation = safeReadFile(path.join(appDir, 'src/app/settings/settings-navigation.ts'), {
+      encoding: 'utf8',
+    });
     expect(navigation).toContain('scrollIntoView');
     // The 4 anchors now live in their own section files (FD-06 file split).
     const anchorFiles: Record<string, string> = {
