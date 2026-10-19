@@ -76,10 +76,6 @@
     {
       "id": "scripts/contrastive_probe.ts",
       "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it \u2014 unit-tested via libs/core/harnessing tests."
-    },
-    {
-      "id": "scripts/video_recut.ts",
-      "reason": "Intentional operator-run video-to-video entrypoint documented in knowledge/product/orchestration/video-recut-production-playbook.md. It consumes a local request file and opt-in render flag; the reusable library API is exported through @agent/core/video. A new actuator or pipeline is deliberately deferred until the edit pattern is accepted for orchestration."
     }
   ],
   "pipelines": [],
