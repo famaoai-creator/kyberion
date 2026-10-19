@@ -4034,6 +4034,7 @@
         "presence/displays/concierge/src/app/sw-register.tsx",
         "presence/displays/concierge/src/lib/agent-avatar-sources.ts",
         "presence/displays/concierge/src/lib/api-guard.ts",
+        "presence/displays/concierge/src/lib/approval-failure.ts",
         "presence/displays/concierge/src/lib/avatar-generation-jobs.ts",
         "presence/displays/concierge/src/lib/browser-human-request.ts",
         "presence/displays/concierge/src/lib/charter-server.ts",

@@ -6,6 +6,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser';
 import { frontDeskFetch } from './front-desk-fetch';
+import { approvalResponseFailure, readApprovalResponseFailure } from './approval-failure';
 
 /** HA-07: browser half of Concierge passkeys (registration + approval signing). */
 
@@ -25,15 +26,18 @@ export function passkeysSupported(): boolean {
 
 async function postJson(
   path: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  approvalDecision = false
 ): Promise<Record<string, unknown>> {
   const response = await frontDeskFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (approvalDecision && !response.ok) throw await readApprovalResponseFailure(response);
   const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   if (!response.ok || !data || data.ok !== true) {
+    if (approvalDecision) throw approvalResponseFailure(response.status, data);
     throw new Error(String(data?.error ?? response.status));
   }
   return data;
@@ -129,18 +133,26 @@ export async function decideWithPasskey(input: {
     channel: input.channel,
     storageChannel: input.storageChannel,
   };
-  const started = await postJson(path, {
-    ...scope,
-    action: 'options',
-    presentedDigest: input.presentedDigest,
-  });
+  const started = await postJson(
+    path,
+    {
+      ...scope,
+      action: 'options',
+      presentedDigest: input.presentedDigest,
+    },
+    true
+  );
   const response = await startAuthentication({
     optionsJSON: started.options as PublicKeyCredentialRequestOptionsJSON,
   });
-  await postJson(path, {
-    ...scope,
-    action: 'verify',
-    challengeId: started.challenge_id,
-    response,
-  });
+  await postJson(
+    path,
+    {
+      ...scope,
+      action: 'verify',
+      challengeId: started.challenge_id,
+      response,
+    },
+    true
+  );
 }

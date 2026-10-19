@@ -28,15 +28,22 @@ import {
   deleteTenant,
   renameTenant,
   requestTenantProviderAttestationApproval,
+  providerAttestationApprovalPayload,
   shellQuoteArg,
 } from './tenant-governance.js';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
   computeApprovalPresentedDigest,
+  computeApprovalPayloadHash,
   decideApprovalRequest,
   loadApprovalRequest,
+  listApprovalRequests,
+  type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
+import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
+import { collectOperatorHomeSummary } from '../surface/operator-home-summary.js';
+import { composeCeoSurfaceSummary } from '../ceo-surface-summary.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -277,6 +284,134 @@ describe('training_use none attestations go through the human approval gate', ()
     expect(record).not.toHaveBeenCalled();
   });
 
+  it('publishes the tenant-wide request only in its tenant queue with its current digest', () => {
+    const id = requestApproval();
+    const approval = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+    expect(approval.scope).toEqual({
+      tier: 'confidential',
+      tenant_slug: 'beta',
+      scope_kind: 'tenant',
+    });
+    expect(approval.accountability).toMatchObject({
+      finalDecision: 'human_only',
+      payloadHash: computeApprovalPayloadHash(providerAttestationApprovalPayload(claim)),
+      effectBinding: providerAttestationApprovalPayload(claim).effect,
+    });
+    const own = collectOperatorHomeSummary({
+      scope: { tiers: ['confidential'], tenantSlugs: ['beta'] },
+    });
+    expect(own.pendingApprovals.map((entry) => entry.id)).toContain(id);
+    const item = composeCeoSurfaceSummary({ home: own, notifications: [] }).approval_queue.find(
+      (entry) => entry.id === id
+    );
+    expect(item).toMatchObject({
+      tenant_slug: 'beta',
+      presented_digest: computeApprovalPresentedDigest(approval),
+    });
+    for (const scope of [
+      { tiers: ['confidential'], tenantSlugs: ['gamma'] },
+      { tiers: ['public'], tenantSlugs: ['beta'] },
+      { tiers: ['confidential'], tenantSlugs: ['beta'], organizationIds: ['org-beta'] },
+      { tiers: ['confidential'], tenantSlugs: ['beta'], projectIds: ['PRJ-BETA'] },
+    ]) {
+      expect(
+        collectOperatorHomeSummary({ scope }).pendingApprovals.map((entry) => entry.id)
+      ).not.toContain(id);
+    }
+    expect(
+      listApprovalRequests({
+        storageChannels: [PROVIDER_ATTESTATION_APPROVAL_CHANNEL],
+        scope: { tier: 'confidential', tenant_slug: 'gamma', scope_kind: 'tenant' },
+      })
+    ).toEqual([]);
+  });
+
+  const incompatibleScopes: Array<[string, ApprovalRequestRecord['scope']]> = [
+    ['legacy unscoped', undefined],
+    [
+      'another tenant with the same claim hash',
+      {
+        tier: 'confidential',
+        tenant_slug: 'gamma',
+        scope_kind: 'tenant',
+      },
+    ],
+    ['wrong tier', { tier: 'public', tenant_slug: 'beta', scope_kind: 'tenant' }],
+    [
+      'organization boundary',
+      {
+        tier: 'confidential',
+        tenant_slug: 'beta',
+        scope_kind: 'organization',
+        organization_id: 'org-beta',
+      },
+    ],
+    [
+      'narrower metadata on a tenant boundary',
+      {
+        tier: 'confidential',
+        tenant_slug: 'beta',
+        scope_kind: 'tenant',
+        organization_id: 'org-beta',
+      },
+    ],
+  ];
+
+  for (const status of ['pending', 'approved'] as const) {
+    it.each(incompatibleScopes)(`does not reuse or alter ${status} %s records`, (_label, scope) => {
+      const oldId = requestApproval();
+      if (status === 'approved') decide(oldId, 'approved');
+      const old = { ...loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId)! };
+      if (scope) old.scope = scope;
+      else delete old.scope;
+      writeGovernedArtifactJson(
+        'mission_controller',
+        approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId),
+        old
+      );
+      const newId = requestApproval();
+      expect(newId).not.toBe(oldId);
+      expect(loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId)).toEqual(old);
+      if (status === 'approved') {
+        expect(() => apply(oldId)).toThrow(/exact confidential tenant scope/);
+        expect(egress('beta')).toBe(false);
+        expect(record).not.toHaveBeenCalled();
+        expect(
+          loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId)?.applyClaim
+        ).toBeUndefined();
+      }
+    });
+
+    it(`reuses an exact scoped ${status} request`, () => {
+      const id = requestApproval();
+      if (status === 'approved') decide(id, 'approved');
+      expect(requestApproval()).toBe(id);
+    });
+  }
+
+  it('rejects a digest from before tenant scope was attached', () => {
+    const id = requestApproval();
+    const approval = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+    const staleDigest = computeApprovalPresentedDigest({ ...approval, scope: undefined });
+    expect(staleDigest).not.toBe(computeApprovalPresentedDigest(approval));
+    expect(() =>
+      decideApprovalRequest('mission_controller', {
+        channel: approval.channel,
+        storageChannel: approval.storageChannel,
+        requestId: id,
+        decision: 'approved',
+        decidedBy: 'human-owner',
+        decidedByRole: 'sovereign',
+        authMethod: 'surface_session',
+        decidedByType: 'human',
+        authenticated: true,
+        presentedDigest: staleDigest,
+      })
+    ).toThrow(/changed since it was shown/);
+    expect(loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)?.status).toBe('pending');
+    expect(egress('beta')).toBe(false);
+  });
+
   it('refuses a pending, a rejected and a mismatched request', () => {
     const pending = requestApproval();
     expect(() => apply(pending)).toThrow(/is pending/);
@@ -315,6 +450,59 @@ describe('training_use none attestations go through the human approval gate', ()
     // At most once: the approval cannot be replayed to refresh the claim.
     expect(() => apply(id)).toThrow(/already used/);
   });
+
+  it.each(['owner', 'approver'])(
+    'applies the exact attestation after a real-store Concierge %s decision',
+    (decidedByRole) => {
+      const id = requestApproval();
+      const pending = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+      decideApprovalRequest('sovereign_concierge', {
+        channel: pending.channel,
+        storageChannel: pending.storageChannel,
+        requestId: id,
+        decision: 'approved',
+        decidedBy: 'user:human-owner',
+        decidedByRole,
+        authMethod: 'surface_session',
+        decidedByType: 'human',
+        authenticated: true,
+        presentedDigest: computeApprovalPresentedDigest(pending),
+      });
+      const decided = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+      expect(decided.status).toBe('approved');
+      expect(decided.workflow?.mode).toBe('any_of');
+      expect(
+        decided.workflow?.approvals.find((entry) => entry.role === decidedByRole)
+      ).toMatchObject({ status: 'approved', decidedByType: 'human', authenticated: true });
+      expect(apply(id).approval?.approved_by).toBe('user:human-owner');
+      expect(egress('beta')).toBe(true);
+    }
+  );
+
+  it.each(['pending', 'approved'] as const)(
+    'does not reuse a scoped sovereign-only %s workflow',
+    (status) => {
+      const id = requestApproval();
+      const old = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+      old.workflow = {
+        workflowId: old.workflow!.workflowId,
+        mode: 'all_required',
+        requiredRoles: ['sovereign'],
+        stages: [],
+        approvals: [{ role: 'sovereign', status: 'pending' }],
+      };
+      writeGovernedArtifactJson(
+        'mission_controller',
+        approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id),
+        old
+      );
+      if (status === 'approved') decide(id, 'approved');
+      const unchanged = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id);
+      expect(requestApproval()).not.toBe(id);
+      expect(loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)).toEqual(unchanged);
+      if (status === 'approved') expect(apply(id).approval?.approved_by).toBe('human-owner');
+    }
+  );
 
   it('cannot be approved by an agent or an unauthenticated decider', () => {
     const id = requestApproval();
