@@ -1,0 +1,32 @@
+name: CI failure triage
+description: >-
+  Classify the job's captured output (steps tee into $RUNNER_TEMP/kyberion-ci-output.log)
+  and write each failure's root-cause class and next command to the job summary.
+  Use as the last step of a job with `if: failure()`. Runbook: operations-hygiene §1.
+inputs:
+  job:
+    description: Job display name (a macOS/Windows name marks platform-only failures).
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Write triage to the job summary
+      shell: bash
+      env:
+        TRIAGE_JOB: ${{ inputs.job }}
+      run: |
+        log="$RUNNER_TEMP/kyberion-ci-output.log"
+        if [ ! -s "$log" ]; then
+          printf '## CI failure triage\n\nNo captured output: the job failed before a captured step ran. Read the failed step log.\n' >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        if ! node --import ./scripts/ts-loader.mjs scripts/ci_failure_triage.ts --job "$TRIAGE_JOB" < "$log" > "$RUNNER_TEMP/kyberion-ci-triage.md"; then
+          {
+            printf '## CI failure triage\n\nThe triage script could not run (dependencies missing?). Last 60 captured lines:\n\n```text\n'
+            tail -n 60 "$log"
+            printf '```\n'
+          } > "$RUNNER_TEMP/kyberion-ci-triage.md"
+        fi
+        cat "$RUNNER_TEMP/kyberion-ci-triage.md" >> "$GITHUB_STEP_SUMMARY"
+        cat "$RUNNER_TEMP/kyberion-ci-triage.md"
