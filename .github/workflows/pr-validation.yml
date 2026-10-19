@@ -66,7 +66,16 @@ jobs:
         with:
           name: build-outputs
       - name: Run manifest-driven PR checks
-        run: pnpm run check -- --scope pr
+        shell: bash
+        run: pnpm run check -- --scope pr 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: pr-gates
 
   static:
     name: static-checks
@@ -92,11 +101,21 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: pnpm run check:pr-title -- --title "$PR_TITLE"
       - name: Type check
-        run: pnpm run typecheck
+        shell: bash
+        run: pnpm run typecheck 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
       - name: Lint check
-        run: pnpm run lint
+        shell: bash
+        run: pnpm run lint 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
       - name: Format check
         run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: static-checks
 
   test-core:
     name: core-tests (shard ${{ matrix.shard }}/${{ matrix.total }})
@@ -171,7 +190,16 @@ jobs:
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
+        shell: bash
+        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: core-tests (shard ${{ matrix.shard }}/${{ matrix.total }})
 
   test-extra:
     name: actuator/boundary/security tests
@@ -192,14 +220,24 @@ jobs:
           name: build-outputs
 
       - name: Run actuator tests
-        run: pnpm test -- --suite actuators
+        shell: bash
+        run: pnpm test -- --suite actuators 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Run governance boundary tests
-        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
+        shell: bash
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Security scan
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: actuator/boundary/security tests
 
   vital:
     name: vital-check

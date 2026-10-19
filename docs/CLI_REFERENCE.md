@@ -353,6 +353,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion check rt-mode`                     |                                  | Check the runtime mode configuration for consistency.                      |
 | `pnpm kyberion check script-integrity`            |                                  | Check package script integrity                                             |
 | `pnpm kyberion ci`                                | `pnpm ci`                        | Run the full CI sequence locally                                           |
+| `pnpm kyberion ci triage`                         |                                  | Classify a red CI log and print the next command per failure               |
 | `pnpm kyberion deps check`                        | `pnpm deps:check`                | Check dependencies                                                         |
 | `pnpm kyberion design import-md-catalog`          |                                  | Import a Markdown design catalog into the governed design data.            |
 | `pnpm kyberion design verify-resolution`          |                                  | Verify layout and body-zone resolution for each scenario brief.            |
