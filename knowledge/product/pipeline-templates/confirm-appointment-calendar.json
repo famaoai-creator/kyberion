@@ -37,6 +37,12 @@
         "correlation_id": "confirm-appointment-calendar:{{mission_id}}:{{appointment_start_iso}}",
         "decision_type": "meeting_scheduling",
         "recipients": 1,
+        "information_flow": {
+          "purpose": "meeting_scheduling",
+          "recipient_class": "known_counterparty",
+          "categories": ["routine_business"],
+          "attachment_count": 0
+        },
         "tenant_slug": "{{tenant_slug}}",
         "mission_id": "{{mission_id}}",
         "channel": "mission",

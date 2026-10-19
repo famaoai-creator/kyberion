@@ -64,18 +64,21 @@ AI による外部操作:
 - parent/child Charter の情報フローはsubset検証され、未指定の受領者やprocessorは許可しない。
 - `evaluateAgainstCharter` が型付きfactsを評価し、既存 `approval-gate-charter` でdenyを承認要求へ戻す。caller payloadのapprovalフラグは信頼しない。
 
-### Phase 3 — 共通ゲート接続 (部分実装)
+### Phase 3 — 共通ゲート接続 (実装済み)
 
-- 推論境界はCharterにprocessor scopeが明示された場合、実provider ID・purpose・カテゴリを既存provider attestation/egress gateと合成する。scope未指定はunknown/missingとして拒否する。
-- customer outboundはbinding済み顧客、本文カテゴリ、添付数をgateへ渡す。Charterの `allow_customer_outbound` は完全一致の定型挨拶のみ・添付なしを委任し、それ以外は承認へ戻す。
-- payment、public publish、credential change 等は既存の金額・decision-rights・high-risk floorを維持。新Charterの public/customer recipient action は facts 欠落を拒否するが、すべての生産入口から具体的宛先/資産factsを渡す統合は未完了。
-- op-preflight の単調 guard と全入口 coverage を使い、特定入口だけのすり抜けを防ぐ。
+- 推論境界はCharterにprocessor scopeが明示された場合、実provider ID・purpose・カテゴリを既存provider attestation/egress gateと合成する。scope未指定はunknown/missingとして拒否する。**実装済み**。
+- customer outboundはbinding済み顧客、本文カテゴリ、添付数をgateへ渡す。Charterの `allow_customer_outbound` は完全一致の定型挨拶のみ・添付なしを委任し、それ以外は承認へ戻す。**実装済み**。
+- すべての生産入口がfactsを渡す: `approval:evaluate_decision_rights` に信頼済み `information_flow`(purpose/recipient_class/processor_id/categories/attachment_count)入力を追加し、`confirm-appointment-calendar` テンプレートが申告する。facts欠落のrecipient actionは人へ戻る。**実装済み**。
+- Charter formは受領者スコープ(`recipient_purposes`/`recipient_classes`/`recipient_categories`/`max_attachments`)を明示的に委任でき、署名文と envelope に反映する。`known_counterparty`(既知の社外当事者)を受領者クラスに追加した。**実装済み**。
+- payment、public publish、credential change 等は既存の金額・decision-rights・high-risk floorを維持する。**維持**。
+- 金額上限の読み取り・判定・消費を憲章スコープ単位のプロセス間ロック(`withCharterDecisionLock` / `decideUnderCharter`)で一つのクリティカルセクションにし、同時実行で同じ残枠を二重消費できないようにした。**実装済み**。
+- 信頼境界の単調性: `enforceApprovalGate` は untrusted payload の `information_flow` を action に合成しない(回帰テストで固定)。情報境界の語彙entryはfacts無しで自動許可されないことを全entryのテストでカバーする。**実装済み**。
 
-### Phase 4 — 運用ループ
+### Phase 4 — 運用ループ (実装済み)
 
-- 監査から使用量、例外、結果を集計し、Charterの狭域化・停止提案を行う。拡張は責任者の再受諾が必須。
-- 低影響の定型作業は自動実行、通知やサンプリング監査、高影響・曖昧・新規宛先は人へ戻す。
-- Singapore IMDA、NIST AI RMF、EU AI Act、日本AI事業者ガイドライン等の適用範囲・強制力の差を明示して運用ガイドへ反映する。
+- Accountability Reportが情報フロー拒否を理由・purpose・受領者クラス・processor・カテゴリ別に集計する。委任済みスコープで反復する拒否は狭域化(narrow)提案、頻発(≥5)は停止(stop)提案として出す。拡張の提案はせず、適用は責任者の再受諾が必須。**実装済み**。
+- 低影響の定型作業は自動実行し、外部効果のある自律実行は相関IDで決定的にサンプリング(5%)して運用者へ通知する。高影響・曖昧・新規宛先は従来どおり人へ戻す(appetite/不可逆/未委任purpose・class・categoryでfail-closed)。**実装済み**。
+- 適用範囲・強制力の差を運用ガイド([ai-use-charter-operations.md](../../../knowledge/product/governance/ai-use-charter-operations.md))に反映した。**実装済み**。
 
 ## 受入条件
 
@@ -94,11 +97,11 @@ AI による外部操作:
 - processorのCharter許可は非学習/保持attestationの代替にならない。purpose/categoriesはモデル出力ではなく信頼済み呼び出し側の明示値が必要で、現時点ではすべてのreasoning呼び出しにpurpose/categoryを補っていない。
 - processor許可はprovider descriptorのendpoint originに束縛し、Charterのstanding stop tripwireを推論egressでも確認する。新Charterのrecipient actionはrecipient factsを必須とし、processor factsで代用できない。
 - legacy Charter（information_flowなし）は既存の受諾済み権限を維持する。新規Charterはprocessor未選択を空リストとして記録し、外部processor利用を閉じる。
-- 帰結として、新規Charterで `send_message_external` / `publish_public` を委任しても、呼び出し側が信頼できるrecipient factsを渡さない限り人へ戻る。`charter-decision-vocabulary` の `meeting_scheduling` なども該当し、語彙entryへ recipient/purpose/category のfacts宣言を追加するまでは自律実行されない（fail-closed）。これは既存の受諾済み `delegated_decisions` を広げず、各入口のfacts接続を次の作業として残す。
-- 既存の日次Accountability Reportに支出・拒否・停止・Charter amendment候補の通知がある。情報フロー拒否を理由付きで集計しCharterの狭域化/停止提案へ戻す運用接続は未実装。
-- 支払上限の原子的消費も別途未実装。
-- Phase 4 は監査結果に基づく自律度の縮小・停止・通知をつなぐ。実行失敗、再送、支出予約の競合を確認するまでは、金銭委任のトランザクション性を保証済みと表現しない。
-- 上位モデルのレビューで確認した追加制約: `approval-gate` の信頼境界に型付き facts を追加し、`op-preflight` の単調拒否・sandbox・provenance・domain・spend・hardened policyを維持する。金額上限は実行時消費の原子性を別途評価する。
+- 新規Charterで `send_message_external` / `publish_public` を委任しても、呼び出し側が信頼できるrecipient factsを渡さない限り人へ戻る。受領者スコープはCharter form(`recipient_*`)で明示的に委任し、`approval:evaluate_decision_rights` がfactsを渡す。factsの形が不正な場合は「facts無し」へ落とさず入力エラーにする。
+- 既存の日次Accountability Reportに支出・拒否・停止・Charter amendment候補の通知がある。情報フロー拒否を理由付きで集計し、狭域化/停止提案へ戻す運用接続を追加した。
+- 金額上限の読み取り・判定・消費は憲章スコープ単位のロックで一つのクリティカルセクションにした。支払の実行そのもの(外部決済の確定)とゲートの消費記録は別プロセスであり、実行失敗時の補償は別途の課題として残る。
+- Phase 4 は監査結果に基づく自律度の縮小・停止・通知(決定的サンプリング通知)をつなぐ。実行失敗・再送・支出予約の競合に対する金銭委任のトランザクション性は、決済側の補償設計が入るまで保証済みとは表現しない。
+- 未実装として残るのは: Concierge UIでの受領者スコープ入力(現在はAPI経由)、決済実行側の補償/取消、`op-preflight` の専用単調guardの追加登録(現状はゲート内fail-closedとentrypoint testで担保)。
 
 ## 根拠資料
 

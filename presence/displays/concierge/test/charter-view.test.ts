@@ -67,6 +67,10 @@ describe('form <-> draft', () => {
       max_loss_per_incident: 100000,
       allow_named_spend: true,
       allow_customer_outbound: false,
+      recipient_purposes: [],
+      recipient_classes: [],
+      recipient_categories: [],
+      max_attachments: 0,
       delegated_decisions: [],
       supersedes_decision_rights: false,
       deputies: ['user:carol', 'user:dave'],
@@ -95,6 +99,26 @@ describe('form <-> draft', () => {
         supersedes_decision_rights: false,
       }).delegated_decisions
     ).toEqual(['meeting_scheduling']);
+  });
+  it('carries a delegated recipient scope through an amendment and back to the API', () => {
+    const d = draftFromCharter({
+      money: { per_action: 0, per_day: 0, per_month: 0 },
+      max_loss_per_incident: 0,
+      deputies: [],
+      allows_named_spend: false,
+      supersedes_decision_rights: false,
+      recipient_purposes: ['meeting_scheduling'],
+      recipient_classes: ['known_counterparty'],
+      recipient_categories: ['routine_business'],
+      max_attachments: 2,
+    });
+    expect(d.recipient_purposes).toBe('meeting_scheduling');
+    expect(d.max_attachments).toBe('2');
+    const body = draftToForm('acme', d);
+    expect(body.recipient_purposes).toEqual(['meeting_scheduling']);
+    expect(body.recipient_classes).toEqual(['known_counterparty']);
+    expect(body.recipient_categories).toEqual(['routine_business']);
+    expect(body.max_attachments).toBe(2);
   });
   it('decision options from the server drop malformed entries', () => {
     expect(

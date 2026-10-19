@@ -149,6 +149,110 @@ describe('buildAccountabilityReport', () => {
     expect(cleared.tripwires_standing).toEqual([]);
   });
 
+  it('groups information-flow denials and proposes narrowing the delegated scope', () => {
+    const withFlow = {
+      ...charter(),
+      envelope: {
+        ...(charter().envelope as object),
+        information_flow: {
+          purposes: ['meeting_scheduling'],
+          recipient_classes: ['known_counterparty'],
+          categories: ['routine_business'],
+          max_attachments: 0,
+        },
+      },
+    } as unknown as Charter;
+    const flowDenied = (ts: string, reason: string): LedgerEntry => ({
+      kind: 'denied',
+      ts,
+      actor: 'a',
+      action_class: 'send_message_external',
+      reasons: [reason],
+      information_flow: {
+        purpose: 'meeting_scheduling',
+        recipient_class: 'known_counterparty',
+        categories: ['sensitive_business'],
+      },
+    });
+    const reason = 'information_flow categories not delegated: sensitive_business';
+    const r = buildAccountabilityReport({
+      charter: withFlow,
+      ledger: [
+        flowDenied('2026-10-01T02:00:00.000Z', reason),
+        flowDenied('2026-10-01T03:00:00.000Z', reason),
+      ],
+      now: NOW,
+    });
+    expect(r.information_flow).toMatchObject({
+      denied: 2,
+      by_reason: [{ reason, count: 2 }],
+      purposes: [{ purpose: 'meeting_scheduling', count: 2 }],
+      recipients: [{ recipient_class: 'known_counterparty', count: 2 }],
+      last_seen: '2026-10-01T03:00:00.000Z',
+    });
+    expect(r.scope_proposals).toEqual([
+      {
+        kind: 'narrow',
+        field: 'envelope.information_flow.purposes',
+        value: 'meeting_scheduling',
+        count: 2,
+        reason: 'repeated_denials_under_delegated_scope',
+        last_seen: '2026-10-01T03:00:00.000Z',
+      },
+      {
+        kind: 'narrow',
+        field: 'envelope.information_flow.recipient_classes',
+        value: 'known_counterparty',
+        count: 2,
+        reason: 'repeated_denials_under_delegated_scope',
+        last_seen: '2026-10-01T03:00:00.000Z',
+      },
+    ]);
+    expect(renderAccountabilityReportText(r, { locale: 'en' })).toContain(
+      'Held for information-flow review: 2'
+    );
+  });
+
+  it('proposes a stop when information-flow denials are frequent', () => {
+    const withFlow = {
+      ...charter(),
+      envelope: {
+        ...(charter().envelope as object),
+        information_flow: {
+          purposes: ['meeting_scheduling'],
+          recipient_classes: ['known_counterparty'],
+          categories: ['routine_business'],
+          max_attachments: 0,
+        },
+      },
+    } as unknown as Charter;
+    const ledger = Array.from({ length: 5 }, (_, i): LedgerEntry => ({
+      kind: 'denied',
+      ts: `2026-10-01T0${i}:00:00.000Z`,
+      actor: 'a',
+      action_class: 'send_message_external',
+      reasons: ['information_flow purpose not delegated'],
+      information_flow: {
+        purpose: 'external_reply',
+        recipient_class: 'public',
+        categories: ['routine_business'],
+      },
+    }));
+    const r = buildAccountabilityReport({ charter: withFlow, ledger, now: NOW });
+    // Nothing delegated is being asked for: no narrowing of a delegated scope,
+    // only the stop advice (the owner can then re-accept a narrower charter).
+    expect(r.scope_proposals).toEqual([
+      {
+        kind: 'stop',
+        field: 'envelope.information_flow',
+        value: 'external_egress',
+        count: 5,
+        reason: 'frequent_information_flow_denials',
+        last_seen: '2026-10-01T04:00:00.000Z',
+      },
+    ]);
+  });
+
   it('warns when the charter is about to expire', () => {
     const r = buildAccountabilityReport({
       charter: charter('2026-10-08T09:00:00.000Z'),

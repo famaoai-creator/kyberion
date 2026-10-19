@@ -16,7 +16,7 @@
 
 import { agentActor } from '../actor.js';
 import { buildNhiId, NHI_SLUG_PATTERN } from '../nhi-id.js';
-import type { CharterAction } from './accountability-charter.js';
+import { parseInformationFlowFacts, type CharterAction } from './accountability-charter.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { findActiveCharter, type CharterPathOptions } from './accountability-charter-registry.js';
 import {
@@ -43,6 +43,12 @@ export function charterInputForDecision(
     amount?: number;
     /** Outside parties the decision reaches (messages, invitations). */
     recipients?: number;
+    /**
+     * Trusted facts for an external-recipient action (purpose, recipient class,
+     * categories, attachments). Constructed by a validated pipeline step, never
+     * from model output; invalid facts are an input error, not "no facts".
+     */
+    informationFlow?: unknown;
   },
   options: CharterPathOptions & { vocabulary?: CharterDecisionVocabulary } = {},
   now: Date = new Date()
@@ -67,6 +73,16 @@ export function charterInputForDecision(
     input.recipients >= 0
       ? input.recipients
       : entry.default_recipients;
+  let informationFlow: CharterAction['information_flow'];
+  if (input.informationFlow !== undefined) {
+    const parsed = parseInformationFlowFacts(input.informationFlow);
+    if (!parsed.ok) {
+      throw new Error(
+        `[charter] ${input.decisionType}: ${parsed.error} | evidence: information_flow is caller-supplied at the trusted entry point`
+      );
+    }
+    informationFlow = parsed.facts;
+  }
   const action: CharterAction = {
     actor,
     action_class: entry.action_class,
@@ -86,6 +102,7 @@ export function charterInputForDecision(
           },
         }
       : {}),
+    ...(informationFlow ? { information_flow: informationFlow } : {}),
   };
   return {
     scope,

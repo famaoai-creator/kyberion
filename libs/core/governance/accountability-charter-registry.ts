@@ -18,6 +18,7 @@ import { assertHumanActor, type ActorRef } from '../actor.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import {
@@ -272,6 +273,17 @@ export type LedgerEntry =
       on_behalf_of?: string;
       action_class: string;
       reasons: string[];
+      /**
+       * The recipient/processor facts the action carried, so the report can
+       * group information-flow denials by purpose/recipient without parsing
+       * reason strings. Absent when the action had no facts at all.
+       */
+      information_flow?: {
+        purpose: string;
+        recipient_class?: string;
+        processor_id?: string;
+        categories: string[];
+      };
       /** Which charter field the agent asks to widen, when the denial has an amendment. */
       amendment_field?: string;
       /** The limit in force and the value the denied action needed, so a proposal needs no re-evaluation. */
@@ -464,6 +476,20 @@ export function recordCharterDenial(
       ...(action.actor.on_behalf_of ? { on_behalf_of: action.actor.on_behalf_of } : {}),
       action_class: action.action_class,
       reasons: decision.reasons,
+      ...(action.information_flow
+        ? {
+            information_flow: {
+              purpose: action.information_flow.purpose,
+              ...(action.information_flow.recipient_class
+                ? { recipient_class: action.information_flow.recipient_class }
+                : {}),
+              ...(action.information_flow.processor_id
+                ? { processor_id: action.information_flow.processor_id }
+                : {}),
+              categories: [...action.information_flow.categories],
+            },
+          }
+        : {}),
       ...(decision.amendment
         ? {
             amendment_field: decision.amendment.field,
@@ -479,8 +505,25 @@ export function recordCharterDenial(
 }
 
 /**
+ * One inter-process critical section per charter scope for read-check-append.
+ *
+ * The budget limits are enforced against usage read from the append-only
+ * ledger, so "read usage → decide → append consumption" must be atomic or two
+ * concurrent decisions both see the same remaining budget and both spend it.
+ * The lock is the same primitive the other governed stores use; it is held for
+ * the (short) synchronous decision, never across an external effect.
+ */
+export function withCharterDecisionLock<T>(scope: CharterScope, fn: () => T, timeoutMs = 5000): T {
+  const key =
+    scope.kind === 'organization'
+      ? `charter-decision:organization:${scope.tenant_slug}`
+      : 'charter-decision:person';
+  return withLockSync(key, fn, timeoutMs);
+}
+
+/**
  * Convenience entry point: evaluate and, when inside the charter, record the
- * consumption. Returns null when the scope has no active charter.
+ * consumption atomically. Returns null when the scope has no active charter.
  */
 export function decideUnderCharter(
   scope: CharterScope,
@@ -489,8 +532,10 @@ export function decideUnderCharter(
   options: CharterPathOptions = {},
   now: Date = new Date()
 ): CharterDecision | null {
-  const evaluated = evaluateUnderCharter(scope, action, availability, options, now);
-  if (!evaluated) return null;
-  recordCharterConsumption(evaluated.charter, action, evaluated.decision, options, now);
-  return evaluated.decision;
+  return withCharterDecisionLock(scope, () => {
+    const evaluated = evaluateUnderCharter(scope, action, availability, options, now);
+    if (!evaluated) return null;
+    recordCharterConsumption(evaluated.charter, action, evaluated.decision, options, now);
+    return evaluated.decision;
+  });
 }
