@@ -6,4 +6,6 @@
 export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   hearing: 'active/shared/runtime/hearing',
   discussion_create_requests: 'active/shared/runtime/discussion-create-requests',
+  /** PG-03 standing grants (governance/grant-store.ts). */
+  grants: 'active/shared/runtime/grants',
 } as const;

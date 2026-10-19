@@ -33,3 +33,4 @@ export * from './ingest/video-fetch.js';
 export * from './ingest/video-ingest-types.js';
 export * from './ingest/video-media.js';
 export * from './ingest/vtt-parser.js';
+export * from './video-recut.js';
