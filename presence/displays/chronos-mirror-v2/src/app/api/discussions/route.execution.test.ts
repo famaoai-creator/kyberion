@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
+  receipts: new Map<string, unknown>(),
+  requestCreate: vi.fn(),
   readiness: vi.fn(() => ({
     provider: 'claude',
     execution: 'unverified',
@@ -17,6 +20,10 @@ const mocks = vi.hoisted(() => ({
   guard: vi.fn(() => null),
   access: vi.fn(() => null),
   scope: vi.fn(() => ({ tenant_slug: 'fixture-tenant' })),
+}));
+vi.mock('@agent/core/discussion/discussion-create-request', () => ({
+  createDiscussionRequest: mocks.requestCreate,
+  DiscussionRequestConflictError: class extends Error {},
 }));
 vi.mock('@agent/core/discussion/discussion-readiness', () => ({
   inspectDiscussionReadiness: mocks.readiness,
@@ -46,7 +53,12 @@ vi.mock('../../../lib/discussion-access', () => ({
 vi.mock('../../../lib/su-surface-data', () => ({ buildMissionHistoryItems: vi.fn(() => []) }));
 vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: vi.fn(() => ({
-    context: { role: 'localadmin', principalId: 'fixture-viewer' },
+    context: {
+      role: 'localadmin',
+      source: 'token',
+      principalId: 'fixture-viewer',
+      tenantSlugs: ['fixture-tenant'],
+    },
   })),
   strictViewerTier: vi.fn((_viewer, tier) => tier),
   strictViewerScopeOrganizationIds: vi.fn(() => 'all'),
@@ -61,9 +73,43 @@ import { POST } from './route';
 import { POST as commandPOST } from './[id]/command/route';
 import { POST as reviewPOST } from './[id]/review/route';
 
-const request = (body: unknown) => ({ json: async () => body }) as NextRequest;
+const request = (body: unknown) =>
+  ({
+    json: async () => ({
+      request_id: 'cc4e1edb-e0a6-4e53-8fd4-7f5287679a91',
+      scope_digest: createHash('sha256')
+        .update(JSON.stringify(['fixture-tenant', null, null, null, 'confidential']))
+        .digest('hex'),
+      ...(body as object),
+    }),
+  }) as NextRequest;
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.receipts.clear();
+  mocks.requestCreate.mockImplementation((input) => {
+    const previous = mocks.receipts.get(input.request_id);
+    if (previous) return { ...(previous as object), should_start: false };
+    if (input.rejection) {
+      const result = {
+        request: { request_id: input.request_id, status: 'rejected', reason: input.rejection },
+        should_start: false,
+      };
+      mocks.receipts.set(input.request_id, result);
+      return result;
+    }
+    const room = mocks.create({
+      ...input.input,
+      scope: input.scope,
+      created_by: input.actor.principal_id,
+    });
+    const result = {
+      request: { request_id: input.request_id, status: 'created', room_id: room.id },
+      room,
+      should_start: true,
+    };
+    mocks.receipts.set(input.request_id, result);
+    return result;
+  });
   mocks.read.mockReturnValue(null);
   mocks.readiness.mockReturnValue({
     provider: 'claude',
@@ -162,7 +208,7 @@ describe('Discussion HTTP execution bounds (mocked authority and engine)', () =>
     expect(response.status).toBe(201);
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        scope: { tenant_slug: 'fixture-tenant' },
+        scope: { tenant_slug: 'fixture-tenant', tier: 'confidential' },
         created_by: 'fixture-viewer',
         config: expect.objectContaining({
           speaker: 'reasoning',
@@ -178,7 +224,7 @@ describe('Discussion HTTP execution bounds (mocked authority and engine)', () =>
   });
   it('does not accept a client public tier as authorization', async () => {
     await POST(request({ goal: 'fixture', speaker: 'scripted', tier: 'public' }));
-    expect(mocks.create.mock.calls[0]?.[0].scope).not.toHaveProperty('tier');
+    expect(mocks.create.mock.calls[0]?.[0].scope.tier).toBe('confidential');
   });
   it('keeps explicit scripted mode offline', async () => {
     await POST(
@@ -209,7 +255,34 @@ it('rechecks a known prerequisite blocker before creating a room or consuming it
   const response = await POST(
     request({ goal: 'fixture', speaker: 'reasoning', provider: 'claude', single_pass: true })
   );
-  expect(response.status).toBe(409);
+  expect(response.status).toBe(200);
+  expect((await response.json()).request).toMatchObject({
+    status: 'rejected',
+    reason: 'prerequisites_blocked',
+  });
   expect(mocks.create).not.toHaveBeenCalled();
   expect(mocks.run).not.toHaveBeenCalled();
+});
+
+it('does not launch twice when the original create response was lost', async () => {
+  const body = {
+    request_id: '9fdfb84a-90ec-4fee-a07b-a7a60f6543df',
+    goal: 'Public fixture',
+    speaker: 'scripted',
+  };
+  await POST(request(body));
+  await POST(request(body));
+  expect(mocks.run).toHaveBeenCalledTimes(1);
+});
+
+it('does not create another room when canonical scope gains a previously absent project', async () => {
+  const body = { goal: 'Public fixture', speaker: 'scripted' };
+  expect((await POST(request(body))).status).toBe(201);
+  mocks.scope.mockReturnValueOnce({
+    tenant_slug: 'fixture-tenant',
+    project_id: 'PRJ-LATER',
+  } as never);
+  expect((await POST(request(body))).status).not.toBe(201);
+  expect(mocks.create).toHaveBeenCalledTimes(1);
+  expect(mocks.run).toHaveBeenCalledTimes(1);
 });
