@@ -333,3 +333,141 @@ describe('delegated decisions in a delegation chain', () => {
     expect(evaluate('constructor')).toBe('deny');
   });
 });
+
+describe('information-flow delegation', () => {
+  const flow = {
+    purpose: 'customer_service',
+    recipient_class: 'bound_customer' as const,
+    categories: ['routine_business' as const],
+    attachment_count: 0,
+  };
+  const withFlow = () => {
+    const c = charter();
+    c.envelope.information_flow = {
+      purposes: ['customer_service'],
+      recipient_classes: ['bound_customer'],
+      categories: ['routine_business'],
+      max_attachments: 0,
+    };
+    return c;
+  };
+  it('permits only facts inside the explicit purpose, recipient, category and attachment scope', () => {
+    const c = withFlow();
+    const evaluate = (information_flow: CharterAction['information_flow']) =>
+      run(act({ action_class: 'send_message_external', information_flow }), { charter: c })
+        .decision;
+    expect(evaluate(flow)).toBe('allow');
+    expect(evaluate({ ...flow, recipient_class: 'public' })).toBe('deny');
+    expect(evaluate({ ...flow, categories: ['sensitive_business'] })).toBe('deny');
+    expect(evaluate({ ...flow, attachment_count: 1 })).toBe('deny');
+    expect(evaluate({ ...flow, purpose: 'marketing' })).toBe('deny');
+  });
+  it('fails closed when no information-flow delegation exists', () => {
+    const c = charter();
+    c.envelope.information_flow = {
+      purposes: [],
+      recipient_classes: [],
+      categories: [],
+      max_attachments: 0,
+      processor_ids: [],
+      processing_purposes: [],
+      processing_categories: [],
+    };
+    const decision = run(act({ action_class: 'send_message_external', information_flow: flow }), {
+      charter: c,
+    });
+    expect(decision.decision).toBe('deny');
+    expect(decision.reasons[0]).toMatch(/purpose|recipient/);
+  });
+  it('does not let a child add an information-flow permission', () => {
+    const parent = charter().envelope;
+    const child = {
+      ...parent,
+      information_flow: {
+        purposes: ['customer_service'],
+        recipient_classes: ['bound_customer'] as const,
+        categories: ['routine_business'] as const,
+        max_attachments: 0,
+      },
+    };
+    expect(envelopeExceeds(child, parent)).toContain(
+      'information_flow is not granted by the parent envelope'
+    );
+    const constrained = {
+      ...parent,
+      information_flow: {
+        purposes: [],
+        recipient_classes: [],
+        categories: [],
+        max_attachments: 0,
+        processor_ids: ['claude'],
+        processing_purposes: ['analysis'],
+        processing_categories: ['sensitive_business'] as const,
+      },
+    };
+    expect(
+      envelopeExceeds(
+        {
+          ...constrained,
+          information_flow: {
+            purposes: [],
+            recipient_classes: [],
+            categories: [],
+            max_attachments: 0,
+          },
+        },
+        constrained
+      )
+    ).toContain('information_flow.processor_ids omits a parent restriction');
+    expect(envelopeExceeds(parent, constrained)).toContain(
+      'information_flow is omitted but restricted by the parent envelope'
+    );
+  });
+  it('keeps processors separate from recipients and requires an explicit processing purpose/category', () => {
+    const c = withFlow();
+    c.envelope.information_flow = {
+      ...c.envelope.information_flow!,
+      processor_ids: ['anthropic'],
+      processing_purposes: ['vendor_quote_analysis'],
+      processing_categories: ['sensitive_business'],
+    };
+    const processorAction = (over: Partial<NonNullable<CharterAction['information_flow']>> = {}) =>
+      act({
+        action_class: 'internal_work',
+        information_flow: {
+          purpose: 'vendor_quote_analysis',
+          processor_id: 'anthropic',
+          categories: ['sensitive_business'],
+          attachment_count: 0,
+          ...over,
+        },
+      });
+    expect(run(processorAction(), { charter: c }).decision).toBe('allow');
+    expect(
+      run(processorAction({ processor_id: 'unknown-provider' }), { charter: c }).decision
+    ).toBe('deny');
+    expect(run(processorAction({ purpose: 'marketing' }), { charter: c }).decision).toBe('deny');
+    expect(run(processorAction({ categories: ['unknown'] }), { charter: c }).decision).toBe('deny');
+    expect(
+      run(processorAction({ recipient_class: 'bound_customer' }), { charter: c }).reasons
+    ).toContain('information_flow facts cannot mix a processor and an external recipient');
+    expect(
+      run(act({ ...processorAction(), action_class: 'send_message_external' }), { charter: c })
+        .reasons
+    ).toContain('external recipient actions require recipient facts, not processor facts');
+  });
+  it('requires facts for recipient actions under new Charters but preserves legacy accepted scopes', () => {
+    const action = act({
+      action_class: 'send_message_external',
+      reversible: true,
+    });
+    const restricted = withFlow();
+    expect(run(action, { charter: restricted }).reasons).toContain(
+      'information_flow facts are required for external recipient actions'
+    );
+    expect(run(act({ ...action, information_flow: flow })).decision).toBe('allow');
+    expect(run(act({ ...action, information_flow: flow }), { charter: charter() }).decision).toBe(
+      'allow'
+    );
+  });
+});

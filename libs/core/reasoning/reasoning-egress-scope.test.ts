@@ -35,9 +35,9 @@ beforeEach(() => {
     JSON.stringify({
       version: '1',
       mode: 'warn',
-      manual_allowed_domains: ['api.anthropic.com'],
+      manual_allowed_domains: ['api.anthropic.com', 'model-gateway.example'],
       tenant_allowed_domains: {
-        'approved-tenant': ['api.anthropic.com'],
+        'approved-tenant': ['api.anthropic.com', 'model-gateway.example'],
         'attested-tenant': ['api.anthropic.com'],
         'restricted-tenant': ['api.anthropic.com'],
       },
@@ -50,7 +50,53 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.KYBERION_EGRESS_POLICY_PATH;
   _resetEgressPolicyCacheForTests();
+  _setReasoningTenantRegistryRootForTests(undefined);
 });
+
+function installProcessorCharter(tenant = 'approved-tenant') {
+  const charterId = 'chr-egress-test';
+  const dir = path.join(POLICY_DIR, 'knowledge', 'confidential', tenant, 'charters');
+  safeRmSync(dir, { recursive: true, force: true });
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(
+    path.join(dir, `${charterId}.json`),
+    JSON.stringify({
+      charter_id: charterId,
+      scope: { kind: 'organization', tenant_slug: tenant },
+      accountable: {
+        actor: 'user:owner',
+        authority_basis: { kind: 'owner', evidence_ref: 'test' },
+        accepted_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2030-01-01T00:00:00.000Z',
+        statement_sha256: 'a'.repeat(64),
+        deputies: [],
+      },
+      envelope: {
+        money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+        data_tier: { read: [], write: [] },
+        external_effects: {},
+        irreversible: 'forbid',
+        information_flow: {
+          purposes: [],
+          recipient_classes: [],
+          categories: [],
+          max_attachments: 0,
+          processor_ids: ['claude'],
+          processing_purposes: ['vendor_quote_analysis'],
+          processing_categories: ['sensitive_business'],
+        },
+      },
+      appetite: {
+        max_loss_per_incident: 0,
+        reputational_class_max: 'A',
+        blast_radius_max: { recipients: 0, systems: 0 },
+        tripwires: ['manual-stop'],
+      },
+    })
+  );
+  _setReasoningTenantRegistryRootForTests(POLICY_DIR);
+  return { charterId, ledger: path.join(dir, `${charterId}.ledger.jsonl`) };
+}
 
 describe('scope propagation', () => {
   it('is absent outside any scope', () => {
@@ -128,13 +174,32 @@ describe('assertReasoningEgressAllowed', () => {
     });
   });
 
-  it('does not treat an undeclared remote backend as zero-retention', () => {
+  it('does not treat an undeclared remote backend as no-training', () => {
     withReasoningPayloadScope(
-      { tier: 'confidential', tenant_slug: 'approved-tenant', training_use: 'zero_retention' },
+      { tier: 'confidential', tenant_slug: 'approved-tenant', training_use: 'no_training' },
       () => {
         expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(
-          /no zero_retention declaration/
+          /no no-training declaration/
         );
+      }
+    );
+  });
+
+  it('requires independent retention evidence for public remote zero-retention requests', () => {
+    withReasoningPayloadScope({ tier: 'public', training_use: 'zero_retention' }, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(
+        /zero_retention requires independent retention evidence/
+      );
+    });
+  });
+
+  it('keeps local endpoint behavior unchanged for zero-retention scopes', () => {
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'unattested-tenant', training_use: 'zero_retention' },
+      () => {
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('openai-compatible', 'http://127.0.0.1:11434/v1')
+        ).not.toThrow();
       }
     );
   });
@@ -209,7 +274,7 @@ describe('backend classification', () => {
   });
 });
 
-describe('zero_retention honours tenant provider attestations', () => {
+describe('no_training honours tenant provider attestations', () => {
   const REGISTRY_ROOT = pathResolver.sharedTmp('reasoning-egress-attestation-tests');
   const TENANTS_DIR = path.join(REGISTRY_ROOT, 'knowledge', 'personal', 'tenants');
   const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
@@ -267,33 +332,33 @@ describe('zero_retention honours tenant provider attestations', () => {
     safeRmSync(REGISTRY_ROOT, { recursive: true, force: true });
   });
 
-  const zeroRetention = (tenant_slug: string | undefined, fn: () => void) =>
+  const noTraining = (tenant_slug: string | undefined, fn: () => void) =>
     withReasoningPayloadScope(
       {
         tier: 'confidential',
         ...(tenant_slug ? { tenant_slug } : {}),
-        training_use: 'zero_retention',
+        training_use: 'no_training',
       },
       fn
     );
 
   it('allows an external backend when the tenant attests training_use none', () => {
-    zeroRetention('attested-tenant', () => {
+    noTraining('attested-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow();
     });
   });
 
   it('still applies the tenant domain policy after the attestation passes', () => {
-    zeroRetention('attested-no-domain', () => {
+    noTraining('attested-no-domain', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(ReasoningEgressDeniedError);
       expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow(
-        /no zero_retention declaration/
+        /no no-training declaration/
       );
     });
   });
 
   it("denies an attested provider outside the tenant's allowed_reasoning_backends", () => {
-    zeroRetention('restricted-tenant', () => {
+    noTraining('restricted-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
         /provider egress policy denies confidential material: tenant 'restricted-tenant' does not allow provider 'claude'/
       );
@@ -316,7 +381,7 @@ describe('zero_retention honours tenant provider attestations', () => {
     process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = providerPolicyPath;
     _resetProviderEgressPolicyCacheForTests();
     try {
-      zeroRetention('attested-tenant', () => {
+      noTraining('attested-tenant', () => {
         expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
           /'claude' is not declared/
         );
@@ -328,27 +393,38 @@ describe('zero_retention honours tenant provider attestations', () => {
   });
 
   it('denies without an attestation', () => {
-    zeroRetention('unattested-tenant', () => {
+    noTraining('unattested-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
-        /no zero_retention declaration .*no attestation for provider 'claude' \| next: .* \| tenant=unattested-tenant/
+        /no no-training declaration .*no attestation for provider 'claude' \| next: .* \| tenant=unattested-tenant/
       );
     });
   });
 
+  it('does not treat a no-training attestation as proof of zero retention', () => {
+    noTraining('attested-tenant', () => {
+      expect(() =>
+        withReasoningPayloadScope(
+          { tier: 'confidential', tenant_slug: 'attested-tenant', training_use: 'zero_retention' },
+          () => assertReasoningEgressAllowed('claude-cli')
+        )
+      ).toThrow(/zero_retention requires independent retention evidence/);
+    });
+  });
+
   it('denies an expired attestation', () => {
-    zeroRetention('expired-tenant', () => {
+    noTraining('expired-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/expired/);
     });
   });
 
   it("denies an attestation whose training_use is not 'none'", () => {
-    zeroRetention('trained-tenant', () => {
+    noTraining('trained-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/training_use 'used'/);
     });
   });
 
   it('denies when only another provider is attested', () => {
-    zeroRetention('codex-only-tenant', () => {
+    noTraining('codex-only-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/no attestation/);
     });
   });
@@ -357,7 +433,7 @@ describe('zero_retention honours tenant provider attestations', () => {
     withExecutionContext(
       'mission_controller',
       () =>
-        zeroRetention('attested-tenant', () => {
+        noTraining('attested-tenant', () => {
           expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
             /conflicts with the active tenant scope/
           );
@@ -368,19 +444,19 @@ describe('zero_retention honours tenant provider attestations', () => {
   });
 
   it('denies when the scope names no tenant', () => {
-    withReasoningPayloadScope({ tier: 'public', training_use: 'zero_retention' }, () => {
+    withReasoningPayloadScope({ tier: 'public', training_use: 'no_training' }, () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/no tenant_slug/);
     });
   });
 
   it('denies a backend that maps to no egress provider id', () => {
-    zeroRetention('attested-tenant', () => {
+    noTraining('attested-tenant', () => {
       expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(/no egress provider id/);
     });
   });
 
   it('leaves local backends unaffected', () => {
-    zeroRetention('unattested-tenant', () => {
+    noTraining('unattested-tenant', () => {
       expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
     });
   });
@@ -406,6 +482,82 @@ describe('zero_retention honours tenant provider attestations', () => {
       () => {
         expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/local_only/);
       }
+    );
+  });
+
+  it('composes an active processor Charter with the provider egress gate', () => {
+    installProcessorCharter();
+    withReasoningPayloadScope(
+      {
+        tier: 'public',
+        tenant_slug: 'approved-tenant',
+        purpose: 'vendor_quote_analysis',
+        categories: ['sensitive_business'],
+        training_use: 'training_eligible',
+      },
+      () =>
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://api.anthropic.com')
+        ).not.toThrow()
+    );
+  });
+
+  it('does not treat an approved provider as permission for a different endpoint', () => {
+    installProcessorCharter();
+    withReasoningPayloadScope(
+      {
+        tier: 'public',
+        tenant_slug: 'approved-tenant',
+        purpose: 'vendor_quote_analysis',
+        categories: ['sensitive_business'],
+        training_use: 'training_eligible',
+      },
+      () =>
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://model-gateway.example')
+        ).toThrow(/cannot bind processor.*endpoint/)
+    );
+  });
+
+  it('binds the processor grant to the descriptor scheme and port as well as the host', () => {
+    installProcessorCharter();
+    withReasoningPayloadScope(
+      {
+        tier: 'public',
+        tenant_slug: 'approved-tenant',
+        purpose: 'vendor_quote_analysis',
+        categories: ['sensitive_business'],
+        training_use: 'training_eligible',
+      },
+      () =>
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('claude-cli', 'http://api.anthropic.com')
+        ).toThrow(/cannot bind processor.*endpoint/)
+    );
+  });
+
+  it('applies the active charter stop tripwire to processor egress', () => {
+    const { ledger } = installProcessorCharter();
+    safeWriteFile(
+      ledger,
+      JSON.stringify({
+        kind: 'tripwire',
+        ts: '2026-10-20T00:00:00.000Z',
+        tripwire: 'manual-stop',
+      }) + '\n'
+    );
+    withReasoningPayloadScope(
+      {
+        tier: 'public',
+        tenant_slug: 'approved-tenant',
+        purpose: 'vendor_quote_analysis',
+        categories: ['sensitive_business'],
+        training_use: 'training_eligible',
+      },
+      () =>
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://api.anthropic.com')
+        ).toThrow(/active charter stop tripwire/)
     );
   });
 });

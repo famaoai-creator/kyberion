@@ -42,6 +42,7 @@ import { safeExistsSync } from './secure-io.js';
 import { readTenantProfile } from './organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from './actor.js';
 import { resolveAccountableHuman } from './organization/member-registry.js';
+import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { auditChain } from './governance/audit-chain.js';
 import { nowIso } from './foundation/time.js';
@@ -59,6 +60,9 @@ import {
 
 export const NHI_IDENTITY_RETIRED_EVENT = 'nhi_identity_offboarded';
 export const NHI_ORPHAN_DETECTED_EVENT = 'nhi_orphan_detected';
+
+/** Read-only system-scope role used to resolve accountable member status. */
+export const NHI_ACCOUNTABILITY_READER_ROLE = 'nhi_accountability_reader';
 
 export interface NhiGovernanceAuditEvent {
   action: typeof NHI_IDENTITY_RETIRED_EVENT | typeof NHI_ORPHAN_DETECTED_EVENT;
@@ -268,7 +272,9 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
     // orphaned.
     if (
       record.accountable_human_id.startsWith(HUMAN_ACTOR_PREFIX) &&
-      resolveAccountableHuman(record.accountable_human_id)?.status !== 'active'
+      withExecutionContext(NHI_ACCOUNTABILITY_READER_ROLE, () =>
+        resolveAccountableHuman(record.accountable_human_id)
+      )?.status !== 'active'
     ) {
       orphans.push({
         nhi_id: record.nhi_id,

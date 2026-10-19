@@ -416,7 +416,7 @@ export async function defaultPeerAutoReplyGenerate(
           tier: 'confidential',
           tenant_slug: input.tenantId,
           purpose: AUTO_REPLY_SCOPE_PURPOSE,
-          training_use: 'zero_retention',
+          training_use: 'no_training',
         },
         () =>
           generator.generate({

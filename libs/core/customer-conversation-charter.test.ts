@@ -41,9 +41,29 @@ describe('sendToCustomer × accountability charter', () => {
   it('hands the gate the tenant charter for a clean message', async () => {
     charterFor.mockReturnValue(CHARTER);
     const r = await sendToCustomer(input('Thanks, see https://example.com/help'));
-    expect(charterFor).toHaveBeenCalledWith({ tenantSlug: 'acme' });
+    expect(charterFor).toHaveBeenCalledWith({
+      tenantSlug: 'acme',
+      categories: ['unknown'],
+      attachmentCount: 0,
+    });
     expect(gate.mock.calls[0][0]).toMatchObject({ charter: CHARTER });
     expect(r.status).toBe('sent');
+  });
+
+  it('classifies an exact routine greeting separately from arbitrary customer content', async () => {
+    charterFor.mockReturnValue(CHARTER);
+    await sendToCustomer(input('こんにちは。'));
+    expect(charterFor).toHaveBeenCalledWith({
+      tenantSlug: 'acme',
+      categories: ['routine_business'],
+      attachmentCount: 0,
+    });
+    await sendToCustomer(input('Please find our quote attached'));
+    expect(charterFor).toHaveBeenLastCalledWith({
+      tenantSlug: 'acme',
+      categories: ['unknown'],
+      attachmentCount: 0,
+    });
   });
 
   it('never offers a charter for a message that breaches the audience egress floor', async () => {

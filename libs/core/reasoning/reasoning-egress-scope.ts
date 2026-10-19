@@ -1,6 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from '../logger.js';
 import { evaluateEgressPolicy } from '../egress-policy.js';
+import {
+  findActiveCharter,
+  loadCharterUsage,
+} from '../governance/accountability-charter-registry.js';
+import { evaluateInformationFlow } from '../governance/accountability-charter.js';
 import { isLocalOnlyReasoningBackend } from '../backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from '../shell/sandbox-policy.js';
 import {
@@ -33,7 +38,8 @@ import {
 
 const logger = createLogger('reasoning-egress');
 
-export type ReasoningTrainingUse = 'local_only' | 'zero_retention' | 'training_eligible';
+export type ReasoningTrainingUse =
+  'local_only' | 'no_training' | 'zero_retention' | 'training_eligible';
 
 export interface ReasoningPayloadScope {
   /** Most sensitive tier represented in what will be sent. */
@@ -42,6 +48,8 @@ export interface ReasoningPayloadScope {
   tenant_slug?: string;
   /** What is being sent, recorded on denial. */
   purpose?: string;
+  /** Deterministic categories supplied by the caller; absent facts become `unknown`. */
+  categories?: Array<'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'>;
   /** Maximum provider data-use posture. Defaults to local_only. */
   training_use?: ReasoningTrainingUse;
 }
@@ -97,7 +105,7 @@ export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefi
 }
 
 /**
- * `zero_retention` toward an external backend is allowed only when the
+ * `no_training` toward an external backend is allowed only when the
  * tenant that owns the material holds a valid (unexpired) provider attestation
  * of `training_use: 'none'` for the backend's egress provider id — the same
  * attestation `checkProviderEgress` honours, read through the same governed
@@ -107,12 +115,12 @@ export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefi
  * provider-declared / approved_providers rule apply exactly as they do on the
  * delegation face. Anything else keeps the fail-closed denial.
  */
-function assertZeroRetentionAttested(backendName: string, scope: ReasoningPayloadScope): void {
+function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadScope): void {
   const next =
     "next: record one with 'pnpm onboarding llm attest --request-approval' (or 'pnpm tenant attest-provider'), or declare training_use 'training_eligible' explicitly";
   const deny = (why: string, evidence: string): never => {
     throw new ReasoningEgressDeniedError(
-      `backend ${backendName} has no zero_retention declaration — ${why} | ${next} | ${evidence}`
+      `backend ${backendName} has no no-training declaration — ${why} | ${next} | ${evidence}`
     );
   };
   const provider = providerIdForReasoningIdentifier(backendName);
@@ -168,6 +176,52 @@ function assertZeroRetentionAttested(backendName: string, scope: ReasoningPayloa
   }
 }
 
+function assertCharterProcessorScope(
+  backendName: string,
+  endpoint: string,
+  scope: ReasoningPayloadScope
+): void {
+  if (!scope.tenant_slug) return;
+  const rootDir = tenantRegistryRootForTests;
+  const charter = findActiveCharter(
+    { kind: 'organization', tenant_slug: scope.tenant_slug },
+    new Date(),
+    rootDir ? { rootDir } : {}
+  );
+  const flow = charter?.envelope.information_flow;
+  // Older charters with no processor declaration retain the existing provider
+  // egress rules. Once processors are explicitly scoped, this additional
+  // restriction is mandatory and cannot be inferred from an attestation.
+  if (!flow || flow.processor_ids === undefined) return;
+  const provider = providerIdForReasoningIdentifier(backendName);
+  const usage = loadCharterUsage(charter!, new Date(), rootDir ? { rootDir } : {});
+  if (usage.tripwires_hit.length) {
+    throw new ReasoningEgressDeniedError(
+      `active charter stop tripwire(s): ${usage.tripwires_hit.join(', ')}`
+    );
+  }
+  const descriptorEndpoint = resolveReasoningProviderDescriptor(backendName)?.endpoint;
+  try {
+    if (!descriptorEndpoint || new URL(endpoint).origin !== new URL(descriptorEndpoint).origin) {
+      throw new Error('endpoint does not match the provider descriptor');
+    }
+  } catch {
+    throw new ReasoningEgressDeniedError(
+      `active charter cannot bind processor ${provider ?? '(unmapped)'} to endpoint ${endpoint}`
+    );
+  }
+  const categories: NonNullable<ReasoningPayloadScope['categories']> = scope.categories?.length
+    ? scope.categories
+    : ['unknown'];
+  const violations = evaluateInformationFlow(charter!.envelope, {
+    purpose: scope.purpose ?? '',
+    processor_id: provider ?? '',
+    categories,
+    attachment_count: 0,
+  });
+  if (violations.length) throw new ReasoningEgressDeniedError(violations.join('; '));
+}
+
 /**
  * Throw if the ambient scope forbids sending to this backend.
  *
@@ -220,12 +274,18 @@ export function assertReasoningEgressAllowedAtEndpoint(
       `training_use 'local_only' forbids sending ${scope.tier} material to external backend ${backendName}`
     );
   }
+  if (scope.training_use === 'zero_retention') {
+    throw new ReasoningEgressDeniedError(
+      `zero_retention requires independent retention evidence; a training_use: 'none' attestation only proves that ${backendName} does not train on this data`
+    );
+  }
   if (
-    scope.training_use === 'zero_retention' &&
+    scope.training_use === 'no_training' &&
     reasoningDataPolicy(backendName) === 'training_eligible'
   ) {
-    assertZeroRetentionAttested(backendName, scope);
+    assertNoTrainingAttested(backendName, scope);
   }
+  assertCharterProcessorScope(backendName, endpoint, scope);
   if (scope.tier === 'public') return;
 
   const decision = evaluateEgressPolicy(endpoint, {
