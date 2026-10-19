@@ -16,7 +16,9 @@ afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('AI company onboarding', () => {
   it('uses the foundation reader for onboarding snapshots', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/company_onboarding.ts'));
+    const source = readTextFile(
+      pathResolver.rootResolve('libs/core/organization/company-onboarding.ts')
+    );
     expect(source).toContain('readTextFile');
   });
 

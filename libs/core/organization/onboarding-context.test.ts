@@ -11,7 +11,7 @@ import {
 } from './onboarding-context.js';
 import { writeTenantProfile } from './tenant-registry.js';
 import { applyTenantActivation } from './tenant-activation.js';
-import { loadProjectRecord } from '../project/project-registry.js';
+import { loadProjectRecord, saveProjectRecord } from '../project/project-registry.js';
 import {
   safeExistsSync,
   safeLstat,
@@ -276,6 +276,33 @@ describe('onboarding context binding', () => {
         path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json')
       ).isDirectory()
     ).toBe(true);
+  });
+
+  it('rejects an existing target when the reviewed plan requires a new project', () => {
+    seedFixture();
+    bindAndActivate();
+    const project = {
+      project_id: 'PRJ-REVIEWED-NEW',
+      name: 'Existing',
+      summary: 'Existing target',
+      status: 'active' as const,
+      tier: 'confidential' as const,
+      organization_id: 'org-acme-ai',
+      tenant_slug: 'acme-prod',
+    };
+    saveProjectRecord(project, { rootDir });
+    expect(() =>
+      applyOnboardingFirstWork({
+        customerSlug: 'acme-ai',
+        intent: 'Build a new internal dashboard',
+        accept: true,
+        rootDir,
+        requireNewProject: true,
+        bootstrapProject: { projectId: project.project_id, name: 'New', summary: 'New target' },
+      })
+    ).toThrow(/reviewed project target already exists/);
+    expect(loadProjectRecord(project.project_id, { rootDir })).toEqual(project);
+    expect(loadOnboardingFirstWorkRecord('acme-ai', rootDir)).toBeNull();
   });
 
   it('bootstraps a project entirely under the supplied root', () => {

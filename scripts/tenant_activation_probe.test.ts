@@ -2,6 +2,10 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyOnboardingContextBinding } from '@agent/core/organization/onboarding-context';
 import { resolveTenantActivation } from '@agent/core/organization/tenant-activation';
+import {
+  createTenantActivationProbeDeps,
+  runTenantActivationProbes as runScopedTenantActivationProbes,
+} from '@agent/core/organization/tenant-activation-probe';
 import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
@@ -14,7 +18,7 @@ const rootDir = pathResolver.sharedTmp('tenant-activation-probe-test');
 const scope = { customerSlug: 'acme-ai', tenantSlug: 'acme-prod', organizationId: 'org-acme-ai' };
 const nhiId = 'kyberion://agent/org-acme-ai/planner';
 
-function seed(strict = true): void {
+function seed(strict = true, tenantSlug = scope.tenantSlug): void {
   safeMkdir(path.join(rootDir, 'customer', 'acme-ai'), { recursive: true });
   safeWriteFile(
     path.join(rootDir, 'customer', 'acme-ai', 'organization-profile.json'),
@@ -29,8 +33,8 @@ function seed(strict = true): void {
   );
   writeTenantProfile(
     {
-      tenant_slug: 'acme-prod',
-      tenant_id: 'acme-prod',
+      tenant_slug: tenantSlug,
+      tenant_id: tenantSlug,
       display_name: 'ACME Production',
       status: 'active',
       assigned_role: 'owner',
@@ -40,7 +44,7 @@ function seed(strict = true): void {
     },
     { rootDir }
   );
-  applyOnboardingContextBinding({ ...scope, ownerId: 'human:founder', rootDir });
+  applyOnboardingContextBinding({ ...scope, tenantSlug, ownerId: 'human:founder', rootDir });
 }
 
 function deps(overrides: Partial<TenantActivationProbeDeps> = {}): TenantActivationProbeDeps {
@@ -57,6 +61,99 @@ function deps(overrides: Partial<TenantActivationProbeDeps> = {}): TenantActivat
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('tenant activation probe', () => {
+  it('checks canonical activation prerequisites without claiming a global registry audit', async () => {
+    seed();
+    const input = { ...scope, nhiIds: [nhiId], serviceIds: [], rootDir };
+    const scoped = createTenantActivationProbeDeps(input);
+    expect(scoped.registryCheck()).toEqual({
+      exitCode: 0,
+      scope: 'tenant',
+      output: 'tenant-scoped consistency OK',
+    });
+    const result = await runScopedTenantActivationProbes(input, {
+      ...deps(),
+      registryCheck: scoped.registryCheck,
+    });
+    expect(result.passed).toBe(true);
+    expect(result.results.isolation_probe.detail).toContain('tenant-scoped consistency OK');
+    expect(result.results.isolation_probe.detail).toContain('global registry audit not performed');
+    expect(result.results.isolation_probe.detail).not.toContain('check:tenant-registry OK');
+  });
+
+  it.each([
+    { tenantSlug: 'acme-private' },
+    { organizationId: 'org-other' },
+    { customerSlug: 'other-customer' },
+    { tier: 'public' as const },
+  ])('fails closed for a different activation scope: %j', (different) => {
+    seed();
+    const check = createTenantActivationProbeDeps({
+      ...scope,
+      ...different,
+      nhiIds: [nhiId],
+      serviceIds: [],
+      rootDir,
+    }).registryCheck();
+    expect(check.exitCode).toBe(1);
+    expect(check.scope).toBe('tenant');
+    expect(check.output).toContain('ask an operator');
+    expect(check.output).not.toContain('acme-private');
+  });
+
+  it.each(['missing', 'malformed', 'mismatched'])(
+    'fails closed for a %s organization profile',
+    (state) => {
+      seed();
+      const profilePath = path.join(
+        rootDir,
+        'customer',
+        scope.customerSlug,
+        'organization-profile.json'
+      );
+      if (state === 'missing') safeRmSync(profilePath);
+      else if (state === 'malformed') safeWriteFile(profilePath, '{broken');
+      else
+        safeWriteFile(
+          profilePath,
+          String(safeReadFile(profilePath, { encoding: 'utf8' })).replace(
+            'org-acme-ai',
+            'org-other'
+          )
+        );
+      expect(
+        createTenantActivationProbeDeps({
+          ...scope,
+          nhiIds: [nhiId],
+          serviceIds: [],
+          rootDir,
+        }).registryCheck().exitCode
+      ).toBe(1);
+    }
+  );
+
+  it('fails closed when the canonical tenant profile or binding is absent', () => {
+    seed();
+    const input = { ...scope, nhiIds: [nhiId], serviceIds: [], rootDir };
+    safeRmSync(path.join(rootDir, 'knowledge', 'personal', 'tenants', scope.tenantSlug + '.json'));
+    expect(createTenantActivationProbeDeps(input).registryCheck().exitCode).toBe(1);
+    safeRmSync(
+      path.join(rootDir, 'customer', scope.customerSlug, 'onboarding', 'organization-context.json')
+    );
+    expect(createTenantActivationProbeDeps(input).registryCheck().exitCode).toBe(1);
+  });
+
+  it('fails closed when canonical strict isolation is not declared', () => {
+    seed(false);
+    expect(
+      createTenantActivationProbeDeps({
+        ...scope,
+        nhiIds: [nhiId],
+        serviceIds: [],
+        rootDir,
+      }).registryCheck().exitCode
+    ).toBe(1);
+  });
+
   it('writes passing evidence that activation accepts as its probe refs', async () => {
     seed();
     const result = await runTenantActivationProbes(
@@ -105,8 +202,34 @@ describe('tenant activation probe', () => {
       })
     );
     const detail = result.results.isolation_probe.detail;
-    expect(detail).toContain(`${scope.tenantSlug}: isolation drift`);
+    expect(detail).toContain('check:tenant-registry failed');
+    expect(detail).not.toContain('isolation drift');
     expect(detail).not.toContain('other-tenant-xyz');
+  });
+
+  it('never persists global diagnostics for a tenant with an overlapping slug', async () => {
+    seed(true, 'acme');
+    const result = await runTenantActivationProbes(
+      { ...scope, tenantSlug: 'acme', nhiIds: [nhiId], serviceIds: [], rootDir },
+      deps({
+        registryCheck: () => ({
+          exitCode: 1,
+          output: [
+            '- acme-private: confidential diagnostics',
+            '- acme: conflicts with acme-private in the global registry',
+          ].join('\n'),
+        }),
+      })
+    );
+    const persisted = String(
+      safeReadFile(path.join(rootDir, result.evidence_ref), { encoding: 'utf8' })
+    );
+    expect(result.passed).toBe(false);
+    expect(result.results.isolation_probe.passed).toBe(false);
+    expect(result.results.isolation_probe.detail).toContain('check:tenant-registry failed');
+    expect(result.results.isolation_probe.detail).not.toContain('acme-private');
+    expect(persisted).not.toContain('acme-private');
+    expect(persisted).not.toContain('confidential diagnostics');
   });
 
   it('fails each probe with the reason an operator can act on', async () => {

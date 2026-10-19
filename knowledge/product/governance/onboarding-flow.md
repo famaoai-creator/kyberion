@@ -383,6 +383,8 @@ pnpm onboarding:context bind \
 この apply は `customer/{customer-slug}/onboarding/organization-context.json` と、
 tenant に紐づく organization state を作成または再利用する。これは activation ではない。
 
+Web の初回利用では、既存 first-run の本人登録後に `/setup/company` から会社登録・probe・本人承認・最初の仕事の準備を進められる。対象はその credential が許可する既存 tenant に限る。詳細は [Web 会社設定](../../../docs/developer/COMPANY_WEB_ONBOARDING.ja.md) を参照。
+
 ### Step 7: tenant activation を検証し、人間が受け入れる（C）
 
 activation は context binding があるだけでは完了しない。registry、organization state、

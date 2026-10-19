@@ -233,6 +233,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
    * `brief` surface's `local_token`) stays visible wherever it is reviewed.
    */
   decidedAuthMethod?: ApprovalRecord['authMethod'];
+  /** Digest verified by the decision store, retained for fail-closed effect consumers. */
+  verifiedPresentedDigest?: string;
   /** HA-03: the decision was let through below `min_assurance` (warn rollout mode). */
   assuranceShortfall?: assurance.ApprovalAssuranceShortfall;
   status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'applied' | 'failed';
@@ -1044,6 +1046,7 @@ function decideApprovalRequestUnlocked(
     decidedByDisplayName: _priorDisplayName,
     decidedInAgentSession: _priorAgentSession,
     decidedVia: _priorDecidedVia,
+    verifiedPresentedDigest: _priorPresentedDigest,
     ...recordWithoutChangeRequest
   } = record;
   const updated: ApprovalRequestRecord = {
@@ -1065,6 +1068,7 @@ function decideApprovalRequestUnlocked(
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(bound.presentedDigestVerified ? { verifiedPresentedDigest: params.presentedDigest } : {}),
     ...(assuranceShortfall ? { assuranceShortfall } : {}),
     ...(params.diagnosticDecision ? { diagnosticDecision: params.diagnosticDecision } : {}),
     ...(changeInstruction

@@ -7,6 +7,7 @@ import { frontDeskText } from '../../../lib/i18n';
 import { storeFrontDeskToken } from '../../../lib/front-desk-auth-token';
 import { IdentityLinkSection } from '../identity-link-section';
 import { SsoSettingsForm } from '../sso-settings-form';
+import { companySetupHref } from '../company/company-setup-model';
 
 /**
  * First-run setup: open only while no owner can sign in from a browser. The
@@ -24,7 +25,7 @@ function codeFromHash(hash: string): string {
 }
 
 export default function FirstRunSetupPage() {
-  const { locale } = useConciergeI18n();
+  const { locale, t } = useConciergeI18n();
   const [state, setState] = React.useState<'loading' | 'unavailable' | 'unclaimed' | 'claimed'>(
     'loading'
   );
@@ -138,8 +139,8 @@ export default function FirstRunSetupPage() {
         {tokenStored ? <IdentityLinkSection /> : null}
         <div className="button-row">
           {tokenStored ? (
-            <a className="action-button" href="/">
-              {frontDeskText('first_run_finish', locale)}
+            <a className="action-button" href={companySetupHref(claimed.tenant_slug)}>
+              {t('company_setup.entry')}
             </a>
           ) : (
             <button
