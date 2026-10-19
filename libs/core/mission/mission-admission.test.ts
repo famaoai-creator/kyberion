@@ -7,25 +7,61 @@ import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
 import { normalizeDotProposal } from '../dot/dot-proposals.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
+import type { DotCharter } from '../dot/dot-charter.js';
+import type { DotActionRecord } from '../dot/dot-action-ledger.js';
+import type { WorkItem, ReleaseWorkItemInput } from '../workforce/work-coordination-types.js';
+import type { MissionState } from './mission-types.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
   authorMissionAdmissionBrief,
   recordVerifiedMissionAdmissionApproval,
   resolveDotMissionAdmission,
 } from './mission-admission.js';
 
-const mocks = vi.hoisted(() => ({
-  item: undefined as any,
-  dot: undefined as any,
-  rows: [] as any[],
-  state: undefined as any,
-  missionDir: '',
-  covered: true,
-  execution: vi.fn(),
-  decision: vi.fn(),
-  claim: vi.fn(),
-  release: vi.fn(),
-  approvals: [] as any[],
-}));
+const mocks = vi.hoisted(() => {
+  const item: WorkItem = {
+    item_id: '',
+    title: '',
+    description: '',
+    status: 'ready',
+    priority: 'normal',
+    source: 'local',
+    source_ref: '',
+    project_id: '',
+    labels: [],
+    dependencies: [],
+    version: 1,
+    created_at: '',
+    updated_at: '',
+  };
+  const dot: DotCharter = {
+    kind: 'dot-charter',
+    dot_id: '',
+    version: '1',
+    title: '',
+    purpose: '',
+    status: 'active',
+    scope: { tier: 'confidential' },
+    goal: { statement: '' },
+    attention: { triggers: [] },
+    authority: { authority_role: 'mission_controller' },
+    notification: { deliver_to: { surface: 'surface', channel: 'brief' } },
+  };
+  const state: Partial<MissionState> = {};
+  return {
+    item,
+    dot,
+    rows: Array<DotActionRecord>(),
+    state,
+    missionDir: '',
+    covered: true,
+    execution: vi.fn(),
+    decision: vi.fn(),
+    claim: vi.fn(),
+    release: vi.fn(),
+    approvals: Array<ApprovalRequestRecord>(),
+  };
+});
 vi.mock('../dot/dot-charter.js', () => ({
   findDotCharter: () => ({ charter: mocks.dot }),
   dotGoalRefLabel: () => undefined,
@@ -38,21 +74,21 @@ vi.mock('../workforce/work-coordination.js', () => ({
 }));
 vi.mock('./mission-state.js', () => ({ loadState: () => mocks.state }));
 vi.mock('../path-resolver.js', async (original) => ({
-  ...(await original<any>()),
+  ...(await original<typeof import('../path-resolver.js')>()),
   findMissionPath: () => mocks.missionDir,
 }));
 vi.mock('../governance/mandate-shadow.js', async (original) => ({
-  ...(await original<any>()),
+  ...(await original<typeof import('../governance/mandate-shadow.js')>()),
   evaluateMissionStartMandate: () => ({ covered: mocks.covered, reasons: [] }),
 }));
 vi.mock('../governance/approval-store-reader.js', async (original) => ({
-  ...(await original<any>()),
+  ...(await original<typeof import('../governance/approval-store-reader.js')>()),
   listApprovalRequests: () => mocks.approvals,
   loadApprovalRequest: (_channel: string, id: string) =>
     mocks.approvals.find((record) => record.id === id),
 }));
 vi.mock('../governance/approval-separation-of-duties.js', async (original) => ({
-  ...(await original<any>()),
+  ...(await original<typeof import('../governance/approval-separation-of-duties.js')>()),
   approvalUsabilityRefusal: () => undefined,
 }));
 vi.mock('../governance/autonomy-action-state.js', () => ({
@@ -80,6 +116,7 @@ beforeEach(() => {
   mocks.missionDir = path.join(root, missionId);
   safeMkdir(mocks.missionDir, { recursive: true });
   mocks.dot = {
+    ...mocks.dot,
     dot_id: 'ops',
     title: 'Ops',
     status: 'active',
@@ -98,6 +135,9 @@ beforeEach(() => {
   mocks.rows = [
     {
       action_ref: 'action-1',
+      actor_id: 'ops',
+      proposal_hash: 'proposal-1',
+      at: '2026-10-20T00:00:00Z',
       dot_id: 'ops',
       status: 'dispatched',
       work_item_id: 'work-1',
@@ -110,6 +150,7 @@ beforeEach(() => {
     },
   ];
   mocks.item = {
+    ...mocks.item,
     item_id: 'work-1',
     title: 'Docs',
     description: 'Update docs',
@@ -133,9 +174,9 @@ beforeEach(() => {
     relationships: { project: { project_id: 'proj-1' } },
   };
   mocks.claim.mockReturnValue({ item: mocks.item, lease: { lease_id: 'lease-1' } });
-  mocks.release.mockImplementation((input) => {
+  mocks.release.mockImplementation((input: ReleaseWorkItemInput) => {
     prepareEffectSettlement(mocks.item, input, new Date().toISOString());
-    mocks.item = { ...mocks.item, status: input.nextStatus };
+    mocks.item = { ...mocks.item, status: input.nextStatus ?? mocks.item.status };
   });
 });
 afterEach(() => safeRmSync(root, { recursive: true, force: true }));
@@ -187,7 +228,13 @@ describe('Dot mission admission production and human receipt', () => {
         encoding: 'utf8',
       }) as string
     );
-    const record = {
+    const record: ApprovalRequestRecord = {
+      title: 'Mission admission',
+      summary: 'Approve the exact internal mission admission',
+      kind: 'channel-approval',
+      threadTs: 'thread-1',
+      requestedBy: 'mission_controller',
+      requestedAt: '2026-10-20T00:00:00Z',
       id: 'approval-1',
       channel: 'brief',
       storageChannel: 'brief',
@@ -202,7 +249,7 @@ describe('Dot mission admission production and human receipt', () => {
         finalDecision: 'human_only',
         payloadHash: computeApprovalPayloadHash(brief),
       },
-    } as any;
+    };
     mocks.approvals = [record];
     recordVerifiedMissionAdmissionApproval(record);
     expect(mocks.execution).toHaveBeenCalledWith(
@@ -210,7 +257,7 @@ describe('Dot mission admission production and human receipt', () => {
       expect.objectContaining({ tenantSlug: 'acme' })
     );
     mocks.execution.mockClear();
-    for (const decidedByType of ['ai_agent', 'service', undefined]) {
+    for (const decidedByType of ['ai_agent', 'service', undefined] as const) {
       mocks.approvals = [{ ...record, decidedByType }];
       recordVerifiedMissionAdmissionApproval(record);
     }

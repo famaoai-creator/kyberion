@@ -34,12 +34,6 @@ vi.mock('@agent/core/pipeline/pipeline-approval-resume', () => ({
     reason: 'integration runner owns continuation',
   }),
 }));
-vi.mock('../libs/core/pipeline/pipeline-approval-resume.js', () => ({
-  resumePipelineRunAfterApproval: () => ({
-    status: 'already_running',
-    reason: 'integration runner owns continuation',
-  }),
-}));
 
 describe('protected library execution approval continuation', () => {
   const paths: string[] = [];

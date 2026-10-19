@@ -8,7 +8,10 @@ import { composeDotDigestText, dotCharterTimezone } from './dot-digest-compositi
 import { dotWorkItemInput } from './dot-work-item.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
-import { evaluateMissionStartMandate, loadMandateCatalog } from '../governance/mandate-shadow.js';
+import {
+  dotMissionAdmissionPrompt,
+  dotMissionAdmissionRefusal,
+} from './dot-mission-admission-bounds.js';
 import { sendDueDotDigest } from './dot-digest-delivery.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
@@ -291,28 +294,6 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
   const shapes = effectiveDotWorkShapes(charter, deps);
   const pipelines = charter.authority.allowed_pipelines ?? [];
   const { cap, free } = dotDelegationCapacity(charter, deps);
-  const allowedMandates = charter.authority.mission_mandate_refs ?? [];
-  const missionAdmission: string[] = [];
-  if (shapes.includes('mission') && allowedMandates.length) {
-    try {
-      const now = (deps.now?.() ?? new Date()).getTime();
-      const mandates = loadMandateCatalog().mandates.filter(
-        (mandate) =>
-          allowedMandates.includes(mandate.id) &&
-          mandate.authority?.status === 'active' &&
-          mandate.authority.tenant_slug === charter.scope.tenant_slug &&
-          Date.parse(mandate.expires_at) > now
-      );
-      missionAdmission.push(
-        `Allowed mission_admission mandates: ${JSON.stringify(mandates)}.`,
-        'For mission work you may propose mission_admission {mandate_ref, mandate_facts:{work_type,paths,estimated_cost,currency,external_effects,risk_level}} within these bounds. Facts request internal mission admission only; they never grant tool effects or external operations.'
-      );
-    } catch {
-      missionAdmission.push(
-        'Mission admission catalog unavailable; do not attach mission_admission.'
-      );
-    }
-  }
   const partners = (deps.listCharters?.() ?? defaultListCharters(deps))
     .filter(
       (other) =>
@@ -323,7 +304,7 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
     )
     .map((other) => other.dot_id);
   return [
-    ...missionAdmission,
+    ...dotMissionAdmissionPrompt(charter, shapes, deps.now?.() ?? new Date()),
     shapes.length
       ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
       : 'No work_shape is available to you now; propose nothing and report status instead.',
@@ -422,34 +403,8 @@ function checkDotProposalScope(
   } catch (error) {
     return { ok: false, reason: `accountability authority refused: ${String(error)}` };
   }
-  if (proposal.mission_admission) {
-    const admission = proposal.mission_admission;
-    if (
-      proposal.work_shape !== 'mission' ||
-      proposal.handoff_to ||
-      !charter.authority.mission_mandate_refs?.includes(admission.mandate_ref)
-    ) {
-      return {
-        ok: false,
-        reason:
-          'mission admission requires an explicitly authorized mandate on the owning DotCharter',
-      };
-    }
-    try {
-      const verdict = evaluateMissionStartMandate(
-        {
-          tenant_slug: charter.scope.tenant_slug ?? '',
-          mandate_id: admission.mandate_ref,
-          facts: admission.mandate_facts,
-        },
-        { now: deps.now?.() }
-      );
-      if (!verdict.covered)
-        return { ok: false, reason: `mission admission refused: ${verdict.reasons.join('; ')}` };
-    } catch (error) {
-      return { ok: false, reason: `mission admission authority unavailable: ${String(error)}` };
-    }
-  }
+  const missionRefusal = dotMissionAdmissionRefusal(charter, proposal, deps.now?.());
+  if (missionRefusal) return { ok: false, reason: missionRefusal };
   if (proposal.continuous_work) {
     try {
       parseContinuousWorkPlan(proposal.continuous_work);

@@ -306,6 +306,13 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
+      "roles": [],
+      "unresolved": [
+        "role argument `resolveRole()` could not be resolved at libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+      ]
+    },
+    {
       "site": "libs/core/governance/accountability-digest.ts#runAccountabilityDigest",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -353,6 +360,11 @@
     {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore",
+      "roles": ["autonomy_learning_store"],
       "unresolved": []
     },
     {
@@ -2900,6 +2912,9 @@
     "libs/core/environment-capability.ts#runProbe": [
       "dynamic import with a computed specifier at libs/core/environment-capability.ts#runProbe"
     ],
+    "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo": [
+      "role argument `resolveRole()` could not be resolved at libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+    ],
     "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -3363,6 +3378,16 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
@@ -3576,6 +3601,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-tts.ts#probeNativeTts",
         "libs/core/media/native-tts.ts#speak",
@@ -3676,6 +3702,25 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -3926,6 +3971,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -4248,6 +4294,15 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/secrets/introduce/route.ts#POST",
+            "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction",
+            "libs/core/governance/autonomous-ops-gate.ts#evaluateAutonomousOpsAction",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -4451,6 +4506,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -4549,6 +4605,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -4748,6 +4818,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -4802,6 +4873,7 @@
       },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
+        "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
         "infrastructure_sentinel",
@@ -4876,6 +4948,22 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5098,6 +5186,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -5194,6 +5283,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5401,6 +5504,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -5552,6 +5656,31 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5855,6 +5984,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-tts.ts#probeNativeTts",
         "libs/core/media/native-tts.ts#speak",
@@ -5939,6 +6069,7 @@
         }
       },
       "unresolved_sites": [
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce"
       ],
       "policy_roles_not_reachable": []
@@ -6032,6 +6163,27 @@
           "example_path": [
             "presence/displays/operator-surface/src/lib/selection-service.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6224,6 +6376,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -6322,6 +6475,25 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6568,6 +6740,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -6670,6 +6843,17 @@
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_alignment_request.ts#openAlignmentApproval [child process]",
+            "scripts/mission_alignment_request.ts#buildAlignmentDecisionCard",
+            "libs/core/governance/autonomous-ops-gate.ts#evaluateAutonomousOpsAction",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6838,6 +7022,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mic-capture.ts#detectMacPhysicalAudioDevice",
@@ -6941,6 +7126,21 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -7152,6 +7352,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7252,6 +7453,7 @@
       },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
+        "autonomy_learning_store",
         "chronos_tenant_runner",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -7305,6 +7507,16 @@
       "reachable_roles": {
         "audit_mirror_writer": {
           "example_path": ["scripts/config_mission.ts#<module>", "libs/core/authority.ts#<module>"]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
         },
         "chronos_gateway": {
           "example_path": [
@@ -7478,6 +7690,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7574,6 +7787,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -7773,6 +8000,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7887,6 +8115,27 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -8069,6 +8318,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -8160,6 +8410,27 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -8337,6 +8608,7 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-speech-listen-bridge.ts#listenNativeSpeech",
         "libs/core/mesh/acp-mediator.ts#<module>",

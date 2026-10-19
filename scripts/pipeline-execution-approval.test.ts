@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nowIso } from '@agent/core/foundation/time';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import type { DelegatedExecutionTarget } from '@agent/core/governance/delegated-execution';
 import { requestHumanExecutionAuthorization } from './pipeline-execution-part-control.js';
@@ -60,7 +61,7 @@ function record(): ApprovalRequestRecord {
     threadTs: 'write',
     correlationId: 'original',
     requestedBy: 'pipeline:run-original',
-    requestedAt: new Date().toISOString(),
+    requestedAt: nowIso(),
     title: 'Write',
     summary: 'Exact operation',
     severity: 'high',
