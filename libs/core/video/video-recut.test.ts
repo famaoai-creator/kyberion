@@ -286,6 +286,14 @@ describe('local preparation and exact renderer', () => {
     mocks.read.mockReturnValue('WEBVTT\n\ninvalid --> 00:00:02.000\nBad\n');
     await expect(prepareVideoRecut(request)).rejects.toThrow('Malformed');
   });
+
+  it('rejects an empty cue mixed with valid cues before copying source media', async () => {
+    mocks.read.mockReturnValue(
+      'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nValid\n\n00:00:05.000 --> 00:00:06.000\n\n'
+    );
+    await expect(prepareVideoRecut(request)).rejects.toThrow('Malformed');
+    expect(mocks.copy).not.toHaveBeenCalled();
+  });
   it('refuses disabled rendering and propagates failures without fallback invocation', async () => {
     const prepared = await prepareVideoRecut(request);
     mocks.exec.mockClear();
