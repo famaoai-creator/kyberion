@@ -188,7 +188,7 @@ describe('durable partitioned runtime state', () => {
     ).toBeUndefined();
   });
 
-  it('registers protected state partitions without adding grants or shared-prefix exemptions', () => {
+  it('registers protected state partitions with only the dedicated receipt grant and no shared exemptions', () => {
     const policy = JSON.parse(
       safeReadFile(path.join(rootDir(), 'knowledge/product/governance/security-policy.json'), {
         encoding: 'utf8',
@@ -197,11 +197,32 @@ describe('durable partitioned runtime state', () => {
     expect(protectedRuntimeStatePrefixes()).toEqual([
       'active/shared/runtime/hearing/personal/',
       'active/shared/runtime/hearing/confidential/',
+      'active/shared/runtime/discussion-create-requests/personal/',
+      'active/shared/runtime/discussion-create-requests/confidential/',
       'active/shared/runtime/grants/personal/',
       'active/shared/runtime/grants/confidential/',
     ]);
     for (const prefix of protectedRuntimeStatePrefixes())
       expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
+    expect(
+      policy.tenant_scope.shared_prefixes.some((prefix: string) =>
+        prefix.includes('/discussion-create-requests/')
+      )
+    ).toBe(false);
+    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+      expect(JSON.stringify(policy[field])).not.toContain('runtime/discussion-create-requests');
+    const receiptGrant = policy.authority_role_permissions.discussion_request_store;
+    expect(receiptGrant).toEqual({
+      allow_read: [
+        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
+      ],
+      allow_write: [
+        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
+      ],
+    });
+    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
+      if (role !== 'discussion_request_store')
+        expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
     for (const store of ['hearing', 'grants']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))

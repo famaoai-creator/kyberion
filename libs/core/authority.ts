@@ -1,3 +1,7 @@
+import {
+  isDiscussionRequestCapability,
+  DISCUSSION_REQUEST_STORAGE_ROLE,
+} from './foundation/discussion-request-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -671,6 +675,7 @@ interface PreparedExecutionContext {
  * same as a process without a tenant.
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
+  DISCUSSION_REQUEST_STORAGE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -710,6 +715,14 @@ function prepareExecutionContext(
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
+  if (
+    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
+    (!isDiscussionRequestCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability'
+    );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();
     if (

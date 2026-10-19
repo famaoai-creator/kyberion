@@ -1,0 +1,11 @@
+{
+  "role": "discussion_request_store",
+  "description": "Chronos-only immutable Discussion receipt storage. Requires an exact deny-only tenant/actor/scope/request capability before every operation. No knowledge, room, provider, membership or deployment authority.",
+  "default_persona": "unknown",
+  "write_scopes": [
+    "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
+  ],
+  "scope_classes": ["operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}

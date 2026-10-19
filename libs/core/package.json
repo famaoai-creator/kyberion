@@ -7663,6 +7663,10 @@
     "./organization/continuous-work-owner": {
       "types": "./dist/organization/continuous-work-owner.d.ts",
       "default": "./dist/organization/continuous-work-owner.js"
+    },
+    "./discussion/discussion-create-request": {
+      "types": "./dist/discussion/discussion-create-request.d.ts",
+      "default": "./dist/discussion/discussion-create-request.js"
     }
   },
   "dependencies": {
