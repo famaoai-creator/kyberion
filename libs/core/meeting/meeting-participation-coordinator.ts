@@ -179,10 +179,17 @@ export function checkMeetingParticipationConsent(input: {
   purpose: 'recording' | 'voice';
   /** The meeting being recorded (standing-grant match for `recording`). */
   meeting?: { url?: string; series_id?: string };
+  /**
+   * Record a standing-grant use in the mission evidence (default true).
+   * Readiness checks pass false: they ask, they do not use.
+   */
+  record_binding?: boolean;
 }): {
   allowed: boolean;
   reason?: string;
   grant_id?: string;
+  /** What to run so the check passes (standing-grant request command). */
+  remedy?: string;
   /** Why the mission voice consent failed (see evaluateMissionVoiceConsent). */
   code?: MissionVoiceConsentResult['code'];
 } {
@@ -239,9 +246,10 @@ export function checkMeetingParticipationConsent(input: {
     return {
       allowed: false,
       reason: `${consent.reason}; standing grant: ${grant.reason ?? 'not found'}${remedy}`,
+      ...(grant.remedy ? { remedy: grant.remedy } : {}),
     };
   }
-  if (missionId) {
+  if (missionId && input.record_binding !== false) {
     try {
       recordGrantMissionBinding(missionId, {
         capability: 'meeting.recording',
@@ -326,7 +334,10 @@ export class MeetingParticipationCoordinator {
         mission_id: options.mission_id,
         tenant_slug: options.tenant_slug,
         purpose: 'recording',
-        meeting: { url: target.url },
+        meeting: {
+          url: target.url,
+          ...(target.series_id ? { series_id: target.series_id } : {}),
+        },
       });
       if (!consent.allowed) {
         this.deps.trace?.addEvent('meeting_participation.recording_denied', {

@@ -36,6 +36,16 @@
           }
         ]
       }
+    },
+    "readiness_profiles": {
+      "type": "object",
+      "description": "PG-06: capabilities a kind of work needs, evaluated by grants status / meeting preflight.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/readiness_profile"
+      }
     }
   },
   "definitions": {
@@ -105,6 +115,39 @@
         "probe_key": {
           "type": "string",
           "enum": ["microphone", "camera", "screen_recording"]
+        }
+      }
+    },
+    "readiness_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "requirements"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capability", "required"],
+            "properties": {
+              "capability": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required": {
+                "type": "boolean",
+                "description": "false = reported but does not block readiness."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

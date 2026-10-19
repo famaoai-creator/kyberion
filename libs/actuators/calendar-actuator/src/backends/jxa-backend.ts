@@ -68,6 +68,8 @@ export class JxaCalendarBackend implements CalendarBackendAdapter {
               ]
             });
             events().forEach(function (ev) {
+              // No series_id: Calendar.app only exposes the iCalendar UID,
+              // which the organizer chooses, so it never backs a grant.
               results.push({
                 title: ev.summary(),
                 start: ev.startDate().toISOString(),

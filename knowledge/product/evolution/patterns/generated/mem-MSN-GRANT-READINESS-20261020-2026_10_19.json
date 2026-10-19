@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-GRANT-READINESS-20261020-2026_10_19",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "External identifiers as grant keys: trust only provider-structured fields, namespace them, and gate every consumer",
+  "summary": "When a standing grant is matched by an identifier that arrives from an external system (calendar series ids, meeting links), an attacker-controllable field must never be able to widen what a human approved. Lessons from PG-06/07 (MSN-GRANT-READINESS-20261020).",
+  "candidate_id": "mem-MSN-GRANT-READINESS-20261020-2026_10_19",
+  "evidence_refs": [
+    "active/missions/public/MSN-GRANT-READINESS-20261020/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-GRANT-READINESS-20261020/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-GRANT-READINESS-20261020/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-19T18:06:53.372Z",
+  "applicability": ["mission", "mission:MSN-GRANT-READINESS-20261020"],
+  "reusable_steps": [
+    "When a standing grant is matched by an identifier that arrives from an external system (calendar series ids, meeting links), an attacker-controllable field must never be able to widen what a human approved",
+    "Lessons from PG-06/07 (MSN-GRANT-READINESS-20261020)"
+  ],
+  "expected_outcome": "- Bind an external id to the data it came with. A calendar occurrence yields its recurring series id only when the meeting URL comes from the provider's conference field (Google hangoutLink, M365 onlineMeeting); a URL in free-text location/description is matched on its own. Otherwise an organizer can point one occurrence of a granted series at another meeting.\n- Namespace ids by provider before they become grant keys (`google-workspace:<recurringEventId>`, `m365:<seriesMasterId>`), never accept an id the counterparty chooses freely (iCalendar UID), and reject un-namespaced ids at grant creation so a grant can never be silently unmatchable.\n- A readiness/status check must evaluate the exact production gate in a read-only mode (here `checkMeetingParticipationConsent(..., record_binding: false)`), not a parallel re-implementation, so 'ready' and the real decision cannot drift.\n- When adding a consumer of an id (series id into meeting:join), audit every path that acts on the data for a missing gate: the meeting actuator's join/listen had no recording-consent check at all.\n- A step-level mission_id that disagrees with the ambient MISSION_ID is a conflict to deny, not an override.\n- A notification's follow-up command must reproduce the window, tenant and calendars that produced it, or it lists nothing.\n- Do not run `pnpm build` concurrently with a test suite in the same checkout: the dist rewrite produces spurious integration failures.",
+  "source_branch": "feat/grant-readiness-20261020",
+  "source_commit": "d896e9ebcb368acb646bf694221cb8f907d5ac8c"
+}

@@ -50,6 +50,10 @@ export interface CalendarEvent {
   calendar: string;
   location: string;
   description: string;
+  /** Recurring-series id shared by every occurrence (absent for one-off events). */
+  series_id?: string;
+  /** Conference link the provider stores outside location/description (e.g. Meet). */
+  meeting_url?: string;
 }
 
 export interface CalendarSlotResult {

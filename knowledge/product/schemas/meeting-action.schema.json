@@ -21,6 +21,10 @@
         "url_policy": { "enum": ["explicit_only", "explicit_or_detected"] },
         "url": { "type": "string", "format": "uri" },
         "meeting_id": { "type": "string" },
+        "series_id": {
+          "type": "string",
+          "description": "Calendar series id of the meeting (meeting.recording standing-grant match)."
+        },
         "passcode": { "type": "string" },
         "text": { "type": "string" },
         "duration_sec": { "type": "integer" }

@@ -7248,6 +7248,16 @@
         "ja": "能力が許可されているかと、許可する方法を確認",
         "qps-ploc": "⟦Ƈħėƈķ ẇħėŧħėř ȧ ƈȧṗȧƀïŀïŧẏ ïş ȧŀŀőẇėḓ ȧñḓ ħőẇ ŧő ȧŀŀőẇ ïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
+      "cli_cmd_operator_cli_grants_status": {
+        "en": "List the grants a kind of work still needs, with how to allow each",
+        "ja": "作業に足りない許可と、それぞれの許可のしかたを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ŧħė ɠřȧñŧş ȧ ķïñḓ őƒ ẇőřķ şŧïŀŀ ñėėḓş, ẇïŧħ ħőẇ ŧő ȧŀŀőẇ ėȧƈħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_operator_cli_grants_upcoming": {
+        "en": "Check upcoming calendar meetings for missing grants",
+        "ja": "これからの会議に足りない許可をカレンダーから確認",
+        "qps-ploc": "⟦Ƈħėƈķ ůṗƈőɱïñɠ ƈȧŀėñḓȧř ɱėėŧïñɠş ƒőř ɱïşşïñɠ ɠřȧñŧş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
       "cli_cmd_operator_cli_grants_grant": {
         "en": "Create a standing grant (human approval for external data exchange)",
         "ja": "常設の許可を作成(外部とのデータ入出力は人間の承認が必要)",
@@ -19581,6 +19591,18 @@
         "en": "Output: {path}",
         "ja": "出力先: {path}",
         "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "meeting_readiness": {
+      "notify_title": {
+        "en": "Meeting prep: grants missing for {count} meeting(s)",
+        "ja": "会議の準備: {count} 件の会議で許可が足りません",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ṗřėṗ: ɠřȧñŧş ɱïşşïñɠ ƒőř {count} ɱėėŧïñɠ(ş) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "notify_body": {
+        "en": "{meetings}. See what to allow: {command}",
+        "ja": "{meetings}。許可のしかた: {command}",
+        "qps-ploc": "⟦{meetings}. Şėė ẇħȧŧ ŧő ȧŀŀőẇ: {command} ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "minutes_record": {

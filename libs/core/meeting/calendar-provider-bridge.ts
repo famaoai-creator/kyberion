@@ -16,6 +16,8 @@ export interface CalendarEventSummary {
   html_link: string;
   id: string;
   description?: string;
+  /** Recurring-series id shared by every occurrence (absent for one-off events). */
+  series_id?: string;
   location: string;
   start: string;
   status: string;
@@ -175,10 +177,12 @@ function normalizeM365CalendarEvent(item: unknown): CalendarEventSummary | null 
     calendarNestedText(item, 'body', 'content') ||
     calendarText(item.bodyPreview) ||
     calendarText(item.description);
+  const seriesId = calendarText(item.seriesMasterId);
   return {
     id: item.id,
     summary: calendarText(item.subject) || calendarText(item.summary),
     ...(description ? { description } : {}),
+    ...(seriesId ? { series_id: seriesId } : {}),
     start:
       calendarNestedText(item, 'start', 'dateTime') || calendarNestedText(item, 'start', 'date'),
     end: calendarNestedText(item, 'end', 'dateTime') || calendarNestedText(item, 'end', 'date'),

@@ -64,6 +64,34 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   return { allowed: false, reason: result.reason };
 }
 
+/**
+ * Recording consent for join / listen: the mission's voice-consent.json or a
+ * `meeting.recording` standing grant that covers the meeting (URL or calendar
+ * series id). Fail-closed, the same gate as the participation coordinator.
+ */
+export function checkRecordingConsent(
+  meeting: { url?: string; series_id?: string },
+  missionId: string | undefined = getRegisteredEnvText('MISSION_ID')
+): {
+  allowed: boolean;
+  reason?: string;
+  grant_id?: string;
+} {
+  const url = meeting.url?.trim();
+  const seriesId = meeting.series_id?.trim();
+  const result = checkMeetingParticipationConsent({
+    mission_id: missionId,
+    tenant_slug: resolveIdentityContext().tenantSlug,
+    purpose: 'recording',
+    ...(url || seriesId
+      ? { meeting: { ...(url ? { url } : {}), ...(seriesId ? { series_id: seriesId } : {}) } }
+      : {}),
+  });
+  if (result.allowed)
+    return result.grant_id ? { allowed: true, grant_id: result.grant_id } : { allowed: true };
+  return { allowed: false, reason: `recording consent missing: ${result.reason ?? 'not granted'}` };
+}
+
 export function redactedTarget(input: MeetingAction): string {
   const url = input.params.url;
   if (!url) return `${input.params.platform}:no-url`;
@@ -111,6 +139,7 @@ export function recordMeetingEvent(input: MeetingAction, result: MeetingActionRe
         ...(input.params.audio_bridge ? { audio_bridge: input.params.audio_bridge } : {}),
         ...(input.params.url_policy ? { url_policy: input.params.url_policy } : {}),
         ...(input.params.meeting_id ? { meeting_id: input.params.meeting_id } : {}),
+        ...(input.params.series_id ? { series_id: input.params.series_id } : {}),
         ...(input.params.duration_sec !== undefined
           ? { duration_sec: input.params.duration_sec }
           : {}),

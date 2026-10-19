@@ -252,7 +252,7 @@
       "path": "libs/actuators/meeting-actuator",
       "d": "Layered online-meeting bridge: session transport (Zoom/Teams/Meet join-leave-speak-listen-chat-status) plus intelligence (action items, facilitation, reminders), target resolution, and guided dialogue. Single-op `{ op, params }`, legacy `{ action, params }`, and pipeline envelopes are all accepted.",
       "s": "implemented",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "capability_count": 19,
       "ops": [
         "audit_speaker_fairness",
