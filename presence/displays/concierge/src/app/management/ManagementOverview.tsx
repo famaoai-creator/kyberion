@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Button, SettingsGroup, SettingRow } from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import type { Scope, ManagementData, Operation } from './management-client';
+import { companySetupHref } from '../setup/company/company-setup-model';
 export function ManagementOverview({
   scope,
   data,
@@ -99,6 +100,9 @@ export function ManagementOverview({
                   )}
               </p>
               <div className="settings-inline-actions">
+                {!data.organizations.length && !denied && scope.tenant ? (
+                  <Button label={t('company_setup.entry')} href={companySetupHref(scope.tenant)} />
+                ) : null}
                 <Button
                   label={t('management.create_organization')}
                   disabled={busy || denied || writeBlocked || !data.capabilities.createOrganization}

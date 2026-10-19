@@ -102,6 +102,59 @@ async function scoped<T>(
       )
   );
 }
+/**
+ * Resolve the request selector from persisted ownership before tenant path access.
+ * Only registry records, never the selector, supply the returned filesystem key.
+ */
+export async function resolveSurfaceManagementAuthorization(
+  request: SurfaceManagementAuthorization
+): Promise<SurfaceManagementAuthorization> {
+  checkAuthorizationShape(request);
+  const input: SurfaceManagementAuthorization = {
+    ...request,
+    allowedOrganizationIds:
+      request.allowedOrganizationIds === 'all' ? 'all' : [...request.allowedOrganizationIds],
+    allowedProjectIds: request.allowedProjectIds === 'all' ? 'all' : [...request.allowedProjectIds],
+  };
+  const member = await runInResourceAccessScope(
+    {
+      tenantSlug: input.tenantSlug,
+      readExact: [relative(memberProfilePath(input.memberId))],
+      writeExact: [],
+      mkdirExact: [],
+      allowProductKnowledgeRead: true,
+    },
+    () =>
+      withExecutionContextAsync(
+        'concierge_management_reader',
+        () => readMemberProfile(input.memberId),
+        undefined,
+        input.tenantSlug
+      )
+  );
+  if (!member || member.member_id !== input.memberId || member.status !== 'active')
+    fail('forbidden', 403, 'An active owner membership is required.');
+  const membership = member.memberships.find(
+    (entry) => entry.tenant_slug === input.tenantSlug && entry.role === 'owner'
+  );
+  if (!membership) fail('forbidden', 403, 'An active owner membership is required.');
+  const owned: SurfaceManagementAuthorization = {
+    ...input,
+    memberId: member.member_id,
+    actorId: humanActor(member.member_id).id,
+    tenantSlug: membership.tenant_slug,
+  };
+  checkAuthorizationShape(owned);
+  const tenant = await scoped(owned, {}, [tenantProfilePath(owned.tenantSlug)], [], () =>
+    readTenantProfile(owned.tenantSlug)
+  );
+  if (!tenant || tenant.status !== 'active' || tenant.tenant_slug !== membership.tenant_slug)
+    fail('forbidden', 403, 'The tenant is not active.');
+  const canonical = { ...owned, tenantSlug: tenant.tenant_slug };
+  checkAuthorizationShape(canonical);
+  return canonical;
+}
+
 /** Re-read authoritative membership and tenant after acquiring the mutation lock. */
 export async function verifySurfaceManagementAuthorization(
   auth: SurfaceManagementAuthorization

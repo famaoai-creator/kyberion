@@ -18,8 +18,10 @@ afterEach(() => {
 
 describe('company bootstrap', () => {
   it('uses the foundation reader for template materialization', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/company_bootstrap.ts'));
-    expect(source).toContain('getRegisteredEnvText, readTextFile, setRegisteredEnv');
+    const source = readTextFile(
+      pathResolver.rootResolve('libs/core/organization/company-bootstrap.ts')
+    );
+    expect(source).toContain("import { readTextFile } from '../foundation/index.js'");
   });
 
   it('emits the vertical list through the supplied harness printer', () => {
@@ -62,6 +64,28 @@ describe('company bootstrap', () => {
     expect(chart.organization_id).toBe('acme-saas');
     expect(chart.positions.some((position) => position.role_id === 'ceo')).toBe(true);
   });
+
+  it.each(['Acme "Labs"', 'Acme \\Labs', 'Acme\nLabs', 'Acme $& Labs'])(
+    'escapes JSON company names while keeping Markdown literal: %j',
+    (companyName) => {
+      const result = bootstrapCompany({
+        vertical: 'saas-product-company',
+        slug: 'acme-escaped',
+        companyName,
+        rootDir: tmpRoot,
+      });
+      for (const filePath of result.writtenFiles.filter((file) => file.endsWith('.json'))) {
+        expect(() => JSON.parse(readTextFile(filePath)), filePath).not.toThrow();
+      }
+      const customer = JSON.parse(readTextFile(result.customerDir + '/customer.json'));
+      const profile = JSON.parse(readTextFile(result.customerDir + '/organization-profile.json'));
+      expect(customer.display_name).toBe(companyName);
+      expect(profile.name).toContain(companyName);
+      expect(readTextFile(result.customerDir + '/vision.md')).toContain(
+        '# ' + companyName + ' Vision'
+      );
+    }
+  );
 
   it('rejects invalid slugs, unknown verticals, and accidental overwrites', () => {
     expect(() =>

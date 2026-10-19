@@ -141,6 +141,8 @@ export interface OnboardingFirstWorkResolution {
 
 export interface ApplyOnboardingFirstWorkInput extends ResolveOnboardingFirstWorkInput {
   accept: boolean;
+  /** Reviewed web creation must never silently reuse a colliding project. */
+  requireNewProject?: boolean;
   bootstrapProject?: {
     projectId: string;
     name: string;
@@ -820,6 +822,10 @@ export function applyOnboardingFirstWork(
       }
       const existing = loadProjectRecord(bootstrap.projectId, { rootDir });
       if (existing) {
+        if (input.requireNewProject)
+          throw new Error(
+            'The reviewed project target already exists; review a new first-work plan.'
+          );
         if (
           existing.organization_id !== resolved.binding.organization_id ||
           existing.tenant_slug !== resolved.binding.tenant_slug
