@@ -193,7 +193,7 @@ describe('truthful bounded discussion providers', () => {
     const state = readDiscussionRoom(id)!;
     expect(observed).toMatchObject({
       tier: 'confidential',
-      training_use: 'zero_retention',
+      training_use: 'no_training',
       purpose: 'discussion:decision',
     });
     expect(state.error).toContain('EGRESS_DENIED');

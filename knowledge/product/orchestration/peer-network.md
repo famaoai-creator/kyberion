@@ -139,7 +139,7 @@ Backends are in-process code, never loaded from configuration, and a new one is 
 
 Prerequisites, because the reply sends tenant-confidential material to an external provider:
 
-1. Record a provider attestation for the tenant (`training_use: none`, human approval): `pnpm onboarding llm attest --tenant <tenant> --provider claude --training-use none ... --request-approval`, approve with `pnpm kyberion approvals --approve <id>`, then apply with the printed command. The reasoning gate allows the confidential `zero_retention` send only with this valid attestation, and only when the tenant's `allowed_reasoning_backends` (if set) and the provider declaration permit it.
+1. Record a provider attestation for the tenant (`training_use: none`, human approval): `pnpm onboarding llm attest --tenant <tenant> --provider claude --training-use none ... --request-approval`, approve with `pnpm kyberion approvals --approve <id>`, then apply with the printed command. The reasoning gate allows a confidential `no_training` send only with this valid attestation, and only when the tenant's `allowed_reasoning_backends` (if set) and the provider declaration permit it. This attestation proves non-training, not zero retention; a remote `zero_retention` request requires separate retention evidence.
 2. Allow the provider's endpoint in the tenant egress policy (tenant domain grant for `api.anthropic.com`).
 
 For `--auto-reply-backend codex` the same two gates apply to provider `codex`: attest with `--provider codex`, and grant the endpoint the codex-cli provider declaration names (`api.openai.com`) in the tenant egress overlay; if the tenant sets `allowed_reasoning_backends`, it must permit codex as well. The Codex CLI must already be logged in on that host (`codex login`).
