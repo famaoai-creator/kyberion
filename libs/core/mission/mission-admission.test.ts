@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     attention: { triggers: [] },
     authority: { authority_role: 'mission_controller' },
     notification: { deliver_to: { surface: 'surface', channel: 'brief' } },
+    runtime: { heartbeat_id: 'test-mission-admission' },
   };
   const state: Partial<MissionState> = {};
   return {
@@ -171,7 +172,7 @@ beforeEach(() => {
     tenant_slug: 'acme',
     tier: 'confidential',
     organization_id: 'org-1',
-    relationships: { project: { project_id: 'proj-1' } },
+    relationships: { project: { project_id: 'proj-1', relationship_type: 'belongs_to' } },
   };
   mocks.claim.mockReturnValue({ item: mocks.item, lease: { lease_id: 'lease-1' } });
   mocks.release.mockImplementation((input: ReleaseWorkItemInput) => {
