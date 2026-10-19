@@ -1039,6 +1039,14 @@
     "createInputInvalid": {
       "en": "The goal or run settings are invalid. No create request was sent or saved. Use a nonempty goal up to 2,000 characters and supported run limits.",
       "ja": "目的または実行設定が無効です。作成リクエストは送信・保存していません。目的を1〜2,000文字で入力し、対応する実行上限を選択してください。"
+    },
+    "draftRetention": {
+      "en": "Your draft stays here when you view a result and return. Leaving Discussion or reloading clears it. A new request is sent only when you submit.",
+      "ja": "結果を見て戻っても、書きかけと選択は残ります。Discussionを離れるか再読み込みすると消えます。新しい依頼は送信操作をしたときだけ送られます。"
+    },
+    "draftContextChanged": {
+      "en": "The scope or linked request changed, so the previous draft was cleared. Check the new context before entering a request. Any unconfirmed request still needs checking.",
+      "ja": "対象範囲またはリンクされた依頼が変わったため、前の下書きを消去しました。新しい対象を確認して入力してください。受付未確認の依頼は引き続き確認が必要です。"
     }
   },
   "role_labels": {
