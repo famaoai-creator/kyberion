@@ -39,6 +39,7 @@ import {
 } from '../actuator/actuator-manifest-index.js';
 import type { TierLevel } from '../types.js';
 import { introductionResult, provenanceEgressResult, taintResult } from './op-preflight-stages.js';
+import { charterDecisionFactGuard } from './op-preflight-charter.js';
 
 const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
 
@@ -51,7 +52,7 @@ const DEFAULT_LISTENER_IDS = [
   'core:adf-guardrails',
   'core:provider-egress',
 ] as const;
-const DEFAULT_GUARD_IDS = ['core:spend'] as const;
+const DEFAULT_GUARD_IDS = ['core:spend', 'core:charter-facts'] as const;
 
 type RecordLike = Record<string, unknown>;
 
@@ -279,6 +280,10 @@ export function ensureDefaultOpPreflight(): void {
   }
 
   const guardIds = new Set(listOpGuards().map((guard) => guard.id));
+  builtinGuardFunctions.set(DEFAULT_GUARD_IDS[1], charterDecisionFactGuard);
+  if (!guardIds.has(DEFAULT_GUARD_IDS[1])) {
+    registerOpGuard({ id: DEFAULT_GUARD_IDS[1], order: 190, check: charterDecisionFactGuard });
+  }
   if (!guardIds.has(DEFAULT_GUARD_IDS[0])) {
     registerOpGuard({
       id: DEFAULT_GUARD_IDS[0],

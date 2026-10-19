@@ -12,7 +12,11 @@ import {
   checkDaemonHeartbeatsWithRecovery,
   formatDaemonWatchdogReport,
   DEFAULT_DAEMONS,
+  sweepMissionStartCandidates,
 } from './daemon_watchdog.js';
+import * as workCoordination from '@agent/core/workforce/work-coordination';
+import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
+import * as autonomyState from '@agent/core/governance/autonomy-action-state';
 import {
   recordDaemonHeartbeat,
   pathResolver,
@@ -24,8 +28,69 @@ import {
 const ROOT = pathResolver.sharedTmp('daemon-watchdog-test/heartbeats');
 const ALERT_LOG = pathResolver.sharedTmp('daemon-watchdog-test/alerts.jsonl');
 const TRIGGER_STORE = 'active/shared/tmp/daemon-watchdog-test/trigger-deliveries.jsonl';
+const missionProposal: ReturnType<typeof workCoordination.listWorkItems>[number] = {
+  item_id: 'proposal-1',
+  title: 'Mission proposal',
+  description: 'Awaiting governed start',
+  status: 'blocked',
+  priority: 'normal',
+  source: 'local',
+  source_ref: 'watchdog-test',
+  project_id: 'project-1',
+  labels: [],
+  dependencies: [],
+  version: 1,
+  created_at: '2026-07-04T00:00:00.000Z',
+  updated_at: '2026-07-04T00:00:00.000Z',
+  metadata: { requested_work_shape: 'mission' },
+};
 
 describe('daemon_watchdog', () => {
+  it('records no execution success for blocked mission gate evaluations', async () => {
+    const list = vi
+      .spyOn(workCoordination, 'listWorkItems')
+      .mockReturnValue([
+        {
+          ...missionProposal,
+          metadata: { ...missionProposal.metadata, mandate_ref: 'mandate-1' },
+          context: { tenant_slug: 'acme' },
+        },
+      ]);
+    const gate = vi
+      .spyOn(autonomyGate, 'evaluateAutonomousOpsAction')
+      .mockReturnValue({
+        actionId: 'mission_start_mandate',
+        decision: 'approve',
+        allowed: false,
+      } as ReturnType<typeof autonomyGate.evaluateAutonomousOpsAction>);
+    const record = vi
+      .spyOn(autonomyState, 'recordAutonomyExecution')
+      .mockImplementation(() => undefined);
+    try {
+      await sweepMissionStartCandidates({});
+      expect(gate).toHaveBeenCalledWith({ actionId: 'mission_start_mandate', tenantSlug: 'acme' });
+      expect(record).not.toHaveBeenCalled();
+    } finally {
+      list.mockRestore();
+      gate.mockRestore();
+      record.mockRestore();
+    }
+  });
+
+  it('does not guess a tenant for unscoped mission proposals', async () => {
+    const list = vi
+      .spyOn(workCoordination, 'listWorkItems')
+      .mockReturnValue([{ ...missionProposal }]);
+    const gate = vi.spyOn(autonomyGate, 'evaluateAutonomousOpsAction');
+    try {
+      await sweepMissionStartCandidates({});
+      expect(gate).not.toHaveBeenCalled();
+    } finally {
+      list.mockRestore();
+      gate.mockRestore();
+    }
+  });
+
   it('passes when configured daemons have fresh heartbeats', () => {
     safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
     const now = new Date('2026-07-04T00:00:00.000Z');

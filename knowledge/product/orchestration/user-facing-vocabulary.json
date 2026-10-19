@@ -12106,6 +12106,51 @@
         "ja": "顧客宛のメッセージを、承認なしで送らせる",
         "qps-ploc": "⟦Ŀėŧ ɱėşşȧɠėş ŧő ƈůşŧőɱėřş ɠő őůŧ ẇïŧħőůŧ ȧşķïñɠ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
+      "setup.charter_recipient_purposes": {
+        "en": "Recipient purposes (comma separated)",
+        "ja": "送信目的（カンマ区切り）",
+        "qps-ploc": "⟦Řėƈïṗïėñŧ ṗůřṗőşėş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_recipient_classes": {
+        "en": "Recipient classes (comma separated)",
+        "ja": "送信先区分（カンマ区切り）",
+        "qps-ploc": "⟦Řėƈïṗïėñŧ ƈŀȧşşėş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "setup.charter_recipient_categories": {
+        "en": "Recipient data categories (comma separated)",
+        "ja": "送信する情報区分（カンマ区切り）",
+        "qps-ploc": "⟦Řėƈïṗïėñŧ ḓȧŧȧ ƈȧŧėɠőřïėş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "setup.charter_max_attachments": {
+        "en": "Maximum attachments per action",
+        "ja": "1回あたりの添付上限",
+        "qps-ploc": "⟦Ɱȧẋïɱůɱ ȧŧŧȧƈħɱėñŧş ṗėř ȧƈŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.charter_approved_processors": {
+        "en": "Approved inference processor IDs (comma separated)",
+        "ja": "承認する推論プロセッサーID（カンマ区切り）",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ïñƒėřėñƈė ṗřőƈėşşőř ÏḒş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.charter_processing_purposes": {
+        "en": "Inference purposes (comma separated)",
+        "ja": "推論処理の目的（カンマ区切り）",
+        "qps-ploc": "⟦Ïñƒėřėñƈė ṗůřṗőşėş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_processing_categories": {
+        "en": "Inference data categories (comma separated)",
+        "ja": "推論に渡す情報区分（カンマ区切り）",
+        "qps-ploc": "⟦Ïñƒėřėñƈė ḓȧŧȧ ƈȧŧėɠőřïėş (ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "setup.charter_reputational_class_max": {
+        "en": "Maximum reputational impact (A–D)",
+        "ja": "評判への影響の上限（A〜D）",
+        "qps-ploc": "⟦Ɱȧẋïɱůɱ řėṗůŧȧŧïőñȧŀ ïɱṗȧƈŧ (Ȧ–Ḓ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "setup.charter_information_scope_help": {
+        "en": "Use comma-separated IDs. Purpose example: meeting_scheduling. Recipient classes: bound_customer, known_counterparty, approved_vendor, public, unknown. Data categories: routine_business, personal_data, sensitive_business, unknown. Specify purposes, recipient classes and categories together. Inference scope is separate: use processor IDs from the provider configuration and explicit processing purposes/categories. Only work inside every accepted limit runs without asking. Review and accept a new statement after changes.",
+        "ja": "IDをカンマ区切りで入力します。目的の例：meeting_scheduling。送信先区分：bound_customer（顧客）、known_counterparty（既知の相手）、approved_vendor（承認済み業者）、public（公開）、unknown（不明）。情報区分：routine_business（通常業務）、personal_data（個人情報）、sensitive_business（機密業務）、unknown（不明）。送信目的・送信先区分・情報区分をセットで指定します。推論処理は別枠で、プロバイダー設定のIDと処理目的・情報区分を指定します。すべての承認上限内だけが自律実行され、変更時は宣言の再承認が必要です。",
+        "qps-ploc": "⟦Ůşė ƈőɱɱȧ-şėṗȧřȧŧėḓ ÏḒş. Ṗůřṗőşė ėẋȧɱṗŀė: ɱėėŧïñɠ_şƈħėḓůŀïñɠ. Řėƈïṗïėñŧ ƈŀȧşşėş: ƀőůñḓ_ƈůşŧőɱėř, ķñőẇñ_ƈőůñŧėřṗȧřŧẏ, ȧṗṗřőṽėḓ_ṽėñḓőř, ṗůƀŀïƈ, ůñķñőẇñ. Ḓȧŧȧ ƈȧŧėɠőřïėş: řőůŧïñė_ƀůşïñėşş, ṗėřşőñȧŀ_ḓȧŧȧ, şėñşïŧïṽė_ƀůşïñėşş, ůñķñőẇñ. Şṗėƈïƒẏ ṗůřṗőşėş, řėƈïṗïėñŧ ƈŀȧşşėş ȧñḓ ƈȧŧėɠőřïėş ŧőɠėŧħėř. Ïñƒėřėñƈė şƈőṗė ïş şėṗȧřȧŧė: ůşė ṗřőƈėşşőř ÏḒş ƒřőɱ ŧħė ṗřőṽïḓėř ƈőñƒïɠůřȧŧïőñ ȧñḓ ėẋṗŀïƈïŧ ṗřőƈėşşïñɠ ṗůřṗőşėş/ƈȧŧėɠőřïėş. Őñŀẏ ẇőřķ ïñşïḓė ėṽėřẏ ȧƈƈėṗŧėḓ ŀïɱïŧ řůñş ẇïŧħőůŧ ȧşķïñɠ. Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ȧ ñėẇ şŧȧŧėɱėñŧ ȧƒŧėř ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
       "setup.charter_decisions_title": {
         "en": "Decisions you hand over",
         "ja": "任せる判断",

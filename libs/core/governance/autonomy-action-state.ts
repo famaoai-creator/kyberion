@@ -6,8 +6,8 @@
  * 7 would auto-enable eight unrelated actions at once. This module instead
  * adjusts autonomy per action, from observed evidence, in two bounded tiers:
  *
- *   tier1  approve → notify   (needs PROMOTE_NOTIFY_* evidence)
- *   tier2  notify  → auto     (needs PROMOTE_AUTO_* evidence — stricter)
+ *   tier1  approve → notify   (policy notify_min_decisions)
+ *   tier2  notify  → auto     (policy auto_min_decisions)
  *
  * Evidence lives in an append-only ledger
  * (observability/autonomy-outcomes.jsonl): every gate consumer records the
@@ -16,10 +16,11 @@
  * file, because rewriting governed policy from a daemon would dirty the repo.
  * Malformed state is ignored wholesale (fail-safe to the base decision).
  *
- * Demotion is instant and asymmetric: one incident or execution failure sets
- * `demoted_until`, forcing the base decision (or 'approve') until it lapses.
+ * Demotion is instant when the governed incident allowance is exceeded
+ * (default zero), forcing 'approve' until the configured cooldown lapses.
  */
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -29,6 +30,9 @@ import {
 } from '../secure-io.js';
 import { appendJsonLine, readJsonLines, readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
+import { storagePartitionSegments, PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
 
 const logger = createLogger('autonomy-action-state');
@@ -36,25 +40,9 @@ const logger = createLogger('autonomy-action-state');
 export const AUTONOMY_OUTCOMES_PATH = 'active/shared/observability/autonomy-outcomes.jsonl';
 export const AUTONOMY_OVERRIDES_PATH = 'active/shared/runtime/autonomy-action-overrides.json';
 
-/** Tier-1 (approve→notify): enough receipts, zero incidents. */
-export const PROMOTE_NOTIFY_MIN_DECISIONS = 10;
-/** Tier-2 (notify→auto): the policy's own promotion bar, applied per action. */
-export const PROMOTE_AUTO_MIN_DECISIONS = 20;
-export const PROMOTE_AUTO_MIN_OUTCOME_SUCCESS = 0.9;
-export const PROMOTE_AUTO_MAX_INCIDENTS_30D = 0;
-/**
- * Second tier-2 path: an action that cannot accumulate execution rows (it only
- * executes when the gate already says auto) can still earn auto after a long
- * veto-free soak at notify — every notify decision surfaced to the operator
- * and was not rejected, so a sustained clean streak is itself the evidence.
- */
-export const PROMOTE_AUTO_NOTIFY_SOAK_DECISIONS = 50;
-/** A demotion holds the base decision for this long before re-eligibility. */
-export const DEMOTE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-/** Stats window — promotion evidence ages out. */
-export const AUTONOMY_STATS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
 export interface AutonomyOutcomeRow {
+  /** Stable caller execution identity; retries of one receipt count once. */
+  receipt_id?: string;
   /** 'execution' rows carry results only — they never count as decisions. */
   kind?: 'decision' | 'execution';
   action_id: string;
@@ -85,10 +73,25 @@ interface ActionOverridesFile {
 export interface AutonomyStateDeps {
   rootDir?: string;
   now?: () => Date;
+  tenantSlug?: string;
 }
 
 function filePath(deps: AutonomyStateDeps, rel: string): string {
-  return assertSafeRepositoryPath(path.join(deps.rootDir ?? pathResolver.rootDir(), rel), {
+  // Resolve the protected runtime partition through canonical storage rules.
+  // Never read legacy system evidence
+  // as tenant evidence, even when no tenant-specific file exists yet.
+  const scoped = deps.tenantSlug
+    ? path.posix.join(
+        PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning,
+        ...storagePartitionSegments({
+          kind: 'tier',
+          tier: 'confidential',
+          tenant: deps.tenantSlug,
+        }),
+        path.basename(rel)
+      )
+    : rel;
+  return assertSafeRepositoryPath(path.join(deps.rootDir ?? pathResolver.rootDir(), scoped), {
     allowMissingLeaf: true,
   });
 }
@@ -100,28 +103,38 @@ export function recordAutonomyOutcome(
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
   safeMkdir(path.dirname(p), { recursive: true });
-  appendJsonLine(p, {
-    ...row,
-    recorded_at: (deps.now?.() ?? new Date()).toISOString(),
-  });
+  appendJsonLine(
+    p,
+    {
+      ...row,
+      receipt_id: row.receipt_id ?? randomUUID(),
+      recorded_at: (deps.now?.() ?? new Date()).toISOString(),
+    },
+    { leadingNewline: true }
+  );
 }
 
 /** Record an execution result without double-counting the decision row
  *  the gate already wrote for the same evaluation. */
 export function recordAutonomyExecution(
-  row: { action_id: string; ok: boolean; error?: string },
+  row: { action_id: string; receipt_id: string; ok: boolean; error?: string },
   deps: AutonomyStateDeps = {}
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
   safeMkdir(path.dirname(p), { recursive: true });
-  appendJsonLine(p, {
-    kind: 'execution',
-    action_id: row.action_id,
-    executed: true,
-    ok: row.ok,
-    ...(row.error ? { error: row.error } : {}),
-    recorded_at: (deps.now?.() ?? new Date()).toISOString(),
-  });
+  appendJsonLine(
+    p,
+    {
+      kind: 'execution',
+      receipt_id: row.receipt_id,
+      action_id: row.action_id,
+      executed: true,
+      ok: row.ok,
+      ...(row.error ? { error: row.error } : {}),
+      recorded_at: (deps.now?.() ?? new Date()).toISOString(),
+    },
+    { leadingNewline: true }
+  );
 }
 
 /** Distinct action ids present in the ledger — sweeps must cover every
@@ -130,7 +143,7 @@ export function listAutonomyActionIds(deps: AutonomyStateDeps = {}): string[] {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
   if (!safeExistsSync(p)) return [];
   const ids = new Set<string>();
-  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p)) {
+  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p, { onMalformed: 'skip' })) {
     if (typeof row?.action_id === 'string' && row.action_id) ids.add(row.action_id);
   }
   return [...ids];
@@ -150,7 +163,8 @@ export function actionAutonomyStats(
   actionId: string,
   deps: AutonomyStateDeps = {}
 ): AutonomyActionStats {
-  const cutoff = (deps.now?.() ?? new Date()).getTime() - AUTONOMY_STATS_WINDOW_MS;
+  const now = (deps.now?.() ?? new Date()).getTime();
+  const cutoff = now - loadAutonomyLearningPolicy().window_ms;
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
   const stats: AutonomyActionStats = {
     decisions: 0,
@@ -159,19 +173,57 @@ export function actionAutonomyStats(
     outcome_success: 0,
   };
   if (!safeExistsSync(p)) return stats;
-  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p)) {
+  const successfulReceipts = new Set<string>();
+  // Corruption must not erase a possible failure and leave only successful
+  // evidence. Exceed even the largest validated incident allowance.
+  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p, {
+    onMalformed: () => {
+      stats.incidents = Number.MAX_SAFE_INTEGER;
+    },
+  })) {
+    if (!row || typeof row !== 'object' || typeof row.action_id !== 'string' || !row.action_id) {
+      stats.incidents = Number.MAX_SAFE_INTEGER;
+      continue;
+    }
     if (row?.action_id !== actionId) continue;
     const ts = Date.parse(String(row.recorded_at ?? ''));
-    if (!Number.isFinite(ts) || ts < cutoff) continue;
+    if (
+      !Number.isFinite(ts) ||
+      ts > now ||
+      typeof row.executed !== 'boolean' ||
+      (row.kind !== undefined && !['decision', 'execution'].includes(row.kind))
+    ) {
+      stats.incidents = Number.MAX_SAFE_INTEGER;
+      continue;
+    }
+    if (ts < cutoff) continue;
+    // Legacy rows without a receipt id remain readable as decisions, but
+    // cannot establish execution authority. Failures always remain visible.
+    const success = row.ok === true && !row.error;
+    const freshSuccess =
+      success &&
+      typeof row.receipt_id === 'string' &&
+      row.receipt_id.length > 0 &&
+      !successfulReceipts.has(row.receipt_id);
     if (row.kind === 'execution') {
-      if (row.ok === true) stats.succeeded++;
-      else stats.incidents++;
+      if (row.executed !== true) continue;
+      if (freshSuccess) {
+        stats.succeeded++;
+        successfulReceipts.add(row.receipt_id!);
+      } else if (!success) stats.incidents++;
+      continue;
+    }
+    if (row.kind !== undefined && row.kind !== 'decision') continue;
+    if (!['auto', 'approve', 'notify'].includes(String(row.decision))) {
+      stats.incidents = Number.MAX_SAFE_INTEGER;
       continue;
     }
     stats.decisions++;
-    if (row.executed) {
-      if (row.ok === true) stats.succeeded++;
-      else stats.incidents++;
+    if (row.executed === true) {
+      if (freshSuccess) {
+        stats.succeeded++;
+        successfulReceipts.add(row.receipt_id!);
+      } else if (!success) stats.incidents++;
     }
   }
   const executed = stats.succeeded + stats.incidents;
@@ -181,9 +233,30 @@ export function actionAutonomyStats(
 
 function loadOverrides(deps: AutonomyStateDeps): ActionOverridesFile {
   const p = filePath(deps, AUTONOMY_OVERRIDES_PATH);
-  const parsed = readJsonIfPresent<ActionOverridesFile>(p);
-  if (parsed?.version !== 1 || typeof parsed.overrides !== 'object' || parsed.overrides === null) {
+  let parsed: ActionOverridesFile | null;
+  try {
+    parsed = readJsonIfPresent<ActionOverridesFile>(p);
+  } catch {
     return { version: 1, overrides: {} };
+  }
+  if (
+    parsed?.version !== 1 ||
+    typeof parsed.overrides !== 'object' ||
+    parsed.overrides === null ||
+    Array.isArray(parsed.overrides)
+  ) {
+    return { version: 1, overrides: {} };
+  }
+  for (const value of Object.values(parsed.overrides)) {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      (value.relaxed_to !== undefined && !['auto', 'notify'].includes(value.relaxed_to)) ||
+      (value.demoted_until !== undefined && !Number.isFinite(Date.parse(value.demoted_until)))
+    ) {
+      return { version: 1, overrides: {} };
+    }
   }
   return parsed;
 }
@@ -206,8 +279,10 @@ export function applyAutonomyOverride(
   escalations: readonly string[],
   deps: AutonomyStateDeps = {}
 ): { decision: AutonomousOpsDecision; applied?: string } {
+  const policy = loadAutonomyLearningPolicy();
+  if (!policy.enabled) return { decision };
   const { overrides } = loadOverrides(deps);
-  const o = overrides[actionId];
+  const o = Object.hasOwn(overrides, actionId) ? overrides[actionId] : undefined;
   if (!o) return { decision };
   const now = deps.now?.() ?? new Date();
   if (o.demoted_until && Date.parse(o.demoted_until) > now.getTime()) {
@@ -215,6 +290,17 @@ export function applyAutonomyOverride(
   }
   const rank: Record<AutonomousOpsDecision, number> = { approve: 0, notify: 1, auto: 2 };
   if (o.relaxed_to && escalations.length === 0 && rank[decision] < rank[o.relaxed_to]) {
+    const stats = actionAutonomyStats(actionId, deps);
+    const minimum =
+      o.relaxed_to === 'auto' ? policy.auto_min_decisions : policy.notify_min_decisions;
+    if (
+      stats.decisions < minimum ||
+      stats.succeeded < minimum ||
+      stats.incidents > policy.max_incidents ||
+      stats.outcome_success < policy.min_outcome_success
+    ) {
+      return { decision };
+    }
     return { decision: o.relaxed_to, applied: `relaxed_to:${o.relaxed_to}` };
   }
   return { decision };
@@ -236,49 +322,78 @@ export function sweepAutonomyActionStates(
   actionIds: readonly string[],
   deps: AutonomyStateDeps = {}
 ): AutonomySweepResult {
-  const state = loadOverrides(deps);
-  const now = deps.now?.() ?? new Date();
-  const result: AutonomySweepResult = { promoted: [], demoted: [], held: [] };
+  const policy = loadAutonomyLearningPolicy();
+  if (!policy.enabled) return { promoted: [], demoted: [], held: [...actionIds] };
+  // Serialize read/modify/write sweeps per physical partition. A concurrent
+  // sweep must not overwrite a demotion observed by another writer.
+  return withLockSync(`autonomy-learning:${filePath(deps, AUTONOMY_OVERRIDES_PATH)}`, () => {
+    const state = loadOverrides(deps);
+    const now = deps.now?.() ?? new Date();
+    const result: AutonomySweepResult = { promoted: [], demoted: [], held: [] };
 
-  for (const actionId of actionIds) {
-    const stats = actionAutonomyStats(actionId, deps);
-    const existing = state.overrides[actionId] ?? {};
-    const demotedUntil = existing.demoted_until ? Date.parse(existing.demoted_until) : 0;
+    for (const actionId of actionIds) {
+      const stats = actionAutonomyStats(actionId, deps);
+      const existing = Object.hasOwn(state.overrides, actionId) ? state.overrides[actionId]! : {};
+      const demotedUntil = existing.demoted_until ? Date.parse(existing.demoted_until) : 0;
 
-    // Demotion wins outright: any fresh incident pushes demoted_until.
-    if (stats.incidents > 0 && (!existing.demoted_until || demotedUntil < now.getTime())) {
-      state.overrides[actionId] = {
-        demoted_until: new Date(now.getTime() + DEMOTE_COOLDOWN_MS).toISOString(),
-        demote_reason: `${stats.incidents} incident(s) in window`,
-        stats: {
-          decisions: stats.decisions,
-          succeeded: stats.succeeded,
-          incidents: stats.incidents,
-        },
-      };
-      result.demoted.push(actionId);
-      continue;
-    }
+      if (demotedUntil > now.getTime()) {
+        result.held.push(actionId);
+        continue;
+      }
 
-    // Tier-2: notify→auto, via either execution proof or a notify-tier soak.
-    // Execution-proven needs ≥1 executed row — outcome_success is 0 when
-    // nothing ever ran, which would otherwise block promote-only actions
-    // (a notify-level action never records execution evidence).
-    const executedRuns = stats.succeeded + stats.incidents;
-    const executionProven =
-      stats.decisions >= PROMOTE_AUTO_MIN_DECISIONS &&
-      executedRuns > 0 &&
-      stats.outcome_success >= PROMOTE_AUTO_MIN_OUTCOME_SUCCESS &&
-      stats.incidents <= PROMOTE_AUTO_MAX_INCIDENTS_30D;
-    const notifySoaked =
-      existing.relaxed_to === 'notify' &&
-      stats.decisions >= PROMOTE_AUTO_NOTIFY_SOAK_DECISIONS &&
-      stats.incidents === 0;
-    if (executionProven || notifySoaked) {
-      if (existing.relaxed_to !== 'auto') {
+      // Exceeding the governed incident allowance wins over promotion.
+      if (
+        stats.incidents > policy.max_incidents &&
+        (!existing.demoted_until || demotedUntil < now.getTime())
+      ) {
         state.overrides[actionId] = {
-          ...existing,
-          relaxed_to: 'auto',
+          demoted_until: new Date(now.getTime() + policy.cooldown_ms).toISOString(),
+          demote_reason: `${stats.incidents} incident(s) in window`,
+          stats: {
+            decisions: stats.decisions,
+            succeeded: stats.succeeded,
+            incidents: stats.incidents,
+          },
+        };
+        result.demoted.push(actionId);
+        continue;
+      }
+
+      // Tier-2 needs successful execution receipts, never only gate attempts.
+      const executedRuns = stats.succeeded + stats.incidents;
+      const executionProven =
+        stats.decisions >= policy.auto_min_decisions &&
+        stats.succeeded >= policy.auto_min_decisions &&
+        executedRuns > 0 &&
+        stats.outcome_success >= policy.min_outcome_success &&
+        stats.incidents <= policy.max_incidents;
+      if (executionProven) {
+        if (existing.relaxed_to !== 'auto') {
+          state.overrides[actionId] = {
+            ...existing,
+            relaxed_to: 'auto',
+            promoted_at: now.toISOString(),
+            stats: {
+              decisions: stats.decisions,
+              succeeded: stats.succeeded,
+              incidents: stats.incidents,
+            },
+          };
+          result.promoted.push(`${actionId}→auto`);
+          continue;
+        }
+      }
+
+      // Tier-1: approve→notify is cheaper — sustained volume, zero incidents.
+      if (
+        !existing.relaxed_to &&
+        stats.decisions >= policy.notify_min_decisions &&
+        stats.succeeded >= policy.notify_min_decisions &&
+        stats.outcome_success >= policy.min_outcome_success &&
+        stats.incidents <= policy.max_incidents
+      ) {
+        state.overrides[actionId] = {
+          relaxed_to: 'notify',
           promoted_at: now.toISOString(),
           stats: {
             decisions: stats.decisions,
@@ -286,37 +401,18 @@ export function sweepAutonomyActionStates(
             incidents: stats.incidents,
           },
         };
-        result.promoted.push(`${actionId}→auto`);
+        result.promoted.push(`${actionId}→notify`);
         continue;
       }
+      result.held.push(actionId);
     }
 
-    // Tier-1: approve→notify is cheaper — sustained volume, zero incidents.
-    if (
-      !existing.relaxed_to &&
-      stats.decisions >= PROMOTE_NOTIFY_MIN_DECISIONS &&
-      stats.incidents === 0
-    ) {
-      state.overrides[actionId] = {
-        relaxed_to: 'notify',
-        promoted_at: now.toISOString(),
-        stats: {
-          decisions: stats.decisions,
-          succeeded: stats.succeeded,
-          incidents: stats.incidents,
-        },
-      };
-      result.promoted.push(`${actionId}→notify`);
-      continue;
+    if (result.promoted.length || result.demoted.length) {
+      saveOverrides(state, deps);
+      logger.info(
+        `[AUTONOMY] sweep: promoted=[${result.promoted.join(',')}] demoted=[${result.demoted.join(',')}]`
+      );
     }
-    result.held.push(actionId);
-  }
-
-  if (result.promoted.length || result.demoted.length) {
-    saveOverrides(state, deps);
-    logger.info(
-      `[AUTONOMY] sweep: promoted=[${result.promoted.join(',')}] demoted=[${result.demoted.join(',')}]`
-    );
-  }
-  return result;
+    return result;
+  });
 }

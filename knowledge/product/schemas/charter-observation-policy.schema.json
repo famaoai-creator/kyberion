@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Charter observation policy",
+  "description": "Observation and advice only. Does not change authorization, signed budgets, or tripwires.",
+  "type": "object",
+  "required": [
+    "version",
+    "audit_sample_rate",
+    "repeated_denial_threshold",
+    "frequent_denial_threshold"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "audit_sample_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "repeated_denial_threshold": { "type": "integer", "minimum": 1 },
+    "frequent_denial_threshold": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "../schemas/autonomy-learning-policy.schema.json",
+  "version": "1.0.0",
+  "enabled": true,
+  "window_ms": 2592000000,
+  "cooldown_ms": 604800000,
+  "notify_min_decisions": 10,
+  "auto_min_decisions": 20,
+  "min_outcome_success": 0.9,
+  "max_incidents": 0
+}

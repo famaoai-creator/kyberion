@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { applyAutonomyOverride } from './autonomy-action-state.js';
+vi.mock('./autonomy-action-state.js', () => ({
+  applyAutonomyOverride: vi.fn((_actionId: string, decision: string) => ({ decision })),
+  recordAutonomyOutcome: vi.fn(),
+}));
 import {
   evaluateAutonomousOpsAction,
   getAutonomousOpsPolicy,
@@ -10,6 +15,13 @@ import {
 describe('autonomous-ops-gate', () => {
   const tmpDir = pathResolver.sharedTmp('autonomous-ops-policy-tests');
   const overridePath = `${tmpDir}/autonomous-ops-policy.json`;
+
+  it('preserves the tenant boundary when consulting learned autonomy', () => {
+    evaluateAutonomousOpsAction({ actionId: 'baseline_health_scan', tenantSlug: 'acme' });
+    expect(applyAutonomyOverride).toHaveBeenLastCalledWith('baseline_health_scan', 'auto', [], {
+      tenantSlug: 'acme',
+    });
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "enabled",
+    "window_ms",
+    "cooldown_ms",
+    "notify_min_decisions",
+    "auto_min_decisions",
+    "min_outcome_success",
+    "max_incidents"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "enabled": { "type": "boolean" },
+    "window_ms": { "type": "integer", "minimum": 1, "maximum": 31536000000 },
+    "cooldown_ms": { "type": "integer", "minimum": 1, "maximum": 31536000000 },
+    "notify_min_decisions": { "type": "integer", "minimum": 1 },
+    "auto_min_decisions": { "type": "integer", "minimum": 1 },
+    "min_outcome_success": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "max_incidents": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+  }
+}

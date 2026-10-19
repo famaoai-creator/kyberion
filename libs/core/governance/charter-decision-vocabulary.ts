@@ -37,6 +37,36 @@ export interface CharterDecisionVocabulary {
   decisions: CharterDecisionEntry[];
 }
 
+/** Observation knobs cannot grant authority or change a signed envelope. */
+export interface CharterObservationPolicy {
+  version: string;
+  audit_sample_rate: number;
+  repeated_denial_threshold: number;
+  frequent_denial_threshold: number;
+}
+
+const observationCatalog = defineCatalog<CharterObservationPolicy>({
+  id: 'charter-observation-policy',
+  path: () => pathResolver.knowledge('product/governance/charter-observation-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/charter-observation-policy.schema.json'),
+  // Missing or malformed configuration increases visibility; it never grants work.
+  fallback: {
+    version: 'fallback',
+    audit_sample_rate: 1,
+    repeated_denial_threshold: 1,
+    frequent_denial_threshold: 1,
+  },
+  fallbackOnInvalid: true,
+  onFallback: (error) =>
+    logger.warn(
+      `[charter-observation] invalid policy — full audit sampling and immediate advice | fix charter-observation-policy.json | ${String(error)}`
+    ),
+});
+
+export function loadCharterObservationPolicy(): CharterObservationPolicy {
+  return observationCatalog.load();
+}
+
 const vocabularyCatalog = defineCatalog<CharterDecisionVocabulary>({
   id: 'charter-decision-vocabulary',
   path: () => pathResolver.knowledge('product/governance/charter-decision-vocabulary.json'),
