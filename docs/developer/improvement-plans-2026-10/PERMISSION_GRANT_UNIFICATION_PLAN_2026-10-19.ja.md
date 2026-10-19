@@ -7,7 +7,7 @@ status: partial
 
 # 事前許可(同意・承認・egress・OS 許可)の統一 改善計画 (PG-01〜09)
 
-- 状態: **PG-01〜02 実装済み(MSN-GRANT-UNIFY-20261019)。PG-02b〜09 は未着手**
+- 状態: **PG-01〜02 実装済み(#1178)。PG-03〜04 実装済み(MSN-GRANT-CORE-20261019)。PG-02b、PG-05〜09 は未着手**
 - 発端: 会議の録画やコンソールでのマイク録音で、本番直前に「マイク許可」「会議ミッションの voice consent」を慌てて取ることになり、開始が遅れる。調べると、同意・承認・egress・OS 許可が別々の仕組みで実装されており、粒度・期限・取消・監査がそろっていない。
 - 関連:
   - [HUMAN_APPROVAL_TRUST_PLAN](./HUMAN_APPROVAL_TRUST_PLAN_2026-10-05.ja.md)(承認者の本人性と assurance。本計画はその上に乗る)
@@ -190,8 +190,8 @@ resolveGrant({ capability, context }): {
 | PG-01  | OS 許可 probe にマイク・カメラを追加し、`meeting_preflight` を実状態で判定する(env は退避に格下げ)  | —            | 実装済み |
 | PG-02  | `pnpm kyberion permissions warmup`(ターミナルホストのマイク・カメラ・画面収録)                      | PG-01        | 実装済み |
 | PG-02b | warm-up を Chrome / Playwright Chromium に広げる                                                    | PG-02        | 未着手   |
-| PG-03  | Grant の型・`grant-capability-policy.json`・ストア・`resolveGrant`(standing_grant と os_permission) | —            | 未着手   |
-| PG-04  | `meeting.recording` の常設許可とミッション自動紐づけ。voice consent の重複検査を 1 本化             | PG-03        | 未着手   |
+| PG-03  | Grant の型・`grant-capability-policy.json`・ストア・`resolveGrant`(standing_grant と os_permission) | —            | 実装済み |
+| PG-04  | `meeting.recording` の常設許可とミッション自動紐づけ。voice consent の重複検査を 1 本化             | PG-03        | 実装済み |
 | PG-05  | 既存ストアの adapter 化(provider attestation、作業観察同意、画像 egress、承認ストアの参照)          | PG-03        | 未着手   |
 | PG-06  | `pnpm kyberion grants status` と `meeting_preflight` への統合                                       | PG-03〜05    | 未着手   |
 | PG-07  | カレンダー会議の前の readiness 通知                                                                 | PG-06        | 未着手   |
@@ -211,8 +211,28 @@ resolveGrant({ capability, context }): {
 - `KYBERION_AUDIO_PERMISSION_CONFIRMED=1` は PG-01 以降、probe が使えない環境での退避としてだけ効く。PG-09 で削除する。
 - 発話(`meeting.voice`)はミッションごとの明示許可のまま。常設許可では通らない。
 
-## 5. 未決事項
+## 5. 決定事項(2026-10-19)
 
-1. `meeting.recording` の束縛軸 `meeting_series` の正規形(カレンダーのシリーズ ID か、会議 URL か、両方か)。
-2. standing grant の付与に承認ストアの approval を必須にする capability の範囲(provider egress は必須、会議録音は operator 本人の付与で足りる、が初期案)。
-3. ドメイン egress(warn 運用)を Grant に含めるか、egress-policy のまま adapter だけ用意するか。
+1. **会議の束縛軸は両方**。`meeting.recording` の常設許可は、カレンダーのシリーズ ID(`meeting_series_ids`)と会議 URL(`meeting_urls`)を両方持てる。どちらか 1 つは必須。会議がどちらか一方に一致すれば対象とみなす。URL はスキーム・ホストを小文字にし、クエリとフラグメントを除いた正規形で比べる。
+2. **承認が必須の範囲は、外部とのデータ入出力を伴う capability(仮置き)**。capability ポリシーに `external_io: true` を宣言したものは、付与時に承認ストアの承認(人間の決定、payloadHash で付与内容に束縛)が必須。範囲は運用しながら見直す。
+   - 初期の宣言: `meeting.recording`(外部の会議サービスから音声を取り込む)= `external_io: true`。OS 許可は対象外(OS が管理)。
+3. ドメイン egress を Grant に含めるかは未決(PG-05 で判断)。
+
+## 6. PG-03/04 の実装仕様
+
+- **capability ポリシー** `knowledge/product/governance/grant-capability-policy.json`(+ schema)。初期 capability は `meeting.recording`(standing、`external_io: true`、`max_ttl_days: 90`、`mission_binding: auto`)、`meeting.voice`(per_mission。既存の voice-consent.json を読む adapter)、`os.microphone` / `os.camera` / `os.screen_recording`(os_permission。probe を読む adapter)。provider egress などほかの既存ストアの adapter は PG-05。
+- **ストア**: `active/shared/runtime/grants/<tier>/<tenant|shared>/<grant_id>.json`(hearing と同じ partitioned runtime state root。テナント境界の検査・保護 prefix・テスト隔離がこの仕組みで効く)。記録より先に audit を書く。取消は記録を残したまま `revoked` を付ける。
+- **使用時の再検証**: `external_io` の grant は判定のたびに、根拠の承認が存在し、この grant に消費され、取り消されておらず、payloadHash が記録の内容(capability・テナント・会議・目的・期間)と一致することを確かめる。ファイルを直接書き換えたり承認を偽装したりした grant は何も許可しない。
+- **判定** `resolveGrant({ capability, context })` → `{ allowed, source, grant_id?, reason?, remedy? }`。fail-closed。壊れた・期限切れ・取消済み・ポリシー違反のレコードは無いものとみなす。
+- **ミッション紐づけ**: ミッション文脈で standing grant により許可されたら、ミッション証跡 `evidence/grant-bindings.json` に「どの grant で通ったか」を grant ごとに 1 回記録する。記録に失敗したら録音を許可しない。
+- **会議録音の判定**: `checkMeetingParticipationConsent(purpose: 'recording')` は、従来の voice-consent.json が無い(または無効な)とき、`meeting.recording` の常設許可を会議の URL / シリーズ ID で探す。見つかれば許可してミッションに紐づける。発話(`purpose: 'voice'`)は従来どおりミッションごとの voice-consent.json のみ。
+- **重複の解消**: meeting-actuator の `checkSpeakConsent` は coordinator の検査に委ねる。
+- **CLI** `pnpm kyberion grants list|check|grant|revoke`。`external_io` の capability は `grant --request-approval` で承認依頼を出し、人間が `pnpm kyberion approvals --approve <id>` で決めたあと `grant --approval-request-id <id>` で付与する(scope-approve と同じ流れ)。
+
+## 7. 未決事項
+
+- 会議のシリーズ ID は、いまは呼び出し側が渡さない(会議参加はURLで照合、対面議事録とリアルタイム音声は会議情報なし)。カレンダー連携でシリーズ ID を渡すのは PG-07 で行う。
+- grant のテナントをテナントレジストリで検証するか(いまはスラッグ形式のみ検証)。
+
+1. ドメイン egress(warn 運用)を Grant に含めるか、egress-policy のまま adapter だけ用意するか。
+2. 承認必須の範囲(§5-2 の仮置き)の見直し。

@@ -55,6 +55,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
     file: 'libs/core/service/service-recording-review-approval.ts',
     consumer: 'service_recording_promotion',
   },
+  { file: 'libs/core/governance/grant-store.ts', consumer: 'grant_standing' },
 ];
 
 /**

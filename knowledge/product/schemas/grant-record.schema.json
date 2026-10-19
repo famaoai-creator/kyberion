@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/grant-record.schema.json",
+  "title": "Standing Grant Record (grant-record.v1)",
+  "description": "A scoped, time-bounded standing grant (PG-03). Stored at active/shared/runtime/grants/<tier>/<tenant|shared>/<grant_id>.json. Revocation keeps the record and adds `revoked`. Semantic rules (expiry within the capability's max_ttl_days, required scope keys, external_io => basis.approval_request_id) are enforced in code on create and on load.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "grant_id",
+    "capability",
+    "scope",
+    "purpose",
+    "granted_by",
+    "granted_at",
+    "expires_at",
+    "audit_event_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "grant-record.v1" },
+    "grant_id": { "type": "string", "pattern": "^GRT-[0-9]{8}-[a-f0-9]{12}$" },
+    "capability": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+        "meeting_series_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "meeting_urls": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
+      }
+    },
+    "purpose": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "granted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_id", "role", "assurance"],
+      "properties": {
+        "actor_id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "enum": ["operator", "member_self", "sovereign"] },
+        "assurance": { "type": "string", "enum": ["A0", "A1", "A2", "A3"] }
+      }
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_request_id", "approval_channel"],
+      "properties": {
+        "approval_request_id": { "type": "string", "minLength": 1 },
+        "approval_channel": { "type": "string", "minLength": 1 }
+      }
+    },
+    "granted_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "revoked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "by", "audit_event_id"],
+      "properties": {
+        "at": { "type": "string", "format": "date-time" },
+        "by": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "maxLength": 500 },
+        "audit_event_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "audit_event_id": { "type": "string", "minLength": 1 }
+  }
+}
