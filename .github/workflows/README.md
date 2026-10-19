@@ -2,7 +2,7 @@
 
 ## Current Contracts
 
-The repository currently maintains four execution workflows and one maintenance workflow.
+The repository currently maintains four execution workflows and two maintenance workflows.
 
 1. `ci.yml`
    Runs on pushes, pull requests to `main`, merge-queue (`merge_group`) entries, and the weekly
@@ -21,6 +21,12 @@ The repository currently maintains four execution workflows and one maintenance 
 5. `stale.yml`
    Performs issue and pull-request housekeeping on its own schedule or manual dispatch.
 
+6. `main-failure-triage.yml`
+   Runs after a failed `CI` or `Cross-OS Smoke` run on `main` (`workflow_run`). It downloads the
+   failed jobs' logs, classifies them with `scripts/ci_failure_triage.ts`, and opens or comments on
+   one `ci-main-red` issue per failing signature. Permissions: `actions: read`, `contents: read`,
+   `issues: write`.
+
 The four execution workflows use `.github/actions/setup-kyberion/action.yml` after checkout. The
 action owns the pinned pnpm version, Node setup, and frozen dependency install; workflow-specific
 native packages and test/build steps remain in each workflow.
@@ -31,6 +37,15 @@ The execution workflows are expected to separate **package/app build** from **op
 - operational validation still runs against built scripts under `dist/`
 
 They must not depend on removed `skills` scripts or on stale package-local build artifacts.
+
+## Failure triage
+
+Each main job in `ci.yml`, `pr-validation.yml` and `cross-os.yml` tees its test and check output
+into `$RUNNER_TEMP/kyberion-ci-output.log`. The job then ends with a `Triage failure` step
+(`if: failure()`, `.github/actions/ci-failure-triage`). That step writes each failure's class and
+next command to the job summary. Who acts on which class: operations-hygiene runbook §1
+"CI failure triage". The `cross-os.yml` `windows-native` job keeps its default PowerShell steps and
+has no triage step yet; read its failed step log directly.
 
 ## Workflow contract (enforced)
 

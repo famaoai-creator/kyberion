@@ -122,7 +122,8 @@ jobs:
           # relying on a developer shell's ambient role.
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        run: pnpm run check -- --scope full
+        shell: bash
+        run: pnpm run check -- --scope full 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       # After build: the checker imports @agent/core, which resolves to the
       # package dist. Running it pre-build broke every main push since the
@@ -144,7 +145,8 @@ jobs:
       - name: TypeScript type check
         # pr-validation.yml static-checks owns this on pull requests and merge_group.
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
-        run: pnpm run typecheck
+        shell: bash
+        run: pnpm run typecheck 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Validate capability discovery
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
@@ -164,6 +166,14 @@ jobs:
             exit 1
           fi
           node --import ./scripts/ts-loader.mjs scripts/check_source_shadows.ts
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: lint-and-validate
 
   # Independent of lint-and-validate (S4): a red lint/gate step must not skip
   # the clean-clone, intent-smoke or test signals — every job reports in one
@@ -345,7 +355,8 @@ jobs:
         env:
           KYBERION_PERSONA: ${{ matrix.test-suite == 'core' && 'worker' || '' }}
           MISSION_ROLE: ${{ matrix.test-suite == 'core' && 'mission_controller' || '' }}
-        run: ${{ matrix.command }}
+        shell: bash
+        run: ${{ matrix.command }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v6
@@ -354,6 +365,14 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 14
+
+      # Classify the captured output and print the next command per failure
+      # (operations-hygiene runbook §1 "CI failure triage").
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: test (${{ matrix.test-suite }}${{ matrix.shard && format(', {0}', matrix.shard) || '' }})
 
   security:
     runs-on: ubuntu-latest

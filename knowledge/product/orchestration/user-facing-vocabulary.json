@@ -8408,6 +8408,11 @@
         "ja": "CI 一式をローカルで実行",
         "qps-ploc": "⟦Řůñ ŧħė ƒůŀŀ ƇÏ şėɋůėñƈė ŀőƈȧŀŀẏ ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_ci_triage": {
+        "en": "Classify a red CI log and print the next command per failure",
+        "ja": "失敗した CI ログを分類し、失敗ごとに次のコマンドを表示",
+        "qps-ploc": "⟦Ƈŀȧşşïƒẏ ȧ řėḓ ƇÏ ŀőɠ ȧñḓ ṗřïñŧ ŧħė ñėẋŧ ƈőɱɱȧñḓ ṗėř ƒȧïŀůřė ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "cli_cmd_script_generate_types": {
         "en": "Regenerate types",
         "ja": "型定義を再生成",
