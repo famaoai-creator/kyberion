@@ -41,7 +41,7 @@ git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
 
 # 1〜4. 実装・commit のあと、PR 前確認（下の「エージェント必須手順」）
 git diff --name-only origin/main...HEAD
-pnpm check -- --scope pr
+pnpm check -- --changed     # pr gate 全部 + 変更パスに該当する full-only gate
 
 # 4.5 ミッション作業なら、学びを同じ PR に入れる（verify → distill → curate → promote --target-root）
 #    手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
@@ -54,7 +54,12 @@ pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
 cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/pr-body-<topic>.md
 #    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ Knowledge / 該当チェック欄を埋める
 
-# 7. push してから作成する
+# 6.5 push 前に preflight を通す（PR は作らない。title 検査 + `check --changed` + Knowledge 検査）
+pnpm kyberion pr preflight \
+  --title "<type>(<scope>): <summary>" \
+  --body-file active/shared/tmp/pr-body-<topic>.md
+
+# 7. push してから作成する（`pr create` も同じ readiness gate を実行する）
 git push -u origin <branch>
 pnpm kyberion pr create \
   --title "<type>(<scope>): <summary>" \
@@ -96,10 +101,10 @@ gh pr checks <number> --watch
 
 ### メモリ制約のある環境での同時実行数
 
-`pnpm check -- --scope pr --jobs 1` で検査を直列に実行できる。`--jobs` は整数 1〜6、
+`pnpm check -- --changed --jobs 1`（`--scope pr --jobs 1` も同様）で検査を直列に実行できる。`--jobs` は整数 1〜6、
 省略時は従来どおり 6。同じ全検査を実行し、判定基準・制限時間・結果順序・失敗時の終了コードは変えない。
 PR 作成時も `pnpm kyberion pr create --check-jobs 1 --title "<conventional title>" --body-file <body-file>`
-として、公開ヘルパーが実行する readiness 検査に同じ値を渡す。
+として、公開ヘルパーが実行する readiness 検査に同じ値を渡す（`pr preflight` も `--check-jobs` を受け付ける）。
 リソース不足による終了も失敗として扱い、単独検査の成功や `--skip-readiness` で代用しない。
 
 ## エージェント必須手順
@@ -107,18 +112,34 @@ PR 作成時も `pnpm kyberion pr create --check-jobs 1 --title "<conventional t
 実装と差分確認のあと、PR 作成より先に次を完了する。
 
 1. `git diff --name-only origin/main...HEAD`（または PR 対象 base）で変更範囲を列挙する。
-2. 下記「例外表」から該当行を選ぶ（該当しない行は実行しない）。
+2. 下記「例外表」から該当行を選ぶ（該当しない行は実行しない。`check --changed` が自動選択する gate は手で `--only` 実行しなくてよい）。
 3. 標準コマンドを実行する:
 
 ```bash
-pnpm check -- --scope pr
+pnpm check -- --changed              # base は origin/main（無ければ main）。別 base は --base <ref>
+# または PR を作らずに PR 作成時と同じ readiness 一式を通す
+pnpm kyberion pr preflight --title "<conventional title>" --body-file <body-file>
 ```
 
-4. 例外表の追加確認を実行し、生成物 drift があれば同じ commit に含める。
+`--changed` は merge-base 以降の commit 済み・未 commit・未追跡ファイルを集め、`pr` gate 全部に加えて
+`knowledge/product/governance/ci-gates.json` の `paths`（glob）がいずれかの変更ファイルに一致する
+`full` / `release` gate を実行する。追加で選ばれた gate と、一致したファイル・パターンを先頭に表示する。
+CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-registry / governance-rules / catalogs などの drift を
+ローカルで先に検出するための仕組みで、`--scope pr` / `--scope full` の意味は変わらない。
+`paths` を持たない full gate（`chronos-dom-contrast` は UI build が必要、`audit-continuity` は runtime の監査ログ依存）は
+`--changed` では選ばれないので、必要なら `--scope full --only <id>` で実行する。
+`pr` scope の `registration-tests` gate は、`tests/` の登録・境界ラチェット（shared-tmp allowlist、mission lookup、
+`node:fs` / `child_process` / managed process の allowlist、package boundary など）を実行する。
+
+4. 例外表の残りの追加確認（gate では表現できない手順）を実行し、生成物 drift があれば同じ commit に含める。
 5. push 後は `gh pr checks <number>` で確認し、**pending を pass と数えない**。
 6. 未実行 suite・環境依存・既知 failure は PR 本文の Test plan / Evidence に明記する。
 
-`pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）はデフォルトで手順 3 を実行する。緊急回避のみ `--skip-readiness`。エージェントは通常パスで skip しない。
+`pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）と `pnpm kyberion pr preflight`（`scripts/pr_preflight.ts`）は
+デフォルトで手順 3 の `pnpm check -- --changed` を実行する（`--base <branch>` を渡すと `origin/<branch>` を base にする）。
+`pr preflight` は PR title 検査と、`--body-file` を渡した場合の Knowledge 検査も行うが、gh には触れない。
+実装エージェント（または専用の preflight エージェント）は push 前に `pr preflight` を通して自分の push を gate する。
+緊急回避のみ `pr create --skip-readiness`。エージェントは通常パスで skip しない。
 
 `knowledge/` 配下を 1 ファイルでも変更したら、commit 前に `pnpm generate:knowledge-index` を実行して
 `knowledge/_index.md` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
@@ -138,8 +159,8 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 
 - [ ] `git status --short --branch` と差分一覧で、別作業・秘密情報・生成済み `dist/`・不要な runtime state が混ざっていない。
 - [ ] `git diff --check` が成功している。
-- [ ] `pnpm check -- --scope pr` が緑。
-- [ ] 例外表の該当行が緑（または N/A）。
+- [ ] `pnpm check -- --changed`（または `pnpm kyberion pr preflight`）が緑。
+- [ ] 例外表のうち `--changed` が自動選択しない行が緑（または N/A）。
 - [ ] 実装と生成物の変更が同じ commit に含まれている。
 - [ ] PR の base が `main`（または `develop`）で、タイトルが PR 全体を表す Conventional Commit になっている。
 - [ ] `git log --oneline origin/main..HEAD` がこの作業のコミットだけを含む。別の作業用ブランチから切ってしまうと base が `main` でも無関係なコミット（とその CI 失敗）が PR に混入する — `git rebase --onto origin/main <mix-in の起点>` で切り離す。
@@ -147,11 +168,19 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 - [ ] ミッション作業なら、学びの昇格記録が同じ PR に入り、`## Knowledge` 欄で全候補を宣言している。
 - [ ] push 後の `gh pr checks` がすべて pass（pending 待ちは未完了）。
 
-`pnpm check -- --scope pr` は build / typecheck / lint / test matrix の代替ではない。これらは PR workflow が実行するため、ローカルで追加実行した場合だけ実測済みとして記録する。CI failure は job 名・run ID・失敗 step・ログを先に記録し、原因仮説を更新してから修正する。
+`pnpm check -- --changed`（`--scope pr` も）は build / typecheck / lint / test matrix の代替ではない。これらは PR workflow が実行するため、ローカルで追加実行した場合だけ実測済みとして記録する。CI failure は job 名・run ID・失敗 step・ログを先に記録し、原因仮説を更新してから修正する。
 
 ## 例外表
 
 次の変更だけは、標準手順に加えて該当行を実行する。
+
+**gate で表現できる行は機械化済み**: 各行の `pnpm check -- --scope full --only <gate>`（`catalogs`、`vocabulary-types`、
+`pseudo-locale`、`op-registry`、`contract-schemas`、`governance-rules`、`work-scope-policy` など）は、
+`ci-gates.json` の gate ごとの `paths` に変更範囲として登録してあり、`pnpm check -- --changed`
+（`pr create` / `pr preflight` の readiness gate）が該当ファイルの変更時に自動で実行する。
+新しい full-only gate を追加するとき、または gate が読む入力が増えたときは、同じ PR でその gate の `paths` を更新する。
+この表に残るのは、生成コマンドの実行（`generate:*`、`sync component-inventory`、`--rebaseline`）、build 順序、
+手動確認など、gate の選択だけでは代替できない手順である。
 
 | 変更範囲                                              | 追加確認                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

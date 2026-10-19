@@ -18,6 +18,12 @@
           "script": { "type": "string", "minLength": 1 },
           "timeout_ms": { "type": "integer", "minimum": 1 },
           "baseline": { "type": "string", "minLength": 1 },
+          "paths": {
+            "description": "full/release gates only: repo-relative glob patterns (*, ?, **, {a,b}) of the inputs the gate reads. `pnpm check -- --changed` runs the gate when a changed file matches.",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
           "owner": { "type": "string", "minLength": 1 },
           "rationale": { "type": "string", "minLength": 1 }
         },

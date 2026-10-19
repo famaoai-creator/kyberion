@@ -3001,6 +3001,18 @@
       "native_help": true
     },
     {
+      "id": "script.pr.preflight",
+      "module": "scripts/pr_preflight.ts",
+      "command": "pr preflight",
+      "noun": "pr",
+      "verb": "preflight",
+      "audience": "operator",
+      "description": "cli_cmd_script_pr_preflight",
+      "group": "inspect",
+      "long_running": true,
+      "native_help": true
+    },
+    {
       "id": "script.pr.shadow-observe",
       "module": "scripts/pr_shadow.ts",
       "command": "pr shadow-observe",
