@@ -40,7 +40,28 @@ export type ReputationalClass = 'A' | 'B' | 'C' | 'D';
 /** Deterministic, boundary-derived information facts used for autonomous egress. */
 export type InformationCategory =
   'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown';
-export type RecipientClass = 'bound_customer' | 'approved_vendor' | 'public' | 'unknown';
+export const INFORMATION_CATEGORIES: readonly InformationCategory[] = [
+  'routine_business',
+  'personal_data',
+  'sensitive_business',
+  'unknown',
+];
+
+/**
+ * Who receives the facts. `known_counterparty` is a named outside party the
+ * organization already has a relationship with (a prospect, partner or an
+ * individual contact), which is narrower than `public` and is not a customer
+ * or a supplier under an approved procurement relationship.
+ */
+export type RecipientClass =
+  'bound_customer' | 'known_counterparty' | 'approved_vendor' | 'public' | 'unknown';
+export const RECIPIENT_CLASSES: readonly RecipientClass[] = [
+  'bound_customer',
+  'known_counterparty',
+  'approved_vendor',
+  'public',
+  'unknown',
+];
 export interface InformationFlowFacts {
   purpose: string;
   recipient_class?: RecipientClass;
@@ -272,6 +293,89 @@ export function evaluateInformationFlow(
   return [];
 }
 
+/** Actions that leave the organization with recipient facts (not inference processors). */
+export function isInformationBoundActionClass(actionClass: string): boolean {
+  return actionClass === 'send_message_external' || actionClass === 'publish_public';
+}
+
+export type InformationFlowFactsParse =
+  { ok: true; facts: InformationFlowFacts } | { ok: false; error: string };
+
+const PURPOSE_PATTERN = /^[a-z0-9][a-z0-9:_-]{0,127}$/;
+const PROCESSOR_PATTERN = /^[a-z0-9][a-z0-9 ._:-]{0,127}$/i;
+
+/**
+ * Validate caller-supplied facts at the trusted boundary (a validated pipeline
+ * step, never model output). Invalid facts are an input error: the caller must
+ * not silently fall back to "no facts", because that would turn a malformed
+ * declaration into a different (ambiguous) decision.
+ */
+export function parseInformationFlowFacts(value: unknown): InformationFlowFactsParse {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'information_flow must be an object' };
+  }
+  const raw = value as Record<string, unknown>;
+  const purpose = typeof raw.purpose === 'string' ? raw.purpose.trim() : '';
+  if (!PURPOSE_PATTERN.test(purpose)) {
+    return { ok: false, error: 'information_flow.purpose must be a lowercase id' };
+  }
+  const recipientClass = raw.recipient_class;
+  if (
+    recipientClass !== undefined &&
+    !RECIPIENT_CLASSES.includes(recipientClass as RecipientClass)
+  ) {
+    return { ok: false, error: 'information_flow.recipient_class is not a known recipient class' };
+  }
+  const processorId = raw.processor_id;
+  if (
+    processorId !== undefined &&
+    (typeof processorId !== 'string' || !PROCESSOR_PATTERN.test(processorId.trim()))
+  ) {
+    return { ok: false, error: 'information_flow.processor_id is invalid' };
+  }
+  if (recipientClass === undefined && processorId === undefined) {
+    return {
+      ok: false,
+      error: 'information_flow needs recipient_class (external action) or processor_id (inference)',
+    };
+  }
+  const categories = raw.categories;
+  if (
+    !Array.isArray(categories) ||
+    categories.length === 0 ||
+    categories.some((c) => !INFORMATION_CATEGORIES.includes(c as InformationCategory))
+  ) {
+    return {
+      ok: false,
+      error: 'information_flow.categories must be a non-empty list of known categories',
+    };
+  }
+  const attachmentCount = raw.attachment_count ?? 0;
+  if (
+    typeof attachmentCount !== 'number' ||
+    !Number.isInteger(attachmentCount) ||
+    attachmentCount < 0 ||
+    attachmentCount > 100
+  ) {
+    return {
+      ok: false,
+      error: 'information_flow.attachment_count must be an integer between 0 and 100',
+    };
+  }
+  return {
+    ok: true,
+    facts: {
+      purpose,
+      ...(recipientClass !== undefined
+        ? { recipient_class: recipientClass as RecipientClass }
+        : {}),
+      ...(processorId !== undefined ? { processor_id: processorId.trim() } : {}),
+      categories: [...new Set(categories as InformationCategory[])],
+      attachment_count: attachmentCount,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Validation — "authority cannot be exceeded"
 // ---------------------------------------------------------------------------
@@ -352,16 +456,12 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
       violations.push('information_flow.purposes must be non-empty strings');
     if (
       !Array.isArray(flow.recipient_classes) ||
-      flow.recipient_classes.some(
-        (v) => !['bound_customer', 'approved_vendor', 'public', 'unknown'].includes(v)
-      )
+      flow.recipient_classes.some((v) => !RECIPIENT_CLASSES.includes(v))
     )
       violations.push('information_flow.recipient_classes contains an invalid value');
     if (
       !Array.isArray(flow.categories) ||
-      flow.categories.some(
-        (v) => !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(v)
-      )
+      flow.categories.some((v) => !INFORMATION_CATEGORIES.includes(v))
     )
       violations.push('information_flow.categories contains an invalid value');
     if (!Number.isInteger(flow.max_attachments) || flow.max_attachments < 0)
@@ -373,9 +473,7 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
     if (
       flow.processing_categories !== undefined &&
       (!Array.isArray(flow.processing_categories) ||
-        flow.processing_categories.some(
-          (v) => !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(v)
-        ))
+        flow.processing_categories.some((v) => !INFORMATION_CATEGORIES.includes(v)))
     )
       violations.push('information_flow.processing_categories contains an invalid value');
   }

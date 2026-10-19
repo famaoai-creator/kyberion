@@ -13,6 +13,15 @@ import type { GovernedArtifactRole } from '@agent/core/artifacts';
 const isUsableApproval = (request: ApprovalRequestRecord): boolean =>
   !approvalUsabilityRefusal(request, 'approval_actuator_request_review');
 
+export interface EvaluateDecisionRightsInformationFlow {
+  purpose: string;
+  recipient_class?:
+    'bound_customer' | 'known_counterparty' | 'approved_vendor' | 'public' | 'unknown';
+  processor_id?: string;
+  categories: Array<'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'>;
+  attachment_count?: number;
+}
+
 export interface EvaluateDecisionRightsInput {
   operation_id: string;
   correlation_id: string;
@@ -23,6 +32,13 @@ export interface EvaluateDecisionRightsInput {
   amount?: number;
   /** Outside parties the decision reaches (messages, invitations). */
   recipients?: number;
+  /**
+   * Trusted recipient/processor facts for an information-bound decision
+   * (`send_message_external`, `publish_public`). The caller is a validated
+   * pipeline step, never model output. Absent facts keep the action with a
+   * human (the charter never infers a recipient).
+   */
+  information_flow?: EvaluateDecisionRightsInformationFlow;
   tenant_slug?: string;
   mission_id?: string;
   title?: string;
@@ -60,6 +76,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     decisionType: input.decision_type,
     amount: input.amount,
     ...(typeof input.recipients === 'number' ? { recipients: input.recipients } : {}),
+    ...(input.information_flow ? { informationFlow: input.information_flow } : {}),
   });
   if ((!evaluation || !evaluation.requiresEscalation) && !charter) {
     return { allowed: true, status: 'not_required' };

@@ -60,6 +60,25 @@ describe('evaluateDecisionRightsOp × accountability charter', () => {
     });
   });
 
+  it('forwards trusted recipient facts to the charter call site', () => {
+    const facts = {
+      purpose: 'meeting_scheduling',
+      recipient_class: 'known_counterparty' as const,
+      categories: ['routine_business' as const],
+      attachment_count: 0,
+    };
+    mocks.evaluateDecisionRights.mockReturnValue({ requiresEscalation: false });
+    mocks.charterInputForDecision.mockReturnValue(CHARTER);
+    evaluateDecisionRightsOp({
+      ...input,
+      decision_type: 'meeting_scheduling',
+      information_flow: facts,
+    });
+    expect(mocks.charterInputForDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ decisionType: 'meeting_scheduling', informationFlow: facts })
+    );
+  });
+
   it('rights escalation without a charter still goes to the gate exactly as before, with no charter key', () => {
     mocks.evaluateDecisionRights.mockReturnValue({ requiresEscalation: true });
     mocks.charterInputForDecision.mockReturnValue(undefined);

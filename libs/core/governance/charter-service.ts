@@ -18,11 +18,15 @@ import type { ActorRef } from '../actor.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { t } from '../t.js';
-import type {
-  Charter,
-  CharterEnvelope,
-  ExternalEffectClass,
-  ReputationalClass,
+import {
+  INFORMATION_CATEGORIES,
+  RECIPIENT_CLASSES,
+  type Charter,
+  type CharterEnvelope,
+  type ExternalEffectClass,
+  type InformationCategory,
+  type RecipientClass,
+  type ReputationalClass,
 } from './accountability-charter.js';
 import {
   delegableCharterDecisions,
@@ -66,6 +70,15 @@ export interface CharterForm {
   processing_categories: Array<
     'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'
   >;
+  /**
+   * External-recipient scope explicitly delegated by the owner. The three
+   * lists are all-or-nothing: a purpose without a recipient class (or vice
+   * versa) cannot be checked, so it is rejected rather than guessed.
+   */
+  recipient_purposes: string[];
+  recipient_classes: RecipientClass[];
+  recipient_categories: InformationCategory[];
+  max_attachments: number;
   /** Vocabulary decision types delegated by name (charter-decision-vocabulary.json). */
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
@@ -180,6 +193,51 @@ export function parseCharterForm(
     (processingPurposes.length > 0 || processingCategories.length > 0)
   )
     return { ok: false, error: 'processing scope requires at least one approved processor' };
+  const recipientPurposes = parseStringList(r.recipient_purposes ?? [], 20);
+  if (!recipientPurposes)
+    return { ok: false, error: 'recipient_purposes must contain at most 20 valid purpose ids' };
+  const classesRaw = r.recipient_classes ?? [];
+  if (
+    !Array.isArray(classesRaw) ||
+    classesRaw.some((v) => !RECIPIENT_CLASSES.includes(String(v) as RecipientClass))
+  )
+    return { ok: false, error: 'recipient_classes contains an invalid recipient class' };
+  const recipientClasses = [
+    ...new Set(classesRaw as RecipientClass[]),
+  ].sort() as CharterForm['recipient_classes'];
+  const recipientCategoriesRaw = r.recipient_categories ?? [];
+  if (
+    !Array.isArray(recipientCategoriesRaw) ||
+    recipientCategoriesRaw.some(
+      (v) => !INFORMATION_CATEGORIES.includes(String(v) as InformationCategory)
+    )
+  )
+    return { ok: false, error: 'recipient_categories contains an invalid category' };
+  const recipientCategories = [
+    ...new Set(recipientCategoriesRaw as InformationCategory[]),
+  ].sort() as CharterForm['recipient_categories'];
+  const recipientScopeParts = [
+    recipientPurposes.length,
+    recipientClasses.length,
+    recipientCategories.length,
+  ];
+  if (recipientScopeParts.some((n) => n > 0) && recipientScopeParts.some((n) => n === 0)) {
+    return {
+      ok: false,
+      error: 'recipient scope requires purposes, classes and categories together',
+    };
+  }
+  const maxAttachments = r.max_attachments ?? 0;
+  if (
+    typeof maxAttachments !== 'number' ||
+    !Number.isInteger(maxAttachments) ||
+    maxAttachments < 0 ||
+    maxAttachments > 20
+  )
+    return { ok: false, error: 'max_attachments must be a whole number of 0..20' };
+  if (maxAttachments > 0 && recipientScopeParts.every((n) => n === 0)) {
+    return { ok: false, error: 'max_attachments requires a delegated recipient scope' };
+  }
   return {
     ok: true,
     form: {
@@ -193,6 +251,10 @@ export function parseCharterForm(
       approved_processors: approvedProcessors,
       processing_purposes: processingPurposes,
       processing_categories: processingCategories,
+      recipient_purposes: recipientPurposes,
+      recipient_classes: recipientClasses,
+      recipient_categories: recipientCategories,
+      max_attachments: maxAttachments,
       delegated_decisions: delegatedDecisions,
       supersedes_decision_rights: r.supersedes_decision_rights === true,
       deputies,
@@ -230,6 +292,21 @@ export function renderAcceptanceStatement(input: {
   const expires = new Date(now.getTime() + form.expires_in_days * 86_400_000)
     .toISOString()
     .slice(0, 10);
+  const recipientPurposes = new Set(form.recipient_purposes);
+  const recipientClasses = new Set(form.recipient_classes);
+  const recipientCategories = new Set(form.recipient_categories);
+  if (form.allow_customer_outbound) {
+    recipientPurposes.add('customer_service');
+    recipientClasses.add('bound_customer');
+    recipientCategories.add('routine_business');
+  }
+  const recipientLine =
+    recipientPurposes.size > 0
+      ? `Delegated external recipients: purposes ${[...recipientPurposes].sort().join(', ')}; ` +
+        `recipients ${[...recipientClasses].sort().join(', ')}; ` +
+        `categories ${[...recipientCategories].sort().join(', ')}; ` +
+        `attachments up to ${form.max_attachments}. New recipients, other categories and larger attachments require human approval.`
+      : 'External recipient automation is disabled (no recipient scope delegated).';
   const block = (locale: 'ja' | 'en'): string => {
     const say = (key: string, params?: Record<string, string>) =>
       t(`decision:charter_statement_${key}` as Parameters<typeof t>[0], params, locale);
@@ -246,6 +323,7 @@ export function renderAcceptanceStatement(input: {
       form.allow_customer_outbound
         ? 'Unattended delivery is limited to a routine greeting for a bound customer. Attachments, personal or sensitive data, and all other content require human approval.'
         : 'Customer outbound automation is disabled.',
+      recipientLine,
       `Approved inference processors: ${form.approved_processors.length ? form.approved_processors.join(', ') : 'none'}. Purposes: ${form.processing_purposes.join(', ') || 'none'}. Categories: ${form.processing_categories.join(', ') || 'none'}. Training and retention remain governed by separate provider evidence.`,
       form.delegated_decisions.length > 0
         ? say('decisions_on', { decisions: decisionLabels(locale) })
@@ -277,6 +355,14 @@ export function envelopeFromForm(
   form: CharterForm,
   vocabulary: CharterDecisionVocabulary = loadCharterDecisionVocabulary()
 ): CharterEnvelope {
+  const recipientPurposes = new Set(form.recipient_purposes);
+  const recipientClasses = new Set(form.recipient_classes);
+  const recipientCategories = new Set(form.recipient_categories);
+  if (form.allow_customer_outbound) {
+    recipientPurposes.add('customer_service');
+    recipientClasses.add('bound_customer');
+    recipientCategories.add('routine_business');
+  }
   const externalEffects: CharterEnvelope['external_effects'] = {
     ...(form.per_action > 0 ? { payment: 'allow' as const } : {}),
     ...(form.allow_customer_outbound ? { send_message_external: 'allow' as const } : {}),
@@ -311,10 +397,13 @@ export function envelopeFromForm(
     ...(form.supersedes_decision_rights ? { supersedes_decision_rights: true } : {}),
     ...(form.delegated_decisions.length > 0 ? { delegated_decisions: delegatedDecisions } : {}),
     information_flow: {
-      purposes: form.allow_customer_outbound ? ['customer_service'] : [],
-      recipient_classes: form.allow_customer_outbound ? ['bound_customer'] : [],
-      categories: form.allow_customer_outbound ? ['routine_business'] : [],
-      max_attachments: 0,
+      // Customer outbound is a convenience flag for the greeting path; explicit
+      // recipient delegation opens only the purposes, classes and categories
+      // the owner named (plus the greeting scope when that flag is on).
+      purposes: [...recipientPurposes].sort(),
+      recipient_classes: [...recipientClasses].sort(),
+      categories: [...recipientCategories].sort(),
+      max_attachments: form.max_attachments,
       // An empty list is an explicit denial for newly accepted charters.
       // Legacy charters without information_flow retain their prior behavior.
       processor_ids: form.approved_processors,
@@ -408,6 +497,10 @@ export interface CharterView {
   approved_processors: string[];
   processing_purposes: string[];
   processing_categories: CharterForm['processing_categories'];
+  recipient_purposes: string[];
+  recipient_classes: CharterForm['recipient_classes'];
+  recipient_categories: CharterForm['recipient_categories'];
+  max_attachments: number;
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
   report: AccountabilityReport;
@@ -443,6 +536,10 @@ export function viewCharter(
     approved_processors: [...(charter.envelope.information_flow?.processor_ids ?? [])],
     processing_purposes: [...(charter.envelope.information_flow?.processing_purposes ?? [])],
     processing_categories: [...(charter.envelope.information_flow?.processing_categories ?? [])],
+    recipient_purposes: [...(charter.envelope.information_flow?.purposes ?? [])],
+    recipient_classes: [...(charter.envelope.information_flow?.recipient_classes ?? [])],
+    recipient_categories: [...(charter.envelope.information_flow?.categories ?? [])],
+    max_attachments: charter.envelope.information_flow?.max_attachments ?? 0,
     delegated_decisions: Object.entries(charter.envelope.delegated_decisions ?? {})
       .filter(([, policy]) => policy !== 'forbid')
       .map(([type]) => type)
