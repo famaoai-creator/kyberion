@@ -1,0 +1,5 @@
+---
+category: Fixed
+---
+
+- **Agents can rebuild a missing `dist/` instead of deadlocking.** When the Kyberion hook runtime (`dist/scripts/claude_code_hook.js`) is missing, the Claude `PreToolUse` hook still denies Edit/Write and every other shell command, but now lets a minimal exact-shape bootstrap allowlist through (`pnpm install [--frozen-lockfile] [--prefer-offline]`, `pnpm build`, `pnpm --filter @agent/core build`, `bash .claude/hooks/session-start.sh`, read-only `git status|log|fetch`, `git switch`, `git checkout -b`); any shell metacharacter disqualifies a command, and the deny reason names the commands to run. The cloud `session-start.sh` hook no longer exits silently: `nvm.sh` is sourced safely (it used to exit 3 under `set -eu`), it falls back to an existing Node, continues with a warning when Node 24 is unavailable, reports the failing line and a next step on stderr, and logs to `active/shared/tmp/system/session-start/session-start.log`. See `docs/developer/CLOUD_AGENT_ENVIRONMENT.md`.
