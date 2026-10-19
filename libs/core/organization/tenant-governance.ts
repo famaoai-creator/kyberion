@@ -640,6 +640,39 @@ export interface ProviderAttestationApprovalRequest {
   approve_command: string;
 }
 
+function providerAttestationApprovalScope(slug: string) {
+  return { tier: 'confidential', tenant_slug: slug, scope_kind: 'tenant' } as const;
+}
+
+const PROVIDER_ATTESTATION_DECISION_ROLES = ['sovereign', 'owner', 'approver'] as const;
+
+function matchesProviderAttestationApprovalWorkflow(record: ApprovalRequestRecord): boolean {
+  const workflow = record.workflow;
+  return Boolean(
+    workflow?.mode === 'any_of' &&
+    workflow.stages.length === 0 &&
+    workflow.requiredRoles.length === PROVIDER_ATTESTATION_DECISION_ROLES.length &&
+    workflow.approvals.length === PROVIDER_ATTESTATION_DECISION_ROLES.length &&
+    PROVIDER_ATTESTATION_DECISION_ROLES.every(
+      (role) =>
+        workflow.requiredRoles.includes(role) &&
+        workflow.approvals.some((entry) => entry.role === role)
+    )
+  );
+}
+
+function matchesProviderAttestationApprovalScope(
+  record: ApprovalRequestRecord,
+  slug: string
+): boolean {
+  // Tenant-wide egress must not reuse an unscoped or more narrowly scoped
+  // decision. Keep legacy records immutable and open a fresh scoped request.
+  return (
+    computeApprovalPayloadHash({ scope: record.scope }) ===
+    computeApprovalPayloadHash({ scope: providerAttestationApprovalScope(slug) })
+  );
+}
+
 /**
  * Open (or reuse) the human approval a `training_use: none` attestation needs.
  * Same trust shape as the mission scope-approve flow: the request is hash-bound
@@ -672,6 +705,8 @@ export function requestTenantProviderAttestationApproval(
     status: ['pending', 'approved'],
   }).find(
     (record) =>
+      matchesProviderAttestationApprovalScope(record, slug) &&
+      matchesProviderAttestationApprovalWorkflow(record) &&
       record.accountability?.payloadHash === payloadHash &&
       !record.applyClaim &&
       !isApprovalRequestExpired(record) &&
@@ -716,6 +751,7 @@ export function requestTenantProviderAttestationApproval(
     `Effect if approved: confidential and personal material of tenant '${slug}' may be sent to '${provider}' (for example LLM mission distillation) until the attestation expires.`,
   ].join('\n');
   const record = createApprovalRequest('mission_controller', {
+    scope: providerAttestationApprovalScope(slug),
     channel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
     storageChannel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
     threadTs: `${slug}:${provider}`,
@@ -748,10 +784,12 @@ export function requestTenantProviderAttestationApproval(
     },
     workflow: {
       workflowId: `xp-03-attest-${slug}-${provider}`,
-      mode: 'all_required',
-      requiredRoles: ['sovereign'],
+      // Browser decisions retain the member's real tenant role; the CLI's
+      // existing sovereign path remains valid. Any one human decides once.
+      mode: 'any_of',
+      requiredRoles: [...PROVIDER_ATTESTATION_DECISION_ROLES],
       stages: [],
-      approvals: [{ role: 'sovereign', status: 'pending' }],
+      approvals: PROVIDER_ATTESTATION_DECISION_ROLES.map((role) => ({ role, status: 'pending' })),
     },
     accountability: {
       finalDecision: 'human_only',
@@ -775,7 +813,10 @@ function assertProviderAttestationApproval(
   const approval = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, approvalRequestId);
   const humanApproval = approval?.workflow?.approvals?.find(
     (entry) =>
-      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+      PROVIDER_ATTESTATION_DECISION_ROLES.some((role) => role === entry.role) &&
+      entry.status === 'approved' &&
+      entry.decidedByType === 'human' &&
+      entry.authenticated === true
   );
   if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
     throw new Error(
@@ -789,6 +830,11 @@ function assertProviderAttestationApproval(
   }
   if (isApprovalRequestExpired(approval)) {
     throw new Error(`[POLICY_VIOLATION] provider attestation approval has expired: ${approval.id}`);
+  }
+  if (!matchesProviderAttestationApprovalScope(approval, input.slug)) {
+    throw new Error(
+      '[POLICY_VIOLATION] provider attestation approval requires the exact confidential tenant scope; request a new approval'
+    );
   }
   if (
     approval.accountability?.effectBinding !==

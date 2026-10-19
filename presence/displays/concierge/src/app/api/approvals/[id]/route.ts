@@ -68,7 +68,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       { tenant_slug?: string; tenantSlug?: string } | undefined;
     const loopContext = record.work_loop?.context as { tenant_slug?: string } | undefined;
     const resourceTenant =
-      requesterContext?.tenant_slug || requesterContext?.tenantSlug || loopContext?.tenant_slug;
+      record.scope?.tenant_slug ||
+      requesterContext?.tenant_slug ||
+      requesterContext?.tenantSlug ||
+      loopContext?.tenant_slug;
     const decisionDenied = conciergeDecisionDenied(resolved.context, resourceTenant);
     if (decisionDenied) return decisionDenied;
     const decidedBy = resolveConciergeDecidedBy(resolved.context, resourceTenant);
