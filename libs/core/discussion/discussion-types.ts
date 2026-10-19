@@ -26,6 +26,13 @@ export interface DiscussionScope {
   tier?: 'public' | 'confidential' | 'personal';
 }
 
+export interface DiscussionRequestBinding {
+  request_id: string;
+  actor_sha256: string;
+  scope_sha256: string;
+  intent_sha256: string;
+}
+
 export interface DiscussionParticipant {
   id: string;
   /** Organization agent (profile id) that fills this seat. */
@@ -150,6 +157,8 @@ export type DiscussionEvent = EventBase &
         scope: DiscussionScope;
         config: DiscussionConfig;
         created_by: string;
+        /** Immutable create-request provenance; absent on legacy/direct rooms. */
+        request_binding?: DiscussionRequestBinding;
       }
     | {
         type: 'team_formed';

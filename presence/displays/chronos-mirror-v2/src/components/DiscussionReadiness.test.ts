@@ -162,21 +162,20 @@ describe('Discussion readiness static markup (no rendered browser interaction)',
 });
 
 describe('uncertain real-brief create disclosure', () => {
-  it('separates a read-only retry from any new generation and asks users to inspect existing rooms', () => {
+  it('requires original request proof rather than setup checks or the recent-room list', () => {
     const html = renderToStaticMarkup(createElement(DiscussionCreateUncertainty, { locale: 'en' }));
-    expect(html).toContain('Before explicitly choosing any new generation, inspect Recent rooms');
+    expect(html).toContain('Check the original request receipt before any new room');
     expect(html).toContain('lost create response does not prove that no run started');
-    expect(html).toContain('Retry check repeats only the read-only setup check');
-    expect(html).toContain('it does not retry generation');
+    expect(html).toContain('Setup checks and Recent rooms do not resolve a pending create request');
     expect(html).not.toContain('<button');
     expect(html).not.toContain('idempotent');
   });
   it('provides the same uncertain-create boundary in Japanese', () => {
     const html = renderToStaticMarkup(createElement(DiscussionCreateUncertainty, { locale: 'ja' }));
-    expect(html).toContain('「過去のルーム」を確認');
+    expect(html).toContain('元のリクエストの受付記録を確認');
     expect(html).toContain('実行が開始されなかったとは限りません');
-    expect(html).toContain('読み取り専用の設定確認');
-    expect(html).toContain('生成を再実行しません');
+    expect(html).toContain('設定確認や「過去のルーム」への表示では');
+    expect(html).toContain('未確認の作成リクエストは解消されません');
   });
 });
 

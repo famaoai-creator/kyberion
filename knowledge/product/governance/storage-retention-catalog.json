@@ -704,6 +704,12 @@
       "note": "G02: discussion rooms — events, minutes.md, brief.html (libs/core/discussion/discussion-store.ts, discussion-outcomes.ts). Outcomes are referenced after the room closes; human retention decision."
     },
     {
+      "path": "active/shared/runtime/discussion-create-requests",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Permanent actor/source/canonical-scope-bound Discussion create reservations and terminal receipts. No TTL or status deletion: missing evidence cannot authorize duplicate provider execution. Confidential tenant partitions only; missing selected tenant fails closed. Human retention decisions must preserve no-replay tombstones."
+    },
+    {
       "path": "active/shared/runtime/peer-recovery-quarantine",
       "artifact_class": "evidence",
       "action": "review_required",
