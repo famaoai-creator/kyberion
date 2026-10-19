@@ -12,24 +12,24 @@
   "dependencies": {
     "@agent/core": "workspace:*",
     "@agent/shared-ui": "workspace:*",
-    "@copilotkit/react-core": "^1.76.0",
-    "@copilotkit/react-ui": "^1.76.0",
-    "@copilotkit/runtime": "^1.76.0",
+    "@copilotkit/react-core": "^1.79.1",
+    "@copilotkit/react-ui": "^1.79.1",
+    "@copilotkit/runtime": "^1.79.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.49.0",
-    "next": "^16.3.8",
+    "lucide-react": "^1.59.0",
+    "next": "^16.4.2",
     "node-pty": "^1.1.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
     "vscode-languageserver-types": "^3.18.4"
   },
   "devDependencies": {
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
   }
