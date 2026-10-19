@@ -41,6 +41,7 @@ import {
 import { assertDiagnosticHooksAbsent } from './pipeline-diagnostic-profile.js';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { nowIso } from '@agent/core/foundation/time';
 import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
@@ -599,7 +600,7 @@ export async function requestHumanExecutionAuthorization<T>(
     applyResult: {
       result: 'success',
       appliedBy: target.agentId,
-      appliedAt: new Date().toISOString(),
+      appliedAt: nowIso(),
     },
   });
   return result;
