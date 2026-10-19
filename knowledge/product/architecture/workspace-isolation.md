@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, workspace, git, multi-provider, co-execution, storage, ws-01, ws-07]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-26
+last_updated: 2026-10-19
 ---
 
 # Workspace Isolation
@@ -140,7 +140,73 @@ session staged:
 - `createSessionWorktree({ sessionId, repoRoot?, ref? })` creates an opt-in
   detached worktree under `.worktrees/<sessionId>` for parallel writers, owner
   path only, budget-checked and registered as `git-worktree` before
-  `git worktree add`.
+  `git worktree add`. For a long-lived worktree per provider agent on its own
+  branch, use the agent worktree CLI (M2 below).
+
+## M2 — Agent worktrees (one worktree per agent)
+
+The recommended setup for several provider agents developing in parallel.
+WS-01/02 isolate a delegated worker's _index_ inside one checkout, but the
+branch, working tree and `dist/` stay shared: when one agent switches branch
+or rebuilds, every other agent's runtime goes stale. An agent worktree gives
+each agent its own checkout instead.
+
+`libs/core/workforce/agent-worktree.ts`, CLI `scripts/agent_worktree.ts`:
+
+- `pnpm kyberion worktree create <name> [--branch <b>] [--base <ref>] [--agent <provider>] [--mission <id>] [--bootstrap]`
+  checks out `--branch` (default `worktree/<name>`) at
+  `.worktrees/agent-<name>`. An existing local branch is checked out as is
+  (git refuses one already checked out elsewhere — the clobber guard); a new
+  one is created from `--base` (default `origin/main` when it resolves, else
+  `HEAD`) with `--no-track`, so a later `git push` never targets the base.
+  The command does not fetch: run `git fetch origin` first for a fresh base.
+  The directory is budget-checked (WS-06) and registered in the workspace
+  ledger as `git-worktree` (owner `session_id: agent-worktree-<name>`, plus
+  `mission_id` when given) **before** `git worktree add`, and the record is
+  dropped again when the add fails. A path inside the checkout must be
+  gitignored (`git check-ignore`), so a worktree never lands in tracked
+  content. `--bootstrap` runs `pnpm install --prefer-offline` and
+  `pnpm run build` inside it and writes `dist/.session-build-head` (the same
+  stamp the cloud session-start hook uses). The output ends with the
+  `cd <path> && <provider cli>` launch hint; `--agent` is one of `claude`,
+  `codex`, `gemini`, `devin`, `agy`, `grok`, `copilot`, `cursor`, `opencode`.
+- `pnpm kyberion worktree list` shows name, branch (and what is actually
+  checked out when it differs), agent, `created_at`, dist freshness
+  (`fresh` = stamp equals HEAD, `stale`, `unstamped`, `missing`) and the live
+  owner of the WorkItem linked to the branch's change request
+  (`resolveChangeRequestOwner` from
+  `libs/core/workforce/work-item-change-request.ts`; `-` when nobody holds a
+  live claim).
+- `pnpm kyberion worktree remove <name> [--force]` refuses while the worktree
+  has uncommitted or unreachable work (`describeUnsavedWorktreeWork`), its
+  recorded mission is not terminal (an unresolvable mission counts as not
+  terminal), or the branch's WorkItem has a live claim. `--force` overrides
+  and reports what it overrode. Removal goes through
+  `deleteRegisteredWorkspace` (`git worktree remove` on the owner path); the
+  branch is kept.
+
+Why `.worktrees/` and not a sibling directory: the workspace ledger accepts
+only canonical, symlink-free paths inside the repository under an allowed
+root, and `.worktrees/` already is one — gitignored and excluded from ESLint,
+Prettier and Vitest — so deletion, the disk budget and the WS-07 sweep apply
+unchanged. The sweep never reclaims a live agent worktree without a mission
+(only released entries, or live ones whose mission is terminal, past the
+orphan TTL). One consequence of nesting: an un-bootstrapped worktree resolves
+packages upward into the parent checkout's `node_modules/`, so bootstrap it
+before running anything there.
+
+The registry `active/shared/runtime/agent-worktrees/registry.json` (schema
+`knowledge/product/schemas/agent-worktree-registry.schema.json`, updated
+under a lock) holds only the agent-facing metadata (name, branch, base,
+agent, mission, ledger `workspace_id`); the ledger stays the only source of
+ownership for the directory.
+
+Authority: `create`, `remove` and the bootstrap are operator-only. The CLI
+refuses a delegated worker (`KYBERION_DELEGATION_DEPTH > 0`) and a process
+whose explicit `SYSTEM_ROLE` / `MISSION_ROLE` is not `mission_controller` /
+`orchestrator` / `mission_owner`; it then runs in the `mission_controller`
+execution context, and the library re-checks with `assertMissionOwnerPath`
+(the WS-03 guard). `list` is read-only.
 
 ## WS-05 — Workspace ledger
 

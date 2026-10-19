@@ -4081,6 +4081,40 @@
       "args": ["list"],
       "description": "cli_cmd_script_workspace_list",
       "group": "inspect"
+    },
+    {
+      "id": "script.worktree.create",
+      "module": "scripts/agent_worktree.ts",
+      "command": "worktree create",
+      "noun": "worktree",
+      "verb": "create",
+      "audience": "operator",
+      "args": ["create"],
+      "description": "cli_cmd_script_worktree_create",
+      "group": "operate",
+      "long_running": true
+    },
+    {
+      "id": "script.worktree.list",
+      "module": "scripts/agent_worktree.ts",
+      "command": "worktree list",
+      "noun": "worktree",
+      "verb": "list",
+      "audience": "operator",
+      "args": ["list"],
+      "description": "cli_cmd_script_worktree_list",
+      "group": "inspect"
+    },
+    {
+      "id": "script.worktree.remove",
+      "module": "scripts/agent_worktree.ts",
+      "command": "worktree remove",
+      "noun": "worktree",
+      "verb": "remove",
+      "audience": "operator",
+      "args": ["remove"],
+      "description": "cli_cmd_script_worktree_remove",
+      "group": "operate"
     }
   ],
   "deprecated_script_aliases": [],

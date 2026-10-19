@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-worktree-registry.schema.json",
+  "title": "Agent worktree registry",
+  "description": "M2: per-agent git worktrees created by `pnpm kyberion worktree create`. Each entry's directory is owned by its workspace ledger record (workspace_id); this registry only carries the agent-facing metadata.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+      "path": { "type": "string", "minLength": 1 },
+      "branch": { "type": "string", "minLength": 1 },
+      "base": { "type": ["string", "null"] },
+      "agent": {
+        "type": "string",
+        "enum": [
+          "claude",
+          "codex",
+          "gemini",
+          "devin",
+          "agy",
+          "grok",
+          "copilot",
+          "cursor",
+          "opencode"
+        ]
+      },
+      "mission_id": { "type": "string", "minLength": 1 },
+      "workspace_id": { "type": "string", "pattern": "^ws-[a-z0-9-]+$" },
+      "repo_root": { "type": "string", "minLength": 1 },
+      "created_at": { "type": "string", "minLength": 1 }
+    },
+    "required": ["name", "path", "branch", "base", "workspace_id", "repo_root", "created_at"]
+  }
+}

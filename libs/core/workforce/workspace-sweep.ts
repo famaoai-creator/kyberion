@@ -87,7 +87,8 @@ function repoRelativePosix(absolutePath: string): string {
 
 const TERMINAL_MISSION_STATUSES = new Set(['completed', 'failed', 'archived']);
 
-function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
+/** Whether the owning mission resolves to a terminal status (unresolvable = not terminal). */
+export function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
   if (!owner.mission_id) return false;
   try {
     // SC-07: owner resolution goes through the shared owner-scope resolver;

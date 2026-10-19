@@ -136,6 +136,17 @@ pnpm kyberion workspace gc --apply     # delete orphaned, ledger-registered work
 
 `gc` only ever deletes workspaces the ledger registered, never arbitrary directories.
 
+### Agent worktrees (parallel provider agents)
+
+```bash
+pnpm kyberion worktree create codex-a --agent codex --bootstrap   # .worktrees/agent-codex-a on branch worktree/codex-a
+pnpm kyberion worktree create rev --branch feat/x                 # check out an existing branch
+pnpm kyberion worktree list                                       # branch, agent, dist freshness, change-request owner
+pnpm kyberion worktree remove codex-a                             # refuses uncommitted work or a live claim unless --force
+```
+
+One worktree per agent keeps each agent's branch and `dist/` its own. Run these from an operator shell, not from inside a delegated worker.
+
 ## Secrets
 
 The secret value is never passed on the command line. It comes from a hidden prompt, or from `--from-file` under `active/shared/tmp/`.
