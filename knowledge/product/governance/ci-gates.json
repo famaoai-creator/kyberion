@@ -342,6 +342,16 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_catalog_integrity.js"],
+      "paths": [
+        "knowledge/**",
+        "libs/core/**",
+        "presence/displays/**",
+        "scripts/lib/pad-ui/**",
+        "scripts/cli.ts",
+        "scripts/check_catalog_integrity.ts",
+        "scripts/generate_knowledge_index.ts",
+        "scripts/design-token-utils.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks catalog and knowledge index integrity."
     },
@@ -350,6 +360,11 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_facet_purity.js"],
+      "paths": [
+        "knowledge/product/facets/**",
+        "libs/core/**/facet*",
+        "scripts/check_facet_purity.ts"
+      ],
       "owner": "quality",
       "rationale": "Checks facet purity boundaries."
     },
@@ -358,6 +373,19 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_op_registry.ts", "--check"],
+      "paths": [
+        "libs/actuators/**",
+        "libs/core/actuator/**",
+        "libs/core/actuator-manifest-index.ts",
+        "libs/core/pipeline/op-input-contract*",
+        "libs/core/pipeline/pipeline-contract.ts",
+        "knowledge/product/governance/actuator-op-registry.json",
+        "knowledge/product/orchestration/actuator-op-discovery.json",
+        "knowledge/product/schemas/actuator-manifest.schema.json",
+        "knowledge/product/schemas/actuator-op-registry.schema.json",
+        "scripts/generate_op_registry.ts",
+        ".prettierrc*"
+      ],
       "owner": "operations",
       "rationale": "Checks actuator operation registry freshness."
     },
@@ -370,6 +398,15 @@
         "./scripts/ts-loader.mjs",
         "scripts/generate_vocabulary_types.ts",
         "--check"
+      ],
+      "paths": [
+        "knowledge/product/orchestration/user-facing-vocabulary.json",
+        "knowledge/product/schemas/user-facing-vocabulary.schema.json",
+        "libs/core/locale-normalize.ts",
+        "libs/core/knowledge/vocabulary-*",
+        "libs/shared-ui/vanilla/kyberion-ui-vocabulary.js",
+        "scripts/generate_vocabulary_types.ts",
+        ".prettierrc*"
       ],
       "owner": "experience",
       "rationale": "Checks generated vocabulary types."
@@ -384,6 +421,13 @@
         "scripts/generate_pseudo_locale.ts",
         "--check"
       ],
+      "paths": [
+        "knowledge/product/orchestration/user-facing-vocabulary.json",
+        "knowledge/product/schemas/user-facing-vocabulary.schema.json",
+        "libs/core/message-format.ts",
+        "libs/core/knowledge/vocabulary-*",
+        "scripts/generate_pseudo_locale.ts"
+      ],
       "owner": "experience",
       "rationale": "Checks generated pseudo-locale output."
     },
@@ -397,6 +441,12 @@
         "scripts/check_deprecated_wisdom_ops.ts",
         "--fail"
       ],
+      "paths": [
+        "libs/actuators/wisdom-actuator/**",
+        "pipelines/**",
+        "knowledge/product/pipeline-templates/**",
+        "scripts/check_deprecated_wisdom_ops.ts"
+      ],
       "owner": "governance",
       "rationale": "Prevents retired Wisdom aliases in pipeline catalogs."
     },
@@ -405,6 +455,13 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_wisdom_forwarders.ts"],
+      "paths": [
+        "libs/actuators/wisdom-actuator/**",
+        "libs/core/actuator/actuator-op-registry.ts",
+        "knowledge/product/governance/actuator-op-registry.json",
+        "knowledge/product/pipeline-templates/**",
+        "scripts/check_wisdom_forwarders.ts"
+      ],
       "owner": "operations",
       "rationale": "Checks Wisdom forwarder targets."
     },
@@ -446,6 +503,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_governance_rules.js"],
+      "paths": ["knowledge/**", "libs/**", "scripts/**", "pipelines/**"],
       "owner": "governance",
       "rationale": "Checks governed catalog rules."
     },
@@ -454,6 +512,12 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_work_scope_policy.ts"],
+      "paths": [
+        "knowledge/product/governance/work-scope-policy.json",
+        "knowledge/product/schemas/work-scope-policy.schema.json",
+        "libs/core/workforce/work-scope-*",
+        "scripts/check_work_scope_policy.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks mandatory work-scope policy emitters."
     },
@@ -462,6 +526,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_mission_gate_docs.ts"],
+      "paths": ["knowledge/**", "docs/**", "AGENTS.md", "scripts/check_mission_gate_docs.ts"],
       "owner": "governance",
       "rationale": "Checks canonical mission-gate documentation."
     },
@@ -470,6 +535,11 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_design_contrast.ts"],
+      "paths": [
+        "knowledge/public/design-patterns/**",
+        "libs/core/**",
+        "scripts/check_design_contrast.ts"
+      ],
       "owner": "experience",
       "rationale": "Checks design contrast contracts."
     },
@@ -500,6 +570,14 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_ui_ux_governance.js"],
+      "paths": [
+        "presence/displays/**",
+        "libs/shared-ui/**",
+        "scripts/lib/pad-ui/**",
+        "scripts/sovereign_dashboard.ts",
+        "knowledge/public/design-patterns/**",
+        "scripts/check_ui_ux_governance.ts"
+      ],
       "owner": "experience",
       "rationale": "Checks shared UI and UX governance."
     },
@@ -517,6 +595,13 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_intent_domain_coverage.js"],
+      "paths": [
+        "libs/core/**",
+        "libs/actuators/*/manifest.json",
+        "knowledge/product/governance/**",
+        "knowledge/product/orchestration/**",
+        "scripts/check_intent_domain_coverage.ts"
+      ],
       "owner": "intent",
       "rationale": "Checks intent domain coverage."
     },
@@ -525,6 +610,14 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_contract_schemas.js"],
+      "paths": [
+        "knowledge/**",
+        "pipelines/**",
+        "docs/operator/**",
+        "libs/core/**",
+        "scripts/check_contract_schemas*.ts",
+        "scripts/deny-secret-hook.js"
+      ],
       "owner": "quality",
       "rationale": "Checks contract schema coverage and validity."
     },
@@ -533,6 +626,13 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_pii_rules.ts", "--check"],
+      "paths": [
+        "knowledge/product/governance/knowledge-sync-rules.json",
+        "knowledge/product/schemas/knowledge-sync-rules.schema.json",
+        "libs/core/pii-scrubber.ts",
+        "tools/*/pii-rules.generated.js",
+        "scripts/generate_pii_rules.ts"
+      ],
       "owner": "security",
       "rationale": "Checks generated PII rules."
     },
@@ -541,6 +641,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/eval_distill.ts"],
+      "paths": ["libs/core/**", "eval/**", "scripts/eval_distill.ts"],
       "owner": "quality",
       "rationale": "Runs the deterministic distill evaluation."
     },
@@ -559,6 +660,7 @@
       "executable": "node",
       "args": ["dist/scripts/check_pipeline_shell_independence.js"],
       "baseline": "scripts/pipeline-shell-independence.baseline.json",
+      "paths": ["pipelines/**", "scripts/**", "libs/actuators/**"],
       "owner": "operations",
       "rationale": "Checks portable pipeline shell usage."
     },
@@ -567,6 +669,12 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_workflow_catalog_refs.js"],
+      "paths": [
+        "libs/core/mission/**",
+        "knowledge/product/governance/**",
+        "knowledge/product/orchestration/**",
+        "scripts/check_workflow_catalog_refs.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks workflow catalog references."
     },
@@ -579,6 +687,13 @@
         "./scripts/ts-loader.mjs",
         "scripts/check_process_definition_registry.ts"
       ],
+      "paths": [
+        "libs/core/process-definition-registry*",
+        "knowledge/product/governance/**",
+        "knowledge/product/schemas/**",
+        "knowledge/product/orchestration/**",
+        "scripts/check_process_definition_registry.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks process definition registry bindings."
     },
@@ -587,6 +702,13 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_mission_process_bindings.ts"],
+      "paths": [
+        "libs/core/mission/**",
+        "libs/core/intent/**",
+        "knowledge/product/governance/**",
+        "knowledge/product/orchestration/**",
+        "scripts/check_mission_process_bindings.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks mission process bindings."
     },
@@ -595,6 +717,19 @@
       "scope": "full",
       "executable": "pnpm",
       "args": ["exec", "vitest", "run", "tests/reference-drift-contract.test.ts"],
+      "paths": [
+        ".github/workflows/**",
+        "package.json",
+        "knowledge/product/governance/phases/onboarding.md",
+        "knowledge/product/governance/ci-gates.json",
+        "docs/developer/LOCAL_DEV.md",
+        "docs/PRODUCTIZATION_ROADMAP.md",
+        "pipelines/fragments/capability-docs-sync.json",
+        "pipelines/*.json",
+        "tests/workflow-operations-contract.test.ts",
+        "tests/fixtures/governance-import-baseline.json",
+        "tests/reference-drift-contract.test.ts"
+      ],
       "owner": "quality",
       "rationale": "Checks reference drift contracts."
     },
@@ -603,6 +738,14 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_production_evidence.js"],
+      "paths": [
+        "knowledge/product/governance/production-evidence-register.json",
+        "knowledge/product/schemas/production-evidence*",
+        "docs/operator/**",
+        "libs/core/production-evidence*",
+        "libs/core/organization/onboarding-flow-policy*",
+        "scripts/check_production_evidence.ts"
+      ],
       "owner": "release",
       "rationale": "Surfaces production evidence readiness without blocking local validation."
     },
@@ -611,6 +754,13 @@
       "scope": "full",
       "executable": "pnpm",
       "args": ["exec", "vitest", "run", "tests/production-evidence-register-contract.test.ts"],
+      "paths": [
+        "knowledge/product/governance/production-evidence-register.json",
+        "knowledge/product/schemas/production-evidence*",
+        "docs/operator/**",
+        "libs/core/production-evidence*",
+        "tests/production-evidence-register-contract.test.ts"
+      ],
       "owner": "release",
       "rationale": "Checks the production evidence register contract."
     },
@@ -619,6 +769,15 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_first_win_smoke.js"],
+      "paths": [
+        "docs/INITIALIZATION.md",
+        "docs/QUICKSTART.md",
+        "docs/developer/VOICE_FIRST_WIN.md",
+        "docs/user/**",
+        "pipelines/**",
+        "scripts/refactor/**",
+        "scripts/check_first_win_smoke.ts"
+      ],
       "owner": "experience",
       "rationale": "Checks first-win smoke contract."
     },
@@ -627,6 +786,12 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/first_win_lifecycle_smoke.js", "--dry-run", "--json"],
+      "paths": [
+        "libs/core/**",
+        "scripts/**",
+        "pipelines/first-win-lifecycle-weekly.json",
+        "knowledge/public/templates/onboarding/**"
+      ],
       "owner": "experience",
       "rationale": "Checks first-win lifecycle dry-run."
     },
@@ -635,6 +800,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_doc_examples.js"],
+      "paths": ["docs/**", "package.json", "scripts/check_doc_examples.ts"],
       "owner": "documentation",
       "rationale": "Checks tagged documentation examples."
     },
@@ -643,6 +809,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_tier_hygiene.js"],
+      "paths": ["knowledge/**", "scripts/check_tier_hygiene.ts"],
       "owner": "security",
       "rationale": "Checks tier hygiene boundaries."
     },
@@ -659,6 +826,7 @@
         "--config",
         "vitest.config.mjs"
       ],
+      "paths": ["presence/displays/operator-surface/**"],
       "owner": "security",
       "rationale": "Checks enumerated operator mutation boundaries, scoped administrator selection settings, and mandatory hosted Chromium selection flows in CI (explicit local browser skip is not validation).",
       "timeout_ms": 180000
@@ -676,6 +844,15 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_tenant_registry_consistency.js"],
+      "paths": [
+        "knowledge/product/governance/tenant-registry-exceptions.json",
+        "libs/core/organization/**",
+        "libs/core/project/**",
+        "libs/core/foundation/scope*",
+        "libs/core/authority*",
+        "customer/**",
+        "scripts/check_tenant_registry_consistency.ts"
+      ],
       "owner": "security",
       "rationale": "Checks tenant profile, confidential index, and customer overlay consistency."
     },
@@ -684,6 +861,15 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_entity_governance.ts"],
+      "paths": [
+        "knowledge/product/governance/security-policy.json",
+        "knowledge/product/governance/storage-retention-catalog.json",
+        "knowledge/product/schemas/governed-work-item.schema.json",
+        "libs/core/**",
+        "docs/developer/improvement-plans-2026-07/**",
+        "scripts/check_entity_governance.ts",
+        "scripts/check_tenant_registry_consistency.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks entity and mission governance boundaries."
     },
@@ -692,6 +878,12 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_event_wiring.ts"],
+      "paths": [
+        "{libs,scripts,satellites,presence}/**/*.{ts,tsx}",
+        "knowledge/procedures/reflexes/**",
+        "knowledge/product/governance/storage-retention-catalog.json",
+        "docs/developer/architecture/AUTONOMY_SYSTEM_GUIDE.md"
+      ],
       "owner": "operations",
       "rationale": "Checks event wiring contracts."
     },
@@ -751,6 +943,32 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_op_effect_coverage.ts"],
       "owner": "quality",
       "rationale": "SC-02: every manifest capability must declare its side-effect class (read/write/egress/none) so preflight can classify ops."
+    },
+    {
+      "id": "registration-tests",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "--testTimeout=60000",
+        "--maxWorkers=2",
+        "tests/shared-tmp-ratchet.test.ts",
+        "tests/mission-lookup-boundary.test.ts",
+        "tests/core-fs-exception-boundary.test.ts",
+        "tests/foundation-io-boundary.test.ts",
+        "tests/process-boundary-governance.test.ts",
+        "tests/runtime-child-process-boundary.test.ts",
+        "tests/package-boundary-contract.test.ts",
+        "tests/plugin-execution-guard-boundary.test.ts",
+        "tests/service-channel-boundary.test.ts",
+        "tests/runtime-surface-boundary.test.ts",
+        "tests/protocol-service-boundary-contract.test.ts",
+        "tests/script-topology-contract.test.ts"
+      ],
+      "timeout_ms": 300000,
+      "owner": "quality",
+      "rationale": "S3: registration-ceremony ratchets in tests/ (sharedTmp allowlist, findMissionPath DIRECT_CALLERS, node:fs / child_process / managed-process allowlists, package boundary) previously failed only in CI's test job. Budget: about 30s wall alone, but each file scans libs/ and scripts/, so under the 6-gate concurrent pr run the per-test timeout is raised to 60s and the gate to 300s; tests/core-runtime-import-contract.test.ts (about 30s, needs dist) stays in the test job."
     },
     {
       "id": "test-sleep-ratchet",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
+  collectChangedFiles,
   DEFAULT_GATE_TIMEOUT_MS,
   loadGateManifest,
   main,
@@ -117,5 +118,57 @@ describe('manifest-driven check runner', () => {
       scope: 'full',
       error: 'gate(s) missing-gate are not registered for scope full',
     });
+  });
+
+  it('rejects --changed combined with an explicit scope and --base without --changed', async () => {
+    const output: unknown[] = [];
+    const print = (value: unknown) => output.push(value);
+    await expect(main(['--changed', '--scope', 'full'], print)).resolves.toBe(1);
+    await expect(main(['--base', 'origin/main'], print)).resolves.toBe(1);
+    await expect(main(['--changed', '--base'], print)).resolves.toBe(1);
+    expect(output).toEqual([
+      '[check] ERROR --changed selects gates itself; do not combine it with --scope or --only',
+      '[check] ERROR --base requires --changed',
+      '[check] ERROR --base requires a value',
+    ]);
+  });
+
+  it('gives every full-only gate except runtime/UI-bound ones a path trigger', () => {
+    const untriggered = loadGateManifest()
+      .gates.filter((entry) => entry.scope === 'full' && !entry.paths?.length)
+      .map((entry) => entry.id);
+    expect(untriggered).toEqual(['chronos-dom-contrast', 'audit-continuity']);
+  });
+});
+
+describe('collectChangedFiles', () => {
+  const fakeGit =
+    (responses: Record<string, { status: number; stdout?: string; stderr?: string }>) =>
+    (args: string[]) => {
+      const response = responses[args.join(' ')] ?? { status: 128, stderr: 'unknown ref' };
+      return { stdout: '', stderr: '', ...response };
+    };
+
+  it('falls back from origin/main to main and unions diff with untracked files', () => {
+    const git = fakeGit({
+      'merge-base HEAD main': { status: 0, stdout: 'abc123\n' },
+      'diff --name-only --no-renames abc123 --': {
+        status: 0,
+        stdout: 'libs/actuators/a.ts\nscripts/b.ts\n',
+      },
+      'ls-files --others --exclude-standard': { status: 0, stdout: 'scripts/b.ts\nnew.md\n' },
+    });
+    expect(collectChangedFiles(undefined, git)).toEqual({
+      base: 'main',
+      mergeBase: 'abc123',
+      files: ['libs/actuators/a.ts', 'new.md', 'scripts/b.ts'],
+    });
+  });
+
+  it('uses only an explicit base and fails closed when it cannot be resolved', () => {
+    expect(() => collectChangedFiles('develop', fakeGit({}))).toThrow(
+      'could not resolve a merge-base with develop'
+    );
+    expect(() => collectChangedFiles('--output=x', fakeGit({}))).toThrow('git ref name');
   });
 });

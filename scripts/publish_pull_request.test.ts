@@ -21,6 +21,7 @@ vi.mock('@agent/core/knowledge/pr-knowledge-readiness', async (importOriginal) =
 import {
   PRE_PR_READINESS_CHECKLIST,
   buildGhArgs,
+  buildReadinessCheckArgs,
   main,
   parseDefaultBranchResponse,
   parsePublishArgs,
@@ -124,7 +125,7 @@ describe('publish_pull_request', () => {
     expect(source).toContain('runPrePrReadiness');
     expect(source).toContain('--skip-readiness');
     expect(source).toContain(PRE_PR_READINESS_CHECKLIST);
-    expect(source).toContain("['check', '--', '--scope', 'pr']");
+    expect(source).toContain("['check', '--', '--changed']");
     expect(source).toContain('checkPrKnowledgeReadiness');
     expect(source).toContain('--mission-root');
   });
@@ -382,10 +383,32 @@ describe('publication check concurrency', () => {
     runPrePrReadiness(print, jobs);
     expect(mocks.safeExec).toHaveBeenCalledExactlyOnceWith(
       'pnpm',
-      ['check', '--', '--scope', 'pr', ...(jobs === undefined ? [] : ['--jobs', String(jobs)])],
+      ['check', '--', '--changed', ...(jobs === undefined ? [] : ['--jobs', String(jobs)])],
       { cwd: pathResolver.rootDir(), timeoutMs: 1_800_000 }
     );
     expect(print).toHaveBeenLastCalledWith('[pr:publish] PR readiness gate passed.');
+  });
+
+  it('diffs the changed-path readiness gate against origin/<base> when --base is given', () => {
+    expect(buildReadinessCheckArgs(undefined, 'main')).toEqual([
+      'check',
+      '--',
+      '--changed',
+      '--base',
+      'origin/main',
+    ]);
+    expect(buildReadinessCheckArgs(2, 'origin/develop')).toEqual([
+      'check',
+      '--',
+      '--changed',
+      '--base',
+      'origin/develop',
+      '--jobs',
+      '2',
+    ]);
+    expect(() => buildReadinessCheckArgs(undefined, '--upload-pack=x')).toThrow(
+      'not a valid git ref name'
+    );
   });
 
   it('forwards the option through main and prevents publication when readiness fails', async () => {
@@ -400,7 +423,7 @@ describe('publication check concurrency', () => {
     );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'pnpm',
-      ['check', '--', '--scope', 'pr', '--jobs', '1'],
+      ['check', '--', '--changed', '--jobs', '1'],
       expect.any(Object)
     );
     expect(
