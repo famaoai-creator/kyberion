@@ -29832,17 +29832,17 @@
       "charter_report_information_flow": {
         "en": "Held for information-flow review: {denied} ({reasons})",
         "ja": "情報フローの確認に回したもの: {denied}件({reasons})",
-        "qps-ploc": "⟦Ħėŀḓ ƒőř ïñƒőřɱȧŧïőñ-ƒŀőẇ řėṽïėẇ: {denied} ({reasons}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "qps-ploc": "⟦Ħėŀḓ ƒőř ïñƒőřɱȧŧïőñ-ƒŀőẇ řėṽïėẇ: {denied} ({reasons}) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "charter_report_scope_narrow": {
         "en": "Suggested narrowing (needs your re-acceptance): {field} = {value} ×{count}",
         "ja": "狭域化の提案(再受諾が必要): {field} = {value} ×{count}",
-        "qps-ploc": "⟦Şůɠɠėşŧėḓ ñȧřřőẇïñɠ (ñėėḓş ẏőůř řė-ȧƈƈėṗŧȧñƈė): {field} = {value} ×{count} ŀőřėɱ ï⟧"
+        "qps-ploc": "⟦Şůɠɠėşŧėḓ ñȧřřőẇïñɠ (ñėėḓş ẏőůř řė-ȧƈƈėṗŧȧñƈė): {field} = {value} ×{count} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "charter_report_scope_stop": {
         "en": "Suggested stop (needs your re-acceptance): {field} ({value}) ×{count}",
         "ja": "停止の提案(再受諾が必要): {field}({value}) ×{count}",
-        "qps-ploc": "⟦Şůɠɠėşŧėḓ şŧőṗ (ñėėḓş ẏőůř řė-ȧƈƈėṗŧȧñƈė): {field} ({value}) ×{count} ŀőřėɱ ï⟧"
+        "qps-ploc": "⟦Şůɠɠėşŧėḓ şŧőṗ (ñėėḓş ẏőůř řė-ȧƈƈėṗŧȧñƈė): {field} ({value}) ×{count} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "charter_report_expiry": {
         "en": "This charter expires in {days} days ({date})",

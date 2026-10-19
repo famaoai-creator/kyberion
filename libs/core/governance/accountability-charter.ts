@@ -299,7 +299,8 @@ export function isInformationBoundActionClass(actionClass: string): boolean {
 }
 
 export type InformationFlowFactsParse =
-  { ok: true; facts: InformationFlowFacts } | { ok: false; error: string };
+  | { ok: true; facts: InformationFlowFacts; error?: undefined }
+  | { ok: false; error: string; facts?: undefined };
 
 const PURPOSE_PATTERN = /^[a-z0-9][a-z0-9:_-]{0,127}$/;
 const PROCESSOR_PATTERN = /^[a-z0-9][a-z0-9 ._:-]{0,127}$/i;
@@ -326,12 +327,12 @@ export function parseInformationFlowFacts(value: unknown): InformationFlowFactsP
   ) {
     return { ok: false, error: 'information_flow.recipient_class is not a known recipient class' };
   }
-  const processorId = raw.processor_id;
-  if (
-    processorId !== undefined &&
-    (typeof processorId !== 'string' || !PROCESSOR_PATTERN.test(processorId.trim()))
-  ) {
-    return { ok: false, error: 'information_flow.processor_id is invalid' };
+  let processorId: string | undefined;
+  if (raw.processor_id !== undefined) {
+    if (typeof raw.processor_id !== 'string' || !PROCESSOR_PATTERN.test(raw.processor_id.trim())) {
+      return { ok: false, error: 'information_flow.processor_id is invalid' };
+    }
+    processorId = raw.processor_id.trim();
   }
   if (recipientClass === undefined && processorId === undefined) {
     return {
