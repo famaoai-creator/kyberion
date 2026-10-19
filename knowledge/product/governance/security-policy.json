@@ -65,7 +65,9 @@
       "active/shared/runtime/execution-metrics/personal/",
       "active/shared/runtime/execution-metrics/confidential/",
       "active/shared/runtime/hearing/personal/",
-      "active/shared/runtime/hearing/confidential/"
+      "active/shared/runtime/hearing/confidential/",
+      "active/shared/runtime/discussion-create-requests/personal/",
+      "active/shared/runtime/discussion-create-requests/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
@@ -839,6 +841,14 @@
         "active/shared/state/reasoning-route-user-config.json",
         "active/shared/state/reasoning-route-user-config.json.previous",
         "active/shared/state/reasoning-route-user-config.json.history/"
+      ]
+    },
+    "discussion_request_store": {
+      "allow_read": [
+        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
       ]
     }
   },

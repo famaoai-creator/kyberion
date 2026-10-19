@@ -1,3 +1,7 @@
+import {
+  isDiscussionRequestCapability,
+  DISCUSSION_REQUEST_STORAGE_ROLE,
+} from './foundation/discussion-request-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -620,7 +624,15 @@ function isScopedStructuralMkdir(
   tenantSlug: string | undefined,
   access: { kind: 'read' | 'write' | 'mkdir'; role?: string }
 ): boolean {
-  if (access.kind !== 'mkdir' || access.role !== 'concierge_management_writer') return false;
+  if (access.kind !== 'mkdir') return false;
+  if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
+    if (
+      !isDiscussionRequestCapability(currentResourceAccessScope()) ||
+      normalizePath(protectedPrefix) !==
+        PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests + '/confidential'
+    )
+      return false;
+  } else if (access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
     !tenantSlug ||
@@ -950,6 +962,15 @@ function requestResourceDenial(
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
   if (
+    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
+    !isDiscussionRequestCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability',
+    };
+  if (
     normalizedRole === 'concierge_management_reader' &&
     (!currentResourceAccessScope() || operation === 'write' || operation === 'mkdir')
   ) {
@@ -1035,6 +1056,13 @@ export function validateWritePermission(
     stateKnowledgePath &&
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
+    // This dedicated role grants only its real receipt paths, never knowledge-tier writes.
+    // The exact request ceiling was checked before all ambient/default policy grants.
+    if (
+      currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
+      isDiscussionRequestCapability(currentResourceAccessScope())
+    )
+      return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
 
@@ -1192,6 +1220,21 @@ export function validateReadPermission(
         // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
+        if (
+          identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
+          isDiscussionRequestCapability(currentResourceAccessScope()) &&
+          loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
+            (pattern: string) => {
+              const expanded = expandPolicyPath(
+                pattern,
+                resolveProjectScope().missionId,
+                identity.tenantSlug
+              );
+              return expanded !== null && pathStartsWith(relativePath, expanded);
+            }
+          )
+        )
+          return { allowed: true };
         if (ledgerRoleReadGrant(loaded.policy, relativePath, identity)) return { allowed: true };
         // The partition mirrors knowledge/<tier>/<tenant>/ (knowledge/<tier>/ for
         // the untenanted `shared` segment), so tenant-scoped roles that may read

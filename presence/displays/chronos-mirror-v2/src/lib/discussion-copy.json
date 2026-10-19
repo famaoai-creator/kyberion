@@ -989,12 +989,56 @@
       "ja": "紐づけたミッションは現在の機密スコープでは利用できません。参照可能な別の機密ミッションを選ぶか、ミッションの紐づけを解除して再確認してください。"
     },
     "briefCreateUncertainty": {
-      "en": "Before explicitly choosing any new generation, inspect Recent rooms. A lost create response does not prove that no run started. Retry check repeats only the read-only setup check; it does not retry generation.",
-      "ja": "新たな生成を明示的に選ぶ前に、「過去のルーム」を確認してください。作成の応答が失われても、実行が開始されなかったとは限りません。「再確認」は読み取り専用の設定確認だけを繰り返し、生成を再実行しません。"
+      "en": "A lost create response does not prove that no run started. Check the original request receipt before any new room. Setup checks and Recent rooms do not resolve a pending create request.",
+      "ja": "作成の応答が失われても、実行が開始されなかったとは限りません。新たなルームを開始する前に、元のリクエストの受付記録を確認してください。設定確認や「過去のルーム」への表示では、未確認の作成リクエストは解消されません。"
     },
     "readinessScopeNotice": {
       "en": "Browser rooms remain confidential, including pasted public text. Existing tenant/provider zero-retention and egress authorization are required.",
       "ja": "公開文書を貼り付けても、ブラウザーのルームは機密扱いです。既存のテナント・プロバイダーのゼロ保持設定と外部送信の許可が必要です。"
+    },
+    "createStorageUnavailable": {
+      "en": "Request recovery storage is unavailable or invalid. New rooms are disabled. Restore access to this browser’s existing storage; do not clear it to retry.",
+      "ja": "リクエストの復旧情報を保存・確認できません。新しいルームは開始できません。このブラウザーの既存の保存領域へのアクセスを復旧してください。再試行のために保存情報を削除しないでください。"
+    },
+    "createRequestChecking": {
+      "en": "Confirming the create request. New rooms are disabled until its outcome is known.",
+      "ja": "作成リクエストを確認中です。結果が確定するまで新しいルームは開始できません。"
+    },
+    "createRequestUnconfirmed": {
+      "en": "The create request is still unconfirmed. It may already have started. Changing the goal, provider, mode or mission does not make a new attempt safe.",
+      "ja": "作成リクエストの結果は未確認です。実行が開始済みの可能性があります。目的、プロバイダー、モード、ミッションを変更しても、新たな実行が安全になるわけではありません。"
+    },
+    "createRequestNoRetry": {
+      "en": "Check request only reads the original request receipt. It never resends generation. A timeout does not stop the backend. Recent rooms are not proof of this request’s outcome. These browser markers are not a global cross-tab exactly-once guarantee.",
+      "ja": "「リクエストを確認」は元の受付記録を読み取るだけで、生成を再送しません。タイムアウトはバックエンドの停止を意味しません。「過去のルーム」への表示では、このリクエストの結果を証明できません。ブラウザーの保存情報は、全タブをまたぐ厳密な1回実行の保証ではありません。"
+    },
+    "createRequestId": {
+      "en": "Request",
+      "ja": "リクエスト"
+    },
+    "createRequestCheck": {
+      "en": "Check request",
+      "ja": "リクエストを確認"
+    },
+    "createRequestRejected": {
+      "en": "This request was durably rejected before execution because prerequisites were blocked. Recheck setup before explicitly starting another request.",
+      "ja": "前提条件が満たされず、このリクエストは実行前に確定的に拒否されました。別のリクエストを明示的に開始する前に設定を再確認してください。"
+    },
+    "createRequestOpen": {
+      "en": "Open confirmed room (read-only)",
+      "ja": "確認済みのルームを開く（読み取り専用）"
+    },
+    "createContextResolving": {
+      "en": "Confirming the existing request scope before sending the goal. No room has been requested yet.",
+      "ja": "目的の本文を送る前に、既存のリクエストスコープを確認しています。ルーム作成はまだ要求していません。"
+    },
+    "createContextFailed": {
+      "en": "The request scope could not be confirmed. No create request was sent or saved. Verify the selected mission and existing access, then explicitly try again.",
+      "ja": "リクエストスコープを確認できませんでした。作成リクエストは送信・保存していません。選択したミッションと既存のアクセス権限を確認してから、明示的に再試行してください。"
+    },
+    "createInputInvalid": {
+      "en": "The goal or run settings are invalid. No create request was sent or saved. Use a nonempty goal up to 2,000 characters and supported run limits.",
+      "ja": "目的または実行設定が無効です。作成リクエストは送信・保存していません。目的を1〜2,000文字で入力し、対応する実行上限を選択してください。"
     }
   },
   "role_labels": {

@@ -146,6 +146,16 @@
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "discussion_request_store": {
+      "description": "Chronos-only immutable Discussion receipt storage. Requires an exact deny-only tenant/actor/scope/request capability before every operation. No knowledge, room, provider, membership or deployment authority.",
+      "default_persona": "unknown",
+      "write_scopes": [
+        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
+      ],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "dot_lifecycle_writer": {
       "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
       "default_persona": "worker",
@@ -302,6 +312,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential", "personal"]
     },
+    "peer_responder_reader": {
+      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal"]
+    },
     "peer_task_artifact_writer": {
       "description": "Least-privilege writer for typed peer task results. libs/core/mesh/peer-task-exchange.ts assumes it, bound to the receiving tenant, after the recipient operator accepts a peer task: it writes the task report and output log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's scoped artifact index, and reads only those paths (persona worker). It is tenant-bound (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
       "default_persona": "worker",
@@ -312,14 +330,6 @@
       "scope_classes": [],
       "allowed_actuators": [],
       "tier_access": ["confidential"]
-    },
-    "peer_responder_reader": {
-      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
-      "default_persona": "worker",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["confidential", "personal"]
     },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
