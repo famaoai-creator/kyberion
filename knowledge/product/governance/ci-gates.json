@@ -725,7 +725,7 @@
         "docs/developer/LOCAL_DEV.md",
         "docs/PRODUCTIZATION_ROADMAP.md",
         "pipelines/fragments/capability-docs-sync.json",
-        "pipelines/orchestration-jobs.json",
+        "pipelines/*.json",
         "tests/workflow-operations-contract.test.ts",
         "tests/fixtures/governance-import-baseline.json",
         "tests/reference-drift-contract.test.ts"
