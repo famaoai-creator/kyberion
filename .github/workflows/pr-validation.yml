@@ -8,9 +8,14 @@ env:
 on:
   pull_request:
     branches: [main, develop]
+  # Merge-queue readiness: these are the required PR checks, so they must
+  # also report on merge_group events (the queue itself is a repository
+  # setting). PR-only steps (title check, PR comment) skip there.
+  merge_group:
 
 # A newer push to the same PR supersedes the running checks; main pushes and
 # scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+# merge_group runs get a unique gh-readonly-queue ref and are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -81,21 +86,31 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
+      # The checks below run even when an earlier one failed (`!cancelled()`),
+      # so one push reports title, type, lint and format failures together.
+      # The job still fails when any of them fails.
       - name: Download compiler outputs
+        id: workspace
         uses: actions/download-artifact@v6
         with:
           name: build-outputs
       - name: Check PR title
+        # merge_group events carry no pull_request payload; the title was
+        # already checked on the PR.
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name == 'pull_request' }}
         # Pass the title through env: interpolating it into the script would let
         # a crafted PR title run shell commands.
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: pnpm run check:pr-title -- --title "$PR_TITLE"
       - name: Type check
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: pnpm run typecheck
       - name: Lint check
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: pnpm run lint
       - name: Format check
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
   test-core:
@@ -187,6 +202,7 @@ jobs:
         with:
           node-version: '24'
       - name: Download compiler outputs
+        id: workspace
         uses: actions/download-artifact@v6
         with:
           name: build-outputs
@@ -195,6 +211,8 @@ jobs:
         run: pnpm test -- --suite actuators
 
       - name: Run governance boundary tests
+        # Independent of the actuator suite: report both in one round.
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
 
       - name: Security scan
@@ -227,53 +245,60 @@ jobs:
           node dist/scripts/vital_check.js --format json --exit-on-missing=false > vital-check-report.json
           cat vital-check-report.md
 
+      # One sticky comment per PR, found by a hidden marker: created on the
+      # first run, edited when the report changes, untouched otherwise (the
+      # report used to be re-posted as a new comment on every push).
       - name: Comment vital check report on PR
-        if: github.event_name == 'pull_request' && always()
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
 
-            // Check if report file exists
             if (!fs.existsSync('vital-check-report.md')) {
-              console.log('Vital check report not found, skipping comment');
+              core.info('Vital check report not found, skipping comment');
               return;
             }
 
-            const report = fs.readFileSync('vital-check-report.md', 'utf8');
+            const MARKER = '<!-- kyberion:vital-check-report -->';
+            const report = fs.readFileSync('vital-check-report.md', 'utf8').trim();
+            const body = `${MARKER}\n### 🩺 Vital Check Report\n\n${report}\n`;
 
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              per_page: 100,
             });
-
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('🩺 Vital Check Report')
+            const fromActions = comments.filter(
+              (comment) => comment.user?.login === 'github-actions[bot]'
             );
+            // Prefer the marked comment; otherwise adopt the newest legacy
+            // (unmarked) report so existing PRs converge on one comment.
+            const existing =
+              fromActions.find((comment) => (comment.body ?? '').includes(MARKER)) ??
+              fromActions
+                .filter((comment) => /Physical Foundation:/.test(comment.body ?? '') && /^Overall: /m.test(comment.body ?? ''))
+                .pop();
 
-            const commentBody = report;
-
-            if (botComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-              console.log('Updated existing vital check comment');
-            } else {
-              // Create new comment
+            if (!existing) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: commentBody
+                body,
               });
-              console.log('Created new vital check comment');
+              core.info('Created vital check comment');
+            } else if ((existing.body ?? '').trim() === body.trim()) {
+              core.info(`Vital check comment ${existing.id} is unchanged; not updating`);
+            } else {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated vital check comment ${existing.id}`);
             }
 
       - name: Upload vital check artifacts
