@@ -35,10 +35,165 @@ export interface AccountabilityReport {
   amendments: Array<{ field: string; count: number }>;
   /** Concrete widenings the accountable human may accept as a new charter (never applied automatically). */
   amendment_proposals: AmendmentSuggestion[];
+  /** Information-flow denials in the window, grouped for the owner. */
+  information_flow: InformationFlowReport;
+  /**
+   * Narrowing / stop advice derived from those denials. Advice only: applying
+   * any of it requires the accountable human to accept a new charter.
+   */
+  scope_proposals: ScopeProposal[];
   expires_at: string;
   expires_in_days: number;
   /** True when nothing needs the accountable human. */
   all_clear: boolean;
+}
+
+export interface InformationFlowReport {
+  denied: number;
+  by_reason: Array<{ reason: string; count: number }>;
+  purposes: Array<{ purpose: string; count: number }>;
+  recipients: Array<{ recipient_class: string; count: number }>;
+  processors: Array<{ processor_id: string; count: number }>;
+  categories: Array<{ category: string; count: number }>;
+  last_seen?: string;
+}
+
+export interface ScopeProposal {
+  kind: 'narrow' | 'stop';
+  field: string;
+  value: string;
+  count: number;
+  reason: 'repeated_denials_under_delegated_scope' | 'frequent_information_flow_denials';
+  last_seen: string;
+}
+
+const INFORMATION_FLOW_REASON_PREFIX = 'information_flow';
+
+const topCounts = (counts: Map<string, number>): Array<{ key: string; count: number }> =>
+  [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+
+/**
+ * Group information-flow denials by the scope that produced them. Only reason
+ * strings carrying the `information_flow` prefix count, so a budget denial is
+ * never reported as a recipient issue.
+ */
+export function buildInformationFlowReport(
+  ledger: readonly LedgerEntry[],
+  sinceMs: number
+): InformationFlowReport {
+  const reasons = new Map<string, number>();
+  const purposes = new Map<string, number>();
+  const recipients = new Map<string, number>();
+  const processors = new Map<string, number>();
+  const categories = new Map<string, number>();
+  let denied = 0;
+  let lastSeen: string | undefined;
+  for (const entry of ledger) {
+    if (entry.kind !== 'denied' || Date.parse(entry.ts) < sinceMs) continue;
+    const flowReasons = entry.reasons.filter((r) => r.startsWith(INFORMATION_FLOW_REASON_PREFIX));
+    if (flowReasons.length === 0) continue;
+    denied += 1;
+    if (!lastSeen || entry.ts > lastSeen) lastSeen = entry.ts;
+    for (const reason of flowReasons) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+    const facts = entry.information_flow;
+    if (!facts) continue;
+    purposes.set(facts.purpose, (purposes.get(facts.purpose) ?? 0) + 1);
+    if (facts.recipient_class) {
+      recipients.set(facts.recipient_class, (recipients.get(facts.recipient_class) ?? 0) + 1);
+    }
+    if (facts.processor_id) {
+      processors.set(facts.processor_id, (processors.get(facts.processor_id) ?? 0) + 1);
+    }
+    for (const category of facts.categories) {
+      categories.set(category, (categories.get(category) ?? 0) + 1);
+    }
+  }
+  return {
+    denied,
+    by_reason: topCounts(reasons).map(({ key, count }) => ({ reason: key, count })),
+    purposes: topCounts(purposes).map(({ key, count }) => ({ purpose: key, count })),
+    recipients: topCounts(recipients).map(({ key, count }) => ({ recipient_class: key, count })),
+    processors: topCounts(processors).map(({ key, count }) => ({ processor_id: key, count })),
+    categories: topCounts(categories).map(({ key, count }) => ({ category: key, count })),
+    ...(lastSeen ? { last_seen: lastSeen } : {}),
+  };
+}
+
+const REPEATED_DENIAL_THRESHOLD = 2;
+const FREQUENT_DENIAL_THRESHOLD = 5;
+
+/**
+ * Repeated denials under a scope the charter actually delegates mean the
+ * delegation is not matching reality (usually a category the action needs was
+ * left out). The safe response is to reduce autonomy, never to widen it
+ * automatically: narrow that purpose/class/processor out, or stop autonomous
+ * information flow until the human re-accepts a narrower charter.
+ */
+export function buildScopeProposals(
+  charter: Charter,
+  report: InformationFlowReport
+): ScopeProposal[] {
+  const flow = charter.envelope.information_flow;
+  if (!flow || report.denied === 0) return [];
+  const out: ScopeProposal[] = [];
+  const lastSeen = report.last_seen ?? new Date(0).toISOString();
+  const proposed = (values: Set<string>, value: string): boolean => values.has(value);
+  const purposes = new Set(flow.purposes);
+  const recipients = new Set<string>(flow.recipient_classes);
+  const processors = new Set<string>(flow.processor_ids ?? []);
+
+  for (const { purpose, count } of report.purposes) {
+    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(purposes, purpose)) continue;
+    out.push({
+      kind: 'narrow',
+      field: 'envelope.information_flow.purposes',
+      value: purpose,
+      count,
+      reason: 'repeated_denials_under_delegated_scope',
+      last_seen: lastSeen,
+    });
+  }
+  for (const { recipient_class, count } of report.recipients) {
+    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(recipients, recipient_class)) continue;
+    out.push({
+      kind: 'narrow',
+      field: 'envelope.information_flow.recipient_classes',
+      value: recipient_class,
+      count,
+      reason: 'repeated_denials_under_delegated_scope',
+      last_seen: lastSeen,
+    });
+  }
+  for (const { processor_id, count } of report.processors) {
+    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(processors, processor_id)) continue;
+    out.push({
+      kind: 'narrow',
+      field: 'envelope.information_flow.processor_ids',
+      value: processor_id,
+      count,
+      reason: 'repeated_denials_under_delegated_scope',
+      last_seen: lastSeen,
+    });
+  }
+  if (report.denied >= FREQUENT_DENIAL_THRESHOLD) {
+    out.push({
+      kind: 'stop',
+      field: 'envelope.information_flow',
+      value: 'external_egress',
+      count: report.denied,
+      reason: 'frequent_information_flow_denials',
+      last_seen: lastSeen,
+    });
+  }
+  return out.sort(
+    (a, b) =>
+      (a.kind === b.kind ? 0 : a.kind === 'stop' ? -1 : 1) ||
+      b.count - a.count ||
+      a.field.localeCompare(b.field) ||
+      a.value.localeCompare(b.value)
+  );
 }
 
 export interface AmendmentSuggestion {
@@ -136,6 +291,8 @@ export function buildAccountabilityReport(input: {
   const amendments = [...amendmentCounts.entries()]
     .map(([field, count]) => ({ field, count }))
     .sort((a, b) => b.count - a.count || a.field.localeCompare(b.field));
+  const informationFlow = buildInformationFlowReport(ledger, sinceMs);
+  const scopeProposals = buildScopeProposals(charter, informationFlow);
   const expiresInDays = Math.max(
     0,
     Math.ceil((Date.parse(charter.accountable.expires_at) - now.getTime()) / DAY_MS)
@@ -153,6 +310,8 @@ export function buildAccountabilityReport(input: {
     tripwires_standing: [...standing].sort(),
     amendments,
     amendment_proposals: buildAmendmentSuggestions(ledger, sinceMs),
+    information_flow: informationFlow,
+    scope_proposals: scopeProposals,
     expires_at: charter.accountable.expires_at,
     expires_in_days: expiresInDays,
     all_clear: standing.size === 0 && denied === 0 && near.length === 0 && expiresInDays > 14,
@@ -226,6 +385,36 @@ export function renderAccountabilityReportText(
   for (const a of report.amendments.slice(0, 5)) {
     lines.push(
       t('decision:charter_report_amendment', { field: a.field, count: String(a.count) }, locale)
+    );
+  }
+  if (report.information_flow.denied > 0) {
+    lines.push(
+      t(
+        'decision:charter_report_information_flow',
+        {
+          denied: String(report.information_flow.denied),
+          reasons: report.information_flow.by_reason
+            .slice(0, 3)
+            .map((r) => `${r.reason} ×${r.count}`)
+            .join('; '),
+        },
+        locale
+      )
+    );
+  }
+  for (const proposal of report.scope_proposals.slice(0, 3)) {
+    lines.push(
+      t(
+        proposal.kind === 'stop'
+          ? 'decision:charter_report_scope_stop'
+          : 'decision:charter_report_scope_narrow',
+        {
+          field: proposal.field,
+          value: proposal.value,
+          count: String(proposal.count),
+        },
+        locale
+      )
     );
   }
   if (report.expires_in_days <= 14) {

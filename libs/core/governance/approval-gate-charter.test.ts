@@ -10,9 +10,16 @@ vi.mock('./accountability-charter-registry.js', () => ({
   evaluateUnderCharter: vi.fn(),
   recordCharterConsumption: vi.fn(),
   recordCharterDenial: vi.fn(),
+  // The lock is the registry's I/O seam; the gate's unit tests exercise the
+  // decision, not the filesystem, so the lock is a pass-through here.
+  withCharterDecisionLock: vi.fn((_scope: unknown, fn: () => unknown) => fn()),
 }));
 
-import { isCharterEligiblePolicy, runCharterGate } from './approval-gate-charter.js';
+import {
+  isCharterEligiblePolicy,
+  runCharterGate,
+  shouldSampleCharterAudit,
+} from './approval-gate-charter.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import { auditChain } from './audit-chain.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
@@ -270,5 +277,62 @@ describe('runCharterGate', () => {
     const out = run();
     expect(out).toMatchObject({ kind: 'stop', message: expect.stringContaining('[CHARTER_STOP]') });
     expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('never takes information-flow facts from the untrusted payload', () => {
+    evaluate.mockReturnValue({ charter: CHARTER, decision: decision({}) });
+    runCharterGate({
+      charter: { scope: { kind: 'organization', tenant_slug: 'acme' }, action: ACTION },
+      agentId: 'agent-1',
+      operationId: 'payment:send',
+      correlationId: 'corr-2',
+      payload: {
+        decision_type: 'meeting_scheduling',
+        information_flow: {
+          purpose: 'meeting_scheduling',
+          recipient_class: 'known_counterparty',
+          categories: ['routine_business'],
+        },
+      },
+      now: new Date('2026-10-01T00:00:00.000Z'),
+    });
+    // The action evaluated is exactly the trusted one the caller built; a
+    // payload fact is never merged in (it could otherwise widen the gate).
+    expect(evaluate.mock.calls[0][1]).not.toHaveProperty('information_flow');
+  });
+
+  it('samples autonomous external egress for the operator without gating it', () => {
+    const sampled = Array.from({ length: 500 }, (_, i) => `sample-${i}`).find((id) =>
+      shouldSampleCharterAudit(id)
+    )!;
+    evaluate.mockReturnValue({ charter: CHARTER, decision: decision({}) });
+    const out = runCharterGate({
+      charter: { scope: { kind: 'organization', tenant_slug: 'acme' }, action: ACTION },
+      agentId: 'agent-1',
+      operationId: 'payment:send',
+      correlationId: sampled,
+      now: new Date('2026-10-01T00:00:00.000Z'),
+    });
+    expect(out.kind).toBe('allow');
+    expect(consume).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith(
+      'decision_digest',
+      expect.objectContaining({
+        title: expect.stringContaining('audit sample'),
+        correlation_id: `charter-sample:chr-acme-1:${sampled}`,
+      })
+    );
+  });
+});
+
+describe('shouldSampleCharterAudit', () => {
+  it('is deterministic, bounded by the rate, and never samples at rate 0', () => {
+    expect(shouldSampleCharterAudit('corr', 0)).toBe(false);
+    expect(shouldSampleCharterAudit('corr', 1)).toBe(true);
+    expect(shouldSampleCharterAudit('corr')).toBe(shouldSampleCharterAudit('corr'));
+    const ids = Array.from({ length: 2000 }, (_, i) => `id-${i}`);
+    const sampled = ids.filter((id) => shouldSampleCharterAudit(id)).length;
+    expect(sampled).toBeGreaterThan(0);
+    expect(sampled).toBeLessThan(ids.length * 0.15);
   });
 });

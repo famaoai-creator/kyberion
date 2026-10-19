@@ -44,6 +44,26 @@ const APPROVAL_PROPERTIES = {
   caller_role: { type: 'string' },
   amount: { type: 'number' },
   recipients: { type: 'integer', minimum: 0 },
+  information_flow: {
+    type: 'object',
+    properties: {
+      purpose: { type: 'string' },
+      recipient_class: {
+        enum: ['bound_customer', 'known_counterparty', 'approved_vendor', 'public', 'unknown'],
+      },
+      processor_id: { type: 'string' },
+      categories: {
+        type: 'array',
+        minItems: 1,
+        items: {
+          enum: ['routine_business', 'personal_data', 'sensitive_business', 'unknown'],
+        },
+      },
+      attachment_count: { type: 'integer', minimum: 0, maximum: 100 },
+    },
+    required: ['purpose', 'categories'],
+    additionalProperties: false,
+  },
   tenant_slug: { type: 'string' },
   mission_id: { type: 'string' },
   title: { type: 'string' },

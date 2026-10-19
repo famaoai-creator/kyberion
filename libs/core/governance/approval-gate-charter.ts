@@ -15,11 +15,13 @@
  * would have let it through.
  */
 
+import { createHash } from 'node:crypto';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { resolveApprovalPolicy, type ApprovalPolicyResolution } from './approval-policy.js';
 import {
+  EXTERNAL_EFFECT_CLASSES,
   delegatedDecisionPolicy,
   type CharterAction,
   type CharterAvailability,
@@ -29,6 +31,7 @@ import {
   evaluateUnderCharter,
   recordCharterConsumption,
   recordCharterDenial,
+  withCharterDecisionLock,
   type CharterPathOptions,
 } from './accountability-charter-registry.js';
 
@@ -53,6 +56,24 @@ export type CharterGateOutcome =
 
 const HARDENED_RULES = new Set(['injection-suspected-override', 'strict-posture-floor']);
 
+/** Share of autonomous external actions echoed to the operator for sampling audit. */
+export const CHARTER_AUDIT_SAMPLE_RATE = 0.05;
+
+/**
+ * Deterministic sample by correlation id: the same action is either sampled
+ * or not every time it is replayed, so a retry never double-notifies. Sampling
+ * is feedback, never a gate: a sampled action already ran.
+ */
+export function shouldSampleCharterAudit(
+  correlationId: string,
+  rate: number = CHARTER_AUDIT_SAMPLE_RATE
+): boolean {
+  if (!(rate > 0)) return false;
+  if (rate >= 1) return true;
+  const digest = createHash('sha256').update(correlationId, 'utf8').digest();
+  return digest.readUInt32BE(0) / 0x1_0000_0000 < rate;
+}
+
 /** Policies whose reason for a human lies outside what an envelope can express. */
 export function isCharterEligiblePolicy(policy: ApprovalPolicyResolution): boolean {
   if (policy.mandatoryApproval) return false;
@@ -61,7 +82,7 @@ export function isCharterEligiblePolicy(policy: ApprovalPolicyResolution): boole
   return !policy.missingRequirements.includes('dual_key_confirmation');
 }
 
-export function runCharterGate(input: {
+export interface CharterGateRequest {
   charter: ApprovalGateCharterInput;
   agentId: string;
   operationId: string;
@@ -76,7 +97,15 @@ export function runCharterGate(input: {
    */
   decisionRightsCharterDelegable?: boolean;
   now?: Date;
-}): CharterGateOutcome {
+}
+
+export function runCharterGate(input: CharterGateRequest): CharterGateOutcome {
+  // Usage is read, checked and appended as one critical section: two concurrent
+  // decisions must not both spend the same remaining budget.
+  return withCharterDecisionLock(input.charter.scope, () => runCharterGateUnlocked(input));
+}
+
+function runCharterGateUnlocked(input: CharterGateRequest): CharterGateOutcome {
   const { charter, agentId, operationId, correlationId } = input;
   const now = input.now ?? new Date();
   const evaluated = evaluateUnderCharter(
@@ -169,6 +198,18 @@ export function runCharterGate(input: {
         title: `Charter budget near its limit (${active.charter_id})`,
         body: `${operationId} ran inside the charter; a budget is above 80%.`,
         correlation_id: `charter-near-limit:${active.charter_id}:${now.toISOString().slice(0, 10)}`,
+      });
+    }
+    // Low-impact routine work runs; a small deterministic sample is echoed to
+    // the operator so autonomy stays observable without asking every time.
+    if (
+      (EXTERNAL_EFFECT_CLASSES as readonly string[]).includes(charter.action.action_class) &&
+      shouldSampleCharterAudit(correlationId)
+    ) {
+      void notifyOperator('decision_digest', {
+        title: `Charter audit sample (${active.charter_id})`,
+        body: `${operationId} (${charter.action.action_class}) ran unattended inside the charter; review the outcome if needed.`,
+        correlation_id: `charter-sample:${active.charter_id}:${correlationId}`,
       });
     }
     return { kind: 'allow', message };
