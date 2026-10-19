@@ -28873,6 +28873,12 @@
             "properties": {
               "key": {
                 "type": "string"
+              },
+              "modifiers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "required": ["key"],
