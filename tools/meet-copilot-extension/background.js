@@ -79,6 +79,12 @@ function isOptionalBoolean(value) {
   return value === undefined || typeof value === 'boolean';
 }
 
+// The driver sends mic/camera as the 'on'|'off' string union (content.js
+// compares `mic === 'on'`); booleans stay accepted for older drivers.
+function isOptionalToggle(value) {
+  return isOptionalBoolean(value) || value === 'on' || value === 'off';
+}
+
 function parseControlMessage(raw) {
   let value;
   try {
@@ -94,8 +100,8 @@ function parseControlMessage(raw) {
   if (value.cmd === 'join') {
     return isOptionalString(value.url) &&
       isOptionalString(value.display_name) &&
-      isOptionalBoolean(value.mic) &&
-      isOptionalBoolean(value.camera) &&
+      isOptionalToggle(value.mic) &&
+      isOptionalToggle(value.camera) &&
       isOptionalBoolean(value.captions)
       ? value
       : null;
@@ -205,7 +211,7 @@ async function getConfig() {
   return {
     host: cfg.meetCopilotHost || DEFAULT_HOST,
     port: cfg.meetCopilotPort || DEFAULT_PORT,
-    authToken: cfg.meetCopilotAuthToken || '',
+    authToken: String(cfg.meetCopilotAuthToken || '').trim(),
   };
 }
 
@@ -216,13 +222,35 @@ const MEETING_URL_PATTERNS = [
   'https://*.zoom.us/*',
 ];
 
-async function findMeetTab() {
+async function findMeetTab(targetUrl) {
   const tabs = await chrome.tabs.query({ url: MEETING_URL_PATTERNS });
-  return tabs[0] || null;
+  if (!tabs.length) return null;
+  if (targetUrl) {
+    let want = '';
+    try {
+      want = new URL(targetUrl).pathname.replace(/\/+$/, '');
+    } catch {
+      /* leave want empty */
+    }
+    if (want) {
+      const exact = tabs.find((t) => {
+        try {
+          return new URL(t.url || '').pathname.replace(/\/+$/, '') === want;
+        } catch {
+          return false;
+        }
+      });
+      // Never relay join into a different meeting's tab — if nothing is at the
+      // requested URL, the caller opens a fresh tab instead.
+      if (exact) return exact;
+      return null;
+    }
+  }
+  return tabs.find((t) => t.active) || tabs[0];
 }
 
 async function ensureMeetTab(url) {
-  let tab = await findMeetTab();
+  let tab = await findMeetTab(url);
   if (!tab && url) {
     tab = await chrome.tabs.create({ url, active: true });
     // wait for the tab to finish loading before injecting
@@ -445,6 +473,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message && message.type === 'popup:set-port') {
     chrome.storage.local.set({ meetCopilotPort: Number(message.port) || DEFAULT_PORT }, () => {
+      try {
+        if (ws) ws.close();
+      } catch {
+        /* noop */
+      }
+      connect();
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+  if (message && message.type === 'popup:set-token') {
+    chrome.storage.local.set({ meetCopilotAuthToken: String(message.token || '').trim() }, () => {
       try {
         if (ws) ws.close();
       } catch {
