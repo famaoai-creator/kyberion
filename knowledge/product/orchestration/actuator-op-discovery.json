@@ -22902,6 +22902,9 @@
               "meeting_id": {
                 "type": "string"
               },
+              "series_id": {
+                "type": "string"
+              },
               "passcode": {
                 "type": "string"
               },
@@ -23139,6 +23142,9 @@
               "meeting_id": {
                 "type": "string"
               },
+              "series_id": {
+                "type": "string"
+              },
               "passcode": {
                 "type": "string"
               },
@@ -23346,6 +23352,9 @@
                 "type": "string"
               },
               "meeting_id": {
+                "type": "string"
+              },
+              "series_id": {
                 "type": "string"
               },
               "passcode": {
@@ -23614,6 +23623,9 @@
               "meeting_id": {
                 "type": "string"
               },
+              "series_id": {
+                "type": "string"
+              },
               "passcode": {
                 "type": "string"
               },
@@ -23821,6 +23833,9 @@
                 "type": "string"
               },
               "meeting_id": {
+                "type": "string"
+              },
+              "series_id": {
                 "type": "string"
               },
               "passcode": {
@@ -24032,6 +24047,9 @@
               "meeting_id": {
                 "type": "string"
               },
+              "series_id": {
+                "type": "string"
+              },
               "passcode": {
                 "type": "string"
               },
@@ -24239,6 +24257,9 @@
                 "type": "string"
               },
               "meeting_id": {
+                "type": "string"
+              },
+              "series_id": {
                 "type": "string"
               },
               "passcode": {
