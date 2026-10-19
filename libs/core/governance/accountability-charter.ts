@@ -37,6 +37,28 @@ export type IrreversiblePolicy = 'forbid' | 'named_actions_only' | 'allow';
 export type DataTier = 'public' | 'confidential' | 'personal';
 export type ReputationalClass = 'A' | 'B' | 'C' | 'D';
 
+/** Deterministic, boundary-derived information facts used for autonomous egress. */
+export type InformationCategory =
+  'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown';
+export type RecipientClass = 'bound_customer' | 'approved_vendor' | 'public' | 'unknown';
+export interface InformationFlowFacts {
+  purpose: string;
+  recipient_class?: RecipientClass;
+  processor_id?: string;
+  categories: InformationCategory[];
+  attachment_count: number;
+}
+export interface InformationFlowEnvelope {
+  purposes: string[];
+  recipient_classes: RecipientClass[];
+  categories: InformationCategory[];
+  max_attachments: number;
+  /** When present, constrains inference/API processors independently of recipients. */
+  processor_ids?: string[];
+  processing_purposes?: string[];
+  processing_categories?: InformationCategory[];
+}
+
 export const EXTERNAL_EFFECT_CLASSES = [
   'send_message_external',
   'publish_public',
@@ -77,6 +99,8 @@ export interface CharterEnvelope {
    * never a grant.
    */
   delegated_decisions?: Partial<Record<string, ExternalEffectPolicy>>;
+  /** Optional, explicit information-flow scope. Omission grants no info-flow delegation. */
+  information_flow?: InformationFlowEnvelope;
 }
 
 export interface CharterAppetite {
@@ -130,6 +154,8 @@ export interface CharterAction {
   blast_radius?: { recipients?: number; systems?: number };
   /** True when a cross-provider review of this action has already passed. */
   reviewed_by_other_provider?: boolean;
+  /** Facts must be constructed at a trusted boundary, never from model output. */
+  information_flow?: InformationFlowFacts;
 }
 
 export interface CharterAvailability {
@@ -205,6 +231,47 @@ function dataScopeToken(tier: DataTier, tenant?: string): string {
   return tier === 'confidential' ? `confidential:${tenant ?? ''}` : tier;
 }
 
+/** Shared information-flow rule used by both action and reasoning egress gates. */
+export function evaluateInformationFlow(
+  envelope: CharterEnvelope,
+  facts: InformationFlowFacts
+): string[] {
+  const grant = envelope.information_flow;
+  if (!grant) return ['information_flow not delegated'];
+  if (
+    !facts.purpose?.trim() ||
+    !Array.isArray(facts.categories) ||
+    facts.categories.length === 0 ||
+    !Number.isInteger(facts.attachment_count) ||
+    facts.attachment_count < 0
+  )
+    return ['information_flow facts are incomplete or invalid'];
+  if (facts.processor_id && facts.recipient_class)
+    return ['information_flow facts cannot mix a processor and an external recipient'];
+  if (facts.processor_id) {
+    if (!grant.processor_ids?.includes(facts.processor_id))
+      return [`information_flow processor '${facts.processor_id}' not delegated`];
+    if (!grant.processing_purposes?.includes(facts.purpose))
+      return [`information_flow processing purpose '${facts.purpose}' not delegated`];
+    const excluded = facts.categories.filter(
+      (category) => !grant.processing_categories?.includes(category)
+    );
+    if (excluded.length)
+      return [`information_flow processing categories not delegated: ${excluded.join(',')}`];
+  } else {
+    if (!facts.recipient_class || !grant.purposes.includes(facts.purpose))
+      return [`information_flow purpose '${facts.purpose}' not delegated`];
+    if (!grant.recipient_classes.includes(facts.recipient_class))
+      return [`information_flow recipient '${facts.recipient_class}' not delegated`];
+    if (facts.attachment_count > grant.max_attachments)
+      return ['information_flow attachment limit exceeded'];
+    const excluded = facts.categories.filter((category) => !grant.categories.includes(category));
+    if (excluded.length)
+      return [`information_flow categories not delegated: ${excluded.join(',')}`];
+  }
+  return [];
+}
+
 // ---------------------------------------------------------------------------
 // Validation — "authority cannot be exceeded"
 // ---------------------------------------------------------------------------
@@ -276,6 +343,41 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
         `delegated_decisions.${type} must be forbid, allow_with_review or allow (got '${String(policy)}')`
       );
     }
+  }
+  const flow = envelope.information_flow;
+  if (flow) {
+    const validStringList = (value: unknown): value is string[] =>
+      Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim().length > 0);
+    if (!validStringList(flow.purposes))
+      violations.push('information_flow.purposes must be non-empty strings');
+    if (
+      !Array.isArray(flow.recipient_classes) ||
+      flow.recipient_classes.some(
+        (v) => !['bound_customer', 'approved_vendor', 'public', 'unknown'].includes(v)
+      )
+    )
+      violations.push('information_flow.recipient_classes contains an invalid value');
+    if (
+      !Array.isArray(flow.categories) ||
+      flow.categories.some(
+        (v) => !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(v)
+      )
+    )
+      violations.push('information_flow.categories contains an invalid value');
+    if (!Number.isInteger(flow.max_attachments) || flow.max_attachments < 0)
+      violations.push('information_flow.max_attachments must be a non-negative integer');
+    if (flow.processor_ids !== undefined && !validStringList(flow.processor_ids))
+      violations.push('information_flow.processor_ids must be non-empty strings');
+    if (flow.processing_purposes !== undefined && !validStringList(flow.processing_purposes))
+      violations.push('information_flow.processing_purposes must be non-empty strings');
+    if (
+      flow.processing_categories !== undefined &&
+      (!Array.isArray(flow.processing_categories) ||
+        flow.processing_categories.some(
+          (v) => !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(v)
+        ))
+    )
+      violations.push('information_flow.processing_categories contains an invalid value');
   }
   if (envelope.money.per_action > 0 && effectPolicy(envelope, 'payment') === 'forbid') {
     violations.push('money.per_action > 0 requires external_effects.payment to be permitted');
@@ -360,6 +462,34 @@ export function envelopeExceeds(child: CharterEnvelope, parent: CharterEnvelope)
     ) {
       out.push(`delegated_decisions.${type} is more permissive than the parent envelope`);
     }
+  }
+  if (child.information_flow) {
+    const p = parent.information_flow;
+    if (!p) out.push('information_flow is not granted by the parent envelope');
+    else {
+      for (const key of ['purposes', 'recipient_classes', 'categories'] as const) {
+        for (const value of child.information_flow[key]) {
+          if (!(p[key] as string[]).includes(value))
+            out.push(`information_flow.${key} '${value}' is not granted by the parent envelope`);
+        }
+      }
+      if (child.information_flow.max_attachments > p.max_attachments)
+        out.push('information_flow.max_attachments exceeds parent envelope');
+      for (const key of [
+        'processor_ids',
+        'processing_purposes',
+        'processing_categories',
+      ] as const) {
+        if (p[key] !== undefined && child.information_flow[key] === undefined)
+          out.push(`information_flow.${key} omits a parent restriction`);
+        for (const value of child.information_flow[key] ?? []) {
+          if (!(p[key] ?? []).includes(value as never))
+            out.push(`information_flow.${key} '${value}' is not granted by the parent envelope`);
+        }
+      }
+    }
+  } else if (parent.information_flow) {
+    out.push('information_flow is omitted but restricted by the parent envelope');
   }
   return out;
 }
@@ -511,6 +641,19 @@ export function evaluateAgainstCharter(input: {
         requested: token,
         reason: 'data scope not delegated by the accountable human',
       });
+    }
+  }
+
+  const informationBoundAction =
+    action.action_class === 'send_message_external' || action.action_class === 'publish_public';
+  if (envelope.information_flow) {
+    if (action.information_flow) {
+      if (informationBoundAction && action.information_flow.processor_id)
+        return deny(['external recipient actions require recipient facts, not processor facts']);
+      const violations = evaluateInformationFlow(envelope, action.information_flow);
+      if (violations.length) return deny(violations);
+    } else if (informationBoundAction) {
+      return deny(['information_flow facts are required for external recipient actions']);
     }
   }
 

@@ -10,6 +10,7 @@
       "infrastructure_sentinel",
       "knowledge_steward",
       "metrics_cap_reader",
+      "nhi_accountability_reader",
       "organization_operator",
       "peer_catalog_reader",
       "peer_responder_reader",
