@@ -132,13 +132,19 @@ describe('concierge approval passkey route (HA-07)', () => {
   });
 
   it('takes the decision tenant from the request scope', async () => {
-    mocks.loadApprovalRequest.mockReturnValue({ id: 'req-1', scope: { tenant_slug: 'globex' } });
+    mocks.loadApprovalRequest.mockReturnValue({
+      id: 'req-1',
+      scope: { tenant_slug: 'globex' },
+      requestedByContext: { tenant_slug: 'acme' },
+      work_loop: { context: { tenant_slug: 'acme' } },
+    });
     mocks.createApprovalPasskeyOptions.mockResolvedValue({ challengeId: 'ch-1', options: {} });
     await POST(
       request({ action: 'options', decision: 'approved', presentedDigest: 'shown-digest' }),
       params
     );
     expect(mocks.decisionDenied).toHaveBeenCalledWith(expect.anything(), 'globex');
+    expect(mocks.member).toHaveBeenCalledWith(expect.anything(), 'globex');
   });
 
   it('records a passkey decision only from the verified proof', async () => {

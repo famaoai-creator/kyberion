@@ -38,6 +38,7 @@ import {
 } from '../lib/concierge-advisory-response';
 import { useOutcomePreview } from '../lib/use-outcome-preview';
 import { decideWithPasskey } from '../lib/passkey-client';
+import { formatApprovalFailure, readApprovalResponseFailure } from '../lib/approval-failure';
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
 import {
   deriveCardFields,
@@ -469,7 +470,7 @@ export default function ConciergePage() {
               presentedDigest: item.presented_digest,
             }),
           });
-          if (!response.ok) throw new Error('Approval failed');
+          if (!response.ok) throw await readApprovalResponseFailure(response);
         }
         setNotice({
           text: t(decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice', {
@@ -478,12 +479,12 @@ export default function ConciergePage() {
         });
         await refresh();
       } catch (error) {
-        setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
+        setNotice({ text: formatApprovalFailure(error, locale), error: true });
       } finally {
         setBusyId(null);
       }
     },
-    [refresh, t]
+    [refresh, t, locale]
   );
 
   const [changeFormId, setChangeFormId] = React.useState<string | null>(null);

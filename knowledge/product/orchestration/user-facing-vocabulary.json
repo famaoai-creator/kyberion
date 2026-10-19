@@ -11336,6 +11336,46 @@
         "ja": "「{title}」を承認いたしました。担当へお伝えします。",
         "qps-ploc": "⟦Ȧṗṗřőṽėḓ “{title}”. Ŧħė őẇñėř ħȧş ƀėėñ ñőŧïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
+      "home.approval_failure_notice": {
+        "en": "{guidance} ({diagnostic})",
+        "ja": "{guidance}（{diagnostic}）",
+        "qps-ploc": "⟦{guidance} ({diagnostic}) ŀőřėɱ ïṗ⟧"
+      },
+      "home.approval_failure_unconfirmed": {
+        "en": "The decision result could not be confirmed. Refresh the queue and check its status before trying again.",
+        "ja": "承認操作の結果を確認できませんでした。再操作の前にキューを再読み込みし、状態を確認してください。",
+        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ řėşůŀŧ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėƒřėşħ ŧħė ɋůėůė ȧñḓ ƈħėƈķ ïŧş şŧȧŧůş ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "home.approval_failure_auth": {
+        "en": "Sign-in could not be verified. Check your sign-in, then refresh the queue and review its status.",
+        "ja": "サインインを確認できませんでした。ログイン状態を確認し、キューを再読み込みして状態を確認してください。",
+        "qps-ploc": "⟦Şïɠñ-ïñ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Ƈħėƈķ ẏőůř şïɠñ-ïñ, ŧħėñ řėƒřėşħ ŧħė ɋůėůė ȧñḓ řėṽïėẇ ïŧş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "home.approval_failure_access": {
+        "en": "This decision was not permitted. Check the selected company and your approval access with its administrator.",
+        "ja": "この承認操作は許可されませんでした。選択中の会社と承認権限を管理者に確認してください。",
+        "qps-ploc": "⟦Ŧħïş ḓėƈïşïőñ ẇȧş ñőŧ ṗėřɱïŧŧėḓ. Ƈħėƈķ ŧħė şėŀėƈŧėḓ ƈőɱṗȧñẏ ȧñḓ ẏőůř ȧṗṗřőṽȧŀ ȧƈƈėşş ẇïŧħ ïŧş ȧḓɱïñïşŧřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "home.approval_failure_busy": {
+        "en": "The decision could not be confirmed while the service was busy or locked. Wait, then refresh the queue and check its status.",
+        "ja": "サービスの混雑またはロックにより結果を確認できませんでした。時間を置いてキューを再読み込みし、状態を確認してください。",
+        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ ẇħïŀė ŧħė şėřṽïƈė ẇȧş ƀůşẏ őř ŀőƈķėḓ. Ẇȧïŧ, ŧħėñ řėƒřėşħ ŧħė ɋůėůė ȧñḓ ƈħėƈķ ïŧş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "home.approval_failure_missing": {
+        "en": "The request is no longer available. Refresh the queue and check its current status.",
+        "ja": "この申請は現在利用できません。キューを再読み込みし、現在の状態を確認してください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ïş ñő ŀőñɠėř ȧṽȧïŀȧƀŀė. Řėƒřėşħ ŧħė ɋůėůė ȧñḓ ƈħėƈķ ïŧş ƈůřřėñŧ şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "home.approval_failure_invalid": {
+        "en": "The decision could not be accepted. Refresh the queue and review the current request and your approval access.",
+        "ja": "承認操作を受け付けられませんでした。キューを再読み込みし、現在の申請内容と承認権限を確認してください。",
+        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ ƈőůŀḓ ñőŧ ƀė ȧƈƈėṗŧėḓ. Řėƒřėşħ ŧħė ɋůėůė ȧñḓ řėṽïėẇ ŧħė ƈůřřėñŧ řėɋůėşŧ ȧñḓ ẏőůř ȧṗṗřőṽȧŀ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "home.approval_failure_unsupported": {
+        "en": "This decision operation is not supported. Contact the administrator.",
+        "ja": "この承認操作には対応していません。管理者にお問い合わせください。",
+        "qps-ploc": "⟦Ŧħïş ḓėƈïşïőñ őṗėřȧŧïőñ ïş ñőŧ şůṗṗőřŧėḓ. Ƈőñŧȧƈŧ ŧħė ȧḓɱïñïşŧřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
       "home.rejected_notice": {
         "en": "Sent “{title}” back.",
         "ja": "「{title}」を差し戻しました。",
