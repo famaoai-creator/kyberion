@@ -62,7 +62,7 @@ describe('Discussion static readiness', () => {
       expect.objectContaining({
         tier: 'confidential',
         tenant_slug: 'fixture',
-        training_use: 'zero_retention',
+        training_use: 'no_training',
         purpose: 'discussion:decision',
       }),
       expect.any(Function)
