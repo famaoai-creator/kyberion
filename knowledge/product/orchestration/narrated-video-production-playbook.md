@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [video, narrated, scratch-first, pipeline, orchestration]
 owner: ecosystem_architect
-last_updated: 2026-10-14
+last_updated: 2026-10-19
 ---
 
 # Narrated Video Production Playbook
@@ -97,6 +97,12 @@ Good fits for this preflight include tutorial videos, product intros, onboarding
 5. Approval: pause before upload or public publish if visibility, licensing, or brand risk needs confirmation.
 6. Publish preparation: `narrated-video-publish-plan` when external distribution is in scope.
 7. Review: propose reusable preference updates for `knowledge/personal/` only when the user approves.
+
+## 既存動画を編集する場合
+
+動画素材のカット・字幕付けは、[動画素材からの字幕付き短縮編集](video-recut-production-playbook.md)へ進む。
+元映像・元音声を保持し、元動画の時刻と編集後の時刻を対応付ける。
+このページの原稿・ナレーション起点の制作経路とは入口を分ける。
 
 ## Nearby Media Surfaces
 
