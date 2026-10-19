@@ -201,6 +201,7 @@
       "layer": "orchestration",
       "pattern": "scripts/generate_capability_seams.ts"
     },
+    { "layer": "orchestration", "pattern": "scripts/resolve_generated.ts" },
     { "layer": "orchestration", "pattern": "scripts/demos/*.ts" },
     { "layer": "orchestration", "pattern": "libs/core/*worker*.ts" },
     { "layer": "contracts", "pattern": "libs/core/*/*-contract.ts" },
