@@ -195,23 +195,33 @@ export function evaluateDecisionRights(
   const thresholdValue = matched.threshold.value;
   const actorRole = input.actorRole?.trim() || null;
   const authorizedRole = matched.authorized_role || null;
-  const roleMismatch = Boolean(actorRole && authorizedRole && actorRole !== authorizedRole);
+  const roleMismatch = Boolean(authorizedRole && actorRole !== authorizedRole);
 
-  let overThreshold = false;
-  if (typeof input.amount === 'number' && Number.isFinite(input.amount)) {
-    if (typeof thresholdValue === 'number') {
+  // A grant needs evidence for its own metric. Missing or unknown facts are
+  // never evidence that the decision is below the threshold.
+  let invalidThresholdContext = true;
+  let overThreshold = true;
+  if (thresholdMetric === 'amount_jpy' || thresholdMetric === 'headcount') {
+    if (
+      typeof thresholdValue === 'number' &&
+      Number.isFinite(thresholdValue) &&
+      thresholdValue >= 0 &&
+      typeof input.amount === 'number' &&
+      Number.isFinite(input.amount) &&
+      input.amount >= 0 &&
+      (thresholdMetric !== 'headcount' || Number.isInteger(input.amount))
+    ) {
+      invalidThresholdContext = false;
       overThreshold = input.amount > thresholdValue;
-    } else if (typeof thresholdValue === 'string' && thresholdMetric === 'risk_level') {
-      const rank = { low: 1, medium: 2, high: 3, critical: 4 } as const;
-      const amountRank = rank[(input.riskLevel || '').toLowerCase() as keyof typeof rank] || 0;
-      const thresholdRank = rank[thresholdValue.toLowerCase() as keyof typeof rank] || 0;
-      overThreshold = amountRank > thresholdRank;
     }
-  } else if (typeof input.riskLevel === 'string' && typeof thresholdValue === 'string') {
-    const rank = { low: 1, medium: 2, high: 3, critical: 4 } as const;
-    const inputRank = rank[input.riskLevel.toLowerCase() as keyof typeof rank] || 0;
-    const thresholdRank = rank[thresholdValue.toLowerCase() as keyof typeof rank] || 0;
-    overThreshold = inputRank > thresholdRank;
+  } else if (thresholdMetric === 'risk_level' && typeof thresholdValue === 'string') {
+    const rank: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+    const inputRank = rank[input.riskLevel?.trim().toLowerCase() ?? ''];
+    const thresholdRank = rank[thresholdValue.trim().toLowerCase()];
+    if (typeof inputRank === 'number' && typeof thresholdRank === 'number') {
+      invalidThresholdContext = false;
+      overThreshold = inputRank > thresholdRank;
+    }
   }
 
   const finalDecisionHolder = matched.final_decision_holder || null;
@@ -229,7 +239,9 @@ export function evaluateDecisionRights(
     escalationKind === 'role_mismatch'
       ? `actor role ${actorRole} is not authorized for ${decisionType}`
       : escalationKind === 'over_threshold'
-        ? `decision value exceeds threshold ${String(thresholdValue)}`
+        ? invalidThresholdContext
+          ? `missing or invalid decision facts for threshold metric ${thresholdMetric}`
+          : `decision value exceeds threshold ${String(thresholdValue)}`
         : escalationKind === 'human_acceptance'
           ? 'final decision holder is human'
           : null;

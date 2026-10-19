@@ -18,6 +18,20 @@ This is the contract between Kyberion core and:
 
 ## 1. Stability Tiers
 
+### Payment provider integration — Beta
+
+`@agent/core/governance/charter-payment-settlement` exposes
+`executeCharterPayment`, `reconcileCharterPayment` and `CharterPaymentAdapter`.
+A trusted host adapter supplies execution and read-only reconciliation; ADF or
+model output cannot supply executable adapters. Use a durable business payment
+ID across retries. The executor binds scope, recipient, amount, currency and
+provider identity before reserving budget and attempting an effect once.
+Unknown or partial outcomes retain the reservation. Nonexecution or full
+compensation may release it only with provider evidence and permanent execution
+closure. No real payment provider is bundled; adapter integration must enforce
+the idempotency and closure contract. See
+[AI Use Charter operations](../../knowledge/product/governance/ai-use-charter-operations.md).
+
 | Tier             | Meaning                                                                                               | Versioning |
 | ---------------- | ----------------------------------------------------------------------------------------------------- | ---------- |
 | **Stable (v1+)** | Public surface. Breaking changes require a major version bump and a migration path.                   | semver     |

@@ -69,7 +69,9 @@
       "active/shared/runtime/discussion-create-requests/personal/",
       "active/shared/runtime/discussion-create-requests/confidential/",
       "active/shared/runtime/grants/personal/",
-      "active/shared/runtime/grants/confidential/"
+      "active/shared/runtime/grants/confidential/",
+      "active/shared/runtime/autonomy-learning/personal/",
+      "active/shared/runtime/autonomy-learning/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",

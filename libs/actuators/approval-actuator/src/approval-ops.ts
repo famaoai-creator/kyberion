@@ -2,6 +2,7 @@ import { createApprovalRequest, listApprovalRequests } from '@agent/core/governa
 import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { charterInputForDecision } from '@agent/core/governance/charter-call-site';
+import { charterDecisionFactError } from '@agent/core/pipeline/op-preflight-charter';
 import {
   approvalUsabilityRefusal,
   isApprovalRequestExpired,
@@ -30,6 +31,7 @@ export interface EvaluateDecisionRightsInput {
   caller_role?: string;
   channel?: string;
   amount?: number;
+  risk_level?: 'low' | 'medium' | 'high' | 'critical';
   /** Outside parties the decision reaches (messages, invitations). */
   recipients?: number;
   /**
@@ -53,6 +55,8 @@ export interface DecisionRightsResult {
 }
 
 export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): DecisionRightsResult {
+  const factError = charterDecisionFactError({ ...input });
+  if (factError) throw new Error(`[OP_CHARTER_FACTS_DENIED] ${factError}`);
   if (!input.operation_id || !input.correlation_id || !input.decision_type) {
     throw new Error(
       '[evaluate_decision_rights] requires operation_id, correlation_id, and decision_type'
@@ -64,6 +68,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     decisionType: input.decision_type,
     actorRole: input.caller_role,
     amount: input.amount,
+    riskLevel: input.risk_level,
   });
   // An active accountability charter for the tenant takes part even when the
   // decision-rights matrix would not escalate: the charter is a limit as well
@@ -91,6 +96,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     ...(charter ? { charter } : {}),
     payload: {
       decision_type: input.decision_type,
+      ...(input.risk_level ? { risk_level: input.risk_level } : {}),
       ...(typeof input.amount === 'number' && Number.isFinite(input.amount)
         ? { amount: input.amount }
         : {}),

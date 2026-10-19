@@ -1403,6 +1403,9 @@
               "amount": {
                 "type": "number"
               },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
+              },
               "recipients": {
                 "type": "integer",
                 "minimum": 0
@@ -1580,6 +1583,9 @@
               "amount": {
                 "type": "number"
               },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
+              },
               "recipients": {
                 "type": "integer",
                 "minimum": 0
@@ -1755,6 +1761,9 @@
               },
               "amount": {
                 "type": "number"
+              },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
               },
               "recipients": {
                 "type": "integer",
@@ -1940,6 +1949,9 @@
               "amount": {
                 "type": "number"
               },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
+              },
               "recipients": {
                 "type": "integer",
                 "minimum": 0
@@ -2119,6 +2131,9 @@
               "amount": {
                 "type": "number"
               },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
+              },
               "recipients": {
                 "type": "integer",
                 "minimum": 0
@@ -2296,6 +2311,9 @@
               },
               "amount": {
                 "type": "number"
+              },
+              "risk_level": {
+                "enum": ["low", "medium", "high", "critical"]
               },
               "recipients": {
                 "type": "integer",

@@ -3,10 +3,48 @@ import type { Charter } from './accountability-charter.js';
 import type { LedgerEntry } from './accountability-charter-registry.js';
 import {
   buildAccountabilityReport,
+  buildScopeProposals,
   renderAccountabilityReportText,
 } from './accountability-report.js';
 
 const NOW = new Date('2026-10-01T09:00:00.000Z');
+
+it('observation policy changes advice thresholds without changing the delegated envelope', () => {
+  const c = charter();
+  c.envelope.information_flow = {
+    purposes: ['meeting_scheduling'],
+    recipient_classes: ['known_counterparty'],
+    categories: ['routine_business'],
+    max_attachments: 0,
+  };
+  const before = structuredClone(c);
+  const report = {
+    denied: 2,
+    by_reason: [],
+    purposes: [{ purpose: 'meeting_scheduling', count: 2 }],
+    recipients: [],
+    processors: [],
+    categories: [],
+    last_seen: NOW.toISOString(),
+  };
+  expect(
+    buildScopeProposals(c, report, {
+      version: 'test',
+      audit_sample_rate: 1,
+      repeated_denial_threshold: 3,
+      frequent_denial_threshold: 4,
+    })
+  ).toEqual([]);
+  expect(
+    buildScopeProposals(c, report, {
+      version: 'test',
+      audit_sample_rate: 1,
+      repeated_denial_threshold: 1,
+      frequent_denial_threshold: 2,
+    }).map((p) => p.kind)
+  ).toEqual(['stop', 'narrow']);
+  expect(c).toEqual(before);
+});
 const charter = (expires = '2026-12-31T00:00:00.000Z'): Charter =>
   ({
     charter_id: 'chr-acme-1',

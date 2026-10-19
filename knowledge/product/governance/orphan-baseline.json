@@ -4,6 +4,10 @@
   "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
   "libs_core_modules": [
     {
+      "id": "libs/core/governance/charter-payment-settlement.ts",
+      "reason": "Provider integration extension point published as @agent/core/governance/charter-payment-settlement and documented in docs/developer/EXTENSION_POINTS.md and ai-use-charter-operations.md. External trusted payment adapters call executeCharterPayment/reconcileCharterPayment; no real payment provider is bundled. Integration tests exercise the actual charter gate and compensation ledger."
+    },
+    {
       "id": "libs/core/mesh/acp-mediator-entry.ts",
       "reason": "Public subpath @agent/core/acp-mediator, listed in docs/PACKAGING_CONTRACT.md (\"Agent runtime and orchestration\") and libs/core/package.json exports: a side-effect bootstrap that imports risky-op-registry so a package-name consumer gets the governed approval handler, then re-exports acp-mediator. Consumed by package name only; in-repo code imports mesh/acp-mediator directly."
     },

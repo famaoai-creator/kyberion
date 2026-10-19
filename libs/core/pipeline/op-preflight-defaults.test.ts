@@ -22,7 +22,7 @@ describe('default operation preflight waterfall', () => {
       'core:adf-guardrails',
       'core:provider-egress',
     ]);
-    expect(listOpGuards().map((entry) => entry.id)).toEqual(['core:spend']);
+    expect(listOpGuards().map((entry) => entry.id)).toEqual(['core:charter-facts', 'core:spend']);
   });
 
   it('fails closed for a protected operation without a tenant binding', async () => {

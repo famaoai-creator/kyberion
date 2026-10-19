@@ -1566,6 +1566,33 @@ Bind the browser report to the selected provider and mission. Invalidate it imme
 
 Regression gates: discussion-readiness, Discussion readiness/execution HTTP routes, readiness controller and panel markup tests, plus Discussion/Presence and package-boundary suites. Cover authorization/tier/tenant/mission denial, missing versus unreadable executables, guarded and missing artifact ancestors, policy failures with zero room creation, malformed reports, stale/overlapping requests and explicit unverified live behavior. These mocked and server-rendered checks do not certify a live provider or a rendered browser journey.
 
+## Delegated authority facts and learned autonomy
+
+Evaluate a decision only with its declared metric: require an authorized role,
+finite nonnegative numeric facts or a recognized risk level. Missing facts and
+unsupported metrics require escalation; an absent value never means zero risk.
+Carry the same facts through the actuator and the approval gate. Changes to a
+charter draft invalidate consent and late previews; preserve every declared
+scope when amending a charter.
+
+Gate requests are not successful execution evidence. Learned promotion requires
+successful execution receipts and must revalidate stored promotions against the
+current evidence window. Tenant learning uses only its protected confidential
+partition; system proof cannot relax tenant policy. Require stable receipt IDs
+and deduplicate replayed success. A verdict is not an execution receipt.
+Invalid or incoherent learning settings disable learned relaxation.
+
+Payment providers must use durable scoped intent and provider idempotency.
+Unknown/partial results hold budget. Release only authoritative full compensation
+or permanent nonexecution proof; a transient not-found is not that proof.
+Reconciliation is read-only and cannot submit or initiate refund. Keep the
+reservation's original UTC budget window and idempotent release receipts.
+
+Regression gates: decision-rights, approval-ops-charter, autonomy-action-state,
+autonomous-ops-gate, autonomy-learning-policy, daemon_watchdog, charter payment
+settlement, op-preflight-charter and charter-view tests. Cover invalid policies,
+tenant isolation, repeated receipt IDs and uncertain concurrent effects.
+
 ## Discussion uncertain-create request recovery
 
 Before persisting a browser pending marker, resolve the authenticated actor and canonical tenant/organization/project/mission routing through the read-only request-context endpoint. It reserves nothing and never calls a provider. Require an existing selected tenant (or tenant-bound confidential mission); do not invent an unscoped tenant or relabel a public mission. Validate the local input and freeze the submission snapshot across this check. A context failure is pre-submit and must not strand a pending request.
