@@ -437,12 +437,19 @@ function extractLinkHost(raw: string): string | null {
   }
 }
 
-/** Only a tiny, exact greeting vocabulary is eligible for unattended delivery. */
+/**
+ * Only a tiny, exact greeting vocabulary is eligible for unattended delivery.
+ * Trailing whitespace and sentence punctuation are stripped with a bounded
+ * scan (no backtracking regex over caller-controlled text).
+ */
 function classifyCustomerOutbound(body: string): 'routine_business' | 'unknown' {
-  const normalized = String(body ?? '')
-    .trim()
-    .replace(/[。.!！?？\s]+$/u, '')
-    .toLocaleLowerCase();
+  let text = String(body ?? '');
+  for (;;) {
+    const next = trimEndChars(text.trimEnd(), '。.!！?？');
+    if (next === text) break;
+    text = next;
+  }
+  const normalized = text.toLocaleLowerCase();
   return matchesIntentPhrase(normalized, 'egress.customer_routine_greeting')
     ? 'routine_business'
     : 'unknown';
