@@ -947,10 +947,9 @@
     {
       "id": "registration-tests",
       "scope": "pr",
-      "executable": "pnpm",
+      "executable": "node",
       "args": [
-        "exec",
-        "vitest",
+        "node_modules/vitest/vitest.mjs",
         "run",
         "--testTimeout=60000",
         "--maxWorkers=2",
