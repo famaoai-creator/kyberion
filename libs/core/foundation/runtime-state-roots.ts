@@ -5,4 +5,5 @@
  */
 export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   hearing: 'active/shared/runtime/hearing',
+  discussion_create_requests: 'active/shared/runtime/discussion-create-requests',
 } as const;

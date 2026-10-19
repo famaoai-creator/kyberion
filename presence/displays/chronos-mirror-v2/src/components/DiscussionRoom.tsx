@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import {
-  createDiscussion,
   DISCUSSION_EXAMPLES,
   dt,
   fetchDiscussionRooms,
@@ -34,11 +33,8 @@ import {
 } from './DiscussionExecutionStatus';
 import { DiscussionBriefControls } from './DiscussionBriefControls';
 import { DiscussionBriefResult } from './DiscussionBriefResult';
-import {
-  DiscussionCreateUncertainty,
-  DiscussionReadiness,
-  useDiscussionReadiness,
-} from './DiscussionReadiness';
+import { DiscussionReadiness, useDiscussionReadiness } from './DiscussionReadiness';
+import { DiscussionCreateRecovery, useDiscussionCreateRecovery } from './DiscussionCreateRecovery';
 import { canAttemptDiscussion } from '../lib/discussion-readiness-state';
 import { OutcomesCard } from './DiscussionOutcomes';
 import {
@@ -64,11 +60,13 @@ function readRoomParam(): string | null {
   return new URLSearchParams(window.location.search).get('room');
 }
 
-function writeRoomParam(id: string | null) {
+function writeRoomParam(id: string | null, readOnly = false) {
   const url = new URL(window.location.href);
   if (id) url.searchParams.set('room', id);
   else url.searchParams.delete('room');
-  window.history.replaceState(null, '', url.toString());
+  if (id && readOnly) url.searchParams.set('discussion_readonly', '1');
+  else url.searchParams.delete('discussion_readonly');
+  window.history.pushState(null, '', url.toString());
 }
 
 export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
@@ -78,16 +76,24 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
     override ?? coerceLocale(chronosLocale, ['en', 'ja'] as const, 'en');
   const [roomId, setRoomId] = React.useState<string | null>(null);
   const [canSteer, setCanSteer] = React.useState(false);
+  const [readOnly, setReadOnly] = React.useState(false);
   const [hydrated, setHydrated] = React.useState(false);
 
   React.useEffect(() => {
-    setRoomId(readRoomParam());
+    const restore = () => {
+      setRoomId(readRoomParam());
+      setReadOnly(new URLSearchParams(window.location.search).get('discussion_readonly') === '1');
+    };
+    restore();
     setHydrated(true);
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
   }, []);
 
-  const open = (id: string | null) => {
+  const open = (id: string | null, asReadOnly = false) => {
     setRoomId(id);
-    writeRoomParam(id);
+    setReadOnly(asReadOnly);
+    writeRoomParam(id, asReadOnly);
   };
 
   if (!hydrated) return <div className="dr-root" aria-busy="true" />;
@@ -98,6 +104,7 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
           roomId={roomId}
           locale={locale}
           canSteer={canSteer}
+          readOnly={readOnly}
           onBack={() => open(null)}
           onOpen={open}
         />
@@ -108,6 +115,7 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
           onLocale={setOverride}
           onOpen={open}
           onAccess={setCanSteer}
+          onConfirmedOpen={(id) => open(id, true)}
         />
       )}
     </div>
@@ -122,12 +130,14 @@ function Launcher({
   onLocale,
   onOpen,
   onAccess,
+  onConfirmedOpen,
 }: {
   embedded: boolean;
   locale: DiscussionLocale;
   onLocale: (locale: DiscussionLocale) => void;
   onOpen: (id: string) => void;
   onAccess: (canSteer: boolean) => void;
+  onConfirmedOpen: (id: string) => void;
 }) {
   const [goal, setGoal] = React.useState('');
   const [tempo, setTempo] = React.useState<'fast' | 'normal' | 'slow'>('normal');
@@ -135,10 +145,8 @@ function Launcher({
   const [format, setFormat] = React.useState<DiscussionRunFormat>('brief');
   const mode = format === 'dialogue' ? 'dialogue' : 'panel';
   const runConfig = discussionRunConfig(format, speaker);
-  const submitting = React.useRef(false);
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [createUnconfirmed, setCreateUnconfirmed] = React.useState(false);
+  const recovery = useDiscussionCreateRecovery();
+  const busy = recovery.busy;
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
   const [missions, setMissions] = React.useState<MissionOption[]>([]);
   const [missionId, setMissionId] = React.useState('');
@@ -177,32 +185,20 @@ function Launcher({
     event.preventDefault();
     if (
       !goal.trim() ||
-      submitting.current ||
+      recovery.blocked ||
       !canAttemptDiscussion(format, speaker, missionId, readiness.getState())
     )
       return;
-    submitting.current = true;
-    setBusy(true);
-    setError(null);
-    setCreateUnconfirmed(false);
-    const result = await createDiscussion({
+    const result = await recovery.start({
       goal: goal.trim(),
       locale,
       ...runConfig,
       turn_delay_ms: TEMPO.find((t) => t.id === tempo)?.ms ?? 1800,
       ...(missionId ? { mission_id: missionId } : {}),
     });
-    submitting.current = false;
-    setBusy(false);
-    if (!result.ok || !result.data) {
-      if (readinessSelection) {
-        readiness.invalidate(result.status);
-        setCreateUnconfirmed(true);
-      }
-      setError(result.error ?? 'failed');
-      return;
-    }
-    onOpen(result.data.room.id);
+    // A lost/rejected create response also invalidates the static setup check.
+    // Its retry cannot release the independent durable pending-create guard.
+    if (result && readinessSelection) readiness.invalidate(result.status);
   };
 
   return (
@@ -338,7 +334,7 @@ function Launcher({
           <button
             type="submit"
             className="dr-btn dr-btn--primary dr-btn--lg"
-            disabled={busy || !goal.trim() || !canAttempt}
+            disabled={recovery.blocked || !goal.trim() || !canAttempt}
             aria-describedby={readinessSelection ? 'dr-run-bounds dr-readiness' : 'dr-run-bounds'}
           >
             <Rocket size={16} aria-hidden />{' '}
@@ -379,12 +375,12 @@ function Launcher({
             onRetry={readiness.retry}
           />
         ) : null}
-        {error ? (
-          <div className="dr-note" data-tone="danger" role="alert">
-            {error}
-            {createUnconfirmed ? <DiscussionCreateUncertainty locale={locale} /> : null}
-          </div>
-        ) : null}
+        <DiscussionCreateRecovery
+          state={recovery.state}
+          locale={locale}
+          onCheck={recovery.check}
+          onOpen={onConfirmedOpen}
+        />
       </form>
 
       <section className="dr-recent">
@@ -427,17 +423,20 @@ function RoomView({
   roomId,
   locale,
   canSteer,
+  readOnly,
   onBack,
   onOpen,
 }: {
   roomId: string;
   locale: DiscussionLocale;
   canSteer: boolean;
+  readOnly: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
 }) {
   const { room, connection, error, setRoom } = useDiscussionStream(roomId);
-  const [access, setAccess] = React.useState(canSteer);
+  const [accessRole, setAccess] = React.useState(canSteer);
+  const access = !readOnly && accessRole;
   // The room speaks in the language it was opened in, whatever the console locale.
   const roomLocale: DiscussionLocale = room?.config.locale ?? locale;
 
