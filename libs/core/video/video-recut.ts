@@ -395,8 +395,8 @@ export async function prepareVideoRecut(input: VideoRecutRequest): Promise<Prepa
   const subtitleText = String(safeReadFile(subtitles, { encoding: 'utf8' }));
   const cues = parseVtt(subtitleText);
   // The canonical parser skips malformed blocks; reject them instead of silently dropping edits.
-  if ((subtitleText.match(/-->/g) ?? []).length !== cues.length)
-    throw new Error('Malformed or empty subtitle cue');
+  const timingSeparatorCount = subtitleText.split('-->').length - 1;
+  if (timingSeparatorCount !== cues.length) throw new Error('Malformed or empty subtitle cue');
   const plan = planVideoRecut(request, cues, metadata.duration);
   const bundle = request.bundle_dir
     ? scratchPath(request.bundle_dir)
