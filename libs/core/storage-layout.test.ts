@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { rootDir } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import {
+  autonomyLearningCapability,
+  isAutonomyLearningCapability,
+} from './foundation/autonomy-learning-capability.js';
+import {
   SYSTEM_PARTITION,
   PARTITIONED_RUNTIME_STATE_ROOTS,
   partitionedRuntimeStateKnowledgePath,
@@ -231,14 +235,49 @@ describe('durable partitioned runtime state', () => {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
       ).toBe(false);
-      for (const field of [
-        'default_allow',
-        'persona_permissions',
-        'authority_permissions',
-        'authority_role_permissions',
-      ]) {
+      for (const field of ['default_allow', 'persona_permissions', 'authority_permissions']) {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
+      for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
+        if (store === 'autonomy-learning' && role === 'autonomy_learning_store') continue;
+        expect(JSON.stringify(grant)).not.toContain(`runtime/${store}`);
+      }
     }
+    // The learning mediator has exact tenant file/directory policy grants;
+    // its mandatory capability further limits directory grants to mkdir and
+    // rejects the virtual knowledge aliases as actual data destinations.
+    const runtime = 'active/shared/runtime/autonomy-learning';
+    const tenantDirectory = runtime + '/confidential/${KYBERION_TENANT}';
+    const exactGrant = [
+      tenantDirectory,
+      tenantDirectory + '/autonomy-outcomes.jsonl',
+      'knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl',
+      tenantDirectory + '/autonomy-action-overrides.json',
+      'knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json',
+      runtime,
+      runtime + '/confidential',
+      'knowledge/confidential/${KYBERION_TENANT}',
+    ];
+    expect(policy.authority_role_permissions.autonomy_learning_store).toEqual({
+      allow_read: exactGrant,
+      allow_write: exactGrant,
+    });
+    const capability = autonomyLearningCapability('tenant-a');
+    const tenantRoot = runtime + '/confidential/tenant-a';
+    expect(capability).toEqual({
+      tenantSlug: 'tenant-a',
+      readExact: [
+        tenantRoot + '/autonomy-outcomes.jsonl',
+        tenantRoot + '/autonomy-action-overrides.json',
+      ],
+      writeExact: [
+        tenantRoot + '/autonomy-outcomes.jsonl',
+        tenantRoot + '/autonomy-action-overrides.json',
+      ],
+      mkdirExact: [runtime, runtime + '/confidential', tenantRoot],
+    });
+    expect(isAutonomyLearningCapability(capability)).toBe(true);
+    expect(isAutonomyLearningCapability({ ...capability, writeExact: [tenantRoot] })).toBe(false);
+    expect(isAutonomyLearningCapability({ ...capability, tenantSlug: 'tenant-b' })).toBe(false);
   });
 });

@@ -762,6 +762,19 @@ export class Analyzer {
       result.unresolved.push(`role expression too deep at ${this.position(expr)}`);
       return result;
     }
+    // The canonical zero-argument authority resolver preserves the ambient
+    // principal. It cannot introduce a new role assumption. Match the bound
+    // declaration, never a function name supplied by another module.
+    if (ts.isCallExpression(expr) && expr.arguments.length === 0) {
+      const callee = this.calleeDeclaration(expr);
+      if (
+        callee &&
+        ts.isFunctionDeclaration(callee) &&
+        callee.name?.text === 'resolveRole' &&
+        this.ws.rel(callee.getSourceFile().fileName) === AUTHORITY_FILE
+      )
+        return result;
+    }
     if (ts.isStringLiteralLike(expr)) {
       result.roles.add(expr.text);
       return result;

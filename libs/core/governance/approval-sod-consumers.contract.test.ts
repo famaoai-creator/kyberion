@@ -14,7 +14,7 @@ import { evaluateApprovalUsability, type ApprovalRequestRecord } from './approva
 const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/governance/approval-gate.ts', consumer: 'approval_gate' },
   { file: 'libs/core/governance/approval-gate.ts', consumer: 'approval_gate_session_cache' },
-  { file: 'libs/core/governance/approval-store.ts', consumer: 'apply_claim' },
+  { file: 'libs/core/governance/approval-apply-claim.ts', consumer: 'apply_claim' },
   { file: 'libs/core/project/project-trust.ts', consumer: 'project_trust' },
   { file: 'libs/core/dot/dot-executor-release.ts', consumer: 'dot_release' },
   { file: 'libs/core/governance/work-effect-release.ts', consumer: 'dot_release' },
@@ -70,7 +70,7 @@ const SOD_OFF_GUARD_EXCEPTIONS: Readonly<Record<string, string>> = {
   'libs/core/governance/approval-gate.ts':
     'a session-cache grant whose seed record is missing is kept while off (as before); a seed that exists is always checked',
   'libs/core/governance/approval-store.ts':
-    'decide-time enforcement (enforceSeparationOfDutiesOnDecision) only; apply_claim calls assertApprovalUsable unconditionally',
+    'decide-time enforcement (enforceSeparationOfDutiesOnDecision) only; approval-apply-claim calls assertApprovalUsable unconditionally',
   'libs/core/service/service-recording-review-approval.ts':
     'a legacy review written before reviews went through the store has no record to check; accepted only while off',
   'scripts/mission-alignment-gate/serve-brief.ts':
