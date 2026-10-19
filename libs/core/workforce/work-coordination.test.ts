@@ -438,7 +438,15 @@ describe('work coordination', () => {
   });
 
   describe('QM-01 lease reaping and poison-pill parking', () => {
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    // Lease expiry reads Date.now(): move a frozen clock past the TTL instead
+    // of sleeping, so a loaded runner cannot reorder the claim and the check.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const elapse = (ms: number) => vi.setSystemTime(Date.now() + ms);
 
     const makeItem = () =>
       createWorkItem({
@@ -470,14 +478,14 @@ describe('work coordination', () => {
         purpose: 'work',
         ttlMs: 1,
       });
-      await sleep(10);
+      elapse(10);
       expect(() => renewWorkItemLease({ leaseId: lease.lease_id })).toThrowError(/lapsed/i);
     });
 
     it('recovers a stranded in_progress item back to ready', async () => {
       const item = makeItem();
       claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
-      await sleep(10);
+      elapse(10);
       expect(listWorkItems()[0].status).toBe('in_progress');
 
       const result = reapExpiredWorkLeases();
@@ -495,7 +503,7 @@ describe('work coordination', () => {
     it('replays durable completion evidence instead of discarding an orphan result', async () => {
       const item = makeItem();
       claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
-      await sleep(10);
+      elapse(10);
       const result = reapExpiredWorkLeases({ completedEvidence: () => true });
       expect(result.replayed.map((entry) => entry.item_id)).toContain(item.item_id);
       expect(listWorkItems()[0]).toMatchObject({ status: 'done', metadata: { replayed: true } });
@@ -510,7 +518,7 @@ describe('work coordination', () => {
         metadata: { completed_evidence: true },
       });
       claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
-      await sleep(10);
+      elapse(10);
       const result = reapExpiredWorkLeases();
       expect(result.replayed).toHaveLength(0);
       expect(result.recovered.map((entry) => entry.item_id)).toContain(item.item_id);
@@ -525,7 +533,7 @@ describe('work coordination', () => {
         purpose: 'work',
         ttlMs: 1,
       });
-      await sleep(10);
+      elapse(10);
       reapExpiredWorkLeases();
       const fresh = claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-b', purpose: 'work' });
       expect(() =>
@@ -549,7 +557,7 @@ describe('work coordination', () => {
       const item = makeItem();
       for (let round = 0; round < 3; round++) {
         claimWorkItem({ itemId: item.item_id, actorPeerId: 'peer-a', purpose: 'work', ttlMs: 1 });
-        await sleep(10);
+        elapse(10);
         const result = reapExpiredWorkLeases({ maxErrorAttempts: 3 });
         if (round < 2) {
           expect(result.parked).toHaveLength(0);
