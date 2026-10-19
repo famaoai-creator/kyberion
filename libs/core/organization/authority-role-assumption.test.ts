@@ -394,6 +394,13 @@ describe('RA-02 role assumption policy', () => {
     expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(false);
   });
 
+  it('limits the NHI member-status reader to surfaces that display the operator ledger', () => {
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'nhi_accountability_reader')).toBe(true);
+    expect(isRoleAssumptionAllowed('concierge', 'nhi_accountability_reader')).toBe(true);
+    expect(isRoleAssumptionAllowed('terminal_hud', 'nhi_accountability_reader')).toBe(true);
+    expect(isRoleAssumptionAllowed('slack_bridge', 'nhi_accountability_reader')).toBe(false);
+  });
+
   it('grants only the broad roles the reachability report evidences (RN-03)', () => {
     // docs/developer/role-assumption-reachability.json: unreachable and never traced.
     expect(isRoleAssumptionAllowed('oauth_callback_surface', 'sovereign_concierge')).toBe(true);
