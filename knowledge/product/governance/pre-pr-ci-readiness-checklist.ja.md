@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-10-14
+last_updated: 2026-10-19
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -124,8 +124,9 @@ pnpm check -- --scope pr
 `knowledge/_index.md` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
 `knowledge/_integrity-manifest.json` は gitignore 済みのローカル生成物（`pnpm build` が再生成）なので commit しない。
 
-`main` を取り込んだ（merge / rebase）あとは `pnpm kyberion resolve generated` を実行する。
-env registry → knowledge index → role-assumption reachability を順に再生成して stage し、changelog fragment を検証する。
+`main` を取り込んだ（merge / rebase）あと、または freshness gate が drift を報告したときは `pnpm kyberion resolve generated` を実行する。
+**この 1 コマンドで、CI が drift を検査する生成物をすべて**（op-registry、pseudo-locale、vocabulary-types、pii-rules、CLI reference、capability seams、subagent 定義、provider hooks、env registry、role-assumption reachability、knowledge index）依存順に再生成して stage し、changelog fragment を検証する。個別の `generate:*` を手で順に実行しない。
+`--check` は書き込まずに drift したファイルを全件列挙して非 0 で終了する。`.husky/pre-push` が `--check --fast`（約 100 秒かかる role-assumption 解析だけを省略。CI gate では実行される）を実行し、失敗時は修正コマンドを表示する（1 回だけ飛ばすときは `KYBERION_SKIP_PRE_PUSH=1 git push`）。
 生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
 conflict marker が残っていても、このコマンドが index の conflict stage から組み直して再生成する（merge driver は不要）。
 `env-registry.json` で同じ entry が両側で別々に変更された場合だけ手で直してから再実行する。

@@ -420,9 +420,17 @@ keep them mergeable:
   unmerged generated files are first rebuilt from their index conflict stages
   (`:1:` base, `:2:` ours, `:3:` theirs) — derived files by text merge else
   our side, `env-registry.json` entry-by-entry by name — then it regenerates
-  env registry → knowledge index → role-assumption reachability, validates the
-  changelog fragments and stages the results (`--check` is read-only,
-  `--no-stage` skips `git add`). Only an `env-registry.json` entry changed
+  **every committed, CI-drift-checked generated file** in dependency order
+  (op-registry → pseudo-locale → vocabulary-types → pii-rules → cli-reference
+  → capability-seams → subagent definitions → provider hooks → env registry →
+  role-assumption reachability → knowledge index), validates the changelog
+  fragments and stages the results (`--check` is read-only and lists every
+  drifted file; `--no-stage` skips `git add`). Never run the individual
+  `generate:*` commands by hand to chase a freshness gate — this one command
+  regenerates everything. The `.husky/pre-push` hook runs
+  `--check --fast` (`--fast` skips the ~100s role-assumption analysis, which
+  its CI gate still covers) and prints the fix command;
+  `KYBERION_SKIP_PRE_PUSH=1 git push` skips it once. Only an `env-registry.json` entry changed
   differently on both sides needs a human: edit its markers keeping both
   descriptions' intent, then rerun. The `post-merge` hook reminds you when
   both sides of a completed merge changed a generated file.
@@ -443,10 +451,13 @@ keep them mergeable:
   run no `post-merge` hook. Only regeneration makes a merge correct, and the
   freshness gates (`env-registry`, `role-assumption-reachability`,
   `catalogs`) are what enforce it.
-- **Adding a tracked generated file**: give it a `.gitattributes`
-  `merge=kyberion-regenerate` line AND a step in
-  `scripts/resolve_generated.ts` — `scripts/resolve_generated.test.ts` fails
-  when the two lists differ.
+- **Adding a tracked generated file or generator**: add a step (script,
+  tracked outputs, `after` dependencies) to `GENERATED_ARTIFACT_STEPS` in
+  `scripts/resolve_generated.ts`; for a file with a `.gitattributes`
+  `merge=kyberion-regenerate` line, mark the step `mergeDriver: true`.
+  `scripts/resolve_generated.test.ts` fails when a generator `--check` gate in
+  `ci-gates.json` has no step, when the merge-driver lists differ, or when a
+  step runs before a step it depends on.
 
 ## 7. Design principles adopted from qm (QM adoption plan §3)
 

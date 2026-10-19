@@ -331,11 +331,14 @@ jobs:
 
   # Stable, always-reporting check for branch protection and the merge queue:
   # the jobs above are skipped as a whole on prose-only changes, and a skipped
-  # matrix never reports its per-OS check names. Require this job.
+  # matrix never reports its per-OS check names. Require this job. It runs
+  # whatever the upstream results (failed and skipped jobs still report), but
+  # not once the run itself is cancelled by a newer push, so a superseded
+  # commit is not left with a red result for jobs that were merely cancelled.
   cross-os-result:
     name: cross-os-result
     needs: [changes, build-artifacts, build-and-smoke, windows-native]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

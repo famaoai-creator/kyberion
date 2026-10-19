@@ -3759,6 +3759,14 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_SKIP_PRE_PUSH",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 1 to skip the .husky/pre-push generated-file drift check (`pnpm kyberion resolve generated --check --fast`) for one push; CI still enforces every freshness gate.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",
