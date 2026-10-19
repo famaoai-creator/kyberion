@@ -10,6 +10,12 @@
       "note": "Load-bearing global operations halt and governance state. Never expire automatically: deleting the halt flag could resume autonomous work without an operator decision. Retire only through explicit governance review."
     },
     {
+      "path": "active/shared/runtime/grants",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "PG-03 standing grants (governance/grant-store.ts), partitioned by tier and tenant. Expired and revoked records are kept as the evidence of what was allowed and when; never expire automatically. Removal requires an explicit retention review (tenant offboarding)."
+    },
+    {
       "path": "active/shared/runtime/hearing",
       "artifact_class": "state",
       "action": "review_required",

@@ -1,0 +1,19 @@
+{
+  "record_id": "mem-MSN-GRANT-CORE-20261019-2026_10_19",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Standing grants must be bound to their consumed approval and re-verified on every use",
+  "summary": "A standing (reusable) permission backed by a one-shot human approval is only as strong as the binding between the stored grant record and that approval. Verify the binding at use time, not only at grant time.",
+  "candidate_id": "mem-MSN-GRANT-CORE-20261019-2026_10_19",
+  "evidence_refs": ["active/missions/public/MSN-GRANT-CORE-20261019/evidence/distillation.md"],
+  "created_at": "2026-10-19T03:46:22.492Z",
+  "applicability": ["mission", "mission:MSN-GRANT-CORE-20261019"],
+  "reusable_steps": [
+    "A standing (reusable) permission backed by a one-shot human approval is only as strong as the binding between the stored grant record and that approval",
+    "Verify the binding at use time, not only at grant time"
+  ],
+  "expected_outcome": "- Record what the approval created: put the effect id (grant id) into the approval's consumption (`effectRef`) and use the consumption time as the grant's start time; re-check both exactly on every use.\n- Re-derive the approval payloadHash from the stored record (capability, tenant, scope, purpose, whole-day lifetime — no rounding) so widened scope or shifted windows grant nothing.\n- One approval backs exactly one record: if several records name the same approval, none of them grants (blocks copy-to-new-id).\n- Revoking a standing effect must also withdraw its approval (`revokeStandingEffectApproval`, only when consumer + effectRef match), otherwise editing `revoked` out of the record resurrects it. Withdraw first, then audit the outcome.\n- Attribute revocations truthfully: check for an agent principal before falling back to the terminal owner, and carry the actor kind into the audit.\n- Inside a mission, take the tenant from the mission state, never from the caller or ambient identity, before matching tenant-scoped grants.\n- These gaps were found only by an adversarial independent review; schedule one for any new grant/consent store.",
+  "source_branch": "feat/grant-core-20261019",
+  "source_commit": "358d02bc26c75d9e75e4ddd109aa17ce08c89b8a"
+}

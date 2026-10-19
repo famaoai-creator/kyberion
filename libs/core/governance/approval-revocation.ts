@@ -46,6 +46,11 @@ export interface ApprovalConsumption {
   consumer: string;
   consumedBy: string;
   consumedAt: string;
+  /**
+   * Identifier of what the one-shot effect created (e.g. a standing grant id),
+   * so a consumer can check that a stored effect is the one this approval made.
+   */
+  effectRef?: string;
 }
 
 /**
@@ -106,7 +111,8 @@ export function revokeApprovalAsLocalOwner(
 function revoke(
   role: GovernedArtifactRole,
   params: RevokeParams & { revokedBy: string; revokedByDisplayName?: string },
-  authority: 'owner' | 'accountable_principal'
+  authority: 'owner' | 'accountable_principal' | 'standing_effect',
+  standingEffect?: { consumer: string; effectRef: string }
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => {
     const storageChannel = params.storageChannel || params.channel;
@@ -122,7 +128,15 @@ function revoke(
     if (record.applyClaim || record.applyResult) {
       refuse('it was already claimed or applied — its one-shot effect has happened');
     }
-    if (record.consumption) {
+    const standingEffectMatch =
+      authority === 'standing_effect' &&
+      standingEffect !== undefined &&
+      record.consumption?.consumer === standingEffect.consumer &&
+      record.consumption?.effectRef === standingEffect.effectRef;
+    if (authority === 'standing_effect' && !standingEffectMatch) {
+      refuse('it was not consumed by the standing effect being withdrawn');
+    }
+    if (record.consumption && !standingEffectMatch) {
       refuse(
         `it was already consumed by ${record.consumption.consumer} at ${record.consumption.consumedAt} — its one-shot effect has happened`
       );
@@ -138,7 +152,7 @@ function revoke(
         .map(normalizeApprovalPrincipalId)
         .filter(Boolean),
     ]);
-    if (authority !== 'owner' && !accountable.has(revoker)) {
+    if (authority === 'accountable_principal' && !accountable.has(revoker)) {
       refuse(
         `${params.revokedBy} is neither its requester, one of its approvers, nor the local owner`
       );
@@ -194,6 +208,42 @@ function revoke(
 }
 
 /**
+ * Withdraw the approval behind a *standing* effect (a standing grant) when
+ * that effect is revoked. Unlike a one-shot effect, a standing effect keeps
+ * being used after consumption, so revoking its approval stops further uses
+ * (`evaluateApprovalUsability` refuses a revoked record) — the record keeps
+ * its consumption and gains a revocation. Only the effect the approval made
+ * (`consumption.consumer` + `consumption.effectRef`) can be withdrawn this
+ * way. Withdrawal only narrows authority, so any identified principal
+ * (operator or agent) may do it; the revoker is recorded as given.
+ */
+export function revokeStandingEffectApproval(
+  role: GovernedArtifactRole,
+  params: RevokeParams & {
+    revokedBy: string;
+    revokedByDisplayName?: string;
+    consumer: string;
+    effectRef: string;
+  }
+): ApprovalRequestRecord {
+  // Never let an empty ref match a one-shot consumption that carries none.
+  if (
+    typeof params.consumer !== 'string' ||
+    !params.consumer.trim() ||
+    typeof params.effectRef !== 'string' ||
+    !params.effectRef.trim()
+  ) {
+    throw new Error(
+      '[POLICY_VIOLATION] withdrawing a standing-effect approval needs a consumer and an effectRef'
+    );
+  }
+  return revoke(role, params, 'standing_effect', {
+    consumer: params.consumer,
+    effectRef: params.effectRef,
+  });
+}
+
+/**
  * Record that a one-shot effect used an approved record (consumers that do not
  * take an apply claim: organization decisions, service recording promotion).
  * Refuses a record that is unusable (revoked, or failing separation of
@@ -208,6 +258,8 @@ export function markApprovalConsumed(
     requestId: string;
     consumer: string;
     consumedBy: string;
+    /** What the effect created (see {@link ApprovalConsumption.effectRef}). */
+    effectRef?: string;
   }
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => {
@@ -228,6 +280,7 @@ export function markApprovalConsumed(
       consumer: params.consumer,
       consumedBy: params.consumedBy,
       consumedAt: nowIso(),
+      ...(params.effectRef ? { effectRef: params.effectRef } : {}),
     };
     const updated: ApprovalRequestRecord = { ...record, consumption };
     writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), updated);
@@ -238,6 +291,7 @@ export function markApprovalConsumed(
       correlation_id: record.correlationId,
       consumer: consumption.consumer,
       consumed_by: consumption.consumedBy,
+      ...(consumption.effectRef ? { effect_ref: consumption.effectRef } : {}),
       channel: record.channel,
       thread_ts: record.threadTs,
     });
