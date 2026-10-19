@@ -916,26 +916,40 @@ export function revokeGrant(
     throw new GrantError('invalid_state', `grant ${grantId} is already revoked`);
   }
   const at = nowIso(options.now ?? new Date());
-  const auditEventId = recordGrantAudit('grant.revoked', existing, by, { revoked_at: at });
-  // Withdraw the approval too: it lives outside the tenant partition, so
+  // Withdraw the approval first: it lives outside the tenant partition, so
   // editing `revoked` out of the record does not bring the grant back
-  // (verifyGrantBasis refuses a revoked approval).
+  // (verifyGrantBasis refuses a revoked approval). The audit then states
+  // whether the withdrawal happened; the record is revoked either way.
+  let approvalWithdrawn = false;
+  let withdrawalError: string | undefined;
   if (existing.basis) {
-    const approval = loadApprovalRequest(
-      existing.basis.approval_channel,
-      existing.basis.approval_request_id
-    );
-    if (approval && !approval.revocation) {
-      revokeStandingEffectApproval('mission_controller', {
-        channel: existing.basis.approval_channel,
-        requestId: existing.basis.approval_request_id,
-        revokedBy: by.id,
-        reason: `standing grant ${grantId} revoked: ${reason}`,
-        consumer: GRANT_APPROVAL_CONSUMER,
-        effectRef: grantId,
-      });
+    try {
+      const approval = loadApprovalRequest(
+        existing.basis.approval_channel,
+        existing.basis.approval_request_id
+      );
+      if (approval?.revocation) {
+        approvalWithdrawn = true;
+      } else if (approval) {
+        revokeStandingEffectApproval('mission_controller', {
+          channel: existing.basis.approval_channel,
+          requestId: existing.basis.approval_request_id,
+          revokedBy: by.id,
+          reason: `standing grant ${grantId} revoked: ${reason}`,
+          consumer: GRANT_APPROVAL_CONSUMER,
+          effectRef: grantId,
+        });
+        approvalWithdrawn = true;
+      }
+    } catch (err: unknown) {
+      withdrawalError = err instanceof Error ? err.message : String(err);
     }
   }
+  const auditEventId = recordGrantAudit('grant.revoked', existing, by, {
+    revoked_at: at,
+    ...(existing.basis ? { approval_withdrawn: approvalWithdrawn } : {}),
+    ...(withdrawalError ? { approval_withdrawal_error: withdrawalError } : {}),
+  });
   const revoked: GrantRecord = {
     ...existing,
     revoked: { at, by: by.id, by_kind: by.kind, reason, audit_event_id: auditEventId },

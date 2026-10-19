@@ -1,3 +1,4 @@
+import { revokeStandingEffectApproval } from './approval-revocation.js';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
@@ -601,5 +602,25 @@ describe('recordGrantMissionBinding', () => {
         grant_id: 'GRT-20261019-aaaaaaaaaaaa',
       })
     ).toThrow();
+  });
+});
+
+describe('revokeStandingEffectApproval', () => {
+  it('refuses an empty consumer or effectRef', () => {
+    for (const bad of [
+      { consumer: 'grant_standing', effectRef: '' },
+      { consumer: '', effectRef: 'GRT-x' },
+      { consumer: 'grant_standing', effectRef: undefined as unknown as string },
+    ]) {
+      expect(() =>
+        revokeStandingEffectApproval('mission_controller', {
+          channel: 'grant-standing',
+          requestId: 'any',
+          revokedBy: 'agent:x',
+          reason: 'test',
+          ...bad,
+        })
+      ).toThrow(/consumer and an effectRef/);
+    }
   });
 });
