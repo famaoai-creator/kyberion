@@ -2,6 +2,13 @@
 
 import { coerceLocale, pickByLocale } from '@agent/core/locale-normalize';
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  discussionDraftContext,
+  emptyDiscussionDraft,
+  initialDiscussionDraft,
+  type DiscussionLauncherDraft,
+} from '../lib/discussion-launcher-draft';
 import {
   ArrowLeft,
   Check,
@@ -70,6 +77,22 @@ function writeRoomParam(id: string | null, readOnly = false) {
 }
 
 export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
+  const searchParams = useSearchParams();
+  const contextKey = discussionDraftContext(searchParams);
+  const [savedDraft, setSavedDraft] = React.useState(() => ({
+    contextKey,
+    draft: initialDiscussionDraft(searchParams),
+    discarded: false,
+  }));
+  // Render-time reset prevents a stale draft painting or submitting in a new scope.
+  // This is one volatile draft, not a per-tenant cache that Back can resurrect.
+  if (savedDraft.contextKey !== contextKey) {
+    setSavedDraft({ contextKey, draft: emptyDiscussionDraft(), discarded: true });
+  }
+  const updateDraft = (patch: Partial<DiscussionLauncherDraft>) => {
+    if (discussionDraftContext(new URLSearchParams(window.location.search)) !== contextKey) return;
+    setSavedDraft((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
+  };
   const chronosLocale = useChronosLocale();
   const [override, setOverride] = React.useState<DiscussionLocale | null>(null);
   const locale: DiscussionLocale =
@@ -110,6 +133,11 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
         />
       ) : (
         <Launcher
+          key={contextKey}
+          draft={savedDraft.draft}
+          onDraft={updateDraft}
+          contextKey={contextKey}
+          draftDiscarded={savedDraft.discarded}
           embedded={embedded}
           locale={locale}
           onLocale={setOverride}
@@ -125,6 +153,10 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
 /* ---------------------------------------------------------- launcher -- */
 
 function Launcher({
+  draft,
+  onDraft,
+  contextKey,
+  draftDiscarded,
   embedded,
   locale,
   onLocale,
@@ -132,6 +164,10 @@ function Launcher({
   onAccess,
   onConfirmedOpen,
 }: {
+  draft: DiscussionLauncherDraft;
+  onDraft: (patch: Partial<DiscussionLauncherDraft>) => void;
+  contextKey: string;
+  draftDiscarded: boolean;
   embedded: boolean;
   locale: DiscussionLocale;
   onLocale: (locale: DiscussionLocale) => void;
@@ -139,30 +175,31 @@ function Launcher({
   onAccess: (canSteer: boolean) => void;
   onConfirmedOpen: (id: string) => void;
 }) {
-  const [goal, setGoal] = React.useState('');
-  const [tempo, setTempo] = React.useState<'fast' | 'normal' | 'slow'>('normal');
-  const [speaker, setSpeaker] = React.useState<DiscussionEngineChoice>('scripted');
-  const [format, setFormat] = React.useState<DiscussionRunFormat>('brief');
+  const { goal, tempo, speaker, format, missionId } = draft;
+  const setGoal = (goal: string) => onDraft({ goal });
+  const setTempo = (tempo: DiscussionLauncherDraft['tempo']) => onDraft({ tempo });
+  const setSpeaker = (speaker: DiscussionEngineChoice) => onDraft({ speaker });
+  const setFormat = (format: DiscussionRunFormat) => onDraft({ format });
+  const setMissionId = (missionId: string) => onDraft({ missionId });
   const mode = format === 'dialogue' ? 'dialogue' : 'panel';
   const runConfig = discussionRunConfig(format, speaker);
   const recovery = useDiscussionCreateRecovery();
   const busy = recovery.busy;
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
   const [missions, setMissions] = React.useState<MissionOption[]>([]);
-  const [missionId, setMissionId] = React.useState('');
   const readinessSelection =
     format === 'brief' && speaker !== 'scripted' ? { provider: speaker, missionId } : null;
   const readiness = useDiscussionReadiness(readinessSelection);
   const canAttempt = canAttemptDiscussion(format, speaker, missionId, readiness.state);
 
-  // Deep links (`?goal=…&mission=…`) let a mission or WorkItem open a room with its context.
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const linkedGoal = params.get('goal');
-    const linkedMission = params.get('mission');
-    if (linkedGoal) setGoal(linkedGoal.slice(0, 2000));
-    if (linkedMission) setMissionId(linkedMission);
-    void fetchMissionOptions().then(setMissions);
+    let cancelled = false;
+    void fetchMissionOptions().then((options) => {
+      if (!cancelled) setMissions(options);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const refresh = React.useCallback(async () => {
@@ -184,6 +221,7 @@ function Launcher({
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
     if (
+      discussionDraftContext(new URLSearchParams(window.location.search)) !== contextKey ||
       !goal.trim() ||
       recovery.blocked ||
       !canAttemptDiscussion(format, speaker, missionId, readiness.getState())
@@ -232,6 +270,12 @@ function Launcher({
       </header>
 
       <form className="dr-launch-card" onSubmit={start}>
+        {draftDiscarded ? (
+          <p className="dr-note" role="status">
+            {dt('draftContextChanged', locale)}
+          </p>
+        ) : null}
+        <p className="dr-muted">{dt('draftRetention', locale)}</p>
         <div className="dl-modes" role="radiogroup" aria-label={dt('modeTitle', locale)}>
           {(
             [
