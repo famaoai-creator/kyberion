@@ -98,6 +98,8 @@ describe('collectMissionTriageReport', () => {
     const report = collectMissionTriageReport(missionId);
     expect(report.classification).toBe('ready_to_verify');
     expect(report.recommendation.commands.join(' ')).toContain('verify');
+    expect(report.recommendation.commands.join(' ')).not.toContain('&&');
+    expect(report.recommendation.reason).toContain('task closure is not runtime readiness');
   });
 
   it('classifies a validating mission with recorded drift failures as intent_drift_blocked', () => {

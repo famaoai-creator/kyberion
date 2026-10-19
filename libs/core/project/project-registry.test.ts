@@ -180,6 +180,24 @@ describe('project and artifact registries', () => {
     );
   });
 
+  it.each([
+    '会議準備チェックリストの文書を作る新規プロジェクト。レビューを受けて改訂する。',
+    '新しいプロジェクトで監査用の手順書を作成する',
+    'Start a new project to write a meeting preparation checklist and review it.',
+  ])('bootstraps document work rather than generic project work: %s', (utterance) => {
+    const items = buildProjectBootstrapWorkItems({
+      projectId: 'PRJ-DOCUMENT-FIXTURE',
+      projectName: 'Document fixture',
+      utterance,
+    });
+    expect(items.map((item) => item.work_id)).toEqual([
+      'WRK-DOCUMENT-FIXTURE-SCOPE',
+      'WRK-DOCUMENT-FIXTURE-SOURCE',
+      'WRK-DOCUMENT-FIXTURE-DRAFT',
+    ]);
+    expect(items.at(-1)?.specialist_id).toBe('document-specialist');
+  });
+
   it('builds bootstrap work items for project creation flows', () => {
     const items = buildProjectBootstrapWorkItems({
       projectId: 'PRJ-TEST-WEB',

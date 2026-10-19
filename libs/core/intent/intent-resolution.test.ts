@@ -5,6 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import {
   chooseExecutionIntent,
+  isDocumentProjectRequest,
   loadStandardIntentCatalog,
   loadResolvedStandardIntentCatalog,
   normalizeForTriggerMatch,
@@ -69,6 +70,70 @@ describe('intent-resolution', () => {
         0.45
       );
     }
+  });
+
+  it.each([
+    '会議準備チェックリストの文書を作る新規プロジェクト。提出期限と担当者、遅れた場合の連絡先を含め、レビューを受けて改訂する。',
+    '監査用の手順書を作成する新しいプロジェクト。レビュー後に改訂する。',
+    '新規プロジェクトで週次レビュー用の資料を書いて、改訂版を残す。',
+    'Start a new project to write a meeting preparation checklist, then review and revise the document.',
+    'Launch a new project to draft an audit report and review the result.',
+  ])(
+    'keeps the requested document project ahead of its meeting or review topic: %s',
+    (utterance) => {
+      const packet = resolveIntentResolutionPacket(utterance);
+      expect(packet.selected_intent_id).toBe('bootstrap-project');
+      expect(packet.selected_resolution?.shape).toBe('project_bootstrap');
+      expect(
+        packet.candidates.some((candidate) => candidate.intent_id === 'schedule-read-agenda')
+      ).toBe(false);
+    }
+  );
+
+  it.each([
+    ['新規プロジェクトの来週のレビュー会議の予定を教えて', 'schedule-read-agenda'],
+    ['文書を作る新規プロジェクトの来週のレビュー会議の予定を教えて', 'schedule-read-agenda'],
+    ['文書作成ではなく来週の会議予定を教えて', 'schedule-read-agenda'],
+    ['会議の報告書をdocxで作って', 'generate-report'],
+  ])(
+    'does not turn calendar reads or standalone documents into new projects: %s',
+    (utterance, intentId) => {
+      expect(resolveIntentResolutionPacket(utterance).selected_intent_id).toBe(intentId);
+    }
+  );
+
+  it.each([
+    ['新規プロジェクトで文書を作成する申請を承認して', 'resolve-approval'],
+    ['新規プロジェクトで文書を書いてはいけません。来週の会議予定を教えて', 'schedule-read-agenda'],
+    ['Approve the request to start a new project to write a report.', 'resolve-approval'],
+    [
+      'Do not start a new project or write a report. Show my calendar for tomorrow.',
+      'schedule-read-agenda',
+    ],
+    ['文書を作る新規プロジェクトではなく、来週の会議予定を教えて', 'schedule-read-agenda'],
+  ])(
+    'does not promote approval decisions or negated project clauses: %s',
+    (utterance, expectedIntent) => {
+      expect(isDocumentProjectRequest(utterance)).toBe(false);
+      expect(resolveIntentResolutionPacket(utterance).selected_intent_id).toBe(expectedIntent);
+    }
+  );
+
+  it.each([
+    'セキュリティ監査を実施する。新規プロジェクトで文書を作成する',
+    'Run a security audit. Start a new project to write the report.',
+  ])('does not demote the existing approval-required security engagement: %s', (utterance) => {
+    expect(resolveIntentResolutionPacket(utterance).selected_intent_id).toBe(
+      'security-audit-service'
+    );
+  });
+
+  it('does not demote an incident response behind its documentation project', () => {
+    const packet = resolveIntentResolutionPacket(
+      '本番障害を収束させる。新規プロジェクトで報告書を作成する'
+    );
+    expect(packet.selected_intent_id).toBe('incident-response');
+    expect(packet.selected_resolution?.shape).toBe('mission');
   });
 
   it('keeps service operations and document intents bound to their catalog resolution', () => {

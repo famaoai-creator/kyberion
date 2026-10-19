@@ -18,6 +18,10 @@ import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
 import { clamp } from './foundation/text.js';
 import { findIntentPhrase, matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import {
+  isDocumentProjectRequest,
+  resolveIntentResolutionPacket,
+} from './intent/intent-resolution.js';
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -103,11 +107,38 @@ function isMeetingScheduleCoordination(seed: ExecutionBriefSeed): boolean {
 }
 
 function isScheduleAgendaRead(seed: ExecutionBriefSeed): boolean {
-  return seed.intentId === 'schedule-read-agenda' || isScheduleReadAgendaRequest(seed.requestText);
+  if (seed.intentId) return seed.intentId === 'schedule-read-agenda';
+  return !isDocumentProjectSeed(seed) && isScheduleReadAgendaRequest(seed.requestText);
 }
 
 function isProjectBootstrapRequest(text: string): boolean {
   return matchesIntentPhrase(text, 'project.bootstrap_request');
+}
+
+function isDocumentProjectSeed(seed: ExecutionBriefSeed): boolean {
+  return (
+    (!seed.intentId || seed.intentId === 'bootstrap-project') &&
+    isDocumentProjectRequest(seed.requestText)
+  );
+}
+
+function isProjectBootstrapSeed(seed: ExecutionBriefSeed): boolean {
+  if (seed.intentId) return seed.intentId === 'bootstrap-project';
+  return isProjectBootstrapRequest(seed.requestText) || isDocumentProjectSeed(seed);
+}
+
+/** Preserve a supplied scoped intent; raw project mentions use the public resolver. */
+function resolveProjectBriefSeed(seed: ExecutionBriefSeed): ExecutionBriefSeed {
+  if (
+    seed.intentId ||
+    (!isProjectBootstrapRequest(seed.requestText) &&
+      !matchesIntentPhrase(seed.requestText, 'project.explicit_new_project'))
+  )
+    return seed;
+  const intentId = resolveIntentResolutionPacket(seed.requestText, {
+    tier: 'public',
+  }).selected_intent_id;
+  return intentId ? { ...seed, intentId } : seed;
 }
 
 function isApprovalRequestCreation(text: string): boolean {
@@ -243,12 +274,13 @@ function sanitizeQuestion(value: unknown, fallbackId: string): ExecutionBriefQue
 function inferArchetypeId(seed: ExecutionBriefSeed): string {
   if (seed.intentId && seed.intentId.trim().length > 0) return seed.intentId;
   if (seed.taskType && seed.taskType.trim().length > 0) return `${seed.taskType}-execution`;
+  if (isDocumentProjectSeed(seed)) return 'bootstrap-project';
   if (isScheduleAgendaRead(seed)) return 'schedule-read-agenda';
   if (isApprovalRequestResolution(seed.requestText)) return 'resolve-approval';
   if (isApprovalRequestCreation(seed.requestText)) return 'request-approval';
   if (isMeetingRequest(seed.requestText)) return 'meeting-operations';
   if (isScheduleRequest(seed.requestText)) return 'schedule-coordination';
-  if (isProjectBootstrapRequest(seed.requestText)) return 'bootstrap-project';
+  if (isProjectBootstrapSeed(seed)) return 'bootstrap-project';
   return 'general-request';
 }
 
@@ -260,6 +292,7 @@ function inferMissingInputs(
   const contextualFrame = seed.contextualFrame || buildContextualIntentFrame(seed.requestText);
   const candidateMissingInputs = (() => {
     if (requiredInputs.length > 0) return requiredInputs;
+    if (isDocumentProjectSeed(seed)) return ['project_brief'];
     if (isScheduleAgendaRead(seed)) {
       const agendaMissing = [...contextualFrame.missing];
       if (agendaMissing.length > 0) return agendaMissing;
@@ -287,7 +320,7 @@ function inferMissingInputs(
     if (isScheduleRequest(seed.requestText)) {
       return ['schedule_scope', 'date_range', 'fixed_constraints', 'calendar_action_boundary'];
     }
-    if (isProjectBootstrapRequest(seed.requestText)) {
+    if (isProjectBootstrapSeed(seed)) {
       return ['project_brief'];
     }
     if (guidedMissingInputs.length > 0) return guidedMissingInputs;
@@ -311,6 +344,7 @@ function inferReadiness(missingInputs: string[]): ActuatorExecutionBrief['readin
 function inferReadinessReason(seed: ExecutionBriefSeed, missingInputs: string[]): string {
   if (missingInputs.length > 0) {
     const missing = `Missing inputs: ${missingInputs.join(', ')}.`;
+    if (isDocumentProjectSeed(seed)) return missing;
     if (isScheduleAgendaRead(seed)) {
       return `${missing} Once the calendar source is known, the assistant can return a read-only agenda summary.`;
     }
@@ -321,6 +355,9 @@ function inferReadinessReason(seed: ExecutionBriefSeed, missingInputs: string[])
       return `${missing} Once clarified, the request can start in schedule coordination and hand off to meeting operations if live meeting handling matters.`;
     }
     return missing;
+  }
+  if (isDocumentProjectSeed(seed)) {
+    return 'The request can be routed through the governed project bootstrap path.';
   }
   if (isScheduleAgendaRead(seed)) {
     return 'The request can be routed through the governed schedule agenda summary path.';
@@ -337,7 +374,7 @@ function inferReadinessReason(seed: ExecutionBriefSeed, missingInputs: string[])
   if (isScheduleRequest(seed.requestText)) {
     return 'The request can be routed through the governed schedule coordination path.';
   }
-  if (isProjectBootstrapRequest(seed.requestText)) {
+  if (isProjectBootstrapSeed(seed)) {
     return 'The request can be routed through the governed project bootstrap path.';
   }
   if (seed.taskType) {
@@ -372,7 +409,7 @@ function inferServiceBindingRefs(seed: ExecutionBriefSeed): string[] {
 }
 
 function inferClarificationQuestions(seed: ExecutionBriefSeed, missingInputs: string[]) {
-  if (isProjectBootstrapRequest(seed.requestText)) {
+  if (isProjectBootstrapSeed(seed)) {
     const questionByInput: Record<string, { question: string; reason: string; impact: string }> = {
       project_brief: {
         question: 'What is the project brief and the first outcome you want?',
@@ -633,6 +670,7 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
   guidedBrief: GuidedCoordinationBrief,
   seed: ExecutionBriefSeed
 ): ActuatorExecutionBrief {
+  seed = resolveProjectBriefSeed(seed);
   let missingInputs = inferMissingInputs(seed, guidedBrief.missing_inputs);
   let targetActuators = guidedBrief.suggested_target_actuators;
   let supportComponents = guidedBrief.suggested_support_components ?? [];
@@ -652,19 +690,19 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
     applyOverride('schedule_agenda_read');
   }
 
-  if (isApprovalRequestResolution(seed.requestText)) {
+  if (!isDocumentProjectSeed(seed) && isApprovalRequestResolution(seed.requestText)) {
     approvalSystemCandidates = inferApprovalSystemCandidates(seed);
     applyOverride('approval_request_resolution');
     workflowSteps = inferApprovalWorkflowSteps(seed, approvalSystemCandidates[0]);
   }
 
-  if (isApprovalRequestCreation(seed.requestText)) {
+  if (!isDocumentProjectSeed(seed) && isApprovalRequestCreation(seed.requestText)) {
     approvalSystemCandidates = inferApprovalSystemCandidates(seed);
     applyOverride('approval_request_creation');
     workflowSteps = inferApprovalWorkflowSteps(seed, approvalSystemCandidates[0]);
   }
 
-  if (isProjectBootstrapRequest(seed.requestText)) {
+  if (isProjectBootstrapSeed(seed)) {
     applyOverride('project_bootstrap');
   }
 
@@ -703,9 +741,11 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
 }
 
 export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorExecutionBrief {
+  seed = resolveProjectBriefSeed(seed);
   const contextualFrame = seed.contextualFrame || buildContextualIntentFrame(seed.requestText);
   const guidedBrief = buildGuidedCoordinationBrief({
     requestText: seed.requestText,
+    ...(isDocumentProjectSeed(seed) ? { coordinationKind: 'general' } : {}),
     intentId: seed.intentId,
     goalSummary: seed.goalSummary,
     serviceBindings: seed.serviceBindings,
@@ -723,8 +763,12 @@ export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorE
   const brief = buildExecutionBriefFromGuidedCoordinationBrief(guidedBrief, adjustedSeed);
   return {
     ...brief,
-    calendar_source:
-      contextualFrame.source_binding.selected || resolveDefaultScheduleSource().source,
+    ...(isDocumentProjectSeed(seed)
+      ? {}
+      : {
+          calendar_source:
+            contextualFrame.source_binding.selected || resolveDefaultScheduleSource().source,
+        }),
   } as ActuatorExecutionBrief;
 }
 

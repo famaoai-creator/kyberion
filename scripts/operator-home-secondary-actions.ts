@@ -11,13 +11,14 @@ import {
   recordContractReview,
 } from '@agent/core/deal-documents';
 import {
-  listDistillCandidateRecords,
-  updateDistillCandidateRecord,
-} from '@agent/core/knowledge/distill-candidate-registry';
-import {
   materializeExecutionFeedbackCandidate,
   recordExecutionFeedback,
+  listExecutionFeedbackCandidates,
+  inspectExecutionFeedbackLearning,
+  queueExecutionFeedbackLearning,
 } from '@agent/core/execution-feedback';
+import { currentScope } from '@agent/core/scope-context';
+import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { VocabularyKey } from '@agent/core/t';
 import { withExecutionContext } from '@agent/core/authority';
 import { ScriptExitError } from './lib/harness.js';
@@ -43,6 +44,7 @@ export function handleFeedbackSubcommand(
     correction?: string;
     procedureId?: string;
     correlationId?: string;
+    scope?: MemoryScopeEnvelope;
     json?: boolean;
   },
   print: HomePrint = () => undefined
@@ -63,6 +65,7 @@ export function handleFeedbackSubcommand(
     correlation_id: argv.correlationId,
     source: 'operator',
     surface: 'cli',
+    scope: argv.scope || selectedFeedbackScope(),
   });
   const improvement = materializeExecutionFeedbackCandidate({
     feedback,
@@ -87,51 +90,86 @@ export function handleFeedbackSubcommand(
   }
 }
 
+function selectedFeedbackScope(): MemoryScopeEnvelope | undefined {
+  const scope = currentScope();
+  // Legacy standalone feedback remains unscoped. Current canonical tenant
+  // context is classification, never a grant to bypass secure-io.
+  return scope.tier !== 'public' || Object.keys(scope).some((key) => key !== 'tier')
+    ? scope
+    : undefined;
+}
+
 export function handleImprovements(
   ui: HomeUi,
   argv: {
     approve?: string;
     deny?: string;
+    review?: string;
+    queue?: string;
     note?: string;
     json?: boolean;
+    scope?: MemoryScopeEnvelope;
+    legacy?: boolean;
   },
   print: HomePrint = () => undefined
 ): void {
+  if ([argv.approve, argv.deny, argv.review, argv.queue].filter(Boolean).length > 1) {
+    throw new ScriptExitError(1, 'Choose one improvements action.');
+  }
   if (argv.approve || argv.deny) {
-    const candidateId = String(argv.approve || argv.deny);
-    const candidate = listDistillCandidateRecords().find(
-      (entry) => entry.candidate_id === candidateId
+    print(ui('recorder:recorder_improvement_decision_route'));
+    throw new ScriptExitError(1, '', true);
+  }
+  if (argv.legacy && (!argv.review || argv.queue || argv.scope))
+    throw new ScriptExitError(
+      1,
+      '--legacy is only supported for explicit read-only --review without a scope override.'
     );
-    if (!candidate || candidate.status !== 'proposed') {
-      print(ui('recorder:recorder_improvement_not_found', { id: candidateId }));
-      throw new ScriptExitError(1, '', true);
+  const scope = argv.legacy ? undefined : argv.scope || selectedFeedbackScope();
+  const id = argv.review || argv.queue;
+  if (id) {
+    const review = argv.queue
+      ? queueExecutionFeedbackLearning(id, scope)
+      : inspectExecutionFeedbackLearning(id, scope);
+    if (argv.json) print(JSON.stringify(review, null, 2));
+    else {
+      print(
+        ui('recorder:recorder_learning_state', {
+          id,
+          scope: review.scope_disposition,
+          queue: review.queue.status,
+          human: review.human_review.status,
+          promotion: review.promotion.status,
+          retrieval: review.retrieval.status,
+        })
+      );
+      if (review.queue.candidate_id) print('memory-review ' + review.queue.candidate_id);
+      if (review.promotion.reference) print(review.promotion.reference);
+      if (review.blockers.length) print(review.blockers.join(', '));
+      print(
+        ui(
+          review.scope_disposition === 'legacy_unscoped'
+            ? 'recorder:recorder_learning_legacy'
+            : review.blockers.length
+              ? 'recorder:recorder_learning_blocked'
+              : 'recorder:recorder_learning_next'
+        )
+      );
     }
-    const reviewed = updateDistillCandidateRecord(candidateId, {
-      status: argv.approve ? 'promoted' : 'archived',
-      ...(argv.approve ? { promoted_ref: `procedure-improvement:${candidateId}` } : {}),
-      metadata: {
-        ...(candidate.metadata || {}),
-        review: {
-          status: argv.approve ? 'approved' : 'rejected',
-          reviewer: 'human:operator',
-          note: argv.note || 'reviewed via pnpm kyberion improvements',
-        },
-      },
-    });
-    print(
-      ui('recorder:recorder_improvement_updated', {
-        id: reviewed?.candidate_id || candidateId,
-        status: reviewed?.status || 'unknown',
-      })
-    );
-    if (argv.approve) print(ui('recorder:recorder_catalog_review_note'));
     return;
   }
-  const candidates = listDistillCandidateRecords().filter(
-    (candidate) => candidate.metadata?.improvement_kind === 'execution_feedback'
-  );
+  const candidates = listExecutionFeedbackCandidates(scope);
   if (argv.json) {
-    print(JSON.stringify(candidates, null, 2));
+    print(
+      JSON.stringify(
+        candidates.map((candidate) => ({
+          ...candidate,
+          learning: inspectExecutionFeedbackLearning(candidate.candidate_id, scope),
+        })),
+        null,
+        2
+      )
+    );
     return;
   }
   if (candidates.length === 0) {
@@ -140,8 +178,8 @@ export function handleImprovements(
   }
   print(ui('recorder:recorder_improvement_header', { count: candidates.length }));
   for (const candidate of candidates) {
-    print(`  [${candidate.candidate_id}] ${candidate.status} ${candidate.title}`);
-    print(`      ${candidate.summary}`);
+    print('  [' + candidate.candidate_id + '] ' + candidate.status + ' ' + candidate.title);
+    print('      ' + candidate.summary);
   }
   print(ui('recorder:recorder_improvement_approve'));
 }
