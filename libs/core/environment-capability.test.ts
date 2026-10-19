@@ -12,7 +12,6 @@ import {
   resetEnvironmentCapabilityProbeRegistry,
   safeMkdir,
   safeRmSync,
-  safeSymlinkSync,
   safeWriteFile,
   verifyManifestSignature,
   verifyReady,
@@ -22,6 +21,7 @@ import {
 import { readNodeEnginesRangeFromFile } from './environment-capability-probes.js';
 
 const ROOT = pathResolver.rootDir();
+const directorySymlinkType = process.platform === 'win32' ? 'junction' : 'dir';
 
 describe('environment capability resource loaders', () => {
   const fixtureRoot = pathResolver.sharedTmp('environment-node-range-loader-test');
@@ -174,14 +174,14 @@ describe('probeManifest', () => {
     const missionId = 'MSN-ENV-PROBE-PATH-001';
     const missionDir = path.join(ROOT, 'active/missions/confidential', missionId);
     const evidenceDir = path.join(missionDir, 'evidence');
-    const outside = path.join(ROOT, 'active/shared/tmp/environment-capability-probe-outside.json');
+    const outside = path.join(ROOT, 'active/shared/tmp/environment-capability-probe-outside');
     const symlink = path.join(evidenceDir, 'linked.json');
     await withExecutionContextAsync('mission_controller', async () => {
       safeMkdir(evidenceDir, { recursive: true });
+      safeMkdir(outside, { recursive: true });
       safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify({ missionId }));
-      safeWriteFile(outside, JSON.stringify({ ready: true }));
-      safeSymlinkSync(outside, symlink);
       try {
+        fs.symlinkSync(outside, symlink, directorySymlinkType);
         const manifest: EnvironmentManifest = {
           manifest_id: 'unit-test-mission-evidence-paths',
           version: 'test',
@@ -209,7 +209,7 @@ describe('probeManifest', () => {
         expect(statuses[1]?.reason).toContain('path rejected');
       } finally {
         safeRmSync(missionDir, { recursive: true, force: true });
-        safeRmSync(outside, { force: true });
+        safeRmSync(outside, { recursive: true, force: true });
       }
     });
   });
@@ -649,14 +649,17 @@ describe('loadEnvironmentManifest', () => {
   it('rejects symlinked manifests in the governed directory', () => {
     const dir = path.join(ROOT, 'knowledge/product/governance/environment-manifests');
     const link = path.join(dir, 'unit-test-symlink.json');
+    const target = path.join(ROOT, 'active/shared/tmp/environment-capability-manifest-target');
     fs.rmSync(link, { force: true });
-    fs.symlinkSync(path.join(dir, 'reasoning-backend.json'), link);
+    safeMkdir(target, { recursive: true });
     try {
+      fs.symlinkSync(target, link, directorySymlinkType);
       expect(() => loadEnvironmentManifest('unit-test-symlink')).toThrow(
         'must not contain symlinks'
       );
     } finally {
-      fs.rmSync(link, { force: true });
+      fs.rmSync(link, { recursive: true, force: true });
+      safeRmSync(target, { recursive: true, force: true });
     }
   });
 
