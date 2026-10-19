@@ -173,6 +173,10 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     は run の再開のたびに確かめる）ので、revoke 以降の利用が拒否される。それ以前の利用は取り消せない。
   - 取り消せないもの: pending（cancel を使う）、rejected などの承認以外、claim 済み・適用済み・消費済み
     （一度きりの効果がすでに起きた）、steering の依頼（承認した時点で効果が始まる）。
+  - 例外（常設の効果）: 常設許可（`grant_standing`）のように、消費したあとも使われ続ける効果は、その効果を
+    取り消すときに `revokeStandingEffectApproval` で承認も取り消す。消費の記録（`consumption.consumer` と、
+    効果が作ったものを指す `consumption.effectRef`）と一致する効果だけが対象。権限を減らすだけなので、
+    識別できる principal（operator でも agent でも）が行え、取り消した者はそのまま記録される。
   - 監査: 監査台帳（`approval_decision` / `revoke`）と、その channel のイベントログ（`revoked`、消費は
     `consumed`）。
 - **ON・利用時**: 承認済みレコードを効果に変える箇所は、次の consumer id で同じ判定をやり直す

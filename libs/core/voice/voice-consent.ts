@@ -143,7 +143,7 @@ export interface MissionVoiceConsentResult extends VoiceConsentValidationResult 
    * `path_rejected`: the mission id or evidence path failed the repository
    * boundary — callers must not fall back to any other consent source.
    */
-  code?: 'no_mission' | 'path_rejected' | 'missing' | 'invalid';
+  code?: 'no_mission' | 'no_mission_dir' | 'path_rejected' | 'missing' | 'invalid';
 }
 
 /**
@@ -182,7 +182,7 @@ export function evaluateMissionVoiceConsent(input: {
   if (!evidenceDir) {
     return {
       allowed: false,
-      code: 'missing',
+      code: 'no_mission_dir',
       reason: `mission evidence dir not found for ${missionId}`,
     };
   }

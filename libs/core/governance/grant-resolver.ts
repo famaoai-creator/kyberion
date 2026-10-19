@@ -136,8 +136,18 @@ export function resolveStandingGrant(
       record.scope.tenant_slug === tenant &&
       (!policy.scope_keys.includes('meeting') || grantMatchesMeeting(record, context.meeting))
   );
+  // One approval creates one record: when several records name the same
+  // approval (a copy under a new id), none of them grants.
+  const basisUses = new Map<string, number>();
+  for (const record of records) {
+    const basisId = record.basis?.approval_request_id;
+    if (basisId) basisUses.set(basisId, (basisUses.get(basisId) ?? 0) + 1);
+  }
+  const uniqueBasis = (record: GrantRecord): boolean =>
+    !record.basis || basisUses.get(record.basis.approval_request_id) === 1;
   const active = matching.find(
-    (record) => grantStatusAt(record, now) === 'active' && verifyGrantBasis(record)
+    (record) =>
+      grantStatusAt(record, now) === 'active' && uniqueBasis(record) && verifyGrantBasis(record)
   );
   if (active) return { allowed: true, source: 'standing', grant_id: active.grant_id };
   if (matching.some((record) => grantStatusAt(record, now) === 'active')) {

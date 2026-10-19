@@ -44,12 +44,24 @@ export { buildRetryOptions };
  * implementation, PG-04). Speaking never uses a standing grant.
  */
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
+  const missionId = getRegisteredEnvText('MISSION_ID');
   const result = checkMeetingParticipationConsent({
-    mission_id: getRegisteredEnvText('MISSION_ID'),
+    mission_id: missionId,
     tenant_slug: resolveIdentityContext().tenantSlug,
     purpose: 'voice',
   });
-  return result.allowed ? { allowed: true } : { allowed: false, reason: result.reason };
+  if (result.allowed) return { allowed: true };
+  // The speak path keeps its own denial wording for these two cases.
+  if (result.code === 'no_mission') {
+    return {
+      allowed: false,
+      reason: 'speak requires MISSION_ID + voice-consent.json in the mission evidence dir',
+    };
+  }
+  if (result.code === 'no_mission_dir') {
+    return { allowed: false, reason: `mission '${missionId}' not found` };
+  }
+  return { allowed: false, reason: result.reason };
 }
 
 export function redactedTarget(input: MeetingAction): string {

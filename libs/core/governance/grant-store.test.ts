@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -10,6 +10,7 @@ import {
 } from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
+import { auditChain } from './audit-chain.js';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
@@ -42,6 +43,7 @@ const GRANTS_ROOT = pathResolver.rootResolve(PARTITIONED_RUNTIME_STATE_ROOTS.gra
 const MISSION_ID = 'MSN-GRANT-STORE-TEST';
 const MISSION_DIR = path.join(pathResolver.rootDir(), 'active/missions/confidential', MISSION_ID);
 const HUMAN = 'user:grant-test-owner';
+const HUMAN_ACTOR = { kind: 'human' as const, id: HUMAN };
 const approvalIds: string[] = [];
 
 const draft: GrantDraft = {
@@ -223,7 +225,7 @@ describe('grant store', () => {
 
   it('revoke keeps the record, audits it, and refuses a second revoke', () => {
     const record = approvedGrant();
-    const revoked = revokeGrant(record.grant_id, { by: HUMAN, reason: 'series ended' });
+    const revoked = revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'series ended' });
     expect(revoked.revoked?.by).toBe(HUMAN);
     expect(revoked.revoked?.audit_event_id).toBeTruthy();
     const stored = JSON.parse(
@@ -231,12 +233,12 @@ describe('grant store', () => {
     );
     expect(stored.revoked.reason).toBe('series ended');
     expect(stored.audit_event_id).toBe(record.audit_event_id);
-    expect(() => revokeGrant(record.grant_id, { by: HUMAN, reason: 'again' })).toThrow(
+    expect(() => revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'again' })).toThrow(
       /already revoked/
     );
-    expect(() => revokeGrant('GRT-20261019-000000000000', { by: HUMAN, reason: 'x' })).toThrow(
-      /not_found/
-    );
+    expect(() =>
+      revokeGrant('GRT-20261019-000000000000', { by: HUMAN_ACTOR, reason: 'x' })
+    ).toThrow(/not_found/);
   });
 });
 
@@ -321,9 +323,12 @@ describe('grant approval flow', () => {
     approvalIds.push(request.id);
     approve(request);
     grantStanding(draft, { approvalRequestId: request.id });
-    expect(loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption?.consumer).toBe(
-      'grant_standing'
-    );
+    const consumption = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption;
+    expect(consumption?.consumer).toBe('grant_standing');
+    const [created] = listGrants({ tenant_slug: 'acme' });
+    expect(consumption?.effectRef).toBe(created.grant_id);
+    expect(consumption?.consumedAt).toBe(created.granted_at);
+    expect(Date.parse(created.expires_at) - Date.parse(created.granted_at)).toBe(30 * 86_400_000);
     expect(() => grantStanding(draft, { approvalRequestId: request.id })).toThrow(/already used/);
     expect(listGrants({ tenant_slug: 'acme' })).toHaveLength(1);
     // A consumed request is not handed back for reuse.
@@ -383,6 +388,88 @@ describe('resolveGrant', () => {
     ).toBe(false);
   });
 
+  it('grants nothing after tampering with revocation, identity or validity window', () => {
+    const resolve = () =>
+      resolveGrant({ capability: 'meeting.recording', context: { tenant_slug: 'acme', meeting } });
+    const record = approvedGrant();
+    const file = grantRecordPath('acme', record.grant_id);
+    expect(resolve().allowed).toBe(true);
+
+    // Copy under a new id: the approval's consumption names the original id,
+    // and two records naming one approval grant nothing at all.
+    const copyId = 'GRT-20261019-cccccccccccc';
+    safeWriteFile(grantRecordPath('acme', copyId), JSON.stringify({ ...record, grant_id: copyId }));
+    expect(resolve().allowed).toBe(false);
+    // …and the copy alone (original removed) is not the record the approval made.
+    safeRmSync(file, { force: true });
+    expect(resolve().allowed).toBe(false);
+    safeRmSync(grantRecordPath('acme', copyId), { force: true });
+    safeWriteFile(file, JSON.stringify(record));
+    expect(resolve().allowed).toBe(true);
+
+    // Shifting granted_at and expires_at forward together (renewal) breaks the
+    // binding to the consumption time.
+    const shift = (iso: string) => new Date(Date.parse(iso) + 30 * 86_400_000).toISOString();
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        ...record,
+        granted_at: shift(record.granted_at),
+        expires_at: shift(record.expires_at),
+      })
+    );
+    expect(resolve().allowed).toBe(false);
+
+    // ttl drift: a few hours longer than the approved whole days.
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        ...record,
+        expires_at: new Date(Date.parse(record.expires_at) + 6 * 3_600_000).toISOString(),
+      })
+    );
+    expect(resolve().allowed).toBe(false);
+    safeWriteFile(file, JSON.stringify(record));
+    expect(resolve().allowed).toBe(true);
+
+    // Un-revoke: revocation also withdraws the approval (outside the tenant
+    // partition), so deleting `revoked` from the record does not bring it back.
+    const revoked = revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'stop' });
+    expect(revoked.revoked?.by_kind).toBe('human');
+    expect(
+      loadApprovalRequest(GRANT_APPROVAL_CHANNEL, record.basis!.approval_request_id)?.revocation
+    ).toMatchObject({ revokedBy: HUMAN });
+    const { revoked: _revoked, ...unrevoked } = revoked;
+    safeWriteFile(file, JSON.stringify(unrevoked));
+    const after = resolve();
+    expect(after.allowed).toBe(false);
+    expect(after.reason).toMatch(/valid human approval/);
+  });
+
+  it('attributes an agent revocation to the agent', () => {
+    const record = approvedGrant();
+    const auditSpy = vi.spyOn(auditChain, 'record');
+    const revoked = revokeGrant(record.grant_id, {
+      by: { kind: 'agent', id: 'agent:claude-code' },
+      reason: 'meeting cancelled',
+    });
+    expect(revoked.revoked).toMatchObject({ by: 'agent:claude-code', by_kind: 'agent' });
+    const revokeAudit = auditSpy.mock.calls
+      .map(([entry]) => entry)
+      .find((entry) => entry.action === 'grant.revoked');
+    expect(revokeAudit?.agentId).toBe('agent:claude-code');
+    expect(revokeAudit?.metadata?.actor_kind).toBe('agent');
+    expect(revokeAudit?.actor?.kind).not.toBe('human');
+    auditSpy.mockRestore();
+    expect(
+      loadApprovalRequest(GRANT_APPROVAL_CHANNEL, record.basis!.approval_request_id)?.revocation
+        ?.revokedBy
+    ).toBe('agent:claude-code');
+    expect(() =>
+      revokeGrant(record.grant_id, { by: { kind: 'human', id: ' ' }, reason: 'x' })
+    ).toThrow(/already revoked|human or agent actor/);
+  });
+
   it('isolates tenants and meetings', () => {
     approvedGrant();
     const otherTenant = resolveGrant({
@@ -406,8 +493,13 @@ describe('resolveGrant', () => {
   });
 
   it('fails closed on expired and revoked grants and unknown capabilities', () => {
-    const past = new Date(Date.now() - 40 * 86_400_000);
-    approvedGrant(draft, past);
+    // The grant starts when its approval is consumed, so age the whole flow.
+    vi.useFakeTimers({ now: new Date(Date.now() - 40 * 86_400_000), toFake: ['Date'] });
+    try {
+      approvedGrant(draft);
+    } finally {
+      vi.useRealTimers();
+    }
     const expired = resolveGrant({
       capability: 'meeting.recording',
       context: { tenant_slug: 'acme', meeting },
@@ -417,7 +509,7 @@ describe('resolveGrant', () => {
 
     safeRmSync(GRANTS_ROOT, { recursive: true, force: true });
     const record = approvedGrant();
-    revokeGrant(record.grant_id, { by: HUMAN, reason: 'stop' });
+    revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'stop' });
     expect(
       resolveGrant({ capability: 'meeting.recording', context: { tenant_slug: 'acme', meeting } })
         .reason

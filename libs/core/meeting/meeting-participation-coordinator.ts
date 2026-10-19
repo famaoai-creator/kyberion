@@ -19,7 +19,11 @@
  * silence, etc.); intelligence lives in the agent callback.
  */
 
+import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJsonIfPresent } from '../foundation/json.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
+import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -44,7 +48,10 @@ import {
   type MediaEvent,
 } from '../realtime-media-session.js';
 import { BargeInController } from '../barge-in-controller.js';
-import { evaluateMissionVoiceConsent } from '../voice/voice-consent.js';
+import {
+  evaluateMissionVoiceConsent,
+  type MissionVoiceConsentResult,
+} from '../voice/voice-consent.js';
 import { recordGrantMissionBinding, resolveStandingGrant } from '../governance/grant-resolver.js';
 import { resolveIdentityContext } from '../authority.js';
 
@@ -124,6 +131,39 @@ function normalizeOptionalString(value: unknown): string | undefined {
 }
 
 /**
+ * The tenant a mission belongs to, from its own mission-state.json. A mission
+ * that cannot be found or read, or that names no valid tenant, yields no
+ * tenant — standing grants are tenant-bound, so it cannot use one.
+ */
+function readMissionTenant(missionId: string): { tenant?: string; reason?: string } {
+  let missionDir: string | null;
+  try {
+    missionDir = pathResolver.findMissionPath(missionId);
+  } catch (err: unknown) {
+    return {
+      reason: `mission ${missionId} rejected: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!missionDir) return { reason: `mission ${missionId} not found` };
+  let state: Record<string, unknown> | null;
+  try {
+    state = readJsonIfPresent<Record<string, unknown>>(path.join(missionDir, 'mission-state.json'));
+  } catch (err: unknown) {
+    return {
+      reason: `mission ${missionId} state unreadable: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  const tenant =
+    normalizeOptionalString(state?.tenant_slug) ?? normalizeOptionalString(state?.tenant_id);
+  if (!tenant || !isValidTenantSlug(tenant)) {
+    return {
+      reason: `mission ${missionId} is not bound to a tenant; a standing grant is tenant-bound`,
+    };
+  }
+  return { tenant };
+}
+
+/**
  * Fail-closed participation consent. `voice` (speaking) needs the mission's
  * voice-consent.json — never a standing grant. `recording` accepts the
  * mission's voice-consent.json and otherwise a `meeting.recording` standing
@@ -137,7 +177,13 @@ export function checkMeetingParticipationConsent(input: {
   purpose: 'recording' | 'voice';
   /** The meeting being recorded (standing-grant match for `recording`). */
   meeting?: { url?: string; series_id?: string };
-}): { allowed: boolean; reason?: string; grant_id?: string } {
+}): {
+  allowed: boolean;
+  reason?: string;
+  grant_id?: string;
+  /** Why the mission voice consent failed (see evaluateMissionVoiceConsent). */
+  code?: MissionVoiceConsentResult['code'];
+} {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = normalizeOptionalString(input.mission_id);
   const consent = evaluateMissionVoiceConsent({
@@ -149,11 +195,38 @@ export function checkMeetingParticipationConsent(input: {
   // Speaking never falls back to a standing grant; a rejected mission path
   // never falls back to anything.
   if (input.purpose !== 'recording' || consent.code === 'path_rejected') {
-    return { allowed: false, reason: consent.reason };
+    return {
+      allowed: false,
+      reason: consent.reason,
+      ...(consent.code ? { code: consent.code } : {}),
+    };
   }
-  const tenantSlug =
-    normalizeOptionalString(input.tenant_slug) ??
-    normalizeOptionalString(resolveIdentityContext().tenantSlug);
+  const callerTenant = normalizeOptionalString(input.tenant_slug);
+  const ambientTenant = normalizeOptionalString(resolveIdentityContext().tenantSlug);
+  let tenantSlug: string | undefined;
+  if (missionId) {
+    // Inside a mission the grant must belong to the mission's tenant; a caller
+    // or ambient tenant that disagrees never widens it.
+    const mission = readMissionTenant(missionId);
+    const denyGrant = (why: string) => ({
+      allowed: false as const,
+      reason: `${consent.reason}; standing grant: ${why}`,
+    });
+    if (!mission.tenant) return denyGrant(mission.reason ?? `mission ${missionId} has no tenant`);
+    for (const [label, other] of [
+      ['caller', callerTenant],
+      ['ambient', ambientTenant],
+    ] as const) {
+      if (other && other !== mission.tenant) {
+        return denyGrant(
+          `mission ${missionId} belongs to tenant ${mission.tenant}, not the ${label} tenant ${other}`
+        );
+      }
+    }
+    tenantSlug = mission.tenant;
+  } else {
+    tenantSlug = callerTenant ?? ambientTenant;
+  }
   const grant = resolveStandingGrant('meeting.recording', {
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     ...(missionId ? { mission_id: missionId } : {}),

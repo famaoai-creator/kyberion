@@ -66,6 +66,7 @@
       "properties": {
         "at": { "type": "string", "format": "date-time" },
         "by": { "type": "string", "minLength": 1 },
+        "by_kind": { "type": "string", "enum": ["human", "agent"] },
         "reason": { "type": "string", "maxLength": 500 },
         "audit_event_id": { "type": "string", "minLength": 1 }
       }
