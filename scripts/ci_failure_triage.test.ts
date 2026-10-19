@@ -217,6 +217,26 @@ describe('ci failure triage', () => {
     expect(markdown).toContain('(suspected flake)');
   });
 
+  it('escapes backslashes before pipes so a log title cannot break the summary table', () => {
+    const markdown = renderTriageMarkdown({
+      ok: false,
+      jobs: [],
+      failures: [
+        {
+          class: 'unknown',
+          signature: 'abcdefabcdef',
+          title: String.raw`regex a\|b | c`,
+          evidence: [],
+          next: [String.raw`grep 'x\|y'`],
+        },
+      ],
+    });
+    const row = markdown.split('\n').find((line) => line.startsWith('| 1 |'))!;
+    // Every literal pipe from the input is escaped, so only the 5 column borders stay bare.
+    expect(row.match(/(?<!\\)\|/gu)).toHaveLength(5);
+    expect(row).toContain(String.raw`regex a\\\|b \| c`);
+  });
+
   it('keeps the resolve-generated gate list in step with scripts/resolve_generated.ts', () => {
     expect([...RESOLVE_GENERATED_GATE_IDS].sort()).toEqual(
       GENERATED_ARTIFACT_STEPS.map((step) => step.id).sort()
