@@ -149,10 +149,11 @@ describe('Workflow operations contract', () => {
       >;
       expect(Object.keys(on)).toContain('merge_group');
     }
-    // S5: the Cross-OS result job always reports, so skipped matrices never
-    // leave a required check pending.
+    // S5: the Cross-OS result job reports even when upstream jobs fail or are
+    // skipped, so skipped matrices never leave a required check pending; it
+    // only stands down when the run itself is cancelled by a newer push.
     const result = crossOs.jobs['cross-os-result']!;
-    expect(result.if).toContain('always()');
+    expect(result.if).toContain('!cancelled()');
     expect([result.needs ?? []].flat()).toEqual(
       expect.arrayContaining(['changes', 'build-and-smoke', 'windows-native'])
     );
