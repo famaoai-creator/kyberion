@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-VIDEO-RECUT-20261019-2026_10_19",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "字幕に基づく動画編集の時刻対応と検証",
+  "summary": "素材動画の編集は生成系と分け、元映像・音声・字幕の時刻対応を保ち、実行結果を確認する。",
+  "candidate_id": "mem-MSN-VIDEO-RECUT-20261019-2026_10_19",
+  "evidence_refs": [
+    "active/missions/public/MSN-VIDEO-RECUT-20261019/evidence/distillation.md",
+    "active/missions/public/MSN-VIDEO-RECUT-20261019/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-19T03:21:48.255Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "既存動画と対応字幕から短縮版を作る場合は、元時間の採用区間と編集後の開始時刻を source map に保存し、映像と元音声を同じ区間で切り出す。字幕のない区間を無音とは判断せず、意味に基づく失敗テイク検出や音声認識を実装済みと表現しない。既定の出力領域は workspace の正規割り当てに従い、型テストだけでなく実際の既定経路も検証する。描画失敗時に静止画へ代替せず停止し、出典や素材の取得元は実行時入力にする。描画検査と人による全編試聴を区別する。"
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-VIDEO-RECUT-20261019/evidence/distillation.md",
+    "active/missions/public/MSN-VIDEO-RECUT-20261019/evidence/test-report.md"
+  ],
+  "source_branch": "feat/video-recut-20261019",
+  "source_commit": "2d6a7c8409b529265bb134d9d5565e5c72188a7a"
+}
