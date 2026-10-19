@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import * as yaml from 'js-yaml';
 import { safeReadFile } from '@agent/core';
+
+interface WorkflowJob {
+  'runs-on'?: string;
+  needs?: string | string[];
+  if?: string;
+  steps?: Array<{ name?: string; run?: string }>;
+}
+interface WorkflowDoc {
+  on?: unknown;
+  jobs: Record<string, WorkflowJob>;
+}
 
 const rootDir = process.cwd();
 
@@ -110,12 +122,40 @@ describe('Workflow operations contract', () => {
 
   it('executes build-artifact casing regressions in the native Windows suite', () => {
     const crossOs = read('.github/workflows/cross-os.yml');
-    const windowsStep = crossOs
-      .split('      - name: Unit tests (Windows native)')[1]
-      ?.split('\n      - name:')[0];
-    expect(windowsStep).toContain("if: runner.os == 'Windows'");
-    expect(windowsStep).toContain('pnpm exec vitest run');
-    expect(windowsStep).toContain('scripts/check_stale_dist.test.ts');
+    const workflow = yaml.load(crossOs) as WorkflowDoc;
+    const windowsJob = workflow.jobs['windows-native']!;
+    expect(windowsJob['runs-on']).toBe('windows-latest');
+    const windowsStep = windowsJob.steps?.find(
+      (step) => step.name === 'Unit tests (Windows native)'
+    );
+    expect(windowsStep?.run).toContain('pnpm exec vitest run');
+    expect(windowsStep?.run).toContain('scripts/check_stale_dist.test.ts');
+  });
+
+  it('keeps one CI round reporting every signal and merge-queue ready', () => {
+    const ci = yaml.load(read('.github/workflows/ci.yml')) as WorkflowDoc;
+    const crossOs = yaml.load(read('.github/workflows/cross-os.yml')) as WorkflowDoc;
+    const prValidation = yaml.load(read('.github/workflows/pr-validation.yml')) as WorkflowDoc;
+    // S4: a red lint/validate job must not skip the test/smoke signals.
+    for (const id of ['test', 'intent-smoke', 'first-win-clean-clone']) {
+      expect([ci.jobs[id]!.needs ?? []].flat(), id).not.toContain('lint-and-validate');
+    }
+    // M5: required-check workflows report on merge_group events.
+    for (const doc of [ci, crossOs, prValidation]) {
+      // YAML 1.1 parsers read the bare `on` key as boolean true.
+      const on = (doc.on ?? (doc as unknown as Record<string, unknown>)['true']) as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(on)).toContain('merge_group');
+    }
+    // S5: the Cross-OS result job always reports, so skipped matrices never
+    // leave a required check pending.
+    const result = crossOs.jobs['cross-os-result']!;
+    expect(result.if).toContain('always()');
+    expect([result.needs ?? []].flat()).toEqual(
+      expect.arrayContaining(['changes', 'build-and-smoke', 'windows-native'])
+    );
   });
 
   it('keeps the CI failure investigation template wired to GitHub Actions run listing', () => {
