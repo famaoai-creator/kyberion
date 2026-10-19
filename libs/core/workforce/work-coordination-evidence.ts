@@ -69,6 +69,8 @@ const EVIDENCE_EVENT_TYPES: readonly WorkCoordinationEventType[] = [
   'item_attempt_failed',
   'mission_handoff_written',
   'review_requested',
+  'change_request_linked',
+  'change_request_updated',
   'external_sync_pulled',
   'external_sync_pushed',
   'conflict_detected',

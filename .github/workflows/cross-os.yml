@@ -13,38 +13,129 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Merge-queue readiness: `cross-os-result` must report on merge_group events
+  # too when it is a required check (the queue itself is a repository setting).
+  merge_group:
   schedule:
     # Weekly to catch ecosystem drift (Node minor releases, OS package changes).
     - cron: '0 4 * * 1'
 
 # A newer push to the same PR supersedes the running checks; main pushes and
 # scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+# merge_group runs get a unique gh-readonly-queue ref and are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
+  # Decides whether the heavy OS jobs run. Pull requests and merge-queue
+  # entries that only touch prose (Markdown/text under docs/, knowledge/,
+  # changelog.d/, .github/, or root *.md) skip them; pushes to main, the
+  # weekly schedule and any diff that cannot be computed run everything.
+  # No workflow-level `paths:` filter: that would leave required checks
+  # pending forever — `cross-os-result` always reports instead.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The PR merge commit's first parent is the base tip.
+          fetch-depth: 2
+
+      - name: Classify changed paths
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          case "$EVENT_NAME" in
+            pull_request)
+              base="$(git rev-parse --verify --quiet 'HEAD^1')" || base="" ;;
+            merge_group)
+              base="$MERGE_GROUP_BASE"
+              git fetch --no-tags --depth=1 origin "$base" || base="" ;;
+            *)
+              base="" ;;
+          esac
+          if [ -z "$base" ]; then
+            echo "Event $EVENT_NAME (or no diff base): running every OS job."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! changed="$(git diff --name-only "$base" HEAD)"; then
+            echo "::warning::git diff against $base failed; running every OS job."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'Changed paths:\n%s\n' "$changed"
+          code_paths="$(printf '%s\n' "$changed" | grep -v -E '^$|^(docs|knowledge|changelog\.d|\.github)/.*\.(md|mdx|txt)$|^[^/]+\.md$')" || code_paths=""
+          if [ -n "$code_paths" ]; then
+            printf 'Code/config paths changed:\n%s\n' "$code_paths"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Prose-only change; the Cross-OS jobs are skipped."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # One Linux build shared by the Unix jobs. The compiler outputs are plain
+  # JavaScript + declaration files (no native addons: those live in
+  # node_modules, which every job installs for its own OS), so macOS reuses
+  # them instead of spending macOS minutes rebuilding per shard.
+  # Windows keeps its own native build: build_repository.ts has a
+  # Windows-specific spawn path, so building there IS part of the check.
+  build-artifacts:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Upload compiler outputs
+        uses: actions/upload-artifact@v6
+        with:
+          name: cross-os-build-outputs
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            dist/
+            libs/core/dist/
+            libs/shared-*/dist/
+            presence/displays/terminal-hud/dist/
+            plugins/dist/
+            satellites/*/dist/
+            knowledge/_integrity-manifest.json
+
   build-and-smoke:
-    permissions:
-      contents: read
-    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}${{ matrix.os != 'windows-latest' && format(' / shard {0}/{1}', matrix.shard, matrix.total) || '' }}
+    needs: [changes, build-artifacts]
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    name: ${{ matrix.os }} / Node ${{ matrix.node-version }} / shard ${{ matrix.shard }}/${{ matrix.total }}
     runs-on: ${{ matrix.os }}
-    # The Unix core suite takes ~21 minutes on macOS; build, follow-up smoke
-    # checks, and post-job cache save push the full job past 30 minutes.
-    # Keep enough headroom for those steps on the slowest hosted runner.
+    # The Unix core suite takes ~21 minutes on macOS; follow-up smoke checks
+    # and post-job cache save push the full job past 30 minutes. Keep enough
+    # headroom for those steps on the slowest hosted runner.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         node-version: [24]
         shard: [1, 2, 3]
         total: [3]
-        exclude:
-          - os: windows-latest
-            shard: 2
-          - os: windows-latest
-            shard: 3
     steps:
       - uses: actions/checkout@v5
 
@@ -112,11 +203,13 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Build
-        run: pnpm run build
-
-      - name: Type check
-        run: pnpm run typecheck
+      # Reuses the shared Linux build instead of rebuilding per OS/shard.
+      # Typecheck is OS-independent and owned by pr-validation static-checks
+      # (pull requests, merge queue) and ci.yml lint-and-validate (main).
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: cross-os-build-outputs
 
       - name: Contract schemas
         run: pnpm run check -- --scope full --only contract-schemas
@@ -124,67 +217,35 @@ jobs:
       # The full core suite is still Unix-oriented: it relies on POSIX path
       # assertions and host-only fixtures (sqlite3, ffmpeg, and macOS/Linux
       # media backends). Keep that coverage on the Unix runners and exercise
-      # the Windows-native surface with its platform-focused suite below.
+      # the Windows-native surface in the windows-native job below.
       - name: Unit tests (core, shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        # On pull requests pr-validation.yml runs the Linux core shards; this
-        # workflow adds the macOS coverage only.
-        if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
+        # On pull requests and in the merge queue pr-validation.yml runs the
+        # Linux core shards; this workflow adds the macOS coverage only.
+        if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
         run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
 
-      - name: Unit tests (Windows native)
-        if: runner.os == 'Windows'
-        run: >-
-          pnpm exec vitest run
-          libs/core/windows-local-assist-bridge.test.ts
-          libs/core/media/native-speech-listen-bridge.test.ts
-          libs/core/media/native-tts.test.ts
-          libs/core/environment-capability.test.ts
-          libs/core/platform.test.ts
-          libs/core/virtual/os-accessibility-detector.test.ts
-          libs/core/windows-os-automation.test.ts
-          scripts/check_stale_dist.test.ts
-
-      # Live UI Automation smoke: launches Notepad and a WPF window on the
-      # runner's interactive desktop, focuses them and checks that
-      # os_accessibility finds their controls in the foreground window, then
-      # clicks the WPF OK button through its Set-of-Marks mark with the
-      # DPI-aware Windows pointer path and checks the click registered.
-      - name: UI Automation live smoke (Windows)
-        if: runner.os == 'Windows'
-        # Three cases with bounded launch/availability deadlines (240 s each worst case).
-        timeout-minutes: 18
-        env:
-          KYBERION_UIA_LIVE_SMOKE: '1'
-          KYBERION_PERSONA: worker
-          MISSION_ROLE: mission_controller
-        run: pnpm exec vitest run libs/core/virtual/os-accessibility-detector.live.test.ts
-
       - name: Governance boundary tests
-        # pr-validation.yml test-extra runs these on Linux for pull requests.
-        if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
+        # pr-validation.yml test-extra runs these on Linux for pull requests
+        # and in the merge queue.
+        if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
 
       - name: Meeting participation dry-run
-        if: runner.os != 'Windows'
         run: pnpm test -- --suite meeting-dry-run
 
       - name: Pipeline preview (baseline)
-        if: runner.os != 'Windows'
         run: pnpm run kyberion -- preview pipelines/baseline-check.json
 
       - name: Pipeline preview (meeting proxy)
-        if: runner.os != 'Windows'
         run: pnpm run kyberion -- preview pipelines/meeting-proxy-workflow.json
 
       - name: Pipeline shell independence
-        if: runner.os != 'Windows'
         run: pnpm run check -- --scope full --only pipeline-shell-independence
 
       - name: Customer aggregation smoke
-        if: runner.os != 'Windows'
         env:
           KYBERION_CUSTOMER: smoke-test
           KYBERION_PERSONA: ecosystem_architect
@@ -202,3 +263,94 @@ jobs:
 
       - name: Contract semver baseline check
         run: pnpm run check:contract-semver
+
+  windows-native:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    name: windows-latest / Node ${{ matrix.node-version }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [24]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # Native build: exercises the Windows package-manager spawn path in
+      # scripts/build_repository.ts (Linux/macOS share one artifact instead).
+      - name: Build
+        run: pnpm run build
+
+      - name: Contract schemas
+        run: pnpm run check -- --scope full --only contract-schemas
+
+      - name: Unit tests (Windows native)
+        run: >-
+          pnpm exec vitest run
+          libs/core/windows-local-assist-bridge.test.ts
+          libs/core/media/native-speech-listen-bridge.test.ts
+          libs/core/media/native-tts.test.ts
+          libs/core/environment-capability.test.ts
+          libs/core/platform.test.ts
+          libs/core/virtual/os-accessibility-detector.test.ts
+          libs/core/windows-os-automation.test.ts
+          scripts/check_stale_dist.test.ts
+
+      # Live UI Automation smoke: launches Notepad and a WPF window on the
+      # runner's interactive desktop, focuses them and checks that
+      # os_accessibility finds their controls in the foreground window, then
+      # clicks the WPF OK button through its Set-of-Marks mark with the
+      # DPI-aware Windows pointer path and checks the click registered.
+      - name: UI Automation live smoke (Windows)
+        # Three cases with bounded launch/availability deadlines (240 s each worst case).
+        timeout-minutes: 18
+        env:
+          KYBERION_UIA_LIVE_SMOKE: '1'
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
+        run: pnpm exec vitest run libs/core/virtual/os-accessibility-detector.live.test.ts
+
+      - name: Contract semver baseline check
+        run: pnpm run check:contract-semver
+
+  # Stable, always-reporting check for branch protection and the merge queue:
+  # the jobs above are skipped as a whole on prose-only changes, and a skipped
+  # matrix never reports its per-OS check names. Require this job.
+  cross-os-result:
+    name: cross-os-result
+    needs: [changes, build-artifacts, build-and-smoke, windows-native]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Summarize Cross-OS results
+        env:
+          CODE_CHANGED: ${{ needs.changes.outputs.code }}
+          RESULTS: >-
+            changes=${{ needs.changes.result }}
+            build-artifacts=${{ needs.build-artifacts.result }}
+            build-and-smoke=${{ needs.build-and-smoke.result }}
+            windows-native=${{ needs.windows-native.result }}
+        run: |
+          echo "code changed: ${CODE_CHANGED:-unknown}"
+          failed=0
+          for entry in $RESULTS; do
+            echo "$entry"
+            case "${entry#*=}" in
+              success) ;;
+              skipped)
+                # Skipping is only legitimate for a prose-only change.
+                if [ "$CODE_CHANGED" != "false" ]; then failed=1; fi ;;
+              *) failed=1 ;;
+            esac
+          done
+          if [ "$failed" != 0 ]; then
+            echo "::error::Cross-OS jobs did not all pass; see the per-OS jobs in this run."
+            exit 1
+          fi

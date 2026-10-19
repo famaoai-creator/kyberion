@@ -261,6 +261,8 @@ describe('dot executor end to end', () => {
       },
     });
     // Simulate a crash right after the claim: a short lease that is never released.
+    // A frozen clock moved past the TTL replaces a real sleep (no TTL race).
+    vi.useFakeTimers({ toFake: ['Date'] });
     claimWorkItem({
       itemId: created.item_id,
       actorPeerId: 'dot:exec-it',
@@ -270,7 +272,7 @@ describe('dot executor end to end', () => {
       expectedVersion: created.version,
     });
     expect(getWorkItem(created.item_id)!.status).toBe('in_progress');
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    vi.setSystemTime(Date.now() + 20);
 
     const p = ports();
     const rows = await runDotExecutorSweep([{ path: 'dots/exec-it.json', charter: CHARTER }], p, {
@@ -863,8 +865,9 @@ describe('dot executor end to end', () => {
 
   it('reaps only dot items: a stranded non-dot claim is left alone', async () => {
     const other = createWorkItem({ title: 'not a dot item', description: 'x', status: 'ready' });
+    vi.useFakeTimers({ toFake: ['Date'] });
     claimWorkItem({ itemId: other.item_id, actorPeerId: 'peer:other', purpose: 'x', ttlMs: 5 });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    vi.setSystemTime(Date.now() + 20);
     await runDotExecutorSweep([{ path: 'dots/exec-it.json', charter: CHARTER }], ports(), {
       rootDir: TEST_ROOT,
     });

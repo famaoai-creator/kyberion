@@ -969,6 +969,15 @@
       "timeout_ms": 300000,
       "owner": "quality",
       "rationale": "S3: registration-ceremony ratchets in tests/ (sharedTmp allowlist, findMissionPath DIRECT_CALLERS, node:fs / child_process / managed-process allowlists, package boundary) previously failed only in CI's test job. Budget: about 30s wall alone, but each file scans libs/ and scripts/, so under the 6-gate concurrent pr run the per-test timeout is raised to 60s and the gate to 300s; tests/core-runtime-import-contract.test.ts (about 30s, needs dist) stays in the test job."
+    },
+    {
+      "id": "test-sleep-ratchet",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_test_sleep_ratchet.ts"],
+      "baseline": "scripts/check_test_sleep_ratchet.baseline.json",
+      "owner": "quality",
+      "rationale": "S6: real-time sleeps in test files (setTimeout(resolve, N), sleep(N)) may only decrease; they race TTLs, deadlines and background work on loaded CI runners. Use fake timers, vi.waitFor or an injected clock instead."
     }
   ],
   "workflow_exceptions": [
