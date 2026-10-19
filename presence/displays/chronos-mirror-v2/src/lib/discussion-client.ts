@@ -8,6 +8,10 @@ import type {
 } from '@agent/core/discussion/discussion-types';
 import copy from './discussion-copy.json';
 import type { ReadinessProvider } from './discussion-readiness-state';
+import type {
+  DiscussionCreateHandle,
+  DiscussionRequestRouting,
+} from './discussion-create-recovery';
 
 export type { DiscussionCommand, DiscussionRoomState, DiscussionRoomSummary };
 
@@ -41,31 +45,63 @@ export interface DiscussionApiResult<T> {
   error?: string;
 }
 
-async function call<T>(url: string, init?: RequestInit): Promise<DiscussionApiResult<T>> {
-  try {
-    const response = await fetch(url, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-      cache: 'no-store',
-    });
-    const body = (await response.json().catch(() => null)) as
-      (T & { ok?: boolean; error?: string }) | null;
-    if (!response.ok || body?.ok === false) {
-      return {
-        ok: false,
-        status: response.status,
-        data: null,
-        error: body?.error ?? response.statusText,
-      };
+/** A deadline covers fetch AND body parsing; abort is not backend cancellation. */
+async function call<T>(
+  url: string,
+  init?: RequestInit,
+  timeoutMs?: number
+): Promise<DiscussionApiResult<T>> {
+  const abort = timeoutMs === undefined ? null : new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: (() => void) | undefined;
+  const unavailable = (): DiscussionApiResult<T> => ({
+    ok: false,
+    status: 0,
+    data: null,
+    error: 'Response not confirmed',
+  });
+  const request = async (): Promise<DiscussionApiResult<T>> => {
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: abort?.signal ?? init?.signal,
+        headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+        cache: 'no-store',
+      });
+      const body = (await response.json().catch(() => null)) as
+        (T & { ok?: boolean; error?: string }) | null;
+      if (!response.ok || body?.ok === false) {
+        return {
+          ok: false,
+          status: response.status,
+          data: null,
+          error: body?.error ?? response.statusText,
+        };
+      }
+      return { ok: true, status: response.status, data: body as T };
+    } catch (error) {
+      if (abort) return unavailable();
+      return { ...unavailable(), error: error instanceof Error ? error.message : String(error) };
     }
-    return { ok: true, status: response.status, data: body as T };
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      error: error instanceof Error ? error.message : String(error),
+  };
+  if (!abort) return request();
+  const interrupted = new Promise<DiscussionApiResult<T>>((resolve) => {
+    cancel = () => {
+      abort.abort();
+      resolve(unavailable());
     };
+    timer = setTimeout(cancel, timeoutMs);
+    init?.signal?.addEventListener('abort', cancel, { once: true });
+  });
+  try {
+    if (init?.signal?.aborted) {
+      cancel?.();
+      return unavailable();
+    }
+    return await Promise.race([request(), interrupted]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (cancel) init?.signal?.removeEventListener('abort', cancel);
   }
 }
 
@@ -95,7 +131,7 @@ export function fetchDiscussionReadiness(
   });
 }
 
-export function createDiscussion(body: {
+export interface DiscussionCreateInput {
   goal: string;
   locale: DiscussionLocale;
   speaker: 'auto' | 'scripted' | 'reasoning';
@@ -106,13 +142,68 @@ export function createDiscussion(body: {
   provider_timeout_ms?: number;
   turn_delay_ms: number;
   tenant?: string;
+  scope_digest?: string;
+  organization_id?: string;
+  project_id?: string;
   mission_id?: string;
   mode?: 'panel' | 'dialogue';
-}) {
-  return call<{ room: DiscussionRoomState }>('/api/discussions', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+}
+
+export const DISCUSSION_REQUEST_TIMEOUT_MS = 15_000;
+
+export function createDiscussion(
+  body: DiscussionCreateInput & { request_id: string },
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+) {
+  return call<unknown>(
+    '/api/discussions',
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+      signal: options.signal,
+    },
+    options.timeoutMs ?? DISCUSSION_REQUEST_TIMEOUT_MS
+  );
+}
+
+/** Resolve canonical routing before persisting a marker or transmitting the goal. */
+export function fetchDiscussionRequestContext(
+  routing: DiscussionRequestRouting,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+) {
+  const params = new URLSearchParams();
+  for (const key of ['tenant', 'organization_id', 'project_id', 'mission_id'] as const) {
+    if (routing[key]) params.set(key, routing[key]);
+  }
+  const query = params.toString();
+  return call<unknown>(
+    `/api/discussions/request-context${query ? `?${query}` : ''}`,
+    { signal: options.signal },
+    options.timeoutMs ?? DISCUSSION_REQUEST_TIMEOUT_MS
+  );
+}
+
+/** Read-only lookup: only the ORIGINAL routing context, never goal/source text. */
+export function fetchDiscussionRequest(
+  handle: DiscussionCreateHandle,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+) {
+  const params = new URLSearchParams();
+  for (const key of [
+    'tenant',
+    'organization_id',
+    'project_id',
+    'mission_id',
+    'scope_digest',
+  ] as const) {
+    if (handle.routing[key]) params.set(key, handle.routing[key]);
+  }
+  const query = params.toString();
+  return call<unknown>(
+    `/api/discussions/requests/${encodeURIComponent(handle.request_id)}${query ? `?${query}` : ''}`,
+    { signal: options.signal },
+    options.timeoutMs ?? DISCUSSION_REQUEST_TIMEOUT_MS
+  );
 }
 
 export interface MissionOption {

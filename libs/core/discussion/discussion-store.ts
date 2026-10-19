@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeCreateExclusiveFileSync,
+  safePublishExclusiveFileSync,
+  safeReadFileSnapshot,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -17,6 +19,7 @@ import type {
   DiscussionEvent,
   DiscussionEventBody,
   DiscussionRoomState,
+  DiscussionRequestBinding,
   DiscussionRoomSummary,
   DiscussionScope,
 } from './discussion-types.js';
@@ -178,7 +181,31 @@ export interface CreateDiscussionRoomInput {
 
 /** Normalize at the core boundary, so callers cannot widen provider budgets through another surface. */
 export function normalizeDiscussionConfig(input: Partial<DiscussionConfig> = {}): DiscussionConfig {
-  const config = { ...DEFAULT_DISCUSSION_CONFIG, ...input };
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw new DiscussionUserError('Invalid discussion config');
+  // Only effective known fields participate; undefined means the default.
+  const config: DiscussionConfig = {
+    max_rounds: input.max_rounds ?? DEFAULT_DISCUSSION_CONFIG.max_rounds,
+    max_messages: input.max_messages ?? DEFAULT_DISCUSSION_CONFIG.max_messages,
+    consensus_threshold: input.consensus_threshold ?? DEFAULT_DISCUSSION_CONFIG.consensus_threshold,
+    turn_delay_ms: input.turn_delay_ms ?? DEFAULT_DISCUSSION_CONFIG.turn_delay_ms,
+    locale: input.locale ?? DEFAULT_DISCUSSION_CONFIG.locale,
+    speaker: input.speaker ?? DEFAULT_DISCUSSION_CONFIG.speaker,
+    mode: input.mode ?? DEFAULT_DISCUSSION_CONFIG.mode,
+    ...(input.provider === undefined ? {} : { provider: input.provider }),
+    max_provider_calls: input.max_provider_calls,
+    provider_timeout_ms: input.provider_timeout_ms,
+    single_pass: input.single_pass ?? false,
+  };
+  if (!['ja', 'en'].includes(config.locale))
+    throw new DiscussionUserError('Invalid discussion locale');
+  if (
+    typeof config.consensus_threshold !== 'number' ||
+    !Number.isFinite(config.consensus_threshold) ||
+    config.consensus_threshold < 0 ||
+    config.consensus_threshold > 1
+  )
+    throw new DiscussionUserError('Invalid discussion consensus_threshold');
   const integer = (value: unknown, fallback: number, min: number, max: number, name: string) => {
     if (value === undefined) return fallback;
     if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) {
@@ -243,6 +270,85 @@ export function createDiscussionRoom(input: CreateDiscussionRoomInput): Discussi
     created_by: input.created_by ?? 'operator',
   });
   return readDiscussionRoom(id) as DiscussionRoomState;
+}
+
+/**
+ * Request-only creation: publish the complete initial event exclusively. Unlike
+ * the legacy append path, this cannot replace an existing/torn room event log.
+ * The request store owns reservation and launch decisions.
+ */
+export function createReservedDiscussionRoom(
+  input: CreateDiscussionRoomInput & { id: string },
+  request_binding: DiscussionRequestBinding
+): void {
+  const goal = input.goal.trim();
+  if (!goal || goal.length > 2000) throw new DiscussionUserError('Invalid discussion goal');
+  const event: DiscussionEvent = {
+    type: 'room_created',
+    seq: 1,
+    ts: nowIso(),
+    goal,
+    title: (input.title?.trim() || goal).slice(0, 120),
+    scope: input.scope ?? {},
+    config: normalizeDiscussionConfig(input.config),
+    created_by: input.created_by ?? 'operator',
+    request_binding,
+  };
+  safePublishExclusiveFileSync(eventsPath(input.id), JSON.stringify(event) + '\n');
+}
+
+/**
+ * Fail-closed creation evidence, independent of the mutable room projection.
+ * Missing is distinct from empty/torn/malformed logs. The snapshot reader pins
+ * a regular non-symlink inode; an event log is bounded before JSON parsing.
+ */
+export function readDiscussionRequestRoom(roomId: string): {
+  created: Extract<DiscussionEvent, { type: 'room_created' }>;
+  room: DiscussionRoomState;
+} | null {
+  let bytes: Buffer;
+  try {
+    const file = eventsPath(roomId);
+    const stat = safeLstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 8 * 1024 * 1024)
+      throw new Error('Invalid discussion request event log file');
+    bytes = safeReadFileSnapshot(file, 8 * 1024 * 1024);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    // A surviving directory may contain a prior provider claim or interrupted
+    // publication. Absence of events alone cannot prove this is a new room.
+    try {
+      safeLstat(path.dirname(eventsPath(roomId)));
+    } catch (directoryError) {
+      if ((directoryError as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw directoryError;
+    }
+    throw new Error('Discussion room directory exists without creation evidence');
+  }
+  const lines = bytes.toString('utf8').split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  if (!lines.length || lines.length > MAX_EVENTS_PER_ROOM)
+    throw new Error('Invalid discussion request event log');
+  const events = lines.map((line, index) => {
+    const event = JSON.parse(line) as DiscussionEvent;
+    if (
+      !event ||
+      typeof event !== 'object' ||
+      event.seq !== index + 1 ||
+      typeof event.type !== 'string' ||
+      typeof event.ts !== 'string' ||
+      !Number.isFinite(Date.parse(event.ts))
+    )
+      throw new Error('Invalid discussion request event');
+    return event;
+  });
+  const created = events[0];
+  if (
+    created?.type !== 'room_created' ||
+    events.filter((event) => event.type === 'room_created').length !== 1
+  )
+    throw new Error('Discussion request requires one original creation event');
+  return { created, room: reduceDiscussionRoom(sanitizeDiscussionId(roomId), events) };
 }
 
 export function submitDiscussionCommand(

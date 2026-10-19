@@ -165,6 +165,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/discussion/discussion-request-storage-scope.ts#withDiscussionRequestReceiptAccess",
+      "roles": ["discussion_request_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -3055,6 +3060,8 @@
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/stop/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/stream/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/readiness/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/request-context/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/requests/[requestId]/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/headless/a2ui/operator-home/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/headless/a2ui/plugin-views/frame/route.ts",
@@ -3121,6 +3128,7 @@
         "presence/displays/chronos-mirror-v2/src/components/DialogueRoom.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionBriefControls.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionBriefResult.tsx",
+        "presence/displays/chronos-mirror-v2/src/components/DiscussionCreateRecovery.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionExecutionStatus.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionOutcomes.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionPanes.tsx",
@@ -3189,7 +3197,9 @@
         "presence/displays/chronos-mirror-v2/src/lib/discussion-access.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-artifact-url.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-client.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/discussion-create-recovery.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-readiness-state.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/discussion-request-context.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-request-scope.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-run-contract.ts",
         "presence/displays/chronos-mirror-v2/src/lib/focused-operator-response.ts",
@@ -3334,6 +3344,14 @@
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "discussion_request_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts#POST",
+            "libs/core/discussion/discussion-create-request.ts#createDiscussionRequest",
+            "libs/core/discussion/discussion-create-request.ts#readRecord",
+            "libs/core/discussion/discussion-request-storage-scope.ts#withDiscussionRequestReceiptAccess"
           ]
         },
         "ecosystem_architect": {
