@@ -1,3 +1,6 @@
+import type { MissionStatusView, MissionSummary } from '@agent/core/mission/mission-read-model';
+import * as providerEgress from '@agent/core/provider/provider-egress-gate';
+import { missionLifecycleService } from '@agent/core/mission/mission-lifecycle-service';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -132,6 +135,68 @@ describe('mission_controller argument parsing', () => {
       peek.mockRestore();
       if (previousRefresh === undefined) delete process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH;
       else process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH = previousRefresh;
+    }
+  });
+
+  it('reports current scoped permission separately from cached health for an existing mission', async () => {
+    const monitor = vi
+      .spyOn(killSwitch.killSwitch, 'startMonitor')
+      .mockImplementation(() => undefined);
+    const discover = vi.spyOn(providerDiscovery, 'discoverProviders').mockImplementation(() => {
+      throw new Error('Must not probe');
+    });
+    const peek = vi
+      .spyOn(providerDiscovery, 'peekProviderDiscovery')
+      .mockReturnValue({ providers: [], source: 'unavailable' });
+    const statusView = {
+      state: {
+        mission_id: 'MSN-READ-ONLY-EXISTING',
+        status: 'active',
+        tier: 'confidential',
+        tenant_slug: 'synthetic-status',
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        priority: 1,
+        execution_mode: 'local',
+        git: { branch: 'test', latest_commit: '12345678', checkpoints: [] },
+        history: [],
+      },
+      missionPath: null,
+      nextAction: 'Inspect recorded outcomes',
+      recentHistory: [],
+      flow: {
+        completion: { structural: 'satisfied' },
+        runtime: { state: 'unknown', reason: 'Not probed' },
+      },
+    } as MissionStatusView;
+    function statusFixture(id: string): MissionStatusView | null;
+    function statusFixture(id?: undefined): MissionSummary[];
+    function statusFixture(id?: string): MissionStatusView | MissionSummary[] | null {
+      return id ? statusView : [];
+    }
+    const status = vi.spyOn(missionLifecycleService, 'status').mockImplementation(statusFixture);
+    const permission = vi
+      .spyOn(providerEgress, 'describeProviderTierAvailability')
+      .mockImplementation(() => {
+        throw new Error('Synthetic unavailable policy');
+      });
+    const previous = process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH;
+    process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH = '0';
+    try {
+      const output: unknown[] = [];
+      await main(['status', 'MSN-READ-ONLY-EXISTING'], (value) => output.push(value));
+      expect(permission).toHaveBeenCalledWith({ tenant_slug: 'synthetic-status' });
+      expect(output.map(String).join('\n')).toContain('permission unverified');
+      expect(output.map(String).join('\n')).toContain('not proof of model execution');
+      expect(discover).not.toHaveBeenCalled();
+    } finally {
+      monitor.mockRestore();
+      discover.mockRestore();
+      peek.mockRestore();
+      status.mockRestore();
+      permission.mockRestore();
+      if (previous === undefined) delete process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH;
+      else process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH = previous;
     }
   });
 

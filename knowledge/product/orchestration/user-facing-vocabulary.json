@@ -9485,10 +9485,35 @@
         "ja": "評価を記録しました: {id} ({outcome})",
         "qps-ploc": "⟦Ƒėėḓƀȧƈķ řėƈőřḓėḓ: {id} ({outcome}) ŀőřėɱ ïṗşůɱ⟧"
       },
+      "recorder_improvement_decision_route": {
+        "en": "This command cannot approve or reject feedback. Review with improvements --review <id>, explicitly hand off with --queue <id>, then use the existing human memory decision path.",
+        "ja": "このコマンドは評価を承認・却下しません。improvements --review <id> で確認し、--queue <id> で明示的に受け渡してから、既存の本人承認経路で判断してください。",
+        "qps-ploc": "⟦Ŧħïş ƈőɱɱȧñḓ ƈȧññőŧ ȧṗṗřőṽė őř řėĵėƈŧ ƒėėḓƀȧƈķ. Řėṽïėẇ ẇïŧħ ïɱṗřőṽėɱėñŧş --řėṽïėẇ <ïḓ>, ėẋṗŀïƈïŧŀẏ ħȧñḓ őƒƒ ẇïŧħ --ɋůėůė <ïḓ>, ŧħėñ ůşė ŧħė ėẋïşŧïñɠ ħůɱȧñ ɱėɱőřẏ ḓėƈïşïőñ ṗȧŧħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_learning_state": {
+        "en": "{id}: scope={scope}; queue={queue}; human review={human}; publication={promotion}; retrieval/use={retrieval}",
+        "ja": "{id}: 範囲={scope}／キュー={queue}／本人レビュー={human}／知識公開={promotion}／取得・利用証跡={retrieval}",
+        "qps-ploc": "⟦{id}: şƈőṗė={scope}; ɋůėůė={queue}; ħůɱȧñ řėṽïėẇ={human}; ṗůƀŀïƈȧŧïőñ={promotion}; řėŧřïėṽȧŀ/ůşė={retrieval} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "recorder_learning_legacy": {
+        "en": "Legacy unscoped proposal: read-only review. Re-submit feedback in an explicitly selected scope; no tenant is inferred and this record is not adopted.",
+        "ja": "旧形式の範囲未設定候補です。ここでは閲覧のみ行います。正規の対象範囲を選んで評価を再受付してください。会社を推測して既存候補を取り込みません。",
+        "qps-ploc": "⟦Ŀėɠȧƈẏ ůñşƈőṗėḓ ṗřőṗőşȧŀ: řėȧḓ-őñŀẏ řėṽïėẇ. Řė-şůƀɱïŧ ƒėėḓƀȧƈķ ïñ ȧñ ėẋṗŀïƈïŧŀẏ şėŀėƈŧėḓ şƈőṗė; ñő ŧėñȧñŧ ïş ïñƒėřřėḓ ȧñḓ ŧħïş řėƈőřḓ ïş ñőŧ ȧḓőṗŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "recorder_learning_blocked": {
+        "en": "Keep this proposal in read-only review. Resolve the listed scope or evidence blocker through a scope-preserving workflow; do not remove scope fields or infer approval, publication, or reuse.",
+        "ja": "この候補は閲覧のまま保留します。表示された範囲・証跡の問題を、元の範囲を維持する正式な経路で解決してください。範囲項目を削ったり、承認・知識公開・再利用済みと推定したりしません。",
+        "qps-ploc": "⟦Ķėėṗ ŧħïş ṗřőṗőşȧŀ ïñ řėȧḓ-őñŀẏ řėṽïėẇ. Řėşőŀṽė ŧħė ŀïşŧėḓ şƈőṗė őř ėṽïḓėñƈė ƀŀőƈķėř ŧħřőůɠħ ȧ şƈőṗė-ṗřėşėřṽïñɠ ẇőřķƒŀőẇ; ḓő ñőŧ řėɱőṽė şƈőṗė ƒïėŀḓş őř ïñƒėř ȧṗṗřőṽȧŀ, ṗůƀŀïƈȧŧïőñ, őř řėůşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "recorder_learning_next": {
+        "en": "Queue handoff is not approval. Human review and governed publication are separate; publication alone does not prove retrieval, use, or executable procedure changes.",
+        "ja": "キュー受渡しは承認ではありません。本人レビューと正規の知識反映は別段階です。反映だけでは取得・利用や実行手順の変更を証明しません。",
+        "qps-ploc": "⟦Ɋůėůė ħȧñḓőƒƒ ïş ñőŧ ȧṗṗřőṽȧŀ. Ħůɱȧñ řėṽïėẇ ȧñḓ ɠőṽėřñėḓ ṗůƀŀïƈȧŧïőñ ȧřė şėṗȧřȧŧė; ṗůƀŀïƈȧŧïőñ ȧŀőñė ḓőėş ñőŧ ṗřőṽė řėŧřïėṽȧŀ, ůşė, őř ėẋėƈůŧȧƀŀė ṗřőƈėḓůřė ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ⟧"
+      },
       "recorder_feedback_review": {
-        "en": "Review: pnpm kyberion improvements --approve {id}",
-        "ja": "レビュー: pnpm kyberion improvements --approve {id}",
-        "qps-ploc": "⟦Řėṽïėẇ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --ȧṗṗřőṽė {id} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+        "en": "Review without deciding: pnpm kyberion improvements --review {id}",
+        "ja": "決定せずに確認: pnpm kyberion improvements --review {id}",
+        "qps-ploc": "⟦Řėṽïėẇ ẇïŧħőůŧ ḓėƈïḓïñɠ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --řėṽïėẇ {id} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "recorder_no_improvement": {
         "en": "No improvement candidate. Continue observing the current procedure.",
@@ -9696,9 +9721,9 @@
         "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧėş ({count}): ŀőřėɱ ïṗşůɱ⟧"
       },
       "recorder_improvement_approve": {
-        "en": "Review: pnpm kyberion improvements --approve <candidate-id>",
-        "ja": "承認: pnpm kyberion improvements --approve <candidate-id>",
-        "qps-ploc": "⟦Řėṽïėẇ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --ȧṗṗřőṽė <ƈȧñḓïḓȧŧė-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+        "en": "Review: pnpm kyberion improvements --review <id> [--json]. Handoff: --queue <id> (does not approve).",
+        "ja": "確認: pnpm kyberion improvements --review <id> [--json]。受渡し: --queue <id>（承認はしません）。",
+        "qps-ploc": "⟦Řėṽïėẇ: ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş --řėṽïėẇ <ïḓ> [--ĵşőñ]. Ħȧñḓőƒƒ: --ɋůėůė <ïḓ> (ḓőėş ñőŧ ȧṗṗřőṽė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "recorder_home_title": {
         "en": "Kyberion Home",

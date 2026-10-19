@@ -1,13 +1,22 @@
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import {
+  executionFeedbackScopeKey,
+  executionFeedbackScopeRoot,
+  listExecutionFeedbackCandidates,
+  saveExecutionFeedbackCandidate,
+} from './execution-feedback-candidates.js';
+export {
+  executionFeedbackScopeKey,
+  listExecutionFeedbackCandidates,
+} from './execution-feedback-candidates.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './knowledge/memory-scope.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
-  listDistillCandidateRecords,
-  saveDistillCandidateRecord,
-  updateDistillCandidateRecord,
   type DistillCandidateRecord,
 } from './knowledge/distill-candidate-registry.js';
 import {
@@ -35,6 +44,8 @@ export interface ExecutionFeedbackInput {
   comment?: string;
   correction?: string;
   source?: 'user' | 'operator';
+  /** Explicit canonical scope; omitted legacy records stay unscoped. */
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface ExecutionFeedbackRecord extends Required<
@@ -49,6 +60,7 @@ export interface ExecutionFeedbackRecord extends Required<
   correction?: string;
   source: 'user' | 'operator';
   recorded_at: string;
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface ExecutionFeedbackStore {
@@ -95,16 +107,20 @@ export function materializeExecutionFeedbackCandidate(input: {
   const summary = summarizeExecutionFeedback({
     scenarioId: input.feedback.scenario_id,
     intentId: input.feedback.intent_id,
+    scope: input.feedback.scope,
   });
   if (summary.improvement_status !== 'candidate') {
     return { summary, candidate: null };
   }
 
-  const existing = listDistillCandidateRecords().find((candidate) => {
+  const existing = listExecutionFeedbackCandidates(input.feedback.scope).find((candidate) => {
     const metadata = candidate.metadata;
     return (
       candidate.status === 'proposed' &&
+      executionFeedbackScopeKey(candidate.scope) ===
+        executionFeedbackScopeKey(input.feedback.scope) &&
       metadata?.improvement_kind === 'execution_feedback' &&
+      !metadata.learning_link &&
       metadata.scenario_id === input.feedback.scenario_id &&
       metadata.intent_id === input.feedback.intent_id
     );
@@ -126,7 +142,8 @@ export function materializeExecutionFeedbackCandidate(input: {
   );
   const candidateInput = {
     source_type: 'task_session' as const,
-    tier: 'personal' as const,
+    tier: input.feedback.scope?.tier || ('personal' as const),
+    ...(input.feedback.scope ? { scope: assertMemoryScope(input.feedback.scope) } : {}),
     task_session_id: input.feedback.correlation_id,
     title,
     summary: t(
@@ -156,17 +173,22 @@ export function materializeExecutionFeedbackCandidate(input: {
     },
   };
   const candidate = existing
-    ? updateDistillCandidateRecord(existing.candidate_id, {
-        title: candidateInput.title,
-        summary: candidateInput.summary,
-        evidence_refs: [
-          ...new Set([...(existing.evidence_refs || []), ...candidateInput.evidence_refs]),
-        ],
-        metadata: { ...(existing.metadata || {}), ...candidateInput.metadata },
-      })
+    ? (() => {
+        const updated = {
+          ...existing,
+          title: candidateInput.title,
+          summary: candidateInput.summary,
+          evidence_refs: [
+            ...new Set([...(existing.evidence_refs || []), ...candidateInput.evidence_refs]),
+          ],
+          metadata: { ...(existing.metadata || {}), ...candidateInput.metadata },
+        };
+        saveExecutionFeedbackCandidate(updated);
+        return updated;
+      })()
     : (() => {
         const created = createDistillCandidateRecord(candidateInput);
-        saveDistillCandidateRecord(created);
+        saveExecutionFeedbackCandidate(created);
         return created;
       })();
   return { summary, candidate };
@@ -253,9 +275,14 @@ function validateStore(store: unknown): ExecutionFeedbackStore {
   }
 }
 
-function loadStoreFromDisk(): ExecutionFeedbackStore {
-  if (!safeExistsSync(FEEDBACK_STORE_PATH)) return defaultStore();
-  return executionFeedbackCatalog.load();
+function loadStoreFromDisk(scope?: MemoryScopeEnvelope): ExecutionFeedbackStore {
+  const filePath = resolveExecutionFeedbackPath(scope);
+  if (!safeExistsSync(filePath)) return defaultStore();
+  return defineCatalog<ExecutionFeedbackStore>({
+    id: 'execution-feedback',
+    path: filePath,
+    schema: FEEDBACK_SCHEMA_PATH,
+  }).load();
 }
 
 function normalizeFeedbackText(value: string | undefined): string | undefined {
@@ -264,15 +291,25 @@ function normalizeFeedbackText(value: string | undefined): string | undefined {
   return normalized.slice(0, MAX_FEEDBACK_TEXT_LENGTH);
 }
 
-export function resolveExecutionFeedbackPath(): string {
-  return FEEDBACK_STORE_PATH;
+export function resolveExecutionFeedbackPath(scope?: MemoryScopeEnvelope): string {
+  return scope
+    ? path.join(executionFeedbackScopeRoot(scope), 'feedback.json')
+    : FEEDBACK_STORE_PATH;
 }
 
-export function loadExecutionFeedbackStore(): ExecutionFeedbackStore {
-  return loadStoreFromDisk();
+export function loadExecutionFeedbackStore(scope?: MemoryScopeEnvelope): ExecutionFeedbackStore {
+  const store = loadStoreFromDisk(scope);
+  return {
+    ...store,
+    entries: store.entries.filter(
+      (entry) => executionFeedbackScopeKey(entry.scope) === executionFeedbackScopeKey(scope)
+    ),
+  };
 }
 
 export function recordExecutionFeedback(input: ExecutionFeedbackInput): ExecutionFeedbackRecord {
+  executionFeedbackScopeKey(input.scope);
+  const scope = input.scope ? assertMemoryScope(input.scope) : undefined;
   const record: ExecutionFeedbackRecord = {
     kind: 'execution-feedback',
     schema_version: '1.0.0',
@@ -282,6 +319,7 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     outcome: input.outcome,
     source: input.source || 'user',
     recorded_at: nowIso(),
+    ...(scope ? { scope } : {}),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
     ...(input.surface?.trim() ? { surface: input.surface.trim() } : {}),
     ...(normalizeFeedbackText(input.comment)
@@ -291,20 +329,23 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
       ? { correction: normalizeFeedbackText(input.correction) }
       : {}),
   };
-  const store = loadStoreFromDisk();
+  const store = loadStoreFromDisk(scope);
   const nextStore = validateStore({
     version: '1.0.0',
     entries: [...store.entries, record].slice(-MAX_FEEDBACK_ENTRIES),
   });
-  safeWriteFile(FEEDBACK_STORE_PATH, JSON.stringify(nextStore, null, 2));
+  const filePath = resolveExecutionFeedbackPath(scope);
+  safeMkdir(path.dirname(filePath), { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(nextStore, null, 2));
   return record;
 }
 
 export function summarizeExecutionFeedback(input: {
   scenarioId: string;
   intentId: string;
+  scope?: MemoryScopeEnvelope;
 }): ExecutionFeedbackSummary {
-  const entries = loadStoreFromDisk().entries.filter(
+  const entries = loadExecutionFeedbackStore(input.scope).entries.filter(
     (entry) => entry.scenario_id === input.scenarioId && entry.intent_id === input.intentId
   );
   const outcomeCounts: Record<ExecutionFeedbackOutcome, number> = {
@@ -378,3 +419,8 @@ export function validateExecutionFeedback(value: unknown): {
     };
   }
 }
+
+export {
+  inspectExecutionFeedbackLearning,
+  queueExecutionFeedbackLearning,
+} from './execution-feedback-learning.js';

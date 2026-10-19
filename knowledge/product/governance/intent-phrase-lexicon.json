@@ -1214,14 +1214,55 @@
         }
       }
     },
+    "project.document_creation_request": {
+      "description": "A concrete document object coupled to a creation verb; review or calendar vocabulary alone is insufficient.",
+      "locales": {
+        "ja": {
+          "patterns": [
+            "(?:文書|ドキュメント|資料|報告書|レポート|提案書|手順書|チェックリスト)(?:を|の初稿を|の草案を)(?:作る|作って|作成(?:する|して)|書く|書いて|執筆(?:する|して)|まとめる|まとめて)"
+          ]
+        },
+        "en": {
+          "patterns": [
+            "\\b(?:write|draft|create|produce|prepare)\\s+[\\w -]{0,80}\\b(?:document|checklist|report|proposal|manual|guide)\\b"
+          ]
+        }
+      }
+    },
+    "project.explicit_new_project": {
+      "description": "An explicit new project or project-start request, rather than a service topic.",
+      "locales": {
+        "ja": {
+          "patterns": [
+            "(?:新規|新しい)プロジェクト(?:を|で|として|(?=$|[\\s。！？.!?、,]))",
+            "プロジェクトを(?:立ち上げ|始め|開始|作成)"
+          ]
+        },
+        "en": {
+          "patterns": [
+            "\\b(?:start|launch|create|begin|set up)\\s+(?:a\\s+)?(?:new\\s+)?project\\b",
+            "^\\s*(?:a\\s+)?new\\s+project\\b"
+          ]
+        }
+      }
+    },
     "project.bootstrap_kind_document_program": {
       "description": "Project bootstrap kind: document program.",
       "locales": {
         "ja": {
-          "phrases": ["試験計画", "報告書", "資料"]
+          "phrases": [
+            "試験計画",
+            "報告書",
+            "資料",
+            "文書",
+            "ドキュメント",
+            "手順書",
+            "チェックリスト",
+            "提案書"
+          ]
         },
         "en": {
-          "phrases": ["proposal", "document", "deck", "report"]
+          "phrases": ["proposal", "document", "deck", "report", "checklist", "manual", "guide"]
         }
       }
     },
@@ -1761,6 +1802,23 @@
             "^'([^'\\n]{1,8192})'$",
             "^「([^」\\n]{1,8192})」$",
             "^『([^』\\n]{1,8192})』$"
+          ]
+        }
+      }
+    },
+    "project.creation_negated": {
+      "description": "A project/document creation action is explicitly negated; do not infer a creation request from its object words.",
+      "locales": {
+        "ja": {
+          "patterns": [
+            "(?:プロジェクト|文書|ドキュメント|資料|報告書|レポート|提案書|手順書|チェックリスト)[^。！？\\n]{0,40}(?:作らない|作成しない|開始しない|立ち上げない|書かない|ではなく|は不要)",
+            "(?:作って|作成して|書いて|執筆して)(?:は(?:いけ|なら)|ほしくない)"
+          ]
+        },
+        "en": {
+          "patterns": [
+            "\\b(?:do\\s+not|don't|never)\\s+(?:start|launch|create|begin|set\\s+up|write|draft|produce|prepare)\\b",
+            "\\b(?:not|no)\\s+(?:a\\s+)?new\\s+project\\b"
           ]
         }
       }

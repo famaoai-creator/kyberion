@@ -28,6 +28,7 @@ import {
   reconcileOrganizationState,
 } from './organization-operating-model-management.js';
 import {
+  classifyOrganizationWork,
   loadOrganizationOperatingModelCatalog,
   loadOrganizationOperationalState,
   resolveOrganizationWork,
@@ -641,6 +642,66 @@ describe('organization operating model', () => {
     } finally {
       safeRmSync(rootDir);
     }
+  });
+
+  it.each([
+    '会議準備チェックリストの文書を作る新規プロジェクト。提出期限と担当者、遅れた場合の連絡先を含め、レビューを受けて改訂する。',
+    '監査用の手順書を作成する新しいプロジェクト。レビュー後に改訂する。',
+    '新規プロジェクトで週次レビュー用の資料を書いて、改訂版を残す。',
+    'Start a new project to write a meeting preparation checklist, then review and revise the document.',
+  ])('classifies a document creation project by its requested outcome: %s', (utterance) => {
+    expect(classifyOrganizationWork(utterance)).toMatchObject({
+      workShape: 'solution_project',
+      managementUnit: 'project',
+    });
+  });
+
+  it.each([
+    ['新規プロジェクトの週次レビュー会議を運営する', 'governance_cadence'],
+    ['文書を作る新規プロジェクトの週次レビュー会議を運営する', 'governance_cadence'],
+    ['毎月の予算レビューを実施する', 'governance_cadence'],
+    ['月次レポートを作って', 'routine_operation'],
+    ['本番障害を収束させる。新規プロジェクトで報告書を作成する', 'incident_response'],
+  ])('preserves actual cadence, routine and incident work: %s', (utterance, workShape) => {
+    expect(classifyOrganizationWork(utterance).workShape).toBe(workShape);
+  });
+
+  it('preserves tenant and explicit project context and the human decision gate', () => {
+    const contextRefs = { project_id: 'PRJ-DOCUMENT-CONTEXT', cadence_id: 'cadence-context' };
+    const resolution = resolveOrganizationWork({
+      utterance: '会議準備チェックリストの文書を作る新規プロジェクト。レビューを受けて改訂する。',
+      organizationId,
+      tier: 'confidential',
+      tenantSlug,
+      contextRefs,
+    });
+    expect(resolution).toMatchObject({
+      work_shape: 'solution_project',
+      management_unit: 'project',
+      selected_intent_id: 'bootstrap-project',
+      tenant_slug: tenantSlug,
+      organization_id: organizationId,
+      tier: 'confidential',
+      context_refs: contextRefs,
+      proposed_parent: { kind: 'project', id: contextRefs.project_id },
+      human_decision: 'pending',
+      dry_run: true,
+    });
+  });
+
+  it('keeps approval-sensitive document projects behind their existing approval gate', () => {
+    const resolution = resolveOrganizationWork({
+      utterance: '新規プロジェクトで予算承認の文書を作成して、レビューを受ける',
+      organizationId,
+      tier: 'confidential',
+      tenantSlug,
+    });
+    expect(resolution).toMatchObject({
+      work_shape: 'solution_project',
+      authority_class: 'approval_required',
+      human_decision: 'pending',
+      dry_run: true,
+    });
   });
 
   it('resolves organization work as a dry-run proposal with a human gate', () => {
