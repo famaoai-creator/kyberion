@@ -53,6 +53,7 @@ import {
   type MissionVoiceConsentResult,
 } from '../voice/voice-consent.js';
 import { recordGrantMissionBinding, resolveStandingGrant } from '../governance/grant-resolver.js';
+import { missionPathOrNull } from '../mission-lookup.js';
 import { resolveIdentityContext } from '../authority.js';
 
 export interface ConversationAgent {
@@ -138,7 +139,8 @@ function normalizeOptionalString(value: unknown): string | undefined {
 function readMissionTenant(missionId: string): { tenant?: string; reason?: string } {
   let missionDir: string | null;
   try {
-    missionDir = pathResolver.findMissionPath(missionId);
+    // Refusals (not visible / ambiguous owner) degrade to null: no tenant, no grant.
+    missionDir = missionPathOrNull(pathResolver.findMissionPath, missionId);
   } catch (err: unknown) {
     return {
       reason: `mission ${missionId} rejected: ${err instanceof Error ? err.message : String(err)}`,
