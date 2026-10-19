@@ -36,6 +36,14 @@ import {
 import { loadAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { projectWorkGraphToNextTasks } from '@agent/core/workforce/work-graph-projection';
+import {
+  linkWorkItemChangeRequest,
+  listChangeRequestLinks,
+  resolveChangeRequestOwner,
+  updateWorkItemChangeRequest,
+  type ChangeRequestState,
+} from '@agent/core/workforce/work-item-change-request';
+import { getCurrentBranch } from '@agent/core/mission/mission-git';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -49,6 +57,19 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
 type Print = (value: unknown) => void;
+
+function optionalArg(value: unknown): string | undefined {
+  return value === undefined || value === null || value === '' ? undefined : String(value);
+}
+
+/** Change requests key on the branch; default to the checkout's current one. */
+function currentBranchOrThrow(): string {
+  const branch = getCurrentBranch(process.cwd());
+  if (!branch || branch === 'HEAD' || branch === 'detached') {
+    throw new Error('not on a branch — pass --branch');
+  }
+  return branch;
+}
 
 let workCoordinationPrint: Print = () => undefined;
 
@@ -217,6 +238,22 @@ async function runMain(args: string[] = []): Promise<void> {
     .command('list-events', 'List coordination events', () => undefined)
     .command('list-leases', 'List active leases', () => undefined)
     .command('history <correlationId>', 'Show the integrated handoff history', () => undefined)
+    .command(
+      'link-change',
+      'Link a change request (PR/MR/branch) to the item you hold the claim on [--branch defaults to the current branch]',
+      () => undefined
+    )
+    .command(
+      'update-change',
+      'Record a change request observation [--change-state open|merged|closed] [--head-sha]',
+      () => undefined
+    )
+    .command(
+      'change-owner',
+      'Show the WorkItem and claim holder behind a change request (--branch, or --forge + --ref)',
+      () => undefined
+    )
+    .command('list-changes', 'List linked change requests and their owners', () => undefined)
     .demandCommand(1)
     .option('item-id', { type: 'string' })
     .option('board-id', { type: 'string' })
@@ -259,6 +296,13 @@ async function runMain(args: string[] = []): Promise<void> {
     .option('note', { type: 'string' })
     .option('payload', { type: 'string' })
     .option('project', { type: 'string' })
+    .option('branch', { type: 'string' })
+    .option('base-branch', { type: 'string' })
+    .option('forge', { type: 'string' })
+    .option('ref', { type: 'string' })
+    .option('url', { type: 'string' })
+    .option('head-sha', { type: 'string' })
+    .option('change-state', { type: 'string' })
     .option('apply', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false });
   for (const entry of listWorkCoordinationImportCatalogEntries()) {
@@ -438,6 +482,52 @@ async function runMain(args: string[] = []): Promise<void> {
       print(event);
       break;
     }
+    case 'link-change': {
+      print(
+        linkWorkItemChangeRequest({
+          itemId: String(argv['item-id'] || ''),
+          actorPeerId: String(argv['actor-peer-id'] || ''),
+          branch: argv.branch ? String(argv.branch) : currentBranchOrThrow(),
+          forge: optionalArg(argv.forge),
+          ref: optionalArg(argv.ref),
+          url: optionalArg(argv.url),
+          baseBranch: optionalArg(argv['base-branch']),
+          headSha: optionalArg(argv['head-sha']),
+        })
+      );
+      break;
+    }
+    case 'update-change': {
+      print(
+        updateWorkItemChangeRequest({
+          itemId: String(argv['item-id'] || ''),
+          actorPeerId: String(argv['actor-peer-id'] || ''),
+          state: optionalArg(argv['change-state']) as ChangeRequestState | undefined,
+          headSha: optionalArg(argv['head-sha']),
+          ref: optionalArg(argv.ref),
+          url: optionalArg(argv.url),
+        })
+      );
+      break;
+    }
+    case 'change-owner': {
+      const ref = optionalArg(argv.ref);
+      print(
+        resolveChangeRequestOwner({
+          branch: argv.branch ? String(argv.branch) : ref ? undefined : currentBranchOrThrow(),
+          forge: optionalArg(argv.forge),
+          ref,
+        })
+      );
+      break;
+    }
+    case 'list-changes':
+      print({
+        changes: listChangeRequestLinks({
+          state: optionalArg(argv['change-state']) as ChangeRequestState | undefined,
+        }),
+      });
+      break;
     case 'list-events':
       print({ events: listCoordinationEvents() });
       break;
