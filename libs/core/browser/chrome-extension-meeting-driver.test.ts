@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-imports */
 import { readFileSync, rmSync } from 'node:fs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { StubAudioBus } from '../voice/audio-bus.js';
 import {
@@ -134,10 +134,12 @@ describe('ChromeExtensionMeetingJoinDriver on-device AI events', () => {
       provider: 'chrome-prompt',
       insights: { decisions: ['PoC を実施する'], review_required: true },
     });
-    // The driver writes synchronously on receipt; give the socket a tick to land.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const document = JSON.parse(readFileSync(summaryPath, 'utf8'));
+    // The driver writes on receipt; wait until both frames landed.
+    const document = await vi.waitFor(() => {
+      const parsed = JSON.parse(readFileSync(summaryPath, 'utf8'));
+      expect(parsed.history).toHaveLength(2);
+      return parsed;
+    });
     expect(document.session_id).toBe(session.state.session_id);
     expect(document.source).toBe('chrome-built-in-ai');
     expect(document.summary).toMatchObject({

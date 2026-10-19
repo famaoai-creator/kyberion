@@ -202,14 +202,12 @@ describe('AgentInputQueue', () => {
       },
     });
     try {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(wakes).toEqual(['next_run']);
-      expect(await queue.peek('next_run')).toEqual([]);
+      await vi.waitFor(() => expect(wakes).toEqual(['next_run']));
+      await vi.waitFor(async () => expect(await queue.peek('next_run')).toEqual([]));
 
       const appended = await queue.enqueue({ delivery: 'next_run', text: 'wake after append' });
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(wakes).toEqual(['next_run', 'next_run']);
-      expect(await queue.peek('next_run')).toEqual([]);
+      await vi.waitFor(() => expect(wakes).toEqual(['next_run', 'next_run']));
+      await vi.waitFor(async () => expect(await queue.peek('next_run')).toEqual([]));
       expect(appended.mission_id).toBe('PI15-WAKE');
     } finally {
       stop();
@@ -232,8 +230,7 @@ describe('AgentInputQueue', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(wakes).toEqual([]);
       await queue.enqueue({ delivery: 'next_run', text: 'task one', scope: { taskId: 'TASK-1' } });
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(wakes).toEqual(['wake']);
+      await vi.waitFor(() => expect(wakes).toEqual(['wake']));
     } finally {
       stop();
     }
