@@ -484,6 +484,7 @@ export function acceptCharterFromForm(
 }
 
 export interface CharterView {
+  reputational_class_max: ReputationalClass;
   charter_id: string;
   tenant_slug: string;
   responsible: string;
@@ -530,6 +531,7 @@ export function viewCharter(
     allows_named_spend: (charter.envelope.irreversible_named_actions ?? []).includes(
       'operational_spend'
     ),
+    reputational_class_max: charter.appetite.reputational_class_max,
     allows_customer_outbound: (charter.envelope.irreversible_named_actions ?? []).includes(
       'customer_outbound'
     ),

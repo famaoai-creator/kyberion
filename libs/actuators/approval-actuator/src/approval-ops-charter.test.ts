@@ -31,6 +31,35 @@ const input = {
 const CHARTER = { scope: { kind: 'organization', tenant_slug: 'acme' }, action: {} };
 
 describe('evaluateDecisionRightsOp × accountability charter', () => {
+  it('rejects malformed supplied facts before matrix, charter or approval side effects', () => {
+    expect(() => evaluateDecisionRightsOp({ ...input, amount: -1 })).toThrow(
+      'OP_CHARTER_FACTS_DENIED'
+    );
+    expect(mocks.resolveDecisionRightsMatrix).not.toHaveBeenCalled();
+    expect(mocks.charterInputForDecision).not.toHaveBeenCalled();
+    expect(mocks.enforceApprovalGate).not.toHaveBeenCalled();
+  });
+
+  it('keeps absent monetary facts available for legacy human approval', () => {
+    mocks.evaluateDecisionRights.mockReturnValue({ requiresEscalation: true });
+    mocks.charterInputForDecision.mockReturnValue(undefined);
+    mocks.enforceApprovalGate.mockReturnValue({ allowed: false, status: 'pending' });
+    expect(evaluateDecisionRightsOp({ ...input, amount: undefined }).status).toBe('pending');
+    expect(mocks.enforceApprovalGate).toHaveBeenCalledOnce();
+  });
+  it('carries risk facts through both matrix evaluation and the approval gate', () => {
+    mocks.evaluateDecisionRights.mockReturnValue({ requiresEscalation: true });
+    mocks.charterInputForDecision.mockReturnValue(undefined);
+    mocks.enforceApprovalGate.mockReturnValue({ allowed: false, status: 'pending' });
+    evaluateDecisionRightsOp({ ...input, risk_level: 'high' });
+    expect(mocks.evaluateDecisionRights).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ riskLevel: 'high' })
+    );
+    expect(mocks.enforceApprovalGate).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ risk_level: 'high' }) })
+    );
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.enforceApprovalGate.mockReturnValue({ allowed: true, status: 'not_required' });

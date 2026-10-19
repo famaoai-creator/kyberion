@@ -16,15 +16,15 @@ export interface CharterFormDraft {
   /** Decision types delegated by name (the server holds the list of delegable ones). */
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
-  /**
-   * Recipient delegation carried through the draft even when this pane does
-   * not render it, so re-accepting a charter never silently drops the scope.
-   * The server validates every value.
-   */
+  /** Explicit information delegation; the server validates every value. */
   recipient_purposes: string;
   recipient_classes: string;
   recipient_categories: string;
   max_attachments: string;
+  approved_processors: string;
+  processing_purposes: string;
+  processing_categories: string;
+  reputational_class_max: string;
 }
 
 export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
@@ -42,6 +42,10 @@ export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
   recipient_classes: '',
   recipient_categories: '',
   max_attachments: '0',
+  approved_processors: '',
+  processing_purposes: '',
+  processing_categories: '',
+  reputational_class_max: 'B',
 };
 
 /** "1,000,000" / "1 000" / "1_000" → 1000000; anything else → NaN. */
@@ -58,6 +62,10 @@ export function checkDraft(draft: CharterFormDraft): DraftCheck {
   const perDay = parseAmount(draft.per_day);
   const perMonth = parseAmount(draft.per_month);
   const loss = parseAmount(draft.max_loss_per_incident);
+  const attachments = Number(draft.max_attachments);
+  if (!/^\d+$/.test(draft.max_attachments) || !Number.isSafeInteger(attachments)) {
+    return { ok: false, reason: 'number' };
+  }
   if ([perAction, perDay, perMonth, loss].some((n) => Number.isNaN(n))) {
     return { ok: false, reason: 'number' };
   }
@@ -102,7 +110,11 @@ export function draftToForm(tenantSlug: string, draft: CharterFormDraft) {
     recipient_purposes: parseList(draft.recipient_purposes),
     recipient_classes: parseList(draft.recipient_classes),
     recipient_categories: parseList(draft.recipient_categories),
-    max_attachments: Number(draft.max_attachments) || 0,
+    max_attachments: Number(draft.max_attachments),
+    approved_processors: parseList(draft.approved_processors),
+    processing_purposes: parseList(draft.processing_purposes),
+    processing_categories: parseList(draft.processing_categories),
+    reputational_class_max: draft.reputational_class_max,
     deputies: parseDeputies(draft.deputies),
     expires_in_days: Number(draft.expires_in_days),
   };
@@ -120,6 +132,10 @@ export function draftFromCharter(charter: {
   recipient_classes?: string[];
   recipient_categories?: string[];
   max_attachments?: number;
+  approved_processors?: string[];
+  processing_purposes?: string[];
+  processing_categories?: string[];
+  reputational_class_max?: string;
   supersedes_decision_rights: boolean;
 }): CharterFormDraft {
   return {
@@ -137,6 +153,10 @@ export function draftFromCharter(charter: {
     recipient_classes: (charter.recipient_classes ?? []).join(', '),
     recipient_categories: (charter.recipient_categories ?? []).join(', '),
     max_attachments: String(charter.max_attachments ?? 0),
+    approved_processors: (charter.approved_processors ?? []).join(', '),
+    processing_purposes: (charter.processing_purposes ?? []).join(', '),
+    processing_categories: (charter.processing_categories ?? []).join(', '),
+    reputational_class_max: charter.reputational_class_max ?? 'B',
   };
 }
 
@@ -163,6 +183,10 @@ export interface CharterTenantView {
     recipient_classes?: string[];
     recipient_categories?: string[];
     max_attachments?: number;
+    approved_processors?: string[];
+    processing_purposes?: string[];
+    processing_categories?: string[];
+    reputational_class_max?: string;
     supersedes_decision_rights: boolean;
     report: {
       tripwires_standing: string[];
@@ -192,6 +216,10 @@ export interface CharterDraft {
     recipient_classes?: string[];
     recipient_categories?: string[];
     max_attachments?: number;
+    approved_processors?: string[];
+    processing_purposes?: string[];
+    processing_categories?: string[];
+    reputational_class_max?: string;
     supersedes_decision_rights: boolean;
   };
 }
@@ -214,6 +242,10 @@ export function draftFromProposal(proposal: CharterDraft): CharterFormDraft {
     recipient_classes: (f.recipient_classes ?? []).join(', '),
     recipient_categories: (f.recipient_categories ?? []).join(', '),
     max_attachments: String(f.max_attachments ?? 0),
+    approved_processors: (f.approved_processors ?? []).join(', '),
+    processing_purposes: (f.processing_purposes ?? []).join(', '),
+    processing_categories: (f.processing_categories ?? []).join(', '),
+    reputational_class_max: f.reputational_class_max ?? 'B',
   };
 }
 

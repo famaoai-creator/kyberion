@@ -33,6 +33,7 @@ import {
   sweepAutonomyActionStates,
 } from '@agent/core/governance/autonomy-action-state';
 import { listWorkItems } from '@agent/core/workforce/work-coordination';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -227,10 +228,14 @@ export async function checkDaemonHeartbeatsWithRecovery(
   try {
     const sweepDeps = options.rootDir ? { rootDir: options.rootDir } : {};
     sweepAutonomyActionStates(listAutonomyActionIds(sweepDeps), sweepDeps);
+    for (const tenantSlug of listTenantProfileSlugs(sweepDeps)) {
+      const tenantDeps = { ...sweepDeps, tenantSlug };
+      sweepAutonomyActionStates(listAutonomyActionIds(tenantDeps), tenantDeps);
+    }
     // Escalated mission proposals: each blocked mission-shaped WorkItem gets a
     // gate verdict recorded — evidence accrues toward notify->auto promotion
     // before any auto-start is ever attempted.
-    void sweepMissionStartCandidates(sweepDeps);
+    await sweepMissionStartCandidates(sweepDeps);
   } catch {
     /* sweep failures must never mask a watchdog verdict */
   }
@@ -372,6 +377,7 @@ export async function requestDaemonRecovery(
           recordAutonomyExecution(
             {
               action_id: 'daemon_restart',
+              receipt_id: `daemon-recovery:${status.daemon_id}:${status.status}:${minuteKey}`,
               ok: autoExecuted,
               ...(autoExecError ? { error: autoExecError } : {}),
             },
@@ -471,23 +477,20 @@ if (
  * autonomy ledger — the notify-soak evidence that eventually justifies
  * auto-start for in-mandate work. Records only; never starts a mission.
  */
-async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
+export async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
   const items = listWorkItems({ status: ['blocked'] });
   for (const item of items) {
     if (item.metadata?.requested_work_shape !== 'mission') continue;
     try {
+      // Unscoped proposals cannot be promoted into a guessed/default tenant.
+      if (!item.context?.tenant_slug) continue;
+      const scopedDeps = { ...deps, tenantSlug: item.context.tenant_slug };
       const verdict = evaluateAutonomousOpsAction({
         actionId: item.metadata?.mandate_ref ? 'mission_start_mandate' : 'mission_start',
         ...(item.context?.tenant_slug ? { tenantSlug: item.context.tenant_slug } : {}),
       });
-      recordAutonomyExecution(
-        {
-          action_id: verdict.actionId,
-          ok: verdict.allowed,
-          ...(verdict.reason ? { error: verdict.reason } : {}),
-        },
-        deps
-      );
+      // A verdict is not an execution receipt. Blocked/allowed evaluations
+      // alone must never bootstrap promotion into authority.
       // Auto-fire: only when the gate itself allows (auto tier, shadow lifted by
       // evidence promotion). mission_start never reaches here today — the
       // unknown action fail-closes to approve — so only in-mandate proposals
@@ -507,16 +510,25 @@ async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<
             '--persona',
             'worker',
             '--tenant',
-            item.context?.tenant_slug ?? 'default',
+            item.context.tenant_slug,
+            '--tenant-slug',
+            item.context.tenant_slug,
           ];
           await missionMain(argv);
+          const { loadState } = await import('@agent/core/mission/mission-state');
+          const started = loadState(missionId, deps);
+          if (!started || started.tenant_slug !== item.context.tenant_slug) {
+            throw new Error(
+              `mission start has no matching tenant-scoped state receipt: ${missionId}`
+            );
+          }
           recordAutonomyExecution(
             {
               action_id: verdict.actionId,
+              receipt_id: `mission-start:${item.context.tenant_slug}:${missionId}`,
               ok: true,
-              error: `mission started: ${missionId}`,
             },
-            deps
+            scopedDeps
           );
           logger.info(
             `[WATCHDOG] auto-started mission ${missionId} from ${item.item_id} | next: mission follows normal controller lifecycle | evidence: ${item.item_id}`
@@ -525,10 +537,11 @@ async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<
           recordAutonomyExecution(
             {
               action_id: verdict.actionId,
+              receipt_id: `mission-start:${item.context.tenant_slug}:${item.item_id}`,
               ok: false,
               error: `auto-start failed: ${error instanceof Error ? error.message : String(error)}`,
             },
-            deps
+            scopedDeps
           );
         }
       }

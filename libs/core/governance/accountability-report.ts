@@ -6,6 +6,10 @@
  */
 
 import { t } from '../t.js';
+import {
+  loadCharterObservationPolicy,
+  type CharterObservationPolicy,
+} from './charter-decision-vocabulary.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import type { Charter } from './accountability-charter.js';
 import type { LedgerEntry } from './accountability-charter-registry.js';
@@ -121,9 +125,6 @@ export function buildInformationFlowReport(
   };
 }
 
-const REPEATED_DENIAL_THRESHOLD = 2;
-const FREQUENT_DENIAL_THRESHOLD = 5;
-
 /**
  * Repeated denials under a scope the charter actually delegates mean the
  * delegation is not matching reality (usually a category the action needs was
@@ -133,7 +134,8 @@ const FREQUENT_DENIAL_THRESHOLD = 5;
  */
 export function buildScopeProposals(
   charter: Charter,
-  report: InformationFlowReport
+  report: InformationFlowReport,
+  policy: CharterObservationPolicy = loadCharterObservationPolicy()
 ): ScopeProposal[] {
   const flow = charter.envelope.information_flow;
   if (!flow || report.denied === 0) return [];
@@ -145,7 +147,7 @@ export function buildScopeProposals(
   const processors = new Set<string>(flow.processor_ids ?? []);
 
   for (const { purpose, count } of report.purposes) {
-    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(purposes, purpose)) continue;
+    if (count < policy.repeated_denial_threshold || !proposed(purposes, purpose)) continue;
     out.push({
       kind: 'narrow',
       field: 'envelope.information_flow.purposes',
@@ -156,7 +158,8 @@ export function buildScopeProposals(
     });
   }
   for (const { recipient_class, count } of report.recipients) {
-    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(recipients, recipient_class)) continue;
+    if (count < policy.repeated_denial_threshold || !proposed(recipients, recipient_class))
+      continue;
     out.push({
       kind: 'narrow',
       field: 'envelope.information_flow.recipient_classes',
@@ -167,7 +170,7 @@ export function buildScopeProposals(
     });
   }
   for (const { processor_id, count } of report.processors) {
-    if (count < REPEATED_DENIAL_THRESHOLD || !proposed(processors, processor_id)) continue;
+    if (count < policy.repeated_denial_threshold || !proposed(processors, processor_id)) continue;
     out.push({
       kind: 'narrow',
       field: 'envelope.information_flow.processor_ids',
@@ -177,7 +180,7 @@ export function buildScopeProposals(
       last_seen: lastSeen,
     });
   }
-  if (report.denied >= FREQUENT_DENIAL_THRESHOLD) {
+  if (report.denied >= policy.frequent_denial_threshold) {
     out.push({
       kind: 'stop',
       field: 'envelope.information_flow',
@@ -266,6 +269,9 @@ export function buildAccountabilityReport(input: {
       if (entry.ts.startsWith(month)) spentMonth += entry.money;
       if (entry.ts.startsWith(day)) spentToday += entry.money;
       if (at >= sinceMs) executed += 1;
+    } else if (entry.kind === 'reservation_release') {
+      if (entry.consumption_ts.startsWith(month)) spentMonth -= entry.money;
+      if (entry.consumption_ts.startsWith(day)) spentToday -= entry.money;
     } else if (entry.kind === 'denied') {
       if (at >= sinceMs) {
         denied += 1;

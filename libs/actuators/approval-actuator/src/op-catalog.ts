@@ -43,6 +43,7 @@ const APPROVAL_PROPERTIES = {
   agent_id: { type: 'string' },
   caller_role: { type: 'string' },
   amount: { type: 'number' },
+  risk_level: { enum: ['low', 'medium', 'high', 'critical'] },
   recipients: { type: 'integer', minimum: 0 },
   information_flow: {
     type: 'object',

@@ -16,6 +16,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { loadCharterObservationPolicy } from './charter-decision-vocabulary.js';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
@@ -66,7 +67,7 @@ export const CHARTER_AUDIT_SAMPLE_RATE = 0.05;
  */
 export function shouldSampleCharterAudit(
   correlationId: string,
-  rate: number = CHARTER_AUDIT_SAMPLE_RATE
+  rate: number = loadCharterObservationPolicy().audit_sample_rate
 ): boolean {
   if (!(rate > 0)) return false;
   if (rate >= 1) return true;
@@ -97,6 +98,8 @@ export interface CharterGateRequest {
    */
   decisionRightsCharterDelegable?: boolean;
   now?: Date;
+  /** Bind a durable payment intent to the charter that reserved it. */
+  expectedCharterId?: string;
 }
 
 export function runCharterGate(input: CharterGateRequest): CharterGateOutcome {
@@ -117,6 +120,9 @@ function runCharterGateUnlocked(input: CharterGateRequest): CharterGateOutcome {
   );
   if (!evaluated) return { kind: 'none' };
   const { charter: active, decision } = evaluated;
+  if (input.expectedCharterId && active.charter_id !== input.expectedCharterId) {
+    return { kind: 'require_approval', reason: 'payment charter changed during authorization' };
+  }
   const metadata = {
     correlationId,
     intentId: input.intentId,

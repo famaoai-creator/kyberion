@@ -37,11 +37,18 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   const [tenants, setTenants] = React.useState<CharterTenantView[]>([]);
   const [decisionOptions, setDecisionOptions] = React.useState<CharterDecisionOption[]>([]);
   const [tenant, setTenant] = React.useState('');
-  const [draft, setDraft] = React.useState<CharterFormDraft>(DEFAULT_CHARTER_DRAFT);
+  const [draft, updateDraft] = React.useState<CharterFormDraft>(DEFAULT_CHARTER_DRAFT);
   const [preview, setPreview] = React.useState<{ statement: string; sha: string } | null>(null);
   const [agreed, setAgreed] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<Message>(null);
+  const draftRevision = React.useRef(0);
+  const setDraft = React.useCallback((next: React.SetStateAction<CharterFormDraft>) => {
+    draftRevision.current += 1;
+    updateDraft(next);
+    setPreview(null);
+    setAgreed(false);
+  }, []);
 
   const current = tenants.find((entry) => entry.tenant_slug === tenant) ?? null;
 
@@ -70,7 +77,7 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
     setDraft(current?.charter ? draftFromCharter(current.charter) : DEFAULT_CHARTER_DRAFT);
     setPreview(null);
     setAgreed(false);
-  }, [tenant, current?.charter?.charter_id]);
+  }, [tenant, current?.charter?.charter_id, setDraft]);
 
   const fail = (code: string) => {
     const kind = charterErrorKind(code);
@@ -117,11 +124,18 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   const review = async () => {
     if (!check.ok || !current) return;
     setAgreed(false);
+    setPreview(null);
+    const revision = draftRevision.current;
     const data = await post('/api/charters', {
       action: 'preview',
       form: draftToForm(current.tenant_slug, draft),
     });
-    if (data && typeof data.statement === 'string' && typeof data.statement_sha256 === 'string') {
+    if (
+      revision === draftRevision.current &&
+      data &&
+      typeof data.statement === 'string' &&
+      typeof data.statement_sha256 === 'string'
+    ) {
       setPreview({ statement: data.statement, sha: data.statement_sha256 });
     }
   };
@@ -212,6 +226,21 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
           setDraft((d) => ({ ...d, max_loss_per_incident: asText(v) })),
         'charter.deputies': (v) => setDraft((d) => ({ ...d, deputies: asText(v) })),
         'charter.expires_in_days': (v) => setDraft((d) => ({ ...d, expires_in_days: asText(v) })),
+        ...Object.fromEntries(
+          [
+            'recipient_purposes',
+            'recipient_classes',
+            'recipient_categories',
+            'max_attachments',
+            'approved_processors',
+            'processing_purposes',
+            'processing_categories',
+            'reputational_class_max',
+          ].map((key) => [
+            `charter.${key}`,
+            (v: unknown) => setDraft((d) => ({ ...d, [key]: asText(v) })),
+          ])
+        ),
         'charter.allow_named_spend': (v) =>
           setDraft((d) => ({ ...d, allow_named_spend: asText(v) === 'on' })),
         'charter.allow_customer_outbound': (v) =>
@@ -383,6 +412,52 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
             {field('max_loss_per_incident', t('setup.charter_max_loss'), 'charter-max-loss')}
             {field('deputies', t('setup.charter_deputies'), 'charter-deputies')}
             {field('expires_in_days', t('setup.charter_expires_days'), 'charter-expires-days')}
+            <p>{t('setup.charter_information_scope_help')}</p>
+            {field(
+              'recipient_purposes',
+              t('setup.charter_recipient_purposes'),
+              'charter-recipient-purposes'
+            )}
+            {field(
+              'recipient_classes',
+              t('setup.charter_recipient_classes'),
+              'charter-recipient-classes'
+            )}
+            {field(
+              'recipient_categories',
+              t('setup.charter_recipient_categories'),
+              'charter-recipient-categories'
+            )}
+            {field(
+              'max_attachments',
+              t('setup.charter_max_attachments'),
+              'charter-max-attachments'
+            )}
+            {field(
+              'approved_processors',
+              t('setup.charter_approved_processors'),
+              'charter-approved-processors'
+            )}
+            {field(
+              'processing_purposes',
+              t('setup.charter_processing_purposes'),
+              'charter-processing-purposes'
+            )}
+            {field(
+              'processing_categories',
+              t('setup.charter_processing_categories'),
+              'charter-processing-categories'
+            )}
+            <SettingRow label={t('setup.charter_reputational_class_max')}>
+              <Select
+                id="charter-reputational-class-max"
+                name="charter.reputational_class_max"
+                label={t('setup.charter_reputational_class_max')}
+                hide_label
+                value={draft.reputational_class_max}
+                options={['A', 'B', 'C', 'D'].map((value) => ({ value, label: value }))}
+              />
+            </SettingRow>
             <SettingRow label={t('setup.charter_named_spend')}>
               <Select
                 id="charter-named-spend"

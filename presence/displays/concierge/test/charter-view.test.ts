@@ -4,6 +4,7 @@ import {
   charterErrorKind,
   checkDraft,
   draftFromCharter,
+  draftFromProposal,
   draftToForm,
   isManuallyStopped,
   parseAmount,
@@ -38,6 +39,9 @@ describe('checkDraft', () => {
   it('accepts a coherent draft', () => expect(checkDraft(draft())).toEqual({ ok: true }));
   it.each([
     [{ per_action: 'x' }, 'number'],
+    [{ max_attachments: 'many' }, 'number'],
+    [{ max_attachments: '-1' }, 'number'],
+    [{ max_attachments: '1.5' }, 'number'],
     [{ per_action: '300000' }, 'order'],
     [{ per_day: '2000000' }, 'order'],
     [{ max_loss_per_incident: '2000000' }, 'loss'],
@@ -54,6 +58,31 @@ describe('checkDraft', () => {
 });
 
 describe('form <-> draft', () => {
+  it('preserves processor delegation and risk appetite through amendments and proposals', () => {
+    const scope = {
+      approved_processors: ['anthropic', 'openai'],
+      processing_purposes: ['reasoning'],
+      processing_categories: ['routine_business'],
+      reputational_class_max: 'C',
+    };
+    const current = draftFromCharter({
+      money: { per_action: 0, per_day: 0, per_month: 0 },
+      max_loss_per_incident: 0,
+      deputies: [],
+      allows_named_spend: false,
+      supersedes_decision_rights: false,
+      ...scope,
+    });
+    expect(draftToForm('acme', current)).toMatchObject(scope);
+    const proposed = draftFromProposal({
+      proposed_by: 'user:owner',
+      proposed_by_name: 'Owner',
+      proposed_at: '',
+      note: '',
+      form: { ...draftToForm('acme', current), ...scope },
+    });
+    expect(draftToForm('acme', proposed)).toMatchObject(scope);
+  });
   it('parses deputies from commas, spaces and 、, deduplicated', () => {
     expect(parseDeputies('user:a, user:b  user:a、user:c')).toEqual(['user:a', 'user:b', 'user:c']);
     expect(parseDeputies('')).toEqual([]);
@@ -71,6 +100,10 @@ describe('form <-> draft', () => {
       recipient_classes: [],
       recipient_categories: [],
       max_attachments: 0,
+      approved_processors: [],
+      processing_purposes: [],
+      processing_categories: [],
+      reputational_class_max: 'B',
       delegated_decisions: [],
       supersedes_decision_rights: false,
       deputies: ['user:carol', 'user:dave'],

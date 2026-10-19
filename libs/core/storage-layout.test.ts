@@ -195,6 +195,8 @@ describe('durable partitioned runtime state', () => {
       }) as string
     );
     expect(protectedRuntimeStatePrefixes()).toEqual([
+      'active/shared/runtime/autonomy-learning/personal/',
+      'active/shared/runtime/autonomy-learning/confidential/',
       'active/shared/runtime/hearing/personal/',
       'active/shared/runtime/hearing/confidential/',
       'active/shared/runtime/discussion-create-requests/personal/',
@@ -223,7 +225,7 @@ describe('durable partitioned runtime state', () => {
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
       if (role !== 'discussion_request_store')
         expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
-    for (const store of ['hearing', 'grants']) {
+    for (const store of ['hearing', 'grants', 'autonomy-learning']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
       ).toBe(false);
