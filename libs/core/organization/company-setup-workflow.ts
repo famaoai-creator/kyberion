@@ -11,6 +11,7 @@ import { humanActor } from '../actor.js';
 import {
   SurfaceManagementError,
   verifySurfaceManagementAuthorization,
+  resolveSurfaceManagementAuthorization,
   type SurfaceManagementAuthorization,
 } from '../surface/surface-management-mutations.js';
 import { readTenantProfile } from './tenant-registry.js';
@@ -306,11 +307,11 @@ function firstWorkReview(auth: SurfaceManagementAuthorization) {
 }
 /** Authorization is re-read under the lock; the caller supplies only verified principal data. */
 export async function executeCompanySetup(
-  auth: SurfaceManagementAuthorization,
+  input: SurfaceManagementAuthorization,
   command: CompanySetupCommand,
   principal: ResolvedPrincipal
 ) {
-  await verifySurfaceManagementAuthorization(auth);
+  const auth = await resolveSurfaceManagementAuthorization(input);
   assertOrganizationGrant(auth);
   legacyOwner(auth);
   return withExecutionContextAsync(

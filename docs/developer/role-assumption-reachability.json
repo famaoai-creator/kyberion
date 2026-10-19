@@ -1299,6 +1299,11 @@
       ]
     },
     {
+      "site": "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization",
+      "roles": ["concierge_management_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-management-mutations.ts#scoped",
       "roles": ["concierge_management_reader", "concierge_management_writer"],
       "unresolved": []
@@ -4270,9 +4275,9 @@
         },
         "concierge_management_reader": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/management/route.ts#POST",
-            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
-            "libs/core/surface/surface-management-mutations.ts#scoped"
+            "presence/displays/concierge/src/app/api/setup/company/route.ts#GET",
+            "libs/core/organization/company-setup-workflow.ts#executeCompanySetup",
+            "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization"
           ]
         },
         "concierge_management_writer": {

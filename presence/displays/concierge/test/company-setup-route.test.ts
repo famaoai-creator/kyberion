@@ -133,3 +133,32 @@ describe('company setup HTTP authorization', () => {
     expect(JSON.stringify(await r.json())).not.toContain('/secret');
   });
 });
+
+describe('company setup rejects path-shaped tenant selectors', () => {
+  it.each([
+    '../acme',
+    '/tmp/acme',
+    'acme/../other',
+    'acme\\other',
+    '%2e%2e%2facme',
+    'acme%2fother',
+    'public',
+  ])('rejects GET and POST selector %s before execution', async (tenant) => {
+    expect(
+      (
+        await GET(
+          new NextRequest('http://localhost/api/setup/company?tenant=' + encodeURIComponent(tenant))
+        )
+      ).status
+    ).toBe(400);
+    expect((await post({ action: 'probe', tenantSlug: tenant })).status).toBe(400);
+    expect(state.execute).not.toHaveBeenCalled();
+  });
+  it('does not let a valid tenant selector widen credential scope', async () => {
+    expect(
+      (await GET(new NextRequest('http://localhost/api/setup/company?tenant=other'))).status
+    ).toBe(403);
+    expect((await post({ action: 'probe', tenantSlug: 'other' })).status).toBe(403);
+    expect(state.execute).not.toHaveBeenCalled();
+  });
+});

@@ -74,6 +74,10 @@ vi.mock('../surface/surface-management-mutations.js', () => ({
       super(message);
     }
   },
+  resolveSurfaceManagementAuthorization: vi.fn(async (auth: SurfaceManagementAuthorization) => {
+    if (st.deny) throw new Error('owner revoked');
+    return { ...auth };
+  }),
   verifySurfaceManagementAuthorization: vi.fn(async () => {
     if (st.deny) throw new Error('owner revoked');
   }),
@@ -142,6 +146,7 @@ vi.mock('../governance/approval-presentation.js', () => ({
   computeApprovalPresentedDigest: () => 'digest',
 }));
 import { executeCompanySetup } from './company-setup-workflow.js';
+import { verifySurfaceManagementAuthorization } from '../surface/surface-management-mutations.js';
 type SetupResult = Awaited<ReturnType<typeof executeCompanySetup>>;
 function reviewOf(result: SetupResult) {
   if (!('review' in result)) throw new Error('Expected a review result');
@@ -204,6 +209,24 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 describe('company setup workflow mediation', () => {
+  it('rejects ownership revoked after canonical resolution and before lock entry', async () => {
+    vi.mocked(verifySurfaceManagementAuthorization).mockRejectedValueOnce(
+      new Error('owner revoked under lock')
+    );
+    await expect(
+      executeCompanySetup(
+        auth,
+        { action: 'register_company', ...command, reviewDigest: 'unused' },
+        principal
+      )
+    ).rejects.toThrow('owner revoked under lock');
+    expect(st.files.size).toBe(0);
+    expect(st.registrations).toBe(0);
+    expect(st.probes).toBe(0);
+    expect(st.requests).toBe(0);
+    expect(st.firstWrites).toBe(0);
+  });
+
   it('status and preview never register, probe or request approval', async () => {
     await executeCompanySetup(auth, { action: 'status' }, principal);
     await executeCompanySetup(auth, { action: 'preview_company', ...command }, principal);

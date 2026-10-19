@@ -86,6 +86,18 @@ vi.mock('../surface/surface-management-mutations.js', () => ({
       super(message);
     }
   },
+  resolveSurfaceManagementAuthorization: async (auth: { memberId: string; tenantSlug: string }) => {
+    fixture.verificationCalls += 1;
+    const member = withExecutionContext('sovereign_concierge', () =>
+      readMemberProfile(auth.memberId, { rootDir: fixture.rootDir })
+    );
+    const membership = member?.memberships.find(
+      (entry) => entry.tenant_slug === auth.tenantSlug && entry.role === 'owner'
+    );
+    if (!member || member.status !== 'active' || !membership)
+      throw new Error('An active owner membership is required.');
+    return { ...auth, tenantSlug: membership.tenant_slug };
+  },
   verifySurfaceManagementAuthorization: async (auth: { memberId: string; tenantSlug: string }) => {
     fixture.verificationCalls += 1;
     const member = withExecutionContext('sovereign_concierge', () =>
