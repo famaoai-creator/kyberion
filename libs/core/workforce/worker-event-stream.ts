@@ -299,7 +299,7 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         }
         // Keep the event partition under shared observability. Creating a
         // mission directory merely to record an event can shadow an existing
-        // public mission in findMissionPath(), causing context resolution to
+        // public mission in the canonical resolver, causing context resolution to
         // select an empty confidential directory. The mission id still gives
         // consumers a physically separated replay stream without mutating
         // mission lifecycle state.
