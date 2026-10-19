@@ -67,6 +67,16 @@ const deps = () => ({
   appendInbox: () => {},
   audit: () => {},
 });
+// Holds the late pipeline until the test releases it: the 15 ms executor
+// deadline always fires first, and the late effect lands only when the test
+// says so — no real sleep racing the deadline.
+function gate() {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { held, release };
+}
 const unused = async (): Promise<never> => {
   throw new Error('No model calls permitted');
 };
@@ -96,20 +106,21 @@ describe('real isolated dot behavior', () => {
     item('late-a', a.dot_id, 'service:reconciled');
     item('queued-b', b.dot_id, 'service:reconciled');
     const commits: string[] = [];
+    const late = gate();
     const ports: DotExecutorPorts = {
       runGoalTurn: unused,
       delegateText: unused,
       async runPipeline(_ref, ctx) {
         const id = String(ctx.work_item_id);
-        if (id === 'late-a') await new Promise((resolve) => setTimeout(resolve, 50));
+        if (id === 'late-a') await late.held;
         safeWriteFile(ROOT + '/reconciled.txt', id);
         commits.push(id);
         return { status: 'succeeded', summary: 'isolated commit' };
       },
     };
     await runDotExecutorSweep([loaded(a)], ports, deps());
-    await new Promise((resolve) => setTimeout(resolve, 70));
-    expect(commits).toEqual(['late-a']);
+    late.release();
+    await vi.waitFor(() => expect(commits).toEqual(['late-a']));
     expect(getWorkItem('late-a')?.effect_ownership?.state).toBe('held');
     const { request } = requestDotWorkItemRelease(
       a,
@@ -186,13 +197,14 @@ describe('real isolated dot behavior', () => {
       item('late-a', a.dot_id, target);
       item('queued-b', b.dot_id, target);
       const events: string[] = [];
+      const late = gate();
       const ports: DotExecutorPorts = {
         runGoalTurn: unused,
         delegateText: unused,
         async runPipeline(_ref, context) {
           const id = String(context.work_item_id);
           events.push(`start:${id}`);
-          if (id === 'late-a') await new Promise((resolve) => setTimeout(resolve, 65));
+          if (id === 'late-a') await late.held;
           safeWriteFile(`${ROOT}/effect.txt`, id);
           events.push(`commit:${id}`);
           return { status: 'succeeded', summary: 'Actual isolated file written' };
@@ -218,7 +230,8 @@ describe('real isolated dot behavior', () => {
           listWorkItems: () => listWorkItems(),
         } as Parameters<typeof checkDotArbitration>[3]
       );
-      await new Promise((resolve) => setTimeout(resolve, 85));
+      late.release();
+      await vi.waitFor(() => expect(events).toContain('commit:late-a'));
       process.stdout.write(
         `DOT_BEHAVIOR ${JSON.stringify({ sameDot, events, first: first.map((x) => x.status), next: next.map((x) => x.status), newProposalAllowed: verdict.ok === true, attempts: listWorkItems().map((x) => [x.item_id, x.attempts?.length ?? 0]), finalContent: safeReadFile(`${ROOT}/effect.txt`, { encoding: 'utf8' }) })}\n`
       );
