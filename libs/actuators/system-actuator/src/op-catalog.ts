@@ -456,7 +456,10 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
   },
   press_key: {
     type: 'object',
-    properties: { key: { type: 'string' } },
+    properties: {
+      key: { type: 'string' },
+      modifiers: { type: 'array', items: { type: 'string' } },
+    },
     required: ['key'],
     additionalProperties: false,
   },
