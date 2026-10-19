@@ -295,6 +295,10 @@ async function main(args: string[] = []): Promise<void> {
     .option('meeting-url', { type: 'string' })
     .option('platform', { type: 'string', default: 'auto' })
     .option('meeting-id', { type: 'string' })
+    .option('meeting-series', {
+      type: 'string',
+      describe: 'Calendar series id (matches a meeting.recording standing grant)',
+    })
     .option('passcode', { type: 'string' })
     .option('display-name', { type: 'string', default: 'Kyberion' })
     .option('persona', { type: 'string', default: 'an attentive meeting participant' })
@@ -419,6 +423,9 @@ async function main(args: string[] = []): Promise<void> {
       url: meetingUrl,
       platform: inRoom ? 'in_room' : ((argv.platform as MeetingTarget['platform']) ?? 'auto'),
       meeting_id: typeof argv['meeting-id'] === 'string' ? String(argv['meeting-id']) : undefined,
+      ...(typeof argv['meeting-series'] === 'string' && argv['meeting-series'].trim()
+        ? { series_id: argv['meeting-series'].trim() }
+        : {}),
       passcode: typeof argv.passcode === 'string' ? String(argv.passcode) : undefined,
       display_name: String(argv['display-name']),
     };

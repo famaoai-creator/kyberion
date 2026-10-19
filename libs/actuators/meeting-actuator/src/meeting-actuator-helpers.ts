@@ -25,7 +25,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
   currentProcessArgv,
@@ -33,6 +33,7 @@ import {
 } from '@agent/core/cli-utils';
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 import {
+  checkRecordingConsent,
   checkSpeakConsent,
   parseMeetingActionResult,
   recordMeetingEvent,
@@ -270,6 +271,40 @@ async function handleSessionAction(input: MeetingAction): Promise<MeetingActionR
   // Explicit driver ids resolve through MeetingJoinDriver. `playwright`
   // keeps the established subprocess path; `auto` tries the operator's
   // Chrome and falls back to Playwright for unattended runs.
+  if (input.action === 'join' || input.action === 'listen') {
+    // A step's own mission_id (listen accepts one) applies when MISSION_ID is
+    // unset; a step naming another mission than the env is refused.
+    const rawParamMission = (input.params as { mission_id?: unknown }).mission_id;
+    const paramMission =
+      typeof rawParamMission === 'string' && rawParamMission.trim()
+        ? rawParamMission.trim().toUpperCase()
+        : undefined;
+    const envMission = getRegisteredEnvText('MISSION_ID')?.trim().toUpperCase() || undefined;
+    const consent =
+      paramMission && envMission && paramMission !== envMission
+        ? {
+            allowed: false,
+            reason: `recording consent missing: step mission ${paramMission} differs from MISSION_ID ${envMission}`,
+          }
+        : checkRecordingConsent(
+            {
+              ...(input.params.url ? { url: String(input.params.url) } : {}),
+              ...(input.params.series_id ? { series_id: String(input.params.series_id) } : {}),
+            },
+            paramMission ?? envMission
+          );
+    if (!consent.allowed) {
+      const denied: MeetingActionResult = {
+        status: 'denied',
+        platform: input.params.platform,
+        message: consent.reason,
+      };
+      denied.audit_event_id = recordMeetingEvent(input, denied);
+      traceCtx.endSpan('error', consent.reason);
+      return { ...denied, ...finalizeActuatorTrace(traceCtx) };
+    }
+  }
+
   if (input.action === 'join' || input.action === 'listen') {
     const requested = String(input.params.join_backend || 'playwright')
       .trim()

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractMeetingUrl, resolveNextMeetingTarget } from './meeting-target-resolve.js';
+import {
+  extractMeetingUrl,
+  listUpcomingMeetings,
+  resolveNextMeetingTarget,
+} from './meeting-target-resolve.js';
 
 describe('extractMeetingUrl', () => {
   it('prefers location over description', () => {
@@ -90,5 +94,62 @@ describe('resolveNextMeetingTarget', () => {
       { now: NOW, max_duration_sec: 600 }
     );
     expect(target.join_duration_sec).toBe(600);
+  });
+});
+
+describe('calendar series id and conference link (PG-07)', () => {
+  const now = '2026-09-06T08:00:00+09:00';
+  const weekly = {
+    title: 'Weekly Sync',
+    start: '2026-09-06T09:10:00+09:00',
+    end: '2026-09-06T09:40:00+09:00',
+    location: 'Room 3',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    series_id: 'series-weekly',
+  };
+
+  it('prefers the provider conference link and carries the series id to the join target', () => {
+    expect(extractMeetingUrl(weekly)).toEqual({
+      url: 'https://meet.google.com/abc-defg-hij',
+      platform: 'meet',
+      source: 'meeting_url',
+    });
+    expect(resolveNextMeetingTarget([weekly], { now: '2026-09-06T09:05:00+09:00' })).toMatchObject({
+      found: true,
+      series_id: 'series-weekly',
+    });
+  });
+
+  it('drops the series id when the URL comes from free text, not the conference field', () => {
+    const edited = {
+      ...weekly,
+      meeting_url: undefined,
+      description: 'This week: https://meet.google.com/zzz-zzzz-zzz',
+    };
+    const target = resolveNextMeetingTarget([edited], { now: '2026-09-06T09:05:00+09:00' });
+    expect(target).toMatchObject({ found: true, url: 'https://meet.google.com/zzz-zzzz-zzz' });
+    expect(target.series_id).toBeUndefined();
+    expect(
+      listUpcomingMeetings([edited], { now, from_min: 60, to_min: 75 })[0]?.series_id
+    ).toBeUndefined();
+  });
+
+  it('lists joinable meetings in [from, to) minutes, earliest first', () => {
+    const later = { ...weekly, title: 'Later', start: '2026-09-06T09:15:00+09:00' };
+    const outside = { ...weekly, title: 'Outside', start: '2026-09-06T09:15:00.001+09:00' };
+    const noLink = { title: 'No link', start: '2026-09-06T09:05:00+09:00', location: 'Room' };
+    expect(
+      listUpcomingMeetings([later, outside, noLink, weekly], { now, from_min: 60, to_min: 75 })
+    ).toEqual([
+      {
+        title: 'Weekly Sync',
+        url: 'https://meet.google.com/abc-defg-hij',
+        platform: 'meet',
+        series_id: 'series-weekly',
+        start: '2026-09-06T09:10:00+09:00',
+        end: '2026-09-06T09:40:00+09:00',
+        starts_in_sec: 4200,
+      },
+    ]);
   });
 });

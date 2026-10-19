@@ -176,6 +176,8 @@ export interface RealtimeVoiceConversationCliOptions {
   ttsEngine?: string;
   /** Mission id carrying recording consent (coordinator-style fail-closed gate). */
   mission?: string;
+  /** The meeting being recorded (calendar series id / URL for a standing grant). */
+  meeting?: { url?: string; series_id?: string };
   /** End the conversation loop after this much listening silence. */
   idleTimeoutSeconds: number;
   /** Max characters per pipelined TTS segment. */
@@ -447,6 +449,7 @@ export async function runRealtimeVoiceConversationInteractive(
 ): Promise<void> {
   const consent = checkMeetingParticipationConsent({
     ...(options.mission ? { mission_id: options.mission } : {}),
+    ...(options.meeting ? { meeting: options.meeting } : {}),
     purpose: 'recording',
   });
   if (!consent.allowed) {
@@ -924,7 +927,10 @@ export async function runRealtimeVoiceConversationLoop(
       ...(options.turns !== undefined ? { maxTurns: options.turns } : {}),
       idleTimeoutMs: options.idleTimeoutSeconds * 1000,
       maxSegmentChars: options.speechSegmentChars ?? 120,
-      consent: { missionId: options.mission },
+      consent: {
+        missionId: options.mission,
+        ...(options.meeting ? { meeting: options.meeting } : {}),
+      },
       ...(options.conversationEngine ||
       options.backchannel ||
       options.intentShortcuts ||
@@ -1076,6 +1082,16 @@ async function runOneShotConversation(
   print(JSON.stringify(result, null, 2));
 }
 
+/** `--meeting-url` / `--meeting-series` → the recording-consent meeting context. */
+function meetingContextFromArgv(argv: Record<string, unknown>): {
+  meeting?: { url?: string; series_id?: string };
+} {
+  const url = String(argv['meeting-url'] ?? '').trim();
+  const seriesId = String(argv['meeting-series'] ?? '').trim();
+  if (!url && !seriesId) return {};
+  return { meeting: { ...(url ? { url } : {}), ...(seriesId ? { series_id: seriesId } : {}) } };
+}
+
 export function parseRealtimeVoiceConversationCli(
   argv: Record<string, unknown>
 ): RealtimeVoiceConversationCliOptions {
@@ -1223,6 +1239,7 @@ export function parseRealtimeVoiceConversationCli(
     avatarFollow: Boolean(argv['avatar-follow']),
     ...(argv['tts-engine'] ? { ttsEngine: String(argv['tts-engine']) } : {}),
     ...(argv.mission ? { mission: String(argv.mission) } : {}),
+    ...meetingContextFromArgv(argv),
     idleTimeoutSeconds: (() => {
       const value = Number(argv['idle-timeout-seconds'] ?? 120);
       if (!Number.isFinite(value) || value <= 0) {
@@ -1446,6 +1463,14 @@ export async function main(
     .option('mission', {
       type: 'string',
       describe: 'Mission id carrying recording consent (fail-closed gate, coordinator-style)',
+    })
+    .option('meeting-url', {
+      type: 'string',
+      describe: 'Meeting URL being recorded (matches a meeting.recording standing grant)',
+    })
+    .option('meeting-series', {
+      type: 'string',
+      describe: 'Calendar series id being recorded (matches a meeting.recording standing grant)',
     })
     .option('idle-timeout-seconds', {
       type: 'number',

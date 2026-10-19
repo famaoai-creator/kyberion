@@ -37,10 +37,24 @@ export interface OsPermissionCapabilityPolicy {
 export type GrantCapabilityPolicyEntry =
   StandingGrantCapabilityPolicy | PerMissionCapabilityPolicy | OsPermissionCapabilityPolicy;
 
+export interface GrantReadinessRequirement {
+  capability: string;
+  /** false = reported but does not block readiness. */
+  required: boolean;
+  note?: string;
+}
+
+/** PG-06: the capabilities one kind of work needs. */
+export interface GrantReadinessProfile {
+  description: string;
+  requirements: GrantReadinessRequirement[];
+}
+
 export interface GrantCapabilityPolicy {
   version: string;
   description?: string;
   capabilities: Record<string, GrantCapabilityPolicyEntry>;
+  readiness_profiles?: Record<string, GrantReadinessProfile>;
 }
 
 const grantCapabilityPolicyCatalog = defineCatalog<GrantCapabilityPolicy>({
@@ -63,6 +77,19 @@ export function getGrantCapabilityPolicy(capability: string): GrantCapabilityPol
 
 export function listGrantCapabilities(): string[] {
   return Object.keys(loadGrantCapabilityPolicy().capabilities).sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+}
+
+/** One readiness profile, or null when the catalog does not declare it. */
+export function getGrantReadinessProfile(profile: string): GrantReadinessProfile | null {
+  const profiles = loadGrantCapabilityPolicy().readiness_profiles ?? {};
+  if (!Object.hasOwn(profiles, profile)) return null;
+  return profiles[profile] ?? null;
+}
+
+export function listGrantReadinessProfiles(): string[] {
+  return Object.keys(loadGrantCapabilityPolicy().readiness_profiles ?? {}).sort((a, b) =>
     a < b ? -1 : a > b ? 1 : 0
   );
 }

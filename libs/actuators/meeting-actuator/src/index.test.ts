@@ -278,25 +278,34 @@ describe('meeting-actuator', () => {
   });
 
   it('fails chrome-extension join closed with setup guidance when no extension is connected', async () => {
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [
-        {
-          type: 'apply',
-          op: 'join',
-          params: {
-            url: 'https://meet.google.com/abc-defg-hij',
-            platform: 'meet',
-            join_backend: 'chrome-extension',
-            duration_sec: 0,
-            ws_port: 18779,
-            join_timeout_sec: 2,
-            export_as: 'join_result',
+    // Recording consent is covered by the consent-gate suite; bypass it here.
+    const savedSudo = process.env.KYBERION_SUDO;
+    process.env.KYBERION_SUDO = 'true';
+    let result: Awaited<ReturnType<typeof handleAction>>;
+    try {
+      result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'join',
+            params: {
+              url: 'https://meet.google.com/abc-defg-hij',
+              platform: 'meet',
+              join_backend: 'chrome-extension',
+              duration_sec: 0,
+              ws_port: 18779,
+              join_timeout_sec: 2,
+              export_as: 'join_result',
+            },
           },
-        },
-      ],
-      context: {},
-    });
+        ],
+        context: {},
+      });
+    } finally {
+      if (savedSudo === undefined) delete process.env.KYBERION_SUDO;
+      else process.env.KYBERION_SUDO = savedSudo;
+    }
 
     expect((result as any).status).toBe('succeeded');
     const joinResult = (result as any).context.join_result;
@@ -438,19 +447,80 @@ describe('meeting-actuator voice-consent gate', () => {
     expect(result.message).toMatch(/tenant_slug/);
   });
 
-  it('does not gate join/listen/leave behind voice consent', async () => {
+  it('denies join/listen without recording consent but never gates leave', async () => {
     const { handleAction } = await import('./index.js');
-    const actions = [
+    for (const action of [
+      {
+        action: 'join',
+        params: {
+          platform: 'auto',
+          url: 'https://example.invalid/meeting',
+          series_id: 'series-weekly',
+        },
+      },
+      { action: 'listen', params: { platform: 'auto', duration_sec: 0 } },
+    ] as const) {
+      const result = await handleAction(action);
+      expect(result.status).toBe('denied');
+      expect(String(result.message)).toMatch(/recording consent missing/);
+      expect(result.audit_event_id).toBeTruthy();
+    }
+    const leave = await handleAction({ action: 'leave', params: { platform: 'auto' } });
+    expect(leave.status).not.toBe('denied');
+  });
+
+  it('allows join/listen once the mission grants recording consent', async () => {
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({
+        consent: 'granted',
+        mission_id: FIX_MISSION,
+        operator_handle: 'operator',
+        granted_at: '2026-05-07T00:00:00.000Z',
+      })
+    );
+    const { handleAction } = await import('./index.js');
+    for (const action of [
       { action: 'join', params: { platform: 'auto', url: 'https://example.invalid/meeting' } },
       { action: 'listen', params: { platform: 'auto', duration_sec: 0 } },
-      { action: 'leave', params: { platform: 'auto' } },
-    ] as const;
-    for (const action of actions) {
+    ] as const) {
       const result = await handleAction(action);
       expect(result.status).not.toBe('denied');
       expect(result.audit_event_id).toBeTruthy();
       expect((result as any).trace_persisted_path).toBeTruthy();
     }
+  });
+
+  it('listen uses its own mission_id param for recording consent when MISSION_ID is unset', async () => {
+    safeWriteFile(
+      path.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({
+        consent: 'granted',
+        mission_id: FIX_MISSION,
+        operator_handle: 'operator',
+        granted_at: '2026-05-07T00:00:00.000Z',
+      })
+    );
+    delete process.env.MISSION_ID;
+    const { handleAction } = await import('./index.js');
+    const withoutMission = await handleAction({
+      action: 'listen',
+      params: { platform: 'auto', duration_sec: 0 },
+    });
+    expect(withoutMission.status).toBe('denied');
+    const withMission = await handleAction({
+      action: 'listen',
+      params: { platform: 'auto', duration_sec: 0, mission_id: FIX_MISSION } as never,
+    });
+    expect(withMission.status).not.toBe('denied');
+    // A step naming another mission than MISSION_ID is refused.
+    process.env.MISSION_ID = 'MSN-OTHER-MISSION-001';
+    const conflicting = await handleAction({
+      action: 'listen',
+      params: { platform: 'auto', duration_sec: 0, mission_id: FIX_MISSION } as never,
+    });
+    expect(conflicting.status).toBe('denied');
+    expect(String(conflicting.message)).toMatch(/differs from MISSION_ID/);
   });
 
   it('allows speak() after consent is granted and emits a meeting audit entry', async () => {

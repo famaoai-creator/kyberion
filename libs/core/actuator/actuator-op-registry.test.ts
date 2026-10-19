@@ -60,6 +60,7 @@ describe('actuator-op-registry', () => {
       'pr_shadow_observe',
       'run_first_win_lifecycle',
       'run_health_degradation_watch',
+      'run_meeting_readiness_check',
       'run_tenant_drift_watch',
       'run_ui_ux_governance',
       'run_vitest',
@@ -102,7 +103,7 @@ describe('actuator-op-registry', () => {
       'validate_productivity_dry_run',
       'wait',
     ];
-    expect(captureOps).toHaveLength(12);
+    expect(captureOps).toHaveLength(13);
     expect(transformOps).toHaveLength(3);
     expect(applyOps).toHaveLength(35);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
@@ -113,7 +114,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(50);
+    ]).toHaveLength(51);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {

@@ -58,6 +58,25 @@ function deps(overrides: Partial<GrantsDeps> = {}): GrantsDeps {
     })),
     find: vi.fn(() => record),
     revoker: () => ({ kind: 'human' as const, id: 'user:owner' }),
+    readiness: vi.fn(({ profile }: { profile: string }) => ({
+      profile,
+      description: `${profile} work`,
+      ready: profile !== 'meeting.online',
+      missing: profile === 'meeting.online' ? ['meeting.recording'] : [],
+      items: [
+        profile === 'meeting.online'
+          ? {
+              capability: 'meeting.recording',
+              required: true,
+              allowed: false,
+              reason: 'no meeting.recording standing grant covers this meeting',
+              remedy: 'pnpm kyberion grants grant --capability meeting.recording',
+            }
+          : { capability: 'os.microphone', required: true, allowed: true, source: 'os' as const },
+      ],
+    })),
+    profiles: vi.fn(() => ['meeting.in_room', 'meeting.online']),
+    upcoming: vi.fn(async () => ({ report: { not_ready_count: 0 }, text: '# Meeting readiness' })),
     now: () => NOW,
     ...overrides,
   };
@@ -82,7 +101,7 @@ describe('cli grants parsing', () => {
       '--meeting-url',
       'https://a.example/y',
       '--meeting-series',
-      's1',
+      'google-workspace:s1',
       '--purpose',
       'minutes',
       '--days',
@@ -93,7 +112,7 @@ describe('cli grants parsing', () => {
       capability: 'meeting.recording',
       tenant_slug: 'acme',
       meeting_urls: ['https://a.example/x', 'https://a.example/y'],
-      meeting_series_ids: ['s1'],
+      meeting_series_ids: ['google-workspace:s1'],
       purpose: 'minutes',
       ttl_days: 30,
     });
@@ -101,6 +120,24 @@ describe('cli grants parsing', () => {
     expect(() => parseGrantsArgs(['list', '--purpose', 'x'])).toThrow(/Unknown option/);
     expect(() => parseGrantsArgs(['nope'])).toThrow(/Unknown grants command/);
     expect(() => parseGrantsArgs(['check', '--capability'])).toThrow(/requires a value/);
+  });
+
+  it('rejects a bare series id that no calendar event would carry', () => {
+    expect(() =>
+      grantDraftFromArgs(
+        parseGrantsArgs([
+          'grant',
+          '--capability',
+          'meeting.recording',
+          '--tenant',
+          'acme',
+          '--meeting-series',
+          'weekly',
+          '--purpose',
+          'minutes',
+        ])
+      )
+    ).toThrow(/provider form \(google-workspace:<id> or m365:<id>\)/);
   });
 
   it('rejects a non-integer --days and missing required flags', () => {
@@ -251,5 +288,34 @@ describe('resolveRevoker', () => {
     principal.owner = null;
     expect(() => resolveRevoker({})).toThrow(/No operator identity/);
     principal.owner = 'user:owner';
+  });
+});
+
+describe('cli grants readiness (PG-06/07)', () => {
+  it('status without --profile reports every profile and exits 0', async () => {
+    const { out, d } = await run(['status', '--tenant', 'acme', '--meeting-series', 'weekly']);
+    expect(d.readiness).toHaveBeenCalledTimes(2);
+    expect(d.readiness).toHaveBeenCalledWith({
+      profile: 'meeting.online',
+      context: { tenant_slug: 'acme', meeting: { series_id: 'weekly' }, now: NOW },
+    });
+    expect(out).toContain('## meeting.in_room: ready');
+    expect(out).toContain('## meeting.online: missing meeting.recording');
+    expect(out).toContain('pnpm kyberion grants grant --capability meeting.recording');
+    expect(out).toContain('> [grants] meeting.recording: no meeting.recording standing grant');
+  });
+
+  it('status --profile exits 1 when that profile is not ready', async () => {
+    await expect(run(['status', '--profile', 'meeting.online'])).rejects.toMatchObject({
+      code: 1,
+    });
+    await expect(run(['status', '--profile', 'meeting.in_room'])).resolves.toBeTruthy();
+  });
+
+  it('upcoming forwards its flags to the readiness check', async () => {
+    const { out, d } = await run(['upcoming', '--stage', 'soon', '--calendar', 'Work']);
+    expect(d.upcoming).toHaveBeenCalledWith(['--stage', 'soon', '--calendar', 'Work']);
+    expect(out).toBe('# Meeting readiness');
+    await expect(run(['upcoming', '--capability', 'x'])).rejects.toThrow(/Unknown option/);
   });
 });

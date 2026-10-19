@@ -1768,6 +1768,10 @@
       "types": "./dist/governance/grant-capability-policy.d.ts",
       "default": "./dist/governance/grant-capability-policy.js"
     },
+    "./governance/grant-readiness": {
+      "types": "./dist/governance/grant-readiness.d.ts",
+      "default": "./dist/governance/grant-readiness.js"
+    },
     "./governance/grant-resolver": {
       "types": "./dist/governance/grant-resolver.d.ts",
       "default": "./dist/governance/grant-resolver.js"

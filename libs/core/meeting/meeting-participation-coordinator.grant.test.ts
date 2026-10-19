@@ -16,6 +16,7 @@ import {
   type GrantRecord,
 } from '../governance/grant-store.js';
 import { readGrantMissionBindings } from '../governance/grant-resolver.js';
+import { evaluateGrantReadiness } from '../governance/grant-readiness.js';
 import { StubAudioBus } from '../voice/audio-bus.js';
 import { StubStreamingSpeechToTextBridge } from '../voice/streaming-stt-bridge.js';
 import { StubStreamingTextToSpeechBridge } from '../voice/streaming-tts-bridge.js';
@@ -41,8 +42,10 @@ const draft: GrantDraft = {
   ttl_days: 30,
 };
 
-function standingGrant(): GrantRecord {
-  const request = requestGrantApproval(draft, { requester: { requestedBy: 'agent:requester' } });
+function standingGrant(grantDraft: GrantDraft = draft): GrantRecord {
+  const request = requestGrantApproval(grantDraft, {
+    requester: { requestedBy: 'agent:requester' },
+  });
   approvalIds.push(request.id);
   decideApprovalRequest('mission_controller', {
     channel: request.channel,
@@ -57,8 +60,17 @@ function standingGrant(): GrantRecord {
     payloadHash: request.accountability?.payloadHash,
     effectBinding: request.accountability?.effectBinding,
   });
-  return grantStanding(draft, { approvalRequestId: request.id });
+  return grantStanding(grantDraft, { approvalRequestId: request.id });
 }
+
+const SERIES_ID = 'series-weekly-sync';
+const seriesDraft: GrantDraft = {
+  capability: 'meeting.recording',
+  tenant_slug: 'acme',
+  meeting_series_ids: [SERIES_ID],
+  purpose: 'weekly minutes by series',
+  ttl_days: 30,
+};
 
 function writeMission(tenant: string | null = 'acme'): void {
   safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -250,5 +262,97 @@ describe('checkMeetingParticipationConsent standing-grant fallback (PG-04)', () 
     );
     expect(openSpy).toHaveBeenCalled();
     expect(readGrantMissionBindings(MISSION_ID).map((b) => b.grant_id)).toEqual([grant.grant_id]);
+  });
+
+  it('a series-bound grant allows the meeting the calendar target names by series id (PG-07)', async () => {
+    writeMission();
+    const grant = standingGrant(seriesDraft);
+    const bus = new StubAudioBus();
+    const openSpy = vi.spyOn(bus, 'open');
+    bus.injectInbound({
+      format: { encoding: 'pcm_s16le', sample_rate_hz: 16000, channels: 1 },
+      payload: new Uint8Array(320),
+      ts_ms: 0,
+    });
+    await new MeetingParticipationCoordinator({
+      driver: new StubMeetingJoinDriver(),
+      bus,
+      stt: new StubStreamingSpeechToTextBridge(1),
+      tts: new StubStreamingTextToSpeechBridge(),
+      vad: new EnergyVad(),
+      agent: {
+        async onUtterance() {
+          return { leave: true };
+        },
+      },
+    }).run(
+      // A fresh meeting URL each week: only the series id matches the grant.
+      { url: 'https://meet.google.com/this-week-xyz', platform: 'meet', series_id: SERIES_ID },
+      {
+        mission_id: MISSION_ID,
+        tenant_slug: 'acme',
+        require_voice_consent: false,
+        max_minutes: 1,
+        voice_profile_id: 'operator-default-v1',
+        audio_format: { encoding: 'pcm_s16le', sample_rate_hz: 16000, channels: 1 },
+      }
+    );
+    expect(openSpy).toHaveBeenCalled();
+    expect(readGrantMissionBindings(MISSION_ID).map((b) => b.grant_id)).toEqual([grant.grant_id]);
+  });
+
+  it('record_binding false answers without writing the mission binding', () => {
+    writeMission();
+    const grant = standingGrant(seriesDraft);
+    expect(
+      checkMeetingParticipationConsent({
+        mission_id: MISSION_ID,
+        purpose: 'recording',
+        meeting: { series_id: SERIES_ID },
+        record_binding: false,
+      })
+    ).toEqual({ allowed: true, grant_id: grant.grant_id });
+    expect(readGrantMissionBindings(MISSION_ID)).toEqual([]);
+  });
+
+  it('a denial carries the standing-grant request command as remedy', () => {
+    const result = checkMeetingParticipationConsent({
+      tenant_slug: 'acme',
+      purpose: 'recording',
+      meeting: { series_id: SERIES_ID },
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.remedy).toBe(
+      'pnpm kyberion grants grant --capability meeting.recording --tenant acme --meeting-series series-weekly-sync --purpose "<purpose>" --request-approval'
+    );
+  });
+});
+
+describe('evaluateGrantReadiness against the real stores (PG-06)', () => {
+  it('reports a missing recording grant with its remedy, then ready once granted', () => {
+    writeMission();
+    const context = { mission_id: MISSION_ID, meeting: { series_id: SERIES_ID } };
+    const before = evaluateGrantReadiness({ profile: 'meeting.online', context });
+    expect(before.ready).toBe(false);
+    expect(before.missing).toEqual(['meeting.recording']);
+    const recording = before.items.find((item) => item.capability === 'meeting.recording');
+    expect(recording?.remedy).toContain('--meeting-series series-weekly-sync');
+    // meeting.voice is optional: missing, but not blocking.
+    expect(before.items.find((item) => item.capability === 'meeting.voice')).toMatchObject({
+      required: false,
+      allowed: false,
+      remedy: `pnpm meeting:consent grant --mission ${MISSION_ID}`,
+    });
+
+    const grant = standingGrant(seriesDraft);
+    const after = evaluateGrantReadiness({ profile: 'meeting.online', context });
+    expect(after.ready).toBe(true);
+    expect(after.items.find((item) => item.capability === 'meeting.recording')).toMatchObject({
+      allowed: true,
+      source: 'standing',
+      grant_id: grant.grant_id,
+    });
+    // Asking is not using: no binding recorded.
+    expect(readGrantMissionBindings(MISSION_ID)).toEqual([]);
   });
 });

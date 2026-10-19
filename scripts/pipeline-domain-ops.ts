@@ -14,6 +14,7 @@ import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
+import { runMeetingReadinessCheck, type MeetingReadinessStage } from './meeting_readiness_check.js';
 import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
@@ -334,6 +335,45 @@ export function runInlineHealthDegradationWatch(
 ): Record<string, unknown> {
   const result = runHealthDegradationWatch();
   return exportValue(params, step, { ...result.report, alert_id: result.alert?.id ?? null }, ctx);
+}
+
+export async function runInlineMeetingReadinessCheck(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const value = (key: string): unknown => resolveVars(params[key], ctx);
+  const text = (key: string): string | undefined => {
+    const resolved = value(key);
+    return typeof resolved === 'string' && resolved.trim() ? resolved.trim() : undefined;
+  };
+  const minutes = (key: string): number | undefined => {
+    const resolved = value(key);
+    if (resolved === undefined || resolved === '') return undefined;
+    const parsed = Number(resolved);
+    if (!Number.isFinite(parsed)) throw new Error(`[meeting-readiness] ${key} must be a number`);
+    return parsed;
+  };
+  const stage = text('stage');
+  if (stage && stage !== 'next_day' && stage !== 'soon') {
+    throw new Error('[meeting-readiness] stage must be next_day or soon');
+  }
+  const calendars = value('calendar_names');
+  const fromMin = minutes('from_min');
+  const toMin = minutes('to_min');
+  const profile = text('profile');
+  const tenant = text('tenant_slug');
+  const report = await runMeetingReadinessCheck({
+    ...(stage ? { stage: stage as MeetingReadinessStage } : {}),
+    ...(fromMin !== undefined ? { from_min: fromMin } : {}),
+    ...(toMin !== undefined ? { to_min: toMin } : {}),
+    ...(profile ? { profile } : {}),
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(Array.isArray(calendars) && calendars.length
+      ? { calendar_names: calendars.map(String) }
+      : {}),
+  });
+  return exportValue(params, step, report, ctx);
 }
 
 export function runInlineKnowledgeHygieneProbe(
