@@ -163,15 +163,31 @@ export function buildGhArgs(
   return args;
 }
 
-export function runPrePrReadiness(print: Print = () => undefined, checkJobs?: number): void {
-  const args = ['check', '--', '--scope', 'pr'];
+/**
+ * S1/M1: the readiness gate runs `check --changed`, i.e. every pr gate plus
+ * each full-only gate whose `paths` (ci-gates.json) match a file changed
+ * since the merge-base — the subset of CI's `--scope full` this branch can
+ * break. `base` is the PR base branch; a bare name diffs against `origin/<base>`.
+ */
+export function buildReadinessCheckArgs(checkJobs?: number, base?: string): string[] {
+  const args = ['check', '--', '--changed'];
+  if (base?.trim()) args.push('--base', resolveKnowledgeDiffBase(base));
   if (checkJobs !== undefined)
     args.push('--jobs', String(parseCheckJobs(String(checkJobs), '--check-jobs')));
+  return args;
+}
+
+export function runPrePrReadiness(
+  print: Print = () => undefined,
+  checkJobs?: number,
+  base?: string
+): void {
+  const args = buildReadinessCheckArgs(checkJobs, base);
   print(
     [
       `[pr:publish] Running PR readiness gate (pnpm ${args.join(' ')}).`,
       `[pr:publish] Canonical checklist: ${PRE_PR_READINESS_CHECKLIST}`,
-      '[pr:publish] Apply exception-table rows for actuator/env/core boundaries before create.',
+      '[pr:publish] Full-only gates are selected by the changed paths (ci-gates.json `paths`); apply the remaining exception-table rows by hand.',
       '[pr:publish] Pass --skip-readiness only for an explicit emergency bypass.',
     ].join('\n')
   );
@@ -262,7 +278,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
       `[pr:publish] Skipping readiness gate (--skip-readiness). Still follow ${PRE_PR_READINESS_CHECKLIST}.`
     );
   } else {
-    runPrePrReadiness(print, options.checkJobs);
+    runPrePrReadiness(print, options.checkJobs, options.base);
   }
 
   runKnowledgeReadinessGate(options);

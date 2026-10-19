@@ -1,8 +1,14 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResultAsync } from '@agent/core/secure-io';
+import { safeExecResult, safeExecResultAsync } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
+import {
+  describeChangedGateMatch,
+  selectChangedGates,
+  validateGatePaths,
+  type ChangedGateMatch,
+} from './lib/changed-gate-selection.js';
 
 type Gate = {
   id: string;
@@ -12,6 +18,8 @@ type Gate = {
   script?: string;
   timeout_ms?: number;
   baseline?: string;
+  /** full/release only: repo-relative globs whose change selects this gate under `--changed`. */
+  paths?: string[];
   owner: string;
   rationale: string;
 };
@@ -113,6 +121,8 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
     ) {
       throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
     }
+    const pathErrors = validateGatePaths(gate);
+    if (pathErrors.length > 0) throw new Error(pathErrors.join('; '));
     const hasExecutable = typeof gate.executable === 'string' && gate.executable.trim().length > 0;
     const hasScript = typeof gate.script === 'string' && gate.script.trim().length > 0;
     if (hasExecutable === hasScript) {
@@ -171,6 +181,74 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
   return scoped;
 }
 
+/** Default `--changed` bases, tried in order when `--base` is omitted. */
+export const DEFAULT_CHANGED_BASES = ['origin/main', 'main'] as const;
+const GIT_REF_PATTERN = /^[A-Za-z0-9._/@^~-]+$/u;
+
+export type GitRunner = (args: string[]) => {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+};
+
+const runGit: GitRunner = (args) =>
+  safeExecResult('git', ['-c', 'core.quotePath=false', ...args], {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: 60_000,
+  });
+
+export interface ChangedFiles {
+  base: string;
+  mergeBase: string;
+  files: string[];
+}
+
+/**
+ * Files that differ from the merge-base with `base`: committed, staged and
+ * unstaged changes (`git diff <merge-base>` compares the working tree) plus
+ * untracked, non-ignored files. Renames count on both sides so a moved input
+ * still selects the gate that read it.
+ */
+export function collectChangedFiles(base?: string, git: GitRunner = runGit): ChangedFiles {
+  const candidates = base ? [base] : [...DEFAULT_CHANGED_BASES];
+  for (const candidate of candidates) {
+    if (!GIT_REF_PATTERN.test(candidate) || candidate.startsWith('-')) {
+      throw new Error(`--base must be a git ref name: ${candidate}`);
+    }
+  }
+  let resolved: { base: string; mergeBase: string } | undefined;
+  for (const candidate of candidates) {
+    const result = git(['merge-base', 'HEAD', candidate]);
+    const mergeBase = result.stdout.trim();
+    if (result.status === 0 && mergeBase) {
+      resolved = { base: candidate, mergeBase };
+      break;
+    }
+  }
+  if (!resolved) {
+    throw new Error(
+      `could not resolve a merge-base with ${candidates.join(' or ')} — run \`git fetch origin main\` or pass --base <ref>`
+    );
+  }
+  const diff = git(['diff', '--name-only', '--no-renames', resolved.mergeBase, '--']);
+  if (diff.status !== 0) {
+    throw new Error(`git diff against ${resolved.mergeBase} failed: ${diff.stderr.trim()}`);
+  }
+  const untracked = git(['ls-files', '--others', '--exclude-standard']);
+  if (untracked.status !== 0) {
+    throw new Error(`git ls-files failed: ${untracked.stderr.trim()}`);
+  }
+  const files = [
+    ...new Set(
+      `${diff.stdout}\n${untracked.stdout}`
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    ),
+  ].sort();
+  return { ...resolved, files };
+}
+
 /**
  * Execute one declared gate through secure-io. Hosted browser coverage needs
  * this non-secret CI marker, which is intentionally absent from the global
@@ -197,7 +275,7 @@ export async function main(
   print: (value: unknown) => void = () => undefined
 ): Promise<number> {
   const args = argv[0] === '--' ? argv.slice(1) : argv;
-  const supportedFlags = new Set(['--scope', '--only', '--json', '--jobs']);
+  const supportedFlags = new Set(['--scope', '--only', '--json', '--jobs', '--changed', '--base']);
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     if (!flag?.startsWith('--')) continue;
@@ -209,7 +287,7 @@ export async function main(
       return 1;
     }
     if (
-      (flag === '--scope' || flag === '--only' || flag === '--jobs') &&
+      (flag === '--scope' || flag === '--only' || flag === '--jobs' || flag === '--base') &&
       (!args[index + 1] || args[index + 1]!.startsWith('--'))
     ) {
       const json = args.includes('--json');
@@ -243,14 +321,34 @@ export async function main(
   } catch (cause) {
     return error(cause instanceof Error ? cause.message : String(cause));
   }
-  const scope = scopeValue;
+  const changedMode = args.includes('--changed');
+  const baseIndex = args.indexOf('--base');
+  if (baseIndex >= 0 && !changedMode) return error('--base requires --changed');
+  if (changedMode && (scopeIndex >= 0 || onlyIndex >= 0)) {
+    return error('--changed selects gates itself; do not combine it with --scope or --only');
+  }
+  const scope = changedMode ? 'changed' : scopeValue;
   let gates: Gate[];
+  let changed: (ChangedFiles & { extra: ChangedGateMatch[] }) | undefined;
   try {
-    gates = selectGates(loadGateManifest(), scopeValue, only);
+    if (changedMode) {
+      const changedFiles = collectChangedFiles(baseIndex >= 0 ? args[baseIndex + 1] : undefined);
+      const selection = selectChangedGates(loadGateManifest().gates, changedFiles.files);
+      gates = selection.gates;
+      changed = { ...changedFiles, extra: selection.extra };
+    } else {
+      gates = selectGates(loadGateManifest(), scopeValue, only);
+    }
   } catch (cause) {
     return error(cause instanceof Error ? cause.message : String(cause));
   }
-  if (gates.length === 0) return error(`no gates registered for scope ${scopeValue}`);
+  if (gates.length === 0) return error(`no gates registered for scope ${scope}`);
+  if (changed && !json) {
+    print(
+      `[check] --changed: ${changed.files.length} file(s) vs ${changed.base} (merge-base ${changed.mergeBase.slice(0, 12)}); pr gates + ${changed.extra.length} path-selected gate(s)`
+    );
+    for (const match of changed.extra) print(describeChangedGateMatch(match));
+  }
   const results: Array<{
     id: string;
     owner: string;
@@ -289,7 +387,22 @@ export async function main(
   };
   await Promise.all(Array.from({ length: Math.min(jobs, gates.length) }, () => worker()));
   const failed = results.filter((result) => result.status === 'failed');
-  if (json) print({ scope, results, failed: failed.length });
+  if (json)
+    print({
+      scope,
+      results,
+      failed: failed.length,
+      ...(changed
+        ? {
+            changed: {
+              base: changed.base,
+              merge_base: changed.mergeBase,
+              files: changed.files,
+              selected: changed.extra,
+            },
+          }
+        : {}),
+    });
   else {
     print(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
     for (const result of results) {
