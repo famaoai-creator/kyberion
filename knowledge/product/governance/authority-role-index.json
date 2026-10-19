@@ -242,14 +242,6 @@
       "allowed_actuators": [],
       "tier_access": ["public", "confidential", "personal"]
     },
-    "nhi_accountability_reader": {
-      "description": "Read-only system-scope reader for L9 NHI lifecycle checks. It reads member profiles only to verify that an accountable human is active; no writes or other personal data access are granted.",
-      "default_persona": "worker",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["personal"]
-    },
     "mission_controller": {
       "description": "Mission lifecycle authority with mission state and observability write access.",
       "default_persona": "worker",
@@ -284,6 +276,14 @@
       "scope_classes": ["coordination_runtime", "operations_runtime", "audit"],
       "allowed_actuators": ["service-actuator", "presence-actuator"],
       "tier_access": ["public", "confidential"]
+    },
+    "nhi_accountability_reader": {
+      "description": "Read-only member-status lookup for NHI accountability reports. Resolves operator user IDs against knowledge/personal/members/ and grants no writes or other role reads.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal"]
     },
     "operational_learning_writer": {
       "description": "Narrow internal store-writer for machine-generated organization learning proposals, bound to one organization and tenant execution scope.",
