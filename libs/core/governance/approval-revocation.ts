@@ -226,6 +226,17 @@ export function revokeStandingEffectApproval(
     effectRef: string;
   }
 ): ApprovalRequestRecord {
+  // Never let an empty ref match a one-shot consumption that carries none.
+  if (
+    typeof params.consumer !== 'string' ||
+    !params.consumer.trim() ||
+    typeof params.effectRef !== 'string' ||
+    !params.effectRef.trim()
+  ) {
+    throw new Error(
+      '[POLICY_VIOLATION] withdrawing a standing-effect approval needs a consumer and an effectRef'
+    );
+  }
   return revoke(role, params, 'standing_effect', {
     consumer: params.consumer,
     effectRef: params.effectRef,
