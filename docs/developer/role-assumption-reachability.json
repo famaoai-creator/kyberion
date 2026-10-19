@@ -2093,6 +2093,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/agent_worktree.ts#asOwner",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/apply_dependency_patch.ts#main",
       "roles": ["ecosystem_architect"],
       "unresolved": []

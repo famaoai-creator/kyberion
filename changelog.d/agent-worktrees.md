@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **`pnpm kyberion worktree create|list|remove` — one git worktree per provider agent** — the operator (or mission owner; delegated workers and non-owner roles are refused) gives each parallel agent (claude / codex / devin / gemini / …) its own checkout at the gitignored `.worktrees/agent-<name>`, on a new branch from `--base` (default `origin/main`, created with `--no-track`) or an existing one, so a branch switch or rebuild by one agent no longer leaves another's `dist/` stale. Worktrees are registered in the workspace ledger before `git worktree add` (budget-checked, removed only through the ledger) and in `active/shared/runtime/agent-worktrees/registry.json`; `--bootstrap` runs `pnpm install --prefer-offline` + `pnpm build` and stamps `dist/.session-build-head`. `list` reports branch, agent, dist freshness and the change-request owner when available; `remove` refuses uncommitted work, a non-terminal mission or a live claim unless `--force`, and keeps the branch.

@@ -159,6 +159,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion voice conversation-config`    | `pnpm voice:conversation-config`  | Show realtime voice conversation config                                                                                                        |
 | `pnpm kyberion voice route`                  | `pnpm voice:route`                | Show or set voice routing                                                                                                                      |
 | `pnpm kyberion workspace list`               |                                   | List workspace ledger entries                                                                                                                  |
+| `pnpm kyberion worktree list`                |                                   | List agent worktrees with branch and build freshness                                                                                           |
 
 ### Operate
 
@@ -325,6 +326,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion work`                          | `pnpm work`                         | Coordinate work items                                                                                                 |
 | `pnpm kyberion workflow register`             |                                     | Register a new mission workflow from a compact registration request.                                                  |
 | `pnpm kyberion workspace gc`                  |                                     | Garbage-collect stale workspaces                                                                                      |
+| `pnpm kyberion worktree create`               |                                     | Create a git worktree for a provider agent                                                                            |
+| `pnpm kyberion worktree remove`               |                                     | Remove an agent worktree (keeps the branch)                                                                           |
 
 ## Developer commands
 

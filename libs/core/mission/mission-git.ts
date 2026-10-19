@@ -62,7 +62,11 @@ export function getCurrentBranch(cwd: string): string {
 }
 
 /** Roles allowed to commit on behalf of a mission (the owner path). */
-const SESSION_INDEX_COMMIT_ROLES = new Set(['mission_controller', 'orchestrator', 'mission_owner']);
+export const MISSION_OWNER_GIT_ROLES: ReadonlySet<string> = new Set([
+  'mission_controller',
+  'orchestrator',
+  'mission_owner',
+]);
 
 export interface SessionIndexCommitResult {
   /** New commit sha, or null when the private index had nothing to commit. */
@@ -75,7 +79,12 @@ function assertSessionIndexCommitOwner(): void {
   assertMissionOwnerPath('commit a session index');
 }
 
-function assertMissionOwnerPath(action: string): void {
+/**
+ * Owner-path guard for repository git writes (`.git` is mission-owner only):
+ * refuses delegated workers (`KYBERION_DELEGATION_DEPTH > 0`) and any role
+ * other than `mission_controller` / `orchestrator` / `mission_owner`.
+ */
+export function assertMissionOwnerPath(action: string): void {
   const depth = Number(getRegisteredEnvText('KYBERION_DELEGATION_DEPTH'));
   if (Number.isFinite(depth) && depth > 0) {
     throw new Error(
@@ -83,7 +92,7 @@ function assertMissionOwnerPath(action: string): void {
     );
   }
   const role = resolveRole();
-  if (!role || !SESSION_INDEX_COMMIT_ROLES.has(role)) {
+  if (!role || !MISSION_OWNER_GIT_ROLES.has(role)) {
     throw new Error(
       `[SESSION_INDEX_OWNER_ONLY] role ${role ?? 'unknown'} may not ${action} (mission owner only)`
     );
@@ -208,7 +217,8 @@ export function createSessionWorktree(
       path: dir,
       kind: 'git-worktree',
       owner: { ...(input.owner ?? {}), session_id: input.sessionId },
-      repoRoot,
+      // The ledger rejects the repository root itself; omitted = the Kyberion root.
+      ...(input.repoRoot ? { repoRoot } : {}),
     },
     ledger
   );

@@ -3,7 +3,7 @@ title: Multi-Provider Co-Execution Contract
 category: Governance
 tags: [governance, multi-provider, cli, co-execution, xp-04, so-03]
 importance: 9
-last_updated: 2026-10-11
+last_updated: 2026-10-19
 ---
 
 # Multi-Provider Co-Execution Contract
@@ -46,6 +46,30 @@ gates, or baseline checks; a baseline-check L2 failure with
 `dist_import_violations` in the report means exactly this. Rebuilding after a
 branch switch is cheap insurance and never harms an in-flight claim holder —
 dist contents are derived state, not authored state.
+
+## Parallel development: one worktree per agent (recommended)
+
+When several provider CLIs develop **in parallel on different branches**, do
+not share one checkout: a branch switch or rebuild by one silently changes the
+source and `dist/` the others execute. Give each agent its own git worktree,
+created by the operator (a human or the mission owner — never a worker CLI,
+since `git worktree add` writes `.git`):
+
+```bash
+pnpm kyberion worktree create codex-a --agent codex [--branch feat/x] [--base origin/main] [--bootstrap]
+pnpm kyberion worktree list            # branch, agent, dist freshness, change-request owner
+pnpm kyberion worktree remove codex-a  # refuses uncommitted work / live mission or claim unless --force
+```
+
+Each worktree lives at `.worktrees/agent-<name>` (gitignored, a WS-05
+workspace-ledger root), so it has its own branch, index, `node_modules/` and
+`dist/`; `--bootstrap` runs `pnpm install --prefer-offline` + `pnpm build`
+there and stamps `dist/.session-build-head`. Launch the provider CLI with the
+worktree root as its startup cwd (the printed `cd … && <cli>` hint) — the
+startup cwd contract above applies to it as the repository root. Until the
+worktree is bootstrapped, Node resolves packages upward into the parent
+checkout's `node_modules/`, so run the bootstrap before trusting its runtime.
+Details: [workspace-isolation](../architecture/workspace-isolation.md#m2--agent-worktrees-one-worktree-per-agent).
 
 ## Shared-checkout live verification
 
@@ -142,6 +166,11 @@ ad-hoc same-checkout collaboration; they are not mission-owner authority.
   commit does not revert it. `KYBERION_SESSION_GIT_INDEX=0` disables it. Only the mission owner
   may commit a session index (`commitFromSessionIndex`), and only while HEAD
   still equals the index's baseline.
+- Agent worktrees (`pnpm kyberion worktree create` / `remove`) are operator-only:
+  the CLI refuses a delegated worker (`KYBERION_DELEGATION_DEPTH > 0`) and a
+  process whose explicit `SYSTEM_ROLE` / `MISSION_ROLE` is not a mission-owner
+  role, then runs the git operation through the same owner-path guard as
+  session worktrees (`assertMissionOwnerPath`). `list` is read-only.
 - Session worktrees are owner-only: per-session `git worktree`s for parallel
   writers are created (`createSessionWorktree`) and removed
   (`deleteRegisteredWorkspace`) only on the mission owner's path and only

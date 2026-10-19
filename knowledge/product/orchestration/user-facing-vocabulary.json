@@ -7763,6 +7763,21 @@
         "ja": "古いワークスペースを回収",
         "qps-ploc": "⟦Ɠȧřƀȧɠė-ƈőŀŀėƈŧ şŧȧŀė ẇőřķşṗȧƈėş ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_worktree_create": {
+        "en": "Create a git worktree for a provider agent",
+        "ja": "プロバイダーエージェント用の git worktree を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ɠïŧ ẇőřķŧřėė ƒőř ȧ ṗřőṽïḓėř ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_worktree_list": {
+        "en": "List agent worktrees with branch and build freshness",
+        "ja": "エージェント worktree をブランチとビルド鮮度付きで一覧",
+        "qps-ploc": "⟦Ŀïşŧ ȧɠėñŧ ẇőřķŧřėėş ẇïŧħ ƀřȧñƈħ ȧñḓ ƀůïŀḓ ƒřėşħñėşş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_worktree_remove": {
+        "en": "Remove an agent worktree (keeps the branch)",
+        "ja": "エージェント worktree を削除 (ブランチは残す)",
+        "qps-ploc": "⟦Řėɱőṽė ȧñ ȧɠėñŧ ẇőřķŧřėė (ķėėṗş ŧħė ƀřȧñƈħ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "cli_cmd_script_secret_introduce": {
         "en": "Introduce a secret through a hidden prompt",
         "ja": "非表示入力でシークレットを登録",
