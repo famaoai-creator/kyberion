@@ -1,9 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const principal = vi.hoisted(() => ({ owner: 'user:owner' as string | null }));
+vi.mock('@agent/core/governance/cli-operator-principal', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/governance/cli-operator-principal')>();
+  return {
+    ...actual,
+    resolveCliOperatorIdentity: () => ({ principalId: principal.owner, displayName: 'Owner' }),
+  };
+});
 import {
   grantDraftFromArgs,
   parseGrantsArgs,
   renderGrantCheck,
   renderGrantList,
+  resolveRevoker,
   runGrantsCommand,
   type GrantsDeps,
 } from './cli-grants.js';
@@ -46,7 +57,7 @@ function deps(overrides: Partial<GrantsDeps> = {}): GrantsDeps {
       revoked: { at: NOW.toISOString(), by: 'user:owner', reason: 'done', audit_event_id: 'a2' },
     })),
     find: vi.fn(() => record),
-    revoker: () => 'user:owner',
+    revoker: () => ({ kind: 'human' as const, id: 'user:owner' }),
     now: () => NOW,
     ...overrides,
   };
@@ -202,7 +213,10 @@ describe('cli grants commands', () => {
 
   it('revoke records the resolved operator, never a free-text actor', async () => {
     const { out, d } = await run(['revoke', record.grant_id, '--reason', 'done']);
-    expect(d.revoke).toHaveBeenCalledWith(record.grant_id, { by: 'user:owner', reason: 'done' });
+    expect(d.revoke).toHaveBeenCalledWith(record.grant_id, {
+      by: { kind: 'human', id: 'user:owner' },
+      reason: 'done',
+    });
     expect(out).toContain('# Grant revoked');
     await expect(run(['revoke', record.grant_id])).rejects.toThrow(/--reason/);
     await expect(
@@ -219,5 +233,23 @@ describe('cli grants commands', () => {
     await expect(run([...grantArgs, '--approval-request-id', 'r'], d)).rejects.toThrow(
       /pending, not approved/
     );
+  });
+});
+
+describe('resolveRevoker', () => {
+  it('attributes an agent session to the agent even when an owner member exists', () => {
+    principal.owner = 'user:owner';
+    expect(resolveRevoker({ KYBERION_AGENT_ID: 'grants-tester' })).toEqual({
+      kind: 'agent',
+      id: 'agent:grants-tester',
+    });
+  });
+
+  it('a plain terminal revokes as the owner member, and fails without one', () => {
+    principal.owner = 'user:owner';
+    expect(resolveRevoker({})).toEqual({ kind: 'human', id: 'user:owner' });
+    principal.owner = null;
+    expect(() => resolveRevoker({})).toThrow(/No operator identity/);
+    principal.owner = 'user:owner';
   });
 });
