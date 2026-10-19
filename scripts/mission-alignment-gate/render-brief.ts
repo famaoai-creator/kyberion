@@ -31,6 +31,7 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import {
   loadMissionBriefAtPath,
+  formatMissionAdmission,
   type MissionBrief,
   type MissionBriefFlowStep,
   type MissionBriefRisk,
@@ -243,6 +244,7 @@ ${approvalConfigScript(options.approval)}
   </div>
 
   <h2>${esc(m.flow)}</h2>
+  ${b.missionAdmission ? `<pre>${esc(formatMissionAdmission(b, locale))}</pre>` : ''}
   <div class="tblwrap"><table><thead><tr><th>#</th><th>${esc(m.step)}</th><th>${esc(m.pipelineBasis)}</th></tr></thead><tbody>${flowRows(b.flow, m.empty, m.adHoc)}</tbody></table></div>
 
   <h2>${esc(m.roles)}</h2>

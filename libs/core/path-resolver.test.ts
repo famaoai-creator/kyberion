@@ -319,6 +319,7 @@ describe('vitest live-state sandbox', () => {
       shared('observability/ops-alerts.jsonl'),
       shared('inbox/entries.jsonl'),
       shared('runtime/intent-contract-memory.json'),
+      shared('runtime/pipeline-library-runs/confidential/acme/run.jsonl'),
       shared('runtime/audit/chain-key'),
       rootResolve('active/shared/runtime/provider-cache.json'),
       rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),

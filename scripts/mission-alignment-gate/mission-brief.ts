@@ -8,6 +8,8 @@
  */
 import { defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { t } from '@agent/core/t';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 
 export interface MissionBriefFlowStep {
   step?: string | number;
@@ -28,6 +30,11 @@ export interface MissionBriefRole {
 }
 
 export interface MissionBrief {
+  /** Hash-bound internal admission facts, never business-effect permission. */
+  missionAdmission?: {
+    mandate_ref: string;
+    mandate_facts: import('@agent/core/governance/mandate-shadow').MissionMandateFacts;
+  };
   missionId?: string;
   title?: string;
   intent?: string;
@@ -54,6 +61,29 @@ export interface MissionBrief {
   lifecycleModel?: string;
   /** Where the brief was authored from (e.g. `{ kind: 'work_inventory', ref: <entry id> }`). */
   source?: { kind: string; ref: string; tenantSlug?: string };
+}
+
+/** Same disclosure on every approval surface and the HTML brief. */
+export function formatMissionAdmission(
+  brief: MissionBrief,
+  locale?: SupportedLocale
+): string | undefined {
+  const admission = brief.missionAdmission;
+  if (!admission) return undefined;
+  const facts = admission.mandate_facts;
+  return t(
+    'mission_alignment:admission_disclosure',
+    {
+      mandate: admission.mandate_ref,
+      work: facts.work_type,
+      paths: facts.paths.join(', '),
+      cost: facts.estimated_cost,
+      currency: facts.currency,
+      risk: facts.risk_level,
+      effects: JSON.stringify(facts.external_effects),
+    },
+    locale
+  );
 }
 
 const MISSION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(

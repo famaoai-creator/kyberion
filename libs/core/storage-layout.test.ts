@@ -195,6 +195,8 @@ describe('durable partitioned runtime state', () => {
       }) as string
     );
     expect(protectedRuntimeStatePrefixes()).toEqual([
+      'active/shared/runtime/pipeline-library-runs/personal/',
+      'active/shared/runtime/pipeline-library-runs/confidential/',
       'active/shared/runtime/autonomy-learning/personal/',
       'active/shared/runtime/autonomy-learning/confidential/',
       'active/shared/runtime/hearing/personal/',

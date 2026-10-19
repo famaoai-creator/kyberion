@@ -14,6 +14,22 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn<(p: string) => boolean>(),
   safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeReadFile: vi.fn<(p: string, opts?: unknown) => string>(),
+  loadState: vi.fn((): unknown => null),
+  listWorkItems: vi.fn((): unknown[] => []),
+  evaluateMissionStartMandate: vi.fn(() => ({ covered: true, reasons: [] })),
+  recordAutonomyExecution: vi.fn(),
+  recordAutonomyOutcome: vi.fn(),
+}));
+
+vi.mock('@agent/core/mission/mission-state', () => ({ loadState: mocks.loadState }));
+vi.mock('@agent/core/workforce/work-coordination', () => ({ listWorkItems: mocks.listWorkItems }));
+vi.mock('@agent/core/governance/mandate-shadow', () => ({
+  recordMandateOutcome: vi.fn(),
+  evaluateMissionStartMandate: mocks.evaluateMissionStartMandate,
+}));
+vi.mock('@agent/core/governance/autonomy-action-state', () => ({
+  recordAutonomyExecution: mocks.recordAutonomyExecution,
+  recordAutonomyOutcome: mocks.recordAutonomyOutcome,
 }));
 
 vi.mock('@agent/core/governance/approval-store', () => ({
@@ -70,6 +86,7 @@ function approvalRecord(overrides: Record<string, unknown> = {}): FakeApprovalRe
     requestedAt: '2026-08-03T00:00:00.000Z',
     decidedAt: '2026-08-03T01:00:00.000Z',
     decidedBy: 'sovereign',
+    decidedByType: 'human',
     source: { missionId: MISSION_ID },
     requestedByContext: { surface: 'brief', actorId: 'sovereign', actorRole: 'sovereign' },
     accountability: { finalDecision: 'human_only', payloadHash: briefHash(BRIEF) },
@@ -85,9 +102,76 @@ function briefOnDisk(brief: unknown): void {
 describe('mission_alignment_decision', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadState.mockReturnValue(null);
+    mocks.listWorkItems.mockReturnValue([]);
     mocks.findMissionPath.mockReturnValue(MISSION_DIR);
     mocks.computeApprovalPayloadHash.mockImplementation((payload) => JSON.stringify(payload ?? {}));
     briefOnDisk(BRIEF);
+  });
+
+  it('assessing an approval never mutates execution learning', () => {
+    const admission = { mandate_ref: 'docs', mandate_facts: {} };
+    const approved = { ...BRIEF, missionAdmission: admission };
+    briefOnDisk(approved);
+    mocks.listApprovalRequests.mockReturnValue([
+      approvalRecord({
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: briefHash(approved),
+        },
+      }),
+    ]);
+    mocks.loadState.mockReturnValue({ status: 'active', tenant_slug: 'acme' });
+    mocks.listWorkItems.mockReturnValue([
+      {
+        context: { tenant_slug: 'acme' },
+        metadata: {
+          requested_work_shape: 'mission',
+          mission_id: MISSION_ID,
+          mandate_ref: 'docs',
+          mandate_facts: {},
+        },
+      },
+    ]);
+    expect(assessAlignmentDecision(MISSION_ID).satisfied).toBe(true);
+    expect(mocks.recordAutonomyExecution).not.toHaveBeenCalled();
+    mocks.recordAutonomyExecution.mockClear();
+    mocks.listWorkItems.mockReturnValue([
+      {
+        context: { tenant_slug: 'acme' },
+        metadata: {
+          requested_work_shape: 'mission',
+          mission_id: MISSION_ID,
+          mandate_ref: 'docs',
+          mandate_facts: { changed_after_approval: true },
+        },
+      },
+    ]);
+    expect(assessAlignmentDecision(MISSION_ID).satisfied).toBe(true);
+    expect(mocks.recordAutonomyExecution).not.toHaveBeenCalled();
+    for (const actor of ['ai_agent', 'service', undefined]) {
+      mocks.listApprovalRequests.mockReturnValue([
+        approvalRecord({
+          decidedByType: actor,
+          accountability: { finalDecision: 'human_only', payloadHash: briefHash(approved) },
+        }),
+      ]);
+      mocks.listWorkItems.mockReturnValue([
+        {
+          context: { tenant_slug: 'acme' },
+          metadata: {
+            requested_work_shape: 'mission',
+            mission_id: MISSION_ID,
+            ...admission,
+          },
+        },
+      ]);
+      expect(assessAlignmentDecision(MISSION_ID).satisfied).toBe(true);
+      expect(mocks.recordAutonomyExecution).not.toHaveBeenCalled();
+    }
+    briefOnDisk({ ...BRIEF, title: 'changed' });
+    expect(assessAlignmentDecision(MISSION_ID).satisfied).toBe(false);
+    expect(mocks.recordAutonomyExecution).not.toHaveBeenCalled();
   });
 
   it('passes when the mission is approved and the brief still matches', () => {

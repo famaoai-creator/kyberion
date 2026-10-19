@@ -237,7 +237,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       '--disable-web-search',
       '--no-subagents',
       ...permissionArgs,
-      ...this.extraArgs,
+      ...(options?.advisory ? [] : this.extraArgs),
     ];
     return this.spawnCli(args, '', options?.signal, effectiveProfile);
   }

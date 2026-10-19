@@ -568,6 +568,7 @@ export async function startMission(args: {
   intentGoal?: string;
   /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
   decidedBy?: HumanDecidedBy;
+  admissionWorkItem?: string;
 }): Promise<void> {
   const {
     id,
@@ -584,6 +585,7 @@ export async function startMission(args: {
     ephemeral,
     intentGoal,
     decidedBy,
+    admissionWorkItem,
   } = args;
 
   if (!id) {
@@ -659,6 +661,14 @@ export async function startMission(args: {
       });
       state = loadState(upperId);
       if (state) {
+        if (admissionWorkItem) {
+          const { assertMissionAdmissionActivation } = await import('./mission-admission.js');
+          assertMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
+            rootDir,
+            organizationId: state.organization_id,
+            projectId: state.relationships?.project?.project_id,
+          });
+        }
         state.status = transitionStatus(state.status, 'active');
         state.history.push({
           ts: nowIso(),
@@ -668,6 +678,10 @@ export async function startMission(args: {
         });
         await saveState(upperId, state);
         activated = true;
+        if (admissionWorkItem) {
+          const { authorMissionAdmissionBrief } = await import('./mission-admission.js');
+          authorMissionAdmissionBrief(upperId, admissionWorkItem, { rootDir });
+        }
       }
     } else {
       if (!state.outcome_contract) {
@@ -730,6 +744,14 @@ export async function startMission(args: {
           },
         };
       }
+      if (admissionWorkItem) {
+        const { assertMissionAdmissionActivation } = await import('./mission-admission.js');
+        assertMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
+          rootDir,
+          organizationId: state.organization_id,
+          projectId: state.relationships?.project?.project_id,
+        });
+      }
       state.status = transitionStatus(state.status, 'active');
       state.history.push({
         ts: nowIso(),
@@ -739,6 +761,10 @@ export async function startMission(args: {
       });
       await saveState(upperId, state);
       activated = true;
+      if (admissionWorkItem) {
+        const { authorMissionAdmissionBrief } = await import('./mission-admission.js');
+        authorMissionAdmissionBrief(upperId, admissionWorkItem, { rootDir });
+      }
     }
 
     await emitMissionLifecycleIntentSnapshot({

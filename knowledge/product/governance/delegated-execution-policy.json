@@ -1,0 +1,18 @@
+{
+  "$schema": "../schemas/delegated-execution-policy.schema.json",
+  "version": "1.0.0",
+  "operations": [
+    {
+      "operation_id": "service:preset:backlog:create_issue",
+      "decision_type": "internal_task_assignment",
+      "required_paths": [
+        ["request", "projectId"],
+        ["request", "summary"],
+        ["request", "issueTypeId"],
+        ["request", "priorityId"]
+      ],
+      "risk_level": "low",
+      "max_ttl_seconds": 600
+    }
+  ]
+}

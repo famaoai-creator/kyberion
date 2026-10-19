@@ -29,6 +29,9 @@ type LookupCategory = 'lifecycle' | 'scope-derivation' | 'placement';
 
 const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // lifecycle
+  // Authors the exact activated mission brief and derives learning authority;
+  // ambiguous/hidden owners must throw rather than select a fallback location.
+  'libs/core/mission/mission-admission.ts': 'lifecycle',
   'libs/core/mission/mission-artifact-closure.ts': 'lifecycle',
   'libs/core/mission/mission-creation.ts': 'lifecycle',
   'libs/core/mission/mission-distill.ts': 'lifecycle',

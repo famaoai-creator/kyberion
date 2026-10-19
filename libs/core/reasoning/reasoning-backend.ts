@@ -122,6 +122,7 @@ import {
   type ReasoningLiveCapabilities,
 } from './reasoning-live-capabilities.js';
 export * from './reasoning-live-capabilities.js';
+import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
 
 function normalizeProviderName(value?: string): string | null {
   const provider = String(value || '')
@@ -140,6 +141,7 @@ function optionsForCandidate(
   candidate: ReasoningBackendCandidate,
   options?: ReasoningCallOptions
 ): ReasoningCallOptions | undefined {
+  assertAdvisoryBackendPermission(candidate.backend.name, options);
   if (!options?.model || candidate === candidates[0]) return options;
   const primaryProvider = normalizeProviderName(candidates[0]?.provider);
   const candidateProvider = normalizeProviderName(candidate.provider);
@@ -1020,10 +1022,13 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
     return this.pick(options).decomposeIntoTasks(input, options);
   }
   delegateTask(instruction: string, context?: string, options?: ReasoningCallOptions) {
-    return this.pick(options).delegateTask(instruction, context, options);
+    const backend = this.pick(options);
+    assertAdvisoryBackendPermission(backend.name, options);
+    return backend.delegateTask(instruction, context, options);
   }
   delegateTaskHandle(instruction: string, context?: string, options?: ReasoningCallOptions) {
     const backend = this.pick(options);
+    assertAdvisoryBackendPermission(backend.name, options);
     return backend.delegateTaskHandle
       ? backend.delegateTaskHandle(instruction, context, options)
       : createDelegationHandle({

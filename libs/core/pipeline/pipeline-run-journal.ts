@@ -6,7 +6,13 @@
  * effects. Output snapshots are limited to declared channels.
  */
 import { createHash, randomUUID } from 'node:crypto';
+import type { ScopeContext } from '../scope-context-validation.js';
 import * as path from 'node:path';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  storagePartitionSegments,
+  type StorageDataTier,
+} from '../storage-layout.js';
 import { readJsonLines } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -50,6 +56,21 @@ export interface PipelineRunStartedPayload {
   input_path: string;
   mission_id?: string;
   step_ids: string[];
+  library_execution?: {
+    source_sha256: string;
+    initial_context: Record<string, unknown>;
+    payload_scope: { tier: StorageDataTier; tenant_slug?: string; purpose?: string };
+    identity: { role: string; persona?: string; tenant_slug?: string; organization_id?: string };
+    scope_identity?: ScopeContext;
+    work_item?: { id: string; tenantSlug: string; agentId: string; attemptId?: string };
+    trust_resolved: boolean;
+    project_trust_approval_id?: string;
+  };
+}
+
+export interface PipelineJournalScope {
+  tier: StorageDataTier;
+  tenantSlug?: string;
 }
 
 export interface PipelineRunNodeCompletedPayload {
@@ -68,6 +89,7 @@ export interface PipelineRunNodeCompletedPayload {
 }
 
 export interface PipelineRunSuspendedPayload {
+  execution_binding_hash?: string;
   step_id: string;
   approval_request_id: string;
   storage_channel: string;
@@ -137,6 +159,48 @@ const pipelineStartedSchema = z.object({
   input_path: z.string(),
   mission_id: z.string().optional(),
   step_ids: z.array(z.string()),
+  library_execution: z
+    .object({
+      source_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+      initial_context: z.record(z.string(), z.unknown()),
+      payload_scope: z.object({
+        tier: z.enum(['public', 'confidential', 'personal']),
+        tenant_slug: z.string().optional(),
+        purpose: z.string().optional(),
+      }),
+      identity: z.object({
+        role: z.string().min(1),
+        persona: z.string().optional(),
+        tenant_slug: z.string().optional(),
+        organization_id: z.string().optional(),
+      }),
+      scope_identity: z
+        .object({
+          tier: z.enum(['public', 'confidential', 'personal']),
+          tenant_slug: z.string().optional(),
+          organization_id: z.string().optional(),
+          project_id: z.string().optional(),
+          mission_id: z.string().optional(),
+          task_id: z.string().optional(),
+          session_id: z.string().optional(),
+          work_shape: z.string().optional(),
+          customer_stance: z.string().optional(),
+          viewer_principal: z.string().optional(),
+          nhi_id: z.string().optional(),
+        })
+        .optional(),
+      work_item: z
+        .object({
+          id: z.string(),
+          tenantSlug: z.string(),
+          agentId: z.string(),
+          attemptId: z.string().optional(),
+        })
+        .optional(),
+      trust_resolved: z.boolean(),
+      project_trust_approval_id: z.string().optional(),
+    })
+    .optional(),
 });
 const pipelineNodeCompletedSchema = z.object({
   step_id: z.string(),
@@ -161,6 +225,10 @@ pipelineJournalKernel.defineOp('pipeline.run_suspended', {
   model: pipelineJournalModel,
   schema: z.object({
     step_id: z.string(),
+    execution_binding_hash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     approval_request_id: z.string(),
     storage_channel: z.string(),
     on_timeout: z.enum(['abort', 'deny', 'escalate']),
@@ -242,9 +310,27 @@ function journalDir(missionId?: string): string {
     : shared('runtime/pipeline-runs');
 }
 
-export function pipelineRunJournalPath(runId: string, missionId?: string): string {
+export function pipelineRunJournalPath(
+  runId: string,
+  missionId?: string,
+  scope?: PipelineJournalScope
+): string {
   return assertSafeRepositoryPath(
-    path.join(journalDir(missionId), `${normalizedSegment(runId)}.jsonl`),
+    path.join(
+      scope
+        ? path.join(
+            shared(
+              path.relative('active/shared', PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs)
+            ),
+            ...storagePartitionSegments({
+              kind: 'tier',
+              tier: scope.tier,
+              tenant: scope.tenantSlug,
+            })
+          )
+        : journalDir(missionId),
+      `${normalizedSegment(runId)}.jsonl`
+    ),
     { allowMissingLeaf: true }
   );
 }
@@ -480,10 +566,16 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   return state;
 }
 
-export function loadPipelineRunJournal(runId: string, missionId?: string): PipelineRunJournalState {
-  const candidates = missionId
-    ? [pipelineRunJournalPath(runId, missionId)]
-    : candidateJournalPaths(runId);
+export function loadPipelineRunJournal(
+  runId: string,
+  missionId?: string,
+  scope?: PipelineJournalScope
+): PipelineRunJournalState {
+  const candidates = scope
+    ? [pipelineRunJournalPath(runId, missionId, scope)]
+    : missionId
+      ? [pipelineRunJournalPath(runId, missionId)]
+      : candidateJournalPaths(runId);
   const found = candidates.find((candidate) => safeExistsSync(candidate));
   if (!found) throw new Error(`[PIPELINE_JOURNAL] run not found: ${runId}`);
   return readPipelineRunJournal(found);
@@ -492,10 +584,11 @@ export function loadPipelineRunJournal(runId: string, missionId?: string): Pipel
 export function createPipelineRunJournal(
   runId: string,
   started: PipelineRunStartedPayload,
-  missionId?: string
+  missionId?: string,
+  scope?: PipelineJournalScope
 ): PipelineRunJournalHandle {
   const id = normalizedSegment(runId);
-  const filePath = pipelineRunJournalPath(id, missionId);
+  const filePath = pipelineRunJournalPath(id, missionId, scope);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   if (safeExistsSync(filePath)) {

@@ -2,6 +2,7 @@ import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
+import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -632,6 +633,13 @@ function isScopedStructuralMkdir(
         PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests + '/confidential'
     )
       return false;
+  } else if (access.role === 'autonomy_learning_store') {
+    if (
+      !isAutonomyLearningCapability(currentResourceAccessScope()) ||
+      normalizePath(protectedPrefix) !==
+        PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning + '/confidential'
+    )
+      return false;
   } else if (access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
@@ -961,6 +969,16 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  if (
+    normalizedRole === 'autonomy_learning_store' &&
+    !isAutonomyLearningCapability(currentResourceAccessScope())
+  ) {
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability',
+    };
+  }
   if (
     normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
     !isDiscussionRequestCapability(currentResourceAccessScope())

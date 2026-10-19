@@ -4,6 +4,7 @@ import { withExecutionContext } from '../authority.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { computeBudgetUsage } from '../governance/org-budget-governor.js';
+import * as autonomyState from '../governance/autonomy-action-state.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
 import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
@@ -162,6 +163,7 @@ function results(c: DotCharter): DotWorkResultRow[] {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   resetDotExecutorDenialAuditForTests();
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
@@ -499,6 +501,40 @@ describe('executeDotWorkItem', () => {
     expect(h.audits[1].result).toBe('denied');
   });
 
+  it('credits only concrete pipeline execution receipts, never advisory completion', async () => {
+    const record = vi
+      .spyOn(autonomyState, 'recordAutonomyExecution')
+      .mockImplementation(() => undefined);
+    const advisory = item('w1', {
+      requested_work_shape: 'direct_reply',
+      action_id: 'dot_delegate_work',
+    });
+    const pipeline = item('w2', {
+      requested_work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/ok.json',
+      gate_action_id: 'dot_intake_work',
+    });
+    const h = harness([advisory, pipeline]);
+    await executeDotWorkItem(charter(), advisory, ports(), h.deps);
+    expect(record).not.toHaveBeenCalled();
+    await executeDotWorkItem(
+      charter(),
+      pipeline,
+      ports({
+        runPipeline: vi.fn(async () => ({
+          status: 'succeeded',
+          summary: 'verified one step',
+          executedSteps: 1,
+        })),
+      }),
+      h.deps
+    );
+    expect(record).toHaveBeenCalledWith(
+      { action_id: 'dot_intake_work', receipt_id: 'dot-execution:ops:w2:run-1', ok: true },
+      expect.objectContaining({ rootDir: TEST_ROOT })
+    );
+  });
+
   it('never starts a mission: mission-shaped work is blocked with guidance', async () => {
     const target = item('w1', { requested_work_shape: 'mission' });
     const h = harness([target]);
@@ -647,7 +683,7 @@ describe('runDotExecutorSweep', () => {
     expect(h.claims.map((c) => c.itemId)).toEqual(['w1']);
   });
 
-  it('fails open when the budget governor throws', async () => {
+  it('holds execution when the budget governor throws', async () => {
     const h = harness([item('w1', {})]);
     h.deps.throttle = () => {
       throw new Error('policy unreadable');
@@ -657,7 +693,8 @@ describe('runDotExecutorSweep', () => {
       ports(),
       h.deps
     );
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(0);
+    expect(h.claims).toHaveLength(0);
   });
 });
 

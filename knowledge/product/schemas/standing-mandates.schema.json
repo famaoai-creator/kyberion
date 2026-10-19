@@ -27,6 +27,28 @@
           "expires_at"
         ],
         "properties": {
+          "authority": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tenant_slug",
+              "status",
+              "max_cost",
+              "currency",
+              "allowed_external_effects"
+            ],
+            "properties": {
+              "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "status": { "enum": ["active", "revoked"] },
+              "max_cost": { "type": "number", "minimum": 0 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+              "allowed_external_effects": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]*$" }
+              }
+            }
+          },
           "id": { "type": "string", "minLength": 1 },
           "title": { "type": "string", "minLength": 1 },
           "work_type_patterns": {

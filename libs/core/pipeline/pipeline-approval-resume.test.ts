@@ -77,6 +77,35 @@ describe('pipeline approval resume', () => {
     });
   });
 
+  it.each(['rejected', 'cancelled', 'expired'] as const)(
+    'settles %s only for an exact scoped library run',
+    (status) => {
+      const denied = {
+        ...record,
+        status,
+        scope: { tier: 'confidential' as const, tenant_slug: 'tenant-a' },
+      };
+      expect(resumePipelineRunAfterApproval(denied).status).toBe('not_applicable');
+      expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+      const state = mocks.loadPipelineRunJournal.mock.results[0]!.value;
+      state.started.library_execution = { source_sha256: 'a'.repeat(64) };
+      expect(resumePipelineRunAfterApproval(denied).status).toBe('started');
+      expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: [
+            '/repo/dist/scripts/run_pipeline.js',
+            '--resume',
+            'run-1',
+            '--journal-tier',
+            'confidential',
+            '--journal-tenant',
+            'tenant-a',
+          ],
+        })
+      );
+    }
+  );
+
   it('starts the canonical runner only for the exact suspended approval', () => {
     expect(resumePipelineRunAfterApproval(record)).toMatchObject({
       status: 'started',

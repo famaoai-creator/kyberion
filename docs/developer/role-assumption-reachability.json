@@ -4,7 +4,7 @@
   "description": "RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts`; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
   "assumption_sites": [
     {
-      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -65,7 +65,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -115,7 +115,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -125,7 +125,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -135,7 +135,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -204,7 +204,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -221,7 +221,7 @@
       ]
     },
     {
-      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -311,7 +311,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -321,7 +321,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -331,7 +331,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -346,12 +346,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -366,7 +371,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -377,6 +382,16 @@
     },
     {
       "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -707,7 +722,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -826,7 +841,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -866,7 +881,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -918,7 +933,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -928,7 +943,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -938,7 +953,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -988,7 +1003,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1058,7 +1073,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1078,7 +1093,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1088,7 +1103,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1437,6 +1452,13 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
+      "roles": [],
+      "unresolved": [
+        "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem"
+      ]
+    },
+    {
       "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1497,7 +1519,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["chronos_gateway"],
       "unresolved": []
     },
@@ -1576,7 +1598,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1586,7 +1608,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1736,7 +1758,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1966,7 +1988,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -2088,7 +2110,7 @@
       ]
     },
     {
-      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -2113,7 +2135,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2318,7 +2340,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2466,7 +2488,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2476,7 +2498,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2656,7 +2678,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2704,6 +2726,13 @@
       "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
+    },
+    {
+      "site": "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+      "roles": [],
+      "unresolved": [
+        "role argument `snapshot.identity.role` could not be resolved at scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun"
+      ]
     },
     {
       "site": "scripts/pipeline_promote.ts#appendCatalogRow",
@@ -2949,6 +2978,9 @@
     "libs/core/secret/secret-resolver.ts#ShellSecretResolver": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
     "libs/core/shell/pty-engine.ts#PtyRegistry": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -2994,6 +3026,9 @@
     "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot": [
       "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot"
     ],
+    "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem": [
+      "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem"
+    ],
     "presence/displays/operator-surface/src/lib/view.ts#<module>": [
       "module specifier '@agent/shared-ui/vanilla' does not resolve to an analysed source (presence/displays/operator-surface/src/lib/view.ts#<module>)"
     ],
@@ -3032,6 +3067,9 @@
     ],
     "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun": [
+      "role argument `snapshot.identity.role` could not be resolved at scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun"
     ],
     "scripts/refactor/adf-input.ts#readWorkflowModuleInput": [
       "dynamic import with a computed specifier at scripts/refactor/adf-input.ts#readWorkflowModuleInput"
@@ -3559,6 +3597,7 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
@@ -3569,6 +3608,7 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3578,6 +3618,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -3904,11 +3945,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3918,6 +3961,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -4424,12 +4468,14 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/surface/surface-management-mutations.ts#audit",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4439,6 +4485,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -4717,11 +4764,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4731,6 +4780,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5064,11 +5114,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5078,6 +5130,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5364,11 +5417,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5378,6 +5433,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5818,6 +5874,7 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
@@ -5832,6 +5889,7 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5841,6 +5899,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5879,20 +5938,10 @@
           "example_path": ["scripts/oauth_callback_surface.ts#<module>"]
         }
       },
-      "unresolved_sites": [],
-      "policy_roles_not_reachable": [
-        "chronos_gateway",
-        "chronos_tenant_runner",
-        "infrastructure_sentinel",
-        "knowledge_steward",
-        "metrics_cap_reader",
-        "organization_operator",
-        "peer_catalog_reader",
-        "peer_responder_reader",
-        "peer_task_artifact_writer",
-        "scope_locale_reader",
-        "slack_bridge"
-      ]
+      "unresolved_sites": [
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce"
+      ],
+      "policy_roles_not_reachable": []
     },
     "operator_surface": {
       "entries": [
@@ -6191,11 +6240,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "presence/displays/operator-surface/src/lib/view.ts#<module>",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -6206,6 +6257,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -6536,11 +6588,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -6550,6 +6604,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -6805,11 +6860,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -6819,6 +6876,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7110,11 +7168,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7124,6 +7184,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7433,11 +7494,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7447,6 +7510,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7725,11 +7789,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7739,6 +7805,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -8018,11 +8085,13 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
         "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
@@ -8034,6 +8103,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -8284,12 +8354,14 @@
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
         "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
         "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
+        "libs/core/workforce/work-coordination.ts#continueSuspendedPipelineWorkItem",
         "satellites/shared/supervise-child.ts#spawnSupervisedChild",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -8300,6 +8372,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],

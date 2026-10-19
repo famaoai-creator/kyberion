@@ -142,7 +142,7 @@ describe('runDotSweepOnce org budget hard throttle', () => {
     });
   });
 
-  it('fails open when the budget evaluation throws', async () => {
+  it('holds wakes when the budget evaluation throws', async () => {
     const woken: string[] = [];
     await runDotSweepOnce(NOW, {
       listCharters: () => [A],
@@ -154,7 +154,7 @@ describe('runDotSweepOnce org budget hard throttle', () => {
         throw new Error('policy unreadable');
       },
     });
-    expect(woken).toEqual(['a']);
+    expect(woken).toEqual([]);
     expect(
       mocks.logger.warn.mock.calls.some(([line]) =>
         String(line).includes('budget evaluation failed')

@@ -1,4 +1,23 @@
 import * as nodePath from 'node:path';
+import { redactSensitiveValue } from '@agent/core/network';
+import { maskActiveSecrets } from '@agent/core/secret/secret-guard';
+import {
+  assertHumanExecutionNotPreviouslyClaimed,
+  claimHumanExecutionAuthorization,
+  runHumanExecutionAuthorization,
+} from '@agent/core/governance/human-execution';
+import {
+  authorizeDelegatedExecution,
+  delegatedExecutionBindingHash,
+  hasDelegatedOperationMapping,
+  runDelegatedExecution,
+  runtimeDelegatedTarget,
+  type DelegatedExecutionTarget,
+} from '@agent/core/governance/delegated-execution';
+import {
+  lookupOpCapability,
+  resolveCapabilityEffect,
+} from '@agent/core/actuator/actuator-manifest-index';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, type SafeShell } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
@@ -26,6 +45,7 @@ import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
   assertPipelineExecutionCurrent,
+  PipelineSuspendedError,
   resolveStepType,
   resolveExportKey,
   buildReasoningPolicyNote,
@@ -183,7 +203,7 @@ export function resolveEngineStepType(step: PipelineAdfStep): 'apply' | 'control
 }
 
 export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
-  return steps.map((step) => {
+  return steps.map((step, stepIndex) => {
     const normalizedOp = normalizePipelineOp(step.op);
     const [domain, action] = normalizedOp.split(':');
     const declaredTimeoutMs =
@@ -197,6 +217,7 @@ export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
     }
     return {
       ...step,
+      id: step.id || `generated-step-${stepIndex + 1}`,
       params,
       ...(declaredTimeoutMs !== undefined && step.timeout_ms === undefined
         ? { timeout_ms: declaredTimeoutMs }
@@ -395,7 +416,8 @@ export async function dispatchProgrammaticToolCall(
  */
 export async function hasBoundApproval(
   step: PipelineAdfStep,
-  ctx: Record<string, unknown>
+  ctx: Record<string, unknown>,
+  exact?: { target: DelegatedExecutionTarget; runId: string }
 ): Promise<boolean> {
   // ES-02: a scenario run may approve an op only when a fixture serves it,
   // so this never admits a real side effect. Unregistered -> false.
@@ -431,10 +453,293 @@ export async function hasBoundApproval(
     }
     // Separation of duties: an unusable approval binds nothing (refusal audited).
     assertApprovalUsable(request, { consumer: 'pipeline_bound_approval' });
+    if (
+      exact &&
+      (request.requestedByContext?.pipelineRunId !== exact.runId ||
+        request.requestedByContext?.executionBindingHash !==
+          delegatedExecutionBindingHash(exact.target))
+    )
+      return false;
     return true;
   } catch {
     return false;
   }
+}
+
+/** Human approvals and charter delegations retain distinct provenance. */
+export async function hasBoundExecutionAuthorization(
+  step: PipelineAdfStep,
+  ctx: Record<string, unknown>,
+  opts?: RunStepsOptions
+): Promise<boolean> {
+  const params = resolveParamsRecursive(
+    (step.params || {}) as Record<string, unknown>,
+    ctx
+  ) as Record<string, unknown>;
+  const target = runtimeDelegatedTarget(normalizePipelineOp(step.op), params, step.id || step.op);
+  const strict =
+    opts?.delegatedExecution === 'require' ||
+    Boolean(target && hasDelegatedOperationMapping(target.operationId));
+  if (
+    (!strict || (target && opts?.runId)) &&
+    (await hasBoundApproval(
+      step,
+      ctx,
+      strict ? { target: target!, runId: opts!.runId! } : undefined
+    ))
+  )
+    return true;
+  if (strict && target && opts?.runId && opts.resumeState?.suspended?.step_id === step.id) {
+    await awaitHumanExecutionAuthorization(step, target, opts);
+    return true;
+  }
+  if (target && authorizeDelegatedExecution(target).allowed) return true;
+  if (strict && target && opts?.runId && step.budget?.approval_required) {
+    await awaitHumanExecutionAuthorization(step, target, opts);
+    return true;
+  }
+  return false;
+}
+
+function effectNeedsAuthorization(op: string, params: Record<string, unknown>): boolean {
+  if (['core:transform', 'core:ptc', 'system:exec', 'system:shell'].includes(op)) return true;
+  // These engine-owned operations compose work or wait; every nested effect
+  // is checked again with the restrictive execution option inherited.
+  if (['core:run_pipeline', 'core:wait', 'system:log'].includes(op)) return false;
+  // A generic service capture can invoke a POST preset.
+  if (op.startsWith('service:')) return true;
+  const capability = lookupOpCapability(op);
+  return !capability || resolveCapabilityEffect(capability, params) !== 'read';
+}
+
+async function runLeafEffect<T>(
+  step: PipelineAdfStep,
+  ctx: Record<string, unknown>,
+  opts: RunStepsOptions,
+  actualParams: Record<string, unknown>,
+  effect: () => Promise<T>
+): Promise<T> {
+  // The existing receipt-only diagnostic has its own exact human-approved
+  // pipeline/input proof; revalidate that proof rather than minting a second grant.
+  if (opts.executionMode === 'front_desk_diagnostic') {
+    if (!opts.validateDiagnosticEffect) throw new Error('Diagnostic effect validator required');
+    opts.validateDiagnosticEffect();
+    return effect();
+  }
+  const params = resolveParamsRecursive(actualParams, ctx) as Record<string, unknown>;
+  const target = runtimeDelegatedTarget(normalizePipelineOp(step.op), params, step.id || step.op);
+  const strict =
+    opts.delegatedExecution === 'require' ||
+    Boolean(target && hasDelegatedOperationMapping(target.operationId));
+  if (
+    (!strict || (target && opts.runId)) &&
+    (await hasBoundApproval(
+      step,
+      ctx,
+      strict ? { target: target!, runId: opts.runId! } : undefined
+    ))
+  ) {
+    if (!strict) return effect();
+    const ref = step.budget?.approval_ref;
+    const decision =
+      typeof ref === 'string' ? (ctx[ref] as Record<string, unknown> | undefined) : undefined;
+    // Scenario approvals are admitted only when a fixture intercepts the op.
+    if (!decision) return effect();
+    return requestHumanExecutionAuthorization(step, target!, opts, effect, {
+      channel: String(decision.storage_channel),
+      requestId: String(decision.approval_request_id),
+    });
+  }
+  if (target && hasDelegatedOperationMapping(target.operationId)) {
+    const authorization = authorizeDelegatedExecution(target);
+    opts.trace?.addEvent('delegated_execution.authorization', {
+      operation_id: target.operationId,
+      permit_id: authorization.permitId,
+      allowed: authorization.allowed,
+      reason: authorization.reason,
+    });
+    if (authorization.allowed) return runDelegatedExecution(target, effect);
+    return requestHumanExecutionAuthorization(step, target, opts, effect);
+  }
+  if (
+    opts.delegatedExecution === 'require' &&
+    effectNeedsAuthorization(normalizePipelineOp(step.op), params)
+  ) {
+    if (!target)
+      throw new Error(
+        `[DELEGATED_EXECUTION_REQUIRED] ${step.op} needs a trusted task or mission identity`
+      );
+    return requestHumanExecutionAuthorization(step, target, opts, effect);
+  }
+  return effect();
+}
+
+/** Suspend the original run before effects; human approval is a separate one-shot capability. */
+export async function requestHumanExecutionAuthorization<T>(
+  step: PipelineAdfStep,
+  target: DelegatedExecutionTarget,
+  opts: RunStepsOptions,
+  effect: () => Promise<T>,
+  explicit?: { channel: string; requestId: string }
+): Promise<T> {
+  const { record, channel } = await awaitHumanExecutionAuthorization(step, target, opts, explicit);
+  const { recordApprovalApplyResult } = await import('@agent/core/governance/approval-store');
+  const claimed = claimHumanExecutionAuthorization(target, { channel, requestId: record.id });
+  assertPipelineExecutionCurrent(opts);
+  // An exception leaves the durable claim intact, requiring reconciliation.
+  const result = await runHumanExecutionAuthorization(
+    target,
+    { channel, requestId: record.id, claimId: claimed.applyClaim.claimId },
+    effect
+  );
+  recordApprovalApplyResult('mission_controller', {
+    channel,
+    requestId: record.id,
+    claimId: claimed.applyClaim.claimId,
+    applyResult: {
+      result: 'success',
+      appliedBy: target.agentId,
+      appliedAt: new Date().toISOString(),
+    },
+  });
+  return result;
+}
+
+async function awaitHumanExecutionAuthorization(
+  step: PipelineAdfStep,
+  target: DelegatedExecutionTarget,
+  opts: RunStepsOptions,
+  explicit?: { channel: string; requestId: string }
+): Promise<{
+  record: import('@agent/core/governance/approval-store').ApprovalRequestRecord;
+  channel: string;
+}> {
+  const { isDelegatedExecutionReplayBlocked, delegatedExecutionIdentity } =
+    await import('@agent/core/governance/delegated-execution');
+  if (isDelegatedExecutionReplayBlocked(target))
+    throw new Error(
+      '[EXECUTION_RECONCILIATION_REQUIRED] Original effect was claimed; human approval cannot authorize replay'
+    );
+  if (!opts.runId || !step.id)
+    throw new Error(
+      '[EXECUTION_IDENTITY_REQUIRED] Durable run and step identity required for approval'
+    );
+  const {
+    assertApprovalUsable,
+    createApprovalRequest,
+    isApprovalRequestExpired,
+    loadApprovalRequest,
+    validateHumanFinalDecision,
+  } = await import('@agent/core/governance/approval-store');
+  const binding = delegatedExecutionBindingHash(target);
+  const suspended = opts.resumeState?.suspended;
+  const selected =
+    explicit ??
+    (suspended?.step_id === step.id
+      ? { channel: suspended.storage_channel, requestId: suspended.approval_request_id }
+      : undefined);
+  assertHumanExecutionNotPreviouslyClaimed(target);
+  const existing = selected ? loadApprovalRequest(selected.channel, selected.requestId) : undefined;
+  if (selected) {
+    if (
+      !existing ||
+      existing.requestedByContext?.pipelineRunId !== opts.runId ||
+      existing.requestedByContext?.targetStepId !== step.id ||
+      existing.requestedByContext?.executionBindingHash !== binding ||
+      existing.scope?.tenant_slug !== target.tenantSlug ||
+      existing.accountability?.finalDecision !== 'human_only' ||
+      existing.accountability.payloadHash !== binding
+    )
+      throw new Error('[EXECUTION_APPROVAL_CHANGED] Resume target differs from original approval');
+    if (isApprovalRequestExpired(existing))
+      throw new Error(
+        '[EXECUTION_APPROVAL_EXPIRED] Original request expired; reconcile before requesting a new operation'
+      );
+    if (existing.status === 'approved') {
+      if (existing.decidedByType !== 'human')
+        throw new Error('[EXECUTION_HUMAN_REQUIRED] A human must decide this request');
+      assertApprovalUsable(existing, { consumer: 'pipeline_effect' });
+      validateHumanFinalDecision({
+        accountability: existing.accountability,
+        decidedByType: existing.decidedByType,
+        authenticated: existing.authenticated,
+        authMethod: existing.decidedAuthMethod,
+        payloadHash: binding,
+        effectBinding: existing.accountability?.effectBinding,
+        mode: 'enforce',
+        channel: existing.channel,
+      });
+      return { record: existing, channel: selected.channel };
+    }
+    if (existing.status !== 'pending')
+      throw new Error(
+        `[EXECUTION_APPROVAL_UNUSABLE] Original request is ${existing.status}; reconcile without replay`
+      );
+    throw new PipelineSuspendedError({
+      ...suspended,
+      step_id: step.id,
+      approval_request_id: existing.id,
+      storage_channel: selected.channel,
+      on_timeout: 'abort',
+      execution_binding_hash: binding,
+    });
+  }
+  const channel = `pipeline-execution-${target.tenantSlug}`;
+  const timeoutAt = new Date(Date.now() + 86_400_000).toISOString();
+  const record = createApprovalRequest('mission_controller', {
+    channel,
+    threadTs: `${opts.runId}:${step.id}`,
+    correlationId: `pipeline:${opts.runId}:${step.id}`,
+    requestedBy: `pipeline:${opts.runId}`,
+    kind: 'mission_gate',
+    expiresAt: timeoutAt,
+    scope: {
+      tier:
+        opts.runJournal?.state().started?.library_execution?.payload_scope.tier ?? 'confidential',
+      tenant_slug: target.tenantSlug,
+      organization_id: target.source.organizationId,
+      project_id: target.source.projectId,
+      mission_id: target.source.missionId,
+      task_id: target.source.taskId,
+    },
+    requestedByContext: {
+      surface: 'system',
+      actorId: `pipeline:${opts.runId}`,
+      actorRole: target.callerRole ?? 'pipeline',
+      missionId: target.source.missionId,
+      stepId: step.id,
+      targetStepId: step.id,
+      pipelineRunId: opts.runId,
+      executionBindingHash: binding,
+      executionIdentity: delegatedExecutionIdentity(target),
+    },
+    source: { agentId: target.agentId, missionId: target.source.missionId },
+    accountability: {
+      finalDecision: 'human_only',
+      payloadHash: binding,
+      effectBinding: `pipeline:${opts.runId}:${step.id}:${binding}`,
+    },
+    draft: {
+      title: `Approve operation: ${target.operationId}`,
+      severity: 'high',
+      summary: `Tenant ${target.tenantSlug}; resume original run ${opts.runId}, step ${step.id}.`,
+      details: maskActiveSecrets(JSON.stringify(redactSensitiveValue(target.params), null, 2)),
+    },
+    justification: {
+      reason: 'Operation exceeds verified delegated authority',
+      requestedEffects: [target.operationId],
+      evidence: [`execution-binding:${binding}`],
+    },
+  });
+  throw new PipelineSuspendedError({
+    step_id: step.id,
+    approval_request_id: record.id,
+    storage_channel: channel,
+    on_timeout: 'abort',
+    timeout_at: timeoutAt,
+    execution_binding_hash: binding,
+    reason: 'Human authorization required for this exact operation; resume the original run',
+  });
 }
 
 /** All non-control ops (system:*, core:wait/run_janitor/transform/ptc, reasoning:*, actuator dispatch). */
@@ -496,6 +801,15 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
       quiet: opts.quiet,
       hasHuman: opts.hasHuman,
     });
+    if (nested.status === 'suspended') {
+      const childRunId =
+        typeof nested.context.pipeline_run_id === 'string'
+          ? nested.context.pipeline_run_id
+          : 'see child journal';
+      throw new Error(
+        `[PIPELINE_NESTED_SUSPENDED] Child pipeline awaits a human decision (${childRunId}); parent effects remain held. Reconcile the child dependency before resuming the parent.`
+      );
+    }
     const exportKey = String(params.export_as || 'pipeline_result');
     return {
       ...ctx,
@@ -857,7 +1171,7 @@ export async function dispatchLeafOp(
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
 
-  const approvalGranted = await hasBoundApproval(step, ctx);
+  const approvalGranted = await hasBoundExecutionAuthorization(step, ctx, opts);
   const preflight = await runOpPreflight({
     op: normalizedOp,
     params,
@@ -873,6 +1187,14 @@ export async function dispatchLeafOp(
     listener_count: preflight.listener_ids.length,
     guard_count: preflight.guard_ids.length,
   });
+  if (preflight.decision === 'ask' && opts.delegatedExecution === 'require') {
+    const target = runtimeDelegatedTarget(
+      normalizedOp,
+      resolveParamsRecursive(params, ctx) as Record<string, unknown>,
+      step.id || step.op
+    );
+    if (target) await awaitHumanExecutionAuthorization(step, target, opts);
+  }
   if (preflight.decision !== 'allow') {
     throw new Error(
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${normalizedOp} was not admitted.`}`
@@ -926,17 +1248,24 @@ export async function dispatchLeafOp(
 
   const inlineHandler = INLINE_OP_HANDLERS[`${domain}:${action}`];
   if (inlineHandler) {
-    return (await inlineHandler({
+    return runLeafEffect(
       step,
-      domain,
-      action,
-      params,
       ctx,
-      rootDir,
-      shellBin,
       opts,
-      stepPolicy,
-    })) as Record<string, unknown>;
+      params,
+      async () =>
+        (await inlineHandler({
+          step,
+          domain,
+          action,
+          params,
+          ctx,
+          rootDir,
+          shellBin,
+          opts,
+          stepPolicy,
+        })) as Record<string, unknown>
+    );
   }
 
   // Emit capability.missing before dispatch so the trace records the gap
@@ -998,18 +1327,20 @@ async function dispatchResolvedActuatorOperation(
   const effectiveType = resolveStepType(step);
   const dispatch = await loadActuatorDispatch(domain, resolvedOperation);
   assertPipelineExecutionCurrent(opts);
-  const result = await dispatch(
-    action,
-    {
-      ...params,
-      _reasoning_policy: stepPolicy,
-      _facets: step.facets,
-      _step_id: step.id || step.op,
-    },
-    ctx,
-    effectiveType,
-    opts.trace,
-    stepPolicy
+  const result = await runLeafEffect(step, ctx, opts, params, () =>
+    dispatch(
+      action,
+      {
+        ...params,
+        _reasoning_policy: stepPolicy,
+        _facets: step.facets,
+        _step_id: step.id || step.op,
+      },
+      ctx,
+      effectiveType,
+      opts.trace,
+      stepPolicy
+    )
   );
   if (!result.handled) {
     throw new Error(`Unsupported pipeline op: ${step.op}`);

@@ -32,8 +32,14 @@ import {
   recordAutonomyExecution,
   sweepAutonomyActionStates,
 } from '@agent/core/governance/autonomy-action-state';
-import { listWorkItems } from '@agent/core/workforce/work-coordination';
+import {
+  listWorkItems,
+  claimWorkItem,
+  releaseWorkItem,
+} from '@agent/core/workforce/work-coordination';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
+import { evaluateMissionStartMandate } from '@agent/core/governance/mandate-shadow';
+import { resolveDotMissionAdmission } from '@agent/core/mission/mission-admission';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -473,20 +479,29 @@ if (
 
 /**
  * Blocked mission-shaped WorkItems are dot escalations awaiting an operator's
- * `mission_controller start`. Each gets a gate verdict appended to the
- * autonomy ledger — the notify-soak evidence that eventually justifies
- * auto-start for in-mandate work. Records only; never starts a mission.
+ * `mission_controller start`. Exact tenant-bound mandates may admit internal
+ * starts; unknown facts stay blocked. Only verified execution builds learning.
  */
 export async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
-  const items = listWorkItems({ status: ['blocked'] });
+  const items = listWorkItems({ status: ['blocked', 'ready'], ...deps });
   for (const item of items) {
     if (item.metadata?.requested_work_shape !== 'mission') continue;
     try {
       // Unscoped proposals cannot be promoted into a guessed/default tenant.
       if (!item.context?.tenant_slug) continue;
       const scopedDeps = { ...deps, tenantSlug: item.context.tenant_slug };
+      const admission = () => {
+        const typed = resolveDotMissionAdmission(item, deps);
+        return evaluateMissionStartMandate({
+          tenant_slug: item.context!.tenant_slug!,
+          mandate_id: typed.mandate_ref,
+          facts: typed.mandate_facts,
+        });
+      };
+      // Metadata is a request, never authority. Legacy shadow catalogs hold.
+      if (!admission().covered) continue;
       const verdict = evaluateAutonomousOpsAction({
-        actionId: item.metadata?.mandate_ref ? 'mission_start_mandate' : 'mission_start',
+        actionId: 'mission_start_mandate',
         ...(item.context?.tenant_slug ? { tenantSlug: item.context.tenant_slug } : {}),
       });
       // A verdict is not an execution receipt. Blocked/allowed evaluations
@@ -494,14 +509,27 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
       // Auto-fire: only when the gate itself allows (auto tier, shadow lifted by
       // evidence promotion). mission_start never reaches here today — the
       // unknown action fail-closes to approve — so only in-mandate proposals
-      // can auto-start, and only after the ledger's clean-soak promotion.
+      // can auto-start after successful execution evidence permits promotion.
       if (verdict.allowed && verdict.decision === 'auto') {
+        let claimed: ReturnType<typeof claimWorkItem> | undefined;
         try {
           const missionId =
             typeof item.metadata?.mission_id === 'string'
               ? item.metadata.mission_id
               : item.item_id.replace(/[^a-zA-Z0-9-]/g, '-').toUpperCase();
           const { main: missionMain } = await import('./mission_controller.js');
+          // Re-read governed authority after asynchronous loading. Revocation
+          // and expiry must be checked at the actual admission boundary.
+          if (!admission().covered) continue;
+          claimed = claimWorkItem({
+            itemId: item.item_id,
+            actorPeerId: 'mission_controller',
+            purpose: 'internal mission admission',
+            requireNewLease: true,
+            expectedVersion: item.version,
+            idempotencyKey: `mission-admission:${missionId}`,
+            ttlMs: 300000,
+          });
           const argv = [
             'start',
             missionId,
@@ -511,17 +539,38 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             'worker',
             '--tenant',
             item.context.tenant_slug,
+            '--admission-work-item',
+            item.item_id,
+            '--goal',
+            item.description,
+            ...(item.context.organization_id
+              ? ['--organization-id', item.context.organization_id]
+              : []),
+            ...(item.context.project_id ? ['--project-id', item.context.project_id] : []),
             '--tenant-slug',
             item.context.tenant_slug,
           ];
           await missionMain(argv);
           const { loadState } = await import('@agent/core/mission/mission-state');
           const started = loadState(missionId, deps);
-          if (!started || started.tenant_slug !== item.context.tenant_slug) {
+          if (
+            !started ||
+            started.status !== 'active' ||
+            started.tenant_slug !== item.context.tenant_slug
+          ) {
             throw new Error(
               `mission start has no matching tenant-scoped state receipt: ${missionId}`
             );
           }
+          releaseWorkItem({
+            itemId: item.item_id,
+            leaseId: claimed.lease.lease_id,
+            actorPeerId: 'mission_controller',
+            nextStatus: 'done',
+            effectDisposition: 'completed',
+            summary: `internal mission admitted: ${missionId}`,
+          });
+          claimed = undefined;
           recordAutonomyExecution(
             {
               action_id: verdict.actionId,
@@ -534,6 +583,15 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             `[WATCHDOG] auto-started mission ${missionId} from ${item.item_id} | next: mission follows normal controller lifecycle | evidence: ${item.item_id}`
           );
         } catch (error) {
+          if (claimed)
+            releaseWorkItem({
+              itemId: item.item_id,
+              leaseId: claimed.lease.lease_id,
+              actorPeerId: 'mission_controller',
+              nextStatus: 'blocked',
+              summary:
+                'internal mission admission held; inspect lifecycle evidence before continuing',
+            });
           recordAutonomyExecution(
             {
               action_id: verdict.actionId,

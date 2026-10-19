@@ -67,7 +67,8 @@ export interface WorkEffectOwnership {
   state: 'held' | 'settled';
   acquired_at: string;
   settled_at?: string;
-  settlement?: 'completed' | 'pre_effect' | 'human_verified';
+  settlement?: 'completed' | 'pre_effect' | 'human_verified' | 'execution_aborted';
+  settlement_evidence_ref?: string;
   approval_request_id?: string;
 }
 

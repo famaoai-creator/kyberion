@@ -34,6 +34,9 @@ import { storagePartitionSegments, PARTITIONED_RUNTIME_STATE_ROOTS } from '../st
 import { withLockSync } from '../foundation/lock-utils.js';
 import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
+import { withExecutionContext } from '../authority.js';
+import { autonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 
 const logger = createLogger('autonomy-action-state');
 
@@ -76,6 +79,19 @@ export interface AutonomyStateDeps {
   tenantSlug?: string;
 }
 
+/** Only this store's typed operations receive the bounded tenant writer role.
+ * Alternate fixture roots retain the original caller's permissions. */
+function withTenantAutonomyStore<T>(deps: AutonomyStateDeps, operation: () => T): T {
+  if (!deps.tenantSlug || (deps.rootDir && path.resolve(deps.rootDir) !== pathResolver.rootDir()))
+    return operation();
+  const directory = pathResolver.toRepoRelative(
+    path.dirname(filePath(deps, AUTONOMY_OUTCOMES_PATH))
+  );
+  return runInResourceAccessScope(autonomyLearningCapability(deps.tenantSlug, directory), () =>
+    withExecutionContext('autonomy_learning_store', operation, undefined, deps.tenantSlug)
+  );
+}
+
 function filePath(deps: AutonomyStateDeps, rel: string): string {
   // Resolve the protected runtime partition through canonical storage rules.
   // Never read legacy system evidence
@@ -91,9 +107,14 @@ function filePath(deps: AutonomyStateDeps, rel: string): string {
         path.basename(rel)
       )
     : rel;
-  return assertSafeRepositoryPath(path.join(deps.rootDir ?? pathResolver.rootDir(), scoped), {
-    allowMissingLeaf: true,
-  });
+  return assertSafeRepositoryPath(
+    deps.rootDir && path.resolve(deps.rootDir) !== pathResolver.rootDir()
+      ? path.join(deps.rootDir, scoped)
+      : pathResolver.rootResolve(scoped),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 /** Append a gate decision (and optional execution result) to the ledger. */
@@ -102,16 +123,19 @@ export function recordAutonomyOutcome(
   deps: AutonomyStateDeps = {}
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
-  safeMkdir(path.dirname(p), { recursive: true });
-  appendJsonLine(
-    p,
-    {
-      ...row,
-      receipt_id: row.receipt_id ?? randomUUID(),
-      recorded_at: (deps.now?.() ?? new Date()).toISOString(),
-    },
-    { leadingNewline: true }
-  );
+  const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  withTenantAutonomyStore(deps, () => {
+    safeMkdir(path.dirname(p), { recursive: true });
+    appendJsonLine(
+      p,
+      {
+        ...row,
+        receipt_id: row.receipt_id ?? randomUUID(),
+        recorded_at: recordedAt,
+      },
+      { leadingNewline: true }
+    );
+  });
 }
 
 /** Record an execution result without double-counting the decision row
@@ -121,29 +145,34 @@ export function recordAutonomyExecution(
   deps: AutonomyStateDeps = {}
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
-  safeMkdir(path.dirname(p), { recursive: true });
-  appendJsonLine(
-    p,
-    {
-      kind: 'execution',
-      receipt_id: row.receipt_id,
-      action_id: row.action_id,
-      executed: true,
-      ok: row.ok,
-      ...(row.error ? { error: row.error } : {}),
-      recorded_at: (deps.now?.() ?? new Date()).toISOString(),
-    },
-    { leadingNewline: true }
-  );
+  const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  withTenantAutonomyStore(deps, () => {
+    safeMkdir(path.dirname(p), { recursive: true });
+    appendJsonLine(
+      p,
+      {
+        kind: 'execution',
+        receipt_id: row.receipt_id,
+        action_id: row.action_id,
+        executed: true,
+        ok: row.ok,
+        ...(row.error ? { error: row.error } : {}),
+        recorded_at: recordedAt,
+      },
+      { leadingNewline: true }
+    );
+  });
 }
 
 /** Distinct action ids present in the ledger — sweeps must cover every
  *  recorded action, not a hardcoded subset, or most promotions never fire. */
 export function listAutonomyActionIds(deps: AutonomyStateDeps = {}): string[] {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
-  if (!safeExistsSync(p)) return [];
+  if (!withTenantAutonomyStore(deps, () => safeExistsSync(p))) return [];
   const ids = new Set<string>();
-  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p, { onMalformed: 'skip' })) {
+  for (const row of withTenantAutonomyStore(deps, () =>
+    readJsonLines<Partial<AutonomyOutcomeRow>>(p, { onMalformed: 'skip' })
+  )) {
     if (typeof row?.action_id === 'string' && row.action_id) ids.add(row.action_id);
   }
   return [...ids];
@@ -172,15 +201,17 @@ export function actionAutonomyStats(
     incidents: 0,
     outcome_success: 0,
   };
-  if (!safeExistsSync(p)) return stats;
+  if (!withTenantAutonomyStore(deps, () => safeExistsSync(p))) return stats;
   const successfulReceipts = new Set<string>();
   // Corruption must not erase a possible failure and leave only successful
   // evidence. Exceed even the largest validated incident allowance.
-  for (const row of readJsonLines<Partial<AutonomyOutcomeRow>>(p, {
-    onMalformed: () => {
-      stats.incidents = Number.MAX_SAFE_INTEGER;
-    },
-  })) {
+  for (const row of withTenantAutonomyStore(deps, () =>
+    readJsonLines<Partial<AutonomyOutcomeRow>>(p, {
+      onMalformed: () => {
+        stats.incidents = Number.MAX_SAFE_INTEGER;
+      },
+    })
+  )) {
     if (!row || typeof row !== 'object' || typeof row.action_id !== 'string' || !row.action_id) {
       stats.incidents = Number.MAX_SAFE_INTEGER;
       continue;
@@ -235,7 +266,7 @@ function loadOverrides(deps: AutonomyStateDeps): ActionOverridesFile {
   const p = filePath(deps, AUTONOMY_OVERRIDES_PATH);
   let parsed: ActionOverridesFile | null;
   try {
-    parsed = readJsonIfPresent<ActionOverridesFile>(p);
+    parsed = withTenantAutonomyStore(deps, () => readJsonIfPresent<ActionOverridesFile>(p));
   } catch {
     return { version: 1, overrides: {} };
   }
@@ -263,8 +294,10 @@ function loadOverrides(deps: AutonomyStateDeps): ActionOverridesFile {
 
 function saveOverrides(state: ActionOverridesFile, deps: AutonomyStateDeps): void {
   const p = filePath(deps, AUTONOMY_OVERRIDES_PATH);
-  safeMkdir(path.dirname(p), { recursive: true });
-  safeWriteFile(p, JSON.stringify(state, null, 2) + '\n');
+  withTenantAutonomyStore(deps, () => {
+    safeMkdir(path.dirname(p), { recursive: true });
+    safeWriteFile(p, JSON.stringify(state, null, 2) + '\n');
+  });
 }
 
 /**

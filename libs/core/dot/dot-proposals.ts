@@ -14,13 +14,21 @@
 
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
 import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
+import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
 
 export type DotWorkShape = 'mission' | 'task_session' | 'pipeline' | 'direct_reply';
 export type DotDecisionLevel = 'auto' | 'notify' | 'approve';
 
+import {
+  parseMissionAdmissionRequest,
+  type MissionAdmissionRequest,
+} from '../governance/mandate-shadow.js';
+
 export interface DotProposal {
+  /** Proposed internal admission facts; never tool authority. */
+  mission_admission?: MissionAdmissionRequest;
   /** Trusted configuration binding; model normalization deliberately discards it. */
   continuous_work?: ContinuousWorkPlan;
   /** Internal server-owned binding; never accepted by the model proposal parser. */
@@ -119,6 +127,34 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
             'Use a shape your charter allows (listed in your bounds): pipeline with an allowed pipeline_ref, or direct_reply for advice. task_session is refused while no task-session executor is configured.',
         },
         rationale: { type: 'string' },
+        mission_admission: {
+          type: 'object',
+          description:
+            'Optional internal mission admission under a mandate listed by this Dot charter; never tool permission.',
+          properties: {
+            mandate_ref: { type: 'string' },
+            mandate_facts: {
+              type: 'object',
+              properties: {
+                work_type: { type: 'string' },
+                paths: { type: 'array', items: { type: 'string' } },
+                estimated_cost: { type: 'number' },
+                currency: { type: 'string' },
+                external_effects: { type: 'array', items: { type: 'string' } },
+                risk_level: { type: 'integer' },
+              },
+              required: [
+                'work_type',
+                'paths',
+                'estimated_cost',
+                'currency',
+                'external_effects',
+                'risk_level',
+              ],
+            },
+          },
+          required: ['mandate_ref', 'mandate_facts'],
+        },
         changed_paths: { type: 'array', items: { type: 'string' } },
         requested_decision: { type: 'string', enum: [...DECISIONS] },
         handoff_to: { type: 'string', description: 'dot_id to hand this work to.' },
@@ -165,6 +201,9 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     throw new Error('proposal must be an object');
   }
   const raw = value as Record<string, unknown>;
+  const missionAdmission = parseMissionAdmissionRequest(raw.mission_admission);
+  if (missionAdmission && (raw.work_shape !== 'mission' || raw.handoff_to))
+    throw new Error('mission_admission requires direct mission work');
   const workShape = raw.work_shape;
   if (!WORK_SHAPES.includes(workShape as DotWorkShape)) {
     throw new Error(`work_shape must be one of ${WORK_SHAPES.join(', ')}`);
@@ -215,6 +254,7 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     : undefined;
   return {
     action_id: handoffTo ? DOT_HANDOFF_ACTION_ID : DEFAULT_DOT_ACTION_ID,
+    ...(missionAdmission ? { mission_admission: missionAdmission } : {}),
     title: text(raw.title, 'title', 200),
     objective: text(raw.objective, 'objective'),
     work_shape: workShape as DotWorkShape,
@@ -240,8 +280,9 @@ export function collectDotProposals(values: readonly unknown[]): ParsedDotPropos
   const proposals: DotProposal[] = [];
   const errors: string[] = [];
   values.forEach((value, index) => {
-    if (proposals.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
-      errors.push(`proposal ${index}: dropped (more than ${MAX_DOT_PROPOSALS_PER_WAKE} per wake)`);
+    const limit = loadDotExecutionPolicy().intake.max_proposals_per_wake;
+    if (proposals.length >= limit) {
+      errors.push(`proposal ${index}: dropped (more than ${limit} per wake)`);
       return;
     }
     try {

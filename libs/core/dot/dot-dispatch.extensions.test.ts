@@ -137,16 +137,13 @@ afterEach(() => {
 });
 
 describe('dot-dispatch extension hooks', () => {
-  it('merges floor contributors into the strictest floor; a throwing one is skipped', () => {
-    DOT_FLOOR_CONTRIBUTORS.push(
-      {
-        id: 'boom',
-        floor: () => {
-          throw new Error('exploded');
-        },
+  it('raises the floor to approve when an authorization contributor throws', () => {
+    DOT_FLOOR_CONTRIBUTORS.push({
+      id: 'boom',
+      floor: () => {
+        throw new Error('exploded');
       },
-      { id: 'budget-soft', floor: () => 'approve' }
-    );
+    });
     const h = harness('auto');
     const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
     expect(h.gateInputs[0].requestedDecision).toBe('approve');
@@ -243,7 +240,7 @@ describe('dot-dispatch extension hooks', () => {
     expect(decisionOf({ ...harness('notify').deps, ...relaxable })).toBe('notify');
   });
 
-  it('a shadow disposition records only; a throwing override is skipped', () => {
+  it('a shadow disposition records only and an unavailable override keeps it record-only', () => {
     DOT_DISPOSITION_OVERRIDES.push(
       {
         id: 'boom',
@@ -257,9 +254,9 @@ describe('dot-dispatch extension hooks', () => {
     const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
     expect(records[0]).toMatchObject({
       status: 'shadow',
-      disposition_by: 'autonomy',
+      disposition_by: 'boom',
       gate_decision: 'approve',
-      reason: 'autonomy: L0',
+      reason: 'boom: authorization disposition unavailable: Error: exploded',
     });
     expect(h.routed).toHaveLength(0);
     expect(h.items).toHaveLength(0);
@@ -273,7 +270,8 @@ describe('dot-dispatch extension hooks', () => {
     });
     const plain = harness('auto');
     const second = dispatchDotProposals(CHARTER, [{ ...PROPOSAL, title: 'Other' }], plain.deps);
-    expect(second.records[0].status).toBe('dispatched');
+    expect(second.records[0].status).toBe('shadow');
+    expect(plain.items).toHaveLength(0);
   });
 
   it('refuses on a pre-gate check failure before the gate runs', () => {
@@ -281,6 +279,21 @@ describe('dot-dispatch extension hooks', () => {
     const h = harness('auto');
     const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
     expect(records[0]).toMatchObject({ status: 'refused', reason: 'arbitration: owned' });
+    expect(h.gateInputs).toHaveLength(0);
+  });
+
+  it('refuses when an authorization precheck throws instead of losing the constraint', () => {
+    DOT_PRE_GATE_CHECKS.push({
+      id: 'authority',
+      check: () => {
+        throw new Error('policy unavailable');
+      },
+    });
+    const h = harness('auto');
+    const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toContain('authorization check unavailable');
+    expect(h.items).toHaveLength(0);
     expect(h.gateInputs).toHaveLength(0);
   });
 

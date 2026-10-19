@@ -2,6 +2,7 @@ import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
+import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -62,6 +63,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
+  autonomy_learning_store: 'worker',
   audit_mirror_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
@@ -675,6 +677,7 @@ interface PreparedExecutionContext {
  * same as a process without a tenant.
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
+  'autonomy_learning_store',
   DISCUSSION_REQUEST_STORAGE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
@@ -715,6 +718,15 @@ function prepareExecutionContext(
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
+  if (
+    normalizedRole === 'autonomy_learning_store' &&
+    (!isAutonomyLearningCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  ) {
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability'
+    );
+  }
   if (
     normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
     (!isDiscussionRequestCapability(currentResourceAccessScope()) ||

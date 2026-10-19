@@ -210,6 +210,66 @@ useSeparationOfDutiesOverlay(
 );
 
 describe('dispatchDotProposals — decision and delegation', () => {
+  it('admits tenant planning into WorkItems without granting planned external effects', () => {
+    const h = harness();
+    const { records } = dispatchDotProposals(
+      CHARTER,
+      [
+        {
+          ...PROPOSAL,
+          objective: 'Classify a request to delete a public service and plan a payment',
+          changed_paths: ['AGENTS.md'],
+        },
+      ],
+      h.deps
+    );
+    expect(h.gateInputs[0]).toMatchObject({ actionId: 'dot_intake_work', tenantSlug: 'acme' });
+    expect(h.gateInputs[0].changedPaths).toBeUndefined();
+    expect(records[0]).toMatchObject({
+      status: 'dispatched',
+      admission_only: true,
+      gate_action_id: 'dot_intake_work',
+    });
+    expect(h.items[0].metadata).toMatchObject({
+      admission_only: true,
+      gate_action_id: 'dot_intake_work',
+    });
+    expect(h.items[0].metadata).not.toHaveProperty('permit_id');
+    expect(h.routed[0].gate.decision).toBe('auto');
+  });
+
+  it('does not exceed governed fanout even when batch dispatch uses per-proposal locks', () => {
+    const h = harness('auto', { countOpenWorkItems: () => 0 });
+    const { records } = dispatchDotProposals(
+      {
+        ...CHARTER,
+        authority: { ...CHARTER.authority, max_concurrent_delegations: 50 },
+      },
+      Array.from({ length: 11 }, (_, index) => ({ ...PROPOSAL, title: `Task ${index}` })),
+      h.deps
+    );
+    expect(h.items).toHaveLength(10);
+    expect(records[10]).toMatchObject({
+      status: 'refused',
+      reason: 'bounded intake fanout limit reached',
+    });
+  });
+
+  it('refuses an invalid explicit accountability ref before gate evaluation', () => {
+    const h = harness();
+    const { records } = dispatchDotProposals(
+      {
+        ...CHARTER,
+        authority: { ...CHARTER.authority, accountability_charter_ref: 'chr-missing' },
+      },
+      [PROPOSAL],
+      h.deps
+    );
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toContain('accountability authority refused');
+    expect(h.gateInputs).toHaveLength(0);
+  });
+
   it('delegates an auto action as a WorkItem stamped with the dot actor id', () => {
     const h = harness('auto');
     const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);

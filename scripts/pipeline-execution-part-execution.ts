@@ -1,4 +1,10 @@
 import { assertPipelineExecutionCurrent } from './pipeline-execution-part-bootstrap.js';
+import {
+  delegatedExecutionBindingHash,
+  delegatedExecutionIdentity,
+  runtimeDelegatedTarget,
+  withDelegatedExecutionFrame,
+} from '@agent/core/governance/delegated-execution';
 import { refineErrorClassification } from '@agent/core/error-classifier-judgment';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
@@ -53,6 +59,7 @@ import { runStepHooks } from './refactor/step-hooks.js';
 
 import {
   registeredEnv,
+  resolveParamsRecursive,
   resolveStepType,
   resolveExportKey,
   normalizeReasoningPolicy,
@@ -76,7 +83,7 @@ import {
   isSkip,
   dispatchLeafOp,
   findStepByIdRecursive,
-  hasBoundApproval,
+  hasBoundExecutionAuthorization,
 } from './pipeline-execution-part-control.js';
 
 /** Install on first use so a step that actually judges does not depend on the eager pre-pass. */
@@ -303,9 +310,13 @@ export async function runStepsInternal(
     const runBody = async (
       body: PipelineAdfStep[],
       seedCtx: Record<string, unknown>,
-      failureLabel: string
+      failureLabel: string,
+      iteration = 'branch'
     ) => {
-      const nested = await runNestedSteps(prepareEngineSteps(body), seedCtx);
+      const nested = await withDelegatedExecutionFrame(
+        `${currentStep?.id || rawOp}:${iteration}`,
+        () => runNestedSteps(prepareEngineSteps(body), seedCtx)
+      );
       if (nested.status === 'failed') {
         throw new Error(nested.results.find((r) => r.status === 'failed')?.error || failureLabel);
       }
@@ -336,7 +347,12 @@ export async function runStepsInternal(
         if (condition !== undefined && action !== 'retry_until_quality') {
           if (!evaluateCondition(condition, workingCtx)) break;
         }
-        const nested = await runBody(body, workingCtx, `${rawOp} iteration failed`);
+        const nested = await runBody(
+          body,
+          workingCtx,
+          `${rawOp} iteration failed`,
+          String(loopCount)
+        );
         workingCtx = nested.context;
         iterations.push({
           iteration: loopCount + 1,
@@ -506,7 +522,29 @@ export async function runStepsInternal(
           typeof params.approval_for === 'string' && params.approval_for.trim()
             ? params.approval_for.trim()
             : undefined;
-        const storageChannel = String(params.storage_channel || 'pipeline-approval');
+        let storageChannel = String(params.storage_channel || 'pipeline-approval');
+        const effectStep = targetStepId
+          ? findStepByIdRecursive(
+              prepareEngineSteps(steps) as unknown as PipelineAdfStep[],
+              targetStepId
+            )
+          : undefined;
+        const concreteTarget = effectStep
+          ? runtimeDelegatedTarget(
+              normalizePipelineOp(effectStep.op),
+              resolveParamsRecursive(effectStep.params || {}, ctx) as Record<string, unknown>,
+              effectStep.id!
+            )
+          : undefined;
+        const executionBindingHash = concreteTarget
+          ? delegatedExecutionBindingHash(concreteTarget)
+          : undefined;
+        const executionIdentity = concreteTarget
+          ? delegatedExecutionIdentity(concreteTarget)
+          : undefined;
+        if (opts.delegatedExecution === 'require' && concreteTarget) {
+          storageChannel = `pipeline-execution-${concreteTarget.tenantSlug}`;
+        }
         const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
           params.on_timeout as 'abort' | 'deny' | 'escalate'
         )
@@ -567,12 +605,28 @@ export async function runStepsInternal(
                 requestedBy: `pipeline:${opts.runId || 'pending'}`,
                 kind: 'mission_gate',
                 expiresAt: new Date(Date.now() + escalationTimeoutMs).toISOString(),
+                ...(concreteTarget && executionBindingHash
+                  ? {
+                      scope: {
+                        tenant_slug: concreteTarget.tenantSlug,
+                        mission_id: concreteTarget.source.missionId,
+                        task_id: concreteTarget.source.taskId,
+                      },
+                      accountability: {
+                        finalDecision: 'human_only' as const,
+                        payloadHash: executionBindingHash,
+                        effectBinding: `pipeline:${opts.runId}:${targetStepId}:${executionBindingHash}`,
+                      },
+                    }
+                  : {}),
                 requestedByContext: {
                   surface: 'system',
                   actorId: `pipeline:${opts.runId || 'pending'}`,
                   actorRole: 'pipeline',
                   stepId,
                   ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
+                  ...(executionBindingHash ? { executionBindingHash } : {}),
+                  ...(executionIdentity ? { executionIdentity } : {}),
                   ...(existing?.requestedByContext?.targetStepId
                     ? { targetStepId: existing.requestedByContext.targetStepId }
                     : {}),
@@ -584,7 +638,11 @@ export async function runStepsInternal(
                   ...(registeredEnv('MISSION_ID')
                     ? { missionId: registeredEnv('MISSION_ID') }
                     : {}),
-                  agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+                  ...(concreteTarget?.source ?? {}),
+                  agentId:
+                    concreteTarget?.agentId ??
+                    registeredEnv('KYBERION_AGENT_ID') ??
+                    'pipeline-orchestrator',
                 },
                 draft: {
                   title: `Escalated pipeline decision: ${stepId}`,
@@ -599,6 +657,7 @@ export async function runStepsInternal(
               throw new PipelineSuspendedError({
                 step_id: stepId,
                 approval_request_id: escalation.id,
+                execution_binding_hash: executionBindingHash,
                 storage_channel: suspended.storage_channel,
                 on_timeout: 'abort',
                 timeout_at: escalation.expiresAt,
@@ -624,6 +683,20 @@ export async function runStepsInternal(
           requestedBy: `pipeline:${opts.runId || 'pending'}`,
           kind: 'mission_gate',
           expiresAt: timeoutAt,
+          ...(concreteTarget && executionBindingHash
+            ? {
+                scope: {
+                  tenant_slug: concreteTarget.tenantSlug,
+                  mission_id: concreteTarget.source.missionId,
+                  task_id: concreteTarget.source.taskId,
+                },
+                accountability: {
+                  finalDecision: 'human_only' as const,
+                  payloadHash: executionBindingHash,
+                  effectBinding: `pipeline:${opts.runId}:${targetStepId}:${executionBindingHash}`,
+                },
+              }
+            : {}),
           requestedByContext: {
             surface: 'system',
             actorId: `pipeline:${opts.runId || 'pending'}`,
@@ -631,11 +704,17 @@ export async function runStepsInternal(
             stepId,
             ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
             ...(targetStepId ? { targetStepId } : {}),
+            ...(executionBindingHash ? { executionBindingHash } : {}),
+            ...(executionIdentity ? { executionIdentity } : {}),
             ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
           },
           source: {
             ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-            agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+            ...(concreteTarget?.source ?? {}),
+            agentId:
+              concreteTarget?.agentId ??
+              registeredEnv('KYBERION_AGENT_ID') ??
+              'pipeline-orchestrator',
           },
           draft: {
             title: String(approval.title || `Pipeline decision: ${stepId}`),
@@ -662,6 +741,7 @@ export async function runStepsInternal(
         throw new PipelineSuspendedError({
           step_id: stepId,
           approval_request_id: record.id,
+          execution_binding_hash: executionBindingHash,
           storage_channel: storageChannel,
           on_timeout: onTimeout,
           timeout_at: timeoutAt,
@@ -775,9 +855,14 @@ export async function runStepsInternal(
         const itemName = (params.as as string) || 'item';
         const originalItemValue = (ctx as any)[itemName];
         let workingCtx = ctx;
-        for (const item of items) {
+        for (const [itemIndex, item] of items.entries()) {
           const loopCtx = { ...workingCtx, [itemName]: item };
-          const nested = await runBody(subSteps, loopCtx, 'core:foreach item failed');
+          const nested = await runBody(
+            subSteps,
+            loopCtx,
+            'core:foreach item failed',
+            String(itemIndex)
+          );
           workingCtx = { ...nested.context };
           if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
           else (workingCtx as any)[itemName] = originalItemValue;
@@ -858,7 +943,10 @@ export async function runStepsInternal(
         }> = [];
         await runParallelBatches(items, concurrency, async (item, index) => {
           const loopCtx = { ...originalSharedCtx, [itemName]: item };
-          const nested = await runNestedSteps(preparedBody, loopCtx);
+          const nested = await withDelegatedExecutionFrame(
+            `${currentStep?.id || rawOp}:${index}`,
+            () => runNestedSteps(preparedBody, loopCtx)
+          );
           if (nested.status === 'failed') {
             throw new Error(
               `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
@@ -930,7 +1018,8 @@ export async function runStepsInternal(
           const nested = await runBody(
             subSteps,
             { ...ctx, [itemName]: task },
-            'core:team_lead worker failed'
+            'core:team_lead worker failed',
+            String(index)
           );
           if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
           outputs[index] = {
@@ -982,7 +1071,10 @@ export async function runStepsInternal(
           return {
             claims,
             run: async (): Promise<Record<string, unknown>> => {
-              const nested = await runNestedSteps([step], ctx);
+              const nested = await withDelegatedExecutionFrame(
+                `${currentStep?.id || rawOp}:${index}`,
+                () => runNestedSteps([step], ctx)
+              );
               if (nested.status === 'failed') {
                 throw new Error(
                   nested.results.find((r) => r.status === 'failed')?.error ||
@@ -1499,7 +1591,11 @@ export async function runStepsInternal(
             : 1,
         ...(opts.hasHuman !== undefined ? { hasHuman: opts.hasHuman } : {}),
         approvalGranted: (step, context) =>
-          hasBoundApproval(step as PipelineAdfStep, context as Record<string, unknown>),
+          hasBoundExecutionAuthorization(
+            step as PipelineAdfStep,
+            context as Record<string, unknown>,
+            opts
+          ),
         resumeCompletedNodeIds: new Set(opts.resumeState?.completed_nodes.keys()),
         onGraphNodeSettled: graphArtifact
           ? (node, outcome, durationMs) =>
