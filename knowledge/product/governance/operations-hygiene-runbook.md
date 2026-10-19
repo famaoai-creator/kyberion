@@ -23,6 +23,7 @@ had regressed.
 | Class                         | Gate / check                                                                    | Section |
 | ----------------------------- | ------------------------------------------------------------------------------- | ------- |
 | CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                             | §1      |
+| Red CI without a next step    | `Triage failure` job-summary step, `main-failure-triage.yml` (`ci-main-red`)    | §1      |
 | Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists              | §2      |
 | Daemons and child processes   | unit tests per daemon; this checklist in review                                 | §3      |
 | stdout / logging in libraries | eslint `no-console` on `libs/`                                                  | §4      |
@@ -112,6 +113,42 @@ diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.t
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
 5. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
+6. **Keep a new test or check step triageable.** Pipe its output into the job's capture log
+   (`shell: bash` and `2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"`; `shell: bash` turns
+   on `pipefail`, so the step still fails). End the job with the `Triage failure` step
+   (`if: failure()`, `uses: ./.github/actions/ci-failure-triage`).
+
+### CI failure triage — who acts on what
+
+A red job writes a **CI failure triage** section to its job summary. The section lists each failure
+with a root-cause class, a stable signature and the exact next command. The same classifier runs
+locally: `pnpm kyberion ci triage <log-file ...> [--job <name>] [--json]`, or pipe a log into it
+(`gh run view <id> --log-failed | pnpm kyberion ci triage`). Read the triage before you open the
+raw log, and act on it in one round:
+
+| Class                  | Meaning                                                                                                                    | Who acts / next step                                                                                                                                                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generated-drift`      | A freshness gate (`op-registry`, `env-registry`, `vocabulary-types`, …) found a stale generated file (`"changed": [...]`). | PR author. Run the printed generator (derived from `ci-gates.json`, e.g. `pnpm generate:op-registry`), or `pnpm kyberion resolve generated`, then commit the result. Re-run the gate with `pnpm check -- --only <gate>`.                        |
+| `ratchet/registration` | A ratchet grew (`increased from X to Y`) or a boundary / allowlist / registration test failed.                             | PR author. Follow the registration ceremony in [kyberion-development-practices §1](./kyberion-development-practices.md). Prefer fixing the code over growing a baseline.                                                                        |
+| `gate-failure`         | Another `pnpm check` gate or the type checker failed.                                                                      | PR author. Run the printed `pnpm check -- --only <gate>` or `pnpm typecheck`.                                                                                                                                                                   |
+| `test-failure`         | A Vitest test failed. The triage prints the assertion and a targeted rerun command.                                        | PR author. If the test is marked `suspected flake` (timers, TTLs, timeouts), reproduce it with the loop command. Fix it with fake timers or an explicit clock. Never just retry. See [WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md). |
+| `platform`             | The test failed only in a macOS / Windows job.                                                                             | PR author. Apply §2 of [kyberion-development-practices](./kyberion-development-practices.md) (cross-platform determinism). A test that fails only on slow hosted runners is also a flake candidate.                                             |
+| `infra`                | Install, checkout, network, artifact or runner trouble before the tests ran.                                               | Anyone. Re-run the failed jobs (`gh run rerun <id> --failed`). If it repeats, treat it as a workflow defect and fix it under this section.                                                                                                      |
+| `unknown`              | Nothing matched. The triage attaches the first error block.                                                                | PR author. Read the failed step log. If the shape will recur, add a pattern and a fixture to `scripts/lib/ci-failure-triage.ts` / `scripts/ci_failure_triage.test.ts`.                                                                          |
+
+**Red CI on your own PR.** Read the job-summary triage (or run `pnpm kyberion ci triage` on the
+log), fix every listed failure in one push, and re-run the printed commands locally first. Pending
+CI is not green.
+
+**Red CI on `main`.** `.github/workflows/main-failure-triage.yml` runs after a failed `CI` or
+`Cross-OS Smoke` run on `main`. It opens one issue per failing signature (label `ci-main-red`,
+deduplicated by the hidden `ci-triage-signature` marker), or comments on the open issue that already
+has that signature. The agent that picks up the issue fixes it on a branch from `main` and opens a
+fix PR whose body says `Fixes #<issue>`, so the merge closes the issue.
+
+**Port main fixes to affected PRs.** A PR branched before the fix keeps failing with the same
+signature. After the fix PR merges, update each open PR whose triage shows that signature: rebase
+or merge `main`, or port the fix commit. Do not re-diagnose the failure on each PR.
 
 **Generated catalogs in shared checkouts.** Regenerate knowledge indexes in the PR's isolated
 worktree, using only the files that ship with that branch. A shared checkout can contain another

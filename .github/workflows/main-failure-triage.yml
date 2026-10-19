@@ -1,0 +1,96 @@
+name: Main Failure Triage
+
+# When CI or Cross-OS Smoke goes red on main, classify the failed jobs' logs
+# (scripts/ci_failure_triage.ts) and open or update ONE issue per failing
+# signature, labelled `ci-main-red`, so an agent can pick it up and ship a fix
+# PR. Who acts on what: operations-hygiene runbook §1 "CI failure triage".
+#
+# workflow_run runs the default-branch copy of this file and of the triage
+# script, never code from the failed run, and nothing from the run's event
+# payload is interpolated into a shell script.
+
+on:
+  workflow_run:
+    workflows: [CI, Cross-OS Smoke]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+      WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+
+      - name: Download failed job logs
+        shell: bash
+        run: gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log-failed > "$RUNNER_TEMP/failed.log"
+
+      - name: Triage
+        shell: bash
+        run: |
+          node --import ./scripts/ts-loader.mjs scripts/ci_failure_triage.ts < "$RUNNER_TEMP/failed.log" > "$RUNNER_TEMP/triage.md"
+          node --import ./scripts/ts-loader.mjs scripts/ci_failure_triage.ts --json < "$RUNNER_TEMP/failed.log" > "$RUNNER_TEMP/triage.json"
+          cat "$RUNNER_TEMP/triage.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update one issue per failing signature
+        shell: bash
+        run: |
+          gh label create ci-main-red --repo "$GITHUB_REPOSITORY" --color B60205 \
+            --description "CI is red on main; opened by main-failure-triage" 2>/dev/null || true
+          count=$(jq '.failures | length' "$RUNNER_TEMP/triage.json")
+          if [ "$count" = "0" ]; then
+            # Nothing recognizable: still surface the red run, keyed by workflow.
+            jq -n --arg wf "$WORKFLOW_NAME" '{failures: [{class: "unknown", signature: ("run-" + ($wf | ascii_downcase | gsub("[^a-z0-9]+"; "-"))), title: ("unclassified failure in " + $wf), markdown: "The triage found no recognizable failure. Read the failed job logs of the run linked above."}]}' \
+              > "$RUNNER_TEMP/triage.json"
+            count=1
+          fi
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label ci-main-red --state open --limit 200 --json number,body)
+          for index in $(seq 0 $((count - 1))); do
+            jq ".failures[$index]" "$RUNNER_TEMP/triage.json" > "$RUNNER_TEMP/failure.json"
+            sig=$(jq -r '.signature' "$RUNNER_TEMP/failure.json")
+            title=$(jq -r '"CI red on main: [" + .class + "] " + .title' "$RUNNER_TEMP/failure.json" | cut -c1-240)
+            marker="<!-- ci-triage-signature: $sig -->"
+            {
+              echo "$marker"
+              echo "**$WORKFLOW_NAME** failed on \`main\` at \`$RUN_SHA\` — run: $RUN_URL"
+              echo
+              jq -r '.markdown // ""' "$RUNNER_TEMP/failure.json"
+              echo
+              echo "Pick-up: fix on a branch from \`main\`, open a PR that links this issue, then port the fix to open PRs that hit the same signature (operations-hygiene runbook §1 \"CI failure triage\")."
+            } > "$RUNNER_TEMP/issue-body.md"
+            number=$(printf '%s' "$existing" | jq -r --arg marker "$marker" '[.[] | select(.body | contains($marker))][0].number // empty')
+            if [ -n "$number" ]; then
+              printf 'Still failing: **%s** at `%s` — %s\n' "$WORKFLOW_NAME" "$RUN_SHA" "$RUN_URL" > "$RUNNER_TEMP/comment.md"
+              gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+              echo "updated #$number ($sig)"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --label ci-main-red --title "$title" --body-file "$RUNNER_TEMP/issue-body.md"
+              echo "opened issue for $sig"
+            fi
+          done
