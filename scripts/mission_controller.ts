@@ -759,6 +759,27 @@ async function showMissionStatus(id: string, follow: boolean = false) {
 
   printOutput(`  Next:        ${nextAction}`);
 
+  const { formatMissionExecutionReadiness } =
+    await import('./refactor/mission-execution-readiness.js');
+  const { describeProviderTierAvailability } =
+    await import('@agent/core/provider/provider-egress-gate');
+  const { peekProviderDiscovery } = await import('@agent/core/provider/provider-discovery');
+  let availability: ReturnType<typeof describeProviderTierAvailability> | null = null;
+  try {
+    availability = describeProviderTierAvailability({ tenant_slug: state.tenant_slug });
+  } catch {
+    // Observation failure is not permission or readiness.
+  }
+  for (const line of formatMissionExecutionReadiness({
+    tier: state.tier,
+    tenantSlug: state.tenant_slug,
+    structural: view.flow.completion.structural,
+    runtimeReason: view.flow.runtime.reason,
+    providers: peekProviderDiscovery().providers,
+    availability,
+  }))
+    printOutput(line);
+
   // Recent history (last 5)
   printOutput('');
   printOutput('  Recent History:');
@@ -816,7 +837,7 @@ async function showReasoningBackendStatus(): Promise<void> {
   for (const provider of providers) {
     const state = provider.installed
       ? provider.healthy
-        ? 'ready'
+        ? 'observed-healthy'
         : 'installed-unhealthy'
       : 'missing';
     const version = provider.version || 'n/a';

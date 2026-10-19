@@ -1581,3 +1581,40 @@ Bound the HTTP wait through body parsing. A timeout or abort ends only the brows
 Reservations and receipts are review_required state with no TTL or automatic status deletion. Never reclaim a reservation on elapsed time, process death or missing room evidence. File fsync and exclusive publication support process-concurrency/restart safety; they are not a claim of complete power-loss durability. Losing exclusive publishers can briefly change a receipt directory while the winner verifies its file: retry only the exact ancestor-instability snapshot error, at most eight complete governed reads with the original leaf identity/content metadata pinned. Never retry a write, a policy denial, a changed leaf or a malformed record. A crash cut point or exhausted read instability can intentionally sacrifice availability rather than duplicate a charged call. Removing these tombstones requires a separate human retention decision that preserves the no-replay boundary.
 
 Regression gates: discussion-create-request, discussion-request-storage-boundary, create/recovery/context HTTP routes and discussion-create-recovery client/UI tests. Cover real competing OS processes and fresh-process recovery with mocked providers, exactly one creator in a clean race and at most one under injected faults, same-scope changed intent, actor/source/scope isolation, missing/corrupt evidence, rejected receipt finality, late POST/body responses, reload/scope changes, per-handle recovery and browser storage failure. Verify exact-capability positive access plus ambient-role, sibling actor/scope/request, tenant, knowledge, room, symlink/hard-link, missing/corrupt policy and GET mutation denials. Production-code fixtures and client harnesses do not prove live provider execution or a rendered browser journey.
+
+## Company-story intent, readiness, and learning continuity
+
+A request to produce a document for a new project must remain a document project
+through intent resolution, organization intake, execution-brief requirements and
+project task bootstrap. Test that chain with natural paraphrases and negative
+controls for recurring meetings and calendar reads; a correct first classifier
+alone is insufficient.
+
+Mission status must distinguish recorded task closure and structural evidence
+from successful model execution. Cached provider health is an observation, not
+current readiness. Evaluate provider egress against the mission's exact tenant
+and tier, preserve unknown when observations are unavailable, and never let an
+allowed but missing local provider hide an installed external provider's refusal.
+
+Feedback proposals are not approved knowledge. Keep queue admission, human review,
+actual promotion, and retrieval/use evidence separate. Any link to an existing
+memory candidate must bind canonical scope and content digest; legacy unscoped,
+cross-tenant, stale, or missing records must not become success by inference.
+Read-only inspection must not invoke providers, approve, promote, or fabricate a
+promoted reference.
+
+Regression gate: run the intent-resolution, organization-operating-model,
+execution-brief, project-registry, mission-execution-readiness, mission-controller,
+and execution-feedback suites. Include tenant mismatch, expired permission,
+legacy feedback, stale links and missing artifacts. Validate synthetic execution
+separately from a real provider run and record any runtime blocker honestly.
+
+The current feedback handoff supports only explicit tenant-wide confidential
+proposals. Organization, project, mission, owner/audience and other narrower
+scope shapes remain review-only until the promotion foundation preserves them.
+Legacy proposals require explicit read-only inspection and cannot be adopted
+through a scoped lookup. Promotion references remain unverified and retrieval
+remains unmeasured until exact attributable evidence is available; neither
+aggregate counts nor candidate labels are proof. Tenant-scoped natural-language
+surface feedback and subsequent scenario hint reuse remain separate integration
+gaps, not completion claims of this CLI handoff.

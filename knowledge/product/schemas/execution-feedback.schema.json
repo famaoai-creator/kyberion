@@ -31,6 +31,24 @@
           "intent_id": { "type": "string", "minLength": 1 },
           "correlation_id": { "type": "string", "minLength": 1 },
           "surface": { "type": "string", "minLength": 1 },
+          "scope": {
+            "type": "object",
+            "required": ["tier"],
+            "properties": {
+              "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+              "tenant_slug": { "type": "string", "minLength": 1 },
+              "organization_id": { "type": "string" },
+              "project_id": { "type": "string" },
+              "mission_id": { "type": "string" },
+              "task_id": { "type": "string" },
+              "session_id": { "type": "string" },
+              "owner_nhi": { "type": "string" },
+              "allowed_audience": { "type": "array", "items": { "type": "string" } },
+              "promotion_policy": { "type": "string" },
+              "provenance_refs": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": true
+          },
           "outcome": { "enum": ["satisfied", "partially_satisfied", "dissatisfied"] },
           "comment": { "type": "string", "maxLength": 2000 },
           "correction": { "type": "string", "maxLength": 2000 },

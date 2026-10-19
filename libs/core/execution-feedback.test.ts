@@ -10,6 +10,7 @@ import {
   validateExecutionFeedback,
 } from './execution-feedback.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { executionFeedbackScopeRoot } from './execution-feedback-candidates.js';
 import { pathResolver } from './path-resolver.js';
 import {
   getIntentPhraseMatcher,
@@ -46,6 +47,22 @@ describe('execution feedback loop', () => {
       });
     }
     createdCandidateIds.clear();
+    safeRmSync(
+      executionFeedbackScopeRoot({ tier: 'confidential', tenant_slug: 'synthetic-feedback-a' }),
+      { recursive: true, force: true }
+    );
+    safeRmSync(
+      executionFeedbackScopeRoot({
+        tier: 'confidential',
+        tenant_slug: 'synthetic-feedback-a',
+        mission_id: 'MSN-SYNTHETIC-OTHER',
+      }),
+      { recursive: true, force: true }
+    );
+    safeRmSync(
+      executionFeedbackScopeRoot({ tier: 'confidential', tenant_slug: 'synthetic-feedback-b' }),
+      { recursive: true, force: true }
+    );
   });
 
   it('records feedback and summarizes repeated corrections per scenario', () => {
@@ -110,6 +127,94 @@ describe('execution feedback loop', () => {
     safeWriteFile(feedbackPath, '{"version":"1.0.0","entries":[{}]}\n');
 
     expect(() => loadExecutionFeedbackStore()).toThrow('Invalid catalog execution-feedback');
+  });
+
+  it('preserves the canonical tenant scope on feedback and its improvement candidate', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'synthetic-feedback-a' };
+    const feedback = recordExecutionFeedback({
+      scenario_id: 'scope-preservation-synthetic',
+      intent_id: 'scope-preservation-synthetic',
+      outcome: 'dissatisfied',
+      correction: 'Confirm the fictional deadline before the next run.',
+      scope,
+    });
+    const result = materializeExecutionFeedbackCandidate({ feedback });
+    if (result.candidate) createdCandidateIds.add(result.candidate.candidate_id);
+    expect(feedback.scope).toEqual(scope);
+    expect(result.candidate).toMatchObject({ tier: 'confidential', scope, status: 'proposed' });
+  });
+
+  it('does not merge tenant feedback, deeper scopes, or legacy unscoped feedback', () => {
+    const a = { tier: 'confidential' as const, tenant_slug: 'synthetic-feedback-a' };
+    const scopes = [
+      undefined,
+      a,
+      { ...a, tenant_slug: 'synthetic-feedback-b' },
+      { ...a, mission_id: 'MSN-SYNTHETIC-OTHER' },
+    ];
+    const candidates = scopes.map((scope, index) => {
+      const feedback = recordExecutionFeedback({
+        scenario_id: 'shared-synthetic-scenario',
+        intent_id: 'shared-synthetic-intent',
+        outcome: 'dissatisfied',
+        correction: 'Fictional correction ' + index,
+        scope,
+      });
+      const result = materializeExecutionFeedbackCandidate({ feedback });
+      if (result.candidate) createdCandidateIds.add(result.candidate.candidate_id);
+      expect(result.summary.sample_count).toBe(1);
+      expect(result.summary.common_corrections).toEqual(['Fictional correction ' + index]);
+      return result.candidate!;
+    });
+    expect(new Set(candidates.map((entry) => entry.candidate_id)).size).toBe(4);
+    expect(candidates[0].scope).toBeUndefined();
+    expect(loadExecutionFeedbackStore().entries.every((entry) => !entry.scope)).toBe(true);
+    expect(resolveExecutionFeedbackPath(a)).not.toBe(resolveExecutionFeedbackPath());
+  });
+
+  it('rejects owner-only scoped storage instead of reading or evicting legacy data', () => {
+    const before = safeExistsSync(feedbackPath)
+      ? safeReadFile(feedbackPath, { encoding: 'utf8' })
+      : null;
+    for (const owner_nhi of ['user:synthetic-a', 'user:synthetic-b']) {
+      expect(() =>
+        recordExecutionFeedback({
+          scenario_id: 'owner-only',
+          intent_id: 'owner-only',
+          outcome: 'dissatisfied',
+          scope: { tier: 'personal', owner_nhi },
+        })
+      ).toThrow(/SCOPE_UNSUPPORTED/);
+    }
+    expect(
+      safeExistsSync(feedbackPath) ? safeReadFile(feedbackPath, { encoding: 'utf8' }) : null
+    ).toEqual(before);
+  });
+
+  it('does not drop unknown scope restrictions before storage', () => {
+    expect(() =>
+      recordExecutionFeedback({
+        scenario_id: 'unknown-scope',
+        intent_id: 'unknown-scope',
+        outcome: 'dissatisfied',
+        scope: {
+          tier: 'confidential',
+          tenant_slug: 'synthetic-feedback-a',
+          future_restriction: 'synthetic-owner-only',
+        } as never,
+      })
+    ).toThrow(/SCOPE_UNSUPPORTED/);
+  });
+
+  it('rejects incomplete confidential scope before recording feedback', () => {
+    expect(() =>
+      recordExecutionFeedback({
+        scenario_id: 'scope-invalid',
+        intent_id: 'scope-invalid',
+        outcome: 'dissatisfied',
+        scope: { tier: 'confidential' },
+      })
+    ).toThrow(/tenant_slug/);
   });
 
   it('materializes a non-positive result as a reviewable procedure candidate', () => {

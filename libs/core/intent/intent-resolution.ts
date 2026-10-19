@@ -625,6 +625,17 @@ function cachedKeywordDocumentFrequency(
   return frequency;
 }
 
+/** A requested document project outranks incidental meeting/review topic words. */
+export function isDocumentProjectRequest(utterance: string): boolean {
+  return (
+    matchesIntentPhrase(utterance, 'project.explicit_new_project') &&
+    matchesIntentPhrase(utterance, 'project.document_creation_request') &&
+    !matchesIntentPhrase(utterance, 'project.creation_negated') &&
+    !matchesIntentPhrase(utterance, 'approval.resolve_verb') &&
+    !matchesIntentPhrase(utterance, 'approval.request_creation')
+  );
+}
+
 function scoreCatalogIntent(
   utterance: string,
   intent: StandardIntentDefinition,
@@ -754,6 +765,7 @@ function scoreScheduleReadAgendaIntent(
   const readHint = frame.action === 'read';
   if (!calendarHint || !readHint) return null;
   if (matchesIntentPhrase(normalized, 'schedule.agenda_non_calendar_object')) return null;
+  if (isDocumentProjectRequest(utterance)) return null;
 
   let confidence = 0.78;
   const reasons: string[] = ['read-only calendar agenda request'];
@@ -1067,6 +1079,54 @@ export function resolveIntentResolutionPacket(
     ),
     ...buildLegacyCandidates(trimmed),
   ];
+
+  // Semantic artifact-project evidence may outrank topic-word matches, but
+  // never demote a viable high-stakes incident/security candidate.
+  const highStakesIntents = new Set(
+    surfaceIntents
+      .filter((intent) => intent.risk_profile === 'high_stakes')
+      .map((intent) => intent.id)
+  );
+  const hasHighStakesCandidate = candidates.some(
+    (candidate) =>
+      highStakesIntents.has(candidate.intent_id) &&
+      candidate.confidence >= scoringPolicy.selected_confidence_threshold
+  );
+  const leadingCandidate = candidates.reduce<IntentResolutionCandidate | undefined>(
+    (leading, candidate) =>
+      !leading ||
+      candidate.confidence > leading.confidence ||
+      (candidate.confidence === leading.confidence &&
+        (candidateSpecificity.get(candidate) || 0) > (candidateSpecificity.get(leading) || 0))
+        ? candidate
+        : leading,
+    undefined
+  );
+  const leadingIntent = surfaceIntents.find((intent) => intent.id === leadingCandidate?.intent_id);
+  const preserveApprovalRequiredSelection =
+    leadingIntent?.id !== 'bootstrap-project' &&
+    leadingIntent?.risk_profile === 'approval_required';
+  if (
+    !hasHighStakesCandidate &&
+    !preserveApprovalRequiredSelection &&
+    isDocumentProjectRequest(trimmed)
+  ) {
+    const project = surfaceIntents.find((intent) => intent.id === 'bootstrap-project');
+    const existing = candidates.find((candidate) => candidate.intent_id === project?.id);
+    if (project) {
+      candidates.push({
+        intent_id: project.id,
+        confidence: Math.max(existing?.confidence || 0, scoringPolicy.keyword_max_confidence),
+        source: 'heuristic',
+        matched_keywords: existing?.matched_keywords || [],
+        reasons: [
+          ...(existing?.reasons || []),
+          'explicit new project with a document creation outcome',
+        ],
+        resolution: project.resolution,
+      });
+    }
+  }
 
   const deduped = new Map<string, IntentResolutionCandidate>();
   for (const candidate of candidates) {

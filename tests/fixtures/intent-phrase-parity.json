@@ -3619,7 +3619,14 @@
         "deck ok",
         "report",
         "REPORT",
-        "ねえ report して"
+        "ねえ report して",
+        "文書",
+        "ドキュメント",
+        "手順書",
+        "チェックリスト",
+        "checklist",
+        "manual",
+        "guide"
       ],
       "no_match": [
         "来週の予定教えて",
@@ -4200,6 +4207,60 @@
       "sites": ["libs/core/surface/conversation-task-routing.ts"],
       "match": ["\"A report\"", "「Aの報告書」"],
       "no_match": ["\"A report\" and \"B report\"", "「A」か「B」", "A report"]
+    },
+    "project.explicit_new_project": {
+      "old_regex": "explicit new-project semantic cue (document-project precedence regression)",
+      "sites": ["libs/core/intent/intent-resolution.ts:isDocumentProjectRequest"],
+      "match": [
+        "新規プロジェクト",
+        "新しいプロジェクト",
+        "プロジェクトを立ち上げる",
+        "start a new project",
+        "Launch a project"
+      ],
+      "no_match": [
+        "週次レビュー会議",
+        "既存プロジェクトの予定",
+        "Webサービスの文書",
+        "project status",
+        "新規プロジェクトの来週の会議",
+        "review meetings for a new project"
+      ]
+    },
+    "project.document_creation_request": {
+      "old_regex": "document object + creation predicate (document-project precedence regression)",
+      "sites": ["libs/core/intent/intent-resolution.ts:isDocumentProjectRequest"],
+      "match": [
+        "文書を作る",
+        "監査用の手順書を作成する",
+        "週次レビュー用の資料を書いて",
+        "write a meeting preparation checklist",
+        "draft an audit report"
+      ],
+      "no_match": [
+        "文書をレビューして",
+        "会議の予定を教えて",
+        "review the document",
+        "read a checklist",
+        "文書は作らない"
+      ]
+    },
+    "project.creation_negated": {
+      "old_regex": "new contract: explicitly negated project or document creation",
+      "sites": ["libs/core/intent/intent-resolution.ts:isDocumentProjectRequest"],
+      "match": [
+        "新規プロジェクトは作らない",
+        "文書を書いてはいけません",
+        "文書を作る新規プロジェクトではなく、予定を見せて",
+        "Do not start a new project",
+        "Don't write a report"
+      ],
+      "no_match": [
+        "新規プロジェクトで文書を作成して",
+        "文書を書いてレビューを受ける",
+        "Start a new project to write a report",
+        "Don't forget to write the report"
+      ]
     }
   }
 }
