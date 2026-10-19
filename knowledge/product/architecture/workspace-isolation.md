@@ -174,8 +174,9 @@ each agent its own checkout instead.
   checked out when it differs), agent, `created_at`, dist freshness
   (`fresh` = stamp equals HEAD, `stale`, `unstamped`, `missing`) and the live
   owner of the WorkItem linked to the branch's change request
-  (`resolveChangeRequestOwner`; `n/a` when that module is not in the build —
-  it is loaded by dynamic import, never copied).
+  (`resolveChangeRequestOwner` from
+  `libs/core/workforce/work-item-change-request.ts`; `-` when nobody holds a
+  live claim).
 - `pnpm kyberion worktree remove <name> [--force]` refuses while the worktree
   has uncommitted or unreachable work (`describeUnsavedWorktreeWork`), its
   recorded mission is not terminal (an unresolvable mission counts as not

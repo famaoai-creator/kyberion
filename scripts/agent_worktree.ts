@@ -27,6 +27,7 @@ import {
   type BootstrapStep,
   type RemoveAgentWorktreeResult,
 } from '@agent/core/workforce/agent-worktree';
+import { resolveChangeRequestOwner } from '@agent/core/workforce/work-item-change-request';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const USAGE =
@@ -120,44 +121,20 @@ function asOwner<T>(fn: () => T): T {
   return withExecutionContext('mission_controller', fn);
 }
 
-// Built at runtime on purpose: the change-request ↔ WorkItem link
-// (work-item-change-request.ts) is not published in every build yet, so it is
-// an optional dynamic import rather than a static dependency. Replace with a
-// static import once that subpath is exported from @agent/core.
-const CHANGE_REQUEST_MODULE = ['@agent/core', 'workforce', 'work-item-change-request'].join('/');
-
-/**
- * The change-request ↔ WorkItem link is optional: when the module is not
- * installed in this build, the owner column is reported as unavailable.
- */
-async function loadClaimResolver(): Promise<ClaimResolver | null> {
+/** The live owner of the WorkItem whose change request is this branch (forge-agnostic link). */
+const resolveBranchClaim: ClaimResolver = (branch) => {
   try {
-    const specifier = CHANGE_REQUEST_MODULE;
-    const mod = (await import(specifier)) as {
-      resolveChangeRequestOwner?: (input: { branch: string }) => {
-        item: { item_id: string };
-        owner: { peer_id: string } | null;
-      } | null;
-    };
-    const resolve = mod.resolveChangeRequestOwner;
-    if (typeof resolve !== 'function') return null;
-    return (branch) => {
-      try {
-        const resolution = resolve({ branch });
-        return resolution?.owner
-          ? { item_id: resolution.item.item_id, owner: resolution.owner.peer_id }
-          : null;
-      } catch {
-        return null;
-      }
-    };
+    const resolution = resolveChangeRequestOwner({ branch });
+    return resolution?.owner
+      ? { item_id: resolution.item.item_id, owner: resolution.owner.peer_id }
+      : null;
   } catch {
     return null;
   }
-}
+};
 
 async function claimResolverOf(options: AgentWorktreeCliOptions): Promise<ClaimResolver | null> {
-  return options.resolveClaim === undefined ? loadClaimResolver() : options.resolveClaim;
+  return options.resolveClaim === undefined ? resolveBranchClaim : options.resolveClaim;
 }
 
 export interface CreateCliResult {
