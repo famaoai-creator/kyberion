@@ -5,13 +5,15 @@
 The repository currently maintains four execution workflows and two maintenance workflows.
 
 1. `ci.yml`
-   Runs on pushes, pull requests to `main`, and the weekly schedule.
+   Runs on pushes, pull requests to `main`, merge-queue (`merge_group`) entries, and the weekly
+   schedule.
 
 2. `pr-validation.yml`
-   Runs on pull requests targeting `main` or `develop`.
+   Runs on pull requests targeting `main` or `develop`, and on merge-queue (`merge_group`) entries.
 
 3. `cross-os.yml`
-   Runs the supported-OS smoke matrix on pushes, pull requests to `main`, and the weekly schedule.
+   Runs the supported-OS smoke matrix on pushes, pull requests to `main`, merge-queue entries, and
+   the weekly schedule (prose-only PRs skip the OS jobs; see "Cross-OS shape").
 
 4. `release.yml`
    Builds and publishes tagged releases.
@@ -42,7 +44,8 @@ Each main job in `ci.yml`, `pr-validation.yml` and `cross-os.yml` tees its test 
 into `$RUNNER_TEMP/kyberion-ci-output.log`. The job then ends with a `Triage failure` step
 (`if: failure()`, `.github/actions/ci-failure-triage`). That step writes each failure's class and
 next command to the job summary. Who acts on which class: operations-hygiene runbook §1
-"CI failure triage".
+"CI failure triage". The `cross-os.yml` `windows-native` job keeps its default PowerShell steps and
+has no triage step yet; read its failed step log directly.
 
 ## Workflow contract (enforced)
 
@@ -80,6 +83,43 @@ manifest — the same set declared in `scripts/build-output-layout.ts`, minus th
 `actions/download-artifact` instead of re-running `pnpm run build` (~4min per job).
 `first-win-clean-clone` keeps its own build — a clean checkout build IS the check there.
 Jobs that need `.next` must build it locally with `pnpm run build:ui`.
+
+**No skip cascade (one failure, every signal).** In `ci.yml`, `test`, `intent-smoke` and
+`first-win-clean-clone` do not depend on `lint-and-validate` (only on `build-artifacts`, or on
+nothing for the clean-clone build), so a red lint/gate step no longer skips the test matrix and
+forces a second CI round. Inside `lint-and-validate` (and `pr-validation.yml` `static-checks` /
+`test-extra`) the independent check steps run with
+`if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}`: they need only the prepared
+workspace (the `workspace` download step), still run after an earlier check failed, and the job
+still fails if any step failed.
+
+**Cross-OS shape.** `cross-os.yml` runs `changes` → `build-artifacts` (one Linux build, artifact
+`cross-os-build-outputs`) → `build-and-smoke` (ubuntu/macOS × 3 shards, downloading that
+artifact — compiler outputs are plain JS, native addons come from each OS's own `pnpm install`)
+and `windows-native` (keeps its own `pnpm run build`, because `scripts/build_repository.ts` has a
+Windows-specific spawn path). Typecheck is not repeated per OS. `changes` diffs the PR merge
+commit against its first parent (or the merge-group base) and skips the OS jobs when only prose
+changed (`.md`/`.mdx`/`.txt` under `docs/`, `knowledge/`, `changelog.d/`, `.github/`, or root
+`*.md`). Pushes to `main`, the weekly cron and any diff error run everything. Never add a
+workflow-level `paths:` filter — it leaves required checks pending. Skipped matrices do not
+report their per-OS check names, so the always-running `cross-os-result` job is the single
+check to require; it fails when any OS job failed, was cancelled, or was skipped without a
+prose-only diff.
+
+**Merge-queue readiness.** `ci.yml`, `pr-validation.yml` and `cross-os.yml` also trigger on
+`merge_group`. There, PR-owned duplicates are skipped exactly as on `pull_request`
+(`github.event_name == 'pull_request' || github.event_name == 'merge_group'`), PR-only steps
+(title check, vital-check comment) are skipped, and the run is never cancelled
+(`cancel-in-progress` stays `pull_request`-only; each queue entry has its own
+`gh-readonly-queue/...` ref). Enabling the queue and choosing required checks are repository
+settings the owner changes manually: require `pr-gates`, `static-checks`, the `core-tests`
+shards, `actuator/boundary/security tests`, the `ci.yml` `lint-and-validate` / `test` /
+`intent-smoke` / `first-win-clean-clone` checks, and `cross-os-result` (which covers the
+macOS and Windows jobs, so a red Windows job blocks the merge).
+
+**Vital-check comment.** `pr-validation.yml` `vital-check` keeps one PR comment, found by the
+hidden marker `<!-- kyberion:vital-check-report -->`: created on the first run, edited when the
+report changes, and left alone when it is unchanged.
 
 ## CI Workflow
 
