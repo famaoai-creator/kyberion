@@ -45,6 +45,18 @@ describe('parseCharterForm', () => {
     const p = parseCharterForm(raw({ deputies: ['user:carol', 'user:carol'] }));
     expect(p.ok && p.form.deputies).toEqual(['user:carol']);
   });
+  it('requires an explicit purpose and category when delegating model processors', () => {
+    expect(parseCharterForm(raw({ approved_processors: ['anthropic'] })).ok).toBe(false);
+    const parsed = parseCharterForm(
+      raw({
+        approved_processors: ['anthropic'],
+        processing_purposes: ['vendor_quote_analysis'],
+        processing_categories: ['sensitive_business'],
+      })
+    );
+    expect(parsed.ok && parsed.form.approved_processors).toEqual(['anthropic']);
+    expect(parsed.ok && parsed.form.processing_categories).toEqual(['sensitive_business']);
+  });
   it.each([
     [{ tenant_slug: 'public' }, /tenant_slug/],
     [{ per_action: 1.5 }, /whole number/],
@@ -90,6 +102,11 @@ describe('renderAcceptanceStatement', () => {
       { per_action: 90_000 },
       { allow_named_spend: false },
       { allow_customer_outbound: true },
+      {
+        approved_processors: ['anthropic'],
+        processing_purposes: ['vendor_quote_analysis'],
+        processing_categories: ['sensitive_business'],
+      },
       { supersedes_decision_rights: true },
       { deputies: [] },
       { expires_in_days: 30 },
@@ -200,6 +217,15 @@ describe('acceptCharterFromForm + viewCharter', () => {
     const f = form({ per_action: 50_000, allow_customer_outbound: true });
     const c = accept(f, { idNonce: 'e5f6', replaces: base.charter_id });
     expect(c.envelope.external_effects.send_message_external).toBe('allow');
+    expect(c.envelope.information_flow).toEqual({
+      purposes: ['customer_service'],
+      recipient_classes: ['bound_customer'],
+      categories: ['routine_business'],
+      max_attachments: 0,
+      processor_ids: [],
+      processing_purposes: [],
+      processing_categories: [],
+    });
     expect(c.envelope.irreversible).toBe('named_actions_only');
     expect(c.envelope.irreversible_named_actions).toEqual([
       'operational_spend',
@@ -216,6 +242,12 @@ describe('acceptCharterFromForm + viewCharter', () => {
         estimated_loss: 0,
         reputational_class: 'B',
         blast_radius: { recipients: 1 },
+        information_flow: {
+          purpose: 'customer_service',
+          recipient_class: 'bound_customer',
+          categories: ['routine_business'],
+          attachment_count: 0,
+        },
       },
       { accountable_available: true, available_deputies: [] },
       opts(),

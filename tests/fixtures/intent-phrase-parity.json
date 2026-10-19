@@ -4189,6 +4189,12 @@
       "match": ["the title", "its document"],
       "no_match": ["B", "my project", "the weather"]
     },
+    "egress.customer_routine_greeting": {
+      "old_regex": "new contract: exact customer greeting allowlist",
+      "sites": ["libs/core/customer-conversation.ts"],
+      "match": ["こんにちは", "こんばんは", "Good morning"],
+      "no_match": ["Hi, we reviewed the quote", "hello there", "ありがとうございます"]
+    },
     "conversation_task.quoted_reference": {
       "old_regex": "new contract: single whole quoted task target",
       "sites": ["libs/core/surface/conversation-task-routing.ts"],

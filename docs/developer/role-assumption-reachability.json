@@ -797,6 +797,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities",
+      "roles": ["nhi_accountability_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/operational-learning.ts#enqueueOperationalLearningSignal",
       "roles": ["operational_learning_writer"],
       "unresolved": []
@@ -3420,6 +3425,15 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "nhi_accountability_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/operator-home/route.ts#GET",
+            "libs/core/surface/operator-home-summary.ts#collectOperatorHomeSummary",
+            "libs/core/surface/operator-home-summary.ts#collectNhiLedgerSummary",
+            "libs/core/nhi-lifecycle-governance.ts#buildNhiLedgerReport",
+            "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
+          ]
+        },
         "operational_learning_writer": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -4312,6 +4326,16 @@
             "libs/core/agent/agent-identity.ts#ensureAgentIdentityProvisioned",
             "libs/core/agent/agent-identity.ts#issueAgentIdentity",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "nhi_accountability_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/lib/headless-projections.ts#readConciergeHome",
+            "libs/core/ceo-surface-summary.ts#buildCeoSurfaceSummary",
+            "libs/core/surface/operator-home-summary.ts#collectOperatorHomeSummary",
+            "libs/core/surface/operator-home-summary.ts#collectNhiLedgerSummary",
+            "libs/core/nhi-lifecycle-governance.ts#buildNhiLedgerReport",
+            "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
           ]
         },
         "organization_operator": {
@@ -5611,6 +5635,25 @@
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
             "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
+          ]
+        },
+        "nhi_accountability_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
           ]
         },
         "operational_learning_writer": {
