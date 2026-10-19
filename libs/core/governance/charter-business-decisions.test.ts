@@ -178,11 +178,20 @@ describe('accountability charter — everyday business decisions', () => {
 
   it('a delegated decision the organization made charter-delegable runs unattended', () => {
     matrix('human_acceptance', true);
-    expect(decide('meeting_scheduling', 'm-1')).toMatchObject({
+    expect(decide('internal_task_assignment', 'm-2')).toMatchObject({
       allowed: true,
       status: 'not_required',
     });
-    expect(decide('internal_task_assignment', 'm-2').allowed).toBe(true);
+  });
+
+  it('an external send stays with a human until the charter delegates the recipient flow', () => {
+    matrix('human_acceptance', true);
+    // meeting_scheduling is delegated and the matrix allows it, but the
+    // charter's information-flow envelope delegates no recipient class and the
+    // call site supplies no trusted recipient facts, so it goes to a human.
+    const r = decide('meeting_scheduling', 'm-1');
+    expect(r.allowed).toBe(false);
+    expect(r.message).toContain('[HUMAN_REQUIRED]');
   });
 
   it('a decision the owner did not delegate goes to a human, and the ask is recorded as an amendment', () => {
@@ -205,14 +214,14 @@ describe('accountability charter — everyday business decisions', () => {
 
   it('a delegated decision still stays inside the appetite (blast radius)', () => {
     matrix('human_acceptance', true);
-    expect(decide('meeting_scheduling', 'm-4', { recipients: 3 }).allowed).toBe(false);
+    expect(decide('internal_task_assignment', 'm-4', { recipients: 3 }).allowed).toBe(false);
   });
 
   it('the matrix wins when the organization did not mark the type delegable, or the value is over its threshold', () => {
     matrix('human_acceptance', false);
-    expect(decide('meeting_scheduling', 'm-5').allowed).toBe(false);
+    expect(decide('internal_task_assignment', 'm-5').allowed).toBe(false);
     matrix('over_threshold', true);
-    expect(decide('meeting_scheduling', 'm-6').allowed).toBe(false);
+    expect(decide('internal_task_assignment', 'm-6').allowed).toBe(false);
   });
 
   it('hiring: within the declared loss it runs; above it a human decides — and no budget is spent', () => {
@@ -229,7 +238,7 @@ describe('accountability charter — everyday business decisions', () => {
   it('the delegated type must be the one the matrix evaluated', () => {
     matrix('human_acceptance', true);
     const charter = charterInputForDecision(
-      { tenantSlug: TENANT, agentId: 'secretary', decisionType: 'meeting_scheduling' },
+      { tenantSlug: TENANT, agentId: 'secretary', decisionType: 'internal_task_assignment' },
       opts()
     )!;
     const r = enforceApprovalGate({
@@ -237,7 +246,7 @@ describe('accountability charter — everyday business decisions', () => {
       agentId: 'secretary',
       correlationId: 'm-12',
       channel: 'mission',
-      payload: { decision_type: 'external_reply', tenant_slug: TENANT },
+      payload: { decision_type: 'internal_document_approval', tenant_slug: TENANT },
       hasHuman: false,
       charter,
     });

@@ -893,7 +893,7 @@ describe('peer auto-reply', () => {
     expect(generate.mock.calls[0][0].userPrompt).not.toContain('tenant-knowledge');
   });
 
-  it('default generate runs runClaudeAgentQuery inside the confidential zero_retention scope', async () => {
+  it('default generate runs runClaudeAgentQuery inside the confidential no_training scope', async () => {
     let observedScope: unknown;
     let observedExecution: { role?: string; tenant?: string } = {};
     runClaudeAgentQueryMock.mockImplementation(async (params: Record<string, unknown>) => {
@@ -926,7 +926,7 @@ describe('peer auto-reply', () => {
       tier: 'confidential',
       tenant_slug: TENANT,
       purpose: 'peer-conversation:auto-reply',
-      training_use: 'zero_retention',
+      training_use: 'no_training',
     });
     // The egress gate reads the tenant's own egress overlay under the
     // tenant-bound responder role, never the caller's ambient role.
@@ -964,7 +964,7 @@ describe('peer auto-reply', () => {
       tier: 'confidential',
       tenant_slug: TENANT,
       purpose: 'peer-conversation:auto-reply',
-      training_use: 'zero_retention',
+      training_use: 'no_training',
     });
     expect(observedExecution).toEqual({ role: 'peer_responder_reader', tenant: TENANT });
     expect(getReasoningBackendSpy).not.toHaveBeenCalled();

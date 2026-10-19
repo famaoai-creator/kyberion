@@ -156,7 +156,7 @@ export class DiscussionProviderSession {
       tenant_slug: room.scope.tenant_slug,
       purpose: 'discussion:' + operation,
       training_use:
-        room.scope.tier === 'public' ? ('training_eligible' as const) : ('zero_retention' as const),
+        room.scope.tier === 'public' ? ('training_eligible' as const) : ('no_training' as const),
     };
     return withReasoningPayloadScope(scope, async () => {
       // Explicitly assert here as well as in the built-in transports: an adapter

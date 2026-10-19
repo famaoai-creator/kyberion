@@ -148,6 +148,16 @@ describe('customer dialogue (E2E-06)', () => {
       path.resolve(process.cwd(), 'knowledge/product/governance/egress-policy.json'),
       path.join(governanceDir, 'egress-policy.json')
     );
+    // sendToCustomer -> classifyCustomerOutbound matches the governed intent
+    // phrase lexicon; it fails closed (throws) when the catalog is absent.
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/governance/intent-phrase-lexicon.json'),
+      path.join(governanceDir, 'intent-phrase-lexicon.json')
+    );
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/intent-phrase-lexicon.schema.json'),
+      path.join(schemaDir, 'intent-phrase-lexicon.schema.json')
+    );
 
     const tenantProfilePath = path.join(
       tmpRoot,

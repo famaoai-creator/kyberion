@@ -1718,6 +1718,18 @@
         }
       }
     },
+    "egress.customer_routine_greeting": {
+      "description": "Exact greeting-only content that may be delegated for unattended customer delivery.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": ["こんにちは", "おはようございます", "こんばんは"]
+        },
+        "en": {
+          "phrases": ["hello", "hi", "good morning", "good afternoon", "good evening"]
+        }
+      }
+    },
     "conversation_task.implicit_reference": {
       "description": "Whole-message allowlist of bounded implicit-target phrases. Complex unmatched instructions require clarification.",
       "locales": {

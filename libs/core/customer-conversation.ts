@@ -7,6 +7,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
+import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { enforceApprovalGate } from './governance/approval-gate.js';
@@ -436,6 +437,24 @@ function extractLinkHost(raw: string): string | null {
   }
 }
 
+/**
+ * Only a tiny, exact greeting vocabulary is eligible for unattended delivery.
+ * Trailing whitespace and sentence punctuation are stripped with a bounded
+ * scan (no backtracking regex over caller-controlled text).
+ */
+function classifyCustomerOutbound(body: string): 'routine_business' | 'unknown' {
+  let text = String(body ?? '');
+  for (;;) {
+    const next = trimEndChars(text.trimEnd(), '。.!！?？');
+    if (next === text) break;
+    text = next;
+  }
+  const normalized = text.toLocaleLowerCase();
+  return matchesIntentPhrase(normalized, 'egress.customer_routine_greeting')
+    ? 'routine_business'
+    : 'unknown';
+}
+
 export function findAudienceFloorViolations(body: string, floor: AudienceEgressFloor): string[] {
   const violations = new Set<string>();
   for (const match of String(body || '').matchAll(URL_IN_TEXT)) {
@@ -471,7 +490,11 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
     // A message that breaches the audience egress floor always goes to a human.
     ...(floorViolations.length === 0
       ? (() => {
-          const charter = charterInputForCustomerOutbound({ tenantSlug: input.binding.tenantSlug });
+          const charter = charterInputForCustomerOutbound({
+            tenantSlug: input.binding.tenantSlug,
+            categories: [classifyCustomerOutbound(input.body)],
+            attachmentCount: 0,
+          });
           return charter ? { charter } : {};
         })()
       : {}),

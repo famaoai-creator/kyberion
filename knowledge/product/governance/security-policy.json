@@ -610,6 +610,10 @@
       ],
       "allow_write": []
     },
+    "nhi_accountability_reader": {
+      "allow_read": ["knowledge/personal/members/"],
+      "allow_write": []
+    },
     "audit_mirror_writer": {
       "allow_read": [],
       "allow_write": ["customer/${KYBERION_TENANT}/logs/audit/"]

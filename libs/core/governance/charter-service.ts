@@ -60,6 +60,12 @@ export interface CharterForm {
   allow_named_spend: boolean;
   /** Let messages to customers go out unattended (names `customer_outbound`, allows `send_message_external`). */
   allow_customer_outbound: boolean;
+  /** External inference processors and processing scope explicitly delegated by the owner. */
+  approved_processors: string[];
+  processing_purposes: string[];
+  processing_categories: Array<
+    'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'
+  >;
   /** Vocabulary decision types delegated by name (charter-decision-vocabulary.json). */
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
@@ -134,6 +140,46 @@ export function parseCharterForm(
   }
   // Canonical order keeps the signed statement independent of click order.
   delegatedDecisions.sort();
+  const parseStringList = (value: unknown, max: number): string[] | null => {
+    if (
+      !Array.isArray(value) ||
+      value.length > max ||
+      value.some((v) => typeof v !== 'string' || !/^[a-z0-9][a-z0-9:_-]{0,127}$/.test(v))
+    )
+      return null;
+    return [...new Set(value as string[])].sort();
+  };
+  const approvedProcessors = parseStringList(r.approved_processors ?? [], 20);
+  if (!approvedProcessors)
+    return { ok: false, error: 'approved_processors must contain at most 20 valid provider ids' };
+  const processingPurposes = parseStringList(r.processing_purposes ?? [], 20);
+  if (!processingPurposes)
+    return { ok: false, error: 'processing_purposes must contain at most 20 valid purpose ids' };
+  const categoriesRaw = r.processing_categories ?? [];
+  if (
+    !Array.isArray(categoriesRaw) ||
+    categoriesRaw.some(
+      (v) =>
+        !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(String(v))
+    )
+  )
+    return { ok: false, error: 'processing_categories contains an invalid category' };
+  const processingCategories = [
+    ...new Set(categoriesRaw as CharterForm['processing_categories']),
+  ].sort();
+  if (
+    approvedProcessors.length > 0 &&
+    (processingPurposes.length === 0 || processingCategories.length === 0)
+  )
+    return {
+      ok: false,
+      error: 'processor delegation requires explicit processing_purposes and processing_categories',
+    };
+  if (
+    approvedProcessors.length === 0 &&
+    (processingPurposes.length > 0 || processingCategories.length > 0)
+  )
+    return { ok: false, error: 'processing scope requires at least one approved processor' };
   return {
     ok: true,
     form: {
@@ -144,6 +190,9 @@ export function parseCharterForm(
       max_loss_per_incident: nums.max_loss_per_incident,
       allow_named_spend: r.allow_named_spend === true,
       allow_customer_outbound: r.allow_customer_outbound === true,
+      approved_processors: approvedProcessors,
+      processing_purposes: processingPurposes,
+      processing_categories: processingCategories,
       delegated_decisions: delegatedDecisions,
       supersedes_decision_rights: r.supersedes_decision_rights === true,
       deputies,
@@ -194,6 +243,10 @@ export function renderAcceptanceStatement(input: {
       say('loss', { loss: yen(form.max_loss_per_incident) }),
       say(form.allow_named_spend ? 'spend_on' : 'spend_off'),
       say(form.allow_customer_outbound ? 'outbound_on' : 'outbound_off'),
+      form.allow_customer_outbound
+        ? 'Unattended delivery is limited to a routine greeting for a bound customer. Attachments, personal or sensitive data, and all other content require human approval.'
+        : 'Customer outbound automation is disabled.',
+      `Approved inference processors: ${form.approved_processors.length ? form.approved_processors.join(', ') : 'none'}. Purposes: ${form.processing_purposes.join(', ') || 'none'}. Categories: ${form.processing_categories.join(', ') || 'none'}. Training and retention remain governed by separate provider evidence.`,
       form.delegated_decisions.length > 0
         ? say('decisions_on', { decisions: decisionLabels(locale) })
         : say('decisions_off'),
@@ -257,6 +310,17 @@ export function envelopeFromForm(
     ...(namedIrreversible.length > 0 ? { irreversible_named_actions: namedIrreversible } : {}),
     ...(form.supersedes_decision_rights ? { supersedes_decision_rights: true } : {}),
     ...(form.delegated_decisions.length > 0 ? { delegated_decisions: delegatedDecisions } : {}),
+    information_flow: {
+      purposes: form.allow_customer_outbound ? ['customer_service'] : [],
+      recipient_classes: form.allow_customer_outbound ? ['bound_customer'] : [],
+      categories: form.allow_customer_outbound ? ['routine_business'] : [],
+      max_attachments: 0,
+      // An empty list is an explicit denial for newly accepted charters.
+      // Legacy charters without information_flow retain their prior behavior.
+      processor_ids: form.approved_processors,
+      processing_purposes: form.processing_purposes,
+      processing_categories: form.processing_categories,
+    },
   };
 }
 
@@ -341,6 +405,9 @@ export interface CharterView {
   max_loss_per_incident: number;
   allows_named_spend: boolean;
   allows_customer_outbound: boolean;
+  approved_processors: string[];
+  processing_purposes: string[];
+  processing_categories: CharterForm['processing_categories'];
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
   report: AccountabilityReport;
@@ -373,6 +440,9 @@ export function viewCharter(
     allows_customer_outbound: (charter.envelope.irreversible_named_actions ?? []).includes(
       'customer_outbound'
     ),
+    approved_processors: [...(charter.envelope.information_flow?.processor_ids ?? [])],
+    processing_purposes: [...(charter.envelope.information_flow?.processing_purposes ?? [])],
+    processing_categories: [...(charter.envelope.information_flow?.processing_categories ?? [])],
     delegated_decisions: Object.entries(charter.envelope.delegated_decisions ?? {})
       .filter(([, policy]) => policy !== 'forbid')
       .map(([type]) => type)

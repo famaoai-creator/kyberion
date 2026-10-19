@@ -104,7 +104,11 @@ export function charterInputForDecision(
  * goes to a human.
  */
 export function charterInputForCustomerOutbound(
-  input: { tenantSlug?: string },
+  input: {
+    tenantSlug?: string;
+    categories?: import('./accountability-charter.js').InformationCategory[];
+    attachmentCount?: number;
+  },
   options: CharterPathOptions = {},
   now: Date = new Date()
 ): ApprovalGateCharterInput | undefined {
@@ -125,6 +129,16 @@ export function charterInputForCustomerOutbound(
       estimated_loss: 0,
       reputational_class: 'B',
       blast_radius: { recipients: 1 },
+      ...(input.categories
+        ? {
+            information_flow: {
+              purpose: 'customer_service',
+              recipient_class: 'bound_customer',
+              categories: input.categories,
+              attachment_count: input.attachmentCount ?? 0,
+            },
+          }
+        : {}),
     },
     ...(options.rootDir ? { pathOptions: options } : {}),
   };
