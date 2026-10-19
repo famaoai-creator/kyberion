@@ -460,6 +460,7 @@
 - [Voice Interface Protocol (VIP)](./product/orchestration/voice-interface-protocol.md) (public | Ecosystem Architect)
 - [Work Coordination Platform](./product/orchestration/work-coordination-platform.md) (public | Unknown)
 - [Work Coordination Platform Implementation Plan](./product/orchestration/work-coordination-platform-plan.md) (public | Unknown)
+- [meet-copilot live verification runbook](./product/orchestration/meet-copilot-live-verification.md) (public | Unknown)
 - [takt Clean-Room Notes](./product/orchestration/takt-clean-room-notes.md) (public | Unknown)
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./product/orchestration/quality-management-flow.md) (public | Ecosystem Architect)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./product/orchestration/context-extraction-rules.md) (public | Ecosystem Architect)
