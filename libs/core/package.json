@@ -7516,6 +7516,10 @@
       "types": "./dist/workforce/work-coordination.d.ts",
       "default": "./dist/workforce/work-coordination.js"
     },
+    "./workforce/work-item-change-request": {
+      "types": "./dist/workforce/work-item-change-request.d.ts",
+      "default": "./dist/workforce/work-item-change-request.js"
+    },
     "./workforce/work-coordination-error": {
       "types": "./dist/workforce/work-coordination-error.d.ts",
       "default": "./dist/workforce/work-coordination-error.js"

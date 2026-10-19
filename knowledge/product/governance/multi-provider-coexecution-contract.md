@@ -148,6 +148,27 @@ to peer/Mesh or promote to a mission when cross-host delivery or ownership
 evidence is required. Path leases here refine the matrix's write row for
 ad-hoc same-checkout collaboration; they are not mission-owner authority.
 
+## Change request ownership (forge-agnostic)
+
+A pull request, merge request, Gerrit change or plain branch is owned by
+whoever holds the claim on the WorkItem it delivers — never by whichever
+agent last pushed to it. Bind the two with
+`pnpm work link-change --item-id <id> --actor-peer-id <peer> [--branch <b>]
+[--forge <label>] [--ref <forge id>] [--url <url>]` right after opening the
+change request (`--branch` defaults to the current branch). Only the live
+claim holder may link, and a branch belongs to at most one unfinished item,
+so two providers never drive the same change request in parallel.
+
+Before acting on someone else's change request (a CI fix, a review reply),
+ask `pnpm work change-owner --branch <b>` (or `--forge <label> --ref <id>`):
+if it names another live owner, hand off through `pnpm work handoff-item`
+instead of pushing. `pnpm work update-change --change-state merged|closed`
+records what was observed on the forge; while the claim is live only its
+holder writes, after release any observer may. The binding lives in
+`metadata.change_request` (`libs/core/workforce/work-item-change-request.ts`)
+and calls no forge API: the branch is the join key every forge shares, and
+`forge` / `ref` / `url` are opaque labels.
+
 ## Enforcement notes
 
 - Write access is enforced through the work-item claim mechanism, not the
