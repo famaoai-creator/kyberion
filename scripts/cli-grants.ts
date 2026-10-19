@@ -23,6 +23,7 @@ import {
   listGrants,
   requestGrantApproval,
   revokeGrant,
+  type GrantActor,
   type GrantDraft,
   type GrantRecord,
 } from '@agent/core/governance/grant-store';
@@ -60,16 +61,21 @@ export interface GrantsDeps {
   grantDirect: typeof grantStandingDirect;
   revoke: typeof revokeGrant;
   find: typeof findGrantById;
-  /** Who revokes: the terminal's operator principal, else the agent session. */
-  revoker: () => string;
+  /** Who revokes: the agent session if this CLI runs in one, else the terminal's operator. */
+  revoker: () => GrantActor;
   now: () => Date;
 }
 
-function resolveRevoker(): string {
-  const identity = resolveCliOperatorIdentity();
-  if (identity.principalId) return identity.principalId;
-  const agent = detectCliAgentPrincipal();
-  if (agent) return agent;
+/**
+ * The revoking principal, attributed truthfully: inside an agent session the
+ * agent revokes (revocation only narrows, so it is allowed) even when a local
+ * owner member exists; a plain terminal revokes as the owner member.
+ */
+export function resolveRevoker(env: Record<string, string | undefined> = process.env): GrantActor {
+  const agent = detectCliAgentPrincipal(env);
+  if (agent) return { kind: 'agent', id: agent };
+  const identity = resolveCliOperatorIdentity({ env });
+  if (identity.principalId) return { kind: 'human', id: identity.principalId };
   throw new ScriptExitError(
     1,
     `No operator identity for this terminal; run \`${CLI_OPERATOR_PROVISION_COMMAND}\` first.`
@@ -84,7 +90,7 @@ const defaultDeps: GrantsDeps = {
   grantDirect: grantStandingDirect,
   revoke: revokeGrant,
   find: findGrantById,
-  revoker: resolveRevoker,
+  revoker: () => resolveRevoker(),
   now: () => new Date(),
 };
 

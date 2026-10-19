@@ -361,6 +361,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []

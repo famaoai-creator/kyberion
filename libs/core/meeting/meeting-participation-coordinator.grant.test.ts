@@ -60,7 +60,7 @@ function standingGrant(): GrantRecord {
   return grantStanding(draft, { approvalRequestId: request.id });
 }
 
-function writeMission(): void {
+function writeMission(tenant: string | null = 'acme'): void {
   safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
   safeWriteFile(
     path.join(MISSION_DIR, 'mission-state.json'),
@@ -68,6 +68,7 @@ function writeMission(): void {
       mission_id: MISSION_ID,
       tier: 'confidential',
       assigned_persona: 'ecosystem_architect',
+      ...(tenant ? { tenant_slug: tenant } : {}),
     })
   );
 }
@@ -171,6 +172,48 @@ describe('checkMeetingParticipationConsent standing-grant fallback (PG-04)', () 
     });
     expect(traversal.allowed).toBe(false);
     expect(traversal.reason).toMatch(/mission evidence path rejected/);
+  });
+
+  it('inside a mission uses the mission tenant and denies a disagreeing caller tenant', () => {
+    standingGrant();
+    // Mission of another tenant: the acme grant does not apply even when the
+    // caller claims acme.
+    writeMission('globex');
+    const mismatch = checkMeetingParticipationConsent({
+      mission_id: MISSION_ID,
+      tenant_slug: 'acme',
+      purpose: 'recording',
+      meeting: { url: MEETING_URL },
+    });
+    expect(mismatch.allowed).toBe(false);
+    expect(mismatch.reason).toMatch(/belongs to tenant globex, not the caller tenant acme/);
+    // Same mission without a caller tenant: resolved as globex, no grant there.
+    expect(
+      checkMeetingParticipationConsent({
+        mission_id: MISSION_ID,
+        purpose: 'recording',
+        meeting: { url: MEETING_URL },
+      }).allowed
+    ).toBe(false);
+    // A mission bound to no tenant cannot use a tenant-bound grant.
+    writeMission(null);
+    const untenanted = checkMeetingParticipationConsent({
+      mission_id: MISSION_ID,
+      tenant_slug: 'acme',
+      purpose: 'recording',
+      meeting: { url: MEETING_URL },
+    });
+    expect(untenanted.allowed).toBe(false);
+    expect(untenanted.reason).toMatch(/not bound to a tenant/);
+    // The acme mission with no caller tenant derives acme from the mission.
+    writeMission('acme');
+    expect(
+      checkMeetingParticipationConsent({
+        mission_id: MISSION_ID,
+        purpose: 'recording',
+        meeting: { url: MEETING_URL },
+      }).allowed
+    ).toBe(true);
   });
 
   it('the coordinator passes the target URL, so a granted meeting is joined', async () => {

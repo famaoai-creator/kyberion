@@ -55,8 +55,10 @@ export function loadGrantCapabilityPolicy(): GrantCapabilityPolicy {
 
 /** The policy entry of one capability, or null when the catalog does not declare it. */
 export function getGrantCapabilityPolicy(capability: string): GrantCapabilityPolicyEntry | null {
-  const entry = loadGrantCapabilityPolicy().capabilities[capability];
-  return entry ?? null;
+  const { capabilities } = loadGrantCapabilityPolicy();
+  // Own keys only: `toString`, `__proto__` and friends are never capabilities.
+  if (!Object.hasOwn(capabilities, capability)) return null;
+  return capabilities[capability] ?? null;
 }
 
 export function listGrantCapabilities(): string[] {

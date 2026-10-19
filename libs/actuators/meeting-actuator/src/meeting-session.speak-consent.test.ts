@@ -37,4 +37,13 @@ describe('checkSpeakConsent delegates to the coordinator voice check (PG-04)', (
       reason: 'voice-consent.json missing at x',
     });
   });
+
+  it('keeps the speak wording for a missing mission id or mission', () => {
+    mocks.check.mockReturnValue({ allowed: false, reason: 'x', code: 'no_mission' });
+    expect(checkSpeakConsent().reason).toBe(
+      'speak requires MISSION_ID + voice-consent.json in the mission evidence dir'
+    );
+    mocks.check.mockReturnValue({ allowed: false, reason: 'x', code: 'no_mission_dir' });
+    expect(checkSpeakConsent().reason).toBe("mission 'MSN-SPEAK-DELEGATE' not found");
+  });
 });

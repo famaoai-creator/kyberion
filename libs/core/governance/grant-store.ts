@@ -58,7 +58,7 @@ import {
   type ApprovalAssuranceLevel,
   type ApprovalRequestRecord,
 } from './approval-store.js';
-import { markApprovalConsumed } from './approval-revocation.js';
+import { markApprovalConsumed, revokeStandingEffectApproval } from './approval-revocation.js';
 import {
   approvalRequesterActorId,
   resolveApprovalRequesterInput,
@@ -99,7 +99,13 @@ export interface GrantRecord {
   basis?: { approval_request_id: string; approval_channel: string };
   granted_at: string;
   expires_at: string;
-  revoked?: { at: string; by: string; reason?: string; audit_event_id: string };
+  revoked?: {
+    at: string;
+    by: string;
+    by_kind?: 'human' | 'agent';
+    reason?: string;
+    audit_event_id: string;
+  };
   /** The audit-chain event recorded before the grant was written. */
   audit_event_id: string;
 }
@@ -448,17 +454,25 @@ export function grantStatusAt(record: GrantRecord, at: Date): GrantStatus {
 // Audit
 // ---------------------------------------------------------------------------
 
+/** Who acted on a grant, as resolved by the entry point (never a free-text default). */
+export interface GrantActor {
+  kind: 'human' | 'agent';
+  id: string;
+}
+
 function recordGrantAudit(
   action: string,
   record: GrantRecord,
-  actorId: string,
+  by: GrantActor,
   extra: Record<string, unknown> = {}
 ): string {
   // Purpose (free text) and meeting URLs stay out of the audit metadata —
   // entries may be forwarded to tenant SIEMs, so only identifiers and counts go in.
-  const actor = parseActorRef({ kind: 'human', id: actorId }) ?? undefined;
+  // The structured actor is set only when the id parses as that kind; the
+  // kind itself is always recorded, so an agent is never logged as a human.
+  const actor = parseActorRef({ kind: by.kind, id: by.id }) ?? undefined;
   const entry = auditChain.record({
-    agentId: actorId,
+    agentId: by.id,
     ...(actor ? { actor } : {}),
     action,
     operation: record.grant_id,
@@ -466,6 +480,7 @@ function recordGrantAudit(
     ...(record.scope.tenant_slug ? { tenantSlug: record.scope.tenant_slug } : {}),
     metadata: {
       grant_id: record.grant_id,
+      actor_kind: by.kind,
       capability: record.capability,
       granted_at: record.granted_at,
       expires_at: record.expires_at,
@@ -488,12 +503,14 @@ function writeNewGrant(
   draft: NormalizedGrantDraft,
   grantedBy: GrantedBy,
   basis: GrantRecord['basis'],
-  now: Date
+  now: Date,
+  identity: { grantId?: string; grantedAt?: string } = {}
 ): GrantRecord {
-  const grantedAt = nowIso(now);
+  const grantedAt = identity.grantedAt ?? nowIso(now);
+  const grantedMs = Date.parse(grantedAt);
   const pending: Omit<GrantRecord, 'audit_event_id'> = {
     schema_version: 'grant-record.v1',
-    grant_id: generateGrantId(now),
+    grant_id: identity.grantId ?? generateGrantId(now),
     capability: draft.capability,
     scope: {
       tenant_slug: draft.tenant_slug,
@@ -504,16 +521,15 @@ function writeNewGrant(
     granted_by: grantedBy,
     ...(basis ? { basis } : {}),
     granted_at: grantedAt,
-    expires_at: new Date(now.getTime() + draft.ttl_days * DAY_MS).toISOString(),
+    expires_at: new Date(grantedMs + draft.ttl_days * DAY_MS).toISOString(),
   };
   // Validate before the audit so an invalid grant leaves no "granted" event.
   const precheck = validateGrantRecord({ ...pending, audit_event_id: 'pending' });
   if (!precheck.valid) throw new GrantError('invalid_input', precheck.errors.join('; '));
-  const auditEventId = recordGrantAudit(
-    'grant.granted',
-    pending as GrantRecord,
-    grantedBy.actor_id
-  );
+  const auditEventId = recordGrantAudit('grant.granted', pending as GrantRecord, {
+    kind: 'human',
+    id: grantedBy.actor_id,
+  });
   const record: GrantRecord = { ...pending, audit_event_id: auditEventId };
   writeGrant(record);
   return record;
@@ -736,10 +752,16 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
   try {
     const approval = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, basis.approval_request_id);
     if (!approval || approval.status !== 'approved' || approval.revocation) return false;
-    if (approval.consumption?.consumer !== GRANT_APPROVAL_CONSUMER) return false;
-    const ttlDays = Math.round(
-      (Date.parse(record.expires_at) - Date.parse(record.granted_at)) / DAY_MS
-    );
+    const consumption = approval.consumption;
+    if (consumption?.consumer !== GRANT_APPROVAL_CONSUMER) return false;
+    // Bound to the record this approval created: same grant id, and the grant
+    // started exactly when the approval was consumed (no copy, no time shift).
+    if (consumption.effectRef !== record.grant_id) return false;
+    if (consumption.consumedAt !== record.granted_at) return false;
+    const lifetimeMs = Date.parse(record.expires_at) - Date.parse(record.granted_at);
+    const ttlDays = lifetimeMs / DAY_MS;
+    // Exactly the approved number of whole days — no rounding slack.
+    if (!Number.isInteger(ttlDays) || ttlDays < 1) return false;
     const draft: NormalizedGrantDraft = {
       capability: record.capability,
       tenant_slug: record.scope.tenant_slug,
@@ -783,17 +805,31 @@ export function grantStanding(
     );
   }
   const checked = assertGrantApproval(normalized, approvalRequestId);
-  markApprovalConsumed('mission_controller', {
+  // The consumption names the grant it creates and its time becomes the
+  // grant's granted_at, so the stored record is bound to this approval:
+  // a copy under another id or a shifted validity window no longer matches
+  // (verifyGrantBasis).
+  const grantId = generateGrantId(options.now ?? new Date());
+  const consumed = markApprovalConsumed('mission_controller', {
     channel: GRANT_APPROVAL_CHANNEL,
     requestId: checked.approval.id,
     consumer: GRANT_APPROVAL_CONSUMER,
     consumedBy: checked.humanDecider,
+    effectRef: grantId,
   });
+  const consumedAt = consumed.consumption?.consumedAt;
+  if (!consumedAt) {
+    throw new GrantError(
+      'approval_invalid',
+      `grant approval ${checked.approval.id} was not consumed`
+    );
+  }
   return writeNewGrant(
     normalized,
     { actor_id: checked.humanDecider, role: checked.role, assurance: checked.assurance },
     { approval_request_id: checked.approval.id, approval_channel: GRANT_APPROVAL_CHANNEL },
-    options.now ?? new Date()
+    options.now ?? new Date(),
+    { grantId, grantedAt: consumedAt }
   );
 }
 
@@ -863,10 +899,13 @@ export function findGrantById(grantId: string, tenantSlug?: string): GrantRecord
 /** Revoke a grant: the record stays (with `revoked`), and grants nothing from now on. */
 export function revokeGrant(
   grantId: string,
-  options: { by: string; reason: string; tenant_slug?: string; now?: Date }
+  options: { by: GrantActor; reason: string; tenant_slug?: string; now?: Date }
 ): GrantRecord {
-  const by = String(options.by ?? '').trim();
-  if (!by) throw new GrantError('invalid_input', 'revoke requires an actor');
+  const byId = String(options.by?.id ?? '').trim();
+  if (!byId || (options.by.kind !== 'human' && options.by.kind !== 'agent')) {
+    throw new GrantError('invalid_input', 'revoke requires a human or agent actor');
+  }
+  const by: GrantActor = { kind: options.by.kind, id: byId };
   const reason = String(options.reason ?? '').trim();
   if (!reason || reason.length > 500) {
     throw new GrantError('invalid_input', 'revoke reason must be 1..500 characters');
@@ -878,9 +917,28 @@ export function revokeGrant(
   }
   const at = nowIso(options.now ?? new Date());
   const auditEventId = recordGrantAudit('grant.revoked', existing, by, { revoked_at: at });
+  // Withdraw the approval too: it lives outside the tenant partition, so
+  // editing `revoked` out of the record does not bring the grant back
+  // (verifyGrantBasis refuses a revoked approval).
+  if (existing.basis) {
+    const approval = loadApprovalRequest(
+      existing.basis.approval_channel,
+      existing.basis.approval_request_id
+    );
+    if (approval && !approval.revocation) {
+      revokeStandingEffectApproval('mission_controller', {
+        channel: existing.basis.approval_channel,
+        requestId: existing.basis.approval_request_id,
+        revokedBy: by.id,
+        reason: `standing grant ${grantId} revoked: ${reason}`,
+        consumer: GRANT_APPROVAL_CONSUMER,
+        effectRef: grantId,
+      });
+    }
+  }
   const revoked: GrantRecord = {
     ...existing,
-    revoked: { at, by, reason, audit_event_id: auditEventId },
+    revoked: { at, by: by.id, by_kind: by.kind, reason, audit_event_id: auditEventId },
   };
   writeGrant(revoked);
   return revoked;
