@@ -13,14 +13,14 @@
     "@agent/core": "workspace:*",
     "@agent/shared-media": "workspace:*",
     "adm-zip": "^0.6.1",
-    "chalk": "^6.0.0",
+    "chalk": "^6.0.1",
     "exceljs": "^4.4.0",
     "html-to-docx": "^1.8.0",
     "jsdom": "^29.1.1",
-    "marked": "^18.0.14",
+    "marked": "^18.1.1",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^6.3.289",
-    "puppeteer": "^25.12.0",
+    "pdfjs-dist": "^6.4.299",
+    "puppeteer": "^25.14.0",
     "tesseract.js": "^7.0.0",
     "yargs": "^17.7.3"
   }
