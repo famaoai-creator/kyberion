@@ -144,6 +144,14 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       await runPermissionsCommand(commandArgs, printText);
       return;
     },
+    grants: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      const { runGrantsCommand } = await import('./cli-grants.js');
+      const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+      await runGrantsCommand(commandArgs, printText);
+      return;
+    },
     capture: async (ctx) => {
       const { firstArg, restArgs, normalizedArgs } = ctx;
       if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
