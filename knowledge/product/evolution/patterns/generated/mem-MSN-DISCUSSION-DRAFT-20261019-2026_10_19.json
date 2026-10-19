@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-DISCUSSION-DRAFT-20261019-2026_10_19",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Keep request drafts across result navigation without retaining execution authority",
+  "summary": "Preserve unfinished launcher inputs in view-local memory while remounting readiness and recovery checks; discard drafts on route-context changes.",
+  "candidate_id": "mem-MSN-DISCUSSION-DRAFT-20261019-2026_10_19",
+  "evidence_refs": [
+    "active/missions/public/MSN-DISCUSSION-DRAFT-20261019/evidence/implementation-report.md",
+    "active/missions/public/MSN-DISCUSSION-DRAFT-20261019/evidence/test-report.md",
+    "active/missions/public/MSN-DISCUSSION-DRAFT-20261019/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-DISCUSSION-DRAFT-20261019/evidence/product-source.json"
+  ],
+  "created_at": "2026-10-19T08:59:37.749Z",
+  "applicability": ["mission", "mission:MSN-DISCUSSION-DRAFT-20261019"],
+  "reusable_steps": [
+    "Preserve unfinished launcher inputs in view-local memory while remounting readiness and recovery checks; discard drafts on route-context changes"
+  ],
+  "expected_outcome": "When a request launcher unmounts to show a result, keep only its user-entered goal and selections in the parent view. Use one volatile draft, not a per-tenant cache or persistent browser storage. Bind retention to all raw route scope selectors and the full linked request; exclude result-room and read-only navigation flags. Observe router replacements and browser history. Clear the entire draft immediately when context changes and explain why; never reseed an old URL goal into a new scope. Check the live URL again before edits or submission. Keep execution-readiness and durable create-receipt recovery in remounting children so restored text does not restore permission, stale readiness or automatic execution. Clearing a draft must not clear an unconfirmed request marker. Test actual open/back/forward events, scope changes, stale submit races and nonempty drafts blocked by unknown receipts. Explicitly distinguish React DOM interaction verification from rendered-browser or live-provider verification. For real result revision, introduce an authorized source-room contract rather than labelling a copied initial goal as a revision.",
+  "source_branch": "fix/result-revision-usability-20261019",
+  "source_commit": "ed39e744355e5064d88ed03f6ed1e6fc77c72d22"
+}
