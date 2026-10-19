@@ -1,0 +1,7 @@
+{
+  "$schema": "../schemas/charter-observation-policy.schema.json",
+  "version": "1.0.0",
+  "audit_sample_rate": 0.05,
+  "repeated_denial_threshold": 2,
+  "frequent_denial_threshold": 5
+}

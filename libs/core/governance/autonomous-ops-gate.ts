@@ -342,7 +342,7 @@ export function evaluateAutonomousOpsAction(
   // Evidence-driven per-action adjustment (autonomy-action-state): a demoted
   // action falls back to 'approve'; a promoted one relaxes toward relaxed_to
   // only when no escalation rule fired this call.
-  const override = applyAutonomyOverride(input.actionId, decision, escalations);
+  const override = applyAutonomyOverride(input.actionId, decision, escalations, { tenantSlug });
   if (override.applied) {
     reasons.push(`autonomy override: ${override.applied}`);
     decision = override.decision;
@@ -351,7 +351,10 @@ export function evaluateAutonomousOpsAction(
   // Every verdict is autonomy evidence (apply-mode only; never in tests).
   if (executionMode === 'apply' && !process.env.VITEST) {
     try {
-      recordAutonomyOutcome({ action_id: input.actionId, decision, executed: false });
+      recordAutonomyOutcome(
+        { action_id: input.actionId, decision, executed: false },
+        { tenantSlug }
+      );
     } catch {
       /* ledger writes must never alter a gate verdict */
     }

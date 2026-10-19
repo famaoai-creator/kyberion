@@ -45,7 +45,31 @@ The `confirm-appointment-calendar` template declares `purpose: meeting_schedulin
 
 Read usage → check limits → append consumption runs inside one inter-process critical section per charter scope (`withCharterDecisionLock`). Two concurrent 60 JPY decisions against a 100 JPY daily limit cannot both see an empty ledger: the first allows and records, the second re-reads under the lock and is denied. The lock is held only for the synchronous decision, never across an external effect.
 
-This bounds what the **gate** may spend, not what a downstream payment processor does. A payment that fails after the gate allowed it (timeout, retry, partial settlement) needs a compensating design on the execution side; until that exists, do not describe money delegation as fully transactional. Keep `per_action ≤ per_day ≤ per_month` and set `max_loss_per_incident` to the most one item may lose.
+Provider integrations use `executeCharterPayment` from
+`@agent/core/governance/charter-payment-settlement` with a durable business
+`payment_id`, recipient, description, trusted gate facts and a trusted
+`CharterPaymentAdapter`. The adapter is a host dependency, never executable
+model/ADF input. Its stable ID names the provider/account; `execute` must honor
+the supplied scope-bound idempotency key. No real payment provider ships here.
+
+The executor durably claims the full immutable intent before the real charter
+gate reserves budget. Concurrent/replayed calls never resubmit an attempted
+payment. A blocked, never-attempted identity may be reauthorized after the human
+accepts a new charter; the same charter cannot reopen it. Unknown, partial or
+completed identities never re-execute. Transport failure and interruption retain
+the reservation. `readCharterPayment` exposes state; `reconcileCharterPayment`
+uses the original adapter's **read-only** query, never submits or refunds.
+
+Only authoritative full nonexecution or full compensation evidence plus
+`execution_closed: true` may release budget. Closure must permanently prevent
+pending or future submission of that key. Temporary not-found means `unknown`;
+partial compensation does not release the full reservation. Verified releases
+are append-only and idempotent, credit the original UTC day/month reservation
+window and appear in daily reports. Provider-specific refund/cancel operations
+retain their own authorization; reconciliation cannot invent them. This is not
+a distributed transaction or an exactly-once promise from an arbitrary provider.
+Keep `per_action ≤ per_day ≤ per_month` and set `max_loss_per_incident` to the
+most one item may lose.
 
 ## The audit loop
 
@@ -74,6 +98,46 @@ The common thread the charter enforces is the same one the frameworks share: **a
 
 ## Residual gaps
 
-- The Concierge charter pane does not yet render `recipient_purposes`/`recipient_classes`/`recipient_categories`/`max_attachments` or the processor fields; delegating them is API-only for now. The pane carries them through an amendment so an owner who set them does not silently lose them, but a first-time UI owner cannot set them yet.
-- Payment execution (settlement) has no compensation/rollback path; only the gate's consumption is atomic.
-- `op-preflight` has no dedicated charter guard: monotonicity is carried by the gate's fail-closed evaluation and the entry-point tests, not by a separately registered preflight guard.
+- The Concierge charter pane renders recipient and processor scopes, preserves them and the reputational ceiling on amendments and proposals, and invalidates consent after edits. The server recomputes the exact acceptance statement before recording the human's decision.
+- Actual payment-provider wiring and refund/cancel operations are host adapter responsibilities. The common execution, reconciliation and verified compensation protocol is tested with a trusted test adapter; no real payment was submitted.
+- Kyberion CLI/browser-actuator navigation, DOM and screenshot capture were verified on local Concierge. The isolated checkout redirects protected settings to login because authentication is not configured; the authenticated live approval journey remains environment-dependent.
+
+## Tenant learning and configurable promotion
+
+`autonomy-learning-policy.json` declares enablement, evidence window, cooldown,
+notify/auto minimum distinct decisions and successful executions, outcome ratio
+and incident allowance. Invalid, missing or incoherent configuration disables
+learned relaxation. Defaults require ten successes for notify, twenty for auto,
+a 30-day evidence window and seven-day cooldown. Stable receipt IDs prevent
+replayed successes earning credit; corruption cannot become clean evidence.
+Current proof is rechecked when applying stored promotions; hard floors still win.
+
+Tenant proof and overrides live under the protected confidential tenant
+partition of `active/shared/runtime/autonomy-learning/`. Watchdog sweeps registered
+tenants independently and records verified completion in the same scope; tenant
+actions never inherit legacy system proof. Other execution adapters must supply
+a stable `receipt_id` to `recordAutonomyExecution` after real completion. An
+allowed verdict or repeated request is not proof of successful execution.
+
+The dedicated `core:charter-facts` preflight guard and direct decision-rights
+op validate supplied facts before side effects. Absent facts preserve the human
+approval path; malformed supplied facts require repair. Preflight consumes no
+budget and grants no authority.
+
+## Configure observation without changing code
+
+`charter-observation-policy.json` controls `audit_sample_rate` (0..1),
+`repeated_denial_threshold` and `frequent_denial_threshold` (positive integers).
+The governed catalog validates and reloads changed configuration. Missing or
+invalid configuration falls back to full sampling and advice after one denial.
+These settings change observation and advice only: they cannot grant authority,
+modify signed limits, or clear a stop. The defaults remain 5%, two and five.
+
+Business decision types are extended through `charter-decision-vocabulary.json`
+and the organization decision-rights matrix; the owner explicitly names the new
+type in a replacement charter. Purpose and processor identifiers are declared
+in the accepted scope. New effect classes or risk metrics need a typed evaluator
+and schema support, because an unknown effect or missing decision fact must not
+be interpreted as permission. `approval:evaluate_decision_rights` forwards
+`risk_level` as well as amount so risk-based decisions can actually run within
+the organization's declared threshold.

@@ -1640,6 +1640,10 @@
       "types": "./dist/governance/accountability-charter-registry.d.ts",
       "default": "./dist/governance/accountability-charter-registry.js"
     },
+    "./governance/charter-payment-settlement": {
+      "types": "./dist/governance/charter-payment-settlement.d.ts",
+      "default": "./dist/governance/charter-payment-settlement.js"
+    },
     "./governance/accountability-digest": {
       "types": "./dist/governance/accountability-digest.d.ts",
       "default": "./dist/governance/accountability-digest.js"
@@ -4311,6 +4315,10 @@
     "./pipeline/op-preflight-defaults": {
       "types": "./dist/pipeline/op-preflight-defaults.d.ts",
       "default": "./dist/pipeline/op-preflight-defaults.js"
+    },
+    "./pipeline/op-preflight-charter": {
+      "types": "./dist/pipeline/op-preflight-charter.d.ts",
+      "default": "./dist/pipeline/op-preflight-charter.js"
     },
     "./pipeline/op-preflight-stages": {
       "types": "./dist/pipeline/op-preflight-stages.d.ts",

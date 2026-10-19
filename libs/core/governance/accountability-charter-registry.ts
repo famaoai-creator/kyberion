@@ -255,6 +255,15 @@ export function retireCharter(
 
 export type LedgerEntry =
   | {
+      kind: 'reservation_release';
+      ts: string;
+      correlation_id: string;
+      consumption_ts: string;
+      money: number;
+      evidence_ref: string;
+      resolution: 'not_executed' | 'compensated';
+    }
+  | {
       kind: 'consumption';
       ts: string;
       actor: string;
@@ -376,6 +385,11 @@ export function loadCharterUsage(
     if (e.kind === 'consumption') {
       if (e.ts.startsWith(month)) spentMonth += e.money;
       if (e.ts.startsWith(day)) spentToday += e.money;
+    } else if (e.kind === 'reservation_release') {
+      // Release the reservation in its original budget window, never credit
+      // today's budget for a charge reserved in a previous day/month.
+      if (e.consumption_ts.startsWith(month)) spentMonth -= e.money;
+      if (e.consumption_ts.startsWith(day)) spentToday -= e.money;
     } else if (e.kind === 'tripwire') standing.add(e.tripwire);
     else if (e.kind === 'tripwire_clear') standing.delete(e.tripwire);
   }
@@ -384,6 +398,46 @@ export function loadCharterUsage(
     spent_this_month: spentMonth,
     tripwires_hit: [...standing],
   };
+}
+
+/** Provider adapters call this only after authoritative full non-execution/refund evidence. */
+export function releaseCharterPaymentReservation(
+  charter: Charter,
+  correlationId: string,
+  evidence: { resolution: 'not_executed' | 'compensated'; evidence_ref: string },
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): boolean {
+  if (!evidence.evidence_ref.trim()) throw new Error('[charter] payment evidence is required');
+  return withCharterDecisionLock(charter.scope, () => {
+    const entries = readLedger(charter.scope, charter.charter_id, options);
+    if (
+      entries.some((e) => e.kind === 'reservation_release' && e.correlation_id === correlationId)
+    ) {
+      return false;
+    }
+    const reservation = entries.find(
+      (e) =>
+        e.kind === 'consumption' &&
+        e.action_class === 'payment' &&
+        e.correlation_id === correlationId
+    );
+    if (!reservation || reservation.kind !== 'consumption') return false;
+    appendLedger(
+      charter.scope,
+      charter.charter_id,
+      {
+        kind: 'reservation_release',
+        ts: now.toISOString(),
+        correlation_id: correlationId,
+        consumption_ts: reservation.ts,
+        money: reservation.money,
+        ...evidence,
+      },
+      options
+    );
+    return true;
+  });
 }
 
 /**

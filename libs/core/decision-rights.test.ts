@@ -135,11 +135,75 @@ describe('decision-rights', () => {
         },
       ],
     };
-    const at = (amount: number, actorRole?: string) =>
+    const at = (amount: number, actorRole = 'finance_controller') =>
       evaluateDecisionRights(m, { decisionType: 'expense_reimbursement', amount, actorRole });
     expect(at(5_000)).toMatchObject({ escalationKind: 'human_acceptance', charterDelegable: true });
     expect(at(150_000)?.escalationKind).toBe('over_threshold');
     expect(at(5_000, 'intern')?.escalationKind).toBe('role_mismatch');
+  });
+
+  it('requires matching role and valid facts for the configured metric before delegating', () => {
+    const evaluate = (
+      metric: string,
+      value: number | string,
+      input: {
+        actorRole?: string;
+        amount?: number;
+        riskLevel?: string;
+      }
+    ) =>
+      evaluateDecisionRights(
+        {
+          version: '1.0.0',
+          company_id: 'default',
+          tenant_slug: null,
+          source_kind: 'public',
+          source_path: 'decision-rights.json',
+          decisions: [
+            {
+              decision_type: 'example',
+              authorized_role: 'owner',
+              threshold: { metric, value },
+              final_decision_holder: 'delegated',
+            },
+          ],
+        },
+        { decisionType: 'example', ...input }
+      );
+
+    expect(evaluate('amount_jpy', 100, { amount: 1 })?.escalationKind).toBe('role_mismatch');
+    for (const amount of [undefined, NaN, Infinity, -1]) {
+      expect(evaluate('amount_jpy', 100, { actorRole: 'owner', amount })).toMatchObject({
+        requiresEscalation: true,
+        escalationKind: 'over_threshold',
+      });
+    }
+    for (const riskLevel of [undefined, '', 'unrecognized', 'constructor', '__proto__']) {
+      expect(
+        evaluate('risk_level', 'medium', { actorRole: 'owner', amount: 0, riskLevel })
+          ?.requiresEscalation
+      ).toBe(true);
+    }
+    expect(
+      evaluate('risk_level', 'medium', { actorRole: 'owner', amount: 999, riskLevel: 'low' })
+        ?.requiresEscalation
+    ).toBe(false);
+    expect(
+      evaluate('risk_level', 'unknown', { actorRole: 'owner', riskLevel: 'low' })
+        ?.requiresEscalation
+    ).toBe(true);
+    expect(
+      evaluate('novel_metric', 100, { actorRole: 'owner', amount: 1 })?.requiresEscalation
+    ).toBe(true);
+    expect(evaluate('headcount', 2, { actorRole: 'owner', amount: 1.5 })?.requiresEscalation).toBe(
+      true
+    );
+    expect(evaluate('headcount', 2, { actorRole: 'owner', amount: 2 })?.requiresEscalation).toBe(
+      false
+    );
+    expect(
+      evaluate('amount_jpy', 100, { actorRole: 'owner', amount: 100 })?.requiresEscalation
+    ).toBe(false);
   });
 
   it('fails closed when a present decision-rights catalog violates its schema', () => {
