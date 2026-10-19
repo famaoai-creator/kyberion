@@ -96,6 +96,7 @@ export interface ComputerInteractionAction {
     marks_id?: string;
     text?: string;
     key?: string;
+    modifiers?: string[];
     dictation_keycode?: number;
     path?: string;
     url?: string;
@@ -760,9 +761,19 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     case 'type':
       steps.push({ type: 'apply', op: 'keyboard', params: { text: interaction.text || '' } });
       break;
-    case 'key':
-      steps.push({ type: 'apply', op: 'keyboard', params: { text: interaction.key || '' } });
+    case 'key': {
+      const modifiers = (interaction.modifiers || []).map(String);
+      steps.push(
+        modifiers.length
+          ? {
+              type: 'apply',
+              op: 'press_key',
+              params: { key: interaction.key || '', modifiers },
+            }
+          : { type: 'apply', op: 'keyboard', params: { text: interaction.key || '' } }
+      );
       break;
+    }
     case 'voice_input_toggle':
       steps.push({
         type: 'apply',

@@ -28,7 +28,7 @@ import {
   setWindowState,
   keystrokeText,
   pasteText,
-  pressKey,
+  pressKeyChord,
   toggleDictation,
   quitApplication,
   systemNotify,
@@ -161,7 +161,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const key = String(resolve(params.key || ''))
         .trim()
         .toLowerCase();
-      pressKey(key);
+      const modifiers = Array.isArray(params.modifiers)
+        ? params.modifiers.map((m: unknown) => String(resolve(m)))
+        : [];
+      pressKeyChord(key, modifiers);
       break;
     }
     case 'voice_input_toggle': {

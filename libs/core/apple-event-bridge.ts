@@ -87,6 +87,53 @@ export function pressKey(key: string) {
   ]);
 }
 
+const MODIFIER_DOWN: Record<string, string> = {
+  cmd: 'command down',
+  command: 'command down',
+  meta: 'command down',
+  ctrl: 'control down',
+  control: 'control down',
+  alt: 'option down',
+  option: 'option down',
+  shift: 'shift down',
+};
+
+const NAMED_KEY_CODES: Record<string, number> = {
+  enter: 36,
+  return: 36,
+  tab: 48,
+  escape: 53,
+  esc: 53,
+  space: 49,
+  backspace: 51,
+  delete: 117,
+  up: 126,
+  down: 125,
+  left: 123,
+  right: 124,
+};
+
+export function pressKeyChord(key: string, modifiers: string[] = []) {
+  if (!isDarwin()) {
+    return;
+  }
+  const normalizedKey = key.trim().toLowerCase();
+  const downs = (modifiers || [])
+    .map((m) => MODIFIER_DOWN[String(m).trim().toLowerCase()])
+    .filter(Boolean);
+  if (!downs.length) {
+    pressKey(normalizedKey);
+    return;
+  }
+  const using = ` using {${downs.join(', ')}}`;
+  const code = NAMED_KEY_CODES[normalizedKey];
+  const body =
+    code !== undefined
+      ? `key code ${code}${using}`
+      : `keystroke "${toAppleScriptString(normalizedKey)}"${using}`;
+  safeExec('osascript', ['-e', `tell application "System Events" to ${body}`]);
+}
+
 export function pressKeyCode(keyCode: number) {
   if (!isDarwin()) {
     return;
