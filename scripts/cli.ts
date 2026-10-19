@@ -1241,6 +1241,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'watch',
   // permissions status/warmup only talk to the macOS TCC probe helper.
   'permissions',
+  // grants list/check/grant/revoke read and write grant records and approvals only.
+  'grants',
   'memory',
   // speak routes through the voice actuator's engine registry, not the
   // bootstrapped python voice bridge / reasoning backends.

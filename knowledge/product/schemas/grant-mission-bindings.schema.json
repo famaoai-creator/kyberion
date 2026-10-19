@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/grant-mission-bindings.schema.json",
+  "title": "Mission Grant Bindings",
+  "description": "Mission evidence (evidence/grant-bindings.json): which standing grant allowed a capability inside this mission (PG-04). One entry per grant; re-binding the same grant is a no-op.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mission_id", "bindings"],
+  "properties": {
+    "mission_id": { "type": "string", "minLength": 1 },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "grant_id", "at"],
+        "properties": {
+          "capability": { "type": "string", "minLength": 1 },
+          "grant_id": { "type": "string", "pattern": "^GRT-[0-9]{8}-[a-f0-9]{12}$" },
+          "at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

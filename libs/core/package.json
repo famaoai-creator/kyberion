@@ -1764,6 +1764,18 @@
       "types": "./dist/governance/governance-status.d.ts",
       "default": "./dist/governance/governance-status.js"
     },
+    "./governance/grant-capability-policy": {
+      "types": "./dist/governance/grant-capability-policy.d.ts",
+      "default": "./dist/governance/grant-capability-policy.js"
+    },
+    "./governance/grant-resolver": {
+      "types": "./dist/governance/grant-resolver.d.ts",
+      "default": "./dist/governance/grant-resolver.js"
+    },
+    "./governance/grant-store": {
+      "types": "./dist/governance/grant-store.d.ts",
+      "default": "./dist/governance/grant-store.js"
+    },
     "./governance/kill-switch": {
       "types": "./dist/governance/kill-switch.d.ts",
       "default": "./dist/governance/kill-switch.js"

@@ -64,6 +64,23 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
+    name: 'grant-capability-policy',
+    schemaPath: 'knowledge/product/schemas/grant-capability-policy.schema.json',
+    dataPath: 'knowledge/product/governance/grant-capability-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      capabilities: {
+        'meeting.recording': {
+          kind: 'standing_grant',
+          scope_keys: ['tenant_slug', 'meeting'],
+          external_io: true,
+          max_ttl_days: 0,
+          mission_binding: 'auto',
+        },
+      },
+    },
+  },
+  {
     name: 'meeting-environment-policy',
     schemaPath: 'knowledge/product/schemas/meeting-environment-policy.schema.json',
     dataPath: 'knowledge/product/governance/meeting-environment-policy.json',

@@ -3,7 +3,8 @@ import { resolveIdentityContext } from '../authority.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
+import * as path from 'node:path';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 
 const VOICE_CONSENT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/voice-consent.schema.json'
@@ -134,6 +135,91 @@ export function loadVoiceConsentAtPath(filePath: string): VoiceConsentRecord {
   } catch (error: unknown) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`voice-consent.json is malformed: ${reason}`);
+  }
+}
+
+export interface MissionVoiceConsentResult extends VoiceConsentValidationResult {
+  /**
+   * `path_rejected`: the mission id or evidence path failed the repository
+   * boundary — callers must not fall back to any other consent source.
+   */
+  code?: 'no_mission' | 'path_rejected' | 'missing' | 'invalid';
+}
+
+/**
+ * The mission-scoped `voice-consent.json` check shared by every meeting
+ * consent gate (coordinator recording/voice, meeting-actuator speak): the
+ * mission id and evidence path pass the repository boundary before the
+ * record is read through its schema, then the record is validated against
+ * the mission and tenant. Fail-closed on every error.
+ */
+export function evaluateMissionVoiceConsent(input: {
+  missionId?: string;
+  tenantSlug?: string;
+  /** Wording of the missing-mission reason (`recording`, `voice`, `speak`). */
+  purpose: string;
+  nowMs?: number;
+}): MissionVoiceConsentResult {
+  const missionId = normalizeOptionalString(input.missionId);
+  if (!missionId) {
+    return {
+      allowed: false,
+      code: 'no_mission',
+      reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
+    };
+  }
+  let evidenceDir: string | null;
+  try {
+    pathResolver.assertMissionIdArgument(missionId);
+    evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      code: 'path_rejected',
+      reason: `mission evidence path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!evidenceDir) {
+    return {
+      allowed: false,
+      code: 'missing',
+      reason: `mission evidence dir not found for ${missionId}`,
+    };
+  }
+  let consentPath: string;
+  try {
+    consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
+      allowMissingLeaf: true,
+    });
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      code: 'path_rejected',
+      reason: `voice-consent path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!safeExistsSync(consentPath)) {
+    return {
+      allowed: false,
+      code: 'missing',
+      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
+    };
+  }
+  try {
+    const consent = loadVoiceConsentAtPath(consentPath);
+    const result = validateVoiceConsentRecord(consent, {
+      missionId,
+      tenantSlug: input.tenantSlug,
+      ...(input.nowMs !== undefined ? { nowMs: input.nowMs } : {}),
+    });
+    return result.allowed ? result : { ...result, code: 'invalid' };
+  } catch (err: unknown) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      allowed: false,
+      code: 'invalid',
+      reason: `failed to parse voice-consent.json: ${reason}`,
+    };
   }
 }
 

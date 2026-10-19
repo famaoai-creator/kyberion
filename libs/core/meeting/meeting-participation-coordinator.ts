@@ -19,13 +19,10 @@
  * silence, etc.); intelligence lives in the agent callback.
  */
 
-import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { auditChain } from '../governance/audit-chain.js';
-import * as pathResolver from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { TraceContext } from '../analysis/trace.js';
 import { teeAudio } from '../voice/audio-tee.js';
 import type { AudioBus } from '../voice/audio-bus.js';
@@ -47,7 +44,9 @@ import {
   type MediaEvent,
 } from '../realtime-media-session.js';
 import { BargeInController } from '../barge-in-controller.js';
-import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '../voice/voice-consent.js';
+import { evaluateMissionVoiceConsent } from '../voice/voice-consent.js';
+import { recordGrantMissionBinding, resolveStandingGrant } from '../governance/grant-resolver.js';
+import { resolveIdentityContext } from '../authority.js';
 
 export interface ConversationAgent {
   /**
@@ -124,59 +123,63 @@ function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+/**
+ * Fail-closed participation consent. `voice` (speaking) needs the mission's
+ * voice-consent.json — never a standing grant. `recording` accepts the
+ * mission's voice-consent.json and otherwise a `meeting.recording` standing
+ * grant of the tenant that covers the meeting (series id or URL, PG-04); a use
+ * inside a mission is then recorded in the mission evidence
+ * (`evidence/grant-bindings.json`).
+ */
 export function checkMeetingParticipationConsent(input: {
   mission_id?: string;
   tenant_slug?: string;
   purpose: 'recording' | 'voice';
-}): { allowed: boolean; reason?: string } {
+  /** The meeting being recorded (standing-grant match for `recording`). */
+  meeting?: { url?: string; series_id?: string };
+}): { allowed: boolean; reason?: string; grant_id?: string } {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = normalizeOptionalString(input.mission_id);
-  if (!missionId) {
+  const consent = evaluateMissionVoiceConsent({
+    missionId,
+    tenantSlug: input.tenant_slug,
+    purpose: input.purpose,
+  });
+  if (consent.allowed) return { allowed: true };
+  // Speaking never falls back to a standing grant; a rejected mission path
+  // never falls back to anything.
+  if (input.purpose !== 'recording' || consent.code === 'path_rejected') {
+    return { allowed: false, reason: consent.reason };
+  }
+  const tenantSlug =
+    normalizeOptionalString(input.tenant_slug) ??
+    normalizeOptionalString(resolveIdentityContext().tenantSlug);
+  const grant = resolveStandingGrant('meeting.recording', {
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(missionId ? { mission_id: missionId } : {}),
+    ...(input.meeting ? { meeting: input.meeting } : {}),
+  });
+  if (!grant.allowed || !grant.grant_id) {
+    const remedy = grant.remedy ? ` | or: ${grant.remedy}` : '';
     return {
       allowed: false,
-      reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
+      reason: `${consent.reason}; standing grant: ${grant.reason ?? 'not found'}${remedy}`,
     };
   }
-  let evidenceDir: string | null;
-  try {
-    pathResolver.assertMissionIdArgument(missionId);
-    evidenceDir = pathResolver.missionEvidenceDir(missionId);
-  } catch (err: unknown) {
-    return {
-      allowed: false,
-      reason: `mission evidence path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
-    };
+  if (missionId) {
+    try {
+      recordGrantMissionBinding(missionId, {
+        capability: 'meeting.recording',
+        grant_id: grant.grant_id,
+      });
+    } catch (err: unknown) {
+      return {
+        allowed: false,
+        reason: `standing grant ${grant.grant_id} matched but the mission binding could not be recorded for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
-  if (!evidenceDir) {
-    return { allowed: false, reason: `mission evidence dir not found for ${missionId}` };
-  }
-  let consentPath: string;
-  try {
-    consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
-      allowMissingLeaf: true,
-    });
-  } catch (err: unknown) {
-    return {
-      allowed: false,
-      reason: `voice-consent path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-  if (!safeExistsSync(consentPath)) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
-    };
-  }
-  try {
-    const consent = loadVoiceConsentAtPath(consentPath);
-    return validateVoiceConsentRecord(consent, {
-      missionId,
-      tenantSlug: input.tenant_slug,
-    });
-  } catch (err: unknown) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { allowed: false, reason: `failed to parse voice-consent.json: ${reason}` };
-  }
+  return { allowed: true, grant_id: grant.grant_id };
 }
 
 export function filterSelfAudioFromMeetingInput(
@@ -248,6 +251,7 @@ export class MeetingParticipationCoordinator {
         mission_id: options.mission_id,
         tenant_slug: options.tenant_slug,
         purpose: 'recording',
+        meeting: { url: target.url },
       });
       if (!consent.allowed) {
         this.deps.trace?.addEvent('meeting_participation.recording_denied', {
