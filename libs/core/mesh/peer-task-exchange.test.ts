@@ -408,39 +408,47 @@ describe('peer task exchange', () => {
 
   it('expires an unaccepted task for both sides and tells the proposer', async () => {
     wirePeers();
+    // A long ttl keeps delivery from racing the expiry on a slow runner (a
+    // proposal already expired on receipt is refused, not left to expire);
+    // the clock is then moved past it instead of sleeping.
     const proposed = await proposePeerTask({
       tenantId: TENANT,
       senderPeerId: PROPOSER,
       recipientPeerId: RECIPIENT,
       taskType: 'baseline.check',
       summary: 'short-lived',
-      ttlMs: 50,
+      ttlMs: 60_000,
       peerCatalogPath: PEER_CATALOG,
     });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    // Unanswered past expiry, the proposer already sees it as expired.
-    expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
-      'expired'
-    );
-    const runner = vi.fn(okRunner);
-    await expect(
-      decidePeerTask({
-        tenantId: TENANT,
-        localPeerId: RECIPIENT,
-        taskId: proposed.request.task_id,
-        decision: 'accepted',
-        actorId: 'operator:test',
-        reason: 'late',
-        taskCatalogPath: TASK_CATALOG,
-        peerCatalogPath: PEER_CATALOG,
-        runner,
-      })
-    ).rejects.toThrow(/peer_task_expired/);
-    expect(runner).not.toHaveBeenCalled();
-    expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)).toMatchObject({
-      state: 'rejected',
-      result: { status: 'rejected' },
-    });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 120_000);
+      // Unanswered past expiry, the proposer already sees it as expired.
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)!.state).toBe(
+        'expired'
+      );
+      const runner = vi.fn(okRunner);
+      await expect(
+        decidePeerTask({
+          tenantId: TENANT,
+          localPeerId: RECIPIENT,
+          taskId: proposed.request.task_id,
+          decision: 'accepted',
+          actorId: 'operator:test',
+          reason: 'late',
+          taskCatalogPath: TASK_CATALOG,
+          peerCatalogPath: PEER_CATALOG,
+          runner,
+        })
+      ).rejects.toThrow(/peer_task_expired/);
+      expect(runner).not.toHaveBeenCalled();
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', proposed.request.task_id)).toMatchObject({
+        state: 'rejected',
+        result: { status: 'rejected' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('refuses proposals with an unbounded lifetime or a future request time', () => {

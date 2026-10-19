@@ -9,6 +9,7 @@ export interface OsAutomationPlatformAdapter {
   keystrokeText(text: string): void;
   pasteText(text: string): void;
   pressKey(key: string): void;
+  pressKeyChord(key: string, modifiers?: string[]): void;
   pressKeyCode(keyCode: number): void;
   toggleDictation(keyCode?: number): void;
   clickAt(x: number, y: number, clickCount?: number): void;
@@ -99,6 +100,7 @@ const unsupportedAdapter: OsAutomationPlatformAdapter = {
   keystrokeText: () => undefined,
   pasteText: () => undefined,
   pressKey: () => undefined,
+  pressKeyChord: () => undefined,
   pressKeyCode: () => undefined,
   toggleDictation: () => undefined,
   clickAt: () => undefined,

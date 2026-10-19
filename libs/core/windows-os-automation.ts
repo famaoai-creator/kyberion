@@ -239,6 +239,43 @@ export function pressKey(key: string): void {
   keystrokeText(map[key.trim().toLowerCase()] || key);
 }
 
+const MODIFIER_SENDKEYS: Record<string, string> = {
+  ctrl: '^',
+  control: '^',
+  alt: '%',
+  option: '%',
+  shift: '+',
+  cmd: '{LWIN}',
+  command: '{LWIN}',
+  meta: '{LWIN}',
+  win: '{LWIN}',
+};
+
+const NAMED_SENDKEYS: Record<string, string> = {
+  enter: '{ENTER}',
+  return: '{ENTER}',
+  tab: '{TAB}',
+  escape: '{ESC}',
+  esc: '{ESC}',
+  space: ' ',
+  backspace: '{BACKSPACE}',
+  delete: '{DELETE}',
+  up: '{UP}',
+  down: '{DOWN}',
+  left: '{LEFT}',
+  right: '{RIGHT}',
+};
+
+export function pressKeyChord(key: string, modifiers: string[] = []): void {
+  const normalizedKey = key.trim().toLowerCase();
+  const keyToken = NAMED_SENDKEYS[normalizedKey] || normalizedKey;
+  const prefix = (modifiers || [])
+    .map((m) => MODIFIER_SENDKEYS[String(m).trim().toLowerCase()])
+    .filter(Boolean)
+    .join('');
+  keystrokeText(prefix ? `${prefix}(${keyToken})` : keyToken);
+}
+
 export function pressKeyCode(keyCode: number): void {
   if (!Number.isInteger(keyCode) || keyCode < 1 || keyCode > 255)
     throw new Error(`Invalid key code: ${keyCode}`);

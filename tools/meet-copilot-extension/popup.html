@@ -50,6 +50,9 @@
       input {
         width: 70px;
       }
+      input.wide {
+        width: 170px;
+      }
       button {
         margin-top: 8px;
         margin-right: 6px;
@@ -74,9 +77,13 @@
     <div class="row">
       <span class="k">WS port</span><span><input id="port" type="number" /> </span>
     </div>
+    <div class="row">
+      <span class="k">Auth token</span><span><input id="token" class="wide" type="password" /> </span>
+    </div>
     <div>
       <button id="panel">Open AI panel</button>
       <button id="save">Save port</button>
+      <button id="savetoken">Save token</button>
       <button id="diagnose">Diagnose DOM</button>
       <button id="leave">Leave</button>
     </div>

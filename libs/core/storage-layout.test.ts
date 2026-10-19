@@ -138,6 +138,12 @@ describe('storage-layout floors', () => {
 describe('durable partitioned runtime state', () => {
   it('registers hearing independently of metrics-ledger lifecycle', () => {
     expect(PARTITIONED_RUNTIME_STATE_ROOTS.hearing).toBe('active/shared/runtime/hearing');
+    expect(PARTITIONED_RUNTIME_STATE_ROOTS.grants).toBe('active/shared/runtime/grants');
+    expect(
+      partitionedRuntimeStateKnowledgePath(
+        'active/shared/runtime/grants/confidential/acme/GRT-20261019-aaaaaaaaaaaa.json'
+      )
+    ).toBe('knowledge/confidential/acme/GRT-20261019-aaaaaaaaaaaa.json');
     expect(
       partitionedRuntimeStateKnowledgePath(
         'active/shared/runtime/hearing/personal/shared/all/a.json'
@@ -193,12 +199,11 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/hearing/confidential/',
       'active/shared/runtime/discussion-create-requests/personal/',
       'active/shared/runtime/discussion-create-requests/confidential/',
+      'active/shared/runtime/grants/personal/',
+      'active/shared/runtime/grants/confidential/',
     ]);
     for (const prefix of protectedRuntimeStatePrefixes())
       expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
-    expect(
-      policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes('/hearing/'))
-    ).toBe(false);
     expect(
       policy.tenant_scope.shared_prefixes.some((prefix: string) =>
         prefix.includes('/discussion-create-requests/')
@@ -218,13 +223,18 @@ describe('durable partitioned runtime state', () => {
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
       if (role !== 'discussion_request_store')
         expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
-    for (const field of [
-      'default_allow',
-      'persona_permissions',
-      'authority_permissions',
-      'authority_role_permissions',
-    ]) {
-      expect(JSON.stringify(policy[field])).not.toContain('runtime/hearing');
+    for (const store of ['hearing', 'grants']) {
+      expect(
+        policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
+      ).toBe(false);
+      for (const field of [
+        'default_allow',
+        'persona_permissions',
+        'authority_permissions',
+        'authority_role_permissions',
+      ]) {
+        expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
+      }
     }
   });
 });
