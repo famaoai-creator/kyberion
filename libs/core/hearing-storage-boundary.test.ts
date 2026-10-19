@@ -78,6 +78,10 @@ beforeAll(async () => {
 }, 30_000);
 
 const STORE = 'active/shared/runtime/hearing';
+// PG-03 standing grants share the registered state-root boundary.
+const GRANTS = 'active/shared/runtime/grants';
+const grantFile = (tenant: string) =>
+  path.join(ROOT, GRANTS, 'confidential', tenant, 'GRT-20261019-aaaaaaaaaaaa.json');
 const TENANT = 'hearing-boundary-' + process.pid;
 const OTHER = 'hearing-other-' + process.pid;
 const session = (tenant = TENANT) =>
@@ -110,6 +114,8 @@ function cleanup(): void {
     for (const tenant of [TENANT, OTHER])
       safeRmSync(path.join(ROOT, STORE, 'confidential', tenant), { recursive: true, force: true });
     safeRmSync(personal, { force: true });
+    for (const tenant of [TENANT, OTHER])
+      safeRmSync(path.join(ROOT, GRANTS, 'confidential', tenant), { recursive: true, force: true });
   });
 }
 
@@ -162,6 +168,21 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
         /tenant.scope_invalid_prefix/
       );
     }, TENANT));
+
+  it('applies the same tenant boundary to the standing-grant store', () => {
+    privileged(() => {
+      safeWriteFile(grantFile(TENANT), 'own tenant grant');
+      safeWriteFile(grantFile(OTHER), 'other tenant grant');
+    });
+    expect(guard.detectTier(grantFile(TENANT))).toBe('confidential');
+    restricted(() => {
+      expect(safeReadFile(grantFile(TENANT), { encoding: 'utf8' })).toBe('own tenant grant');
+      expect(() => safeReadFile(grantFile(OTHER), { encoding: 'utf8' })).toThrow(
+        /tenant.scope_violation/
+      );
+      expect(() => safeWriteFile(grantFile(OTHER), 'replace')).toThrow(/tenant.scope_violation/);
+    }, TENANT);
+  });
 
   it('does not let default runtime grants write a tier that the identity cannot write', () =>
     restricted(() => {

@@ -1,0 +1,35 @@
+{
+  "$schema": "../schemas/grant-capability-policy.schema.json",
+  "version": "1.0.0",
+  "description": "PG-03: per-capability rules for the Grant model (PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19 §2.2/§5/§6). standing_grant capabilities are stored by libs/core/governance/grant-store.ts; per_mission and os_permission capabilities are read through adapters by libs/core/governance/grant-resolver.ts. external_io=true means granting needs a human approval bound by payloadHash to the grant (basis.approval_request_id).",
+  "capabilities": {
+    "meeting.recording": {
+      "kind": "standing_grant",
+      "description": "Record audio from an external meeting service for the bound meeting series / URLs.",
+      "scope_keys": ["tenant_slug", "meeting"],
+      "external_io": true,
+      "max_ttl_days": 90,
+      "mission_binding": "auto"
+    },
+    "meeting.voice": {
+      "kind": "per_mission",
+      "description": "Speak synthesized voice into a meeting. Never standing: the mission-scoped voice-consent.json only.",
+      "adapter": "voice_consent"
+    },
+    "os.microphone": {
+      "kind": "os_permission",
+      "description": "macOS microphone permission of the probing host app.",
+      "probe_key": "microphone"
+    },
+    "os.camera": {
+      "kind": "os_permission",
+      "description": "macOS camera permission of the probing host app.",
+      "probe_key": "camera"
+    },
+    "os.screen_recording": {
+      "kind": "os_permission",
+      "description": "macOS screen recording permission of the probing host app.",
+      "probe_key": "screen_recording"
+    }
+  }
+}

@@ -516,6 +516,56 @@
       "group": "inspect"
     },
     {
+      "id": "operator-cli.grants",
+      "command": "grants",
+      "noun": "grants",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.grants.list",
+      "command": "grants list",
+      "noun": "grants",
+      "verb": "list",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_list",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.grants.check",
+      "command": "grants check",
+      "noun": "grants",
+      "verb": "check",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_check",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.grants.grant",
+      "command": "grants grant",
+      "noun": "grants",
+      "verb": "grant",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_grant",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.grants.revoke",
+      "command": "grants revoke",
+      "noun": "grants",
+      "verb": "revoke",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_revoke",
+      "group": "operate"
+    },
+    {
       "id": "operator-cli.permissions",
       "command": "permissions",
       "noun": "permissions",
@@ -888,6 +938,11 @@
         "diff",
         "see",
         "listen",
+        "grants",
+        "grants list",
+        "grants check",
+        "grants grant",
+        "grants revoke",
         "permissions",
         "permissions status",
         "permissions warmup",
