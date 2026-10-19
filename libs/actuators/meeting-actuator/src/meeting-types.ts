@@ -19,6 +19,8 @@ export interface MeetingAction {
     url_policy?: 'explicit_only' | 'explicit_or_detected';
     url?: string;
     meeting_id?: string;
+    /** Calendar series id of the meeting (standing-grant match for recording). */
+    series_id?: string;
     passcode?: string;
     text?: string;
     duration_sec?: number;

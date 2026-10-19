@@ -21,6 +21,7 @@
     "read_json",
     "run_first_win_lifecycle",
     "run_health_degradation_watch",
+    "run_meeting_readiness_check",
     "run_tenant_drift_watch",
     "run_ui_ux_governance",
     "run_vitest",
@@ -297,6 +298,7 @@
         "pr_shadow_observe",
         "run_first_win_lifecycle",
         "run_health_degradation_watch",
+        "run_meeting_readiness_check",
         "run_tenant_drift_watch",
         "run_ui_ux_governance",
         "run_vitest"

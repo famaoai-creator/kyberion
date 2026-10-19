@@ -62,6 +62,41 @@ describe('calendar-workflow helpers', () => {
     ]);
   });
 
+  it('carries the recurring series id of Google and Microsoft 365 occurrences (PG-07)', async () => {
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      items: [
+        {
+          id: 'event-1_20261021T010000Z',
+          recurringEventId: 'event-1',
+          summary: 'Weekly',
+          start: { dateTime: '2026-10-21T10:00:00+09:00' },
+          end: { dateTime: '2026-10-21T10:30:00+09:00' },
+          hangoutLink: 'https://meet.google.com/abc-defg-hij',
+        },
+        { id: 'one-off', summary: 'Once', start: { dateTime: '2026-10-21T11:00:00+09:00' } },
+      ],
+    });
+    const google = await listCalendarAgenda({});
+    expect(google.events.map((event) => [event.id, event.series_id])).toEqual([
+      ['event-1_20261021T010000Z', 'google-workspace:event-1'],
+      ['one-off', undefined],
+    ]);
+
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      value: [
+        {
+          id: 'occurrence-1',
+          seriesMasterId: 'master-1',
+          subject: 'Weekly',
+          start: { dateTime: '2026-10-21T10:00:00+09:00' },
+          end: { dateTime: '2026-10-21T10:30:00+09:00' },
+        },
+      ],
+    });
+    const m365 = await listCalendarAgenda({ provider: 'm365', calendar_id: 'primary' });
+    expect(m365.events[0]?.series_id).toBe('m365:master-1');
+  });
+
   it('queries free/busy windows for the requested calendars', async () => {
     mocks.executeServicePreset.mockResolvedValue({
       calendars: {

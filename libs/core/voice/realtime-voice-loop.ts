@@ -291,6 +291,8 @@ export interface RealtimeVoiceLoopOptions {
   consent?: {
     missionId?: string;
     tenantSlug?: string;
+    /** The meeting being recorded (calendar series id / URL for a standing grant). */
+    meeting?: { url?: string; series_id?: string };
     /** Default: Boolean(missionId). */
     requireRecordingConsent?: boolean;
   };
@@ -431,6 +433,7 @@ export async function startRealtimeVoiceLoop(
     const consent = checkMeetingParticipationConsent({
       ...(options.consent?.missionId ? { mission_id: options.consent.missionId } : {}),
       ...(options.consent?.tenantSlug ? { tenant_slug: options.consent.tenantSlug } : {}),
+      ...(options.consent?.meeting ? { meeting: options.consent.meeting } : {}),
       purpose: 'recording',
     });
     if (!consent.allowed) {

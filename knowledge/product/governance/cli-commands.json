@@ -536,6 +536,26 @@
       "group": "operate"
     },
     {
+      "id": "operator-cli.grants.status",
+      "command": "grants status",
+      "noun": "grants",
+      "verb": "status",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_status",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.grants.upcoming",
+      "command": "grants upcoming",
+      "noun": "grants",
+      "verb": "upcoming",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_grants_upcoming",
+      "group": "operate"
+    },
+    {
       "id": "operator-cli.grants.check",
       "command": "grants check",
       "noun": "grants",
@@ -941,6 +961,8 @@
         "grants",
         "grants list",
         "grants check",
+        "grants status",
+        "grants upcoming",
         "grants grant",
         "grants revoke",
         "permissions",

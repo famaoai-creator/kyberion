@@ -1,0 +1,73 @@
+{
+  "action": "pipeline",
+  "name": "meeting-readiness-soon",
+  "version": "1.0.0",
+  "description": "PG-07: every 15 minutes, checks meetings starting 60–75 minutes from now (each meeting once) and notifies the operator when one lacks a grant. Read-only.",
+  "_refs": {
+    "plan": "docs/developer/improvement-plans-2026-10/PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19.ja.md",
+    "implementation": "scripts/meeting_readiness_check.ts"
+  },
+  "schedule": {
+    "id": "meeting-readiness-soon",
+    "cron": "*/15 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "context": {
+    "stage": "soon",
+    "profile": "meeting.online",
+    "tenant_slug": "",
+    "calendar_names": []
+  },
+  "steps": [
+    {
+      "id": "check_readiness",
+      "role": "source",
+      "op": "core:run_meeting_readiness_check",
+      "produces": {
+        "channel": "meeting_readiness",
+        "type": "Json"
+      },
+      "params": {
+        "stage": "{{stage}}",
+        "profile": "{{profile}}",
+        "tenant_slug": "{{tenant_slug}}",
+        "calendar_names": "{{calendar_names}}"
+      }
+    },
+    {
+      "id": "notify_if_missing",
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "meeting_readiness",
+      "params": {
+        "condition": {
+          "from": "meeting_readiness.not_ready_count",
+          "operator": "not_equals",
+          "value": 0
+        },
+        "then": [
+          {
+            "id": "notify_operator",
+            "role": "sink",
+            "op": "system:notify",
+            "params": {
+              "title": "{{meeting_readiness.notify_title}}",
+              "message": "{{meeting_readiness.notify_message}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_ready",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "✅ Meeting readiness ({{stage}}): {{meeting_readiness.meetings.length}} meeting(s) in window, all ready."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -17,6 +17,8 @@ export interface MeetingTarget {
   platform: MeetingPlatform;
   /** Platform-specific meeting code / ID when the entry page requires one. */
   meeting_id?: string;
+  /** Calendar series id of the meeting (standing-grant match for recording). */
+  series_id?: string;
   /** Optional passcode / password for platforms that gate entry behind one. */
   passcode?: string;
   /** Display name the AI should show in the participant list. */

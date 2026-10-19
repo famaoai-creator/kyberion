@@ -602,6 +602,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineHealthDegradationWatch(step, params, ctx);
   },
+  'core:run_meeting_readiness_check': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineMeetingReadinessCheck(step, params, ctx);
+  },
   'core:run_ops_health_probe': async (dctx) => {
     const { step, params, ctx } = dctx;
 

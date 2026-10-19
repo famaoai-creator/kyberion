@@ -213,6 +213,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion grants grant`                  |                                     | Create a standing grant (human approval for external data exchange)                                                   |
 | `pnpm kyberion grants list`                   |                                     | List standing grants                                                                                                  |
 | `pnpm kyberion grants revoke`                 |                                     | Revoke a standing grant                                                                                               |
+| `pnpm kyberion grants status`                 |                                     | List the grants a kind of work still needs, with how to allow each                                                    |
+| `pnpm kyberion grants upcoming`               |                                     | Check upcoming calendar meetings for missing grants                                                                   |
 | `pnpm kyberion gws meet-create`               |                                     | Create a Google Meet                                                                                                  |
 | `pnpm kyberion halt engage`                   |                                     | Halt all autonomous operations (work claims, dot wakes, auto-proceed) until resumed.                                  |
 | `pnpm kyberion halt resume`                   |                                     | Resume autonomous operations after a halt.                                                                            |

@@ -140,10 +140,12 @@ function normalizeRfc3339Value(value: string, timeZone?: string): Record<string,
 function normalizeGenericEvent(item: unknown): CalendarEventSummary | null {
   if (!isRecord(item) || !nonEmptyString(item.id)) return null;
   const description = stringValue(item.description);
+  const seriesId = stringValue(item.recurringEventId);
   return {
     id: item.id,
     summary: stringValue(item.summary),
     ...(description ? { description } : {}),
+    ...(seriesId ? { series_id: seriesId } : {}),
     start: nestedStringValue(item, 'start', 'dateTime') || nestedStringValue(item, 'start', 'date'),
     end: nestedStringValue(item, 'end', 'dateTime') || nestedStringValue(item, 'end', 'date'),
     location: stringValue(item.location),
@@ -151,6 +153,19 @@ function normalizeGenericEvent(item: unknown): CalendarEventSummary | null {
     html_link: stringValue(item.htmlLink),
     hangout_link: stringValue(item.hangoutLink),
   };
+}
+
+/**
+ * Series ids are matched against `meeting.recording` standing grants, so they
+ * carry the provider (`google-workspace:<recurringEventId>`,
+ * `m365:<seriesMasterId>`): ids from different providers never collide.
+ */
+function namespaceSeriesId(providerId: string, event: CalendarEventSummary): CalendarEventSummary {
+  if (!event.series_id) return event;
+  const prefix = `${providerId}:`;
+  return event.series_id.startsWith(prefix)
+    ? event
+    : { ...event, series_id: `${prefix}${event.series_id}` };
 }
 
 function normalizeProviderEvent(
@@ -263,11 +278,13 @@ export async function listCalendarAgenda(
     ...(timeZone ? { timeZone } : {}),
   });
 
-  const events = bridge.normalizeEvents
-    ? bridge.normalizeEvents(response)
-    : extractEventItems(response)
-        .map((item) => normalizeProviderEvent(bridge, item))
-        .filter(isCalendarEventSummary);
+  const events = (
+    bridge.normalizeEvents
+      ? bridge.normalizeEvents(response)
+      : extractEventItems(response)
+          .map((item) => normalizeProviderEvent(bridge, item))
+          .filter(isCalendarEventSummary)
+  ).map((event) => namespaceSeriesId(bridge.provider_id, event));
 
   return {
     ok: true,

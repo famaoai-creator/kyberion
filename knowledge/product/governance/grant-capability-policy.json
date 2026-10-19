@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/grant-capability-policy.schema.json",
   "version": "1.0.0",
-  "description": "PG-03: per-capability rules for the Grant model (PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19 §2.2/§5/§6). standing_grant capabilities are stored by libs/core/governance/grant-store.ts; per_mission and os_permission capabilities are read through adapters by libs/core/governance/grant-resolver.ts. external_io=true means granting needs a human approval bound by payloadHash to the grant (basis.approval_request_id).",
+  "description": "PG-03: per-capability rules for the Grant model (PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19 §2.2/§5/§6). standing_grant capabilities are stored by libs/core/governance/grant-store.ts; per_mission and os_permission capabilities are read through adapters by libs/core/governance/grant-resolver.ts. external_io=true means granting needs a human approval bound by payloadHash to the grant (basis.approval_request_id). readiness_profiles (PG-06) list the capabilities a kind of work needs; `pnpm kyberion grants status` and meeting preflight evaluate them.",
   "capabilities": {
     "meeting.recording": {
       "kind": "standing_grant",
@@ -30,6 +30,48 @@
       "kind": "os_permission",
       "description": "macOS screen recording permission of the probing host app.",
       "probe_key": "screen_recording"
+    }
+  },
+  "readiness_profiles": {
+    "meeting.online": {
+      "description": "Join an online meeting and capture it (meeting-watcher, meeting:join, pnpm meeting:participate).",
+      "requirements": [
+        {
+          "capability": "meeting.recording",
+          "required": true
+        },
+        {
+          "capability": "meeting.voice",
+          "required": false,
+          "note": "only when the agent speaks in the meeting"
+        }
+      ]
+    },
+    "meeting.in_room": {
+      "description": "Record an in-room meeting from the local microphone (pnpm minutes:record).",
+      "requirements": [
+        {
+          "capability": "os.microphone",
+          "required": true
+        },
+        {
+          "capability": "meeting.recording",
+          "required": true
+        }
+      ]
+    },
+    "voice.realtime": {
+      "description": "Realtime voice conversation through the local microphone.",
+      "requirements": [
+        {
+          "capability": "os.microphone",
+          "required": true
+        },
+        {
+          "capability": "meeting.recording",
+          "required": true
+        }
+      ]
     }
   }
 }
