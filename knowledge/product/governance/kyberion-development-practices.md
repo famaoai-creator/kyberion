@@ -192,6 +192,22 @@ leftovers. A test may not depend on:
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.
+- **the wall clock's speed** — a real sleep in a test (`new Promise((r) =>
+setTimeout(r, N))`, `await sleep(N)`) races a TTL, a deadline or a
+  background worker, and a loaded CI runner loses the race (#1186: a 1 ms
+  TTL raced the assertion in `peer-task-exchange.test.ts`). The
+  `test-sleep-ratchet` gate (`pnpm check -- --only test-sleep-ratchet`, baseline
+  `scripts/check_test_sleep_ratchet.baseline.json`) counts them per test file
+  and fails when a file gains one; event-loop yields (`setTimeout(r, 0)`,
+  `setImmediate`) and timeout guards (`setTimeout(() => reject(…), N)`) are
+  not counted. Fix by shape: TTL / expiry / lease → long TTL or
+  `vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime(Date.now() + ms)`;
+  timer-driven code → `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync(ms)`;
+  "wait until it happened" → `await vi.waitFor(() => expect(…))`;
+  late completion vs a deadline → hold the work on a deferred promise and
+  release it after the deadline fired; code that reads the clock → inject a
+  clock (`deps.clock`, a `now` option). After removing sleeps, lower the
+  baseline with `node --import ./scripts/ts-loader.mjs scripts/check_test_sleep_ratchet.ts --write-baseline`.
 
 Smell test: _would this pass in a fresh clone on a different OS on the
 first run?_

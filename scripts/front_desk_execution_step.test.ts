@@ -706,14 +706,29 @@ describe('durable diagnostic intake vertical slice', () => {
     assertTenant = createFirstJobTenantStatusAssertion(charter, fixture.policy.mappings[0]);
     const { item } = await admitAndApprove();
     const prepared = prepareReceipt(charter, item, deps());
-    const run = executePipeline.getMockImplementation()!;
-    executePipeline.mockImplementation(async (ref, context, c) => {
-      const result = await run(ref, context, c);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return result;
+    // Ports bound to this test's charter and tenant assertion, so the pipeline
+    // really succeeds and only the deadline guard can stop publication.
+    const ports = buildDotExecutorPorts(charter, { rootDir: root, assertTenant });
+    // Hold the pipeline until the executor deadline has fired, then let it
+    // finish late — explicit ordering instead of sleeping past the deadline.
+    let releaseLate!: () => void;
+    const lateHeld = new Promise<void>((resolve) => {
+      releaseLate = resolve;
+    });
+    let lateFinished: Promise<unknown> | undefined;
+    executePipeline.mockImplementation((ref, context) => {
+      lateFinished = (async () => {
+        const result = await ports.runPipeline(ref, context);
+        await lateHeld;
+        return result;
+      })();
+      return lateFinished as ReturnType<typeof ports.runPipeline>;
     });
     expect((await runExecutor())[0].status).toBe('blocked');
-    await new Promise((resolve) => setTimeout(resolve, 1700));
+    releaseLate();
+    await lateFinished;
+    // Let the executor's post-pipeline continuation (publication check) run.
+    await new Promise((resolve) => setImmediate(resolve));
     expect(safeExistsSync(prepared.artifactPath)).toBe(false);
     await runExecutor();
     expect(executePipeline).toHaveBeenCalledTimes(1);

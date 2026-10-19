@@ -203,7 +203,9 @@ describe('QM-02 trigger runner', () => {
       { idempotencyKey: 'qm02:concurrent', source: 'wake', createdBy: authority },
       delivered
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The first run owns the claim once its delivery has started; wait for
+    // that instead of a fixed sleep that a slow runner can outlast.
+    await vi.waitFor(() => expect(delivered).toHaveBeenCalledTimes(1));
     const secondRun = second.run(
       { idempotencyKey: 'qm02:concurrent', source: 'wake', createdBy: authority },
       delivered
