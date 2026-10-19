@@ -1,9 +1,14 @@
 /**
- * `pnpm kyberion grants list|check|grant|revoke` — standing grants (PG-03/04).
+ * `pnpm kyberion grants list|check|status|upcoming|grant|revoke` — standing grants (PG-03/04)
+ * and readiness (PG-06).
  *
  *   list   [--tenant <slug>] [--capability <c>] [--json]
  *   check  --capability <c> [--tenant <slug>] [--mission <id>]
  *          [--meeting-url <url>] [--meeting-series <id>] [--json]
+ *   status [--profile <p>] [--tenant <slug>] [--mission <id>]
+ *          [--meeting-url <url>] [--meeting-series <id>] [--json]
+ *   upcoming [--stage next_day|soon] [--from-min N --to-min N] [--profile <p>]
+ *          [--tenant <slug>] [--calendar <name>]... [--json]
  *   grant  --capability <c> --tenant <slug> [--meeting-url <url>]... [--meeting-series <id>]...
  *          --purpose <text> [--days N] (--request-approval | --approval-request-id <id>)
  *   revoke <grant_id> --reason <text> [--tenant <slug>]
@@ -29,6 +34,11 @@ import {
 } from '@agent/core/governance/grant-store';
 import { resolveGrant, type GrantResolution } from '@agent/core/governance/grant-resolver';
 import {
+  evaluateGrantReadiness,
+  type GrantReadinessReport,
+} from '@agent/core/governance/grant-readiness';
+import { listGrantReadinessProfiles } from '@agent/core/governance/grant-capability-policy';
+import {
   CLI_OPERATOR_PROVISION_COMMAND,
   detectCliAgentPrincipal,
   resolveCliOperatorIdentity,
@@ -37,16 +47,25 @@ import type { ApprovalRequestRecord } from '@agent/core/governance/approval-stor
 import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import { ScriptExitError } from './lib/harness.js';
 
-export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|grant|revoke> [options]
+export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|status|upcoming|grant|revoke> [options]
 
   list   [--tenant <slug>] [--capability <c>] [--json]
                                   Show standing grants (active, expired and revoked)
   check  --capability <c> [--tenant <slug>] [--mission <id>]
          [--meeting-url <url>] [--meeting-series <id>] [--json]
                                   Resolve whether a capability is allowed, and how to fix it
+  status [--profile <p>] [--tenant <slug>] [--mission <id>]
+         [--meeting-url <url>] [--meeting-series <id>] [--json]
+                                  List what a kind of work still needs (all profiles, or one;
+                                  exits 1 when the named profile is not ready)
+  upcoming [--stage next_day|soon] [--from-min N --to-min N] [--profile <p>]
+         [--tenant <slug>] [--calendar <name>]... [--json]
+                                  Check the calendar's upcoming meetings (default: tomorrow)
+                                  and list the grants each one still needs
   grant  --capability <c> --tenant <slug> [--meeting-url <url>]... [--meeting-series <id>]...
          --purpose <text> [--days N] (--request-approval | --approval-request-id <id>)
-                                  Create a standing grant. Capabilities that exchange data with
+                                  Create a standing grant. Series ids take the provider form
+                                  (google-workspace:<id> | m365:<id>) shown by \`grants upcoming\`. Capabilities that exchange data with
                                   an external service need a human approval first:
                                   --request-approval, then \`pnpm kyberion approvals --approve <id>\`,
                                   then the same command with --approval-request-id <id>.
@@ -56,6 +75,9 @@ export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|grant|revok
 export interface GrantsDeps {
   list: typeof listGrants;
   resolve: typeof resolveGrant;
+  readiness: typeof evaluateGrantReadiness;
+  profiles: typeof listGrantReadinessProfiles;
+  upcoming: (argv: string[]) => Promise<{ report: unknown; text: string }>;
   requestApproval: typeof requestGrantApproval;
   grantWithApproval: typeof grantStanding;
   grantDirect: typeof grantStandingDirect;
@@ -85,6 +107,14 @@ export function resolveRevoker(env: Record<string, string | undefined> = process
 const defaultDeps: GrantsDeps = {
   list: listGrants,
   resolve: resolveGrant,
+  readiness: evaluateGrantReadiness,
+  profiles: listGrantReadinessProfiles,
+  upcoming: async (argv) => {
+    const { parseMeetingReadinessArgs, renderMeetingReadiness, runMeetingReadinessCheck } =
+      await import('./meeting_readiness_check.js');
+    const report = await runMeetingReadinessCheck(parseMeetingReadinessArgs(argv));
+    return { report, text: renderMeetingReadiness(report) };
+  },
   requestApproval: requestGrantApproval,
   grantWithApproval: grantStanding,
   grantDirect: grantStandingDirect,
@@ -97,6 +127,7 @@ const defaultDeps: GrantsDeps = {
 const VALUE_FLAGS = new Set([
   '--tenant',
   '--capability',
+  '--profile',
   '--mission',
   '--meeting-url',
   '--meeting-series',
@@ -104,8 +135,12 @@ const VALUE_FLAGS = new Set([
   '--days',
   '--approval-request-id',
   '--reason',
+  '--stage',
+  '--from-min',
+  '--to-min',
+  '--calendar',
 ]);
-const REPEATABLE_FLAGS = new Set(['--meeting-url', '--meeting-series']);
+const REPEATABLE_FLAGS = new Set(['--meeting-url', '--meeting-series', '--calendar']);
 const BOOLEAN_FLAGS = new Set(['--json', '--request-approval', '--verbose']);
 
 const ALLOWED_FLAGS: Record<string, Set<string>> = {
@@ -116,6 +151,23 @@ const ALLOWED_FLAGS: Record<string, Set<string>> = {
     '--mission',
     '--meeting-url',
     '--meeting-series',
+    '--json',
+  ]),
+  status: new Set([
+    '--profile',
+    '--tenant',
+    '--mission',
+    '--meeting-url',
+    '--meeting-series',
+    '--json',
+  ]),
+  upcoming: new Set([
+    '--stage',
+    '--from-min',
+    '--to-min',
+    '--profile',
+    '--tenant',
+    '--calendar',
     '--json',
   ]),
   grant: new Set([
@@ -241,6 +293,36 @@ export function renderGrantCheck(
   return lines.join('\n');
 }
 
+export function renderGrantReadiness(reports: GrantReadinessReport[], json: boolean): string {
+  if (json) return JSON.stringify(reports, null, 2);
+  const lines = ['# Grant readiness'];
+  for (const report of reports) {
+    lines.push(
+      '',
+      `## ${report.profile}: ${report.ready ? 'ready' : `missing ${report.missing.join(', ')}`}`,
+      '',
+      report.description,
+      '',
+      table([
+        ['capability', 'needed', 'allowed', 'source', 'to allow it'],
+        ['---', '---', '---', '---', '---'],
+        ...report.items.map((item) => [
+          item.capability,
+          item.required ? 'required' : `optional${item.note ? ` (${item.note})` : ''}`,
+          item.allowed ? 'yes' : 'no',
+          item.source ? `${item.source}${item.grant_id ? ` ${item.grant_id}` : ''}` : '-',
+          item.allowed ? '-' : (item.remedy ?? '-'),
+        ]),
+      ])
+    );
+    for (const item of report.items) {
+      if (!item.allowed && item.reason)
+        lines.push('', `> [grants] ${item.capability}: ${item.reason}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function renderGrantRecord(title: string, record: GrantRecord, json: boolean): string {
   if (json) return JSON.stringify(record, null, 2);
   return [
@@ -292,8 +374,19 @@ function parseDays(value: string | undefined): number | undefined {
   return Number(value);
 }
 
+// Calendar events carry provider-namespaced series ids (calendar-workflow).
+const SERIES_ID_PATTERN = /^(google-workspace|m365):\S+$/u;
+
 export function grantDraftFromArgs(parsed: ParsedGrantsArgs): GrantDraft {
   const days = parseDays(parsed.values['--days']);
+  for (const seriesId of parsed.lists['--meeting-series'] ?? []) {
+    if (!SERIES_ID_PATTERN.test(seriesId)) {
+      throw new ScriptExitError(
+        1,
+        `--meeting-series ${seriesId} is not a calendar series id: use the provider form (google-workspace:<id> or m365:<id>) shown by \`pnpm kyberion grants upcoming\``
+      );
+    }
+  }
   return {
     capability: required(parsed, '--capability'),
     tenant_slug: required(parsed, '--tenant'),
@@ -301,6 +394,22 @@ export function grantDraftFromArgs(parsed: ParsedGrantsArgs): GrantDraft {
     meeting_series_ids: parsed.lists['--meeting-series'] ?? [],
     purpose: required(parsed, '--purpose'),
     ...(days !== undefined ? { ttl_days: days } : {}),
+  };
+}
+
+function resolveContextFromArgs(
+  parsed: ParsedGrantsArgs,
+  deps: Pick<GrantsDeps, 'now'>
+): Parameters<typeof resolveGrant>[0]['context'] {
+  const url = parsed.lists['--meeting-url']?.[0];
+  const seriesId = parsed.lists['--meeting-series']?.[0];
+  return {
+    ...(parsed.values['--tenant'] ? { tenant_slug: parsed.values['--tenant'] } : {}),
+    ...(parsed.values['--mission'] ? { mission_id: parsed.values['--mission'] } : {}),
+    ...(url || seriesId
+      ? { meeting: { ...(url ? { url } : {}), ...(seriesId ? { series_id: seriesId } : {}) } }
+      : {}),
+    now: deps.now(),
   };
 }
 
@@ -332,20 +441,24 @@ export async function runGrantsCommand(
     }
     if (parsed.sub === 'check') {
       const capability = required(parsed, '--capability');
-      const url = parsed.lists['--meeting-url']?.[0];
-      const seriesId = parsed.lists['--meeting-series']?.[0];
-      const result = deps.resolve({
-        capability,
-        context: {
-          ...(parsed.values['--tenant'] ? { tenant_slug: parsed.values['--tenant'] } : {}),
-          ...(parsed.values['--mission'] ? { mission_id: parsed.values['--mission'] } : {}),
-          ...(url || seriesId
-            ? { meeting: { ...(url ? { url } : {}), ...(seriesId ? { series_id: seriesId } : {}) } }
-            : {}),
-          now: deps.now(),
-        },
-      });
+      const result = deps.resolve({ capability, context: resolveContextFromArgs(parsed, deps) });
       print(renderGrantCheck(capability, result, json));
+      return;
+    }
+    if (parsed.sub === 'status') {
+      const profile = parsed.values['--profile']?.trim();
+      const context = resolveContextFromArgs(parsed, deps);
+      const reports = (profile ? [profile] : deps.profiles()).map((name) =>
+        deps.readiness({ profile: name, context })
+      );
+      print(renderGrantReadiness(reports, json));
+      if (profile && !reports[0]?.ready) throw new ScriptExitError(1, '', true);
+      return;
+    }
+    if (parsed.sub === 'upcoming') {
+      // Validated above; the readiness check parses the same flags itself.
+      const { report, text } = await deps.upcoming(argv.slice(1));
+      print(json ? JSON.stringify(report, null, 2) : text);
       return;
     }
     if (parsed.sub === 'grant') {

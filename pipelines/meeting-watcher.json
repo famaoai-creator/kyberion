@@ -67,6 +67,7 @@
             "params": {
               "platform": "{{meeting_target.platform}}",
               "url": "{{meeting_target.url}}",
+              "series_id": "{{meeting_target.series_id}}",
               "display_name": "{{display_name}}",
               "join_backend": "{{join_backend}}",
               "duration_sec": "{{meeting_target.join_duration_sec}}",
@@ -79,7 +80,7 @@
             "op": "system:log",
             "consumes": "join_result",
             "params": {
-              "message": "✅ Joined '{{meeting_target.title}}' ({{meeting_target.platform}}): transcript={{transcript_dir}}/{{meeting_target.file_slug}}.txt cues={{join_result.caption_cues}}"
+              "message": "📞 '{{meeting_target.title}}' ({{meeting_target.platform}}): join={{join_result.status}} {{join_result.message}} transcript={{transcript_dir}}/{{meeting_target.file_slug}}.txt cues={{join_result.caption_cues}}"
             }
           }
         ],

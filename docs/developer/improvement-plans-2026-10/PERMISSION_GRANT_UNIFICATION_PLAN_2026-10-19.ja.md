@@ -1,13 +1,13 @@
 ---
 title: '事前許可(同意・承認・egress・OS 許可)の統一 改善計画 (PG-01〜09)'
 tags: [improvement-plan, governance, consent, approval, egress, permission, meeting]
-last_updated: 2026-10-19
+last_updated: 2026-10-20
 status: partial
 ---
 
 # 事前許可(同意・承認・egress・OS 許可)の統一 改善計画 (PG-01〜09)
 
-- 状態: **PG-01〜02 実装済み(#1178)。PG-03〜04 実装済み(MSN-GRANT-CORE-20261019)。PG-02b、PG-05〜09 は未着手**
+- 状態: **PG-01〜02 実装済み(#1178)。PG-03〜04 実装済み(#1184)。PG-06〜07 実装済み(MSN-GRANT-READINESS-20261020)。PG-02b、PG-05、PG-08〜09 は未着手**
 - 発端: 会議の録画やコンソールでのマイク録音で、本番直前に「マイク許可」「会議ミッションの voice consent」を慌てて取ることになり、開始が遅れる。調べると、同意・承認・egress・OS 許可が別々の仕組みで実装されており、粒度・期限・取消・監査がそろっていない。
 - 関連:
   - [HUMAN_APPROVAL_TRUST_PLAN](./HUMAN_APPROVAL_TRUST_PLAN_2026-10-05.ja.md)(承認者の本人性と assurance。本計画はその上に乗る)
@@ -193,8 +193,8 @@ resolveGrant({ capability, context }): {
 | PG-03  | Grant の型・`grant-capability-policy.json`・ストア・`resolveGrant`(standing_grant と os_permission) | —            | 実装済み |
 | PG-04  | `meeting.recording` の常設許可とミッション自動紐づけ。voice consent の重複検査を 1 本化             | PG-03        | 実装済み |
 | PG-05  | 既存ストアの adapter 化(provider attestation、作業観察同意、画像 egress、承認ストアの参照)          | PG-03        | 未着手   |
-| PG-06  | `pnpm kyberion grants status` と `meeting_preflight` への統合                                       | PG-03〜05    | 未着手   |
-| PG-07  | カレンダー会議の前の readiness 通知                                                                 | PG-06        | 未着手   |
+| PG-06  | `pnpm kyberion grants status` と `meeting_preflight` への統合                                       | PG-03〜05    | 実装済み |
+| PG-07  | カレンダー会議の前の readiness 通知                                                                 | PG-06        | 実装済み |
 | PG-08  | Concierge 設定の「録音への同意」を Grant 一覧に広げる(付与・取消、i18n 必須)                        | PG-03        | 未着手   |
 | PG-09  | env 自己申告の整理(`KYBERION_AUDIO_PERMISSION_CONFIRMED` 廃止、`KYBERION_SUDO` 迂回の audit 化)     | PG-01、PG-03 | 未着手   |
 
@@ -217,6 +217,7 @@ resolveGrant({ capability, context }): {
 2. **承認が必須の範囲は、外部とのデータ入出力を伴う capability(仮置き)**。capability ポリシーに `external_io: true` を宣言したものは、付与時に承認ストアの承認(人間の決定、payloadHash で付与内容に束縛)が必須。範囲は運用しながら見直す。
    - 初期の宣言: `meeting.recording`(外部の会議サービスから音声を取り込む)= `external_io: true`。OS 許可は対象外(OS が管理)。
 3. ドメイン egress を Grant に含めるかは未決(PG-05 で判断)。
+4. **(2026-10-20 追加)カレンダーの予定がシリーズ ID を渡すのは、URL がプロバイダの会議リンク欄(Google の Meet リンク、M365 の Teams リンク)から取れたときだけ**。場所欄や説明欄の URL ではシリーズ ID を使わず、URL の照合だけにする。許可済みシリーズの 1 回分だけ説明欄に別の会議の URL を書かれても、その会議は常設許可で録音されない。残るリスクは、主催者が会議リンク欄そのものを差し替えた場合。運用者が CLI で `--meeting-series` を渡すのは本人の操作なので、そのまま受け付ける。
 
 ## 6. PG-03/04 の実装仕様
 
@@ -229,9 +230,30 @@ resolveGrant({ capability, context }): {
 - **重複の解消**: meeting-actuator の `checkSpeakConsent` は coordinator の検査に委ねる。
 - **CLI** `pnpm kyberion grants list|check|grant|revoke`。`external_io` の capability は `grant --request-approval` で承認依頼を出し、人間が `pnpm kyberion approvals --approve <id>` で決めたあと `grant --approval-request-id <id>` で付与する(scope-approve と同じ流れ)。
 
-## 7. 未決事項
+## 7. PG-06/07 の実装仕様(2026-10-20)
 
-- 会議のシリーズ ID は、いまは呼び出し側が渡さない(会議参加はURLで照合、対面議事録とリアルタイム音声は会議情報なし)。カレンダー連携でシリーズ ID を渡すのは PG-07 で行う。
+- **readiness プロファイル**: `grant-capability-policy.json` の `readiness_profiles` に、作業の種類ごとに必要な capability を宣言する。`required: false` は表示するが readiness を止めない。
+  - `meeting.online`: `meeting.recording`(必須)、`meeting.voice`(任意。エージェントが発話するときだけ)
+  - `meeting.in_room` / `voice.realtime`: `os.microphone`、`meeting.recording`(どちらも必須)
+- **判定は本番のゲートと同じ**: `evaluateGrantReadiness`(`libs/core/governance/grant-readiness.ts`)は、録音・発話を `checkMeetingParticipationConsent` で、それ以外を `resolveGrant` で判定する。「status では通るのに本番で拒否される」ずれを作らない。readiness の呼び出しは `record_binding: false` で、ミッション証跡に紐づけを書かない(問い合わせであって使用ではない)。
+- **CLI**: `pnpm kyberion grants status [--profile <p>] [--tenant] [--mission] [--meeting-url] [--meeting-series] [--json]`。`--profile` を付けて不足があれば終了コード 1。
+- **meeting_preflight**: `--profile`(既定 `meeting.online`)・`--tenant`・`--meeting-url`・`--meeting-series` を受け取り、既存項目(`audio.permission`、`voice.consent`)で見ていない capability を `grant.<capability>` 項目として出す。必須の不足は `operator_action_required`、任意の不足は `warn`。
+- **シリーズ ID の受け渡し**:
+  - カレンダーの予定に `series_id` を持たせる。プロバイダ名を前に付けて名前空間を分ける(Google は `google-workspace:<recurringEventId>`、M365 は `m365:<seriesMasterId>`)。macOS カレンダーは iCalendar の UID しか取れず、主催者が値を決められるので、シリーズ ID を出さない。Google の予定は会議リンク(`hangoutLink`)を `meeting_url` として渡す。
+  - シリーズ ID を予定から渡すのは、URL が会議リンク欄から取れたときだけ(§5-4)。
+  - `meeting:resolve_next_target` は `series_id` を返し、`meeting-watcher` は `meeting:join` に渡す。`MeetingTarget.series_id` を coordinator が録音同意の判定に使う。
+  - `pnpm meeting:participate --meeting-series`、`pnpm minutes:record --meeting-series/--meeting-url`、リアルタイム音声の `--meeting-series/--meeting-url` で、対面議事録とリアルタイム音声も常設許可で録音できる。
+- **meeting actuator の join/listen に録音同意の判定を追加**: これまで `meeting:join` / `listen`(ウォッチャーが使う経路)は録音同意を見ていなかった。coordinator と同じ判定(ミッションの voice-consent.json、または会議を覆う `meeting.recording` の常設許可)を通らなければ `denied` を返す。
+- **会議前チェック** `scripts/meeting_readiness_check.ts`(`core:run_meeting_readiness_check`、`pnpm kyberion grants upcoming`):
+  - カレンダーから参加可能な会議を読み、会議ごとに URL とシリーズ ID で readiness を判定する。読み取りのみ。
+  - `next_day`: 翌日 1 日分(`pipelines/meeting-readiness-next-day.json`、毎日 18:00)。
+  - `soon`: 60〜75 分後に始まる会議(`pipelines/meeting-readiness-soon.json`、15 分ごと。各会議は 1 回だけ判定される)。
+  - 不足があれば `system:notify` で通知する。どちらのパイプラインも `schedule.enabled: false` で出荷する(ほかの定期パイプラインと同じ。カレンダーの認証を済ませてから有効化する)。
+
+## 8. 未決事項
+
+- `soon` の窓は 15 分単位の枠で決める(定期実行が数十秒遅れても、会議を飛ばしたり二重に見たりしない)。`next_day` の「翌日」はホストのローカル時刻で決める(スケジュールの時刻帯 `Asia/Tokyo` と同じ前提)。
+- 会議前チェックが判定するのはテナントの常設許可まで。会議を録音するミッションはまだ作られていないので、ミッション固有の voice-consent.json は見ない(常設許可で事前に通すのが前提)。
 - grant のテナントをテナントレジストリで検証するか(いまはスラッグ形式のみ検証)。
 
 1. ドメイン egress(warn 運用)を Grant に含めるか、egress-policy のまま adapter だけ用意するか。

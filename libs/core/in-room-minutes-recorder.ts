@@ -34,6 +34,8 @@ import { resolveLocale } from './locale.js';
 export interface InRoomMinutesOptions {
   missionId: string;
   tenantSlug?: string;
+  /** The meeting being recorded (calendar series id / URL for a standing grant). */
+  meeting?: { url?: string; series_id?: string };
   meetingTitle?: string;
   language?: string;
   mic?: MicCaptureOptions;
@@ -107,11 +109,13 @@ export async function startInRoomMinutesSession(
     mission_id: missionId,
     tenant_slug: options.tenantSlug,
     purpose: 'recording',
+    ...(options.meeting ? { meeting: options.meeting } : {}),
   });
   if (!consent.allowed) {
     throw new Error(
       `[in-room-minutes] recording consent missing: ${consent.reason || 'not granted'}. ` +
-        `Grant it with: pnpm meeting:consent grant --mission ${missionId}`
+        `Grant it with: pnpm meeting:consent grant --mission ${missionId}` +
+        (consent.remedy ? `, or ahead of time: ${consent.remedy}` : '')
     );
   }
 

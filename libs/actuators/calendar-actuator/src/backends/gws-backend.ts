@@ -71,7 +71,9 @@ export class GwsCalendarBackend implements CalendarBackendAdapter {
       end: event.end,
       calendar,
       location: event.location,
-      description: '',
+      description: event.description ?? '',
+      ...(event.series_id ? { series_id: event.series_id } : {}),
+      ...(event.hangout_link ? { meeting_url: event.hangout_link } : {}),
     }));
   }
 

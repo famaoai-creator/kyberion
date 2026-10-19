@@ -14,6 +14,10 @@ import { probeMacOSNativeAutomation } from '@agent/core/macos-native-automation'
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
+import {
+  evaluateGrantReadiness,
+  type GrantReadinessReport,
+} from '@agent/core/governance/grant-readiness';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -375,6 +379,63 @@ function probeVoiceConsent(): MeetingPreflightItem {
   );
 }
 
+// Capabilities the preflight already checks with its own items
+// (audio.permission, voice.consent); the readiness profile adds the rest.
+const PREFLIGHT_COVERED_CAPABILITIES = new Set(['os.microphone', 'meeting.voice']);
+
+export interface MeetingGrantContext {
+  profile?: string;
+  tenantSlug?: string;
+  meeting?: { url?: string; series_id?: string };
+}
+
+function probeGrantReadiness(
+  missionId: string | undefined,
+  grants: MeetingGrantContext,
+  evaluate: typeof evaluateGrantReadiness
+): MeetingPreflightItem[] {
+  const profile = grants.profile || 'meeting.online';
+  let report: GrantReadinessReport;
+  try {
+    report = evaluate({
+      profile,
+      context: {
+        ...(missionId ? { mission_id: missionId } : {}),
+        ...(grants.tenantSlug ? { tenant_slug: grants.tenantSlug } : {}),
+        ...(grants.meeting ? { meeting: grants.meeting } : {}),
+      },
+    });
+  } catch (err: unknown) {
+    return [
+      item(
+        'grant.readiness',
+        'fail',
+        `grant readiness unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        'pnpm kyberion grants status',
+        { reasonCode: 'GRANT_READINESS_UNAVAILABLE' }
+      ),
+    ];
+  }
+  return report.items
+    .filter((entry) => !PREFLIGHT_COVERED_CAPABILITIES.has(entry.capability))
+    .map((entry) => {
+      const id = `grant.${entry.capability}`;
+      if (entry.allowed) {
+        const via = entry.grant_id
+          ? `standing grant ${entry.grant_id}`
+          : (entry.source ?? 'allowed');
+        return item(id, 'pass', `${entry.capability} is allowed (${via})`, 'none');
+      }
+      return item(
+        id,
+        entry.required ? 'operator_action_required' : 'warn',
+        entry.reason || `${entry.capability} is not allowed`,
+        entry.remedy || `pnpm kyberion grants status --profile ${profile}`,
+        { reasonCode: 'GRANT_REQUIRED' }
+      );
+    });
+}
+
 async function probeReasoningBackend(): Promise<MeetingPreflightItem> {
   const manifest = loadEnvironmentManifest('reasoning-backend');
   const probeStatuses = await probeManifest(manifest);
@@ -399,6 +460,8 @@ export async function runMeetingPreflight(
     platform?: NodeJS.Platform;
     inventory_bridge?: CoreAudioDeviceInventoryBridge;
     microphone_probe?: MicrophoneProbe;
+    grants?: MeetingGrantContext;
+    grant_readiness?: typeof evaluateGrantReadiness;
   } = {}
 ): Promise<MeetingPreflightReport> {
   installCoreEnvironmentProbes();
@@ -416,6 +479,11 @@ export async function runMeetingPreflight(
     probeMlxAudioRuntime(platform),
     probeVoiceProfileStore(),
     probeVoiceConsent(),
+    ...probeGrantReadiness(
+      missionId,
+      options.grants ?? {},
+      options.grant_readiness ?? evaluateGrantReadiness
+    ),
     await probeReasoningBackend(),
   ];
 
@@ -439,11 +507,32 @@ function printMeetingPreflightReport(report: MeetingPreflightReport, print: Prin
 export async function main(args: string[] = [], print: Print = () => undefined): Promise<number> {
   const argv = await createStandardYargs(['node', 'meeting_preflight', ...args])
     .option('mission', { type: 'string' })
+    .option('profile', {
+      type: 'string',
+      describe: 'Grant readiness profile (default meeting.online)',
+    })
+    .option('tenant', { type: 'string' })
+    .option('meeting-url', { type: 'string' })
+    .option('meeting-series', { type: 'string' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
+  const meetingUrl = String(argv['meeting-url'] ?? '').trim();
+  const meetingSeries = String(argv['meeting-series'] ?? '').trim();
   const report = await runMeetingPreflight({
     missionId: argv.mission ? String(argv.mission) : undefined,
+    grants: {
+      ...(argv.profile ? { profile: String(argv.profile) } : {}),
+      ...(argv.tenant ? { tenantSlug: String(argv.tenant) } : {}),
+      ...(meetingUrl || meetingSeries
+        ? {
+            meeting: {
+              ...(meetingUrl ? { url: meetingUrl } : {}),
+              ...(meetingSeries ? { series_id: meetingSeries } : {}),
+            },
+          }
+        : {}),
+    },
   });
 
   if (argv.json) {

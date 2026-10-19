@@ -4,11 +4,13 @@
  *
  * Usage:
  *   pnpm minutes:record --mission <MISSION_ID> [--device ":0"] [--title "定例会議"] [--language ja]
+ *     [--meeting-series <calendar series id>] [--meeting-url <url>]
  *
  * Ctrl-C (SIGINT) で録音を終了し、meeting-followup パイプラインで
  * minutes.md + アクションアイテムを生成する。
  * 録音には voice consent (purpose=recording) が必要:
  *   pnpm meeting:consent grant --mission <MISSION_ID>
+ * または、会議のシリーズ ID / URL を渡せば meeting.recording の常設許可でも録音できる。
  * STT バックエンドは KYBERION_STT_COMMAND / WhisperKit / MLX を
  * knowledge/product/orchestration/service-presets/whisper.json を参考に設定。
  */
@@ -79,8 +81,18 @@ async function main(argv: string[] = []): Promise<void> {
   );
   logger.info('   Ctrl-C to stop recording and generate minutes.');
 
+  const meetingUrl = getFlag(argv, '--meeting-url');
+  const meetingSeries = getFlag(argv, '--meeting-series');
   const session = await startInRoomMinutesSession({
     missionId,
+    ...(meetingUrl || meetingSeries
+      ? {
+          meeting: {
+            ...(meetingUrl ? { url: meetingUrl } : {}),
+            ...(meetingSeries ? { series_id: meetingSeries } : {}),
+          },
+        }
+      : {}),
     meetingTitle: getFlag(argv, '--title'),
     language: getFlag(argv, '--language') || 'ja',
     mic: { device: getFlag(argv, '--device') },

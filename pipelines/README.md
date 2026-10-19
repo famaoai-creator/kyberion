@@ -232,6 +232,8 @@ Meeting participation and the voice first-win path (see `docs/user/meeting-facil
 | `meeting-facilitation-workflow` | AI-led meeting session: join → listen N seconds → leave.                                                                                                                                                 |
 | `meeting-proxy-workflow`        | Meeting proxy: join with cloned voice → listen → extract action items.                                                                                                                                   |
 | `meeting-watcher`               | Calendar-driven auto-join: list today's events, pick the meeting starting now, join with live-caption capture. Schedule: `*/5 * * * *`.                                                                  |
+| `meeting-readiness-next-day`    | Evening check of tomorrow's calendar meetings; notifies the operator when one lacks a grant (e.g. `meeting.recording`). Opt-in schedule: `0 18 * * *`.                                                   |
+| `meeting-readiness-soon`        | Checks meetings starting 60–75 minutes ahead and notifies when one lacks a grant. Opt-in schedule: `*/15 * * * *`.                                                                                       |
 | `meeting-followup`              | Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.                                      |
 
 ### Media & Reporting

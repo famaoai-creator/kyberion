@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   checkSpeakConsent: vi.fn(),
   createStandardYargs: vi.fn(),
   probeMacOSNativeAutomation: vi.fn(),
+  evaluateGrantReadiness: vi.fn(),
 }));
 
 vi.mock('@agent/core/macos-native-automation', () => ({
@@ -47,6 +48,10 @@ vi.mock('@agent/core/secure-io', () => ({
 
 vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,
+}));
+
+vi.mock('@agent/core/governance/grant-readiness', () => ({
+  evaluateGrantReadiness: mocks.evaluateGrantReadiness,
 }));
 
 vi.mock('./run_doctor.js', () => ({
@@ -145,6 +150,22 @@ describe('meeting_preflight', () => {
       ],
     });
     mocks.checkSpeakConsent.mockReturnValue({ allowed: true });
+    mocks.evaluateGrantReadiness.mockReturnValue({
+      profile: 'meeting.online',
+      description: 'online meeting',
+      ready: true,
+      missing: [],
+      items: [
+        {
+          capability: 'meeting.recording',
+          required: true,
+          allowed: true,
+          source: 'standing',
+          grant_id: 'grant-weekly',
+        },
+        { capability: 'meeting.voice', required: false, allowed: true, source: 'mission' },
+      ],
+    });
     // Default: probe unavailable, so the env self-report fallback applies.
     mocks.probeMacOSNativeAutomation.mockReturnValue({ available: false, microphone: 'unknown' });
     process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED = '1';
@@ -179,6 +200,7 @@ describe('meeting_preflight', () => {
       ['mlx.audio.runtime', 'pass'],
       ['voice.profile', 'pass'],
       ['voice.consent', 'pass'],
+      ['grant.meeting.recording', 'pass'],
       ['reasoning.backend', 'pass'],
     ]);
     const blackhole = report.items.find((item) => item.id === 'blackhole.device');
@@ -303,6 +325,42 @@ describe('meeting_preflight', () => {
     expect(blackhole?.status).toBe('operator_action_required');
     expect(blackhole?.reason_code).toBe('BLACKHOLE_ROUTE_INCOMPLETE');
     expect(blackhole?.automatic_fix_available).toBe(false);
+  });
+
+  it('asks the operator for a missing recording grant and passes the meeting context', async () => {
+    mocks.evaluateGrantReadiness.mockReturnValue({
+      profile: 'meeting.online',
+      description: 'online meeting',
+      ready: false,
+      missing: ['meeting.recording'],
+      items: [
+        {
+          capability: 'meeting.recording',
+          required: true,
+          allowed: false,
+          reason: 'no meeting.recording standing grant covers this meeting',
+          remedy: 'pnpm kyberion grants grant --capability meeting.recording --request-approval',
+        },
+      ],
+    });
+    const { runMeetingPreflight } = await import('./meeting_preflight.js');
+    const report = await runMeetingPreflight({
+      missionId: 'MSN-MEETING-TEST',
+      platform: 'darwin',
+      grants: { tenantSlug: 'acme', meeting: { series_id: 'series-weekly' } },
+    });
+    expect(mocks.evaluateGrantReadiness).toHaveBeenCalledWith({
+      profile: 'meeting.online',
+      context: {
+        mission_id: 'MSN-MEETING-TEST',
+        tenant_slug: 'acme',
+        meeting: { series_id: 'series-weekly' },
+      },
+    });
+    const grant = report.items.find((item) => item.id === 'grant.meeting.recording');
+    expect(grant?.status).toBe('operator_action_required');
+    expect(grant?.fix).toMatch(/grants grant --capability meeting.recording/);
+    expect(report.ready).toBe(false);
   });
 
   it('warns instead of failing on non-darwin hosts for BlackHole', async () => {

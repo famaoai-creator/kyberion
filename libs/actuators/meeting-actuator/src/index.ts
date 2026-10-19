@@ -38,7 +38,11 @@ export {
   listMeetingProviderAdapters,
   resolveMeetingProvider,
 } from './meeting-provider-adapters.js';
-export { extractMeetingUrl, resolveNextMeetingTarget } from './meeting-target-resolve.js';
+export {
+  extractMeetingUrl,
+  listUpcomingMeetings,
+  resolveNextMeetingTarget,
+} from './meeting-target-resolve.js';
 export { normalizeTranscriptText } from './transcript-normalize.js';
 export type {
   MeetingAction,
