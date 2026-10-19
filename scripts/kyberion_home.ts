@@ -1271,6 +1271,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('read-all', { type: 'boolean', description: 'inbox: mark all unread as read' })
     .option('match', { type: 'string', description: 'inbox: filter --read-all by title/summary' })
     .option('accept', { type: 'string', description: 'inbox: mark entry as accepted' })
+    .option('review', { type: 'string', description: 'improvements: read-only proposal review' })
+    .option('queue', { type: 'string', description: 'improvements: queue for review' })
+    .option('legacy', { type: 'boolean', description: 'Legacy --review only' })
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
     .option('revoke', {
@@ -1507,6 +1510,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
       handleImprovements(
         ui,
         {
+          review: argv.review ? String(argv.review) : undefined,
+          legacy: Boolean(argv.legacy),
+          queue: argv.queue ? String(argv.queue) : undefined,
           approve: argv.approve ? String(argv.approve) : undefined,
           deny: argv.deny ? String(argv.deny) : undefined,
           note: argv.note ? String(argv.note) : undefined,

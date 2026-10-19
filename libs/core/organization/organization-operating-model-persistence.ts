@@ -1,6 +1,9 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
-import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
+import {
+  isDocumentProjectRequest,
+  resolveIntentResolutionPacket,
+} from '../intent/intent-resolution.js';
 import { t } from '../t.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -574,7 +577,7 @@ export function classifyOrganizationWork(
       reasonKey: 'organization:organization_resolution_reason_project',
     },
   ];
-  // The rule order below is the shape decision and stays first-match-wins;
+  // The rules remain first-match-wins except for explicit document projects;
   // only `confidence` is computed. Before this, every matched rule returned
   // its own hard-coded constant (0.80 … 0.93) and every fallback returned one
   // below the `< 0.7` human-confirmation threshold (0.40 / 0.58 / 0.62). The
@@ -592,7 +595,13 @@ export function classifyOrganizationWork(
   //   competition — how many other shapes also claim this utterance
   //   specificity — whether it states an action at all, rather than naming a topic
   const matchedRules = rules.filter((rule) => rule.pattern.test(normalized));
-  const matched = matchedRules[0];
+  // Review/calendar vocabulary can describe the deliverable rather than the
+  // work being requested. Preserve incident priority and all confidence gates.
+  const documentProject =
+    matchedRules[0]?.workShape !== 'incident_response' && isDocumentProjectRequest(utterance);
+  const matched = documentProject
+    ? rules.find((rule) => rule.workShape === 'solution_project')
+    : matchedRules[0];
   if (matched) {
     const strongMatches = matchedRules.filter((rule) => isStrongMatch(rule.pattern, normalized));
     const competition = competitionFactor(strongMatches.length);
@@ -604,6 +613,7 @@ export function classifyOrganizationWork(
       confidence: Math.round(matched.confidence * competition * specificity * 100) / 100,
       signals: {
         prior: matched.confidence,
+        ...(documentProject ? { semantic_precedence: 'document_project' } : {}),
         matched_shapes: matchedRules.map((rule) => rule.workShape),
         strong_shapes: strongMatches.map((rule) => rule.workShape),
         competition,

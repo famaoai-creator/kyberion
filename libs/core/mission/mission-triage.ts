@@ -252,10 +252,9 @@ function classify(
       classification: 'ready_to_verify',
       recommendation: {
         action: 'verify',
-        reason: 'All tasks closed — proceed through the lifecycle.',
-        commands: [
-          `${MC} verify ${missionId} verified "<note>" && ${MC} distill ${missionId} && ${MC} finish ${missionId}`,
-        ],
+        reason:
+          'Recorded tasks closed — verify actual outcomes before proceeding; task closure is not runtime readiness.',
+        commands: [`${MC} verify ${missionId} verified "<evidence-backed note>"`],
       },
     };
   }
