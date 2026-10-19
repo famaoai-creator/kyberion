@@ -27,6 +27,7 @@ import {
   type MemberProfile,
 } from '../organization/member-registry.js';
 import {
+  DEFAULT_TENANT_ISOLATION_POLICY,
   listTenantProfileSlugs,
   readTenantProfile,
   writeTenantProfile,
@@ -323,6 +324,7 @@ export function claimFirstRun(
         display_name: tenantDisplayName ?? tenantSlug,
         status: 'active',
         assigned_role: 'owner',
+        isolation_policy: { ...DEFAULT_TENANT_ISOLATION_POLICY },
       },
       registry
     );

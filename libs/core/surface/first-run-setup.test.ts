@@ -122,7 +122,10 @@ describe('first-run setup', () => {
       tenantSlugs: ['acme'],
       memberId: 'owner',
     });
-    expect(readTenantProfile('acme', { rootDir: root })).toMatchObject({ display_name: 'Acme' });
+    expect(readTenantProfile('acme', { rootDir: root })).toMatchObject({
+      display_name: 'Acme',
+      isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
+    });
     const owner = readMemberProfile('owner', { rootDir: root })!;
     expect(owner).toMatchObject({
       display_name: 'Hana',
