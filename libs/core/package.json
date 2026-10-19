@@ -7616,6 +7616,10 @@
       "types": "./dist/workforce/workspace-budget.d.ts",
       "default": "./dist/workforce/workspace-budget.js"
     },
+    "./workforce/agent-worktree": {
+      "types": "./dist/workforce/agent-worktree.d.ts",
+      "default": "./dist/workforce/agent-worktree.js"
+    },
     "./workforce/workspace-ledger": {
       "types": "./dist/workforce/workspace-ledger.d.ts",
       "default": "./dist/workforce/workspace-ledger.js"

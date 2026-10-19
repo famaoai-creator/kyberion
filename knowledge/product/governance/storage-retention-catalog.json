@@ -475,6 +475,12 @@
       "note": "WS-01 private per-session git index files registered in the workspace ledger (kind git-index). Same contract as active/shared/runtime/workspaces: deleted only through the ledger sweep, never by TTL."
     },
     {
+      "path": "active/shared/runtime/agent-worktrees",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "M2 agent worktree registry (workforce/agent-worktree.ts): name/branch/agent metadata for worktrees under .worktrees/agent-<name>. Each directory is owned by its workspace ledger record; an entry is dropped only by `pnpm kyberion worktree remove`, never by TTL."
+    },
+    {
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",
