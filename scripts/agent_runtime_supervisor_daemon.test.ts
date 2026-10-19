@@ -429,9 +429,7 @@ describe('agent_runtime_supervisor_daemon', () => {
     ).resolves.toMatchObject({ ok: true });
 
     firstChild.emit('exit', 137, null);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    expect(mocks.spawnDelegatedTaskWorkerProcess).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(mocks.spawnDelegatedTaskWorkerProcess).toHaveBeenCalledTimes(2));
     expect(mocks.appendSupervisorEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         decision: 'delegated_task_worker_restart_scheduled',
