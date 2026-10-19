@@ -16,6 +16,15 @@ export interface CharterFormDraft {
   /** Decision types delegated by name (the server holds the list of delegable ones). */
   delegated_decisions: string[];
   supersedes_decision_rights: boolean;
+  /**
+   * Recipient delegation carried through the draft even when this pane does
+   * not render it, so re-accepting a charter never silently drops the scope.
+   * The server validates every value.
+   */
+  recipient_purposes: string;
+  recipient_classes: string;
+  recipient_categories: string;
+  max_attachments: string;
 }
 
 export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
@@ -29,6 +38,10 @@ export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
   allow_customer_outbound: false,
   delegated_decisions: [],
   supersedes_decision_rights: false,
+  recipient_purposes: '',
+  recipient_classes: '',
+  recipient_categories: '',
+  max_attachments: '0',
 };
 
 /** "1,000,000" / "1 000" / "1_000" → 1000000; anything else → NaN. */
@@ -59,6 +72,11 @@ export function checkDraft(draft: CharterFormDraft): DraftCheck {
 }
 
 export function parseDeputies(text: string): string[] {
+  return parseList(text);
+}
+
+/** Comma / whitespace / Japanese-comma separated list, trimmed, de-duplicated. */
+export function parseList(text: string): string[] {
   return [
     ...new Set(
       text
@@ -81,6 +99,10 @@ export function draftToForm(tenantSlug: string, draft: CharterFormDraft) {
     allow_customer_outbound: draft.allow_customer_outbound,
     delegated_decisions: [...draft.delegated_decisions].sort(),
     supersedes_decision_rights: draft.supersedes_decision_rights,
+    recipient_purposes: parseList(draft.recipient_purposes),
+    recipient_classes: parseList(draft.recipient_classes),
+    recipient_categories: parseList(draft.recipient_categories),
+    max_attachments: Number(draft.max_attachments) || 0,
     deputies: parseDeputies(draft.deputies),
     expires_in_days: Number(draft.expires_in_days),
   };
@@ -94,6 +116,10 @@ export function draftFromCharter(charter: {
   allows_named_spend: boolean;
   allows_customer_outbound?: boolean;
   delegated_decisions?: string[];
+  recipient_purposes?: string[];
+  recipient_classes?: string[];
+  recipient_categories?: string[];
+  max_attachments?: number;
   supersedes_decision_rights: boolean;
 }): CharterFormDraft {
   return {
@@ -107,6 +133,10 @@ export function draftFromCharter(charter: {
     allow_customer_outbound: charter.allows_customer_outbound === true,
     delegated_decisions: [...(charter.delegated_decisions ?? [])],
     supersedes_decision_rights: charter.supersedes_decision_rights,
+    recipient_purposes: (charter.recipient_purposes ?? []).join(', '),
+    recipient_classes: (charter.recipient_classes ?? []).join(', '),
+    recipient_categories: (charter.recipient_categories ?? []).join(', '),
+    max_attachments: String(charter.max_attachments ?? 0),
   };
 }
 
@@ -129,6 +159,10 @@ export interface CharterTenantView {
     allows_named_spend: boolean;
     allows_customer_outbound?: boolean;
     delegated_decisions?: string[];
+    recipient_purposes?: string[];
+    recipient_classes?: string[];
+    recipient_categories?: string[];
+    max_attachments?: number;
     supersedes_decision_rights: boolean;
     report: {
       tripwires_standing: string[];
@@ -154,6 +188,10 @@ export interface CharterDraft {
     allow_named_spend: boolean;
     allow_customer_outbound: boolean;
     delegated_decisions?: string[];
+    recipient_purposes?: string[];
+    recipient_classes?: string[];
+    recipient_categories?: string[];
+    max_attachments?: number;
     supersedes_decision_rights: boolean;
   };
 }
@@ -172,6 +210,10 @@ export function draftFromProposal(proposal: CharterDraft): CharterFormDraft {
     allow_customer_outbound: f.allow_customer_outbound,
     delegated_decisions: [...(f.delegated_decisions ?? [])],
     supersedes_decision_rights: f.supersedes_decision_rights,
+    recipient_purposes: (f.recipient_purposes ?? []).join(', '),
+    recipient_classes: (f.recipient_classes ?? []).join(', '),
+    recipient_categories: (f.recipient_categories ?? []).join(', '),
+    max_attachments: String(f.max_attachments ?? 0),
   };
 }
 
