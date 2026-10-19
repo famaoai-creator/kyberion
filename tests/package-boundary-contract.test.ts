@@ -129,7 +129,9 @@ function walk(relDir: string): string[] {
     }
 
     if (CODE_EXTENSIONS.has(path.extname(entry)) && !CONFIG_FILE_PATTERN.test(entry)) {
-      files.push(relPath);
+      // Keep the scanned paths in repository form so allowlists are portable
+      // across Windows separators and POSIX separators.
+      files.push(relPath.split(path.sep).join('/'));
     }
   }
 
