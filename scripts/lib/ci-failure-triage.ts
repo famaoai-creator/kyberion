@@ -519,7 +519,8 @@ export function triageCiLog(text: string, options: TriageOptions = {}): TriageRe
 // ---------------------------------------------------------------------------
 
 function markdownCell(value: string): string {
-  return value.replace(/\|/gu, '\\|').replace(/\n/gu, ' ');
+  // Escape backslashes first so an input `\|` cannot turn into an unescaped pipe.
+  return value.replace(/\\/gu, '\\\\').replace(/\|/gu, '\\|').replace(/\n/gu, ' ');
 }
 
 export function renderFailureMarkdown(failure: CiFailure, heading = '###'): string {
