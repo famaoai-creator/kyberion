@@ -232,6 +232,24 @@ const pressKey = vi.fn((key: string) => {
     `tell application "System Events" to keystroke "${normalizedKey}"`,
   ]);
 });
+const pressKeyChord = vi.fn((key: string, modifiers: string[] = []) => {
+  if (!modifiers.length) return pressKey(key);
+  const MODIFIER_DOWN: Record<string, string> = {
+    cmd: 'command down',
+    command: 'command down',
+    ctrl: 'control down',
+    control: 'control down',
+    alt: 'option down',
+    option: 'option down',
+    shift: 'shift down',
+  };
+  const downs = modifiers.map((m) => MODIFIER_DOWN[String(m).toLowerCase()]).filter(Boolean);
+  const using = ` using {${downs.join(', ')}}`;
+  return safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to keystroke "${key.trim().toLowerCase()}"${using}`,
+  ]);
+});
 const pressKeyCode = vi.fn((keyCode: number) =>
   safeExec('osascript', ['-e', `tell application "System Events" to key code ${keyCode}`])
 );
@@ -1065,6 +1083,7 @@ vi.mock('@agent/core', async () => ({
   keystrokeText,
   pasteText,
   pressKey,
+  pressKeyChord,
   pressKeyCode,
   toggleDictation,
   clickAt,
@@ -1122,6 +1141,7 @@ vi.mock('@agent/core/virtual/os-automation', () => ({
   keystrokeText,
   pasteText,
   pressKey,
+  pressKeyChord,
   pressKeyCode,
   toggleDictation,
   clickAt,
