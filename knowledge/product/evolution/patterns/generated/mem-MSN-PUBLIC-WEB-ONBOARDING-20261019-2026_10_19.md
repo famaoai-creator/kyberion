@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-PUBLIC-WEB-ONBOARDING-20261019-2026_10_19
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ""
+candidate_id: mem-MSN-PUBLIC-WEB-ONBOARDING-20261019-2026_10_19
+supersedes: ""
+superseded_by: ""
+project_id: ""
+task_session_id: ""
+specialist_id: ""
+locale: ""
+created_at: 2026-10-19T21:31:16.273Z
+source_branch: fix/web-company-onboarding-20261019
+source_commit: 124ba740fd556250487cf5ec1babfd3db349b33f
+---
+
+# Web onboarding must share governed services and prove real surface authority
+
+Connect company registration, scoped readiness and first-work preparation through shared core services while binding human activation to verified owner, scope, digest and current state.
+
+## Applicability
+
+- mission
+- mission:MSN-PUBLIC-WEB-ONBOARDING-20261019
+
+## Reusable Steps
+
+1. Connect company registration, scoped readiness and first-work preparation through shared core services while binding human activation to verified owner, scope, digest and current state
+
+## Expected Outcome
+
+When adding Web parity for governed CLI operations, extract reusable core services instead of shelling out or widening surface roles. Verify membership server-side and bind approval to tenant, organization, owner, current viewer mode and presented digest; require human A2 and a durable one-shot claim. Recheck snapshots after asynchronous work and before applying state. Test with the production surface authority: a mock role can hide forbidden global reads. Use canonical tenant-scoped prerequisite checks with explicit evidence coverage; retain global audit in its authorized CLI path. Cover cross-tenant denial, stale and replayed decisions, partial registration recovery, project collision, quoted names, safe errors and exact owned fixture cleanup. A prepared WorkItem is not execution. Synthetic principal tests do not prove browser login or genuine human approval. Record offline structural distillation and omitted model contradiction assessment honestly; preserve known failed gates and clean-base controls without rebaselining. Treat HTTP tenant text only as a selector: read the authenticated member first, select its active owner membership, resolve the exact active tenant profile, and reconstruct authorization from persisted canonical IDs before any tenant path or lock. Snapshot grants before awaits and revalidate under the lock. Monitor the separate GitHub Advanced Security CodeQL check and its alert annotations; successful CodeQL Actions analysis jobs do not mean the security findings passed.
+
+## Evidence
+
+- active/missions/public/MSN-PUBLIC-WEB-ONBOARDING-20261019/evidence/implementation-report.md
+- active/missions/public/MSN-PUBLIC-WEB-ONBOARDING-20261019/evidence/test-report.md
+- active/missions/public/MSN-PUBLIC-WEB-ONBOARDING-20261019/evidence/REVIEW-execution-implement.md
+
+## Artifacts

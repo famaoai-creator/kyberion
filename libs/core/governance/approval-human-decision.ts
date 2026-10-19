@@ -177,11 +177,11 @@ export function settleUnpresentedHumanDecision(
 ): void {
   if (binding.presentedDigestVerified) return;
   if (record.accountability?.finalDecision !== 'human_only') return;
-  if (mode === 'enforce') {
+  if (mode === 'enforce' || record.accountability.effectBinding?.startsWith('tenant-activation:')) {
     throw new Error(
       `[POLICY_VIOLATION] approval decision refused — human-only request ${record.id} was decided without the digest of what the decider was shown ` +
         '| next: decide it on a surface that sends the presented digest (a signed-in Concierge or Chronos session, or the terminal challenge) ' +
-        '| evidence: assurance mode enforce, no presentedDigest'
+        '| evidence: strict human decision requires presentedDigest'
     );
   }
   auditChain.record({
@@ -265,7 +265,8 @@ export function requiredDecisionAssurance(
  * `phase: 'recheck'` is for consumers re-validating an already-decided
  * record: the assurance level was judged when the decision was recorded and
  * is not re-judged (decided records are not retroactively re-graded), while
- * every other rule still applies.
+ * every other rule still applies. Tenant activation deliberately rechecks
+ * recognised A2 proof in every rollout mode; it never inherits warn rollout.
  */
 export function validateHumanFinalDecision(params: {
   accountability?: ApprovalAccountability;
@@ -292,16 +293,19 @@ export function validateHumanFinalDecision(params: {
     );
   }
   let shortfall: ApprovalAssuranceShortfall | undefined;
-  if (params.phase !== 'recheck') {
+  const strictActivation =
+    params.accountability.effectBinding?.startsWith('tenant-activation:') === true;
+  if (params.phase !== 'recheck' || strictActivation) {
     const provided = assuranceOfAuthMethod(params.authMethod);
     if (!params.authMethod || !provided) {
       throw new Error(
         `[POLICY_VIOLATION] Final approval requires a recognised authMethod (got ${params.authMethod ?? 'none'})`
       );
     }
-    const required = requiredDecisionAssurance(params.accountability, params.channel);
+    const floor = requiredDecisionAssurance(params.accountability, params.channel);
+    const required = strictActivation ? strongerAssurance(floor, 'A2') : floor;
     if (!assuranceMeets(provided, required)) {
-      const mode = params.mode ?? resolveApprovalAssuranceMode();
+      const mode = strictActivation ? 'enforce' : (params.mode ?? resolveApprovalAssuranceMode());
       if (mode === 'enforce') {
         throw new Error(
           `[POLICY_VIOLATION] Final approval requires assurance ${required}; ${params.authMethod} provides ${provided}` +
