@@ -10,6 +10,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Merge-queue readiness: required checks must also report on merge_group
+  # events, otherwise a queued PR waits forever. Enabling the queue is a
+  # repository setting (see .github/workflows/README.md).
+  merge_group:
   schedule:
     - cron: '0 2 * * 1'
 
@@ -18,6 +22,7 @@ permissions:
 
 # A newer push to the same PR supersedes the running checks; main pushes and
 # scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+# merge_group runs get a unique gh-readonly-queue ref and are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -72,7 +77,13 @@ jobs:
           node-version: ${{ matrix.node-version }}
           install-playwright: 'true'
 
+      # Every check step below runs even when an earlier check failed
+      # (`!cancelled()`), so one push reports every failing signal instead of
+      # stopping at the first red step. They only require the prepared
+      # workspace: this step succeeding implies checkout + setup succeeded.
+      # The job still fails when any step fails.
       - name: Download compiler outputs
+        id: workspace
         uses: actions/download-artifact@v6
         with:
           name: build-outputs
@@ -81,16 +92,20 @@ jobs:
       # deliberately excluded from the shared artifact (multi-GB), so this
       # job builds the UI locally (~1min vs ~4min for the full build).
       - name: Build UI for surface-dependent gates
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: pnpm run build:ui
 
       # PI-12: prove the source distribution is self-contained in a clean
       # governed staging directory and publish a checksum downstream can pin.
       - name: Verify source archive and clean install
+        id: source-archive
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: |
           pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output active/shared/exports/ci/kyberion-source.tar.gz
           pnpm run release:source-archive -- --check --output active/shared/exports/ci/kyberion-source.tar.gz
           pnpm kyberion release install-smoke --ref "${GITHUB_SHA}"
       - name: Upload source archive evidence
+        if: ${{ !cancelled() && steps.source-archive.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: kyberion-source-archive
@@ -100,6 +115,7 @@ jobs:
           if-no-files-found: error
 
       - name: Run manifest-driven full checks
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         env:
           # The tenant-registry gate verifies the personal-tier tenant spine.
           # Give the governed checker its read authority explicitly instead of
@@ -112,31 +128,34 @@ jobs:
       # package dist. Running it pre-build broke every main push since the
       # step was introduced (ERR_MODULE_NOT_FOUND).
       - name: Check commit subject
-        if: github.event_name == 'push'
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name == 'push' }}
         run: pnpm run check:commit-subject
 
       - name: Lint check
-        # pr-validation.yml static-checks owns this on pull requests.
-        if: github.event_name != 'pull_request'
+        # pr-validation.yml static-checks owns this on pull requests and merge_group.
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
         run: pnpm run lint
 
       - name: Format check
-        # pr-validation.yml static-checks owns this on pull requests.
-        if: github.event_name != 'pull_request'
+        # pr-validation.yml static-checks owns this on pull requests and merge_group.
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
         run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
       - name: TypeScript type check
-        # pr-validation.yml static-checks owns this on pull requests.
-        if: github.event_name != 'pull_request'
+        # pr-validation.yml static-checks owns this on pull requests and merge_group.
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
         run: pnpm run typecheck
 
       - name: Validate capability discovery
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: node dist/scripts/capability_discovery.js > /dev/null
 
       - name: Validate surface runtime contract
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: node dist/scripts/surface_runtime.js --action status > /dev/null
 
       - name: Verify no build artifacts shadow source
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         run: |
           CHANGED=$(git diff --name-only -- 'libs/' 'presence/displays/' 'satellites/')
           STALE=$(printf '%s\n' "$CHANGED" | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5 || true)
@@ -146,9 +165,11 @@ jobs:
           fi
           node --import ./scripts/ts-loader.mjs scripts/check_source_shadows.ts
 
+  # Independent of lint-and-validate (S4): a red lint/gate step must not skip
+  # the clean-clone, intent-smoke or test signals — every job reports in one
+  # round. This job builds its own clean checkout, so it needs nothing.
   first-win-clean-clone:
     runs-on: ubuntu-latest
-    needs: lint-and-validate
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -189,7 +210,7 @@ jobs:
 
   intent-smoke:
     runs-on: ubuntu-latest
-    needs: [lint-and-validate, build-artifacts]
+    needs: build-artifacts
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -218,7 +239,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [lint-and-validate, intent-smoke, build-artifacts]
+    needs: build-artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -250,18 +271,19 @@ jobs:
             shard: '2/2'
             command: pnpm test -- --suite integration --shard=2/2
     steps:
-      # core and actuators run in pr-validation.yml on pull requests; keep the
-      # job (and its check name) but skip the duplicate work there.
+      # core and actuators run in pr-validation.yml on pull requests and in the
+      # merge queue; keep the job (and its check name) but skip the duplicate
+      # work there.
       - name: Skip suite already covered by pr-validation
-        if: ${{ github.event_name == 'pull_request' && matrix.pr-duplicate }}
+        if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate }}
         run: echo "::notice::${{ matrix.test-suite }} runs in pr-validation.yml on pull requests"
 
       - uses: actions/checkout@v5
-        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
 
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
-        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         run: |
           export DEBIAN_FRONTEND=noninteractive
           for source in /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft*; do
@@ -306,19 +328,19 @@ jobs:
           done
 
       - name: Setup Kyberion
-        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
 
       - name: Download compiler outputs
-        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         uses: actions/download-artifact@v6
         with:
           name: build-outputs
 
       - name: Run ${{ matrix.test-suite }} tests
-        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         continue-on-error: ${{ matrix.experimental == true }}
         env:
           KYBERION_PERSONA: ${{ matrix.test-suite == 'core' && 'worker' || '' }}
@@ -327,7 +349,7 @@ jobs:
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v6
-        if: ${{ (matrix.test-suite == 'core' && always()) && !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
+        if: ${{ (matrix.test-suite == 'core' && always()) && !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         with:
           name: coverage-report
           path: coverage/
