@@ -15,6 +15,8 @@ import {
 } from './accountability-charter-registry.js';
 import {
   delegatedExecutionIdentity,
+  delegatedExecutionBindingHash,
+  hashDelegatedServiceConfiguration,
   authorizeDelegatedExecution,
   currentDelegatedExecution,
   runDelegatedExecution,
@@ -195,6 +197,42 @@ describe('operation-bound delegated execution', () => {
       }
     }
   );
+  it('uses keyed deterministic configuration fingerprints and keeps execution identity stable across key rotation', async () => {
+    const previousKey = process.env.KYBERION_AUDIT_CHAIN_KEY;
+    try {
+      process.env.KYBERION_AUDIT_CHAIN_KEY = 'delegation-test-key-before-rotation';
+      const snapshot = {
+        config: { base_url: 'https://example.test' },
+        preset: {},
+        connection: { password: 'guessable' },
+        binding: {},
+        tenantBindings: [],
+      };
+      const first = hashDelegatedServiceConfiguration(snapshot);
+      expect(
+        hashDelegatedServiceConfiguration({ ...snapshot, connection: { password: 'guessable' } })
+      ).toBe(first);
+      expect(
+        hashDelegatedServiceConfiguration({ ...snapshot, connection: { password: 'changed' } })
+      ).not.toBe(first);
+      const identity = delegatedExecutionIdentity(target());
+      const binding = delegatedExecutionBindingHash(target());
+      const authorized = authorizeDelegatedExecution(target(), options());
+      expect(authorized.allowed).toBe(true);
+      process.env.KYBERION_AUDIT_CHAIN_KEY = 'delegation-test-key-after-rotation';
+      expect(hashDelegatedServiceConfiguration(snapshot)).not.toBe(first);
+      expect(delegatedExecutionBindingHash(target())).not.toBe(binding);
+      expect(delegatedExecutionIdentity(target())).toBe(identity);
+      expect(verifyDelegatedExecution({ ...target(), permitId: identity }, options())).toBe(false);
+      expect(authorizeDelegatedExecution(target(), options()).allowed).toBe(false);
+      expect(
+        readCharterLedger(charter, options()).filter((entry) => entry.kind === 'consumption')
+      ).toHaveLength(1);
+    } finally {
+      if (previousKey === undefined) delete process.env.KYBERION_AUDIT_CHAIN_KEY;
+      else process.env.KYBERION_AUDIT_CHAIN_KEY = previousKey;
+    }
+  });
   beforeEach(() => {
     root = path.join(pathResolver.rootDir(), 'active/shared/tmp', `delegation-${randomUUID()}`);
     savedPersona = process.env.KYBERION_PERSONA;

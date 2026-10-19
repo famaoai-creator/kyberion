@@ -1,6 +1,7 @@
 import { assertNoHumanClaim, withExecutionIdentityLock } from './execution-claim-fence.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
+import { resolveAuditChainKey } from '../chain-integrity.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
@@ -127,7 +128,15 @@ function canonical(value: unknown): string {
   );
 }
 function hash(value: unknown): string {
-  return createHash('sha256').update(canonical(value)).digest('hex');
+  // Configuration may contain low-entropy provider passwords. A keyed,
+  // purpose-bound fingerprint prevents offline guesses from a ledger digest.
+  // Reuse the durable governed key, never create a parallel secret store.
+  const key = resolveAuditChainKey({ createIfMissing: true });
+  if (!key) throw new Error('[DELEGATED_FINGERPRINT_KEY_UNAVAILABLE]');
+  return createHmac('sha256', key)
+    .update('kyberion.delegated-execution.fingerprint.v1\0')
+    .update(canonical(value))
+    .digest('hex');
 }
 export function delegatedExecutionBindingHash(target: DelegatedExecutionTarget): string {
   const normalized = normalizeDelegatedTarget(target);
@@ -158,12 +167,21 @@ function id(target: DelegatedExecutionTarget): string {
   // Identity is stable independently of mutable operation/payload/actor facts.
   // Reusing a task step after an uncertain effect must conflict, never mint a
   // fresh payment/message merely by changing its body.
-  return `delegated:${hash({
+  // This nonsecret execution slot must survive fingerprint-key rotation.
+  // Explicit projection excludes payloads and arbitrary extra source fields.
+  const identity = {
     tenantSlug: target.tenantSlug,
-    source: target.source,
+    source: {
+      organizationId: target.source.organizationId,
+      projectId: target.source.projectId,
+      missionId: target.source.missionId,
+      taskId: target.source.taskId,
+      workItemId: target.source.workItemId,
+    },
     stepId: target.stepId,
     correlationId: target.correlationId,
-  })}`;
+  };
+  return `delegated:${createHash('sha256').update(canonical(identity)).digest('hex')}`;
 }
 /** Stable effect slot, independent of mutable payload/actor and of pipeline run IDs. */
 export function delegatedExecutionIdentity(target: DelegatedExecutionTarget): string {
