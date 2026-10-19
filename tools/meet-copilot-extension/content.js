@@ -42,7 +42,14 @@
       camOn: { aria: [/カメラをオン/i, /turn on camera/i] },
       leave: { aria: [/通話から退出/i, /通話を退出/i, /退出/i, /leave call/i] },
       captionsOn: { aria: [/字幕をオン/i, /turn on captions/i, /字幕を表示/i] },
-      captionSel: ['[aria-label*="字幕"] [jsname]', 'div[jsname][aria-live="polite"]'],
+      captionSel: [
+        '[aria-label*="字幕"] [jsname]',
+        'div[jsname][aria-live="polite"]',
+        // Live-verified 2026-10-19 on meet.google.com: nMcdL wraps the
+        // cumulative caption text block; giiMnc is the overlay root.
+        'div[class*="nMcdL"]',
+        'div[jsname="giiMnc"]',
+      ],
       raiseHand: { aria: [/手を挙げる/i, /raise hand/i] },
       lowerHand: { aria: [/手を下ろす/i, /lower hand/i] },
       admit: { aria: [/入室を許可/i, /admit/i] },

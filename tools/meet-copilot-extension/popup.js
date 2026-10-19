@@ -16,8 +16,11 @@ async function refresh() {
 }
 
 async function init() {
-  const cfg = await new Promise((r) => chrome.storage.local.get(['meetCopilotPort'], r));
+  const cfg = await new Promise((r) =>
+    chrome.storage.local.get(['meetCopilotPort', 'meetCopilotAuthToken'], r)
+  );
   $('port').value = cfg.meetCopilotPort || 8779;
+  $('token').value = cfg.meetCopilotAuthToken || '';
   await refresh();
   setInterval(refresh, 1500);
 }
@@ -35,6 +38,10 @@ $('panel').addEventListener('click', async () => {
 });
 $('save').addEventListener('click', async () => {
   await send('popup:set-port', { port: Number($('port').value) });
+  await refresh();
+});
+$('savetoken').addEventListener('click', async () => {
+  await send('popup:set-token', { token: $('token').value });
   await refresh();
 });
 $('diagnose').addEventListener('click', async () => {

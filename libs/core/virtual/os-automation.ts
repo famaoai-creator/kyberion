@@ -12,6 +12,7 @@ export const detectFocusedInput = platform.detectFocusedInput;
 export const keystrokeText = platform.keystrokeText;
 export const pasteText = platform.pasteText;
 export const pressKey = platform.pressKey;
+export const pressKeyChord = platform.pressKeyChord;
 export const pressKeyCode = platform.pressKeyCode;
 export const toggleDictation = platform.toggleDictation;
 export const clickAt = platform.clickAt;

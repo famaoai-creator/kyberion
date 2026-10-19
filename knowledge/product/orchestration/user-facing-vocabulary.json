@@ -7233,6 +7233,31 @@
         "ja": "音声を文字起こし",
         "qps-ploc": "⟦Ŧřȧñşƈřïƀė ȧůḓïő ŀőřėɱ⟧"
       },
+      "cli_cmd_operator_cli_grants": {
+        "en": "Manage standing grants (consents decided ahead of time)",
+        "ja": "常設の許可(事前に決める同意)を管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė şŧȧñḓïñɠ ɠřȧñŧş (ƈőñşėñŧş ḓėƈïḓėḓ ȧħėȧḓ őƒ ŧïɱė) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_operator_cli_grants_list": {
+        "en": "List standing grants",
+        "ja": "常設の許可を一覧表示",
+        "qps-ploc": "⟦Ŀïşŧ şŧȧñḓïñɠ ɠřȧñŧş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_operator_cli_grants_check": {
+        "en": "Check whether a capability is allowed and how to allow it",
+        "ja": "能力が許可されているかと、許可する方法を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ẇħėŧħėř ȧ ƈȧṗȧƀïŀïŧẏ ïş ȧŀŀőẇėḓ ȧñḓ ħőẇ ŧő ȧŀŀőẇ ïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_operator_cli_grants_grant": {
+        "en": "Create a standing grant (human approval for external data exchange)",
+        "ja": "常設の許可を作成(外部とのデータ入出力は人間の承認が必要)",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ şŧȧñḓïñɠ ɠřȧñŧ (ħůɱȧñ ȧṗṗřőṽȧŀ ƒőř ėẋŧėřñȧŀ ḓȧŧȧ ėẋƈħȧñɠė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_operator_cli_grants_revoke": {
+        "en": "Revoke a standing grant",
+        "ja": "常設の許可を取り消す",
+        "qps-ploc": "⟦Řėṽőķė ȧ şŧȧñḓïñɠ ɠřȧñŧ ŀőřėɱ ï⟧"
+      },
       "cli_cmd_operator_cli_permissions": {
         "en": "Check OS permissions",
         "ja": "OS の許可状態を確認",

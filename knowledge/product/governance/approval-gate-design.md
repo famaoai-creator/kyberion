@@ -1,7 +1,7 @@
 ---
 title: 'Approval Gate Design: Store First, Surface as Renderer'
 tags: [governance, approval, mission, gate, human-in-the-loop]
-last_updated: 2026-10-10
+last_updated: 2026-10-19
 ---
 
 # Approval Gate Design
@@ -166,12 +166,17 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     誰でもよい、という承認の責任モデルに合わせた。surface の代替値は identity にならない。
   - 一度きりの効果（one-shot）: apply claim を取る consumer（`apply_claim`）に加えて、claim を取らない
     one-shot の consumer は効果の直前に `markApprovalConsumed` で消費を記録する。対象は
-    `service_recording_promotion`（procedure の登録）と `organization_decision`（承認済み決定の保存）。
+    `service_recording_promotion`（procedure の登録）、`organization_decision`（承認済み決定の保存）と
+    `grant_standing`（常設許可の付与）。
     消費済みの承認は 2 回目の利用も revoke も拒否される（revoke は「すでに消費済み」と報告する）。
     それ以外の claim を取らない consumer は、効果のたびに利用可否を確かめ直す（例: `pipeline_bound_approval`
     は run の再開のたびに確かめる）ので、revoke 以降の利用が拒否される。それ以前の利用は取り消せない。
   - 取り消せないもの: pending（cancel を使う）、rejected などの承認以外、claim 済み・適用済み・消費済み
     （一度きりの効果がすでに起きた）、steering の依頼（承認した時点で効果が始まる）。
+  - 例外（常設の効果）: 常設許可（`grant_standing`）のように、消費したあとも使われ続ける効果は、その効果を
+    取り消すときに `revokeStandingEffectApproval` で承認も取り消す。消費の記録（`consumption.consumer` と、
+    効果が作ったものを指す `consumption.effectRef`）と一致する効果だけが対象。権限を減らすだけなので、
+    識別できる principal（operator でも agent でも）が行え、取り消した者はそのまま記録される。
   - 監査: 監査台帳（`approval_decision` / `revoke`）と、その channel のイベントログ（`revoked`、消費は
     `consumed`）。
 - **ON・利用時**: 承認済みレコードを効果に変える箇所は、次の consumer id で同じ判定をやり直す
@@ -194,6 +199,8 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
   - service recording: `service_recording_review`（`scripts/service_recording.ts` の review が承認を
     recording に書く前）、`service_recording_promotion`（promotion が review の承認を確かめる。
     `libs/core/service/service-recording-review-approval.ts`）
+  - standing grant: `grant_standing`（外部とのデータ入出力を伴う capability の常設許可の付与。承認を 1 回だけ
+    消費してから記録を書く。`libs/core/governance/grant-store.ts`）
 - **利用できない承認の扱い**: 利用時の拒否メッセージは「この承認は再利用されない。新しい承認を依頼し、
   別の、サーバーが識別した principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す
   （held action の場合は held action 自体を依頼し直すよう示す）。承認済みで claim も適用もされていないレコードなら、

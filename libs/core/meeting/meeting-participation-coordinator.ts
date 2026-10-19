@@ -21,11 +21,12 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJsonIfPresent } from '../foundation/json.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
+import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { auditChain } from '../governance/audit-chain.js';
-import * as pathResolver from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { TraceContext } from '../analysis/trace.js';
 import { teeAudio } from '../voice/audio-tee.js';
 import type { AudioBus } from '../voice/audio-bus.js';
@@ -47,7 +48,13 @@ import {
   type MediaEvent,
 } from '../realtime-media-session.js';
 import { BargeInController } from '../barge-in-controller.js';
-import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '../voice/voice-consent.js';
+import {
+  evaluateMissionVoiceConsent,
+  type MissionVoiceConsentResult,
+} from '../voice/voice-consent.js';
+import { recordGrantMissionBinding, resolveStandingGrant } from '../governance/grant-resolver.js';
+import { missionPathOrNull } from '../mission-lookup.js';
+import { resolveIdentityContext } from '../authority.js';
 
 export interface ConversationAgent {
   /**
@@ -124,59 +131,130 @@ function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+/**
+ * The tenant a mission belongs to, from its own mission-state.json. A mission
+ * that cannot be found or read, or that names no valid tenant, yields no
+ * tenant — standing grants are tenant-bound, so it cannot use one.
+ */
+function readMissionTenant(missionId: string): { tenant?: string; reason?: string } {
+  let missionDir: string | null;
+  try {
+    // Refusals (not visible / ambiguous owner) degrade to null: no tenant, no grant.
+    missionDir = missionPathOrNull(pathResolver.findMissionPath, missionId);
+  } catch (err: unknown) {
+    return {
+      reason: `mission ${missionId} rejected: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!missionDir) return { reason: `mission ${missionId} not found` };
+  let state: Record<string, unknown> | null;
+  try {
+    state = readJsonIfPresent<Record<string, unknown>>(path.join(missionDir, 'mission-state.json'));
+  } catch (err: unknown) {
+    return {
+      reason: `mission ${missionId} state unreadable: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  const tenant =
+    normalizeOptionalString(state?.tenant_slug) ?? normalizeOptionalString(state?.tenant_id);
+  if (!tenant || !isValidTenantSlug(tenant)) {
+    return {
+      reason: `mission ${missionId} is not bound to a tenant; a standing grant is tenant-bound`,
+    };
+  }
+  return { tenant };
+}
+
+/**
+ * Fail-closed participation consent. `voice` (speaking) needs the mission's
+ * voice-consent.json — never a standing grant. `recording` accepts the
+ * mission's voice-consent.json and otherwise a `meeting.recording` standing
+ * grant of the tenant that covers the meeting (series id or URL, PG-04); a use
+ * inside a mission is then recorded in the mission evidence
+ * (`evidence/grant-bindings.json`).
+ */
 export function checkMeetingParticipationConsent(input: {
   mission_id?: string;
   tenant_slug?: string;
   purpose: 'recording' | 'voice';
-}): { allowed: boolean; reason?: string } {
+  /** The meeting being recorded (standing-grant match for `recording`). */
+  meeting?: { url?: string; series_id?: string };
+}): {
+  allowed: boolean;
+  reason?: string;
+  grant_id?: string;
+  /** Why the mission voice consent failed (see evaluateMissionVoiceConsent). */
+  code?: MissionVoiceConsentResult['code'];
+} {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = normalizeOptionalString(input.mission_id);
-  if (!missionId) {
+  const consent = evaluateMissionVoiceConsent({
+    missionId,
+    tenantSlug: input.tenant_slug,
+    purpose: input.purpose,
+  });
+  if (consent.allowed) return { allowed: true };
+  // Speaking never falls back to a standing grant; a rejected mission path
+  // never falls back to anything.
+  if (input.purpose !== 'recording' || consent.code === 'path_rejected') {
     return {
       allowed: false,
-      reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
+      reason: consent.reason,
+      ...(consent.code ? { code: consent.code } : {}),
     };
   }
-  let evidenceDir: string | null;
-  try {
-    pathResolver.assertMissionIdArgument(missionId);
-    evidenceDir = pathResolver.missionEvidenceDir(missionId);
-  } catch (err: unknown) {
-    return {
-      allowed: false,
-      reason: `mission evidence path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-  if (!evidenceDir) {
-    return { allowed: false, reason: `mission evidence dir not found for ${missionId}` };
-  }
-  let consentPath: string;
-  try {
-    consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
-      allowMissingLeaf: true,
+  const callerTenant = normalizeOptionalString(input.tenant_slug);
+  const ambientTenant = normalizeOptionalString(resolveIdentityContext().tenantSlug);
+  let tenantSlug: string | undefined;
+  if (missionId) {
+    // Inside a mission the grant must belong to the mission's tenant; a caller
+    // or ambient tenant that disagrees never widens it.
+    const mission = readMissionTenant(missionId);
+    const denyGrant = (why: string) => ({
+      allowed: false as const,
+      reason: `${consent.reason}; standing grant: ${why}`,
     });
-  } catch (err: unknown) {
+    if (!mission.tenant) return denyGrant(mission.reason ?? `mission ${missionId} has no tenant`);
+    for (const [label, other] of [
+      ['caller', callerTenant],
+      ['ambient', ambientTenant],
+    ] as const) {
+      if (other && other !== mission.tenant) {
+        return denyGrant(
+          `mission ${missionId} belongs to tenant ${mission.tenant}, not the ${label} tenant ${other}`
+        );
+      }
+    }
+    tenantSlug = mission.tenant;
+  } else {
+    tenantSlug = callerTenant ?? ambientTenant;
+  }
+  const grant = resolveStandingGrant('meeting.recording', {
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(missionId ? { mission_id: missionId } : {}),
+    ...(input.meeting ? { meeting: input.meeting } : {}),
+  });
+  if (!grant.allowed || !grant.grant_id) {
+    const remedy = grant.remedy ? ` | or: ${grant.remedy}` : '';
     return {
       allowed: false,
-      reason: `voice-consent path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+      reason: `${consent.reason}; standing grant: ${grant.reason ?? 'not found'}${remedy}`,
     };
   }
-  if (!safeExistsSync(consentPath)) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
-    };
+  if (missionId) {
+    try {
+      recordGrantMissionBinding(missionId, {
+        capability: 'meeting.recording',
+        grant_id: grant.grant_id,
+      });
+    } catch (err: unknown) {
+      return {
+        allowed: false,
+        reason: `standing grant ${grant.grant_id} matched but the mission binding could not be recorded for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
-  try {
-    const consent = loadVoiceConsentAtPath(consentPath);
-    return validateVoiceConsentRecord(consent, {
-      missionId,
-      tenantSlug: input.tenant_slug,
-    });
-  } catch (err: unknown) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { allowed: false, reason: `failed to parse voice-consent.json: ${reason}` };
-  }
+  return { allowed: true, grant_id: grant.grant_id };
 }
 
 export function filterSelfAudioFromMeetingInput(
@@ -248,6 +326,7 @@ export class MeetingParticipationCoordinator {
         mission_id: options.mission_id,
         tenant_slug: options.tenant_slug,
         purpose: 'recording',
+        meeting: { url: target.url },
       });
       if (!consent.allowed) {
         this.deps.trace?.addEvent('meeting_participation.recording_denied', {

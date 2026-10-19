@@ -9,17 +9,13 @@ import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
   safeExec,
-  safeExistsSync,
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { resolveIdentityContext } from '@agent/core/authority';
-import {
-  loadVoiceConsentAtPath,
-  validateVoiceConsentRecord,
-} from '@agent/core/voice/voice-consent';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { parseSafeJsonInput, getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -43,38 +39,29 @@ const { buildRetryOptions } = defineActuatorPipelineBase({
 
 export { buildRetryOptions };
 
+/**
+ * Speak consent: the coordinator's mission-scoped voice check (one
+ * implementation, PG-04). Speaking never uses a standing grant.
+ */
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
-  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = getRegisteredEnvText('MISSION_ID');
-  if (!missionId) {
+  const result = checkMeetingParticipationConsent({
+    mission_id: missionId,
+    tenant_slug: resolveIdentityContext().tenantSlug,
+    purpose: 'voice',
+  });
+  if (result.allowed) return { allowed: true };
+  // The speak path keeps its own denial wording for these two cases.
+  if (result.code === 'no_mission') {
     return {
       allowed: false,
       reason: 'speak requires MISSION_ID + voice-consent.json in the mission evidence dir',
     };
   }
-  const evidenceDir = pathResolver.missionEvidenceDir(missionId);
-  if (!evidenceDir) {
+  if (result.code === 'no_mission_dir') {
     return { allowed: false, reason: `mission '${missionId}' not found` };
   }
-  const consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
-    allowMissingLeaf: true,
-  });
-  if (!safeExistsSync(consentPath)) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
-    };
-  }
-  try {
-    const consent = loadVoiceConsentAtPath(consentPath);
-    return validateVoiceConsentRecord(consent, {
-      missionId,
-      tenantSlug: resolveIdentityContext().tenantSlug,
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { allowed: false, reason: `failed to parse voice-consent.json: ${message}` };
-  }
+  return { allowed: false, reason: result.reason };
 }
 
 export function redactedTarget(input: MeetingAction): string {

@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/grant-capability-policy.schema.json",
+  "title": "Grant Capability Policy",
+  "description": "Per-capability rules of the Grant model (PG-03): kind, required scope keys, approval requirement (external_io), maximum standing-grant lifetime and mission binding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "capabilities"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/definitions/standing_grant"
+          },
+          {
+            "$ref": "#/definitions/per_mission"
+          },
+          {
+            "$ref": "#/definitions/os_permission"
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "standing_grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "scope_keys", "external_io", "max_ttl_days", "mission_binding"],
+      "properties": {
+        "kind": {
+          "const": "standing_grant"
+        },
+        "description": {
+          "type": "string"
+        },
+        "scope_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Scope axes a grant must bind. `meeting` means at least one of meeting_series_ids / meeting_urls.",
+          "items": {
+            "type": "string",
+            "enum": ["tenant_slug", "meeting"]
+          }
+        },
+        "external_io": {
+          "type": "boolean"
+        },
+        "max_ttl_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "mission_binding": {
+          "type": "string",
+          "enum": ["auto", "none"]
+        }
+      }
+    },
+    "per_mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "adapter"],
+      "properties": {
+        "kind": {
+          "const": "per_mission"
+        },
+        "description": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string",
+          "enum": ["voice_consent"]
+        }
+      }
+    },
+    "os_permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "probe_key"],
+      "properties": {
+        "kind": {
+          "const": "os_permission"
+        },
+        "description": {
+          "type": "string"
+        },
+        "probe_key": {
+          "type": "string",
+          "enum": ["microphone", "camera", "screen_recording"]
+        }
+      }
+    }
+  }
+}
