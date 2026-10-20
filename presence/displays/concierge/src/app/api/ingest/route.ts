@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+import {
+  buildExecutionEnv,
+  withExecutionContext,
+  withExecutionContextAsync,
+} from '@agent/core/authority';
+import { resolveWorkspaceScope, WorkspaceScopeError } from '@agent/core/surface/workspace-scope';
+import { ingestScopedWorkspaceDocument } from '@agent/core/surface/scoped-workspace-ingest';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -104,10 +110,51 @@ export async function POST(req: NextRequest) {
               : 'api.onboarding_input';
       return NextResponse.json({ ok: false, error: t(messageKey) }, { status: 400 });
     }
-    const { file, tenant, format, dryRun } = parsedForm.value;
+    const { file, tenant, format, dryRun, workspace: requestedWorkspace } = parsedForm.value;
     if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json({ ok: false, error: t('api.ingest.file_size') }, { status: 400 });
     }
+    const workspace = withExecutionContext('sovereign_concierge', () =>
+      resolveWorkspaceScope(resolved.context, requestedWorkspace)
+    );
+    if (workspace.selection.organization_id || workspace.selection.project_id) {
+      const actorId = resolved.context.principal?.actor.id || resolved.context.principalId;
+      if (!actorId)
+        return NextResponse.json(
+          { ok: false, error: 'A server-resolved uploader identity is required.' },
+          { status: 403 }
+        );
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = await withExecutionContextAsync('sovereign_concierge', () =>
+        ingestScopedWorkspaceDocument({
+          workspace,
+          fileName: sanitizeFileName(file.name),
+          bytes,
+          ...(format ? { format } : {}),
+          actorId,
+          dryRun,
+        })
+      );
+      return NextResponse.json({
+        ok: true,
+        message: t(dryRun ? 'api.ingest.previewed' : 'api.ingest.committed', {
+          name: sanitizeFileName(file.name),
+        }),
+        summary: {
+          ...result,
+          dry_run: dryRun,
+          file_name: sanitizeFileName(file.name),
+          tenant: workspace.selection.tenant_slug || '',
+        },
+      });
+    }
+    // The tenant ceremony cannot broaden an organization/project-restricted
+    // uploader's authority just because the client omitted its selection.
+    if (workspace.organizationIds !== 'all' || workspace.projectIds !== 'all')
+      return NextResponse.json(
+        { ok: false, error: 'Select your authorized organization or project before uploading.' },
+        { status: 409 }
+      );
 
     // Only tenants registered in the tenant registry are valid landings from
     // the GUI. `common` (shared/public namespace) needs a KM-03 steward
@@ -240,6 +287,19 @@ export async function POST(req: NextRequest) {
       ),
     });
   } catch (error) {
+    if (error instanceof WorkspaceScopeError)
+      return NextResponse.json(
+        { ok: false, outcome: 'not_applied', error: error.message },
+        { status: 403 }
+      );
+    if (
+      error instanceof Error &&
+      /^\[WORKSPACE_INGEST_(SCOPE|FORMAT|BLOCKED|EMPTY)\]/.test(error.message)
+    )
+      return NextResponse.json(
+        { ok: false, outcome: 'not_applied', error: error.message },
+        { status: 422 }
+      );
     console.error(
       `[concierge/ingest] route failed: ${error instanceof Error ? error.stack || error.message : String(error)}`
     );

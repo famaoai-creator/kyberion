@@ -11,6 +11,7 @@ import {
   humanRequestError,
 } from '../../../lib/browser-human-request';
 import { readRequestObject } from '../../../lib/request-input';
+import { workspaceConversationViewer } from '../../../lib/workspace-conversation';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
 import { CONVERSATION_MAX_INPUT } from '../../../lib/conversation-history';
 import {
@@ -28,10 +29,11 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   let viewer: ReturnType<typeof narrowFrontDeskConversationViewer>;
   try {
-    viewer = narrowFrontDeskConversationViewer(resolved.context, {
+    viewer = workspaceConversationViewer(resolved.context, {
       tenant: req.nextUrl.searchParams.get('tenant'),
       organizationId: req.nextUrl.searchParams.get('organizationId'),
       projectId: req.nextUrl.searchParams.get('projectId'),
+      operationId: req.nextUrl.searchParams.get('operationId'),
     });
   } catch {
     return NextResponse.json(
@@ -228,6 +230,7 @@ export async function POST(req: NextRequest) {
     'tenant',
     'organizationId',
     'projectId',
+    'operationId',
   ]);
   if (!parsedBody.ok) {
     return NextResponse.json(
@@ -266,7 +269,7 @@ export async function POST(req: NextRequest) {
     );
   }
   if (
-    ['tenant', 'organizationId', 'projectId'].some(
+    ['tenant', 'organizationId', 'projectId', 'operationId'].some(
       (field) => body[field] !== undefined && typeof body[field] !== 'string'
     ) ||
     (body.requestCreatedAt !== undefined &&
@@ -278,10 +281,11 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    viewer = narrowFrontDeskConversationViewer(viewer, {
+    viewer = workspaceConversationViewer(viewer, {
       tenant: typeof body.tenant === 'string' ? body.tenant : undefined,
       organizationId: typeof body.organizationId === 'string' ? body.organizationId : undefined,
       projectId: typeof body.projectId === 'string' ? body.projectId : undefined,
+      operationId: typeof body.operationId === 'string' ? body.operationId : undefined,
     });
   } catch {
     return NextResponse.json(

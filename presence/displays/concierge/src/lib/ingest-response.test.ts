@@ -2,6 +2,41 @@ import { describe, expect, it } from 'vitest';
 import { parseConciergeIngestResponse } from './ingest-response';
 
 describe('concierge ingest response boundary', () => {
+  it('preserves canonical inferred project scope and rejects a mismatched owner receipt', () => {
+    const selectedWorkspace = { tier: 'public', project_id: 'docs' };
+    const receipt = {
+      ok: true,
+      message: 'Ready',
+      summary: {
+        dry_run: true,
+        outcome: 'would_commit',
+        file_name: 'a.txt',
+        tenant: '',
+        scope: selectedWorkspace,
+        selectedWorkspace,
+      },
+    };
+    expect(
+      parseConciergeIngestResponse(receipt, {
+        tenant: '',
+        dryRun: true,
+        selection: { project_id: 'docs' },
+      })?.summary.selectedWorkspace
+    ).toEqual(selectedWorkspace);
+    expect(
+      parseConciergeIngestResponse(receipt, {
+        tenant: '',
+        dryRun: true,
+        selection: { project_id: 'other' },
+      })
+    ).toBeUndefined();
+    expect(
+      parseConciergeIngestResponse({
+        ...receipt,
+        summary: { ...receipt.summary, scope: { tier: 'personal', project_id: 'docs' } },
+      })
+    ).toBeUndefined();
+  });
   it('accepts dry-run and committed summaries', () => {
     expect(
       parseConciergeIngestResponse({

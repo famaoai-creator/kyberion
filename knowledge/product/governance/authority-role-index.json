@@ -159,10 +159,15 @@
     "dot_lifecycle_writer": {
       "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
       "default_persona": "worker",
-      "write_scopes": ["dots/", "active/shared/runtime/", "active/shared/tmp/"],
+      "write_scopes": [
+        "dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/runtime/",
+        "active/shared/tmp/"
+      ],
       "scope_classes": ["operations_runtime"],
       "allowed_actuators": [],
-      "tier_access": ["public"]
+      "tier_access": ["public", "confidential"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
@@ -446,6 +451,22 @@
       "scope_classes": ["capability_registration", "tenant_configuration", "audit"],
       "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
+    },
+    "workspace_tenant_registry_index_reader": {
+      "description": "Shared core read-only workspace tenant selector index reader. Used only for authenticated viewers whose tenant grants are all. Enumerates registry filenames only; descendant file reads are explicitly denied. Each valid slug is subsequently checked by the exact tenant-bound registry reader; no personal profile fields or write authority are exposed.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal"]
+    },
+    "workspace_tenant_registry_reader": {
+      "description": "Shared core exact-tenant registry existence reader. Workspace resolution first narrows authenticated viewer grants, then binds this read-only context to that tenant. Reads one knowledge/personal/tenants/${KYBERION_TENANT}.json profile and returns only tenant_slug; never exposes personal profile fields or grants directory enumeration or writes.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal"]
     }
   }
 }

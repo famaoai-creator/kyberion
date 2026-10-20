@@ -1,14 +1,14 @@
+import {
+  resolveChronosWorkspace,
+  workspaceSelectionFromSearchParams,
+} from '../../../lib/workspace-scope';
 import { projectKnowledgeCandidate } from '../../../lib/knowledge-candidate-projection';
 import { NextRequest, NextResponse } from 'next/server';
 import { listMemoryPromotionCandidates } from '@agent/core/knowledge/memory-promotion-queue';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
-import {
-  resolveViewerContextForRequest,
-  viewerErrorResponse,
-  strictViewerScopeTenantSlugs,
-} from '../../../lib/viewer-context';
+import { resolveViewerContextForRequest, viewerErrorResponse } from '../../../lib/viewer-context';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
-import { readChronosOptionalStringParam } from '../../../lib/request-input';
+import { withViewerExecutionContext } from '../../../lib/viewer-context';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -18,17 +18,25 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
-    const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
-    const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-    const candidates = listMemoryPromotionCandidates()
+    const workspace = resolveChronosWorkspace(
+      resolvedViewer.context,
+      workspaceSelectionFromSearchParams(req.nextUrl.searchParams)
+    );
+    const scopedViewer = { ...resolvedViewer.context, ...workspace };
+    const tenantSlugs = workspace.tenantSlugs;
+    const candidates = withViewerExecutionContext(scopedViewer, () =>
+      listMemoryPromotionCandidates()
+    )
       .filter((candidate) =>
-        memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
+        memoryCandidateVisibleToViewer(candidate, scopedViewer, workspace.selection.tenant_slug)
       )
       .map(projectKnowledgeCandidate);
     return NextResponse.json({
       ok: true,
       candidates,
       tenantSlugs,
+      workspace: workspace.selection,
+      ...(workspace.selection.operation_id ? { inheritedScope: 'organization' } : {}),
       accessRole: resolvedViewer.context.role,
     });
   } catch (error) {

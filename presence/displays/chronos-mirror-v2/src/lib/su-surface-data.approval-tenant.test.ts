@@ -3,7 +3,11 @@ import {
   computeApprovalPresentedDigest,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { resolveApprovalTenant, resolveApprovalTenantSource } from './su-surface-data';
+import {
+  approvalMatchesWorkspace,
+  resolveApprovalTenant,
+  resolveApprovalTenantSource,
+} from './su-surface-data';
 
 const missionTenants = vi.hoisted(() => new Map<string, string>());
 
@@ -107,4 +111,28 @@ describe('approval tenant resolution (Chronos approvals workspace)', () => {
       );
     }
   });
+});
+
+it('withholds approvals with unverified sensitivity from a public-only viewer without a tier selection', () => {
+  const workspace = {
+    selection: { kind: 'tenant' as const },
+    tenantSlugs: 'all' as const,
+    organizationIds: 'all' as const,
+    projectIds: 'all' as const,
+    tierAccess: ['public' as const],
+  };
+  const unknown = { ...base, requestedByContext: undefined };
+  expect(approvalMatchesWorkspace(unknown, workspace)).toBe(false);
+  expect(
+    approvalMatchesWorkspace(
+      { ...unknown, scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'private' } },
+      workspace
+    )
+  ).toBe(false);
+  expect(
+    approvalMatchesWorkspace(
+      { ...unknown, scope: { scope_kind: 'tenant', tier: 'public' } },
+      workspace
+    )
+  ).toBe(true);
 });

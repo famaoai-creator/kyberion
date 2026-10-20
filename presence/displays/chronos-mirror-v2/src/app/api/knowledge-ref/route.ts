@@ -11,6 +11,11 @@ import {
 import { normalizeScopedReadPath } from '../../../lib/scoped-read-path';
 import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 import { isAllowedKnowledgeRefPath, resolveSafeKnowledgeReferencePath } from './helpers';
+import {
+  resolveChronosWorkspace,
+  workspaceSelectionFromSearchParams,
+} from '../../../lib/workspace-scope';
+import { knowledgeDocumentVisibleToWorkspace } from '../../../lib/knowledge-scope';
 
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -33,6 +38,15 @@ export async function GET(req: NextRequest) {
   const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
   let tenantSlugs: string[] | 'all';
   try {
+    const workspace = resolveChronosWorkspace(
+      resolvedViewer.context,
+      workspaceSelectionFromSearchParams(req.nextUrl.searchParams)
+    );
+    if (!knowledgeDocumentVisibleToWorkspace(normalizedPath, workspace))
+      return NextResponse.json(
+        { error: 'Knowledge ref is outside the selected workspace' },
+        { status: 403 }
+      );
     tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
   } catch (error) {
     return viewerErrorResponse(error, 403);

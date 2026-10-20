@@ -140,6 +140,45 @@ function mount(
 }
 
 describe('document preview confirmation', () => {
+  it('posts an explicit public project without injecting the active company', async () => {
+    const original = window.location.href;
+    window.location.href = 'http://localhost/ingest?project_id=public-demo&tier=public';
+    try {
+      const m = mount(async (body) => {
+        const preview = body.has('dry_run');
+        return verdict(preview, preview ? 'would_commit' : 'committed', '');
+      });
+      await flush();
+      m.choose();
+      await m.click('Check the document');
+      expect(m.posts).toHaveLength(1);
+      expect(m.posts[0].get('project_id')).toBe('public-demo');
+      expect(m.posts[0].get('tier')).toBe('public');
+      expect(m.posts[0].has('tenant')).toBe(false);
+      expect(m.button('Looks good — file it')).toBeDefined();
+      await m.click('Looks good — file it');
+      expect(m.posts).toHaveLength(2);
+      expect(m.posts[1].has('tenant')).toBe(false);
+    } finally {
+      window.location.href = original;
+    }
+  });
+
+  it('withdraws a reviewed file when the workspace URL changes before confirmation', async () => {
+    const original = window.location.href;
+    try {
+      const m = mount();
+      await flush();
+      m.choose();
+      await m.click('Check the document');
+      window.location.href = 'http://localhost/ingest?tenant=alpha&organization_id=new-owner';
+      await m.click('Looks good — file it');
+      expect(m.posts).toHaveLength(1);
+      expect(m.button('Looks good — file it')).toBeUndefined();
+    } finally {
+      window.location.href = original;
+    }
+  });
   it.each(['tenant', 'format', 'file'])('invalidates a preview when %s changes', async (change) => {
     const m = mount();
     await flush();

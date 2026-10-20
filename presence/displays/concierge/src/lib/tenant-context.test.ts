@@ -3,6 +3,25 @@ import { runInNewContext } from 'node:vm';
 import { safeReadFile } from '@agent/core/secure-io';
 import { announceTenantChange, withSelectedTenant } from './tenant-context';
 
+it('preserves an operation in the same workspace destination and clears it on company changes', async () => {
+  const { workspaceDestinationHref } = await import('./tenant-context');
+  browser('http://localhost:3050/?tenant=alpha&organization_id=sales&operation_id=daily');
+  const retained = new URL(
+    workspaceDestinationHref('http://localhost:3300/?section=home', 'alpha')
+  );
+  expect(retained.searchParams.get('organization_id')).toBe('sales');
+  expect(retained.searchParams.get('operation_id')).toBe('daily');
+  const switched = new URL(
+    workspaceDestinationHref(
+      'http://localhost:3300/?organization_id=sales&operation_id=daily&candidateKey=old',
+      'beta'
+    )
+  );
+  expect(switched.searchParams.get('tenant')).toBe('beta');
+  expect(switched.searchParams.has('operation_id')).toBe(false);
+  expect(switched.searchParams.has('candidateKey')).toBe(false);
+});
+
 type Prefs = {
   scopedUrl(path: string, style?: 'snake' | 'camel'): string;
   setTenant(tenant: string): void;

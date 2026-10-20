@@ -46,6 +46,11 @@ import {
   resolveDistillDecisionTenantSelection,
 } from './intelligence-input';
 import { INTELLIGENCE_ACTION_HANDLERS } from './actions';
+import {
+  resolveChronosWorkspace,
+  workspaceSelectionFromSearchParams,
+} from '../../../lib/workspace-scope';
+import { WorkspaceScopeError, type WorkspaceSelection } from '@agent/core/surface/workspace-scope';
 
 let intelligenceSnapshotRevision = 0;
 
@@ -374,7 +379,10 @@ export async function GET(req: NextRequest) {
       timestamp: nowIso(),
     });
   } catch (err: any) {
-    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
+    return viewerErrorResponse(
+      err,
+      err instanceof ViewerContextError || err instanceof WorkspaceScopeError ? err.status : 500
+    );
   }
 }
 
@@ -406,6 +414,30 @@ export async function POST(req: NextRequest) {
       );
     }
     const action = body.action;
+    if (action.startsWith('memory_') || action === 'approval_decision') {
+      const querySelection = workspaceSelectionFromSearchParams(req.nextUrl.searchParams);
+      const selected = { ...querySelection };
+      for (const [field, key] of [
+        ['tenant', 'tenant_slug'],
+        ['organization_id', 'organization_id'],
+        ['project_id', 'project_id'],
+        ['operation_id', 'operation_id'],
+        ['tier', 'tier'],
+      ] as const) {
+        if (body[field] === undefined) continue;
+        if (selected[key] !== undefined && selected[key] !== body[field])
+          return NextResponse.json(
+            { ok: false, outcome: 'not_applied', error: 'Workspace selections disagree' },
+            { status: 400 }
+          );
+        Object.assign(selected, { [key]: body[field] });
+      }
+      const workspace = resolveChronosWorkspace(
+        resolvedViewer.context,
+        selected as WorkspaceSelection
+      );
+      Object.assign(resolvedViewer.context, workspace);
+    }
     if (action === 'distill_candidate_decision' || action.startsWith('memory_')) {
       const selection = resolveDistillDecisionTenantSelection(
         typeof body.tenant === 'string' ? body.tenant : undefined,
@@ -429,6 +461,9 @@ export async function POST(req: NextRequest) {
     }
     return await handler(body, resolvedViewer, action);
   } catch (err: any) {
-    return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
+    return viewerErrorResponse(
+      err,
+      err instanceof ViewerContextError || err instanceof WorkspaceScopeError ? err.status : 500
+    );
   }
 }

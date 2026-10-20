@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-23
+last_updated: 2026-10-21
 status: active
 ---
 
@@ -30,6 +30,7 @@ status: active
 
 ## 実装記録
 
+- [スコープを共有する継続的な仕事場（2026-10-21）](../../../knowledge/product/architecture/scope-aware-workplaces.md)
 - [実装台帳](./IMPLEMENTATION_LEDGER_2026-08-10.ja.md)
 - [pnpm lockfile review (2026-08-27)](./LOCKFILE_REVIEW_2026-08-27.ja.md)
 

@@ -70,7 +70,12 @@ export function KnowledgeLearningPanel({
   const editable = supported && learning.state === 'draft' && !learning.approvalRef;
   const blocked = disabled || !localAdmin || !supported || !learning.payloadDigest;
   const reviewHref = learning.approvalRef
-    ? learningReviewHref(learning.approvalRef, candidate.candidateKey, candidate.tenantSlug)
+    ? learningReviewHref(
+        learning.approvalRef,
+        candidate.candidateKey,
+        candidate.tenantSlug,
+        candidate.scope
+      )
     : null;
   return (
     <div className="grid gap-4">

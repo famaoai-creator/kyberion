@@ -3,6 +3,8 @@ import {
   type ClientKnowledgeCandidate,
   type ClientKnowledgeCuration,
 } from './knowledge-response';
+import { workspaceQuery, workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
+import type { WorkspaceSelection } from '@agent/core/surface/workspace-scope';
 
 export type LearningAction =
   'memory_curate_candidate' | 'memory_request_learning_approval' | 'memory_publish_learning';
@@ -102,24 +104,30 @@ export function learningMutationConfirmed(
     return Boolean(candidate.learning?.approvalRef);
   return candidate.learning?.state === 'published' && Boolean(candidate.learning.publication);
 }
-export function knowledgeCandidateHref(candidateKey: string, tenant?: string): string {
-  const params = new URLSearchParams({ section: 'knowledge', candidateKey });
+export function knowledgeCandidateHref(
+  candidateKey: string,
+  tenant?: string,
+  selection: WorkspaceSelection = {}
+): string {
+  const params = workspaceQuery(selection);
+  params.set('section', 'knowledge');
+  params.set('candidateKey', candidateKey);
   if (tenant) params.set('tenant', tenant);
   return '/?' + params.toString();
 }
 export function learningReviewHref(
   approvalRef: string,
   candidateKey: string,
-  tenant?: string
+  tenant?: string,
+  selection: WorkspaceSelection = {}
 ): string | null {
   const match = /^terminal:([A-Za-z0-9][A-Za-z0-9._-]{0,255})$/.exec(approvalRef);
   if (!match) return null;
-  const params = new URLSearchParams({
-    section: 'approvals',
-    request: match[1],
-    storageChannel: 'terminal',
-    candidateKey,
-  });
+  const params = workspaceQuery(selection);
+  params.set('section', 'approvals');
+  params.set('request', match[1]);
+  params.set('storageChannel', 'terminal');
+  params.set('candidateKey', candidateKey);
   if (tenant) params.set('tenant', tenant);
   return '/?' + params.toString();
 }
@@ -140,6 +148,8 @@ export function learningScopeSupported(candidate: ClientKnowledgeCandidate): boo
 export function approvalWorkspaceQuery(search: string, tenant?: string): URLSearchParams {
   const location = new URLSearchParams(search);
   const query = new URLSearchParams({ limit: '50' });
+  for (const [key, value] of workspaceQuery(workspaceSelectionFromQuery(location)))
+    query.set(key, value);
   const request = location.get('request');
   const storageChannel = location.get('storageChannel');
   if (request && storageChannel) {

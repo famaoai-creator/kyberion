@@ -16,10 +16,18 @@ const captured: Array<{ args: string[]; env: NodeJS.ProcessEnv | undefined }> = 
 
 vi.mock('../src/lib/api-guard', () => ({ requireConciergeMutationAccess: () => null }));
 vi.mock('../src/lib/viewer-context', () => ({
-  resolveConciergeViewer: () => ({ context: { tenantSlugs: 'all' } }),
+  resolveConciergeViewer: () => ({
+    context: {
+      tenantSlugs: 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: ['public', 'confidential'],
+    },
+  }),
 }));
 vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: () => ['acme'],
+  readTenantProfile: () => ({ tenant_slug: 'acme' }),
 }));
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();

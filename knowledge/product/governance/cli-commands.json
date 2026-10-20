@@ -1781,6 +1781,17 @@
       "same_target_as": "operator-home.doctor"
     },
     {
+      "id": "script.dot.create",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot create",
+      "args": ["create"],
+      "noun": "dot",
+      "verb": "create",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_create",
+      "group": "operate"
+    },
+    {
       "id": "script.dot.activate",
       "module": "scripts/dot_charters.ts",
       "command": "dot activate",

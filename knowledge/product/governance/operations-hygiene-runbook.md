@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-20
+last_updated: 2026-10-21
 ---
 
 # Operations Hygiene Runbook
@@ -1858,3 +1858,34 @@ An explicit missing key stays unavailable; a tenant change without such a key
 selects an authorized row in the new list. A stale response must not override a
 new tenant or requested key. Enforce these transitions in knowledge selection
 tests rather than testing only initial table rendering.
+
+### Scoped workplace controls and source provenance
+
+Workspace selection is a server-validated projection, never an authorization grant.
+Check actual registry parents before reading or mutating resources. Read tenant registry
+existence through the exact bound reader after narrowing; an all-tenant selector uses a
+directory-only index reader and validates each filename through the bound reader. Directory
+listing grants use `deny_read_descendants` in policy, with physical aliases checked by the
+same tier guard. Do not add privileged profile fields to selector DTOs.
+
+An organization-only WorkItem has no intrinsic tier. Do not choose its tier from whichever
+same-name organization the viewer can see. Require authoritative owner provenance, such
+as the frozen dot admission and matching item identity; otherwise withhold the row.
+
+Dot operation bindings are work provenance, not another authority axis. Include them in
+admission identity and approval dedupe, stamp them only from the charter, and revalidate
+before claim. Changing or removing a binding cannot consume an old parked approval. Check
+scope, status and binding inside the lifecycle lock. Pause means future wakeups stop, not
+proof that existing effects stopped. Sanitize activation diagnostics that can name another
+scope and withhold inherited budget aggregates outside the viewer's full tier/owner access.
+
+Gate these rules with workspace scope/work/autonomy, real-store scoped ingest,
+dot-work-binding, lifecycle, dispatch, admission recovery and executor tests, plus the
+mounted workspace/ingest UI tests. Include public-only viewers, same-name owners in two
+tiers, parentless projects, binding removal, sibling operations and delayed scope changes.
+
+## Dot authoring: ownership and confidentiality
+
+Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
+
+Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not `dot_lifecycle_writer`. Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
