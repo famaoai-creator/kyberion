@@ -23,6 +23,11 @@ import * as mandates from '@agent/core/governance/mandate-shadow';
 import * as missionAdmission from '@agent/core/mission/mission-admission';
 import * as missionState from '@agent/core/mission/mission-state';
 import {
+  resolveIdentityContext,
+  resolveRole,
+  withExecutionContextAsync,
+} from '@agent/core/authority';
+import {
   recordDaemonHeartbeat,
   pathResolver,
   safeExistsSync,
@@ -137,9 +142,15 @@ describe('daemon_watchdog', () => {
     }
   });
 
-  it.each([undefined, 'default', 'proj-1'])(
-    'claims typed intake with actual project %s and settles only after an active receipt',
-    async (projectId) => {
+  it.each([
+    { projectId: undefined, fail: false },
+    { projectId: 'default', fail: false },
+    { projectId: 'proj-1', fail: false },
+    { projectId: undefined, fail: true },
+    { projectId: undefined, fail: false, callerRole: 'daemon_watchdog' },
+  ])(
+    'mediates the controller scope for project $projectId, failure $fail',
+    async ({ projectId, fail, callerRole = 'organization_operator' }) => {
       const item = {
         ...missionProposal,
         status: 'ready' as const,
@@ -182,8 +193,25 @@ describe('daemon_watchdog', () => {
         .spyOn(autonomyState, 'recordAutonomyExecution')
         .mockImplementation(() => undefined);
       routing.missionMain.mockClear();
+      routing.missionMain.mockImplementation(async () => {
+        expect(resolveRole()).toBe('mission_controller');
+        expect(resolveIdentityContext().tenantSlug).toBe('acme');
+        expect(claim).toHaveBeenCalledTimes(1);
+        if (fail) throw new Error('controller rejected admission');
+      });
       try {
-        await sweepMissionStartCandidates({});
+        await withExecutionContextAsync(
+          callerRole,
+          async () => {
+            expect(resolveRole()).toBe(callerRole);
+            await sweepMissionStartCandidates({});
+            expect(resolveRole()).toBe(callerRole);
+            expect(resolveIdentityContext().tenantSlug).toBe('acme');
+          },
+          undefined,
+          'acme',
+          'org-1'
+        );
         expect(claim).toHaveBeenCalledWith(
           expect.objectContaining({
             itemId: item.item_id,
@@ -202,6 +230,21 @@ describe('daemon_watchdog', () => {
           ])
         );
         if (!projectId) expect(routing.missionMain.mock.calls[0][0]).not.toContain('--project-id');
+        if (fail) {
+          expect(release).toHaveBeenCalledWith(
+            expect.objectContaining({
+              itemId: item.item_id,
+              leaseId: 'mission-lease',
+              nextStatus: 'blocked',
+            })
+          );
+          expect(release).not.toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'done' }));
+          expect(execution).toHaveBeenCalledWith(
+            expect.objectContaining({ ok: false }),
+            expect.objectContaining({ tenantSlug: 'acme' })
+          );
+          return;
+        }
         expect(release).toHaveBeenCalledWith(
           expect.objectContaining({
             itemId: item.item_id,
@@ -215,6 +258,7 @@ describe('daemon_watchdog', () => {
           expect.objectContaining({ tenantSlug: 'acme' })
         );
       } finally {
+        routing.missionMain.mockReset();
         for (const spy of [
           list,
           resolver,

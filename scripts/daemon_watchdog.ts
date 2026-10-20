@@ -554,7 +554,15 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             '--tenant-slug',
             item.context.tenant_slug,
           ];
-          await missionMain(argv);
+          // Enter the governed controller only after the exact intake, current
+          // mandate, autonomous gate and WorkItem claim have been verified.
+          await withExecutionContextAsync(
+            'mission_controller',
+            () => missionMain(argv),
+            undefined,
+            missionScope.tenant_slug,
+            missionScope.organization_id
+          );
           const { loadState } = await import('@agent/core/mission/mission-state');
           const started = loadState(missionId, deps);
           if (
