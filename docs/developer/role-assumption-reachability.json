@@ -2396,6 +2396,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/daemon_watchdog.ts#sweepMissionStartCandidates",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/dot_charters.ts#asCharter",
       "roles": [],
       "unresolved": [
