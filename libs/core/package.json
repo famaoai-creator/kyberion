@@ -7703,6 +7703,34 @@
     "./discussion/discussion-create-request": {
       "types": "./dist/discussion/discussion-create-request.d.ts",
       "default": "./dist/discussion/discussion-create-request.js"
+    },
+    "./organization/company-bootstrap": {
+      "types": "./dist/organization/company-bootstrap.d.ts",
+      "default": "./dist/organization/company-bootstrap.js"
+    },
+    "./organization/company-onboarding": {
+      "types": "./dist/organization/company-onboarding.d.ts",
+      "default": "./dist/organization/company-onboarding.js"
+    },
+    "./organization/company-setup-workflow": {
+      "types": "./dist/organization/company-setup-workflow.d.ts",
+      "default": "./dist/organization/company-setup-workflow.js"
+    },
+    "./organization/tenant-activation-approval": {
+      "types": "./dist/organization/tenant-activation-approval.d.ts",
+      "default": "./dist/organization/tenant-activation-approval.js"
+    },
+    "./organization/tenant-activation-probe": {
+      "types": "./dist/organization/tenant-activation-probe.d.ts",
+      "default": "./dist/organization/tenant-activation-probe.js"
+    },
+    "./organization/tenant-registry-consistency": {
+      "types": "./dist/organization/tenant-registry-consistency.d.ts",
+      "default": "./dist/organization/tenant-registry-consistency.js"
+    },
+    "./service/service-preflight": {
+      "types": "./dist/service/service-preflight.d.ts",
+      "default": "./dist/service/service-preflight.js"
     }
   },
   "dependencies": {

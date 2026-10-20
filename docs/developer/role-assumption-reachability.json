@@ -827,6 +827,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/company-onboarding.ts#onboardAiCompany",
+      "roles": ["mission_controller", "sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/company-setup-workflow.ts#executeCompanySetup",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
       "roles": [],
       "unresolved": [
@@ -846,6 +856,21 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-activation-approval.ts#requestTenantActivationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -858,6 +883,11 @@
     {
       "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-registry-consistency.ts#collectTenantSystems",
+      "roles": ["check_tenant_registry_consistency"],
       "unresolved": []
     },
     {
@@ -1279,6 +1309,11 @@
         "sovereign_concierge",
         "surface_runtime"
       ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization",
+      "roles": ["concierge_management_reader"],
       "unresolved": []
     },
     {
@@ -2269,11 +2304,6 @@
       "unresolved": []
     },
     {
-      "site": "scripts/check_tenant_registry_consistency.ts#collectTenantSystems",
-      "roles": ["check_tenant_registry_consistency"],
-      "unresolved": []
-    },
-    {
       "site": "scripts/check_test_sleep_ratchet.ts#checkTestSleepRatchet",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -2316,11 +2346,6 @@
     {
       "site": "scripts/clean.ts#main",
       "roles": ["mission_controller"],
-      "unresolved": []
-    },
-    {
-      "site": "scripts/company_onboarding.ts#onboardAiCompany",
-      "roles": ["mission_controller", "sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -4014,6 +4039,7 @@
         "presence/displays/concierge/src/app/api/services/operator/route.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-actions.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-generation/route.ts",
+        "presence/displays/concierge/src/app/api/setup/company/route.ts",
         "presence/displays/concierge/src/app/api/setup/first-run/route.ts",
         "presence/displays/concierge/src/app/api/setup/link-identity/route.ts",
         "presence/displays/concierge/src/app/api/setup/oidc/route.ts",
@@ -4083,6 +4109,10 @@
         "presence/displays/concierge/src/app/settings/sections/form-scope.tsx",
         "presence/displays/concierge/src/app/settings/settings-api.ts",
         "presence/displays/concierge/src/app/settings/settings-navigation.ts",
+        "presence/displays/concierge/src/app/setup/company/CompanySetupView.tsx",
+        "presence/displays/concierge/src/app/setup/company/company-setup-client.ts",
+        "presence/displays/concierge/src/app/setup/company/company-setup-model.ts",
+        "presence/displays/concierge/src/app/setup/company/page.tsx",
         "presence/displays/concierge/src/app/setup/first-run/page.tsx",
         "presence/displays/concierge/src/app/setup/identity-link-section.tsx",
         "presence/displays/concierge/src/app/setup/page.tsx",
@@ -4293,9 +4323,9 @@
         },
         "concierge_management_reader": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/management/route.ts#POST",
-            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
-            "libs/core/surface/surface-management-mutations.ts#scoped"
+            "presence/displays/concierge/src/app/api/setup/company/route.ts#GET",
+            "libs/core/organization/company-setup-workflow.ts#executeCompanySetup",
+            "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization"
           ]
         },
         "concierge_management_writer": {

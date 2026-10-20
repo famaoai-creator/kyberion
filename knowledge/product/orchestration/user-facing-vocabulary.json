@@ -15030,6 +15030,261 @@
         "en": "Submitted changes saved. You still have unsaved edits.",
         "ja": "送信した変更を保存しました。まだ保存していない編集があります。",
         "qps-ploc": "⟦Şůƀɱïŧŧėḓ ƈħȧñɠėş şȧṽėḓ. Ẏőů şŧïŀŀ ħȧṽė ůñşȧṽėḓ ėḓïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "company_setup.title": {
+        "en": "Set up your company",
+        "ja": "会社をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ẏőůř ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "company_setup.description": {
+        "en": "Register the company, check readiness, request human approval, and prepare the first work in separate steps.",
+        "ja": "会社の登録、準備確認、人による承認、初回の仕事の準備を順に進めます。",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħė ƈőɱṗȧñẏ, ƈħėƈķ řėȧḓïñėşş, řėɋůėşŧ ħůɱȧñ ȧṗṗřőṽȧŀ, ȧñḓ ṗřėṗȧřė ŧħė ƒïřşŧ ẇőřķ ïñ şėṗȧřȧŧė şŧėṗş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "company_setup.company": {
+        "en": "Company",
+        "ja": "会社",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ ŀőř⟧"
+      },
+      "company_setup.choose_company": {
+        "en": "Choose an existing company",
+        "ja": "既存の会社を選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ ėẋïşŧïñɠ ƈőɱṗȧñẏ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.tenant_hint": {
+        "en": "Only active companies where you are an owner are available.",
+        "ja": "オーナーとして所属する有効な会社を選べます。",
+        "qps-ploc": "⟦Őñŀẏ ȧƈŧïṽė ƈőɱṗȧñïėş ẇħėřė ẏőů ȧřė ȧñ őẇñėř ȧřė ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "company_setup.first_run": {
+        "en": "Create the first owner and tenant",
+        "ja": "最初のオーナーとテナントを登録",
+        "qps-ploc": "⟦Ƈřėȧŧė ŧħė ƒïřşŧ őẇñėř ȧñḓ ŧėñȧñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "company_setup.failed": {
+        "en": "The setup status could not be loaded. Refresh to try again.",
+        "ja": "セットアップ状況を読み込めませんでした。状況を更新してください。",
+        "qps-ploc": "⟦Ŧħė şėŧůṗ şŧȧŧůş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Řėƒřėşħ ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "company_setup.expired": {
+        "en": "Your sign-in has expired. Sign in again to continue.",
+        "ja": "サインインの有効期限が切れました。再度サインインしてください。",
+        "qps-ploc": "⟦Ẏőůř şïɠñ-ïñ ħȧş ėẋṗïřėḓ. Şïɠñ ïñ ȧɠȧïñ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "company_setup.forbidden": {
+        "en": "You need an active owner membership for this company.",
+        "ja": "この会社の有効なオーナー権限が必要です。",
+        "qps-ploc": "⟦Ẏőů ñėėḓ ȧñ ȧƈŧïṽė őẇñėř ɱėɱƀėřşħïṗ ƒőř ŧħïş ƈőɱṗȧñẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "company_setup.changed": {
+        "en": "The company, page, or sign-in changed. Refresh the status before continuing.",
+        "ja": "会社、ページ、またはサインイン状態が変わりました。状況を更新してから続けてください。",
+        "qps-ploc": "⟦Ŧħė ƈőɱṗȧñẏ, ṗȧɠė, őř şïɠñ-ïñ ƈħȧñɠėḓ. Řėƒřėşħ ŧħė şŧȧŧůş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "company_setup.uncertain": {
+        "en": "The request may have been applied, but its result could not be confirmed. Refresh the status before doing anything else. It has not been retried.",
+        "ja": "処理が反映された可能性がありますが、結果を確認できませんでした。ほかの操作を行う前に状況を更新してください。自動再送はしていません。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ɱȧẏ ħȧṽė ƀėėñ ȧṗṗŀïėḓ, ƀůŧ ïŧş řėşůŀŧ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėƒřėşħ ŧħė şŧȧŧůş ƀėƒőřė ḓőïñɠ ȧñẏŧħïñɠ ėŀşė. Ïŧ ħȧş ñőŧ ƀėėñ řėŧřïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "company_setup.busy": {
+        "en": "Checking or applying the selected step…",
+        "ja": "選択した手順を確認・反映しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ őř ȧṗṗŀẏïñɠ ŧħė şėŀėƈŧėḓ şŧėṗ… ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "company_setup.refresh": {
+        "en": "Refresh status",
+        "ja": "状況を更新",
+        "qps-ploc": "⟦Řėƒřėşħ şŧȧŧůş ŀőřė⟧"
+      },
+      "company_setup.progress": {
+        "en": "Setup progress",
+        "ja": "セットアップの進行状況",
+        "qps-ploc": "⟦Şėŧůṗ ṗřőɠřėşş ŀőřė⟧"
+      },
+      "company_setup.current": {
+        "en": "Current stage",
+        "ja": "現在の段階",
+        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧɠė ŀőřė⟧"
+      },
+      "company_setup.stage_unregistered": {
+        "en": "Company registration needed",
+        "ja": "会社の登録前",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ řėɠïşŧřȧŧïőñ ñėėḓėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.stage_registered": {
+        "en": "Company registered",
+        "ja": "会社の登録済み",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ řėɠïşŧėřėḓ ŀőřėɱ⟧"
+      },
+      "company_setup.stage_awaiting_approval": {
+        "en": "Activation approval requested",
+        "ja": "有効化の承認待ち",
+        "qps-ploc": "⟦Ȧƈŧïṽȧŧïőñ ȧṗṗřőṽȧŀ řėɋůėşŧėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "company_setup.stage_active": {
+        "en": "Company active",
+        "ja": "会社の有効化済み",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ ȧƈŧïṽė ŀőřė⟧"
+      },
+      "company_setup.stage_first_work_prepared": {
+        "en": "First work prepared",
+        "ja": "初回の仕事の準備済み",
+        "qps-ploc": "⟦Ƒïřşŧ ẇőřķ ṗřėṗȧřėḓ ŀőřėɱ ⟧"
+      },
+      "company_setup.company_name": {
+        "en": "Registered company name",
+        "ja": "登録済みの会社名",
+        "qps-ploc": "⟦Řėɠïşŧėřėḓ ƈőɱṗȧñẏ ñȧɱė ŀőřėɱ ï⟧"
+      },
+      "company_setup.name_locked": {
+        "en": "The name comes from the existing tenant registration.",
+        "ja": "会社名には既存のテナント登録情報を使います。",
+        "qps-ploc": "⟦Ŧħė ñȧɱė ƈőɱėş ƒřőɱ ŧħė ėẋïşŧïñɠ ŧėñȧñŧ řėɠïşŧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "company_setup.registration": {
+        "en": "Review company registration",
+        "ja": "会社の登録内容を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ƈőɱṗȧñẏ řėɠïşŧřȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.vertical": {
+        "en": "Business template",
+        "ja": "事業テンプレート",
+        "qps-ploc": "⟦Ƀůşïñėşş ŧėɱṗŀȧŧė ŀőřėɱ⟧"
+      },
+      "company_setup.choose_vertical": {
+        "en": "Choose a business template",
+        "ja": "事業テンプレートを選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƀůşïñėşş ŧėɱṗŀȧŧė ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.first_work": {
+        "en": "First work goal",
+        "ja": "初回の仕事の目標",
+        "qps-ploc": "⟦Ƒïřşŧ ẇőřķ ɠőȧŀ ŀőřė⟧"
+      },
+      "company_setup.registration_hint": {
+        "en": "Review the proposed company setup before registering it.",
+        "ja": "会社のセットアップ案を確認してから登録します。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ṗřőṗőşėḓ ƈőɱṗȧñẏ şėŧůṗ ƀėƒőřė řėɠïşŧėřïñɠ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "company_setup.preview_company": {
+        "en": "Preview registration",
+        "ja": "登録内容をプレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ řėɠïşŧřȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "company_setup.probe_results": {
+        "en": "Readiness check results",
+        "ja": "準備確認の結果",
+        "qps-ploc": "⟦Řėȧḓïñėşş ƈħėƈķ řėşůŀŧş ŀőřėɱ ï⟧"
+      },
+      "company_setup.blockers": {
+        "en": "What is needed next",
+        "ja": "次に必要なこと",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ñėėḓėḓ ñėẋŧ ŀőřėɱ ⟧"
+      },
+      "company_setup.activation": {
+        "en": "Check and request activation",
+        "ja": "準備確認と有効化の申請",
+        "qps-ploc": "⟦Ƈħėƈķ ȧñḓ řėɋůėşŧ ȧƈŧïṽȧŧïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "company_setup.probe_hint": {
+        "en": "Run the readiness checks before requesting activation. The server verifies the required evidence.",
+        "ja": "有効化を申請する前に準備状況を確認します。必要な証跡はサーバーで検証されます。",
+        "qps-ploc": "⟦Řůñ ŧħė řėȧḓïñėşş ƈħėƈķş ƀėƒőřė řėɋůėşŧïñɠ ȧƈŧïṽȧŧïőñ. Ŧħė şėřṽėř ṽėřïƒïėş ŧħė řėɋůïřėḓ ėṽïḓėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "company_setup.probe": {
+        "en": "Run readiness checks",
+        "ja": "準備状況を確認",
+        "qps-ploc": "⟦Řůñ řėȧḓïñėşş ƈħėƈķş ŀőřėɱ ⟧"
+      },
+      "company_setup.request_activation": {
+        "en": "Request activation approval",
+        "ja": "有効化の承認を申請",
+        "qps-ploc": "⟦Řėɋůėşŧ ȧƈŧïṽȧŧïőñ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.approval": {
+        "en": "Human approval",
+        "ja": "人による承認",
+        "qps-ploc": "⟦Ħůɱȧñ ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "company_setup.approval_hint": {
+        "en": "Review and decide in the approval queue. Return here and refresh the status after the decision.",
+        "ja": "承認一覧で内容を確認し、承認するか判断してください。判断後にこのページへ戻り、状況を更新してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ïñ ŧħė ȧṗṗřőṽȧŀ ɋůėůė. Řėŧůřñ ħėřė ȧñḓ řėƒřėşħ ŧħė şŧȧŧůş ȧƒŧėř ŧħė ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "company_setup.open_approval": {
+        "en": "Open approval queue",
+        "ja": "承認一覧を開く",
+        "qps-ploc": "⟦Őṗėñ ȧṗṗřőṽȧŀ ɋůėůė ŀőřėɱ ⟧"
+      },
+      "company_setup.apply_activation": {
+        "en": "Apply approved activation",
+        "ja": "承認済みの有効化を反映",
+        "qps-ploc": "⟦Ȧṗṗŀẏ ȧṗṗřőṽėḓ ȧƈŧïṽȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.apply_hint": {
+        "en": "An approval does not activate the company by itself. Apply it explicitly after approval is confirmed.",
+        "ja": "承認だけでは会社は有効化されません。承認を確認した後、このボタンで明示的に反映します。",
+        "qps-ploc": "⟦Ȧñ ȧṗṗřőṽȧŀ ḓőėş ñőŧ ȧƈŧïṽȧŧė ŧħė ƈőɱṗȧñẏ ƀẏ ïŧşėŀƒ. Ȧṗṗŀẏ ïŧ ėẋṗŀïƈïŧŀẏ ȧƒŧėř ȧṗṗřőṽȧŀ ïş ƈőñƒïřɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "company_setup.prepare_title": {
+        "en": "Prepare the first work",
+        "ja": "初回の仕事を準備",
+        "qps-ploc": "⟦Ṗřėṗȧřė ŧħė ƒïřşŧ ẇőřķ ŀőřėɱ ï⟧"
+      },
+      "company_setup.prepare_hint": {
+        "en": "Review the first-work plan, then save its preparation. Running the work is a separate step.",
+        "ja": "初回の仕事の計画を確認し、準備を保存します。仕事の実行は別の手順です。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƒïřşŧ-ẇőřķ ṗŀȧñ, ŧħėñ şȧṽė ïŧş ṗřėṗȧřȧŧïőñ. Řůññïñɠ ŧħė ẇőřķ ïş ȧ şėṗȧřȧŧė şŧėṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "company_setup.preview_first_work": {
+        "en": "Preview first-work preparation",
+        "ja": "初回の仕事の準備をプレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ƒïřşŧ-ẇőřķ ṗřėṗȧřȧŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "company_setup.review": {
+        "en": "Review before applying",
+        "ja": "反映前の確認",
+        "qps-ploc": "⟦Řėṽïėẇ ƀėƒőřė ȧṗṗŀẏïñɠ ŀőřėɱ ï⟧"
+      },
+      "company_setup.review_hint": {
+        "en": "Applying uses this exact preview. Editing the inputs or refreshing requires a new preview.",
+        "ja": "このプレビュー内容を反映します。入力の変更や状況の更新後は、再度プレビューしてください。",
+        "qps-ploc": "⟦Ȧṗṗŀẏïñɠ ůşėş ŧħïş ėẋȧƈŧ ṗřėṽïėẇ. Ėḓïŧïñɠ ŧħė ïñṗůŧş őř řėƒřėşħïñɠ řėɋůïřėş ȧ ñėẇ ṗřėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "company_setup.register_company": {
+        "en": "Register this company setup",
+        "ja": "この内容で会社を登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħïş ƈőɱṗȧñẏ şėŧůṗ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.apply_first_work": {
+        "en": "Save first-work preparation",
+        "ja": "初回の仕事の準備を保存",
+        "qps-ploc": "⟦Şȧṽė ƒïřşŧ-ẇőřķ ṗřėṗȧřȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "company_setup.cancel_review": {
+        "en": "Cancel review",
+        "ja": "確認を取り消す",
+        "qps-ploc": "⟦Ƈȧñƈėŀ řėṽïėẇ ŀőřė⟧"
+      },
+      "company_setup.prepared": {
+        "en": "The first work is prepared. No work has been executed by this setup flow.",
+        "ja": "初回の仕事の準備ができました。このセットアップでは仕事を実行していません。",
+        "qps-ploc": "⟦Ŧħė ƒïřşŧ ẇőřķ ïş ṗřėṗȧřėḓ. Ñő ẇőřķ ħȧş ƀėėñ ėẋėƈůŧėḓ ƀẏ ŧħïş şėŧůṗ ƒŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "company_setup.no_execution": {
+        "en": "Registration, activation, and preparation do not run a mission or execute work.",
+        "ja": "登録、有効化、準備のいずれも、ミッションや仕事の実行は行いません。",
+        "qps-ploc": "⟦Řėɠïşŧřȧŧïőñ, ȧƈŧïṽȧŧïőñ, ȧñḓ ṗřėṗȧřȧŧïőñ ḓő ñőŧ řůñ ȧ ɱïşşïőñ őř ėẋėƈůŧė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "company_setup.management": {
+        "en": "Continue to company management",
+        "ja": "会社の管理へ",
+        "qps-ploc": "⟦Ƈőñŧïñůė ŧő ƈőɱṗȧñẏ ɱȧñȧɠėɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "company_setup.entry": {
+        "en": "Set up this company",
+        "ja": "この会社をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ŧħïş ƈőɱṗȧñẏ ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
