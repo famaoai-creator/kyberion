@@ -1,4 +1,6 @@
-### Fixed
+---
+category: Fixed
+---
 
 - Allow exact tenant-bound host trace and quota bookkeeping during read-only Dot planning without granting model writes.
 - Preserve projectless organization scope and mediate autonomous mission starts through the mission controller.
