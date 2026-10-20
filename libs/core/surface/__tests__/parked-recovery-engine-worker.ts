@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, createHmac } from 'node:crypto';
 import { withExecutionContext } from '../../authority.js';
+import { mutateTenant } from '../../organization/tenant-governance.js';
 import { safeMkdir, safeLstat, safeWriteFile } from '../../secure-io.js';
 import { appendJsonLine, readJsonLines, readJson } from '../../foundation/json.js';
 import {
@@ -123,6 +124,13 @@ function put(file: string, value: unknown): void {
   safeWriteFile(file, JSON.stringify(value) + '\n');
 }
 function seed() {
+  mutateTenant({
+    verb: 'create',
+    slug: 'fixture-recovery',
+    displayName: 'Synthetic recovery fixture',
+    actor: 'synthetic-test-fixture',
+    apply: true,
+  });
   withExecutionContext('sovereign_concierge', () =>
     writeMemberProfile(syntheticFirstJobOwner('fixture-recovery'))
   );

@@ -45,6 +45,7 @@ import { loadOrganizationOperation } from '../organization/organization-operatin
 import { dotAdmissionScopeHash } from './dot-admission-identity.js';
 import {
   findDotCharter,
+  assertFrontDeskDiagnosticDotCharter,
   listDotCharters,
   validateDotCharter,
   type DotCharter,
@@ -126,34 +127,38 @@ function assertActivationReady(
   }
 }
 
+function readWorkspaceTenant(slug: string, rootDir: string) {
+  return withExecutionContext(
+    'workspace_tenant_registry_reader',
+    () => {
+      const profile = readTenantProfile(slug, { rootDir });
+      return profile ? { tenant_slug: profile.tenant_slug } : null;
+    },
+    'worker',
+    slug
+  );
+}
+
 export function assertOperationBinding(charter: DotCharter, deps: DotLifecycleDeps = {}): void {
   if (!charter.work_binding) return;
   const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
-  withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () =>
-      resolveWorkspaceScope(
-        {
-          tenantSlugs: 'all',
-          organizationIds: 'all',
-          projectIds: 'all',
-          tierAccess: [charter.scope.tier],
-        },
-        {
-          ...charter.scope,
-          operation_id: charter.work_binding.operation_id,
-        },
-        {
-          readTenant: (slug) => readTenantProfile(slug, { rootDir }),
-          readProject: (id) => loadProjectRecord(id, { rootDir }),
-          readOrganization: (id, query) =>
-            loadOrganizationOperationalState(id, { ...query, rootDir }),
-          readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
-        }
-      ),
-    undefined,
-    charter.scope.tenant_slug,
-    charter.scope.organization_id
+  resolveWorkspaceScope(
+    {
+      tenantSlugs: 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: [charter.scope.tier],
+    },
+    {
+      ...charter.scope,
+      operation_id: charter.work_binding.operation_id,
+    },
+    {
+      readTenant: (slug) => readWorkspaceTenant(slug, rootDir),
+      readProject: (id) => loadProjectRecord(id, { rootDir }),
+      readOrganization: (id, query) => loadOrganizationOperationalState(id, { ...query, rootDir }),
+      readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
+    }
   );
 }
 
@@ -190,22 +195,29 @@ export function createDraftDotCharter(
       },
       charter.scope,
       {
-        readTenant: (slug) => readTenantProfile(slug, { rootDir }),
+        readTenant: (slug) => readWorkspaceTenant(slug, rootDir),
         readProject: (id) => loadProjectRecord(id, { rootDir }),
         readOrganization: (id, query) =>
           loadOrganizationOperationalState(id, { ...query, rootDir }),
         readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
       }
     );
-  } else if (charter.scope.tenant_slug) {
-    throw new Error('[DOT_CREATE_SCOPE] tenant drafts require tenant-confidential placement');
-  } else if (charter.scope.organization_id || charter.scope.project_id) {
+  } else if (
+    charter.scope.tenant_slug ||
+    charter.scope.organization_id ||
+    charter.scope.project_id
+  ) {
+    // A tenant is an ownership boundary, not a confidentiality declaration.
+    // Tenant-only public work is limited to the strictly bounded diagnostic;
+    // public projects/organizations must prove their actual declared tier below.
+    if (charter.scope.tenant_slug && !charter.scope.organization_id && !charter.scope.project_id)
+      assertFrontDeskDiagnosticDotCharter(charter);
     const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
     resolveWorkspaceScope(
       { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all', tierAccess: ['public'] },
       charter.scope,
       {
-        readTenant: (slug) => readTenantProfile(slug, { rootDir }),
+        readTenant: (slug) => readWorkspaceTenant(slug, rootDir),
         readProject: (id) => loadProjectRecord(id, { rootDir }),
         readOrganization: (id, query) =>
           loadOrganizationOperationalState(id, { ...query, rootDir }),
