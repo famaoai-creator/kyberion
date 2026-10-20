@@ -849,7 +849,7 @@
     },
     {
       "file": "pipelines/verify-session.json",
-      "count": 4
+      "count": 2
     },
     {
       "file": "pipelines/voice-onboarding.json",

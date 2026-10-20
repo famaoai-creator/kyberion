@@ -1,9 +1,10 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   safeMkdir,
   safeReadFile,
@@ -14,6 +15,13 @@ import {
 } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
 import { parseMeetingActionInput, parseMeetingActionResult } from './meeting-actuator-helpers.js';
+
+// These transport/consent fixtures exercise the real execution and trace path.
+// Admission is covered independently in meeting-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  assertExternalOperationBatchResumable: vi.fn(),
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -344,6 +352,7 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     try {
       safeRmSync(MISSION_DIR, { recursive: true, force: true });
     } catch {
@@ -420,6 +429,8 @@ describe('meeting-actuator voice-consent gate', () => {
   });
 
   it('denies speak() when consent belongs to another tenant', async () => {
+    // Keep this synthetic tenant's audit mirror out of live customer state.
+    vi.spyOn(auditChain, 'record').mockReturnValue({ id: 'tenant-consent-denial' } as never);
     safeWriteFile(
       path.join(MISSION_DIR, 'mission-state.json'),
       JSON.stringify({

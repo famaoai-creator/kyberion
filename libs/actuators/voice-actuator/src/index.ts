@@ -50,6 +50,7 @@ import {
   performPlayback,
   renderNativeArtifact,
   waitForVoiceJob,
+  voiceRenderingNeedsAdmission,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
 import {
@@ -79,6 +80,12 @@ import {
   renderTalkingAvatar,
 } from './voice-media-output-helpers.js';
 import { describeOps } from './op-catalog.js';
+import {
+  assertExternalOperationBatchResumable,
+  assertExternalOperationReplayIdentity,
+} from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
+import { externalOperationReplayKey } from '@agent/core/governance/external-operation-runtime';
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
@@ -367,6 +374,10 @@ async function recordVerifyRepairVoiceSample(input: {
   const sessionPath = input.resume_session_path
     ? resolveVoicePath(input.resume_session_path, 'transcript-output')
     : pathResolver.sharedTmp(`voice-sample-repairs/${requestId}/${sampleId}/session.json`);
+  // Recording + verification can include multiple captures/provider uploads
+  // without outer checkpoints. Keep that interactive repair flow outside a
+  // resumable production pipeline rather than replaying its first recording.
+  assertExternalOperationBatchResumable(2);
   let initial: any;
   let initialTranscript: any;
   let initialVerification: any;
@@ -864,6 +875,15 @@ export async function handleAction(input: VoiceAction) {
   const normalized = normalizeVoiceActionInput(input) as VoiceAction;
   validateVoiceAction(normalized);
   if ((normalized as any).action === 'pipeline') {
+    assertExternalOperationBatchResumable(
+      () =>
+        (normalized as unknown as { steps: Array<Record<string, unknown>> }).steps.filter(
+          (step) =>
+            !['health', 'list_voices', 'list_audio_routes', 'probe_audio_route'].includes(
+              String(step.action)
+            )
+        ).length
+    );
     const traceCtx = createActuatorTrace('voice-actuator', 'pipeline', {
       pipelineId: String((normalized as any).request_id || ''),
     });
@@ -872,6 +892,7 @@ export async function handleAction(input: VoiceAction) {
     });
     const results = [];
     try {
+      let occurrence = 0;
       for (const step of (normalized as any).steps) {
         validateVoiceAction(step);
         traceCtx.startSpan(`voice:${String(step.action || 'step')}`);
@@ -891,10 +912,12 @@ export async function handleAction(input: VoiceAction) {
             context: { result: undefined as unknown },
             execute: async (op, params, context) => ({
               ...context,
-              result: await executeSingleAction({
-                ...(params as Record<string, unknown>),
-                action: op,
-              } as VoiceAction),
+              result: await withExternalOperationOccurrence(`voice:${occurrence++}`, () =>
+                executeSingleAction({
+                  ...(params as Record<string, unknown>),
+                  action: op,
+                } as VoiceAction)
+              ),
             }),
           });
           results.push(pipeline.result);
@@ -907,6 +930,7 @@ export async function handleAction(input: VoiceAction) {
       traceCtx.endSpan('ok');
       return { status: 'succeeded', results, ...finalizeActuatorTrace(traceCtx) };
     } catch (err: any) {
+      if (err?.adfControlFlow === 'preflight') throw err;
       traceCtx.endSpan('error', err?.message ?? String(err));
       return {
         status: 'error',
@@ -926,6 +950,7 @@ export async function handleAction(input: VoiceAction) {
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {
+    if (err?.adfControlFlow === 'preflight') throw err;
     traceCtx.endSpan('error', err?.message ?? String(err));
     return {
       status: 'error',
@@ -962,7 +987,8 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   }
   const profile = getVoiceProfileRecord(input.profile_ref?.profile_id);
   const policy = getVoiceRuntimePolicy();
-  const jobId = String(input.request_id || randomUUID());
+  const replayKey = externalOperationReplayKey('voice:generate_voice');
+  const jobId = String(input.request_id || replayKey || randomUUID());
   const language = String(input.rendering?.language || profile.languages[0] || 'en').toLowerCase();
   const defaults = getVoiceTtsLanguageConfig(language);
   const maxChunkChars = Number(
@@ -973,6 +999,10 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   );
   const chunks = splitVoiceTextIntoChunks(String(input.text || ''), maxChunkChars);
   const deliveryMode = String(input.delivery?.mode || 'playback');
+  // Chunk playback has no independent durable checkpoint in one voice job.
+  assertExternalOperationBatchResumable(
+    deliveryMode === 'playback' ? chunks.length : deliveryMode === 'artifact_and_playback' ? 1 : 0
+  );
   const requestedFormat = String(
     input.delivery?.format || policy.delivery.default_format
   ) as VoiceArtifactFormat;
@@ -1031,6 +1061,27 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   for (const warning of routing.warnings) logger.warn(`[VOICE] ${warning}`);
   const baselineEngineId = engine.engine_id;
   engine = routing.engine;
+  assertExternalOperationReplayIdentity(
+    Boolean(String(input.request_id || '').trim() || replayKey) ||
+      (deliveryMode === 'artifact' &&
+        !voiceRenderingNeedsAdmission(engine.engine_id, {
+          candidateEngineIds: routing.candidateEngineIds,
+          format: requestedFormat,
+          requireVoiceClone: requiresPersonalVoice,
+        })),
+    'generate_voice requires an explicit stable request_id for resumable external generation or playback'
+  );
+  if (deliveryMode === 'artifact_and_playback') {
+    assertExternalOperationBatchResumable(
+      voiceRenderingNeedsAdmission(engine.engine_id, {
+        candidateEngineIds: routing.candidateEngineIds,
+        format: requestedFormat,
+        requireVoiceClone: requiresPersonalVoice,
+      })
+        ? 2
+        : 1
+    );
+  }
   const backend =
     engine.engine_id === baselineEngineId ? baselineBackend : resolveVoiceBackend(engine.engine_id);
   const selectionFields = {
@@ -1135,15 +1186,17 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
               message: `rendering chunk ${index + 1}/${chunks.length}`,
               artifact_refs: artifactRefs,
             });
-            const verification = await performPlayback(chunks[index], {
-              language,
-              voice: defaults.voice,
-              rate: defaults.rate,
-              engineId: engine.engine_id,
-              profile,
-              requireVoiceClone: requiresPersonalVoice,
-              ...candidateEngineIds,
-            });
+            const verification = await withExternalOperationOccurrence(`voice-chunk:${index}`, () =>
+              performPlayback(chunks[index], {
+                language,
+                voice: defaults.voice,
+                rate: defaults.rate,
+                engineId: engine.engine_id,
+                profile,
+                requireVoiceClone: requiresPersonalVoice,
+                ...candidateEngineIds,
+              })
+            );
             speaker_verification.push({
               chunk_index: index,
               playback_source_path: verification?.playback_source_path,

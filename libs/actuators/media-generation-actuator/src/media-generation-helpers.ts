@@ -1,5 +1,6 @@
 import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { executeServicePreset } from '@agent/core/service/service-engine';
+import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadRecoveryPolicy as loadCoreRecoveryPolicy } from '@agent/core/recovery-policy';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -800,10 +801,26 @@ async function executePreparedGeneration(
   ) {
     return executeDirectVideoGeneration(prepared.params);
   }
-  const result = await executeServicePreset('media-generation', action, {
+  const params = {
     ...prepared.params,
     workflow: prepared.workflow,
-  });
+  };
+  const result = await runExternalOperation(
+    {
+      operationId: `media:generation:${action}`,
+      effect: { backend: resolveGenerationBackend(action, prepared.params), params },
+      requiresApproval: true,
+      delegable: false,
+    },
+    () => executeServicePreset('media-generation', action, params),
+    (receipt) =>
+      isPlainObject(receipt) &&
+      (receipt.status === 'succeeded' ||
+        ((receipt.status === 'submitted' || receipt.status === undefined) &&
+          typeof (receipt.provider_job_id ?? receipt.prompt_id) === 'string'))
+        ? 'succeeded'
+        : 'unknown'
+  );
   return isPlainObject(result) ? result : { status: 'failed', message: 'invalid backend result' };
 }
 

@@ -10,6 +10,12 @@ import {
 import { resetVoiceBridge } from '@agent/core/voice/voice-bridge';
 import { handleAction } from './index.js';
 
+// Transport/format tests execute the real callback; admission has its own suite.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  assertExternalOperationBatchResumable: vi.fn(),
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
+
 const OUT_DIR = 'active/shared/tmp/meeting-facilitation-ops-test';
 
 type PipelineResult = {

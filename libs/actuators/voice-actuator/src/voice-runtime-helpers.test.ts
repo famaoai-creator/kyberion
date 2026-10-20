@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+}));
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),

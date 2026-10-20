@@ -20,7 +20,7 @@ import {
   safeLstat,
   safeStat,
 } from '@agent/core/secure-io';
-import { retry, getRetryDefaults } from '@agent/core/async-utils';
+import { getRetryDefaults } from '@agent/core/async-utils';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
@@ -30,8 +30,12 @@ import type {
   SpeechToTextCapabilities,
   TranscriptSegment,
 } from '@agent/core/voice/speech-to-text-bridge';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import * as path from 'node:path';
+import {
+  runExternalOperation,
+  assertExternalOperationBatchResumable,
+} from '@agent/core/governance/external-operation';
 
 const VOICE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/voice-actuator/manifest.json');
 const DEFAULT_VOICE_RETRY = getRetryDefaults('voice-actuator:defaults');
@@ -42,6 +46,15 @@ export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBa
 });
 
 type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'faster_whisper' | 'kokoro_tts' | 'pocket_tts';
+const LOCAL_TTS_BRIDGES = new Set(
+  [
+    'mlx_audio_tts_bridge.py',
+    'espeak_ng_tts_bridge.py',
+    'kokoro_tts_bridge.py',
+    'pocket_tts_bridge.py',
+    'irodori_tts_bridge.py',
+  ].map((name) => pathResolver.rootResolve(`libs/actuators/voice-actuator/scripts/${name}`))
+);
 
 export interface VoiceSttBridgeResponse {
   status: 'success' | 'error';
@@ -232,6 +245,13 @@ async function runPythonTtsBridge(
 
   const refAudio = resolveProfileRefAudio(profile);
   const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
+  const localBridge = LOCAL_TTS_BRIDGES.has(bridgeScript);
+  const digestFile = (file: string) =>
+    createHash('sha256')
+      .update(safeReadFile(file) as Buffer)
+      .digest('hex');
+  const referenceAudioHash = !localBridge && refAudio ? digestFile(refAudio) : undefined;
+  const bridgeHash = !localBridge ? digestFile(bridgeScript) : undefined;
 
   const payload = JSON.stringify({
     action: 'generate',
@@ -245,9 +265,67 @@ async function runPythonTtsBridge(
     },
   });
 
-  const result = safeExecResult(resolvePythonBin(runtimeId), ['-X', 'utf8', bridgeScript], {
-    input: payload,
-  });
+  const execute = () => {
+    if (
+      !localBridge &&
+      (digestFile(bridgeScript) !== bridgeHash ||
+        (refAudio && digestFile(refAudio) !== referenceAudioHash))
+    )
+      throw new Error(
+        '[VOICE_INPUT_CHANGED] Provider script or reference audio changed after admission'
+      );
+    return safeExecResult(resolvePythonBin(runtimeId), ['-X', 'utf8', bridgeScript], {
+      input: payload,
+    });
+  };
+  const result = localBridge
+    ? execute()
+    : await runExternalOperation(
+        {
+          operationId: 'voice:render_provider',
+          effect: {
+            params: {
+              bridgeScript,
+              bridge_hash: bridgeHash,
+              reference_audio_hash: referenceAudioHash,
+              reference_text_hash: refText
+                ? createHash('sha256').update(refText).digest('hex')
+                : undefined,
+              text,
+              outputPath: safeOutputPath,
+              language,
+              profile,
+              runtimeId,
+              voice,
+            },
+          },
+          requiresApproval: true,
+          delegable: false,
+        },
+        async () => {
+          const result = execute();
+          if (
+            result.error ||
+            result.status !== 0 ||
+            parseTrailingJson(String(result.stdout)).status !== 'success'
+          ) {
+            throw new Error(
+              '[VOICE_PROVIDER_UNVERIFIED] External TTS provider did not confirm generation'
+            );
+          }
+          return result;
+        },
+        (result) => {
+          if (result.error || result.status !== 0) return 'unknown';
+          try {
+            return parseTrailingJson(String(result.stdout)).status === 'success'
+              ? 'succeeded'
+              : 'failed';
+          } catch {
+            return 'unknown';
+          }
+        }
+      );
   if (result.error || result.status !== 0) {
     throw new Error(
       `${path.basename(bridgeScriptPath)} failed: ${result.stderr || result.error?.message}`
@@ -317,8 +395,8 @@ export interface VoicePlaybackVoice {
 
 export interface VoicePlaybackPlatformAdapter {
   listVoices?(): VoicePlaybackVoice[] | Promise<VoicePlaybackVoice[]>;
-  openArtifact?(path: string): void;
-  speak?(text: string, rate: number): void;
+  openArtifact?(path: string): void | Promise<void>;
+  speak?(text: string, rate: number): void | Promise<void>;
   renderNativeArtifact?(
     text: string,
     options: {
@@ -329,7 +407,7 @@ export interface VoicePlaybackPlatformAdapter {
       format: VoiceArtifactFormat;
       outputPath?: string;
     }
-  ): string;
+  ): string | Promise<string>;
   playViaOutputBridge?(
     text: string,
     playbackSourcePath: string | undefined,
@@ -387,10 +465,7 @@ class DarwinVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
         '[VOICE] virtual audio output bridge unavailable: ' + (probe.reason || 'unknown reason')
       );
     }
-    const outputs = await retry(
-      async () => bridge.playOnOutputs(probe.outputs, { source_path: playbackSource }),
-      buildRetryOptions()
-    );
+    const outputs = await bridge.playOnOutputs(probe.outputs, { source_path: playbackSource });
     return {
       bridge_id: outputs.bridge_id,
       platform: outputs.platform,
@@ -526,6 +601,7 @@ const voicePlaybackPlatformSeam = createSeam<VoicePlaybackPlatformAdapter>({
   catalog: coreSeamCatalog,
   owner: 'libs/actuators/voice-actuator/src/voice-runtime-helpers.ts',
 });
+const builtinPlaybackAdapters = new WeakSet<VoicePlaybackPlatformAdapter>();
 
 export function registerVoicePlaybackPlatformAdapter(
   platform: string,
@@ -558,7 +634,159 @@ export function registerVoicePlaybackPlatformAdapter(
       throw new Error(`Voice playback platform '${id}' has an invalid ${capability} capability`);
     }
   }
-  return voicePlaybackPlatformSeam.register(id, adapter, metadata);
+  const guarded: VoicePlaybackPlatformAdapter = {
+    ...adapter,
+    ...(adapter.listVoices ? { listVoices: () => adapter.listVoices!() } : {}),
+  };
+  const openArtifact = adapter.openArtifact?.bind(adapter);
+  const speak = adapter.speak?.bind(adapter);
+  const playViaOutputBridge = adapter.playViaOutputBridge?.bind(adapter);
+  const renderNativeArtifact = adapter.renderNativeArtifact?.bind(adapter);
+  if (openArtifact)
+    guarded.openArtifact = (artifact) => {
+      const checked = assertSafeRepositoryPath(artifact, { allowMissingLeaf: false });
+      const format = path.extname(checked).toLowerCase();
+      if (
+        !['.wav', '.mp3', '.ogg', '.aiff', '.aif', '.flac', '.m4a', '.aac', '.opus'].includes(
+          format
+        )
+      ) {
+        throw new Error(
+          '[VOICE_ARTIFACT_FORMAT] OS playback requires a supported audio file extension'
+        );
+      }
+      const contentHash = createHash('sha256')
+        .update(safeReadFile(checked) as Buffer)
+        .digest('hex');
+      return runExternalOperation(
+        {
+          operationId: 'voice:playback',
+          effect: { params: { platform: id, format, content_hash: contentHash } },
+          requiresApproval: true,
+          delegable: true,
+        },
+        async () => {
+          if (
+            createHash('sha256')
+              .update(safeReadFile(checked) as Buffer)
+              .digest('hex') !== contentHash
+          ) {
+            throw new Error('[VOICE_AUDIO_CHANGED] Playback artifact changed after admission');
+          }
+          return openArtifact(checked);
+        },
+        () => 'succeeded'
+      );
+    };
+  if (speak)
+    guarded.speak = (text, rate) =>
+      runExternalOperation(
+        {
+          operationId: 'voice:speak',
+          effect: { params: { platform: id, text, rate } },
+          requiresApproval: true,
+          delegable: true,
+        },
+        async () => speak(text, rate),
+        () => 'succeeded'
+      );
+  // Builtin bridge delegates to the governed physical output bridge. Opaque
+  // extensions need their own admission because they may send/play directly.
+  if (playViaOutputBridge && !builtinPlaybackAdapters.has(adapter))
+    guarded.playViaOutputBridge = (text, source, options) => {
+      const snapshot = Object.freeze(structuredClone(options));
+      const checkedSource = source
+        ? assertSafeRepositoryPath(source, { allowMissingLeaf: false })
+        : undefined;
+      const digest = () =>
+        checkedSource
+          ? createHash('sha256')
+              .update(safeReadFile(checkedSource) as Buffer)
+              .digest('hex')
+          : undefined;
+      const sourceHash = digest();
+      return runExternalOperation(
+        {
+          operationId: 'voice:playback',
+          effect: {
+            params: {
+              platform: id,
+              text,
+              source_format: checkedSource ? path.extname(checkedSource).toLowerCase() : undefined,
+              source_hash: sourceHash,
+              options: snapshot,
+            },
+          },
+          requiresApproval: true,
+          delegable: false,
+        },
+        async () => {
+          if (digest() !== sourceHash)
+            throw new Error('[VOICE_AUDIO_CHANGED] Playback source changed after admission');
+          const result = await playViaOutputBridge(text, checkedSource, snapshot);
+          if (
+            !result.outputs?.length ||
+            !result.outputs.every((output) => output.status === 'played')
+          ) {
+            throw new Error('[VOICE_PLAYBACK_UNVERIFIED] Custom bridge did not confirm playback');
+          }
+          return result;
+        },
+        (result) =>
+          result.outputs?.length && result.outputs.every((output) => output.status === 'played')
+            ? 'succeeded'
+            : 'unknown'
+      );
+    };
+  if (renderNativeArtifact && !builtinPlaybackAdapters.has(adapter))
+    guarded.renderNativeArtifact = (text, options) => {
+      const snapshot = Object.freeze(structuredClone(options));
+      const profile = (snapshot as unknown as { profile?: unknown }).profile;
+      const reference = resolveProfileRefAudio(profile);
+      const digestReference = () =>
+        reference
+          ? createHash('sha256')
+              .update(safeReadFile(reference) as Buffer)
+              .digest('hex')
+          : undefined;
+      const referenceHash = digestReference();
+      const referenceText = reference ? resolveRefTranscript(reference) : undefined;
+      return runExternalOperation(
+        {
+          operationId: 'voice:render_provider',
+          effect: {
+            params: {
+              platform: id,
+              text,
+              options: snapshot,
+              reference_audio_hash: referenceHash,
+              reference_text_hash: referenceText
+                ? createHash('sha256').update(referenceText).digest('hex')
+                : undefined,
+            },
+          },
+          requiresApproval: true,
+          delegable: false,
+        },
+        async () => {
+          if (
+            digestReference() !== referenceHash ||
+            (reference && resolveRefTranscript(reference) !== referenceText)
+          ) {
+            throw new Error(
+              '[VOICE_INPUT_CHANGED] Custom renderer reference audio or transcript changed after admission'
+            );
+          }
+          const artifact = await renderNativeArtifact(text, snapshot);
+          if (!(await isRenderableAudioArtifact(artifact)))
+            throw new Error('Custom voice provider did not produce a valid audio artifact');
+          return artifact;
+        },
+        () => 'succeeded'
+      );
+    };
+  if (builtinPlaybackAdapters.has(adapter)) builtinPlaybackAdapters.add(guarded);
+  return voicePlaybackPlatformSeam.register(id, Object.freeze(guarded), metadata);
 }
 
 export function listVoicePlaybackPlatforms(): string[] {
@@ -567,7 +795,15 @@ export function listVoicePlaybackPlatforms(): string[] {
 
 const darwinPlaybackAdapter = new DarwinVoicePlaybackAdapter();
 const darwinArtifactAdapter = new DarwinVoiceArtifactAdapter();
-registerVoicePlaybackPlatformAdapter(
+function registerBuiltinPlaybackAdapter(
+  id: string,
+  adapter: VoicePlaybackPlatformAdapter,
+  metadata: SeamProviderMetadata
+): void {
+  builtinPlaybackAdapters.add(adapter);
+  registerVoicePlaybackPlatformAdapter(id, adapter, metadata);
+}
+registerBuiltinPlaybackAdapter(
   'darwin',
   {
     listVoices: darwinPlaybackAdapter.listVoices.bind(darwinPlaybackAdapter),
@@ -580,7 +816,7 @@ registerVoicePlaybackPlatformAdapter(
 
 const linuxPlaybackAdapter = new LinuxVoicePlaybackAdapter();
 const linuxArtifactAdapter = new LinuxVoiceArtifactAdapter();
-registerVoicePlaybackPlatformAdapter(
+registerBuiltinPlaybackAdapter(
   'linux',
   {
     listVoices: linuxPlaybackAdapter.listVoices.bind(linuxPlaybackAdapter),
@@ -593,7 +829,7 @@ registerVoicePlaybackPlatformAdapter(
 
 const windowsPlaybackAdapter = new WindowsVoicePlaybackAdapter();
 const windowsArtifactAdapter = new WindowsVoiceArtifactAdapter();
-registerVoicePlaybackPlatformAdapter(
+registerBuiltinPlaybackAdapter(
   'win32',
   {
     listVoices: windowsPlaybackAdapter.listVoices.bind(windowsPlaybackAdapter),
@@ -636,7 +872,28 @@ export function resolveVoicePlaybackPlatformAdapter(
   return adapter as unknown as VoicePlaybackPlatformAdapter;
 }
 
-function openPlaybackArtifact(artifactPath: string): void {
+export function voiceRenderingNeedsAdmission(
+  engineId: string,
+  options: {
+    candidateEngineIds?: string[];
+    format?: VoiceArtifactFormat;
+    requireVoiceClone?: boolean;
+  } = {}
+): boolean {
+  const engine = resolveVoiceEngineForPlatform(engineId);
+  const candidates = resolveVoiceArtifactCandidates(
+    engineId,
+    options.format || engine.supports.artifact_formats[0] || 'wav',
+    options
+  );
+  return candidates.some((candidate) =>
+    candidate.bridge_script
+      ? !LOCAL_TTS_BRIDGES.has(pathResolver.rootResolve(candidate.bridge_script))
+      : !builtinPlaybackAdapters.has(resolveVoicePlaybackPlatformAdapter(process.platform))
+  );
+}
+
+async function openPlaybackArtifact(artifactPath: string): Promise<void> {
   const safeArtifactPath = assertSafeRepositoryPath(artifactPath, {
     allowMissingLeaf: true,
   });
@@ -649,7 +906,7 @@ function openPlaybackArtifact(artifactPath: string): void {
       `Voice playback platform ${process.platform} does not support artifact playback`
     );
   }
-  adapter.openArtifact(safeArtifactPath);
+  await adapter.openArtifact(safeArtifactPath);
 }
 
 async function renderWithEspeakNg(
@@ -845,7 +1102,7 @@ async function renderVoiceArtifactWithEngine(
       `Voice playback platform ${process.platform} does not support native artifact rendering`
     );
   }
-  const rendered = nativeAdapter.renderNativeArtifact(text, options);
+  const rendered = await nativeAdapter.renderNativeArtifact(text, options);
   if (await isRenderableAudioArtifact(rendered)) {
     return rendered;
   }
@@ -894,17 +1151,19 @@ async function renderNativeArtifact(
   let lastError: unknown;
   for (const engine of candidates) {
     try {
-      const rendered = await retry(async () => {
-        const renderedPath = await renderVoiceArtifactWithEngine(text, options, engine);
-        if (await isRenderableAudioArtifact(renderedPath)) {
-          return renderedPath;
-        }
-        throw new Error(
-          `voice engine ${engine.engine_id} produced an invalid audio artifact: ${renderedPath}`
-        );
-      }, buildRetryOptions());
-      return rendered;
+      const renderedPath = await renderVoiceArtifactWithEngine(text, options, engine);
+      if (await isRenderableAudioArtifact(renderedPath)) return renderedPath;
+      throw new Error(
+        `voice engine ${engine.engine_id} produced an invalid audio artifact: ${renderedPath}`
+      );
     } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'adfControlFlow' in error &&
+        error.adfControlFlow === 'preflight'
+      )
+        throw error;
       lastError = error;
       logger.warn(
         `[VOICE] configured engine ${engine.engine_id} failed for artifact rendering: ${error instanceof Error ? error.message : String(error)}`
@@ -943,6 +1202,15 @@ async function performPlayback(
   }
 
   const platformAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  if (!playbackSourcePath)
+    assertExternalOperationBatchResumable(
+      voiceRenderingNeedsAdmission(options.engineId, {
+        candidateEngineIds: options.candidateEngineIds,
+        requireVoiceClone: options.requireVoiceClone,
+      })
+        ? 2
+        : 1
+    );
   if (platformAdapter.playViaOutputBridge) {
     return platformAdapter.playViaOutputBridge(text, playbackSourcePath, options);
   }
@@ -953,20 +1221,18 @@ async function performPlayback(
       : assertSafeRepositoryPath(pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`), {
           allowMissingLeaf: true,
         });
-    await retry(async () => {
-      if (!playbackSourcePath) {
-        await runPythonTtsBridge(
-          engine.bridge_script!,
-          text,
-          tmpPath,
-          options.language,
-          options.profile,
-          (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
-          options.voice
-        );
-      }
-      openPlaybackArtifact(tmpPath);
-    }, buildRetryOptions());
+    if (!playbackSourcePath) {
+      await runPythonTtsBridge(
+        engine.bridge_script!,
+        text,
+        tmpPath,
+        options.language,
+        options.profile,
+        (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
+        options.voice
+      );
+    }
+    await openPlaybackArtifact(tmpPath);
     return {
       playback_source_path: tmpPath,
       outputs: [],
@@ -979,9 +1245,7 @@ async function performPlayback(
       `Voice playback platform ${process.platform} does not support local speech playback`
     );
   }
-  await retry(async () => {
-    speechAdapter.speak?.(text, options.rate);
-  }, buildRetryOptions());
+  await speechAdapter.speak(text, options.rate);
   return {
     playback_source_path: undefined,
     outputs: [],

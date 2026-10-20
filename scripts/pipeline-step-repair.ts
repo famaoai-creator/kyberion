@@ -41,7 +41,7 @@ export async function runWithRepair(
     try {
       return await attemptOnce();
     } catch (err: any) {
-      if (err?.adfControlFlow === 'preflight') throw err;
+      if (err?.adfControlFlow === 'preflight' || err?.adfControlFlow === 'suspend') throw err;
       assertPipelineExecutionCurrent(opts);
       lastError = err;
       // classifyError(), refined only by a calibrated judgment (inert until a fit lands).

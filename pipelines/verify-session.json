@@ -1,58 +1,20 @@
 {
   "pipeline_id": "verify-session",
-  "version": "2.0.0",
-  "description": "Clean first-win browser smoke: open a local data URL and capture a screenshot artifact under active/shared/tmp/ without requiring an existing login session.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "version": "3.0.0",
+  "description": "Clean first-win browser smoke: fixed engine-owned content in a fresh offline browser with JavaScript disabled, screenshot and guaranteed cleanup. TARGET_URL overrides are rejected; external navigation requires a separately governed browser pipeline.",
   "action": "pipeline",
   "labels": ["first-win", "browser", "screenshot", "clean-env"],
   "fallback_pipeline": "pipelines/verify-session-fallback.json",
-  "inputs": {
-    "TARGET_URL": {
-      "required": false,
-      "default": "data:text/html,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Ctitle%3EKyberion%20First%20Win%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%20style%3D%22font-family%3Asystem-ui%3Bpadding%3A48px%22%3E%3Ch1%3EKyberion%20First%20Win%3C%2Fh1%3E%3Cp%3EThe%20browser%20runtime%20opened%20a%20page%20and%20captured%20this%20artifact.%3C%2Fp%3E%3C%2Fbody%3E%3C%2Fhtml%3E"
-    }
-  },
-  "context": {
-    "TARGET_URL": "data:text/html,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Ctitle%3EKyberion%20First%20Win%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%20style%3D%22font-family%3Asystem-ui%3Bpadding%3A48px%22%3E%3Ch1%3EKyberion%20First%20Win%3C%2Fh1%3E%3Cp%3EThe%20browser%20runtime%20opened%20a%20page%20and%20captured%20this%20artifact.%3C%2Fp%3E%3C%2Fbody%3E%3C%2Fhtml%3E"
-  },
   "expected_outcome": "Within 5 minutes of setup, Kyberion writes active/shared/tmp/first-win-session.png as a visible browser artifact.",
-  "options": {
-    "headless": true,
-    "keep_alive": true,
-    "user_data_dir": "active/shared/tmp/first-win-browser-profile"
-  },
   "steps": [
     {
-      "id": "open-first-win-page",
-      "role": "sink",
-      "op": "browser:goto",
-      "params": {
-        "url": "{{TARGET_URL}}"
-      }
-    },
-    {
-      "id": "check-state",
+      "id": "verify-local-session",
       "role": "source",
-      "op": "browser:evaluate",
-      "produces": { "channel": "session_state", "type": "BrowserEvaluateResult" },
-      "params": {
-        "script": "({ title: document.title, url: location.href, bodyText: document.body.innerText.slice(0, 80) })"
-      }
-    },
-    {
-      "id": "screenshot-verify",
-      "role": "source",
-      "op": "browser:screenshot",
+      "op": "browser:local_session_probe",
       "produces": { "channel": "first_win_screenshot", "type": "ScreenshotResult" },
       "params": {
         "path": "active/shared/tmp/first-win-session.png"
       }
-    },
-    {
-      "id": "close-first-win-session",
-      "role": "gate",
-      "op": "browser:close_session",
-      "params": {}
     }
   ]
 }

@@ -28,6 +28,8 @@ import {
   gitWorktree,
 } from '@agent/core/vcs';
 import type { ValidateFunction } from 'ajv';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 
 export type VcsOp =
   | 'status'
@@ -187,7 +189,18 @@ function asActionableError(error: unknown, bin: string, installStep: string): Er
 }
 
 export async function handleAction(action: VcsAction): Promise<unknown> {
-  const valid = validateAction(action);
+  const input = validateAction(action);
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `vcs:${input.op}`,
+    params: (input.params as Record<string, unknown>) || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow')
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'VCS operation denied'}`
+    );
+  const valid = validateAction({ ...input, params: preflight.input });
   const params = valid.params || {};
   const cwd = resolveCwd(params);
   logger.info(`[vcs-actuator] ${valid.op} (cwd: ${cwd})`);

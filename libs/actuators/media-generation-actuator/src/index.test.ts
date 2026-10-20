@@ -5,6 +5,10 @@ import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import { describeOps, MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+}));
 
 // Governed product catalogs (the media-backend and voice-engine registries
 // under knowledge/product/) always see the real filesystem. A per-test
@@ -1142,30 +1146,24 @@ describe('media-generation-actuator', () => {
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 
-  it('aggregates pipeline step failures with step results', async () => {
+  it('stops after an unverified generation even with continue_on_error', async () => {
     mocks.executeServicePreset.mockResolvedValueOnce({
       status: 'failed',
       action: 'generate_image',
     });
     const { handleAction } = await import('./index.js');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      continue_on_error: true,
-      steps: [
-        { action: 'generate_image', params: { workflow_path: 'active/shared/tmp/a.json' } },
-        { action: 'record_screen', params: { output: 'active/shared/tmp/a.mp4' } },
-      ],
-    });
-
-    expect(result.status).toBe('failed');
-    expect(result.results).toHaveLength(2);
-    expect(result.results[0]).toEqual(expect.objectContaining({ status: 'failed' }));
-    expect(mocks.handleSystemAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        steps: [expect.objectContaining({ op: 'record_screen' })],
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        continue_on_error: true,
+        steps: [
+          { action: 'generate_image', params: { workflow_path: 'active/shared/tmp/a.json' } },
+          { action: 'record_screen', params: { output: 'active/shared/tmp/a.mp4' } },
+        ],
       })
-    );
+    ).rejects.toThrow('GENERATION_UNVERIFIED');
+    expect(mocks.handleSystemAction).not.toHaveBeenCalled();
   });
 
   it('can await image generation completion and return the generated artifact', async () => {
@@ -1438,13 +1436,14 @@ describe('media-generation-actuator', () => {
     expect(result).toEqual(
       expect.objectContaining({
         job_id: 'genjob-generate_music-2',
-        status: 'retrying',
-        next_retry_at: expect.any(String),
+        status: 'failed',
+        next_retry_at: undefined,
+        result: expect.objectContaining({ verification_required: true }),
       })
     );
   });
 
-  it('resumes a retrying generation job once its backoff window has elapsed', async () => {
+  it('stops legacy retrying jobs without submitting another generation', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-22T00:01:00.000Z'));
     mocks.safeReadFile.mockReturnValue(
@@ -1474,19 +1473,14 @@ describe('media-generation-actuator', () => {
       params: { job_id: 'genjob-generate_music-3' },
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
-      'media-generation',
-      'generate_music',
-      expect.objectContaining({
-        workflow: { '111': { class_type: 'SaveAudioMP3' } },
-      })
-    );
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
     expect(result).toEqual(
       expect.objectContaining({
         job_id: 'genjob-generate_music-3',
-        status: 'submitted',
-        attempts: 2,
-        provider: expect.objectContaining({ prompt_id: 'music-789' }),
+        status: 'failed',
+        attempts: 1,
+        provider: expect.objectContaining({ prompt_id: 'music-456' }),
+        result: expect.objectContaining({ verification_required: true }),
       })
     );
     vi.useRealTimers();

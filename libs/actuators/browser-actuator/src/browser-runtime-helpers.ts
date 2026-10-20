@@ -1089,6 +1089,10 @@ async function waitForOperatorContinue(options: {
 }
 
 export const browserRuntimeHelpers = {
+  hasBrowserRuntimeLease: (sessionId: string): boolean => {
+    const lease = browserRuntimeLeases.get(sessionId);
+    return Boolean(lease && (!lease.leaseExpiresAt || lease.leaseExpiresAt > Date.now()));
+  },
   createBrowserRuntime,
   registerBrowserPage,
   attachPageObservers,
