@@ -54,10 +54,11 @@ export function collectMissionGateDocViolations(documents: Record<string, string
 export function collectMissionGateDocumentPaths(): string[] {
   const documents: string[] = [];
   const visit = (relativePath: string): void => {
+    const normalizedPath = relativePath.split(path.sep).join('/');
     if (
-      MISSION_GATE_DOCUMENT_EXCLUSIONS.has(relativePath) ||
+      MISSION_GATE_DOCUMENT_EXCLUSIONS.has(normalizedPath) ||
       [...MISSION_GATE_DOCUMENT_EXCLUSIONS].some((excluded) =>
-        relativePath.startsWith(`${excluded}/`)
+        normalizedPath.startsWith(`${excluded}/`)
       )
     ) {
       return;
@@ -70,7 +71,7 @@ export function collectMissionGateDocumentPaths(): string[] {
       }
       return;
     }
-    if (relativePath.endsWith('.md')) documents.push(relativePath);
+    if (normalizedPath.endsWith('.md')) documents.push(normalizedPath);
   };
 
   for (const root of MISSION_GATE_SCAN_ROOTS) visit(root);
