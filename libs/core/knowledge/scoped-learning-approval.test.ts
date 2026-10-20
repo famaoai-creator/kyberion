@@ -3,7 +3,11 @@ import { withExecutionContext } from '../authority.js';
 import { safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { writeMemberProfile, memberProfilePath } from '../organization/member-registry.js';
-import { createMemoryPromotionCandidate } from './memory-promotion-queue.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+  memoryPromotionQueuePath,
+} from './memory-promotion-queue.js';
 import {
   requestScopedLearningApproval,
   verifyScopedLearningApprovalRef,
@@ -21,17 +25,20 @@ const refs: string[] = [];
 let sequence = 0;
 const scope = {
   tier: 'confidential' as const,
-  tenant_slug: 'synthetic-sop-review',
+  tenant_slug: 'synthetic-sop-review-' + process.pid,
   organization_id: 'ORG-SOP',
   project_id: 'PRJ-SOP',
 };
-function member(status: 'active' | 'suspended' = 'active') {
+function member(
+  status: 'active' | 'suspended' = 'active',
+  role: 'approver' | 'viewer' = 'approver'
+) {
   withExecutionContext('sovereign_concierge', () =>
     writeMemberProfile({
       member_id: memberId,
       display_name: 'Synthetic SOP reviewer',
       status,
-      memberships: [{ tenant_slug: scope.tenant_slug, role: 'approver' }],
+      memberships: [{ tenant_slug: scope.tenant_slug, role }],
       access_registrations: [],
       created_at: '2026-10-20T00:00:00.000Z',
       updated_at: '2026-10-20T00:00:00.000Z',
@@ -42,7 +49,7 @@ function fixture() {
   const candidate = createMemoryPromotionCandidate({
     candidateId: 'MEM-SOP-PROOF-' + process.pid + '-' + ++sequence,
     sourceType: 'task_session',
-    sourceRef: 'task_session:synthetic',
+    sourceRef: 'task_session:synthetic-' + sequence,
     knowledgeDomain: 'organization',
     proposedMemoryKind: 'sop',
     summary: 'Check the exact scoped input before producing the report.',
@@ -57,6 +64,7 @@ function fixture() {
     content: 'Check the source scope. Produce the report. Verify its evidence.',
     evidence_refs: candidate.evidence_refs,
   };
+  enqueueMemoryPromotionCandidate(candidate);
   const request = requestScopedLearningApproval({
     candidate,
     requester: { requestedBy: 'agent:synthetic-planner', actorId: 'agent:synthetic-planner' },
@@ -96,6 +104,9 @@ afterEach(() => {
   });
   withExecutionContext('sovereign_concierge', () =>
     safeRmSync(memberProfilePath(memberId), { force: true })
+  );
+  withExecutionContext('ecosystem_architect', () =>
+    safeRmSync(memoryPromotionQueuePath(scope), { force: true })
   );
   vi.unstubAllEnvs();
 });
@@ -165,6 +176,12 @@ describe('scoped SOP authenticated review', () => {
     const f = fixture();
     decide(f.ref);
     member('suspended');
+    expect(() => verifyScopedLearningApprovalRef(f.candidate, f.ref)).toThrow(/AUTHORITY/);
+  });
+  it('refuses a still-active reviewer whose membership lost approval authority', () => {
+    const f = fixture();
+    decide(f.ref);
+    member('active', 'viewer');
     expect(() => verifyScopedLearningApprovalRef(f.candidate, f.ref)).toThrow(/AUTHORITY/);
   });
   it('accepts existing real-terminal A2 proof with unmarked server identity', () => {

@@ -1,4 +1,6 @@
 import { recordScopedLearningPublicationConsumption } from './scoped-learning-approval.js';
+import { withLock } from '../lock-utils.js';
+import { createHash } from 'node:crypto';
 import {
   createDistillCandidateRecord,
   loadDistillCandidateRecord,
@@ -25,7 +27,10 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { assertScopedLearningApproval } from './scoped-learning-approval-verification.js';
-import { isScopedLearningCandidate } from './scoped-learning-domain.js';
+import {
+  isScopedLearningCandidate,
+  approvedLearningPayloadDigest,
+} from './scoped-learning-domain.js';
 import {
   inspectScopedLearningPublication,
   verifyScopedLearningPublication,
@@ -474,8 +479,22 @@ export async function promotePersonalMemoryCandidates(
   };
 }
 
-export async function promoteMemoryCandidateToKnowledge(input: {
+/** Serialize complete scoped publication attempts, without nesting primitive publication locks. */
+export async function promoteMemoryCandidateToKnowledge(
+  input: Parameters<typeof promoteMemoryCandidateToKnowledgeUnlocked>[0]
+): ReturnType<typeof promoteMemoryCandidateToKnowledgeUnlocked> {
+  const candidate = loadMemoryPromotionCandidate(input.candidateId, input.scope);
+  if (candidate && isScopedLearningCandidate(candidate))
+    return withLock(
+      'scoped-learning-workflow:' + createHash('sha256').update(input.candidateId).digest('hex'),
+      () => promoteMemoryCandidateToKnowledgeUnlocked(input)
+    );
+  return promoteMemoryCandidateToKnowledgeUnlocked(input);
+}
+
+async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   candidateId: string;
+  expectedPayloadDigest?: string;
   executionRole?: PromotedMemoryExecutionRole;
   ratificationNote?: string;
   supersedes?: string;
@@ -492,6 +511,11 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   if (!candidateId) throw new Error('candidateId is required.');
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+  if (
+    input.expectedPayloadDigest !== undefined &&
+    input.expectedPayloadDigest !== approvedLearningPayloadDigest(candidate)
+  )
+    throw new Error('[LEARNING_STALE_PAYLOAD] Candidate changed; reload before publishing');
   const domain = candidate.knowledge_domain || 'organization';
   const scopedLearning = isScopedLearningCandidate(candidate);
   if (scopedLearning) {
@@ -576,7 +600,7 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     // Lane-aware self-ratification: auto/evidence_gated lanes approve without
     // a steward — the status flip IS the audit trail. Sensitive scopes and
     // pr_review candidates keep blocking here.
-    const review = reviewMemoryPromotionCandidate(candidateId)[0];
+    const review = reviewMemoryPromotionCandidate(candidateId, candidate.scope)[0];
     const lane = laneApprovesWithoutSteward(candidate, review?.physical_record_count ?? 1);
     if (!lane.approves) {
       throw new Error(

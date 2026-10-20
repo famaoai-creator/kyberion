@@ -3,7 +3,6 @@ import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import {
   createApprovalRequest,
-  listApprovalRequests,
   loadApprovalRequest,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
@@ -17,15 +16,37 @@ import {
   scopedLearningApprovalBinding as binding,
   assertScopedLearningApprovalBinding as exact,
   verifyScopedLearningApprovalRef,
+  findScopedLearningApprovalRequest,
 } from './scoped-learning-approval-verifier.js';
 import { inspectScopedLearningPublication } from './scoped-learning-publication.js';
 import type { ScopedLearningPublicationIdentity } from './scoped-learning-contract.js';
-import type { MemoryCandidate } from './memory-promotion-queue.js';
+import {
+  withScopedLearningCandidateReview,
+  type MemoryCandidate,
+} from './memory-promotion-queue.js';
 export { verifyScopedLearningApprovalRef } from './scoped-learning-approval-verifier.js';
 const ROLE = 'infrastructure_sentinel';
 const CHANNEL = 'terminal';
 /** Opens once per exact payload, retaining terminal decisions rather than re-requesting. */
 export function requestScopedLearningApproval(input: {
+  candidate: MemoryCandidate;
+  requester: ApprovalRequesterInput;
+  expectedPayloadDigest?: string;
+}): { ref: string; status: ApprovalRequestRecord['status'] } {
+  return withScopedLearningCandidateReview(
+    {
+      candidateId: input.candidate.candidate_id,
+      scope: input.candidate.scope!,
+      expectedCandidate: input.candidate,
+      expectedPayloadDigest: input.expectedPayloadDigest,
+      ...(input.candidate.curation ? { curation: input.candidate.curation } : {}),
+    },
+    (candidate) => requestScopedLearningApprovalLocked({ ...input, candidate })
+  );
+}
+
+/** Caller holds publication and queue locks; never exposed as a detached writer. */
+function requestScopedLearningApprovalLocked(input: {
   candidate: MemoryCandidate;
   requester: ApprovalRequesterInput;
 }): { ref: string; status: ApprovalRequestRecord['status'] } {
@@ -36,15 +57,13 @@ export function requestScopedLearningApproval(input: {
     );
   return withExecutionContext(ROLE, () =>
     withLockSync('scoped-learning-approval:' + b.digest, () => {
-      const rows = listApprovalRequests({ storageChannels: [CHANNEL] }).filter(
-        (row) => row.accountability?.effectBinding === b.effect
-      );
-      if (rows.length > 1)
-        throw new Error('[LEARNING_APPROVAL_CONFLICT] Multiple decisions require reconciliation');
-      if (rows[0]) {
-        exact(rows[0], input.candidate);
-        return { ref: CHANNEL + ':' + rows[0].id, status: rows[0].status };
+      const existing = findScopedLearningApprovalRequest(input.candidate);
+      if (existing) {
+        exact(existing, input.candidate);
+        return { ref: CHANNEL + ':' + existing.id, status: existing.status };
       }
+      if (input.candidate.status !== 'queued')
+        throw new Error('[LEARNING_REVIEW_REQUIRED] Only a queued candidate can request review');
       const requester = resolveApprovalRequesterInput(input.requester);
       const record = createApprovalRequest(ROLE, {
         channel: CHANNEL,

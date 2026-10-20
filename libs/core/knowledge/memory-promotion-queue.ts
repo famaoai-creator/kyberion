@@ -23,9 +23,13 @@ import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { scopeContextKey } from '../scope-context.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { physicalScopedPath } from '../physical-namespace.js';
-import { verifyScopedLearningApprovalRef } from './scoped-learning-approval-verifier.js';
+import {
+  verifyScopedLearningApprovalRef,
+  assertScopedLearningReviewUnchanged,
+} from './scoped-learning-approval-verifier.js';
 import {
   approvedLearningPayloadDigest,
+  assertScopedLearningScope,
   isScopedLearningCandidate,
   type ScopedLearningApproval,
   type ScopedLearningPublicationIdentity,
@@ -398,6 +402,15 @@ export function memoryPromotionScopeKey(scope?: MemoryScopeEnvelope): string {
   return resolveScopeKey(scope);
 }
 
+/** Opaque cross-surface identity; never use candidate_id alone to select a scoped row. */
+export function memoryPromotionCandidateKey(
+  candidate: Pick<MemoryCandidate, 'candidate_id' | 'scope'>
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify([candidate.candidate_id, memoryPromotionScopeKey(candidate.scope)]))
+    .digest('hex');
+}
+
 function normalizeOccurrenceCount(value: unknown): number {
   const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
   return Math.max(1, count);
@@ -637,6 +650,7 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
       throw new Error(
         '[LEARNING_APPROVAL_IMMUTABLE] Re-enqueue cannot change approved evidence or content'
       );
+    assertScopedLearningReviewUnchanged(current, next);
     assertPublicTierReferencesSafe(next);
     const updatedValidation = validateMemoryPromotionCandidate(next);
     if (!updatedValidation.valid) {
@@ -648,6 +662,7 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
     safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
     return queuePath;
   }
+  assertScopedLearningReviewUnchanged(normalizedCandidate, normalizedCandidate);
   const nextCandidate: MemoryCandidate = {
     ...normalizedCandidate,
     content_hash: contentHash,
@@ -722,6 +737,10 @@ export function updateMemoryPromotionCandidateStatus(
 function updateMemoryPromotionCandidateStatusUnlocked(input: {
   candidateId: string;
   status: MemoryCandidateStatus;
+  /** Reject stale decisions while holding the same mutex as the queue write. */
+  expectedStatus?: MemoryCandidateStatus;
+  /** Compare-and-set token for scoped curation; checked while holding the queue mutex. */
+  expectedPayloadDigest?: string;
   knowledgeDomain?: MemoryKnowledgeDomain;
   ratificationNote?: string;
   promotedRef?: string;
@@ -792,12 +811,27 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
       ) {
         continue;
       }
+      if (input.expectedStatus !== undefined && input.expectedStatus !== current.status)
+        throw new Error(
+          '[MEMORY_PROMOTION_STALE_STATUS] Candidate state changed; reload before deciding'
+        );
       if (
         isScopedLearningCandidate(current) &&
         current.status === 'rejected' &&
         input.status !== 'rejected'
       )
         throw new Error('[LEARNING_REJECTED] Rejected scoped learning requires a new candidate');
+      if (
+        isScopedLearningCandidate(current) &&
+        ((current.status === 'promoted' && input.status !== 'promoted') ||
+          (current.status === 'approved' && input.status === 'queued'))
+      )
+        throw new Error('[LEARNING_APPROVAL_IMMUTABLE] Scoped publication status cannot regress');
+      if (
+        input.expectedPayloadDigest !== undefined &&
+        input.expectedPayloadDigest !== approvedLearningPayloadDigest(current)
+      )
+        throw new Error('[LEARNING_STALE_PAYLOAD] Candidate changed; reload before editing');
       const requestedDomain = input.knowledgeDomain || current.knowledge_domain;
       // D7: tagged curation refs are normalized to the canonical string form before
       // the subset check; plain strings are compared verbatim (legacy behavior).
@@ -806,18 +840,18 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
             typeof ref === 'string' ? ref : formatMemoryEvidenceRef(ref)
           )
         : undefined;
-      if (input.status === 'approved') {
-        if (input.curation && normalizedCurationRefs) {
-          const originalRefs = new Set(current.evidence_refs);
-          if (
-            normalizedCurationRefs.length === 0 ||
-            normalizedCurationRefs.some((ref) => !originalRefs.has(ref))
-          ) {
-            throw new Error(
-              'Curated evidence refs must be selected from the candidate original evidence refs.'
-            );
-          }
+      if (input.curation && normalizedCurationRefs) {
+        const originalRefs = new Set(current.evidence_refs);
+        if (
+          normalizedCurationRefs.length === 0 ||
+          normalizedCurationRefs.some((ref) => !originalRefs.has(ref))
+        ) {
+          throw new Error(
+            'Curated evidence refs must be selected from the candidate original evidence refs.'
+          );
         }
+      }
+      if (input.status === 'approved') {
         if (
           current.source_type === 'mission' &&
           (!requestedDomain || requestedDomain === 'unclassified')
@@ -940,6 +974,7 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
           throw new Error('[LEARNING_PUBLICATION_INVALID] Publication must match the approval');
         next.learning_publication = input.learningPublication;
       }
+      assertScopedLearningReviewUnchanged(current, next);
       assertPublicTierReferencesSafe(next);
       if (next.status === 'approved' && next.source_type === 'mission' && !next.curation) {
         throw new Error(
@@ -963,6 +998,87 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
     }
   }
   return firstUpdated;
+}
+
+/**
+ * Synchronous review seam. All request writers enter the same publication → queue
+ * critical section as status writers. The callback must not call queue mutators.
+ * Curation is durable before opening a canonical approval, so a lost response is
+ * recoverable from candidate identity without a second pending-reference store.
+ */
+export function withScopedLearningCandidateReview<T>(
+  input: {
+    candidateId: string;
+    scope: MemoryScopeEnvelope;
+    expectedPayloadDigest?: string;
+    expectedCandidate?: MemoryCandidate;
+    curation?: NonNullable<MemoryCandidate['curation']>;
+  },
+  open: (candidate: MemoryCandidate) => T
+): T {
+  const scope = assertScopedLearningScope(input.scope);
+  return withLockSync(
+    'scoped-learning-publication:' + createHash('sha256').update(input.candidateId).digest('hex'),
+    () =>
+      withLockSync('memory-promotion-queue-mutations', () => {
+        const rows = listMemoryPromotionCandidates(scope).filter(
+          (row) =>
+            row.candidate_id === input.candidateId &&
+            memoryPromotionScopeKey(row.scope) === memoryPromotionScopeKey(scope)
+        );
+        if (rows.length !== 1)
+          throw new Error('[LEARNING_CANDIDATE_CONFLICT] Expected exactly one scoped candidate');
+        let candidate = rows[0]!;
+        const digest = approvedLearningPayloadDigest(candidate);
+        if (input.expectedPayloadDigest !== undefined && input.expectedPayloadDigest !== digest)
+          throw new Error('[LEARNING_STALE_PAYLOAD] Candidate changed; reload before editing');
+        if (
+          input.expectedCandidate &&
+          approvedLearningPayloadDigest({
+            ...input.expectedCandidate,
+            curation: candidate.curation,
+          }) !== digest
+        )
+          throw new Error(
+            '[LEARNING_STALE_PAYLOAD] Detached candidate differs from durable candidate'
+          );
+        if (
+          input.curation &&
+          JSON.stringify(input.curation) !== JSON.stringify(candidate.curation)
+        ) {
+          if (
+            input.expectedCandidate &&
+            candidate.curation &&
+            input.expectedPayloadDigest === undefined
+          )
+            throw new Error(
+              '[LEARNING_STALE_PAYLOAD] Existing curation must be changed with compare-and-set'
+            );
+          if (candidate.status !== 'queued')
+            throw new Error('[LEARNING_APPROVAL_IMMUTABLE] Only a queued draft can be curated');
+          candidate = updateMemoryPromotionCandidateStatusUnlocked({
+            candidateId: input.candidateId,
+            scope,
+            status: 'queued',
+            expectedPayloadDigest: digest,
+            curation: input.curation,
+          })!;
+        }
+        const validation = validateMemoryPromotionCandidate(candidate);
+        if (!validation.valid)
+          throw new Error('[LEARNING_CURATION_INVALID] ' + validation.errors.join('; '));
+        if (
+          candidate.curation &&
+          (candidate.curation.evidence_refs.length === 0 ||
+            candidate.curation.evidence_refs.some((ref) => !candidate.evidence_refs.includes(ref)))
+        )
+          throw new Error(
+            '[LEARNING_CURATION_INVALID] Curation must select original evidence refs'
+          );
+        assertScopedLearningReviewUnchanged(candidate, candidate);
+        return open(candidate);
+      })
+  );
 }
 
 export function queueMissionMemoryPromotionCandidate(input: {

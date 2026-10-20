@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Badge,
   Button,
@@ -25,9 +26,9 @@ import {
   parseApprovalsResponse,
   type ClientApproval,
 } from '../lib/approvals-response';
+import { approvalWorkspaceQuery, knowledgeCandidateHref } from '../lib/knowledge-learning-client';
 
 type Approval = ClientApproval;
-
 function approvalRiskLabel(value: string | undefined, locale: SupportedLocale): string {
   const labels: Record<string, string> = {
     low: 'chronos_risk_low',
@@ -37,7 +38,6 @@ function approvalRiskLabel(value: string | undefined, locale: SupportedLocale): 
   };
   return uxText(labels[value || ''] || 'chronos_unknown', locale);
 }
-
 function approvalMutationLabel(value: string | undefined, locale: SupportedLocale): string {
   const labels: Record<string, string> = {
     create: 'chronos_change_create',
@@ -47,65 +47,114 @@ function approvalMutationLabel(value: string | undefined, locale: SupportedLocal
   };
   return uxText(labels[value || ''] || 'chronos_change_other', locale);
 }
-
 function approvalTenantLabel(item: Approval, locale: SupportedLocale): string | undefined {
   if (!item.tenantSlug) return undefined;
   return item.tenantSource === 'mission'
-    ? `${item.tenantSlug} (${uxText('chronos_tenant_from_mission', locale)})`
+    ? item.tenantSlug + ' (' + uxText('chronos_tenant_from_mission', locale) + ')'
     : item.tenantSlug;
 }
+function approvalStatusLabel(status: string, locale: SupportedLocale): string {
+  const labels: Record<string, string> = {
+    pending: 'chronos_learning_pending',
+    approved: 'chronos_learning_approved',
+    rejected: 'chronos_learning_rejected',
+    expired: 'chronos_learning_expired',
+    revoked: 'chronos_learning_revoked',
+    cancelled: 'chronos_learning_cancelled',
+  };
+  return uxText(labels[status] || 'chronos_unknown', locale);
+}
+const selectionKey = (item: Approval) => JSON.stringify([item.storageChannel, item.id]);
 
 export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
   const locale = useChronosLocale();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const requestedId = searchParams.get('request');
+  const requestedChannel = searchParams.get('storageChannel');
+  const returnCandidateKey = searchParams.get('candidateKey');
   const [items, setItems] = React.useState<Approval[]>([]);
-  const [selectedId, setSelectedId] = React.useState<string | null>(() =>
-    typeof window === 'undefined'
-      ? null
-      : new URLSearchParams(window.location.search).get('request')
-  );
+  const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [fresh, setFresh] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
   const [note, setNote] = React.useState('');
-  const selected = selectedId
-    ? items.find((item) => item.id === selectedId) || null
-    : items[0] || null;
+  const refreshVersion = React.useRef(0);
+  const mutationInFlight = React.useRef(false);
+  const view = React.useRef({ tenant, search });
+  view.current = { tenant, search };
+  const selected = selectedKey
+    ? items.find((item) => selectionKey(item) === selectedKey) || null
+    : null;
 
   const refresh = React.useCallback(async () => {
+    const version = ++refreshVersion.current;
+    setFresh(false);
     try {
-      const location =
-        typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
-      const query = new URLSearchParams({ limit: '50' });
-      if (location?.get('request') && location.get('mission'))
-        query.set('missionId', location.get('mission')!);
-      else query.set('status', 'pending');
-      if (tenant) query.set('tenant', tenant);
-      const response = await fetch(`/api/approvals?${query.toString()}`, {
-        cache: 'no-store',
-      });
+      const query = approvalWorkspaceQuery(search, tenant);
+      const response = await fetch('/api/approvals?' + query.toString(), { cache: 'no-store' });
       const payload = parseApprovalsResponse(await response.json().catch(() => null));
-      if (!response.ok || !payload) throw new Error('Invalid approval queue response');
+      if (!response.ok || !payload)
+        throw new Error(uxText('chronos_learning_review_load_failed', locale));
+      if (
+        version !== refreshVersion.current ||
+        tenant !== view.current.tenant ||
+        search !== view.current.search
+      )
+        return;
       setAccessRole(payload.accessRole);
       setItems(payload.approvals);
-      setSelectedId((current) =>
-        location?.get('request')
-          ? location.get('request')
-          : payload.approvals.some((item) => item.id === current)
+      if (requestedId) {
+        const exact = payload.approvals.filter(
+          (item) =>
+            item.id === requestedId &&
+            (!requestedChannel || item.storageChannel === requestedChannel)
+        );
+        setSelectedKey(exact.length === 1 ? selectionKey(exact[0]) : null);
+      } else {
+        setSelectedKey((current) =>
+          payload.approvals.some((item) => selectionKey(item) === current)
             ? current
-            : payload.approvals[0]?.id || null
-      );
+            : payload.approvals[0]
+              ? selectionKey(payload.approvals[0])
+              : null
+        );
+      }
+      setFresh(true);
       setError(null);
     } catch (err) {
+      if (
+        version !== refreshVersion.current ||
+        tenant !== view.current.tenant ||
+        search !== view.current.search
+      )
+        return;
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [tenant]);
-
+  }, [tenant, search, requestedId, requestedChannel, locale]);
   React.useEffect(() => {
+    setItems([]);
+    setSelectedKey(null);
     void refresh();
+    return () => {
+      refreshVersion.current += 1;
+    };
   }, [refresh]);
+  React.useEffect(() => {
+    setNote('');
+  }, [selectedKey]);
 
   const decide = async (decision: 'approved' | 'rejected') => {
-    if (!selected) return;
+    if (
+      !selected ||
+      !fresh ||
+      accessRole !== 'localadmin' ||
+      selected.status !== 'pending' ||
+      mutationInFlight.current
+    )
+      return;
+    mutationInFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -123,20 +172,36 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           ...(selected.presentedDigest ? { presentedDigest: selected.presentedDigest } : {}),
         }),
       });
-      if (!response.ok) throw new Error('Failed to record the approval decision');
+      const payload = await response.json().catch(() => null);
+      if (
+        !response.ok ||
+        payload?.ok !== true ||
+        payload.approval?.id !== selected.id ||
+        payload.approval?.storageChannel !== selected.storageChannel ||
+        typeof payload.approval?.status !== 'string'
+      )
+        throw new Error(uxText('chronos_learning_outcome_unknown', locale));
+      if (tenant !== view.current.tenant || search !== view.current.search) return;
       setNote('');
       await refresh();
     } catch (err) {
+      if (tenant !== view.current.tenant || search !== view.current.search) return;
+      setFresh(false);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      mutationInFlight.current = false;
       setBusy(false);
     }
   };
 
   const localAdmin = accessRole === 'localadmin';
-  const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
+  const scopeLabel = (tenant || uxText('chronos_ac_scope_all', locale)) + ' · ' + items.length;
   const kindFallback = uxTextOr('chronos_ws_approval_kind_default', 'Approval', locale);
-
+  const learningReview =
+    selected?.justification?.requestedEffects?.some((effect) =>
+      effect.startsWith('scoped-learning:')
+    ) === true;
+  const returnHref = returnCandidateKey ? knowledgeCandidateHref(returnCandidateKey, tenant) : null;
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
@@ -145,6 +210,17 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />
+          <Button
+            label={uxText('chronos_learning_refresh', locale)}
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void refresh()}
+          />
+          {returnHref ? (
+            <a className="kb-link" href={returnHref}>
+              {uxText('chronos_learning_return', locale)}
+            </a>
+          ) : null}
         </div>
         {error ? (
           <Callout
@@ -156,25 +232,26 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
         <WsSelectTable
           columns={[
             { key: 'title', label: uxTextOr('chronos_ws_col_request', 'Request', locale) },
-            {
-              key: 'risk',
-              label: uxText('chronos_risk', locale),
-              width: '6rem',
-            },
+            { key: 'risk', label: uxText('chronos_risk', locale), width: '6rem' },
           ]}
           rows={items}
-          rowKey={(item) => item.id}
-          selectedKey={selected?.id}
-          onSelect={setSelectedId}
+          rowKey={selectionKey}
+          selectedKey={selectedKey}
+          onSelect={setSelectedKey}
           empty={uxText('chronos_approvals_empty', locale)}
           renderCell={(item, key, select) =>
             key === 'title' ? (
               <div className="flex flex-col gap-0.5">
                 <WsTitleCell
                   title={item.title}
-                  id={`${approvalTenantLabel(item, locale) || uxText('chronos_org_not_configured', locale)} / ${item.kind || kindFallback}`}
+                  id={
+                    (approvalTenantLabel(item, locale) ||
+                      uxText('chronos_org_not_configured', locale)) +
+                    ' / ' +
+                    (item.kind || kindFallback)
+                  }
                   onSelect={select}
-                  selected={selected?.id === item.id}
+                  selected={selectedKey === selectionKey(item)}
                 />
                 <span className="kb-list__meta">
                   {item.requestedBy} · {formatChronosDateTime(item.requestedAt, locale)}
@@ -189,15 +266,28 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           }
         />
       </Section>
-
       {selected ? (
         <Section
           title={selected.title}
           description={uxTextOr('chronos_ws_approval_detail_eyebrow', 'Approval content', locale)}
         >
           <div className="flex flex-wrap gap-2">
+            <StatusPill
+              status={
+                selected.status === 'approved'
+                  ? 'completed'
+                  : selected.status === 'pending'
+                    ? 'pending'
+                    : 'blocked'
+              }
+              label={approvalStatusLabel(selected.status, locale)}
+            />
             <Badge
-              label={`${uxText('chronos_risk', locale)}: ${approvalRiskLabel(selected.risk?.level, locale)}`}
+              label={
+                uxText('chronos_risk', locale) +
+                ': ' +
+                approvalRiskLabel(selected.risk?.level, locale)
+              }
               tone={riskTone(selected.risk?.level)}
             />
             {selected.risk?.level === 'critical' ? (
@@ -219,63 +309,71 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
               </p>
             </Disclosure>
           ) : null}
-          <div className="chronos-two-col">
-            <div className="chronos-feed">
-              <h3 className="chronos-feed__title">
-                {uxText('chronos_approval_change_details', locale)}
-              </h3>
-              <KeyValue
-                items={[
-                  {
-                    label: uxText('chronos_approval_service', locale),
-                    value: selected.target?.serviceId || '-',
-                    mono: true,
-                  },
-                  {
-                    label: uxText('chronos_approval_operation', locale),
-                    value: approvalMutationLabel(selected.target?.mutation, locale),
-                  },
-                  {
-                    label: uxText('chronos_approval_key', locale),
-                    value: selected.target?.secretKey || '-',
-                    mono: true,
-                  },
-                  {
-                    label: uxText('chronos_approval_current_value', locale),
-                    value: selected.target?.existingValuePresent
-                      ? uxText('chronos_approval_value_present', locale)
-                      : uxText('chronos_approval_value_missing', locale),
-                  },
-                ]}
-              />
+          {learningReview ? (
+            <p className="kb-text kb-text--muted">
+              {uxText('chronos_learning_review_only', locale)}
+            </p>
+          ) : (
+            <div className="chronos-two-col">
+              <div className="chronos-feed">
+                <h3 className="chronos-feed__title">
+                  {uxText('chronos_approval_change_details', locale)}
+                </h3>
+                <KeyValue
+                  items={[
+                    {
+                      label: uxText('chronos_approval_service', locale),
+                      value: selected.target?.serviceId || '-',
+                      mono: true,
+                    },
+                    {
+                      label: uxText('chronos_approval_operation', locale),
+                      value: approvalMutationLabel(selected.target?.mutation, locale),
+                    },
+                    {
+                      label: uxText('chronos_approval_key', locale),
+                      value: selected.target?.secretKey || '-',
+                      mono: true,
+                    },
+                    {
+                      label: uxText('chronos_approval_current_value', locale),
+                      value: selected.target?.existingValuePresent
+                        ? uxText('chronos_approval_value_present', locale)
+                        : uxText('chronos_approval_value_missing', locale),
+                    },
+                  ]}
+                />
+              </div>
+              <div className="chronos-feed">
+                <h3 className="chronos-feed__title">
+                  {uxTextOr('chronos_ws_approval_cautions', 'Points to check', locale)}
+                </h3>
+                <KeyValue
+                  items={[
+                    {
+                      label: uxText('chronos_approval_restart', locale),
+                      value:
+                        selected.risk?.restartScope ||
+                        uxText('chronos_approval_not_needed', locale),
+                    },
+                    {
+                      label: uxText('chronos_approval_strong_auth', locale),
+                      value: selected.risk?.requiresStrongAuth
+                        ? uxText('chronos_required', locale)
+                        : uxText('chronos_not_required', locale),
+                    },
+                    {
+                      label: uxText('chronos_approval_policy', locale),
+                      value:
+                        selected.risk?.policyId ||
+                        uxText('chronos_approval_default_policy', locale),
+                      mono: Boolean(selected.risk?.policyId),
+                    },
+                  ]}
+                />
+              </div>
             </div>
-            <div className="chronos-feed">
-              <h3 className="chronos-feed__title">
-                {uxTextOr('chronos_ws_approval_cautions', 'Points to check', locale)}
-              </h3>
-              <KeyValue
-                items={[
-                  {
-                    label: uxText('chronos_approval_restart', locale),
-                    value:
-                      selected.risk?.restartScope || uxText('chronos_approval_not_needed', locale),
-                  },
-                  {
-                    label: uxText('chronos_approval_strong_auth', locale),
-                    value: selected.risk?.requiresStrongAuth
-                      ? uxText('chronos_required', locale)
-                      : uxText('chronos_not_required', locale),
-                  },
-                  {
-                    label: uxText('chronos_approval_policy', locale),
-                    value:
-                      selected.risk?.policyId || uxText('chronos_approval_default_policy', locale),
-                    mono: Boolean(selected.risk?.policyId),
-                  },
-                ]}
-              />
-            </div>
-          </div>
+          )}
           {selected.justification ? (
             <div className="chronos-feed">
               <h3 className="chronos-feed__title">{uxText('chronos_reason_impact', locale)}</h3>
@@ -330,13 +428,13 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             <Button
               label={uxText('chronos_approve', locale)}
               variant="primary"
-              disabled={busy || !localAdmin || selected.status !== 'pending'}
+              disabled={busy || !fresh || !localAdmin || selected.status !== 'pending'}
               onClick={() => void decide('approved')}
             />
             <Button
               label={uxText('chronos_reject', locale)}
               variant="danger"
-              disabled={busy || !localAdmin || selected.status !== 'pending'}
+              disabled={busy || !fresh || !localAdmin || selected.status !== 'pending'}
               onClick={() => void decide('rejected')}
             />
           </div>
@@ -346,13 +444,17 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
         </Section>
       ) : (
         <Section>
-          <EmptyState title={uxText('chronos_select_approval', locale)} />
+          <EmptyState
+            title={uxText(
+              requestedId ? 'chronos_learning_review_unavailable' : 'chronos_select_approval',
+              locale
+            )}
+          />
         </Section>
       )}
     </div>
   );
 }
-
 function riskTone(level: string | undefined): 'neutral' | 'warning' | 'danger' {
   if (level === 'high' || level === 'critical') return 'danger';
   if (level === 'medium') return 'warning';
