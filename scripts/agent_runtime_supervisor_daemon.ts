@@ -1,6 +1,6 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
-import { resolveLocalIpcAddress } from '../libs/core/local-ipc.js';
+import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {

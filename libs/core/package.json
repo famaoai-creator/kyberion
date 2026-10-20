@@ -2508,6 +2508,10 @@
       "types": "./dist/local-stt-discovery.d.ts",
       "default": "./dist/local-stt-discovery.js"
     },
+    "./local-ipc": {
+      "types": "./dist/local-ipc.d.ts",
+      "default": "./dist/local-ipc.js"
+    },
     "./locale": {
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"

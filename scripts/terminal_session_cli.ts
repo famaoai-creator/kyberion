@@ -29,7 +29,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getRegisteredEnv, nowIso } from '@agent/core/foundation';
-import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from '../libs/core/local-ipc.js';
+import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import {
   defineScript,
   isDirectScript,
