@@ -29,6 +29,7 @@ import {
   type ConciergeSummary,
 } from '../lib/summary-event';
 import {
+  conciergeMemoryQueueEntryId,
   parseConciergeHygieneResponse,
   parseConciergeMemoryQueueResponse,
   parseConciergeResponseStatusResponse,
@@ -565,7 +566,10 @@ export default function ConciergePage() {
         const response = await fetch(`/api/memory-queue/${encodeURIComponent(item.id)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify({
+            decision,
+            ...(item.candidateKey ? { candidateKey: item.candidateKey } : {}),
+          }),
         });
         const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
         if (!response.ok || !parsed?.result?.message) throw new Error('Memory decision failed');
@@ -596,7 +600,7 @@ export default function ConciergePage() {
       item,
     })),
     ...memoryQueue.map((item): DecideQueueEntry => ({
-      id: `memory-${item.id}`,
+      id: conciergeMemoryQueueEntryId(item),
       kind: 'memory',
       item,
     })),
@@ -840,7 +844,12 @@ export default function ConciergePage() {
         fields={fields}
         locale={locale}
       >
-        {memoryConfirm?.id === item.id ? (
+        {item.learningReviewUrl ? (
+          <div className="decide-actions">
+            <a href={item.learningReviewUrl}>{t('memory.review_in_chronos')}</a>
+            {later(entry.id)}
+          </div>
+        ) : memoryConfirm?.id === item.id ? (
           <div className="decide-confirm">
             <p className="decide-confirm-text">
               {t(

@@ -29,6 +29,8 @@ export type ConciergeHygieneInquiry = {
 };
 
 export type ConciergeMemoryQueueItem = {
+  learningReviewUrl?: string;
+  candidateKey?: string;
   id: string;
   kind: 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
   summary: string;
@@ -38,6 +40,13 @@ export type ConciergeMemoryQueueItem = {
   occurrences: number;
   queued_at: string;
 };
+
+/** One identity for rendering and deferral; legacy saved deferrals retain their existing key. */
+export function conciergeMemoryQueueEntryId(
+  item: Pick<ConciergeMemoryQueueItem, 'id' | 'candidateKey'>
+): string {
+  return item.candidateKey ? `memory:scoped:${item.candidateKey}` : `memory-${item.id}`;
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -180,6 +189,16 @@ export function parseConciergeMemoryQueueResponse(
   for (const candidate of value.candidates) {
     if (
       !isRecord(candidate) ||
+      (candidate.learningReviewUrl !== undefined &&
+        (candidate.kind !== 'sop' ||
+          !safeLearningReviewUrl(candidate.learningReviewUrl, candidate.candidateKey))) ||
+      (candidate.candidateKey !== undefined &&
+        (typeof candidate.candidateKey !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(candidate.candidateKey))) ||
+      (Boolean(candidate.learningReviewUrl) && !candidate.candidateKey) ||
+      (candidate.kind === 'sop' &&
+        Boolean(candidate.candidateKey) &&
+        !candidate.learningReviewUrl) ||
       typeof candidate.id !== 'string' ||
       typeof candidate.kind !== 'string' ||
       !MEMORY_KINDS.has(candidate.kind) ||
@@ -195,6 +214,10 @@ export function parseConciergeMemoryQueueResponse(
       return undefined;
     }
     candidates.push({
+      ...(candidate.candidateKey ? { candidateKey: candidate.candidateKey as string } : {}),
+      ...(candidate.learningReviewUrl
+        ? { learningReviewUrl: candidate.learningReviewUrl as string }
+        : {}),
       id: candidate.id,
       kind: candidate.kind as ConciergeMemoryQueueItem['kind'],
       summary: candidate.summary,
@@ -206,4 +229,29 @@ export function parseConciergeMemoryQueueResponse(
     });
   }
   return candidates;
+}
+
+// Navigation selectors are bound to the displayed row, never treated as scope authority.
+function safeLearningReviewUrl(value: unknown, candidateKey: unknown): value is string {
+  if (
+    typeof value !== 'string' ||
+    typeof candidateKey !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(candidateKey)
+  )
+    return false;
+  try {
+    const url = new URL(value);
+    return (
+      !url.username &&
+      !url.password &&
+      (url.protocol === 'https:' ||
+        (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) &&
+      url.searchParams.getAll('section').length === 1 &&
+      url.searchParams.get('section') === 'knowledge' &&
+      url.searchParams.getAll('candidateKey').length === 1 &&
+      url.searchParams.get('candidateKey') === candidateKey
+    );
+  } catch {
+    return false;
+  }
 }

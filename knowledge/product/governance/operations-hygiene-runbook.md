@@ -1840,6 +1840,21 @@ real feedback queue, canonical approval store, publisher, exact-scope retrieval,
 task provisioning and result stores; only worker transport is mocked. It must
 prove sibling exclusion, unchanged in-flight delivery after a source edit, old
 version credit, rejection of forged references and repeated-result idempotency.
-The editorial request/apply/publish steps still use the existing memory CLI;
-the shared approval surface decides the presented content. Do not describe this
-as a fully graphical SOP editor or as measured outcome improvement.
+Chronos Knowledge exposes curation, canonical approval requests and verified
+publication for supported organization SOP scopes; Concierge links to the same
+candidate identity. The shared approval surface decides the presented content.
+This does not establish measured outcome improvement.
+
+Candidate disposition is separate from publication authority. Unsupported
+publication must never imply that an authorized operator cannot reject an unused
+candidate. Resolve the exact candidate and full viewer scope, restrict decisions
+to eligible states, and compare the observed status inside the queue mutation
+mutex. Never restore approval or publication shortcuts to make rejection work.
+Enforce this through the memory queue, scoped learning action and Concierge
+decision regressions.
+
+Knowledge selection distinguishes explicit deep links from ordinary selection.
+An explicit missing key stays unavailable; a tenant change without such a key
+selects an authorized row in the new list. A stale response must not override a
+new tenant or requested key. Enforce these transitions in knowledge selection
+tests rather than testing only initial table rendering.
