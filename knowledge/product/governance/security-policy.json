@@ -71,7 +71,9 @@
       "active/shared/runtime/grants/personal/",
       "active/shared/runtime/grants/confidential/",
       "active/shared/runtime/autonomy-learning/personal/",
-      "active/shared/runtime/autonomy-learning/confidential/"
+      "active/shared/runtime/autonomy-learning/confidential/",
+      "active/shared/runtime/pipeline-library-runs/personal/",
+      "active/shared/runtime/pipeline-library-runs/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
@@ -857,6 +859,28 @@
       ],
       "allow_write": [
         "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
+      ]
+    },
+    "autonomy_learning_store": {
+      "allow_read": [
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
+        "knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
+        "knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
+        "active/shared/runtime/autonomy-learning",
+        "active/shared/runtime/autonomy-learning/confidential",
+        "knowledge/confidential/${KYBERION_TENANT}"
+      ],
+      "allow_write": [
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
+        "knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
+        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
+        "knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
+        "active/shared/runtime/autonomy-learning",
+        "active/shared/runtime/autonomy-learning/confidential",
+        "knowledge/confidential/${KYBERION_TENANT}"
       ]
     }
   },

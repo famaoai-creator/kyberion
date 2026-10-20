@@ -12,6 +12,7 @@ Lifecycle Commands:
                                  ID convention: <PREFIX>-<TOPIC>-<YYYYMMDD> (e.g. MSN-LOG-OPT-20260930)
                                  repo-internal work needs --tier public (default is confidential)
   kickoff  <ID>                  One-step create+start: creates the mission if absent, then activates
+                                 --admission-work-item <ID> verifies a typed Dot intake and authors its hash-bound alignment brief
                                  it (same options as start: --tier --goal --success-condition)
   start    <ID>                  Activate a mission (planned/paused/failed → active)
                                  --goal <TEXT> carries the user goal into the intent baseline

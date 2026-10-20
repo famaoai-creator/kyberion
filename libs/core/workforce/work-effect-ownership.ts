@@ -72,10 +72,13 @@ export function workEffectOwnership(item: WorkItem): WorkEffectOwnership | undef
       );
     if (
       hold.state === 'settled' &&
-      (!['completed', 'pre_effect', 'human_verified'].includes(hold.settlement ?? '') ||
+      (!['completed', 'pre_effect', 'human_verified', 'execution_aborted'].includes(
+        hold.settlement ?? ''
+      ) ||
         typeof hold.settled_at !== 'string' ||
         !Number.isFinite(Date.parse(hold.settled_at)) ||
-        (hold.settlement === 'human_verified' && typeof hold.approval_request_id !== 'string'))
+        (hold.settlement === 'human_verified' && typeof hold.approval_request_id !== 'string') ||
+        (hold.settlement === 'execution_aborted' && !hold.settlement_evidence_ref?.trim()))
     )
       throw new WorkCoordinationError(
         'validation_error',

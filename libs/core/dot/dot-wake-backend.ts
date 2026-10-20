@@ -21,6 +21,8 @@ import {
 } from '../reasoning/reasoning-backend.js';
 import type { ReasoningBackend } from '../reasoning/reasoning-backend-contracts.js';
 import type { DotCharter } from './dot-charter.js';
+import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 export type DotWakeBackend = Pick<
   ReasoningBackend,
@@ -96,25 +98,34 @@ export async function runDelegatedWake(
   prompt: string,
   timeoutMs: number
 ): Promise<string> {
-  if (backend.delegateTaskHandle) {
-    const handle = backend.delegateTaskHandle(prompt, undefined);
-    return await Promise.race([
-      handle.join(),
-      new Promise<string>((_resolve, reject) =>
-        setTimeout(() => {
-          void handle.cancel(`wall_clock budget ${timeoutMs}ms exceeded`).catch(() => {});
-          reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`));
-        }, timeoutMs).unref?.()
-      ),
-    ]);
-  }
-  return await Promise.race([
-    backend.delegateTask(prompt, undefined),
-    new Promise<string>((_resolve, reject) =>
-      setTimeout(
-        () => reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`)),
-        timeoutMs
-      ).unref?.()
-    ),
-  ]);
+  const options = { advisory: true, profile: 'planner' } as const;
+  // Unnamed injected ports are explicit hosts/test seams. Every production
+  // backend has a governed identity, rechecked per candidate by failover.
+  if (backend.name) assertAdvisoryBackendPermission(backend.name, options);
+  return withSandboxPolicy(
+    resolveSandboxPolicy({ mode: 'read-only', networkAccess: true }),
+    async () => {
+      if (backend.delegateTaskHandle) {
+        const handle = backend.delegateTaskHandle(prompt, undefined, options);
+        return await Promise.race([
+          handle.join(),
+          new Promise<string>((_resolve, reject) =>
+            setTimeout(() => {
+              void handle.cancel(`wall_clock budget ${timeoutMs}ms exceeded`).catch(() => {});
+              reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`));
+            }, timeoutMs).unref?.()
+          ),
+        ]);
+      }
+      return await Promise.race([
+        backend.delegateTask(prompt, undefined, options),
+        new Promise<string>((_resolve, reject) =>
+          setTimeout(
+            () => reject(new Error(`delegated wake exceeded wall_clock budget ${timeoutMs}ms`)),
+            timeoutMs
+          ).unref?.()
+        ),
+      ]);
+    }
+  );
 }

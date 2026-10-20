@@ -14,6 +14,7 @@ import {
   type ReasoningBackend,
 } from './reasoning-backend.js';
 import { clearProviderHealth } from '../provider/provider-health-registry.js';
+import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
 import { z } from 'zod';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
@@ -22,6 +23,63 @@ import { withExecutionContextAsync } from '../authority.js';
 const visibilityRoot = pathResolver.sharedTmp(`reasoning-backend-visibility-${process.pid}`);
 
 describe('reasoning-backend', () => {
+  it('refuses unsupported planner candidates before any native invocation, including failover', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        backend: {
+          ...stubReasoningBackend,
+          name: 'codex-cli',
+          delegateTask: async () => {
+            calls.push('codex');
+            return 'unsafe';
+          },
+        },
+        provider: 'codex',
+      },
+      {
+        backend: {
+          ...stubReasoningBackend,
+          name: 'agy',
+          delegateTask: async () => {
+            calls.push('agy');
+            return 'unsafe';
+          },
+        },
+        provider: 'agy',
+      },
+    ]);
+    await expect(
+      backend.delegateTask('plan only', undefined, { advisory: true, profile: 'planner' })
+    ).rejects.toThrow('ADVISORY_BACKEND_DENIED');
+    expect(calls).toEqual([]);
+  });
+
+  it('rejects an unknown advisory adapter before it receives a prompt', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        backend: {
+          ...stubReasoningBackend,
+          name: 'unregistered-native-agent',
+          delegateTask: async () => {
+            calls.push('unknown');
+            return 'unsafe';
+          },
+        },
+      },
+    ]);
+    expect(() =>
+      assertAdvisoryBackendPermission('unregistered-native-agent', {
+        advisory: true,
+        profile: 'planner',
+      })
+    ).toThrow('unknown adapter');
+    await expect(
+      backend.delegateTask('plan', undefined, { advisory: true, profile: 'planner' })
+    ).rejects.toThrow(/DENIED/);
+    expect(calls).toEqual([]);
+  });
   afterEach(() => {
     delete process.env.KYBERION_REASONING_IN_PLACE_RETRIES;
     delete process.env.KYBERION_REASONING_RETRY_BASE_MS;

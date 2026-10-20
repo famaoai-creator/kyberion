@@ -4,6 +4,7 @@
  * are never added to metrics offboarding/compaction merely by registration.
  */
 export const PARTITIONED_RUNTIME_STATE_ROOTS = {
+  pipeline_library_runs: 'active/shared/runtime/pipeline-library-runs',
   /** Evidence and per-action autonomy overrides; never shared across tenants. */
   autonomy_learning: 'active/shared/runtime/autonomy-learning',
   hearing: 'active/shared/runtime/hearing',

@@ -387,6 +387,7 @@ export const VALUE_FLAGS = new Set([
   '--success-condition',
   '--intent-id',
   '--intent-goal',
+  '--admission-work-item',
   '--intent-confidence',
   '--confirm-intent-track',
   '--execution-shape',

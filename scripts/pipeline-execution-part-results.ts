@@ -1,4 +1,13 @@
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
+import { createHash } from 'node:crypto';
+import { currentExecutionScope } from '@agent/core/foundation';
+import {
+  currentScopeEnvelope,
+  runtimeScopeIdentity,
+  mintScopeEnvelope,
+  withScopeEnvelope,
+} from '@agent/core/scope-envelope';
+import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
@@ -20,11 +29,15 @@ import {
   openPipelineRunJournal,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
+  type PipelineJournalScope,
 } from '@agent/core/pipeline/pipeline-run-journal';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
 
 import * as nodePath from 'node:path';
-import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
+import {
+  type PipelineAdfStep,
+  type PipelineStepResult,
+} from '@agent/core/pipeline/pipeline-contract';
 import {
   formatPipelineFailure,
   logNextActionForPipelineFailure,
@@ -47,6 +60,10 @@ import {
   PipelineSuspendedError,
 } from './pipeline-execution-part-bootstrap.js';
 import type { RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
+import {
+  withDelegatedExecutionFrame,
+  withDelegatedExecutionOptions,
+} from '@agent/core/governance/delegated-execution';
 import { registerPipelineFileRunner } from './lib/pipeline-file-runner.js';
 import {
   assertDiagnosticPipelineProfile,
@@ -160,6 +177,10 @@ async function recordPipelineFeedback(
 }
 
 export interface ExecutePipelineFileOptions {
+  /** Trusted host identity; never read from ADF/context flags. */
+  delegatedWorkItem?: { id: string; tenantSlug: string; agentId: string; attemptId?: string };
+  /** Internal durable continuation, loaded from the protected journal. */
+  resumeState?: PipelineRunJournalState;
   /** Trusted caller ownership/deadline fence, inherited by nested pipelines. */
   assertExecutionCurrent?: () => void;
   executionMode?: PipelineExecutionMode;
@@ -169,6 +190,8 @@ export interface ExecutePipelineFileOptions {
   trace?: TraceContext;
   quiet?: boolean;
   hasHuman?: boolean;
+  /** Restrictive server-side execution mode; never populated from ADF. */
+  delegatedExecution?: 'require';
   /** Explicit project-trust decision for pipeline/template loading. */
   trustResolved?: boolean;
   /** Durable human approval for the exact project-local resource being loaded. */
@@ -180,8 +203,8 @@ export interface ExecutePipelineFileOptions {
 /**
  * Library entry for callers that already run inside the Kyberion process.
  *
- * The CLI remains responsible for durable resume journals and terminal exit
- * codes. This entry deliberately shares the same validated input, ADF
+ * Delegated library calls own protected durable journals just like the CLI.
+ * This entry deliberately shares the same validated input, ADF
  * lifecycle, actuator dispatch, trace finalization, and feedback loop rather
  * than spawning a second `run_pipeline` process.
  */
@@ -198,12 +221,21 @@ export async function executePipelineFile(
       'Diagnostic cannot inherit a mission context; run it in a separate unbound diagnostic shell without MISSION_ID.'
     );
   let diagnosticSource: string | undefined;
+  let loadedSource = '';
   if (options.executionMode && !options.validateLoadedPipeline)
     throw new Error('Diagnostic execution requires an approved pipeline snapshot validator');
   assertPipelineExecutionCurrent(options);
   const pipeline = await readValidatedWorkflowAdf(inputPath, {
     trustResolved: options.trustResolved,
     projectTrustApprovalId: options.projectTrustApprovalId,
+    onValidatedInput: (loaded: unknown, source: string) => {
+      loadedSource = source;
+      if (options.executionMode) {
+        assertFrontDeskReceiptPipeline(source);
+        diagnosticSource = source;
+        options.validateLoadedPipeline!(loaded, source);
+      }
+    },
     ...(options.executionMode
       ? {
           onValidatedInput: (loaded: unknown, source: string) => {
@@ -260,7 +292,7 @@ export async function executePipelineFile(
   // mission paths instead of computing its own.  `core:run_pipeline` already
   // strips those on the way down (`sanitizeNestedPipelineContext`); re-applying
   // `autoContext` last keeps the invariant for every library caller.
-  const mergedContext = { ...baseContext, ...(options.context || {}), ...autoContext };
+  let mergedContext = { ...baseContext, ...(options.context || {}), ...autoContext };
   const trace =
     options.trace ||
     new TraceContext(`pipeline:${pipelineId}`, {
@@ -268,7 +300,11 @@ export async function executePipelineFile(
       pipelineId,
     });
   trace.addArtifact('file', inputPath, 'Pipeline ADF input');
-  const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+  const steps = (pipeline.steps || []).map((step, index) => ({
+    ...step,
+    id: step.id || `__step_${index}`,
+    params: step.params || {},
+  }));
   if (!options.executionMode) await installReasoningBackendsForSteps(steps);
   assertPipelineExecutionCurrent(options);
   const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
@@ -302,30 +338,45 @@ export async function executePipelineFile(
       `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
     );
   }
-  const run = () =>
-    runValidatedSteps(steps, mergedContext, {
-      trace,
-      pipelinePath: inputPath,
-      executionMode: options.executionMode,
-      assertExecutionCurrent: options.assertExecutionCurrent,
-      ...(options.executionMode
-        ? {
-            validateDiagnosticEffect: () =>
-              options.validateLoadedPipeline!(pipeline, diagnosticSource!),
-          }
-        : {}),
-      quiet: options.quiet,
-      hasHuman: options.hasHuman,
-      trustResolved: effectiveTrustResolved,
-      projectTrustApprovalId: options.projectTrustApprovalId,
-      runPipelineFile: (nestedPath, nestedOptions = {}) =>
-        executePipelineFile(nestedPath, {
-          ...nestedOptions,
+  let libraryJournal: PipelineRunJournalHandle | undefined;
+  const run = (): Promise<{
+    status: 'succeeded' | 'failed';
+    results: PipelineStepResult[];
+    context: Record<string, unknown>;
+  }> =>
+    withDelegatedExecutionOptions({ workItem: options.delegatedWorkItem }, () =>
+      withDelegatedExecutionFrame(pathResolver.toRepoRelative(inputPath), () =>
+        runValidatedSteps(steps, mergedContext, {
+          trace,
+          pipelinePath: inputPath,
+          executionMode: options.executionMode,
           assertExecutionCurrent: options.assertExecutionCurrent,
+          ...(options.executionMode
+            ? {
+                validateDiagnosticEffect: () =>
+                  options.validateLoadedPipeline!(pipeline, diagnosticSource!),
+              }
+            : {}),
+          quiet: options.quiet,
+          hasHuman: options.hasHuman,
+          delegatedExecution: options.delegatedExecution,
+          runJournal: libraryJournal,
+          resumeState: options.resumeState,
+          runId: libraryJournal?.runId,
           trustResolved: effectiveTrustResolved,
           projectTrustApprovalId: options.projectTrustApprovalId,
-        }),
-    });
+          runPipelineFile: (nestedPath, nestedOptions = {}) =>
+            executePipelineFile(nestedPath, {
+              ...nestedOptions,
+              assertExecutionCurrent: options.assertExecutionCurrent,
+              delegatedExecution: options.delegatedExecution,
+              delegatedWorkItem: options.delegatedWorkItem,
+              trustResolved: effectiveTrustResolved,
+              projectTrustApprovalId: options.projectTrustApprovalId,
+            }),
+        })
+      )
+    );
   const missionTier = String(autoContext.mission_tier || '');
   const payloadTier: 'public' | 'confidential' | 'personal' =
     missionTier === 'personal'
@@ -342,13 +393,129 @@ export async function executePipelineFile(
   if (tierRank[effectivePayloadScope.tier] < tierRank[payloadTier]) {
     throw new Error('Pipeline payload scope cannot be lower than its mission tier.');
   }
-  const result =
-    effectivePayloadScope.tier === 'public'
-      ? await run()
-      : await (
-          await import('@agent/core/reasoning/reasoning-egress-scope')
-        ).withReasoningPayloadScope(effectivePayloadScope, run);
+  if (options.delegatedExecution === 'require' && !options.executionMode) {
+    const scope = currentExecutionScope();
+    const identity = resolveIdentityContext();
+    const sourceHash = createHash('sha256').update(loadedSource).digest('hex');
+    const resumed = options.resumeState?.started?.library_execution;
+    if (options.resumeState) {
+      if (
+        !resumed ||
+        options.resumeState.finished ||
+        resumed.source_sha256 !== sourceHash ||
+        path.resolve(pathResolver.rootDir(), options.resumeState.started!.input_path) !==
+          path.resolve(inputPath)
+      ) {
+        throw new Error(
+          '[PIPELINE_RESUME_DENIED] Original source identity changed or run is terminal'
+        );
+      }
+      if (
+        options.resumeState.events.some(
+          (event) =>
+            event.event === 'node_completed' &&
+            Array.isArray(event.payload.redacted_channels) &&
+            event.payload.redacted_channels.length > 0
+        )
+      ) {
+        throw new Error(
+          '[PIPELINE_RESUME_DENIED] Redacted completed outputs require explicit recovery; effects are never replayed'
+        );
+      }
+      mergedContext = structuredClone(resumed.initial_context);
+      for (const node of options.resumeState.completed_nodes.values()) {
+        Object.assign(
+          mergedContext,
+          node.output_channels_snapshot,
+          node.control_state_snapshot ?? {}
+        );
+      }
+      libraryJournal = openPipelineRunJournal(options.resumeState);
+      libraryJournal.append('run_resumed', { resumed_at: nowIso() });
+    } else {
+      const role = scope?.assumedRole ?? identity.role;
+      if (!role || role === 'unknown')
+        throw new Error('[PIPELINE_JOURNAL] Trusted execution role is required');
+      const originalRunId = newPipelineRunId();
+      const scopeIdentity = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
+      libraryJournal = createPipelineRunJournal(
+        originalRunId,
+        {
+          pipeline_id: pipelineId,
+          input_path: path.resolve(inputPath),
+          ...(missionId ? { mission_id: missionId } : {}),
+          step_ids: steps.map((step) => step.id),
+          library_execution: {
+            source_sha256: sourceHash,
+            initial_context: structuredClone(mergedContext),
+            payload_scope: effectivePayloadScope,
+            identity: {
+              role,
+              persona:
+                scope?.assumedPersona ??
+                (identity.persona === 'unknown' ? undefined : identity.persona),
+              tenant_slug: scope?.tenantSlug ?? effectivePayloadScope.tenant_slug,
+              organization_id: scope?.organizationId,
+            },
+            scope_identity: {
+              ...scopeIdentity,
+              session_id: scopeIdentity.session_id ?? `pipeline:${originalRunId}`,
+              tenant_slug: scope?.tenantSlug ?? effectivePayloadScope.tenant_slug,
+              tier: effectivePayloadScope.tier,
+            },
+            work_item: options.delegatedWorkItem,
+            trust_resolved: effectiveTrustResolved,
+            project_trust_approval_id: options.projectTrustApprovalId,
+          },
+        },
+        missionId,
+        { tier: effectivePayloadScope.tier, tenantSlug: effectivePayloadScope.tenant_slug }
+      );
+    }
+  }
+  let result: Awaited<ReturnType<typeof run>>;
+  try {
+    result =
+      effectivePayloadScope.tier === 'public'
+        ? await run()
+        : await (
+            await import('@agent/core/reasoning/reasoning-egress-scope')
+          ).withReasoningPayloadScope(effectivePayloadScope, run);
+  } catch (error) {
+    if (!(error instanceof PipelineSuspendedError) || !libraryJournal) {
+      if (libraryJournal)
+        libraryJournal.append('run_finished', { status: 'failed', error: String(error) });
+      throw error;
+    }
+    libraryJournal.append('run_suspended', { ...error.suspension });
+    trace.addEvent('pipeline.suspended', {
+      step_id: error.suspension.step_id,
+      approval_request_id: error.suspension.approval_request_id,
+      storage_channel: error.suspension.storage_channel,
+    });
+    await firePipelineLifecycleHooks(undefined, 'task_settled', {
+      pipeline_id: pipelineId,
+      status: 'suspended',
+    });
+    await firePipelineLifecycleHooks(undefined, 'session_end', {
+      pipeline_id: pipelineId,
+      status: 'suspended',
+    });
+    const persisted = finalizePipelineTrace(trace, true);
+    return {
+      status: 'suspended' as const,
+      results: [],
+      context: mergedContext,
+      trace,
+      persistedPath: persisted.path,
+      runId: libraryJournal.runId,
+      approvalRequestId: error.suspension.approval_request_id,
+      storageChannel: error.suspension.storage_channel,
+    };
+  }
   const failed = result.results.some((entry) => entry.status === 'failed');
+  if (libraryJournal)
+    libraryJournal.append('run_finished', { status: failed ? 'failed' : 'succeeded' });
   // Preserve local diagnostic evidence even when a late observer makes final publication unsafe.
   const diagnosticPersisted = options.executionMode
     ? finalizePipelineTrace(trace, !failed, { localOnly: true })
@@ -375,6 +542,218 @@ export async function executePipelineFile(
 }
 
 type Print = (value: unknown) => void;
+
+/** Resume the protected original library run, never a reconstructed command. */
+export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJournalScope) {
+  const state = loadPipelineRunJournal(runId, undefined, scope);
+  const snapshot = state.started?.library_execution;
+  if (
+    !snapshot ||
+    state.finished ||
+    !state.suspended ||
+    snapshot.payload_scope.tier !== scope.tier ||
+    snapshot.payload_scope.tenant_slug !== scope.tenantSlug ||
+    snapshot.identity.tenant_slug !== scope.tenantSlug
+  ) {
+    throw new Error('[PIPELINE_RESUME_DENIED] Original scoped library execution is not resumable');
+  }
+  if (!snapshot.scope_identity)
+    throw new Error('[PIPELINE_RESUME_DENIED] Original scope identity is missing');
+  const envelope = mintScopeEnvelope({
+    identity: snapshot.scope_identity,
+    env: {},
+    policy: {
+      read_tiers: [scope.tier],
+      write_tier: scope.tier,
+      purpose: snapshot.payload_scope.purpose ?? 'original pipeline continuation',
+    },
+  });
+  return withScopeEnvelope(envelope, () =>
+    withExecutionContextAsync(
+      snapshot.identity.role,
+      async () => {
+        const coordination = await import('@agent/core/workforce/work-coordination');
+        const owner = snapshot.work_item;
+        const { loadApprovalRequest } = await import('@agent/core/governance/approval-store');
+        const approval = loadApprovalRequest(
+          state.suspended!.storage_channel,
+          state.suspended!.approval_request_id
+        );
+        if (
+          !approval ||
+          approval.kind !== 'mission_gate' ||
+          approval.requestedBy !== `pipeline:${runId}` ||
+          approval.requestedByContext?.pipelineRunId !== runId ||
+          approval.requestedByContext?.stepId !== state.suspended!.step_id ||
+          approval.correlationId !== `pipeline:${runId}:${state.suspended!.step_id}` ||
+          approval.scope?.tier !== scope.tier ||
+          approval.scope?.tenant_slug !== scope.tenantSlug
+        ) {
+          throw new Error(
+            '[PIPELINE_RESUME_DENIED] Approval does not bind the original scoped suspension'
+          );
+        }
+        if (
+          approval.status === 'rejected' ||
+          approval.status === 'cancelled' ||
+          approval.status === 'expired'
+        ) {
+          // This path never invokes the runner, acquires an execution lease, or grants an effect.
+          const journal = openPipelineRunJournal(state);
+          journal.append('run_finished', {
+            status: 'aborted',
+            error: `Human authorization ${approval.status}: ${approval.id}`,
+          });
+          if (owner)
+            await coordination.finalizeDeniedSuspendedPipelineWorkItem({
+              itemId: owner.id,
+              runId,
+              approvalRequestId: approval.id,
+              storageChannel: approval.storageChannel,
+              actorPeerId: owner.agentId,
+              expectedAttemptId: owner.attemptId ?? '',
+              tenantSlug: owner.tenantSlug,
+              sourceHash: snapshot.source_sha256,
+            });
+          return {
+            status: 'aborted' as const,
+            results: [],
+            context: snapshot.initial_context,
+            runId,
+          };
+        }
+        if (approval.status !== 'approved')
+          throw new Error('[PIPELINE_RESUME_DENIED] Approval is not decided');
+        const dotCharters = owner?.agentId.startsWith('dot:')
+          ? await import('@agent/core/dot/dot-charter')
+          : undefined;
+        const dotExecutor = dotCharters ? await import('@agent/core/dot/dot-executor') : undefined;
+        const validateDot = () => {
+          if (!dotCharters || !owner) return undefined;
+          const dot = dotCharters.findDotCharter(owner.agentId.slice(4))?.charter;
+          if (
+            !dot ||
+            dot.status !== 'active' ||
+            dot.authority.authority_role !== snapshot.identity.role ||
+            dot.scope.tenant_slug !== owner.tenantSlug ||
+            dot.scope.organization_id !== snapshot.identity.organization_id ||
+            !(dot.authority.allowed_pipelines ?? []).includes(state.started!.input_path)
+          ) {
+            throw new Error(
+              '[PIPELINE_RESUME_DENIED] Current Dot authority no longer permits this original pipeline'
+            );
+          }
+          dotExecutor!.assertDotAccountabilityCharter(dot);
+          return dot;
+        };
+        validateDot();
+        const continuation = owner
+          ? await coordination.resumeSuspendedPipelineWorkItem({
+              itemId: owner.id,
+              runId,
+              approvalRequestId: state.suspended!.approval_request_id,
+              storageChannel: state.suspended!.storage_channel,
+              actorPeerId: owner.agentId,
+              expectedAttemptId: owner.attemptId ?? '',
+              tenantSlug: owner.tenantSlug,
+              sourceHash: snapshot.source_sha256,
+            })
+          : undefined;
+        const assertCurrent = (): void => {
+          validateDot();
+          if (!owner || !continuation) return;
+          const latest = coordination.getWorkItem(owner.id);
+          if (
+            !latest ||
+            latest.status !== 'in_progress' ||
+            latest.lease_id !== continuation.lease.lease_id ||
+            latest.current_attempt_id !== owner.attemptId ||
+            latest.claimed_by_peer_id !== owner.agentId
+          ) {
+            throw new Error('[PIPELINE_RESUME_DENIED] Continuation lease or attempt changed');
+          }
+        };
+        const release = (
+          status: 'done' | 'blocked',
+          awaiting?: { runId: string; approvalRequestId: string; storageChannel: string }
+        ): void => {
+          if (!owner || !continuation) return;
+          assertCurrent();
+          const latest = coordination.getWorkItem(owner.id)!;
+          const previous = latest.metadata?.dot_executor;
+          coordination.releaseWorkItem({
+            itemId: owner.id,
+            leaseId: continuation.lease.lease_id,
+            actorPeerId: owner.agentId,
+            nextStatus: status,
+            ...(status === 'done' ? { effectDisposition: 'completed' as const } : {}),
+            summary:
+              status === 'done'
+                ? `Pipeline ${runId} completed after approval`
+                : `Pipeline ${runId} remains held`,
+            metadata: {
+              ...latest.metadata,
+              dot_executor: {
+                ...(previous && typeof previous === 'object' ? previous : {}),
+                mode: 'pipeline',
+                status,
+                awaiting_approval: Boolean(awaiting),
+                pipeline_run_id: runId,
+                ...(awaiting
+                  ? {
+                      approval_request_id: awaiting.approvalRequestId,
+                      storage_channel: awaiting.storageChannel,
+                    }
+                  : {}),
+              },
+            },
+          });
+        };
+        try {
+          const result = await executePipelineFile(
+            pathResolver.rootResolve(state.started!.input_path),
+            {
+              delegatedExecution: 'require',
+              delegatedWorkItem: owner,
+              resumeState: state,
+              assertExecutionCurrent: assertCurrent,
+              payloadScope: snapshot.payload_scope,
+              trustResolved: snapshot.trust_resolved,
+              projectTrustApprovalId: snapshot.project_trust_approval_id,
+              hasHuman: false,
+              quiet: true,
+            }
+          );
+          const currentDot = validateDot();
+          if (owner && continuation && currentDot && result.status !== 'suspended') {
+            dotExecutor!.recordDotPipelineContinuation(currentDot, continuation.item, {
+              runId,
+              succeeded: !result.results.some((row) => row.status === 'failed'),
+            });
+          }
+          if (result.status === 'suspended')
+            release('blocked', {
+              runId: result.runId,
+              approvalRequestId: result.approvalRequestId,
+              storageChannel: result.storageChannel,
+            });
+          else release(result.results.some((row) => row.status === 'failed') ? 'blocked' : 'done');
+          return result;
+        } catch (error) {
+          try {
+            release('blocked');
+          } catch {
+            /* the durable lease/hold remains for recovery */
+          }
+          throw error;
+        }
+      },
+      snapshot.identity.persona as Parameters<typeof withExecutionContextAsync>[2],
+      snapshot.identity.tenant_slug,
+      snapshot.identity.organization_id
+    )
+  );
+}
 
 export async function main(args?: string[], print: Print = () => undefined) {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
@@ -410,6 +789,11 @@ export async function main(args?: string[], print: Print = () => undefined) {
       type: 'string',
       describe: 'Resume a durable pipeline run by run id',
     })
+    .option('journal-tier', {
+      type: 'string',
+      choices: ['public', 'confidential', 'personal'] as const,
+    })
+    .option('journal-tenant', { type: 'string' })
     .option('context', {
       alias: 'c',
       type: 'string',
@@ -433,7 +817,30 @@ export async function main(args?: string[], print: Print = () => undefined) {
 
   let resumeState: PipelineRunJournalState | undefined;
   if (argv.resume) {
-    resumeState = loadPipelineRunJournal(String(argv.resume), getRegisteredEnvText('MISSION_ID'));
+    const journalScope = argv['journal-tier']
+      ? { tier: argv['journal-tier'], tenantSlug: argv['journal-tenant'] }
+      : undefined;
+    resumeState = loadPipelineRunJournal(
+      String(argv.resume),
+      getRegisteredEnvText('MISSION_ID'),
+      journalScope
+    );
+    if (resumeState.started?.library_execution) {
+      if (
+        !journalScope ||
+        argv.context ||
+        (argv.input &&
+          path.resolve(String(argv.input)) !==
+            pathResolver.rootResolve(resumeState.started.input_path))
+      ) {
+        throw new Error(
+          '[PIPELINE_RESUME_DENIED] Library continuation cannot replace original source or context'
+        );
+      }
+      const result = await resumeLibraryPipelineRun(String(argv.resume), journalScope);
+      if (argv.json) print({ status: result.status, run_id: String(argv.resume) });
+      return;
+    }
     if (!argv.input) argv.input = resumeState.started?.input_path;
   }
   if (!argv.input) throw new Error('Either --input or --resume is required.');

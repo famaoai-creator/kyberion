@@ -1,5 +1,15 @@
 import { createLogger } from '../logger.js';
 import {
+  currentHumanExecutionAuthorization,
+  hasHumanExecutionContext,
+} from '../governance/human-execution.js';
+import {
+  currentDelegatedExecution,
+  hasDelegatedExecutionContext,
+  verifyDelegatedExecution,
+  hashDelegatedServiceConfiguration,
+} from '../governance/delegated-execution.js';
+import {
   consumeOperatorServiceProbeAdmission,
   OperatorServiceProbeError,
 } from './operator-service-connection-admission.js';
@@ -13,9 +23,13 @@ import {
   mergeParamsWithConnection,
   isPlainObject,
   resolveRequestEnvelope,
+  ServiceEffectOutcomeUnknownError,
 } from './service-engine-helpers.js';
 import { executeServicePresetAlternative } from './service-engine-execution.js';
-import { authorizeTenantServiceAction } from './service-binding-registry.js';
+import {
+  authorizeTenantServiceAction,
+  listServiceBindingRecords,
+} from './service-binding-registry.js';
 import { resolveTenantServiceEngineAdmission } from './service-engine-admission.js';
 
 const logger = createLogger('service-engine');
@@ -63,7 +77,21 @@ function enforceTenantBindingContract(
     operation.risk === 'write' ||
     operation.risk === 'destructive' ||
     (operation.approval_required !== false && operation.risk !== 'read');
-  if (approvalRequired && tenantBindingContext.approvalGranted !== true) {
+  const delegated = tenantBindingContext.delegated;
+  const delegatedAllowed =
+    delegated &&
+    currentDelegatedExecution(delegated.target.operationId, delegated.target.params) &&
+    verifyDelegatedExecution({ ...delegated.target, permitId: delegated.permitId });
+  const human = tenantBindingContext.humanExecution;
+  const currentHuman =
+    human && currentHumanExecutionAuthorization(human.target.operationId, human.target.params);
+  const humanAllowed = currentHuman && currentHuman.reference.claimId === human!.reference.claimId;
+  if (
+    approvalRequired &&
+    tenantBindingContext.approvalGranted !== true &&
+    !delegatedAllowed &&
+    !humanAllowed
+  ) {
     throw new Error(
       `[POLICY_VIOLATION] ${serviceId}:${action} requires an admitted approval decision`
     );
@@ -95,6 +123,37 @@ export async function executeServicePreset(
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 
   enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
+  const activeDelegation = currentDelegatedExecution(`service:preset:${serviceId}:${action}`, {
+    request: params,
+    auth,
+  });
+  const activeHuman = currentHumanExecutionAuthorization(`service:preset:${serviceId}:${action}`, {
+    request: params,
+    auth,
+  });
+  if (hasHumanExecutionContext() && !activeHuman) {
+    throw new Error(
+      '[POLICY_VIOLATION] Actual service operation/payload differs from human-authorized effect'
+    );
+  }
+  if (hasDelegatedExecutionContext() && !activeDelegation) {
+    throw new Error(
+      '[POLICY_VIOLATION] Actual service operation/payload no longer matches delegated authority'
+    );
+  }
+  if (tenantBindingCapability) {
+    const admitted = resolveTenantServiceEngineAdmission(tenantBindingCapability);
+    if (
+      admitted?.delegated &&
+      (!activeDelegation ||
+        !verifyDelegatedExecution({
+          ...admitted.delegated.target,
+          permitId: admitted.delegated.permitId,
+        }))
+    ) {
+      throw new Error('[POLICY_VIOLATION] Delegated service effect no longer authorized');
+    }
+  }
 
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
   const envelope = resolveRequestEnvelope(params);
@@ -114,6 +173,20 @@ export async function executeServicePreset(
 
   // Auth resolution
   const binding = probe?.binding || resolveServiceBinding(serviceId, auth);
+  const executionTenant = activeDelegation?.target.tenantSlug ?? activeHuman?.target.tenantSlug;
+  const effectConfigurationHash = executionTenant
+    ? hashDelegatedServiceConfiguration({
+        config: serviceConfig,
+        preset,
+        connection,
+        binding,
+        tenantBindings: listServiceBindingRecords().filter(
+          (record) =>
+            record.tenant_slug === executionTenant &&
+            (record.service_id === serviceId || record.service_type === serviceId)
+        ),
+      })
+    : undefined;
   for (const alt of alternatives) {
     try {
       const resolved = await executeServicePresetAlternative({
@@ -126,10 +199,13 @@ export async function executeServicePreset(
         envelope,
         mergedParams,
         binding,
+        authSelector: auth,
+        effectConfigurationHash,
         operatorProbe: Boolean(probe),
       });
       if (resolved) return resolved.result;
     } catch (err: any) {
+      if (err instanceof ServiceEffectOutcomeUnknownError) throw err;
       if (probe) {
         // Neither provider errors nor request headers may reach logs or the Web result.
         throw new OperatorServiceProbeError(

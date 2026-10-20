@@ -44,6 +44,7 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
 
 export interface GeminiCliBackendOptions {
@@ -248,9 +249,21 @@ export class GeminiCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const activePermissionArgs = resolveActiveProviderPermissionArgs('gemini');
+    const profile = resolveEffectiveProviderPermissionProfile(
+      'gemini',
+      options?.advisory ? 'planner' : undefined
+    );
+    const resolution = profile ? resolveProviderPermissionArgs(profile, 'gemini') : undefined;
+    if (resolution?.kind === 'refused')
+      throw new Error(`[ADVISORY_BACKEND_DENIED] ${resolution.reason}`);
+    const activePermissionArgs =
+      resolution?.kind === 'ok' ? resolution.args : resolveActiveProviderPermissionArgs('gemini');
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
@@ -267,10 +280,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     ];
     // For delegation, we don't necessarily want JSON format, we want it to just do the work.
     // However, the caller expects a string result (the report).
-    const stdout = await this.spawnCli(
-      args,
-      activePermissionArgs ? resolveEffectiveProviderPermissionProfile('gemini') : undefined
-    );
+    const stdout = await this.spawnCli(args, profile);
     const lines = stdout.split('\n');
     const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
     if (jsonStartIdx === -1) {

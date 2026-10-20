@@ -1,6 +1,7 @@
 /** Mission-owner execution surface. The dot worker executor cannot run these bindings. */
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import type { DotCharter } from '../dot/dot-charter.js';
+import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
 import { dotAdmissionScopeHash } from '../dot/dot-admission-identity.js';
@@ -159,6 +160,7 @@ export function authorizeItem(
   rootDir: string,
   currentApproval = true
 ): void {
+  assertDotAccountabilityCharter(charter, { rootDir });
   const record = readDotActionLedgerStrict({ rootDir })
     .filter((row) => row.action_ref === item.metadata?.action_ref)
     .at(-1);

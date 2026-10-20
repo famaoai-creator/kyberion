@@ -95,6 +95,12 @@
     }
   },
   "actions": {
+    "dot_intake_work": {
+      "title": "Dot internal work intake",
+      "description": "Observe, classify and enqueue bounded tenant work. Admission grants no external effect authority; concrete execution requires its own governance.",
+      "axis_scores": { "scope": 0, "reversibility": 0, "sensitivity": 0, "confidence": 0 },
+      "action_class": "internal_work_intake"
+    },
     "storage_janitor": {
       "title": "Storage janitor",
       "description": "Remove stale runtime and temporary artifacts after safe verification.",

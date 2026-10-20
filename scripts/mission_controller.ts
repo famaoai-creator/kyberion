@@ -297,6 +297,7 @@ async function startMission(
     intentGoal?: string;
     force?: boolean;
     decidedBy?: HumanDecidedBy;
+    admissionWorkItem?: string;
   }
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
@@ -315,6 +316,10 @@ async function startMission(
     )
   );
   const targetId = id.toUpperCase();
+  if (options?.admissionWorkItem) {
+    const { authorMissionAdmissionBrief } = await import('@agent/core/mission/mission-admission');
+    authorMissionAdmissionBrief(targetId, options.admissionWorkItem);
+  }
   const state = loadState(targetId);
   if (state?.status === 'active') {
     writeFocusedMissionId(targetId);

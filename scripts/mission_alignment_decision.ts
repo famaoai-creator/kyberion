@@ -25,7 +25,6 @@
  * left alone, so a relative path in `args` would resolve against the repo root.
  */
 
-import { recordMandateOutcome } from '@agent/core/governance/mandate-shadow';
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -160,12 +159,6 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
       ? approvalUsabilityRefusal(record, 'mission_alignment_gate')
       : undefined;
   if (sodRefusal) return { ...base, verdict: 'pending', satisfied: false, reasons: [sodRefusal] };
-
-  // Shadow mode (P4): remember what the operator decided so it can be compared
-  // with what a standing mandate would have done. Record-only, once per mission.
-  if (record.status === 'approved' || record.status === 'rejected') {
-    recordMandateOutcome(missionId, record.status);
-  }
 
   if (record.status !== 'approved') {
     const rejected = record.status === 'rejected';

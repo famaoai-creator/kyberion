@@ -73,6 +73,9 @@ import {
 } from '../workforce/work-coordination.js';
 import type { WorkItem, WorkItemStatus } from '../workforce/work-coordination-types.js';
 import { dotBudgetThrottle } from './dot-budget.js';
+import { assertDotAccountabilityCharter } from './dot-authority.js';
+export { assertDotAccountabilityCharter } from './dot-authority.js';
+import { recordAutonomyExecution } from '../governance/autonomy-action-state.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import type { DotStatusSection } from './dot-extensions.js';
 import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotWorkShape } from './dot-proposals.js';
@@ -197,7 +200,14 @@ export interface DotExecutorPorts {
     ref: string,
     ctx: Record<string, unknown>,
     signal?: AbortSignal
-  ): Promise<{ status: 'succeeded' | 'failed'; summary: string }>;
+  ): Promise<{
+    status: 'succeeded' | 'failed' | 'suspended';
+    summary: string;
+    executedSteps?: number;
+    runId?: string;
+    approvalRequestId?: string;
+    storageChannel?: string;
+  }>;
   /**
    * How conversational work runs for this charter now; defaults to `tool`.
    * `unavailable` leaves the item unclaimed for a later sweep.
@@ -220,6 +230,7 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
       (item) =>
         item.status === 'ready' &&
         !item.metadata?.continuous_work &&
+        !(item.metadata?.requested_work_shape === 'mission' && item.metadata?.mandate_ref) &&
         !item.lease_id &&
         addressedTo(c, item) &&
         !activeTerminalResult(terminal, item) &&
@@ -258,6 +269,8 @@ function executorObjective(item: WorkItem): string {
 }
 
 interface Outcome {
+  awaitingApproval?: { runId: string; approvalRequestId: string; storageChannel: string };
+  executedSteps?: number;
   front_desk_verification?: FrontDeskArtifactVerification;
   mode: DotWorkResultRow['mode'];
   status: 'done' | 'blocked' | 'failed';
@@ -334,6 +347,20 @@ async function routeItem(
       },
       signal
     );
+    if (result.status === 'suspended') {
+      if (!result.runId || !result.approvalRequestId || !result.storageChannel)
+        throw new Error('Suspended pipeline has no durable approval/run binding');
+      return {
+        mode: 'pipeline',
+        status: 'blocked',
+        summary: result.summary,
+        awaitingApproval: {
+          runId: result.runId,
+          approvalRequestId: result.approvalRequestId,
+          storageChannel: result.storageChannel,
+        },
+      };
+    }
     // The pipeline may outlive the executor deadline. Never publish a new
     // deliverable after quarantine, or under a request revoked while it ran.
     if (prepared && result.status === 'succeeded') {
@@ -351,6 +378,7 @@ async function routeItem(
       prepared && result.status === 'succeeded' ? verifyFrontDeskExecution(prepared) : undefined;
     return {
       ...(verified ? { front_desk_verification: verified } : {}),
+      executedSteps: result.executedSteps,
       mode: 'pipeline',
       status: result.status === 'succeeded' ? 'done' : 'failed',
       summary: `pipeline ${ref} ${result.status}: ${result.summary}`,
@@ -536,6 +564,23 @@ export async function executeDotWorkItem(
 ): Promise<DotWorkResultRow> {
   const startedAt = nowOf(deps).toISOString();
   const actionRef = meta(item, 'action_ref') ?? item.item_id;
+  try {
+    assertDotAccountabilityCharter(c, deps);
+  } catch (error) {
+    recordAudit(
+      c,
+      'denied',
+      { work_item_id: item.item_id, action_ref: actionRef, reason: String(error) },
+      deps
+    );
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      `accountability authority refused: ${String(error)}`,
+      deps
+    );
+  }
   const actor = actorOf(c);
   if (item.metadata?.continuous_work) {
     return skippedRow(
@@ -671,9 +716,15 @@ export async function executeDotWorkItem(
 
   // Escalations end terminal (archived) so they stop holding a delegation slot;
   // the real status lives in metadata.dot_executor, the result row and the report.
-  const escalated = outcome.status !== 'done' && !retryable;
+  const escalated = outcome.status !== 'done' && !retryable && !outcome.awaitingApproval;
   const nextStatus: WorkItemStatus =
-    outcome.status === 'done' ? 'done' : retryable ? 'ready' : DOT_EXECUTOR_ESCALATED_STATUS;
+    outcome.status === 'done'
+      ? 'done'
+      : outcome.awaitingApproval
+        ? 'blocked'
+        : retryable
+          ? 'ready'
+          : DOT_EXECUTOR_ESCALATED_STATUS;
   const summary = bounded(outcome.summary);
   const tenantBound = Boolean(c.scope.tenant_slug);
   const completedAt = nowOf(deps).toISOString();
@@ -682,6 +733,14 @@ export async function executeDotWorkItem(
     work_item_id: item.item_id,
     action_ref: actionRef,
     ...(claimed.item.current_attempt_id ? { attempt_id: claimed.item.current_attempt_id } : {}),
+    ...(outcome.awaitingApproval
+      ? {
+          awaiting_approval: true,
+          pipeline_run_id: outcome.awaitingApproval.runId,
+          approval_request_id: outcome.awaitingApproval.approvalRequestId,
+          storage_channel: outcome.awaitingApproval.storageChannel,
+        }
+      : {}),
     mode: outcome.mode,
     status: outcome.status,
     summary,
@@ -699,6 +758,32 @@ export async function executeDotWorkItem(
   // Never release before durable evidence exists. If this throws, the expired
   // claim is conservatively quarantined by recovery, not replayed.
   appendWorkResult(c, row, deps);
+  // Advisory model completions are never receipts of an executed effect.
+  // Pipeline ports report concrete runner outcomes; retries use the same
+  // attempt identity and the tenant learner deduplicates their receipts.
+  if (
+    outcome.mode === 'pipeline' &&
+    !outcome.awaitingApproval &&
+    claimed.item.current_attempt_id &&
+    (outcome.status !== 'done' ||
+      (Number.isInteger(outcome.executedSteps) && outcome.executedSteps! > 0))
+  ) {
+    try {
+      recordAutonomyExecution(
+        {
+          action_id: meta(item, 'gate_action_id') ?? meta(item, 'action_id') ?? 'dot_delegate_work',
+          receipt_id: `dot-execution:${c.dot_id}:${item.item_id}:${claimed.item.current_attempt_id}`,
+          ok: outcome.status === 'done',
+          ...(outcome.status === 'done' ? {} : { error: summary }),
+        },
+        { rootDir: deps.rootDir, now: deps.now, tenantSlug: c.scope.tenant_slug }
+      );
+    } catch (error) {
+      logger.warn(
+        `execution receipt unavailable — ${String(error)} | next: inspect tenant autonomy ledger | evidence: ${item.item_id}`
+      );
+    }
+  }
   try {
     (deps.release ?? releaseWorkItem)({
       itemId: item.item_id,
@@ -721,6 +806,14 @@ export async function executeDotWorkItem(
           status: outcome.status,
           mode: outcome.mode,
           completed_at: completedAt,
+          ...(outcome.awaitingApproval
+            ? {
+                awaiting_approval: true,
+                pipeline_run_id: outcome.awaitingApproval.runId,
+                approval_request_id: outcome.awaitingApproval.approvalRequestId,
+                storage_channel: outcome.awaitingApproval.storageChannel,
+              }
+            : {}),
           ...(escalated ? { escalated: true } : {}),
           ...(retryable ? { retryable: true } : {}),
           ...(outcome.reason_code ? { reason_code: outcome.reason_code } : {}),
@@ -766,6 +859,40 @@ export async function executeDotWorkItem(
   );
   // A retryable pre-effect failure is not a result yet: no report, no wake.
   return retryable ? row : enqueueExecutorReport(c, row, deps, item);
+}
+
+/** Terminal continuation evidence is persisted before its scheduling lease releases. */
+export function recordDotPipelineContinuation(
+  charter: DotCharter,
+  item: WorkItem,
+  outcome: { runId: string; succeeded: boolean },
+  deps: DotExecutorDeps = {}
+): DotWorkResultRow {
+  const at = nowOf(deps).toISOString();
+  const row: DotWorkResultRow = {
+    dot_id: charter.dot_id,
+    work_item_id: item.item_id,
+    action_ref: meta(item, 'action_ref') ?? item.item_id,
+    attempt_id: item.current_attempt_id,
+    mode: 'pipeline',
+    status: outcome.succeeded ? 'done' : 'blocked',
+    pipeline_run_id: outcome.runId,
+    started_at: at,
+    completed_at: at,
+    summary: `Original pipeline ${outcome.runId} ${outcome.succeeded ? 'completed' : 'failed and remains held'} after approval`,
+    report_to_dot_id: meta(item, 'dot_id') ?? charter.dot_id,
+  };
+  appendWorkResult(charter, row, deps);
+  recordAutonomyExecution(
+    {
+      action_id: meta(item, 'gate_action_id') ?? meta(item, 'action_id') ?? 'dot_delegate_work',
+      receipt_id: `dot-execution:${charter.dot_id}:${item.item_id}:${item.current_attempt_id}`,
+      ok: outcome.succeeded,
+      ...(outcome.succeeded ? {} : { error: row.summary }),
+    },
+    { rootDir: deps.rootDir, now: deps.now, tenantSlug: charter.scope.tenant_slug }
+  );
+  return row;
 }
 
 const isDotItem = (item: WorkItem): boolean =>
@@ -1058,8 +1185,9 @@ export async function runDotExecutorSweep(
         capped = tokenCapReached(charter, deps);
       } catch (error) {
         logger.warn(
-          `token cap check failed for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: the executor proceeds | evidence: active/shared/runtime/dot`
+          `token cap check failed for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: executor held until budget evidence is readable | evidence: active/shared/runtime/dot`
         );
+        capped = true;
       }
       if (capped) {
         logger.debug(`executor skips ${charter.dot_id}: daily token cap reached`);
@@ -1069,11 +1197,10 @@ export async function runDotExecutorSweep(
       try {
         throttle = throttleFor(charter, deps);
       } catch (error) {
-        // Fail open: a broken governor must not stop the organization loop.
         logger.warn(
-          `budget evaluation failed for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: the executor proceeds; check spend-policy.json org_budget | evidence: knowledge/product/governance/spend-policy.json`
+          `budget evaluation failed for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: executor held; repair spend-policy.json org_budget | evidence: knowledge/product/governance/spend-policy.json`
         );
-        throttle = 'normal';
+        throttle = 'hard';
       }
       if (throttle === 'hard') continue;
       const candidates = listClaimableDotWorkItems(charter, deps).filter(

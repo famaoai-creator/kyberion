@@ -1,3 +1,7 @@
+import {
+  continueSuspendedPipelineWorkItem,
+  type ResumeSuspendedPipelineWorkItemInput,
+} from './work-coordination-pipeline-continuation.js';
 import { latestById, readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
 import { finalizeWorkItemAttempt } from './work-item-attempt.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
@@ -945,6 +949,36 @@ function appendLeaseEvent(
 
 export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
   return withCoordinationMutation(() => claimWorkItemInternal(input));
+}
+
+export type { ResumeSuspendedPipelineWorkItemInput } from './work-coordination-pipeline-continuation.js';
+const pipelineContinuationStore = {
+  withCoordinationMutation,
+  currentWorkItem,
+  activeLeaseForItem,
+  currentLeaseById,
+  appendLeaseSnapshot,
+  appendItemSnapshot,
+  appendLeaseEvent,
+  appendWorkItemAttemptEvent,
+  randomId,
+};
+/** Continue the same protected held attempt after its exact human approval. */
+export async function resumeSuspendedPipelineWorkItem(
+  input: ResumeSuspendedPipelineWorkItemInput
+): Promise<{ item: WorkItem; lease: WorkLease }> {
+  const result = await continueSuspendedPipelineWorkItem(
+    input,
+    'resume',
+    pipelineContinuationStore
+  );
+  return { item: result.item, lease: result.lease! };
+}
+/** Settle denied execution only from the exact protected terminal journal. */
+export async function finalizeDeniedSuspendedPipelineWorkItem(
+  input: ResumeSuspendedPipelineWorkItemInput
+): Promise<WorkItem> {
+  return (await continueSuspendedPipelineWorkItem(input, 'deny', pipelineContinuationStore)).item;
 }
 
 function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {

@@ -10,8 +10,9 @@ vi.mock('@agent/core', async () => {
   };
 });
 
-vi.mock('@agent/core/network', async () => {
+vi.mock('@agent/core/network', async (original) => {
   return {
+    ...(await original<typeof import('@agent/core/network')>()),
     secureFetch: vi.fn(),
   };
 });
@@ -55,7 +56,7 @@ describe('Resilience Verification', () => {
     expect(result.context.last_capture.data).toBe('success');
   });
 
-  it('service-actuator: API mode should retry on failure', async () => {
+  it('service-actuator: a GET read can retry on failure', async () => {
     const { handleAction: handleServiceAction } =
       await import('../libs/actuators/service-actuator/src/index');
     const mockFetch = vi.mocked(network.secureFetch);
@@ -69,6 +70,7 @@ describe('Resilience Verification', () => {
       service_id: 'example',
       mode: 'API',
       action: 'get_data',
+      method: 'GET',
       params: {
         retry: {
           maxRetries: 1,
@@ -81,5 +83,21 @@ describe('Resilience Verification', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result.data).toBe('service success');
+  });
+
+  it('service-actuator: an uncertain write is never retried', async () => {
+    const { handleAction } = await import('../libs/actuators/service-actuator/src/index');
+    const mockFetch = vi.mocked(network.secureFetch);
+    mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
+    await expect(
+      handleAction({
+        service_id: 'example',
+        mode: 'API',
+        action: 'write_data',
+        method: 'POST',
+        params: { retry: { maxRetries: 4, initialDelayMs: 1 } },
+      })
+    ).rejects.toThrow('outcome is unknown');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

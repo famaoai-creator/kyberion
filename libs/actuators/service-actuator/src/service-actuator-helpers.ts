@@ -25,6 +25,7 @@ import { authorizeTenantServiceBinding } from './service-actuator-tenant-binding
 import * as pathResolver from '@agent/core/path-resolver';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { executeServicePreset, executeMcp } from '@agent/core/service/service-engine';
+import { ServiceEffectOutcomeUnknownError } from '@agent/core/service/service-engine-helpers';
 import { issueTenantServiceEngineAdmission } from '@agent/core/service/service-engine-admission';
 import {
   beginServiceOAuth,
@@ -68,6 +69,18 @@ import { secureFetch } from '@agent/core/network';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import {
+  currentHumanExecutionAuthorization,
+  hasHumanExecutionContext,
+} from '@agent/core/governance/human-execution';
+import {
+  authorizeDelegatedExecution,
+  currentDelegatedExecution,
+  hasDelegatedExecutionContext,
+  hasDelegatedOperationMapping,
+  runDelegatedExecution,
+  runtimeDelegatedTarget,
+} from '@agent/core/governance/delegated-execution';
 
 export interface ServiceAction {
   service_id: string;
@@ -360,7 +373,7 @@ export async function handleAction(
     const steps = input.steps || [];
     for (const step of steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await retry(async () => {
+      const stepResult = await (async () => {
         return await handleSingleAction(
           {
             service_id: step.params.service_id,
@@ -377,7 +390,7 @@ export async function handleAction(
           false,
           options
         );
-      }, buildPipelineRetryPolicy(step.params.retry));
+      })();
 
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
@@ -391,7 +404,7 @@ export async function handleAction(
     }
     return { status: derivePipelineStatus(results), results, ...ctx };
   }
-  return await handleSingleAction(input, onEvent, true);
+  return await handleSingleAction(input, onEvent, true, options);
 }
 
 async function handleSingleAction(
@@ -418,6 +431,20 @@ async function handleSingleAction(
             securityScope: input.context.security_scope,
             bindingId: input.context.service_binding_id,
             approvalGranted: input.context.service_binding_approval_granted === true,
+            humanExecution: currentHumanExecutionAuthorization(
+              `service:preset:${input.service_id}:${input.action}`,
+              {
+                request: input.params,
+                auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+              }
+            ),
+            delegated: currentDelegatedExecution(
+              `service:preset:${input.service_id}:${input.action}`,
+              {
+                request: input.params,
+                auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+              }
+            ),
           });
           return await executeServicePreset(
             input.service_id,
@@ -473,9 +500,37 @@ async function handleSingleAction(
     }
   };
 
-  const result = egressContext
-    ? await withEgressPayloadContext(egressContext, execute)
-    : await execute();
+  const serviceTarget = delegatedServiceTarget(input);
+  const invoke = () =>
+    egressContext ? withEgressPayloadContext(egressContext, execute) : execute();
+  if (
+    hasDelegatedExecutionContext() &&
+    !currentDelegatedExecution(`service:preset:${input.service_id}:${input.action}`, {
+      request: input.params,
+      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+    })
+  ) {
+    throw new Error('[POLICY_VIOLATION] Service action differs from active delegated execution');
+  }
+  const explicitHumanApproval = options.approvalGranted
+    ? await options.approvalGranted(input)
+    : false;
+  const humanExecution = currentHumanExecutionAuthorization(
+    `service:preset:${input.service_id}:${input.action}`,
+    {
+      request: input.params,
+      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+    }
+  );
+  if (hasHumanExecutionContext() && !humanExecution)
+    throw new Error('[POLICY_VIOLATION] Service action differs from human-authorized effect');
+  const result =
+    !explicitHumanApproval &&
+    !humanExecution &&
+    serviceTarget &&
+    hasDelegatedOperationMapping(serviceTarget.operationId)
+      ? await runDelegatedExecution(serviceTarget, invoke)
+      : await invoke();
 
   // Capture only canonical PRESET calls when an explicit recording session is
   // attached by the caller. The session stores operation metadata and bounded
@@ -514,6 +569,29 @@ async function handleSingleAction(
  * dispatch normally arrives through run_pipeline, but direct CLI, harness,
  * and embedded callers must receive the same serial preflight waterfall.
  */
+function delegatedServiceTarget(input: ServiceAction) {
+  if (input.mode !== 'PRESET') return;
+  const operationId = `service:preset:${input.service_id}:${input.action}`;
+  const params = {
+    request: input.params,
+    auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+  };
+  return (
+    currentHumanExecutionAuthorization(operationId, params)?.target ??
+    currentDelegatedExecution(operationId, params)?.target ??
+    runtimeDelegatedTarget(operationId, params, `${input.service_id}:${input.action}`)
+  );
+}
+
+function authorizeServiceTarget(
+  target: NonNullable<ReturnType<typeof delegatedServiceTarget>>
+): boolean {
+  return (
+    Boolean(currentDelegatedExecution(target.operationId, target.params)) ||
+    authorizeDelegatedExecution(target).allowed
+  );
+}
+
 async function admitServiceAction(
   input: ServiceAction,
   options: ServiceActionExecutionOptions = {}
@@ -529,6 +607,17 @@ async function admitServiceAction(
     };
   }
   ensureDefaultOpPreflight();
+  const humanApproval = options.approvalGranted ? await options.approvalGranted(input) : false;
+  const exactHumanApproval = currentHumanExecutionAuthorization(
+    `service:preset:${input.service_id}:${input.action}`,
+    {
+      request: input.params,
+      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+    }
+  );
+  const target = delegatedServiceTarget(input);
+  const delegatedApproval =
+    !exactHumanApproval && Boolean(target && authorizeServiceTarget(target));
   const preflight = await runOpPreflight({
     op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
     params: input as unknown as Record<string, unknown>,
@@ -538,7 +627,7 @@ async function admitServiceAction(
       bindingAuthorization.approvalRequired ||
       input.params?._approval_required === true ||
       input.context?._approval_required === true,
-    approvalGranted: options.approvalGranted ? await options.approvalGranted(input) : false,
+    approvalGranted: humanApproval || Boolean(exactHumanApproval) || delegatedApproval,
     ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
   });
   if (preflight.decision === 'allow' && !hasSafeDynamicServiceTree(preflight.input)) {
@@ -556,7 +645,7 @@ async function admitServiceAction(
     context: {
       ...(admitted.context || {}),
       service_binding_id: bindingAuthorization.bindingId,
-      service_binding_approval_granted: true,
+      service_binding_approval_granted: humanApproval,
     },
   };
 }
@@ -844,15 +933,24 @@ async function executeApiRequest(input: ServiceAction) {
   const token: string | null = binding.accessToken || null;
   const baseUrl = resolveServiceBaseUrl(input.service_id);
   const httpMethod = input.method || (input.params ? 'POST' : 'GET');
-  return await retry(async () => {
-    return await secureFetch({
-      method: httpMethod,
-      url: `${baseUrl}/${input.action}`,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      data: httpMethod !== 'GET' ? input.params : undefined,
-      params: httpMethod === 'GET' ? input.params : undefined,
-    });
-  }, buildPipelineRetryPolicy(input.params?.retry));
+  const readOnly = ['GET', 'HEAD', 'OPTIONS'].includes(httpMethod.toUpperCase());
+  return await retry(
+    async () => {
+      try {
+        return await secureFetch({
+          method: httpMethod,
+          url: `${baseUrl}/${input.action}`,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          data: httpMethod !== 'GET' ? input.params : undefined,
+          params: httpMethod === 'GET' ? input.params : undefined,
+        });
+      } catch (error) {
+        if (!readOnly) throw new ServiceEffectOutcomeUnknownError();
+        throw error;
+      }
+    },
+    readOnly ? buildPipelineRetryPolicy(input.params?.retry) : { maxRetries: 0 }
+  );
 }
 
 async function executeCliRequest(input: ServiceAction) {

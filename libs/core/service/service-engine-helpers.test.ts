@@ -7,7 +7,43 @@ import {
   loadServiceConnectionAtPath,
   resolveTemplateValue,
   writeServiceConnectionAtPath,
+  buildRetryOptions,
+  isRetrySafeServiceOperation,
 } from './service-engine-helpers.js';
+
+describe('service effect retry boundary', () => {
+  it('disables retries for unknown writes even when a preset requests retries and idempotency', () => {
+    const preset = { operations: { pay: { risk: 'write', idempotency: 'required' } } };
+    const alternative = { type: 'api', method: 'POST', retry: { maxRetries: 9 } };
+    const safe = isRetrySafeServiceOperation(preset, 'pay', alternative);
+    expect(safe).toBe(false);
+    const options = buildRetryOptions({}, preset, alternative, { retrySafe: safe });
+    expect(options.maxRetries).toBe(0);
+    expect(options.shouldRetry(new Error('network timeout'))).toBe(false);
+  });
+
+  it('requires read authority for CLI and rejects contradictory transport metadata', () => {
+    expect(isRetrySafeServiceOperation({}, 'run', { type: 'cli' })).toBe(false);
+    expect(
+      isRetrySafeServiceOperation({ operations: { list: { risk: 'read' } } }, 'list', {
+        type: 'cli',
+      })
+    ).toBe(true);
+    expect(
+      isRetrySafeServiceOperation({ operations: { list: { risk: 'read' } } }, 'list', {
+        type: 'api',
+        method: 'POST',
+      })
+    ).toBe(false);
+    expect(
+      isRetrySafeServiceOperation({ operations: { write: { risk: 'write' } } }, 'write', {
+        type: 'api',
+        method: 'GET',
+      })
+    ).toBe(false);
+    expect(isRetrySafeServiceOperation({}, 'list', { type: 'api', method: 'GET' })).toBe(true);
+  });
+});
 
 const serviceConnectionPath = pathResolver.sharedTmp(
   `service-connection-loader-${process.pid}.json`

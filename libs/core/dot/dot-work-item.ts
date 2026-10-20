@@ -1,7 +1,7 @@
 import { dotGoalRefLabel, type DotCharter } from './dot-charter.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
 import type { CreateWorkItemInput } from '../workforce/work-coordination-types.js';
-import { dotAdmissionItemId } from './dot-admission-identity.js';
+import { dotAdmissionItemId, dotAdmissionMissionId } from './dot-admission-identity.js';
 
 function workItemDescription(charter: DotCharter, record: DotActionRecord): string {
   return [
@@ -48,6 +48,17 @@ export function dotWorkItemInput(
       work_shape: 'routine_operation',
     },
     metadata: {
+      ...(record.mission_admission
+        ? {
+            mission_admission: record.mission_admission,
+            mandate_ref: record.mission_admission.mandate_ref,
+            mandate_facts: record.mission_admission.mandate_facts,
+            mission_id: dotAdmissionMissionId(record.action_ref),
+          }
+        : {}),
+      ...(record.admission_only
+        ? { admission_only: true, gate_action_id: record.gate_action_id }
+        : {}),
       ...(record.continuous_work ? { continuous_work: record.continuous_work } : {}),
       ...(record.front_desk_execution ? { front_desk_execution: record.front_desk_execution } : {}),
       dot_id: charter.dot_id,
