@@ -281,6 +281,11 @@
       ]
     },
     {
+      "site": "libs/core/dot/dot-lifecycle.ts#assertOperationBinding",
+      "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#createDraftDotCharter",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
@@ -1158,6 +1163,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/scoped-workspace-ingest.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
@@ -1485,6 +1502,16 @@
     {
       "site": "libs/core/surface/verified-human-request-identity.ts#strictMember",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/workspace-scope.ts#<module>",
+      "roles": ["workspace_tenant_registry_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/workspace-scope.ts#listWorkspaceTenantOptions",
+      "roles": ["workspace_tenant_registry_index_reader"],
       "unresolved": []
     },
     {
@@ -2053,6 +2080,11 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/work-inventory-member.ts#resolveWorkInventoryMember",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/workspace-conversation.ts#workspaceConversationViewer",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3246,6 +3278,8 @@
         "presence/displays/chronos-mirror-v2/src/app/api/workitems/mission-alignment.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/workitems/work-item-input.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/workspace/autonomy/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/workspace/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/auth/callback/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/auth/start/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts",
@@ -3306,6 +3340,7 @@
         "presence/displays/chronos-mirror-v2/src/components/TraceViewer.tsx",
         "presence/displays/chronos-mirror-v2/src/components/WorkItemMissionAlignmentAction.tsx",
         "presence/displays/chronos-mirror-v2/src/components/WorkItemsWorkspace.tsx",
+        "presence/displays/chronos-mirror-v2/src/components/WorkspaceOverview.tsx",
         "presence/displays/chronos-mirror-v2/src/components/chronos-a2ui-adapter.ts",
         "presence/displays/chronos-mirror-v2/src/components/chronos-kb-i18n.tsx",
         "presence/displays/chronos-mirror-v2/src/components/chronos-ui.tsx",
@@ -3400,6 +3435,8 @@
         "presence/displays/chronos-mirror-v2/src/lib/ux-vocabulary.ts",
         "presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts",
         "presence/displays/chronos-mirror-v2/src/lib/workitems-response.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/workspace-overview.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/workspace-scope.ts",
         "presence/displays/chronos-mirror-v2/src/proxy.ts"
       ],
       "reviewed_infeasible": [],
@@ -3505,7 +3542,7 @@
         },
         "chronos_token_registry_reader": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/lib/headless-response.ts#<module>",
+            "presence/displays/chronos-mirror-v2/src/app/api/workspace/autonomy/route.ts#<module>",
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
@@ -3517,6 +3554,15 @@
             "libs/core/discussion/discussion-create-request.ts#createDiscussionRequest",
             "libs/core/discussion/discussion-create-request.ts#readRecord",
             "libs/core/discussion/discussion-request-storage-scope.ts#withDiscussionRequestReceiptAccess"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/lib/workspace-overview.ts#collectWorkspaceOverview",
+            "libs/core/surface/workspace-autonomy.ts#readWorkspaceAutonomy",
+            "libs/core/dot/dot-lifecycle.ts#checkDotActivationReadiness",
+            "libs/core/dot/dot-lifecycle.ts#assertActivationReady",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -3669,6 +3715,18 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_index_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts#GET",
+            "libs/core/surface/workspace-scope.ts#listWorkspaceTenantOptions"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -3844,6 +3902,34 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -4036,6 +4122,14 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/page.ts#<module>",
+            "libs/core/index.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -4307,6 +4401,7 @@
         "presence/displays/concierge/src/lib/voice-hub.ts",
         "presence/displays/concierge/src/lib/voice-types.ts",
         "presence/displays/concierge/src/lib/work-inventory-member.ts",
+        "presence/displays/concierge/src/lib/workspace-conversation.ts",
         "presence/displays/concierge/src/proxy.ts"
       ],
       "reviewed_infeasible": [],
@@ -4443,6 +4538,20 @@
             "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -4570,6 +4679,12 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/ingest-input.ts#parseIngestForm",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -4728,6 +4843,29 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -4878,6 +5016,23 @@
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
+          ]
         }
       },
       "unresolved_sites": [
@@ -4967,7 +5122,9 @@
         "peer_task_artifact_writer",
         "scope_locale_reader",
         "slack_bridge",
-        "surface_runtime"
+        "surface_runtime",
+        "workspace_tenant_registry_index_reader",
+        "workspace_tenant_registry_reader"
       ]
     },
     "imessage_bridge": {
@@ -5081,6 +5238,31 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -5252,6 +5434,25 @@
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
+          ]
         }
       },
       "unresolved_sites": [
@@ -5406,6 +5607,19 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -5565,6 +5779,23 @@
             "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/core/cowork-surface.ts#deliverToCowork"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -5791,6 +6022,30 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -6037,6 +6292,28 @@
             "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
+          ]
         }
       },
       "unresolved_sites": [
@@ -6151,7 +6428,9 @@
         "peer_responder_reader",
         "peer_task_artifact_writer",
         "scope_locale_reader",
-        "slack_bridge"
+        "slack_bridge",
+        "workspace_tenant_registry_index_reader",
+        "workspace_tenant_registry_reader"
       ]
     },
     "operator_surface": {
@@ -6299,6 +6578,26 @@
             "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "scripts/run_mission_orchestration_event_worker.ts#main",
@@ -6439,6 +6738,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -6621,6 +6934,34 @@
             "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -6800,6 +7141,14 @@
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "scripts/personal-pads/server.ts#<module>",
+            "scripts/lib/pad-ui.ts#<module>",
+            "libs/core/index.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
+          ]
         }
       },
       "unresolved_sites": [
@@ -6956,6 +7305,19 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -7078,6 +7440,14 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/front-desk-pages.ts#<module>",
+            "libs/core/index.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -7245,6 +7615,30 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -7405,6 +7799,24 @@
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
+          ]
         }
       },
       "unresolved_sites": [
@@ -7525,7 +7937,9 @@
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
-        "peer_task_artifact_writer"
+        "peer_task_artifact_writer",
+        "workspace_tenant_registry_index_reader",
+        "workspace_tenant_registry_reader"
       ]
     },
     "system_configurator": {
@@ -7604,6 +8018,15 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
           ]
         },
         "ecosystem_architect": {
@@ -7738,6 +8161,19 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -7895,6 +8331,29 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
@@ -8044,6 +8503,23 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -8218,6 +8694,26 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -8358,6 +8854,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },
@@ -8511,6 +9021,26 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "dot_lifecycle_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -8644,6 +9174,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-extension-bootstrap.ts#<module>",
+            "libs/core/dot/dot-executor.ts#<module>",
+            "libs/core/dot/dot-lifecycle.ts#<module>",
+            "libs/core/surface/workspace-scope.ts#<module>"
           ]
         }
       },

@@ -71,6 +71,7 @@ export interface RouteAutonomousDecisionInput {
   recommendation: string;
   evidence?: DecisionCardEvidence[];
   requestedBy: string;
+  operationBinding?: { operation_id: string; actor_role: string };
   source?: ApprovalRequestSource;
   /** False when the agent has other work and the answer can wait for the digest. */
   blocking?: boolean;
@@ -217,6 +218,16 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
       ? dedupeCorrelationId(input.gate.actionId, input.dedupeKey)
       : `autonomy:${input.gate.actionId}:${now.toString(36)}`,
     requestedBy: input.requestedBy,
+    ...(input.operationBinding
+      ? {
+          requestedByContext: {
+            surface: 'system' as const,
+            actorId: input.requestedBy,
+            actorRole: input.operationBinding.actor_role,
+            operationId: input.operationBinding.operation_id,
+          },
+        }
+      : {}),
     draft: {
       title: input.title,
       summary: input.question,

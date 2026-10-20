@@ -1,5 +1,6 @@
 /** Request-only adapter. Other Concierge mutation routes retain their localadmin gate. */
 import { NextResponse, type NextRequest } from 'next/server';
+import { workspaceConversationViewer } from './workspace-conversation';
 import {
   authorizeSurfaceMutation,
   extractSurfaceBearerToken,
@@ -124,5 +125,17 @@ export function authorizeConciergeHumanRequest(
   );
   if (!identity) return narrowed;
   authorizeBrowserHumanRequest(identity, operation, requestId);
-  return identity.viewer;
+  return narrowed.workspaceOperationId
+    ? workspaceConversationViewer(identity.viewer, {
+        operationId: narrowed.workspaceOperationId,
+        tenant:
+          narrowed.tenantSlugs !== 'all' && narrowed.tenantSlugs.length === 1
+            ? narrowed.tenantSlugs[0]
+            : undefined,
+        organizationId:
+          narrowed.organizationIds !== 'all' && narrowed.organizationIds.length === 1
+            ? narrowed.organizationIds[0]
+            : undefined,
+      })
+    : identity.viewer;
 }

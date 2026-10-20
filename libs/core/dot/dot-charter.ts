@@ -79,6 +79,8 @@ export interface DotCharter {
   title: string;
   purpose: string;
   status: DotCharterStatus;
+  /** Organization-owned responsibility/provenance, never another authority axis. */
+  work_binding?: { operation_id: string };
   scope: {
     tier: 'public' | 'confidential' | 'personal';
     tenant_slug?: string;
@@ -230,6 +232,14 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
     throw new Error(`Invalid dot charter at ${sourcePath}: ${errors}`);
   }
   isFrontDeskDiagnosticDot(candidate as DotCharter);
+  const bound = candidate as DotCharter;
+  if (
+    bound.work_binding &&
+    (!bound.scope.organization_id || bound.scope.project_id || bound.operations_cadence)
+  )
+    throw new Error(
+      `Invalid dot charter at ${sourcePath}: an operation binding requires an organization, excludes a project and cannot supervise organization-wide cadence`
+    );
   assertOperationsCadenceTimezones(candidate as DotCharter, sourcePath);
   return candidate as DotCharter;
 }

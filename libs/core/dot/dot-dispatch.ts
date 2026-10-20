@@ -19,6 +19,7 @@ import {
   admissionForDotRecord,
   dotAdmissionItemId,
   dotAdmissionScopeHash,
+  dotRecordAdmissionMatches,
   genericDotActionIdentity,
   withDotAdmissionLock,
 } from './dot-admission-identity.js';
@@ -1204,9 +1205,17 @@ function dispatchDotProposalsUnlocked(
         question: escalation ? `${question}\n\n${escalation.card_context}` : question,
         recommendation: proposal.rationale ?? proposal.objective,
         requestedBy: actor,
+        ...(charter.work_binding
+          ? {
+              operationBinding: {
+                operation_id: charter.work_binding.operation_id,
+                actor_role: charter.authority.authority_role,
+              },
+            }
+          : {}),
         source: { agentId: actor },
         ...(accountability ? { accountability } : {}),
-        dedupeKey: `${charter.dot_id}-${hash}${proposal.continuous_work ? '-' + base.action_ref : ''}`,
+        dedupeKey: `${charter.dot_id}-${hash}${charter.work_binding ? '-' + dotAdmissionScopeHash(charter) : ''}${proposal.continuous_work ? '-' + base.action_ref : ''}`,
         notificationRoute: dotNotificationRoute(charter),
         quietHours: dotQuietHours(charter),
         ...(charter.scope.tenant_slug
@@ -1472,6 +1481,9 @@ export function settleDotParkedActions(
       )
         return;
       if (row.status !== 'parked' || !row.request_id) return;
+      // Scope/binding changes never consume an old decision, including removal
+      // of an operation binding. Keep the original row parked for reconciliation.
+      if (!dotRecordAdmissionMatches(charter, row)) return;
       let approval: ApprovalRequestRecord | null;
       try {
         approval = load(row.request_id);

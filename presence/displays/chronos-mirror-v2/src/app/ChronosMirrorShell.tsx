@@ -35,6 +35,7 @@ import {
   type ConsoleSectionId,
 } from './chronos-page-config';
 import { ChronosHome } from '../components/ChronosHome';
+import { WorkspaceOverview } from '../components/WorkspaceOverview';
 import { humanizeMissionId } from '../components/ChronosOffice';
 import { ChronosKbI18n } from '../components/chronos-kb-i18n';
 import { ChronosFieldScope, ChronosInline, ChronosToolbar } from '../components/chronos-ui';
@@ -340,6 +341,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
 
           {consoleSection === 'home' ? (
             <>
+              <WorkspaceOverview />
               <ChronosHome
                 tenant={tenant}
                 summary={operatorHomeSummary}
@@ -1152,13 +1154,21 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
           ) : null}
 
           {consoleSection === 'approvals' ? (
-            <ApprovalsWorkspace tenant={tenant || undefined} />
+            <ApprovalsWorkspace
+              tenant={tenant || undefined}
+              organizationId={organizationId || undefined}
+              projectId={projectId || undefined}
+            />
           ) : null}
 
           {consoleSection === 'discussion' ? <DiscussionRoom embedded /> : null}
 
           {consoleSection === 'knowledge' ? (
-            <KnowledgeWorkspace tenant={tenant || undefined} />
+            <KnowledgeWorkspace
+              tenant={tenant || undefined}
+              organizationId={organizationId || undefined}
+              projectId={projectId || undefined}
+            />
           ) : null}
 
           <ChronosMirrorLegacySections model={model} />

@@ -1,0 +1,9 @@
+{
+  "role": "workspace_tenant_registry_reader",
+  "description": "Shared core exact-tenant registry existence reader. Workspace resolution first narrows authenticated viewer grants, then binds this read-only context to that tenant. Reads one knowledge/personal/tenants/${KYBERION_TENANT}.json profile and returns only tenant_slug; never exposes personal profile fields or grants directory enumeration or writes.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal"]
+}

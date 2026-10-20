@@ -147,6 +147,7 @@
 - [SDLC Gating Model](./product/architecture/sdlc-gating-model.md) (public | Kyberion)
 - [Satellite Architecture Model (Hybrid-C)](./product/architecture/satellite-model.md) (public | Unknown)
 - [Scope Governance Plane](./product/architecture/scope-governance-plane.md) (public | Unknown)
+- [Scope-aware continuous workplaces](./product/architecture/scope-aware-workplaces.md) (public | Unknown)
 - [Seam Provider Selection — Choosing Between Providers of the Same Function](./product/architecture/seam-provider-selection.md) (public | ecosystem_architect)
 - [Secret Introduction Model](./product/architecture/secret-introduction-model.md) (public | Ecosystem Architect)
 - [Secret Mutation Approval Model](./product/architecture/secret-mutation-approval-model.md) (public | Ecosystem Architect)

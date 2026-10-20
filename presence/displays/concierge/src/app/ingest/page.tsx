@@ -40,6 +40,17 @@ export default function IngestPage() {
     <section className="pane ingest-pane" aria-label={t('ingest.title')}>
       <h2>{t('ingest.title')}</h2>
       <p className="pane-subtitle">{t('ingest.description')}</p>
+      {[
+        flow.selection.organization_id,
+        flow.selection.project_id,
+        flow.selection.operation_id,
+      ].some(Boolean) ? (
+        <p className="pane-subtitle">
+          {[flow.selection.organization_id, flow.selection.project_id, flow.selection.operation_id]
+            .filter(Boolean)
+            .join(' / ')}
+        </p>
+      ) : null}
 
       {loading ? <p role="status">{t('ingest.loading')}</p> : null}
       {loadError || access ? (
@@ -64,7 +75,7 @@ export default function IngestPage() {
           </button>
         </div>
       ) : null}
-      {!loading && !loadError && !access && tenants.length === 0 ? (
+      {!loading && !loadError && !access && tenants.length === 0 && !flow.selection.project_id ? (
         <div>
           <p role="status">{t('ingest.no_destination')}</p>
           <button type="button" className="action-button secondary" onClick={flow.reload}>
@@ -124,6 +135,9 @@ export default function IngestPage() {
           value={tenant}
           onChange={(event) => flow.changeSelection({ tenant: event.target.value })}
         >
+          {flow.selection.project_id && !tenant ? (
+            <option value="">{flow.selection.project_id}</option>
+          ) : null}
           {tenants.map((option) => (
             <option key={option.tenant_slug} value={option.tenant_slug}>
               {option.display_name} ({option.tenant_slug})
@@ -163,7 +177,7 @@ export default function IngestPage() {
         <button
           type="button"
           className="action-button"
-          disabled={!file || !tenant || disabled}
+          disabled={!file || (!tenant && !flow.selection.project_id) || disabled}
           onClick={() => void flow.submit(dryRun)}
         >
           {dryRun ? t('ingest.submit_preview') : t('ingest.submit_commit')}
@@ -198,6 +212,21 @@ export default function IngestPage() {
             <p className="item-meta">{t('ingest.target_path', { value: result.target_path })}</p>
           ) : null}
           <p className="item-meta">{t('ingest.requested_destination', { value: result.tenant })}</p>
+          {result.scope ? (
+            <p className="item-meta">
+              {[
+                result.scope.tier,
+                result.scope.tenant_slug,
+                result.scope.organization_id,
+                result.scope.project_id,
+              ]
+                .filter(Boolean)
+                .join(' / ')}
+            </p>
+          ) : null}
+          {result.inheritedScope === 'organization' ? (
+            <p className="item-meta">Shared organization library</p>
+          ) : null}
           {result.outcome === 'duplicate' ? <p>{t('ingest.duplicate_note')}</p> : null}
           {flow.canConfirm ? (
             <div className="button-row">

@@ -1233,6 +1233,9 @@ function dotSystemPrompt(
   return [
     `You are the resident dot "${charter.dot_id}" (actor id dot:${charter.dot_id}).`,
     `Standing purpose: ${charter.purpose}`,
+    charter.work_binding
+      ? `Organization operation responsibility (context only, no additional authority): ${charter.work_binding.operation_id}`
+      : '',
     dotGoalRefLabel(charter)
       ? `Organization goal you contribute to: ${dotGoalRefLabel(charter)}`
       : '',

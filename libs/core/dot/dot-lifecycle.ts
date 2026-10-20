@@ -37,6 +37,12 @@ import { withExecutionContext } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine } from '../foundation/json.js';
+import { resolveWorkspaceScope } from '../surface/workspace-scope.js';
+import { readTenantProfile } from '../organization/tenant-registry.js';
+import { loadProjectRecord } from '../project/project-registry.js';
+import { loadOrganizationOperationalState } from '../organization/organization-operating-model-persistence.js';
+import { loadOrganizationOperation } from '../organization/organization-operating-model-operations.js';
+import { dotAdmissionScopeHash } from './dot-admission-identity.js';
 import {
   findDotCharter,
   listDotCharters,
@@ -65,6 +71,10 @@ const TRANSITIONS: Record<DotCharterStatus, readonly DotCharterStatus[]> = {
 };
 
 export interface DotLifecycleDeps {
+  expectedAdmissionScopeHash?: string;
+  /** Optimistic controls checked inside the charter lock, never only in a UI projection. */
+  expectedScope?: DotCharter['scope'];
+  expectedStatus?: DotCharterStatus;
   rootDir?: string;
   now?: () => Date;
   actor?: string;
@@ -79,6 +89,7 @@ function assertActivationReady(
   deps: DotLifecycleDeps,
   allCharters: DotCharter[]
 ): void {
+  assertOperationBinding(charter, deps);
   const hasRole =
     deps.hasRole ?? ((role: string) => Boolean(loadAuthorityRoleIndex(deps.rootDir)[role]));
   if (!hasRole(charter.authority.authority_role)) {
@@ -115,6 +126,37 @@ function assertActivationReady(
   }
 }
 
+export function assertOperationBinding(charter: DotCharter, deps: DotLifecycleDeps = {}): void {
+  if (!charter.work_binding) return;
+  const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
+  withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () =>
+      resolveWorkspaceScope(
+        {
+          tenantSlugs: 'all',
+          organizationIds: 'all',
+          projectIds: 'all',
+          tierAccess: [charter.scope.tier],
+        },
+        {
+          ...charter.scope,
+          operation_id: charter.work_binding.operation_id,
+        },
+        {
+          readTenant: (slug) => readTenantProfile(slug, { rootDir }),
+          readProject: (id) => loadProjectRecord(id, { rootDir }),
+          readOrganization: (id, query) =>
+            loadOrganizationOperationalState(id, { ...query, rootDir }),
+          readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
+        }
+      ),
+    undefined,
+    charter.scope.tenant_slug,
+    charter.scope.organization_id
+  );
+}
+
 function auditTransition(entry: Record<string, unknown>, deps: DotLifecycleDeps): void {
   const auditPath = path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_LIFECYCLE_AUDIT_PATH);
   safeMkdir(path.dirname(auditPath), { recursive: true });
@@ -125,24 +167,73 @@ function auditTransition(entry: Record<string, unknown>, deps: DotLifecycleDeps)
   });
 }
 
-/** Create only a public draft; activation remains a separate governed transition. */
-export function createDraftDotCharter(input: unknown, deps: DotLifecycleDeps = {}): DotCharter {
+/** Create a public or registered tenant draft; activation is always separate. */
+export function createDraftDotCharter(
+  input: unknown,
+  deps: DotLifecycleDeps & { dryRun?: boolean } = {}
+): DotCharter {
   const charter = validateDotCharter(input);
-  if (charter.status !== 'draft' || charter.scope.tier !== 'public')
-    throw new Error('[DOT_CREATE_DRAFT] only a public draft may be created');
+  assertOperationBinding(charter, deps);
+  if (charter.status !== 'draft' || charter.scope.tier === 'personal')
+    throw new Error(
+      '[DOT_CREATE_DRAFT] create a public or tenant-confidential draft; activation is separate'
+    );
+  if (charter.scope.tier === 'confidential') {
+    if (!charter.scope.tenant_slug) throw new Error('[DOT_CREATE_SCOPE] tenant is required');
+    const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
+    resolveWorkspaceScope(
+      {
+        tenantSlugs: 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+        tierAccess: ['confidential'],
+      },
+      charter.scope,
+      {
+        readTenant: (slug) => readTenantProfile(slug, { rootDir }),
+        readProject: (id) => loadProjectRecord(id, { rootDir }),
+        readOrganization: (id, query) =>
+          loadOrganizationOperationalState(id, { ...query, rootDir }),
+        readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
+      }
+    );
+  } else if (charter.scope.tenant_slug) {
+    throw new Error('[DOT_CREATE_SCOPE] tenant drafts require tenant-confidential placement');
+  } else if (charter.scope.organization_id || charter.scope.project_id) {
+    const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
+    resolveWorkspaceScope(
+      { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all', tierAccess: ['public'] },
+      charter.scope,
+      {
+        readTenant: (slug) => readTenantProfile(slug, { rootDir }),
+        readProject: (id) => loadProjectRecord(id, { rootDir }),
+        readOrganization: (id, query) =>
+          loadOrganizationOperationalState(id, { ...query, rootDir }),
+        readOperation: (id, query) => loadOrganizationOperation(id, { ...query, rootDir }),
+      }
+    );
+  }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(charter.dot_id))
     throw new Error('[DOT_CREATE_ID] invalid dot id');
   const filePath = path.join(
     deps.rootDir ?? pathResolver.rootDir(),
-    'dots',
+    ...(charter.scope.tier === 'confidential'
+      ? ['knowledge', 'confidential', charter.scope.tenant_slug!, 'dots']
+      : ['dots']),
     charter.dot_id + '.json'
   );
+  if (deps.dryRun) {
+    if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
+      throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
+    return charter;
+  }
   return withExecutionContext(
     CHARTER_WRITER_ROLE,
     () =>
       withLockSync('dot-charter-create:' + filePath, () => {
         if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
           throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
+        safeMkdir(path.dirname(filePath), { recursive: true });
         safeWriteFile(filePath, JSON.stringify(charter, null, 2) + '\n', { createOnly: true });
         auditTransition(
           { event: 'dot_draft_created', dot_id: charter.dot_id, to: 'draft', path: filePath },
@@ -181,6 +272,19 @@ function transitionDotCharterStatusUnlocked(
   );
   const parsed = parseSafeJsonObjectInput(rawText, `dot charter ${filePath}`);
   const current = validateDotCharter(parsed, filePath);
+  if (
+    deps.expectedAdmissionScopeHash &&
+    dotAdmissionScopeHash(current) !== deps.expectedAdmissionScopeHash
+  )
+    throw new Error(
+      '[DOT_TRANSITION_CONFLICT] Responsibility binding changed; refresh before controlling it.'
+    );
+  if (
+    (deps.expectedScope && !isDeepStrictEqual(current.scope, deps.expectedScope)) ||
+    (deps.expectedStatus && current.status !== deps.expectedStatus)
+  ) {
+    throw new Error('[DOT_TRANSITION_CONFLICT] Charter changed; refresh before controlling it.');
+  }
 
   const allowed = TRANSITIONS[current.status] ?? [];
   if (!allowed.includes(target)) {

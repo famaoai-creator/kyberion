@@ -59,6 +59,8 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_localadmin: 'worker',
   chronos_token_registry_reader: 'worker',
   scope_locale_reader: 'worker',
+  workspace_tenant_registry_reader: 'worker',
+  workspace_tenant_registry_index_reader: 'worker',
   peer_catalog_reader: 'worker',
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',
@@ -683,6 +685,7 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'peer_responder_reader',
   'peer_task_artifact_writer',
   'scope_locale_reader',
+  'workspace_tenant_registry_reader',
 ]);
 
 /**

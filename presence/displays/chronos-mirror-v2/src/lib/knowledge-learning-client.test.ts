@@ -12,6 +12,19 @@ import {
 } from './knowledge-learning-client';
 import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from './knowledge-response';
 const digest = 'a'.repeat(64);
+it('keeps organization and project selection through learning review and return navigation', () => {
+  const selection = {
+    tenant_slug: 'acme',
+    organization_id: 'sales',
+    project_id: 'launch',
+    tier: 'confidential' as const,
+  };
+  const href = learningReviewHref('terminal:review-1', 'a'.repeat(64), 'acme', selection)!;
+  const query = approvalWorkspaceQuery(href.split('?')[1]);
+  expect(query.get('organization_id')).toBe('sales');
+  expect(query.get('project_id')).toBe('launch');
+  expect(knowledgeCandidateHref('a'.repeat(64), 'acme', selection)).toContain('project_id=launch');
+});
 const scope = {
   tier: 'confidential' as const,
   tenant_slug: 'acme',

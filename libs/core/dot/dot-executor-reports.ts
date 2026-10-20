@@ -112,6 +112,7 @@ export function meta(item: WorkItem, key: string): string | undefined {
 }
 
 export function addressedTo(c: DotCharter, item: WorkItem): boolean {
+  if (dotItemWorkBindingMismatch(c, item)) return false;
   const handoffTo = meta(item, 'handoff_to');
   if (handoffTo) return handoffTo === c.dot_id;
   return meta(item, 'dot_id') === c.dot_id;
@@ -519,4 +520,9 @@ export function dotItemTenantMismatch(c: DotCharter, item: WorkItem): boolean {
   const itemTenant = item.context?.tenant_slug || undefined;
   const charterTenant = c.scope.tenant_slug || undefined;
   return itemTenant !== charterTenant;
+}
+
+/** Responsibility binding must survive admission, handoff and recovery unchanged. */
+export function dotItemWorkBindingMismatch(c: DotCharter, item: WorkItem): boolean {
+  return (item.metadata?.operation_id ?? undefined) !== c.work_binding?.operation_id;
 }

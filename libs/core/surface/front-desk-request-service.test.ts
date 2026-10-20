@@ -48,6 +48,18 @@ beforeEach(() => {
 });
 
 describe('auth-neutral shared front-desk request lifecycle', () => {
+  it('provides validated operation context to reasoning while retaining the canonical ownership scope', async () => {
+    const scoped = { ...viewer, projectIds: 'all' as const, workspaceOperationId: 'weekly-report' };
+    await runFrontDeskRequest(scoped, { text: 'Review this operation', requestId: REQUEST_ID });
+    expect(mocks.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('weekly-report'),
+        conversationKey: conversationRef(scoped).key,
+        scope: expect.objectContaining({ organization_id: 'org-a' }),
+      })
+    );
+    expect(mocks.run.mock.calls[0][0].scope).not.toHaveProperty('operation_id');
+  });
   it('reserves before runtime and derives actor, session, scope and key only from trusted viewer', async () => {
     const forged = {
       text: 'Hello',

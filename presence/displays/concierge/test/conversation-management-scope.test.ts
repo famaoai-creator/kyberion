@@ -7,6 +7,26 @@ import {
 } from '../src/lib/conversation-request';
 
 describe('conversation from company management', () => {
+  it('binds retained conversation retries to the exact operation', () => {
+    const scope = conversationScopeFromQuery(
+      'session',
+      'acme',
+      new URLSearchParams('organization_id=sales&operation_id=daily')
+    );
+    expect(scope.operationId).toBe('daily');
+    const saved = prepareConversationRequest(
+      'Prepare',
+      scope,
+      'en',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      1,
+      null
+    );
+    expect(parsePendingConversationRequest(saved, scope, 'en')).toBeDefined();
+    expect(
+      parsePendingConversationRequest(saved, { ...scope, operationId: 'weekly' }, 'en')
+    ).toBeUndefined();
+  });
   it('uses management precedence when both aliases are present', () => {
     expect(
       conversationScopeFromQuery(

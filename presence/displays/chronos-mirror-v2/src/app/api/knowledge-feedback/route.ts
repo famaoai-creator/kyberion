@@ -3,10 +3,10 @@ import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loo
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { readChronosJsonObject } from '../../../lib/request-input';
 import { parseKnowledgeFeedbackInput } from './knowledge-feedback-input';
+import { resolveChronosWorkspace } from '../../../lib/workspace-scope';
+import { knowledgeDocumentVisibleToWorkspace } from '../../../lib/knowledge-scope';
 import {
   resolveViewerContextForRequest,
-  strictViewerScopeOrganizationIds,
-  strictViewerScopeProjectIds,
   strictViewerTier,
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
@@ -38,6 +38,18 @@ export async function POST(req: NextRequest) {
       projectId,
       reason,
     } = input;
+    const workspace = resolveChronosWorkspace(resolvedViewer.context, {
+      tenant_slug: requestedTenant,
+      organization_id: organizationId,
+      project_id: projectId,
+      operation_id: input.operationId,
+      tier: input.tier,
+    });
+    if (!knowledgeDocumentVisibleToWorkspace(documentPath, workspace))
+      return NextResponse.json(
+        { error: 'Knowledge document is outside the selected workspace' },
+        { status: 403 }
+      );
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
     const pathParts = documentPath.split('/');
     const tier = strictViewerTier(
@@ -52,18 +64,13 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
-    const organizationIds = strictViewerScopeOrganizationIds(
-      resolvedViewer.context,
-      organizationId
-    );
-    const projectIds = strictViewerScopeProjectIds(resolvedViewer.context, projectId);
     const scope = {
       tier,
       ...(pathTenant ? { tenant_slug: pathTenant } : {}),
-      ...(organizationIds !== 'all' && organizationIds[0]
-        ? { organization_id: organizationIds[0] }
+      ...(workspace.selection.organization_id
+        ? { organization_id: workspace.selection.organization_id }
         : {}),
-      ...(projectIds !== 'all' && projectIds[0] ? { project_id: projectIds[0] } : {}),
+      ...(workspace.selection.project_id ? { project_id: workspace.selection.project_id } : {}),
     } as const;
     const feedbackPath = withViewerExecutionContext(resolvedViewer.context, () =>
       recordHumanKnowledgeFeedback({

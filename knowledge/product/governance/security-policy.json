@@ -828,6 +828,9 @@
     "dot_lifecycle_writer": {
       "allow_read": [
         "dots/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "knowledge/confidential/${KYBERION_TENANT}/dots/",
         "active/shared/runtime/",
         "active/shared/tmp/"
@@ -884,6 +887,15 @@
         "active/shared/runtime/autonomy-learning/confidential",
         "knowledge/confidential/${KYBERION_TENANT}"
       ]
+    },
+    "workspace_tenant_registry_reader": {
+      "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
+      "allow_write": []
+    },
+    "workspace_tenant_registry_index_reader": {
+      "allow_read": ["knowledge/personal/tenants/"],
+      "deny_read_descendants": ["knowledge/personal/tenants/"],
+      "allow_write": []
     }
   },
   "authority_permissions": {
