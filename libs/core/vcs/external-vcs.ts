@@ -14,8 +14,8 @@ export function governVcsCommand(
       operationId,
       effect,
       requiresApproval: mutation,
-      // Publishing code / merging commits is not a delegated ordinary reply.
-      delegable: false,
+      // Only PR creation may consult an exact repository grant. Merge/push stay human-only.
+      delegable: operationId === 'vcs:pr_create',
     },
     execute,
     (result) =>

@@ -1,6 +1,10 @@
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
+import {
+  currentInstalledPersonCharterRuntime,
+  withPersonCharterStoreAccess,
+} from './person-charter-runtime.js';
 /**
  * Accountability charter — persistence, acceptance and the consumption ledger.
  *
@@ -89,6 +93,13 @@ function scopedCharterIo<T>(
   action: () => T
 ): T {
   const identity = currentExecutionScope();
+  if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
+    const relative = (file: string) =>
+      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    return withPersonCharterStoreAccess(files.map(relative), writes.map(relative), () =>
+      withExecutionContext('person_charter_store', action, 'worker')
+    );
+  }
   if (scope.kind !== 'organization' || !identity?.tenantSlug) return action();
   if (identity.tenantSlug !== scope.tenant_slug)
     throw new Error('[CHARTER_SCOPE_DENIED] Caller tenant differs from charter tenant');
@@ -137,6 +148,14 @@ export function readCharter(
       throw new Error(
         '[CHARTER_SCOPE_DENIED] Persisted charter scope differs from requested resource'
       );
+    if (
+      scope.kind === 'person' &&
+      currentInstalledPersonCharterRuntime() &&
+      parsed.accountable.actor !== currentInstalledPersonCharterRuntime()!.ownerActor
+    )
+      throw new Error(
+        '[PERSON_CHARTER_OWNER_MISMATCH] Charter belongs to another accountable owner'
+      );
     return parsed;
   });
 }
@@ -177,6 +196,32 @@ export function findActiveCharter(
   return active[0] ?? null;
 }
 
+/** A unique validated accounting head may be renewed after retirement/expiry.
+ * No timestamp guessing or disconnected legacy-history reset is permitted. */
+export function findLatestCharterForRenewal(
+  scope: CharterScope,
+  options: CharterPathOptions = {}
+): Charter | null {
+  const records = listCharterIds(scope, options)
+    .map((id) => readCharter(scope, id, options))
+    .filter((value): value is Charter => Boolean(value));
+  if (!records.length) return null;
+  const referenced = new Set(
+    records.flatMap((record) => (record.replaces_charter_id ? [record.replaces_charter_id] : []))
+  );
+  const heads = records.filter((record) => !referenced.has(record.charter_id));
+  if (heads.length !== 1)
+    throw new Error(
+      '[CHARTER_ACCOUNTING_LINEAGE] Ambiguous historical accounting heads require verified repair'
+    );
+  const chain = charterAccountingChain(heads[0], options);
+  if (chain.length !== records.length)
+    throw new Error(
+      '[CHARTER_ACCOUNTING_LINEAGE] Disconnected historical accounting requires verified repair'
+    );
+  return heads[0];
+}
+
 /** Every charter currently in force: the person's own, plus one per registered tenant. */
 export function listActiveCharters(now: Date, options: CharterPathOptions = {}): Charter[] {
   const scopes: CharterScope[] = [
@@ -215,6 +260,8 @@ export interface AcceptCharterInput {
    * old one is retired, never edited.
    */
   replaces?: string;
+  /** Frozen human-reviewed lifecycle intent; checked atomically with replacement. */
+  expected_lifecycle?: 'active' | 'renewal' | 'new';
   validation: Omit<CharterValidationContext, 'now'>;
   now?: Date;
 }
@@ -228,6 +275,10 @@ export function acceptCharter(
   input: AcceptCharterInput,
   options: CharterPathOptions = {}
 ): Charter {
+  return withCharterDecisionLock(input.draft.scope, () => acceptCharterLocked(input, options));
+}
+
+function acceptCharterLocked(input: AcceptCharterInput, options: CharterPathOptions): Charter {
   assertHumanActor(input.acceptedBy, 'accept charter');
   if (input.acceptedBy.id !== input.draft.accountable.actor) {
     throw new Error(
@@ -244,6 +295,8 @@ export function acceptCharter(
       statement_sha256: createHash('sha256').update(input.statement, 'utf8').digest('hex'),
     },
   };
+  // Draft input never chooses or clears accounting ancestry.
+  delete charter.replaces_charter_id;
   const violations = validateCharter(charter, { ...input.validation, now });
   if (violations.length > 0) {
     throw new Error(`[charter] invalid charter:\n- ${violations.join('\n- ')}`);
@@ -254,16 +307,38 @@ export function acceptCharter(
       `[charter] '${charter.charter_id}' already exists; amendments are new charters (never edited in place)`
     );
   }
-  const inForce = findActiveCharter(charter.scope, now, options);
+  const active = findActiveCharter(charter.scope, now, options);
+  const inForce = active ?? findLatestCharterForRenewal(charter.scope, options);
+  const lifecycle = active ? 'active' : inForce ? 'renewal' : 'new';
+  if (input.expected_lifecycle && input.expected_lifecycle !== lifecycle)
+    throw new Error(
+      '[CHARTER_LIFECYCLE_CHANGED] Review current lifecycle before accepting this charter'
+    );
   if (inForce) {
     if (input.replaces !== inForce.charter_id) {
       throw new Error(
         `[charter] scope already has active charter '${inForce.charter_id}'; pass replaces to amend it`
       );
     }
+    const inherited = loadCharterUsage(inForce, now, options);
+    if (inForce.appetite.tripwires.some((name) => !charter.appetite.tripwires.includes(name)))
+      throw new Error(
+        '[CHARTER_ACCOUNTING_LINEAGE] Predecessor tripwires must remain declared for late in-flight outcomes'
+      );
+    if (inherited.tripwires_hit.some((hit) => !charter.appetite.tripwires.includes(hit)))
+      throw new Error(
+        '[CHARTER_ACCOUNTING_LINEAGE] Clear standing tripwires explicitly before removing them'
+      );
+    charter.replaces_charter_id = inForce.charter_id;
     // Retire the old charter first: if writing the new one then fails the scope
     // falls back to the legacy approval gate (safe), never to two charters.
-    retireCharter(inForce, input.acceptedBy, `replaced by ${charter.charter_id}`, options, now);
+    retireCharterLocked(
+      inForce,
+      input.acceptedBy,
+      `replaced by ${charter.charter_id}`,
+      options,
+      now
+    );
   } else if (input.replaces) {
     throw new Error(`[charter] '${input.replaces}' is not an active charter of this scope`);
   }
@@ -287,6 +362,18 @@ export function retireCharter(
   reason: string,
   options: CharterPathOptions = {},
   now: Date = new Date()
+): void {
+  return withCharterDecisionLock(charter.scope, () =>
+    retireCharterLocked(charter, retiredBy, reason, options, now)
+  );
+}
+
+function retireCharterLocked(
+  charter: Charter,
+  retiredBy: ActorRef,
+  reason: string,
+  options: CharterPathOptions,
+  now: Date
 ): void {
   assertHumanActor(retiredBy, 'retire charter');
   if (![charter.accountable.actor, ...charter.accountable.deputies].includes(retiredBy.id)) {
@@ -404,6 +491,24 @@ function appendLedger(
   options: CharterPathOptions
 ): void {
   const file = ledgerPath(scope, charterId, options);
+  if (
+    scope.kind === 'person' &&
+    currentInstalledPersonCharterRuntime() &&
+    [
+      'consumption',
+      'delegated_execution',
+      'denied',
+      'execution_started',
+      'execution_outcome',
+      'tripwire',
+    ].includes(entry.kind)
+  ) {
+    if (!readCharter(scope, charterId, options))
+      throw new Error('[PERSON_CHARTER_RESOURCE_DENIED] Existing owned charter required');
+    return scopedCharterIo(scope, [file], [file], () =>
+      appendJsonLine(safePath(file, options), entry)
+    );
+  }
   const append = () => {
     const safeFile = safePath(file, options);
     safeMkdir(path.dirname(safeFile), { recursive: true });
@@ -607,7 +712,10 @@ export function loadCharterUsage(
   let spentToday = 0;
   let spentMonth = 0;
   const standing = new Set<string>();
-  for (const e of readLedger(charter.scope, charter.charter_id, options)) {
+  const events = charterAccountingChain(charter, options)
+    .flatMap((owner) => readLedger(owner.scope, owner.charter_id, options))
+    .sort((a, b) => a.ts.localeCompare(b.ts));
+  for (const e of events) {
     if (e.kind === 'consumption') {
       if (e.ts.startsWith(month)) spentMonth += e.money;
       if (e.ts.startsWith(day)) spentToday += e.money;
@@ -624,6 +732,52 @@ export function loadCharterUsage(
     spent_this_month: spentMonth,
     tripwires_hit: [...standing],
   };
+}
+
+/** Old reservations remain live; future settlements/releases in any ancestor
+ * ledger are reflected dynamically, never copied into the amendment ledger. */
+function charterAccountingChain(charter: Charter, options: CharterPathOptions): Charter[] {
+  const chain: Charter[] = [];
+  const seen = new Set<string>();
+  let current = charter;
+  for (;;) {
+    assertCharterId(current.charter_id);
+    if (seen.has(current.charter_id) || chain.length >= 256)
+      throw new Error('[CHARTER_ACCOUNTING_LINEAGE] Cyclic or oversized predecessor chain');
+    seen.add(current.charter_id);
+    chain.unshift(current);
+    const predecessorId = current.replaces_charter_id;
+    if (!predecessorId) {
+      // Pre-upgrade amendments have no immutable link. Do not silently reset
+      // their history; require explicit lineage repair rather than guessing.
+      const unlinked = listCharterIds(current.scope, options).some(
+        (id) =>
+          id !== current.charter_id &&
+          readLedger(current.scope, id, options).some(
+            (e) => e.kind === 'retired' && e.reason === `replaced by ${current.charter_id}`
+          )
+      );
+      if (unlinked)
+        throw new Error(
+          '[CHARTER_ACCOUNTING_LINEAGE] Legacy amendment requires verified predecessor repair'
+        );
+      break;
+    }
+    assertCharterId(predecessorId);
+    const predecessor = readCharter(current.scope, predecessorId, options);
+    if (
+      !predecessor ||
+      !Number.isFinite(Date.parse(predecessor.accountable.accepted_at)) ||
+      Date.parse(predecessor.accountable.accepted_at) >
+        Date.parse(current.accountable.accepted_at) ||
+      !readLedger(current.scope, predecessorId, options).some(
+        (e) => e.kind === 'retired' && e.reason === `replaced by ${current.charter_id}`
+      )
+    )
+      throw new Error('[CHARTER_ACCOUNTING_LINEAGE] Missing or invalid same-scope predecessor');
+    current = predecessor;
+  }
+  return chain;
 }
 
 /** Provider adapters call this only after authoritative full non-execution/refund evidence. */

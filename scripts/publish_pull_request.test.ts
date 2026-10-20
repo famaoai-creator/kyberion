@@ -49,6 +49,7 @@ function stubGhAndGit(): void {
     if (command === 'gh' && args[0] === 'auth') return 'Logged in to github.com\n';
     if (command === 'gh' && args[0] === 'repo') return '{"defaultBranchRef":{"name":"main"}}';
     if (command === 'git' && args[0] === 'branch') return 'agent/kl-03\n';
+    if (command === 'git' && args[0] === 'rev-parse') return 'a'.repeat(40) + '\n';
     if (command === 'gh' && args[0] === 'pr') return 'https://github.com/acme/repo/pull/1\n';
     throw new Error(`unexpected safeExec(${command}, ${JSON.stringify(args)})`);
   });

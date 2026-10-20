@@ -169,6 +169,24 @@ describe('acceptCharterFromForm + viewCharter', () => {
     if (root) safeRmSync(root, { recursive: true, force: true });
   });
 
+  it('persists and projects a person target grant without manufacturing a tenant', () => {
+    const grant = {
+      operation_id: 'vcs:pr_create' as const,
+      repository: 'https://github.com/acme/project',
+    };
+    const f = form({ scope_kind: 'person', tenant_slug: '', external_operations: [grant] });
+    const stored = accept(f);
+    expect(stored.scope).toEqual({ kind: 'person' });
+    const loaded = findActiveCharter({ kind: 'person' }, NOW, opts());
+    expect(loaded?.envelope.external_operations).toEqual([grant]);
+    expect(viewCharter(stored, NOW, opts())).toMatchObject({
+      scope_kind: 'person',
+      tenant_slug: '',
+      external_operations: [grant],
+      responsible: 'user:owner',
+    });
+  });
+
   it('refuses anyone but an owner, an agent, or a statement that differs from what was shown', () => {
     const f = form();
     expect(() => accept(f, { holderRole: 'approver' })).toThrow(/only an owner/);

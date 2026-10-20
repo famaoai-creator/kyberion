@@ -205,6 +205,7 @@ export default function SettingsPage() {
   const [voiceRecording, setVoiceRecording] = React.useState(false);
   const [oauthBusyId, setOauthBusyId] = React.useState<string | null>(null);
   const [oauthMessage, setOauthMessage] = React.useState<string | null>(null);
+  const [oauthError, setOauthError] = React.useState(false);
   const [meTenants, setMeTenants] = React.useState<SettingsTenantView[]>([]);
   const [meViewing, setMeViewing] = React.useState<SettingsTenantView | null>(null);
   const [members, setMembers] = React.useState<SettingsMember[]>([]);
@@ -684,6 +685,7 @@ export default function SettingsPage() {
     async (serviceId: string, serviceLabel: string) => {
       setOauthBusyId(serviceId);
       setOauthMessage(null);
+      setOauthError(false);
       const oauthWindow = window.open('', '_blank', 'noopener');
       try {
         const response = await globalThis.fetch('/api/oauth/begin', {
@@ -699,11 +701,19 @@ export default function SettingsPage() {
         if (!response.ok || !body?.ok || !body.authorization_url) {
           throw new Error(body?.error || `HTTP ${response.status}`);
         }
+        const authorizationUrl = new URL(body.authorization_url);
+        if (
+          authorizationUrl.protocol !== 'https:' ||
+          authorizationUrl.username ||
+          authorizationUrl.password
+        )
+          throw new Error(t('authority.oauth_invalid'));
         if (oauthWindow) oauthWindow.location.href = body.authorization_url;
         else window.location.assign(body.authorization_url);
         setOauthMessage(t('setup.connect_oauth_started', { service: serviceLabel || serviceId }));
       } catch (err) {
         oauthWindow?.close();
+        setOauthError(true);
         setOauthMessage(
           t('setup.connect_oauth_failed', {
             service: serviceLabel || serviceId,
@@ -1145,10 +1155,13 @@ export default function SettingsPage() {
             t={t}
             setup={setup}
             services={services}
+            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
+            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
             setServices={setServices}
             busy={busy}
             oauthBusyId={oauthBusyId}
             oauthMessage={oauthMessage}
+            oauthError={oauthError}
             onConnectOAuth={(serviceId, serviceLabel) => void connectOAuth(serviceId, serviceLabel)}
             saveFeedback={saveFeedback?.section === 'services' ? saveFeedback : null}
             hasUnsavedChanges={profileDirty || servicesDirty}

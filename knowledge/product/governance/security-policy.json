@@ -896,6 +896,18 @@
       "allow_read": ["knowledge/personal/tenants/"],
       "deny_read_descendants": ["knowledge/personal/tenants/"],
       "allow_write": []
+    },
+    "person_charter_store": {
+      "allow_read": [
+        "knowledge/personal/charters/",
+        "active/shared/runtime/external-operations/personal/shared/",
+        "active/shared/tmp/personal/shared/vitest-external-operations/"
+      ],
+      "allow_write": [
+        "knowledge/personal/charters/",
+        "active/shared/runtime/external-operations/personal/shared/",
+        "active/shared/tmp/personal/shared/vitest-external-operations/"
+      ]
     }
   },
   "authority_permissions": {

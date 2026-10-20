@@ -754,3 +754,7 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 - [stance-tenant-customer-model](../architecture/stance-tenant-customer-model.md)
 - [docs/SURFACES.md](../../../docs/SURFACES.md)
 - [Tenant / Organization / Onboarding / Autonomous Operations 統合計画](../../../docs/developer/improvement-plans-archive/2026-08/TENANT_ORGANIZATION_ONBOARDING_AUTONOMY_PLAN_2026-08-15.ja.md)
+
+## 外部操作の接続と権限委任
+
+GitHub の認証やブラウザへの接続だけでは、自律実行の権限は付かない。identity と接続設定の後、[外部操作のオンボーディング](../orchestration/onboarding-action-authority.md)で操作・対象・期限を確認し、本人承認してから適用する。Concierge の設定画面でも同じ申請・承認・適用・取消しを行う。個人利用では person scope を使い、架空の tenant は作らない。

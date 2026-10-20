@@ -4,6 +4,7 @@ import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from '../se
 import { withExecutionContext } from '../authority.js';
 import {
   activateAgentIdentity,
+  activateProvisionedAgentIdentity,
   AGENT_IDENTITY_OPS,
   AgentIdentityAccountabilityError,
   AgentIdentityConflictError,
@@ -274,6 +275,19 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — lifecycle and restart replay', () => {
+  it('initial activation never lifts suspension, including a delayed journal event', () => {
+    const issued = issueTestIdentity('initial-consent-agent');
+    withExecutionContext('mission_controller', () => {
+      expect(activateProvisionedAgentIdentity(issued.nhi_id).lifecycle_status).toBe('active');
+      suspendAgentIdentity(issued.nhi_id, 'human hold');
+      expect(() => activateProvisionedAgentIdentity(issued.nhi_id)).toThrow('provisioned');
+      new AgentIdentityJournal({ journalPath: currentJournalPath }).append(
+        AGENT_IDENTITY_OPS.identityActivated,
+        { nhi_id: issued.nhi_id, activated_at: new Date().toISOString(), only_provisioned: true }
+      );
+      expect(getAgentIdentity(issued.nhi_id)?.lifecycle_status).toBe('suspended');
+    });
+  });
   it('rejects an external journal path before reading or writing it', () => {
     expect(
       () => new AgentIdentityJournal({ journalPath: '/tmp/agent-identity-external.jsonl' })

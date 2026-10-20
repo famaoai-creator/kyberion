@@ -1,4 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { sharedTmp } from '../path-resolver.js';
+import { safeWriteFile, safeRmSync } from '../secure-io.js';
+const bodyPath = sharedTmp('vcs-review-' + randomUUID() + '.md');
+beforeAll(() => safeWriteFile(bodyPath, 'Fixture review body'));
+afterAll(() => safeRmSync(bodyPath, { force: true }));
 const mocks = vi.hoisted(() => ({
   gate: vi.fn(),
   audit: vi.fn(),
@@ -15,7 +21,7 @@ vi.mock('../secure-io.js', async (original) => {
   return {
     ...actual,
     safeReadFile: (file: string, options?: Parameters<typeof actual.safeReadFile>[1]) =>
-      file === '/fixture/body.md' ? mocks.body : actual.safeReadFile(file, options),
+      file === bodyPath ? mocks.body : actual.safeReadFile(file, options),
   };
 });
 import { gitRun, gitPush, gitFetch, gitStatus, type VcsCommandRunner } from './git.js';
@@ -114,7 +120,7 @@ describe('canonical VCS external governance', () => {
           title: 'review',
           head: 'feature',
           base: 'main',
-          bodyFile: '/fixture/body.md',
+          bodyFile: bodyPath,
         },
         run
       )
@@ -130,10 +136,7 @@ describe('canonical VCS external governance', () => {
     });
     expect(() =>
       trusted(() =>
-        ghPrCreate(
-          { title: 'review', head: 'feature', base: 'main', bodyFile: '/fixture/body.md' },
-          run
-        )
+        ghPrCreate({ title: 'review', head: 'feature', base: 'main', bodyFile: bodyPath }, run)
       )
     ).toThrow('VCS_SNAPSHOT_CHANGED');
     expect(sent()).toEqual([]);

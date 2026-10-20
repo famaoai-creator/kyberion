@@ -29,6 +29,11 @@ export async function main(
     llmMain(args.slice(1), print);
     return;
   }
+  if (args[0] === 'authority') {
+    const { main: authorityMain } = await import('./onboarding_authority.js');
+    await authorityMain(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'apply') {
     await applyOnboardingMain(args.slice(1), print);
     return;
