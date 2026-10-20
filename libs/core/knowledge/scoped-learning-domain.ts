@@ -35,6 +35,28 @@ function scopedLearningMarkdownPathUnchecked(scope: MemoryScopeEnvelope, id: str
 export function scopedLearningMarkdownPath(scope: MemoryScopeEnvelope, id: string): string {
   return scopedLearningMarkdownPathUnchecked(assertScopedLearningScope(scope), id);
 }
+/** Reject caller-altered receipt identity before any historical publication read. */
+export function assertScopedLearningPublicationReferences(candidate: MemoryCandidate): void {
+  const scope = assertScopedLearningScope(candidate.scope!);
+  const markdownPath = scopedLearningMarkdownPath(scope, candidate.candidate_id);
+  if (candidate.promoted_ref !== undefined && candidate.promoted_ref !== markdownPath)
+    throw new Error('[LEARNING_PUBLICATION_INVALID] Unexpected publication reference');
+  const publication = candidate.learning_publication;
+  // An approved queue row may have no receipt after a publisher/queue crash.
+  // The subsequent canonical readback is what establishes its new receipt.
+  if (!publication) return;
+  if (
+    publication.version !== 1 ||
+    publication.candidate_id !== candidate.candidate_id ||
+    JSON.stringify(assertScopedLearningScope(publication.scope)) !== JSON.stringify(scope) ||
+    publication.approved_payload_digest !== approvedLearningPayloadDigest(candidate) ||
+    publication.markdown_path !== markdownPath ||
+    publication.record_path !== markdownPath.replace(/\.md$/, '.json') ||
+    !/^[a-f0-9]{64}$/.test(publication.markdown_sha256) ||
+    !/^[a-f0-9]{64}$/.test(publication.record_sha256)
+  )
+    throw new Error('[LEARNING_PUBLICATION_INVALID] Receipt identity differs from candidate');
+}
 export function isScopedLearningCandidate(candidate: MemoryCandidate): boolean {
   return Boolean(
     candidate.scope &&

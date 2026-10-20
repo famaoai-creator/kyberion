@@ -288,6 +288,14 @@ At the 2026-10-20 governed-continuation integration:
 
 The acceptance suite must cover continuity across clarification, delegation, approval hold/resume, verified delivery, scoped feedback, review/promotion and next-work use. Each work item traverses only the applicable stages; simple work does not acquire unnecessary questions or approval gates. Cover duplicate inputs, denial/expiry, changed approved content, unknown outcomes and cross-scope contamination. Mocked tests, recorded closure and builds are separate evidence classes from authenticated live business execution.
 
+### 9.1 Scoped SOP review in the existing surfaces
+
+Chronos Knowledge is the preparation and publication surface: select an exact candidate, save its curated title/summary/content/evidence, request human review, then explicitly publish the approved SOP. The request opens the existing shared Approvals view, including mission-less and terminal decisions. Concierge links the same candidate to Chronos rather than introducing another editor or approval store.
+
+The canonical request freezes the reviewed payload and destination. Every queue writer and publication retry must preserve that binding; a changed proposal needs a new candidate. Candidate keys are selectors, not authority. Server-resolved tenant, organization and project visibility is applied before candidate or approval details, counts, decisions and passkey operations. Owner/audience and unsupported scope restrictions remain review-only. Scoped details are not broadcast through shared notifications or the legacy knowledge-preview route.
+
+A lost response is an unknown result, not permission to resend. Refresh the exact candidate/review first. Publication reconciles canonical artifact hashes and approval consumption before marking the queue promoted; a retry after final queue persistence fails must retain identical artifact bytes and receipt. The publisher's existing scoped service authority may read only the fixed proof artifacts after binding and current-approver checks, never an arbitrary viewer-supplied path. A verified receipt makes the SOP eligible for existing same-scope retrieval; it does not grant execution authority or relax the autonomous shadow mandate.
+
 ## 10. Companion Documents
 
 - `knowledge/product/architecture/enterprise-operating-kernel.md`

@@ -1,3 +1,5 @@
+import { scopedLearningApprovalVisibleToViewer } from '../../../lib/scoped-learning-approval-visibility';
+import type { ViewerContext } from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
 import { buildCompanyVisionRef, type CompanyAggregate } from '@agent/core/company';
 import {
@@ -1021,9 +1023,11 @@ export function collectPendingSecretApprovals(
 
 export function collectPendingApprovals(
   tenantSlugs: string[] | 'all',
-  tierAccess?: readonly string[]
+  tierAccess?: readonly string[],
+  viewer?: ViewerContext
 ): intelligenceData.PendingApprovalSummary[] {
   return listApprovalRequests({ status: 'pending' })
+    .filter((request) => scopedLearningApprovalVisibleToViewer(request, viewer))
     .filter((request) =>
       approvalVisibleToScope(
         {

@@ -1,3 +1,5 @@
+import { scopedLearningApprovalVisibleToViewer } from './scoped-learning-approval-visibility';
+import type { ViewerContext } from './viewer-context';
 import * as path from 'node:path';
 import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
 import { executionMetricsReadFor } from '@agent/core/cost-report';
@@ -167,6 +169,9 @@ function approvalTenantFields(
 }
 
 export interface ApprovalQueueQuery {
+  requestId?: string;
+  storageChannel?: string;
+  viewer?: ViewerContext;
   query?: string;
   status?: ApprovalRequestRecord['status'] | ApprovalRequestRecord['status'][] | string | string[];
   kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][] | string | string[];
@@ -557,6 +562,9 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
 
   return listApprovalRequests()
     .filter((record) => {
+      if (query.requestId && record.id !== query.requestId) return false;
+      if (query.storageChannel && record.storageChannel !== query.storageChannel) return false;
+      if (!scopedLearningApprovalVisibleToViewer(record, query.viewer, query.tenant)) return false;
       if (statusFilter && !statusFilter.has(record.status)) return false;
       if (kindFilter && !kindFilter.has(record.kind)) return false;
       if (missionFilter && record.requestedByContext?.missionId?.toUpperCase() !== missionFilter)

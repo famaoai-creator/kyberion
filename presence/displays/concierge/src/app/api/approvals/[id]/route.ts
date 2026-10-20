@@ -1,3 +1,4 @@
+import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   decideApprovalRequest,
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { status: 404 }
       );
     }
+    if (!scopedLearningApprovalVisibleToViewer(record, resolved.context))
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     // The decision lands on the approval's tenant — the member gate checks
     // the membership for THAT tenant, not the first scope entry (B4/F2).
     const requesterContext = record.requestedByContext as
