@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleAction as handleNetworkAction } from '../libs/actuators/network-actuator/src/index';
 import * as network from '@agent/core/network';
+import * as externalOperations from '@agent/core/governance/external-operation';
 
 vi.mock('@agent/core', async () => {
   const actual = await vi.importActual('@agent/core');
@@ -89,15 +90,27 @@ describe('Resilience Verification', () => {
     const { handleAction } = await import('../libs/actuators/service-actuator/src/index');
     const mockFetch = vi.mocked(network.secureFetch);
     mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
-    await expect(
-      handleAction({
-        service_id: 'example',
-        mode: 'API',
-        action: 'write_data',
-        method: 'POST',
-        params: { retry: { maxRetries: 4, initialDelayMs: 1 } },
-      })
-    ).rejects.toThrow('outcome is unknown');
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // This transport-resilience fixture starts after admission. Real approval,
+    // reservation and replay behavior is covered by the external-operation
+    // suites and the external-actuator simulation, without admission mocks.
+    const admission = vi.spyOn(externalOperations, 'admitExternalOperation').mockReturnValue({
+      allowed: true,
+      status: 'approved',
+    });
+    try {
+      await expect(
+        handleAction({
+          service_id: 'example',
+          mode: 'API',
+          action: 'write_data',
+          method: 'POST',
+          params: { retry: { maxRetries: 4, initialDelayMs: 1 } },
+        })
+      ).rejects.toThrow('outcome is unknown');
+      expect(admission).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      admission.mockRestore();
+    }
   });
 });

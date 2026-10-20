@@ -831,6 +831,9 @@ describe('customer dialogue (E2E-06)', () => {
     const stt = await import('../libs/core/voice/speech-to-text-bridge.js');
     stt.registerSpeechToTextBridge({
       name: 'test-stt',
+      // This fixture returns an in-process transcript and never opens or
+      // uploads audio. Declare that locality instead of posing as remote STT.
+      capabilities: { timestamps: false, granularity: 'none', local_only: true },
       async transcribe() {
         return {
           text: '毎朝9時に売上レポートが欲しい。データソースはBigQuery。',
@@ -859,6 +862,9 @@ describe('customer dialogue (E2E-06)', () => {
     });
     expect(result).toBeTruthy();
     expect(result!.capture.requirements.functional_requirements[0].id).toBe('FR-AUDIO-1');
+    expect(backendExtractRequirements.mock.calls.at(-1)![0].sourceText).toBe(
+      '毎朝9時に売上レポートが欲しい。データソースはBigQuery。'
+    );
     // prior draft threading: second ingestion passes the first as priorDraft
     await modes.ingestAudioIntoDealRequirements({
       tenantSlug: SLUG,

@@ -16,6 +16,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./chain-integrity": {
+      "types": "./dist/chain-integrity.d.ts",
+      "default": "./dist/chain-integrity.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
