@@ -9,4 +9,5 @@ category: Added
 - Keep meeting action items unfinished when only an execution plan has been generated.
 - Reuse exact existing service execution proof without a second approval or charter charge, and keep scoped review references stable across headless pipeline resume.
 - Route the PR publisher through the typed, snapshot-bound VCS creation API.
+- Bind camera credentials with a restart-stable, installation-keyed scrypt identity rather than a fast password hash; preserve denial on missing keys or configuration drift.
 - Stop after an attempted meeting join fails; verify the prior session before selecting another transport. Resumable workflows must keep service calls and meeting external effects in separate top-level steps.

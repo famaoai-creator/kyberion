@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scryptSync } from 'node:crypto';
+import { resolveAuditChainKey } from '@agent/core/chain-integrity';
 import * as path from 'node:path';
 import { parseSafeJsonInput, getRegisteredEnvText } from '@agent/core/foundation';
 import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
@@ -21,13 +22,32 @@ import {
 const STT_READY_SAMPLE_RATE = 16000;
 const STT_READY_CHANNELS = 1;
 const ownedCameraConfigs = new Map<string, { fingerprint: string; implementation: object }>();
+// Private process-local identity, never a reusable password verifier. A salted
+// memory-hard derivation keeps low-entropy OBS credentials out of fast hashes.
+const cameraConfigSalt = randomBytes(32);
+const fingerprintCameraConfig = (value: string): string =>
+  scryptSync(value, cameraConfigSalt, 32).toString('hex');
+
+function fingerprintCameraCredential(password: string, host: string, port: number): string {
+  const key = resolveAuditChainKey({ createIfMissing: true });
+  if (!key)
+    throw new Error(
+      '[VOICE_CAMERA_KEY_UNAVAILABLE] A governed installation key is required to bind camera credentials'
+    );
+  // The existing protected installation key makes this identity restart-stable
+  // without a new secret store. Key rotation deliberately requires reapproval.
+  const salt = createHmac('sha256', key)
+    .update(JSON.stringify(['kyberion:voice-camera-credential:v1', host, port]))
+    .digest();
+  return scryptSync(password, salt, 32).toString('hex');
+}
 
 function installOwnedCamera(
   id: string,
   config: Record<string, unknown>,
   install: () => unknown
 ): void {
-  const fingerprint = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+  const fingerprint = fingerprintCameraConfig(JSON.stringify(config));
   const existing = listCameraOutputBridges().find((bridge) => bridge.bridge_id === id);
   const owned = ownedCameraConfigs.get(id);
   if (existing) {
@@ -324,6 +344,12 @@ export async function outputToVirtualCamera(input: {
     String(input.obs_password || '').trim() ||
     String(getRegisteredEnvText('KYBERION_OBS_WS_PASSWORD') || '').trim();
   const backend = String(input.backend || 'auto').trim() || 'auto';
+  const obsHost = String(input.obs_host || '127.0.0.1').trim() || '127.0.0.1';
+  const obsPort = Number(input.obs_port) || 4455;
+  // Resolve the stable credential binding before registering any bridge.
+  const credentialHash = password
+    ? fingerprintCameraCredential(password, obsHost, obsPort)
+    : undefined;
   const obsOptions = {
     ...(String(input.obs_host || '').trim() ? { host: String(input.obs_host).trim() } : {}),
     ...(Number.isFinite(Number(input.obs_port)) ? { port: Number(input.obs_port) } : {}),
@@ -358,9 +384,9 @@ export async function outputToVirtualCamera(input: {
   }
   const target = {
     backend: bridge.bridge_id,
-    obs_host: String(input.obs_host || '127.0.0.1').trim() || '127.0.0.1',
-    obs_port: Number(input.obs_port) || 4455,
-    credential_hash: password ? createHash('sha256').update(password).digest('hex') : undefined,
+    obs_host: obsHost,
+    obs_port: obsPort,
+    credential_hash: credentialHash,
     v4l2_device_path: String(input.v4l2_device_path || '').trim(),
   };
   if (input.stop) {

@@ -292,16 +292,45 @@ describe('voice external operation boundaries', () => {
     }
   });
 
-  it('stops multi-output production playback before the first audible effect', async () => {
-    const bridge = createVirtualAudioOutputPlaybackBridge();
-    await expect(
-      withExternalOperationPipelineRun('run', () =>
-        trusted(() =>
-          bridge.playOnOutputs(['one', 'two'], { source_path: 'active/shared/tmp/input.wav' })
+  it.each(['darwin', 'win32'] as const)(
+    'stops multi-output production playback before the first audible effect on supported %s',
+    async (supportedPlatform) => {
+      // Platform capability selection precedes the batch gate. Pin a supported
+      // fixture backend so Linux CI reaches the checkpoint being tested.
+      const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+      Object.defineProperty(process, 'platform', { ...platform, value: supportedPlatform });
+      try {
+        const bridge = createVirtualAudioOutputPlaybackBridge();
+        await expect(
+          withExternalOperationPipelineRun('run', () =>
+            trusted(() =>
+              bridge.playOnOutputs(['one', 'two'], { source_path: 'active/shared/tmp/input.wav' })
+            )
+          )
+        ).rejects.toThrow('EXTERNAL_BATCH_CHECKPOINT_REQUIRED');
+        expect(safeExec).not.toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(process, 'platform', platform);
+      }
+    }
+  );
+
+  it('keeps unsupported Linux playback fail-closed before any audible effect', async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
+    try {
+      const bridge = createVirtualAudioOutputPlaybackBridge();
+      await expect(
+        withExternalOperationPipelineRun('run', () =>
+          trusted(() =>
+            bridge.playOnOutputs(['one', 'two'], { source_path: 'active/shared/tmp/input.wav' })
+          )
         )
-      )
-    ).rejects.toThrow('EXTERNAL_BATCH_CHECKPOINT_REQUIRED');
-    expect(safeExec).not.toHaveBeenCalled();
+      ).rejects.toThrow('unsupported platform linux');
+      expect(safeExec).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+    }
   });
 
   it('protects registered remote STT handles while local-only transcription remains automatic', async () => {

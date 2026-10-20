@@ -33,6 +33,8 @@ beforeEach(() => {
   safeMkdir(missionEvidenceDir(missionId), { recursive: true });
   registerSpeechToTextBridge({
     name: 'test-fixed',
+    // Canned in-process transcription never uploads the captured audio.
+    capabilities: { timestamps: false, granularity: 'none', local_only: true },
     transcribe: async () => ({ text: '本日の決定事項は予算承認です', backend: 'test-fixed' }),
   });
 });

@@ -1643,6 +1643,15 @@ effects: checkpoint them separately. A generation status/download failure
 must never automatically submit a second paid/provider job. Gates include
 browser/vcs/voice/media external-governance tests and the sync facade tests.
 
+Credential identities inside persisted approval effects must not be fast,
+unkeyed password hashes. Derive a purpose/target-bound identity using the
+governed installation key and a memory-hard KDF; never serialize the password,
+key or salt. Keep that identity stable across process restarts. Process-random
+salts are suitable only for private in-memory configuration comparisons.
+Missing keys fail closed before bridge installation; key rotation invalidates
+prior approval. Gate: voice-camera-credential-fingerprint tests cover module
+reload, password/host/port/key drift, missing-key refusal and secret absence.
+
 Do not reinstall a named virtual-camera bridge on every start/stop request:
 seam multiplicity is enforced outside Vitest too. Reuse the owner's exact
 configuration, reject target drift before effects, and never replace a custom
