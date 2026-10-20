@@ -65,7 +65,8 @@ describe('calendar backend selection', () => {
       createEvent: vi.fn().mockResolvedValue({ status: 'success', title: 'x' }),
     };
     const registry = new CalendarBackendRegistry([outlookAdapter]);
-    expect(registry.resolve('outlook')).toBe(outlookAdapter);
+    expect(registry.resolve('outlook')).toBe(registry.get('outlook'));
+    expect(registry.resolve('outlook').id).toBe(outlookAdapter.id);
   });
 });
 
@@ -167,3 +168,19 @@ describe('JXA calendar response boundary', () => {
     );
   });
 });
+// Backend transport fixtures isolate admission; direct registered backend
+// authorization is exercised in calendar-external-governance.test.ts.
+vi.mock('@agent/core/meeting/calendar-external-effect', () => ({
+  runCalendarExternalEffect: (
+    _input: object,
+    _kind: string,
+    _effect: object,
+    execute: () => unknown
+  ) => execute(),
+  forwardCalendarExternalEffect: (
+    _source: object,
+    _target: object,
+    _kind: string,
+    execute: () => unknown
+  ) => execute(),
+}));

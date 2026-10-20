@@ -75,6 +75,78 @@ const denied = (ts: string, field?: string): LedgerEntry => ({
 });
 
 describe('buildAccountabilityReport', () => {
+  it('separates execution evidence from admission counts and flags unknown outcomes', () => {
+    const evidence = (
+      outcome: 'succeeded' | 'failed' | 'unknown',
+      ts = NOW.toISOString()
+    ): LedgerEntry => ({
+      kind: 'execution_outcome',
+      ts,
+      actor: 'agent',
+      action_class: 'send_message_external',
+      operation_id: 'service:send',
+      correlation_id: outcome,
+      effect_hash: 'hash',
+      outcome,
+    });
+    const report = buildAccountabilityReport({
+      charter: charter(),
+      now: NOW,
+      ledger: [
+        spend(NOW.toISOString(), 1),
+        evidence('succeeded'),
+        evidence('failed'),
+        evidence('unknown'),
+        { ...evidence('succeeded', '2026-09-01T00:00:00.000Z'), correlation_id: 'older-succeeded' },
+      ],
+    });
+    expect(report.executed).toBe(1);
+    expect(report.execution_outcomes).toEqual({
+      succeeded: 1,
+      failed: 1,
+      unknown: 1,
+      needs_verification: 1,
+    });
+    expect(report.all_clear).toBe(false);
+    expect(renderAccountabilityReportText(report)).toContain('要確認 1');
+    const reconciled = buildAccountabilityReport({
+      charter: charter(),
+      now: NOW,
+      ledger: [evidence('unknown'), { ...evidence('succeeded'), correlation_id: 'unknown' }],
+    });
+    expect(reconciled.execution_outcomes).toEqual({
+      succeeded: 1,
+      failed: 0,
+      unknown: 0,
+      needs_verification: 0,
+    });
+    expect(reconciled.all_clear).toBe(true);
+    const started: LedgerEntry = {
+      kind: 'execution_started',
+      ts: NOW.toISOString(),
+      actor: 'agent',
+      action_class: 'send_message_external',
+      operation_id: 'service:send',
+      correlation_id: 'external:start',
+      effect_hash: 'hash',
+    };
+    const unmatchedAdmission = {
+      ...spend(NOW.toISOString(), 0),
+      correlation_id: 'external:admitted',
+    };
+    const crashed = buildAccountabilityReport({
+      charter: charter(),
+      now: NOW,
+      ledger: [started, unmatchedAdmission],
+    });
+    expect(crashed.execution_outcomes).toEqual({
+      succeeded: 0,
+      failed: 0,
+      unknown: 2,
+      needs_verification: 2,
+    });
+    expect(crashed.all_clear).toBe(false);
+  });
   it('is all clear when only quiet, in-budget work happened', () => {
     const r = buildAccountabilityReport({
       charter: charter(),

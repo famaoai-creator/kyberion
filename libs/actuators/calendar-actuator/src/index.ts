@@ -42,6 +42,7 @@ export {
   listCalendarsOnJxa,
   listEventsOnJxa,
 } from './calendar-actuator-helpers.js';
+export type { CalendarExecutionOptions } from './calendar-actuator-helpers.js';
 
 export {
   calendarBackendRegistry,

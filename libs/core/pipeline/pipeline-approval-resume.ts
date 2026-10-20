@@ -49,7 +49,18 @@ function approvalBindsToSuspendedRun(
   if (context?.actorId !== `pipeline:${runId}` || record.requestedBy !== context.actorId) {
     return 'approval requester is not bound to the pipeline run';
   }
-  const expectedCorrelation = `pipeline:${runId}:${stepId}`;
+  const externalCorrelation = state.suspended.approval_correlation_id;
+  if (
+    externalCorrelation &&
+    (state.suspended.storage_channel !== 'external-operation' ||
+      record.channel !== 'external-operation' ||
+      !/^external:[a-f0-9]{64}$/u.test(externalCorrelation) ||
+      !record.accountability?.effectBinding ||
+      !record.accountability?.payloadHash)
+  ) {
+    return 'external approval binding is incomplete';
+  }
+  const expectedCorrelation = externalCorrelation || `pipeline:${runId}:${stepId}`;
   if (record.correlationId !== expectedCorrelation) {
     return 'approval correlation is not bound to the pipeline step';
   }

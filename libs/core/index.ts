@@ -14,6 +14,11 @@ export * from './index-part-08.js';
 export * from './index-part-09.js';
 export * from './index-part-10.js';
 export * from './index-part-11.js';
+export * from './governance/external-operation.js';
+export * from './governance/external-operation-occurrence.js';
+export * from './governance/external-operation-runtime.js';
+export * from './governance/external-operation-store.js';
+export * from './meeting/calendar-external-effect.js';
 
 // Preserve the original explicit export precedence for names also surfaced by
 // broad compatibility barrels.

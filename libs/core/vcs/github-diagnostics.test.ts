@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('./external-vcs.js', () => ({
+  governVcsCommand: (_operation: string, _effect: object, execute: () => unknown) => execute(),
+}));
 
 const mocks = vi.hoisted(() => ({ safeExec: vi.fn() }));
 vi.mock('../secure-io.js', async (original) => ({
@@ -83,7 +86,7 @@ describe('GitHub CLI diagnostics', () => {
         stdout: '',
         stderr: 'unknown failure secret-value',
       }))
-    ).toThrow(/gh command: command_failure/);
+    ).toThrow(/VCS_TYPED_VERB_REQUIRED/);
     expect(() =>
       ghMust(['secret-command', 'secret-value'], {}, () => ({
         status: 1,

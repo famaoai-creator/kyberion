@@ -189,6 +189,7 @@
         "export_session_handoff",
         "extract_text_ref",
         "goto",
+        "local_session_probe",
         "network",
         "passkey_credentials",
         "passkey_events",

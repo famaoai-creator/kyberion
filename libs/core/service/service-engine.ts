@@ -25,7 +25,10 @@ import {
   resolveRequestEnvelope,
   ServiceEffectOutcomeUnknownError,
 } from './service-engine-helpers.js';
-import { executeServicePresetAlternative } from './service-engine-execution.js';
+import {
+  executeServicePresetAlternative,
+  isReplaySafeServiceOperation,
+} from './service-engine-execution.js';
 import {
   authorizeTenantServiceAction,
   listServiceBindingRecords,
@@ -213,6 +216,16 @@ export async function executeServicePreset(
             ? 'authentication_failed'
             : 'unavailable'
         );
+      }
+      // An attempted mutation may already have completed remotely. Switching
+      // transports would repeat the same effect under one admission.
+      if (!isReplaySafeServiceOperation(op)) {
+        if (binding.authMode === 'secret-guard') {
+          throw new Error(
+            `Service execution outcome unknown for ${serviceId}:${action}; provider diagnostics withheld`
+          );
+        }
+        throw err;
       }
       logger.error(
         binding.authMode === 'secret-guard'

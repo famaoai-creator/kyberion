@@ -314,6 +314,8 @@ describe('realtime voice conversation', () => {
 
     const fakeStt: SpeechToTextBridge = {
       name: 'fake-stt',
+      // This fixture returns text in-process without reading/uploading audio.
+      capabilities: { timestamps: false, granularity: 'none', local_only: true },
       async transcribe() {
         return { text: '今日の予定を教えて', backend: 'fake-stt' };
       },

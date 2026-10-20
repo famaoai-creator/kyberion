@@ -20,6 +20,19 @@ import type {
   CalendarSummary,
 } from '../calendar-types.js';
 import { calendarName, planSlotsFromBusy } from '../calendar-shared.js';
+import {
+  forwardCalendarExternalEffect,
+  type CalendarMutationKind,
+} from '@agent/core/meeting/calendar-external-effect';
+
+function forward<T extends object, R>(
+  source: object,
+  kind: CalendarMutationKind,
+  request: T,
+  send: (input: T) => Promise<R>
+): Promise<R> {
+  return forwardCalendarExternalEffect(source, request, kind, () => send(request));
+}
 
 function isGwsReady(): boolean {
   const status = readGwsAuthStatus();
@@ -95,19 +108,24 @@ export class GwsCalendarBackend implements CalendarBackendAdapter {
   }
 
   async createEvent(params: CalendarParams): Promise<CalendarEventMutation> {
-    const result: CalendarEventCreateResult = await createCalendarEvent({
-      provider: 'google-workspace',
-      calendar_id: calendarName(params),
-      summary: params.title || '',
-      start: params.start_date || '',
-      end: params.end_date || '',
-      description: params.description,
-      location: params.location,
-      attendees: params.attendees,
-      time_zone: params.time_zone,
-      with_meet: params.with_meet,
-      conference_request_id: params.conference_request_id,
-    });
+    const result: CalendarEventCreateResult = await forward(
+      params,
+      'create_event',
+      {
+        provider: 'google-workspace',
+        calendar_id: calendarName(params),
+        summary: params.title || '',
+        start: params.start_date || '',
+        end: params.end_date || '',
+        description: params.description,
+        location: params.location,
+        attendees: params.attendees,
+        time_zone: params.time_zone,
+        with_meet: params.with_meet,
+        conference_request_id: params.conference_request_id,
+      },
+      createCalendarEvent
+    );
     return {
       status: result.ok ? 'success' : 'error',
       title: result.created_event.summary,
@@ -116,20 +134,25 @@ export class GwsCalendarBackend implements CalendarBackendAdapter {
   }
 
   async updateEvent(params: CalendarParams): Promise<CalendarEventMutation> {
-    const result = await updateCalendarEvent({
-      provider: 'google-workspace',
-      calendar_id: calendarName(params),
-      event_id: params.event_id || '',
-      summary: params.title,
-      start: params.start_date,
-      end: params.end_date,
-      description: params.description,
-      location: params.location,
-      attendees: params.attendees,
-      reminder_minutes_before_start: params.reminder_minutes_before_start,
-      send_updates: params.send_updates,
-      time_zone: params.time_zone,
-    });
+    const result = await forward(
+      params,
+      'update_event',
+      {
+        provider: 'google-workspace',
+        calendar_id: calendarName(params),
+        event_id: params.event_id || '',
+        summary: params.title,
+        start: params.start_date,
+        end: params.end_date,
+        description: params.description,
+        location: params.location,
+        attendees: params.attendees,
+        reminder_minutes_before_start: params.reminder_minutes_before_start,
+        send_updates: params.send_updates,
+        time_zone: params.time_zone,
+      },
+      updateCalendarEvent
+    );
     return {
       status: result.ok ? 'success' : 'error',
       title: result.created_event.summary,
@@ -138,12 +161,17 @@ export class GwsCalendarBackend implements CalendarBackendAdapter {
   }
 
   async deleteEvent(params: CalendarParams): Promise<CalendarEventDeleteResult> {
-    const result = await deleteCalendarEvent({
-      provider: 'google-workspace',
-      calendar_id: calendarName(params),
-      event_id: params.event_id || '',
-      send_updates: params.send_updates,
-    });
+    const result = await forward(
+      params,
+      'delete_event',
+      {
+        provider: 'google-workspace',
+        calendar_id: calendarName(params),
+        event_id: params.event_id || '',
+        send_updates: params.send_updates,
+      },
+      deleteCalendarEvent
+    );
     return { status: result.ok ? 'success' : 'error', ...result };
   }
 }

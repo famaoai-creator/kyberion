@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord } from '../foundation/text.js';
@@ -56,6 +57,83 @@ import {
   type SeamProviderCandidate,
 } from '../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
+import { runExternalOperation } from '../governance/external-operation.js';
+
+const admittedImageMethods = new WeakSet<object>();
+const imageReferenceSnapshots = new WeakMap<ImageGenerationRequest, Map<string, Buffer>>();
+function imageNeedsAdmission(provider: ImageGenerationProvider): boolean {
+  return (
+    imageProviderDataEgress(provider) !== 'local' ||
+    provider.costTier === 'paid' ||
+    provider.id === 'comfyui'
+  );
+}
+
+/** Registered/custom providers and direct native cloud instances use the same
+ * final generation boundary. Local rendering remains automatic. */
+function governImageProvider<T extends ImageGenerationProvider>(provider: T): T {
+  const original = provider.generate;
+  if (admittedImageMethods.has(original)) return provider;
+  const generate = async (request: ImageGenerationRequest): Promise<ImageGenerationResult> => {
+    const snapshot = structuredClone(request);
+    assertReferenceEgressAllowed(snapshot, provider);
+    const references = new Map(
+      (snapshot.referenceImages || []).map((reference) => {
+        const referencePath = resolveReferenceImagePath(reference);
+        return [
+          referencePath,
+          Buffer.from(safeReadFile(referencePath, { encoding: null }) as Buffer),
+        ] as const;
+      })
+    );
+    const referenceContent = [...references].map(([referencePath, bytes]) => ({
+      path: referencePath,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      bytes: bytes.length,
+    }));
+    imageReferenceSnapshots.set(snapshot, references);
+    return runExternalOperation(
+      {
+        operationId: `media:image:${provider.id}:generate`,
+        effect: { provider: provider.id, params: snapshot, reference_content: referenceContent },
+        requiresApproval:
+          imageNeedsAdmission(provider) &&
+          !(
+            provider.requiresInteractiveHandoff &&
+            snapshot.targetPath &&
+            isHostImageHandoffOutput(snapshot.targetPath, snapshot.prompt)
+          ),
+        delegable: false,
+      },
+      () => {
+        for (const reference of referenceContent) {
+          const current = safeReadFile(reference.path, { encoding: null }) as Buffer;
+          if (createHash('sha256').update(current).digest('hex') !== reference.sha256) {
+            throw new Error(
+              '[IMAGE_REFERENCE_CHANGED] Revalidate reference content before sending'
+            );
+          }
+        }
+        // Native inline upload reads the captured buffers below, not mutable
+        // files. Custom adapters are trusted code and revalidate at this call.
+        return original.call(provider, snapshot);
+      },
+      (result) =>
+        (result.status === 'succeeded' && typeof result.path === 'string') ||
+        (result.status === 'submitted' && typeof result.promptId === 'string')
+          ? 'succeeded'
+          : 'unknown'
+    );
+  };
+  admittedImageMethods.add(generate);
+  return new Proxy(provider, {
+    get(target, property) {
+      if (property === 'generate') return generate;
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
 
 const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
 const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
@@ -80,7 +158,11 @@ export function registerImageGenerationProvider(
 ): () => void {
   const id = String(provider.id || '').trim();
   if (!id) throw new Error('ImageGenerationProvider.id is required');
-  const disposeFromSeam = imageGenerationProviderSeam.register(id, provider, metadata);
+  const disposeFromSeam = imageGenerationProviderSeam.register(
+    id,
+    governImageProvider(provider),
+    metadata
+  );
   const dispose = () => {
     disposeFromSeam();
     if (imageGenerationProviderDisposers.get(id) === dispose)
@@ -315,6 +397,9 @@ async function runLocalFluxGeneration(
 }
 
 export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
+  constructor() {
+    this.generate = governImageProvider(this).generate;
+  }
   readonly id = 'comfyui';
   readonly backendIds = ['media-generation.comfyui'];
   readonly costTier = 'self_hosted';
@@ -359,6 +444,9 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
 }
 
 export class GeminiFastImageGenerationProvider implements ImageGenerationProvider {
+  constructor() {
+    this.generate = governImageProvider(this).generate;
+  }
   readonly id = 'gemini_fast';
   readonly backendIds = ['media-generation.gemini.imagen-3-fast'];
   readonly costTier = 'free';
@@ -419,6 +507,9 @@ export class GeminiFastImageGenerationProvider implements ImageGenerationProvide
 }
 
 export class GeminiServiceImageGenerationProvider implements ImageGenerationProvider {
+  constructor() {
+    this.generate = governImageProvider(this).generate;
+  }
   readonly id = 'gemini_service';
   readonly backendIds = ['media-generation.gemini'];
   readonly costTier = 'paid';
@@ -571,7 +662,9 @@ export async function buildGeminiImageContents(request: ImageGenerationRequest):
   const references = request.referenceImages ?? [];
   for (const [index, reference] of references.entries()) {
     const referencePath = resolveReferenceImagePath(reference);
-    const source = safeReadFile(referencePath, { encoding: null }) as Buffer;
+    const source =
+      imageReferenceSnapshots.get(request)?.get(referencePath) ??
+      (safeReadFile(referencePath, { encoding: null }) as Buffer);
     // Each reference gets an equal share of what is left of the total budget.
     const remaining = references.length - index;
     const share = Math.floor((GEMINI_REFERENCE_TOTAL_MAX_BYTES - total) / remaining);
@@ -621,6 +714,9 @@ export function geminiContentImageBytes(value: unknown): string | undefined {
  * can stylise a user photo. Cloud egress: reference requests need consent.
  */
 export class GeminiImageModelGenerationProvider implements ImageGenerationProvider {
+  constructor() {
+    this.generate = governImageProvider(this).generate;
+  }
   readonly id = 'gemini_image';
   readonly displayName = 'Google Gemini API';
   readonly costTier = 'paid';
@@ -682,6 +778,9 @@ export class GeminiImageModelGenerationProvider implements ImageGenerationProvid
 }
 
 export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
+  constructor() {
+    this.generate = governImageProvider(this).generate;
+  }
   readonly id = 'llm_api';
   readonly costTier = 'paid';
   readonly dataPolicy = 'zero_retention';
@@ -1153,7 +1252,7 @@ export class AdaptivePolicyRouter {
 
   constructor(providers: ImageGenerationProvider[]) {
     for (const p of providers) {
-      this.providers.set(p.id, p);
+      this.providers.set(p.id, governImageProvider(p));
     }
     this.initFallbackGraph();
   }
@@ -1467,6 +1566,9 @@ export class AdaptivePolicyRouter {
           recordReferenceEgressReceipt(request, provider, 'allowed');
         }
         const result = await provider.generate(request);
+        // An external request was attempted. A quota/error receipt cannot
+        // prove no generation or charge occurred; never change providers now.
+        if (imageNeedsAdmission(provider)) return result;
         if (result.status === 'failed' && isRateLimitOrQuotaError(result.error)) {
           logger.warn(
             `[image_generation_bridge] Provider ${provider.id} encountered rate limit / quota error: ${result.error}. Attempting fallback.`
@@ -1477,6 +1579,7 @@ export class AdaptivePolicyRouter {
         return result;
       } catch (err: any) {
         lastError = err;
+        if (imageNeedsAdmission(provider) || err?.adfControlFlow === 'preflight') throw err;
         if (isRateLimitOrQuotaError(err)) {
           logger.warn(
             `[image_generation_bridge] Provider ${provider.id} threw rate limit / quota error: ${err?.message || err}. Attempting fallback.`

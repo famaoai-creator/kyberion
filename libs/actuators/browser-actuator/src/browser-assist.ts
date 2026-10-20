@@ -1,4 +1,6 @@
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import {
   createTaskSession,
   loadTaskSession,
@@ -553,6 +555,7 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
   if (!Number.isInteger(maxActions) || maxActions < 1 || maxActions > MAX_ACTIONS) {
     throw new Error(`browser_assist max_actions must be an integer between 1 and ${MAX_ACTIONS}`);
   }
+  assertExternalOperationBatchResumable(maxActions);
   const sessionId = input.session_id || `browser-assist-${Date.now()}`;
   const options = {
     headless: input.browser_options?.headless ?? true,
@@ -783,7 +786,9 @@ export async function runBrowserAssist(input: AssistInput, deps: AssistDeps) {
       };
     }
     const step = actionStep(action, snapshot, origins, index);
-    const actionResult = await deps.executePipeline([step], sessionId, options);
+    const actionResult = await withExternalOperationOccurrence(`browser-assist:${index}`, () =>
+      deps.executePipeline([step], sessionId, options)
+    );
     const resultContext = actionResult.context as Record<string, unknown> | undefined;
     const extractedText = Object.entries(resultContext || {}).find(
       ([key, value]) =>

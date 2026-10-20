@@ -14,6 +14,7 @@ import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { getSecret } from '@agent/core/secret/secret-guard';
 import { clamp, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { governBrowserHandlers } from './browser-external-governance.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import {
   registerPasskey,
@@ -89,7 +90,7 @@ const BROWSER_CAPTURE_OP_HANDLERS_SHARED_0: BrowserCaptureOpHandler = async ({
   );
 };
 /** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
-export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCaptureOpHandler>> = {
+const RAW_CAPTURE_HANDLERS: Record<string, BrowserCaptureOpHandler> = {
   navigate: BROWSER_CAPTURE_OP_HANDLERS_SHARED_0,
   goto: BROWSER_CAPTURE_OP_HANDLERS_SHARED_0,
   tabs: async ({ op, params, runtime, ctx }) => {
@@ -419,6 +420,7 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
     );
   },
 };
+export const BROWSER_CAPTURE_OP_HANDLERS = governBrowserHandlers('capture', RAW_CAPTURE_HANDLERS);
 
 export interface BrowserTransformOpHandlerInput extends BrowserOpSupport {
   op: string;
@@ -536,7 +538,7 @@ const BROWSER_APPLY_OP_HANDLERS_SHARED_0: BrowserApplyOpHandler = async ({
   );
 };
 /** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
-export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHandler>> = {
+const RAW_APPLY_HANDLERS: Record<string, BrowserApplyOpHandler> = {
   navigate: BROWSER_APPLY_OP_HANDLERS_SHARED_0,
   goto: BROWSER_APPLY_OP_HANDLERS_SHARED_0,
   click: async ({ op, params, runtime, ctx, resolve, page, buildRetryOptions, opApply }) => {
@@ -1135,3 +1137,4 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
     );
   },
 };
+export const BROWSER_APPLY_OP_HANDLERS = governBrowserHandlers('apply', RAW_APPLY_HANDLERS);

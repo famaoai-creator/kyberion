@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
 
 const mocks = vi.hoisted(() => ({ safeExecResult: vi.fn() }));
 vi.mock('@agent/core/secure-io', async (original) => ({

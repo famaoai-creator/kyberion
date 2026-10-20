@@ -25,6 +25,7 @@ import {
   EXTERNAL_EFFECT_CLASSES,
   delegatedDecisionPolicy,
   type CharterAction,
+  type Charter,
   type CharterAvailability,
   type CharterScope,
 } from './accountability-charter.js';
@@ -52,7 +53,7 @@ export interface ApprovalGateCharterInput {
 export type CharterGateOutcome =
   | { kind: 'none' }
   | { kind: 'stop'; message: string }
-  | { kind: 'allow'; message: string }
+  | { kind: 'allow'; message: string; acceptedCharter?: Charter }
   | { kind: 'require_approval'; reason: string };
 
 const HARDENED_RULES = new Set(['injection-suspected-override', 'strict-posture-floor']);
@@ -218,7 +219,7 @@ function runCharterGateUnlocked(input: CharterGateRequest): CharterGateOutcome {
         correlation_id: `charter-sample:${active.charter_id}:${correlationId}`,
       });
     }
-    return { kind: 'allow', message };
+    return { kind: 'allow', message, acceptedCharter: active };
   }
 
   // deny: outside the envelope / appetite. A human decides this one action.

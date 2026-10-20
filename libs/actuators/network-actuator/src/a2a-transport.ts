@@ -16,6 +16,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { runExternalOperation } from '@agent/core/governance/external-operation';
 
 /**
  * A2A Physical Transport Layer v1.0
@@ -168,17 +169,32 @@ export async function sendA2AMessage(
   if (options.encrypt && !options.target_public_key?.trim()) {
     throw new Error('[A2A_Transport] encryption requested but target_public_key is missing');
   }
-  let payload = JSON.stringify(envelope);
-  if (options.encrypt) {
-    logger.info(`🔒 [A2A_Transport] Encrypting message ${messageId}...`);
-    payload = await _encryptPayload(payload, options.target_public_key!);
-  }
   const { method = 'local' } = options;
-  await resolveA2ATransport(method).send({
-    message_id: messageId,
-    payload,
-    encrypted: options.encrypt,
-  });
+  const transport = resolveA2ATransport(method);
+  await runExternalOperation(
+    {
+      operationId: 'network:a2a_send',
+      effect: {
+        params: {
+          message: envelope,
+          method,
+          encrypt: options.encrypt,
+          target_public_key: options.target_public_key,
+        },
+      },
+      requiresApproval: true,
+      delegable: true,
+    },
+    async () => {
+      let payload = JSON.stringify(envelope);
+      if (options.encrypt) {
+        logger.info(`🔒 [A2A_Transport] Encrypting message ${messageId}...`);
+        payload = await _encryptPayload(payload, options.target_public_key!);
+      }
+      await transport.send({ message_id: messageId, payload, encrypted: options.encrypt });
+    },
+    () => 'succeeded'
+  );
 }
 
 const localA2ATransport: A2ATransport = {

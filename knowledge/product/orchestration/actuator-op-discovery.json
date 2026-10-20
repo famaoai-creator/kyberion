@@ -3453,6 +3453,28 @@
           "examples": [{}]
         },
         {
+          "op": "local_session_probe",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/first-win-session.png"
+            }
+          ]
+        },
+        {
           "op": "action_trail",
           "kind": "capture",
           "input_schema": {

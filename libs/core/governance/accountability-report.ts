@@ -24,6 +24,13 @@ export interface AccountabilityReport {
   generated_at: string;
   since: string;
   executed: number;
+  /** Verified results, separate from the legacy admission/consumption count above. */
+  execution_outcomes: {
+    succeeded: number;
+    failed: number;
+    unknown: number;
+    needs_verification: number;
+  };
   denied: number;
   money: {
     currency: string;
@@ -257,6 +264,9 @@ export function buildAccountabilityReport(input: {
   const month = now.toISOString().slice(0, 7);
 
   let executed = 0;
+  const outcomes = { succeeded: 0, failed: 0, unknown: 0, needs_verification: 0 };
+  const latestOutcomes = new Map<string, Extract<LedgerEntry, { kind: 'execution_outcome' }>>();
+  const externalAdmissions = new Set<string>();
   let denied = 0;
   let spentToday = 0;
   let spentMonth = 0;
@@ -269,6 +279,12 @@ export function buildAccountabilityReport(input: {
       if (entry.ts.startsWith(month)) spentMonth += entry.money;
       if (entry.ts.startsWith(day)) spentToday += entry.money;
       if (at >= sinceMs) executed += 1;
+      if (entry.correlation_id?.startsWith('external:'))
+        externalAdmissions.add(entry.correlation_id);
+    } else if (entry.kind === 'execution_started') {
+      externalAdmissions.add(entry.correlation_id);
+    } else if (entry.kind === 'execution_outcome') {
+      latestOutcomes.set(entry.correlation_id, entry);
     } else if (entry.kind === 'reservation_release') {
       if (entry.consumption_ts.startsWith(month)) spentMonth -= entry.money;
       if (entry.consumption_ts.startsWith(day)) spentToday -= entry.money;
@@ -286,6 +302,19 @@ export function buildAccountabilityReport(input: {
       standing.add(entry.tripwire);
     } else if (entry.kind === 'tripwire_clear') {
       standing.delete(entry.tripwire);
+    }
+  }
+  for (const entry of latestOutcomes.values()) {
+    if (entry.outcome === 'unknown') {
+      outcomes.unknown += 1;
+      outcomes.needs_verification += 1;
+    } else if (Date.parse(entry.ts) >= sinceMs) outcomes[entry.outcome] += 1;
+  }
+  // A crash after admission/start but before outcome logging is not success.
+  for (const correlationId of externalAdmissions) {
+    if (!latestOutcomes.has(correlationId)) {
+      outcomes.unknown += 1;
+      outcomes.needs_verification += 1;
     }
   }
 
@@ -310,6 +339,7 @@ export function buildAccountabilityReport(input: {
     generated_at: now.toISOString(),
     since: new Date(sinceMs).toISOString(),
     executed,
+    execution_outcomes: outcomes,
     denied,
     money: { currency, spent_today: spentToday, spent_this_month: spentMonth, per_day, per_month },
     near_limit: near,
@@ -320,7 +350,13 @@ export function buildAccountabilityReport(input: {
     scope_proposals: scopeProposals,
     expires_at: charter.accountable.expires_at,
     expires_in_days: expiresInDays,
-    all_clear: standing.size === 0 && denied === 0 && near.length === 0 && expiresInDays > 14,
+    all_clear:
+      standing.size === 0 &&
+      denied === 0 &&
+      outcomes.failed === 0 &&
+      outcomes.unknown === 0 &&
+      near.length === 0 &&
+      expiresInDays > 14,
   };
 }
 
@@ -350,6 +386,23 @@ export function renderAccountabilityReportText(
       locale
     ),
   ];
+  if (
+    report.execution_outcomes &&
+    Object.values(report.execution_outcomes).some((count) => count > 0)
+  ) {
+    const o = report.execution_outcomes;
+    lines.push(
+      t(
+        'decision:charter_report_execution_outcomes',
+        {
+          succeeded: String(o.succeeded),
+          failed: String(o.failed),
+          unknown: String(o.needs_verification),
+        },
+        locale
+      )
+    );
+  }
   // The stop is the one thing that can never be missed: it goes first.
   if (report.tripwires_standing.length > 0) {
     lines.splice(

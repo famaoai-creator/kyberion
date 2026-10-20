@@ -7,6 +7,11 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
 import type { ValidateFunction } from 'ajv';
 import {
+  type ExternalOperation,
+  type ExternalOperationAuthority,
+} from '@agent/core/governance/external-operation';
+import { runCalendarExternalEffect } from '@agent/core/meeting/calendar-external-effect';
+import {
   calendarBackendRegistry,
   createJxaCalendarBackend,
   type CalendarBackendRegistry,
@@ -32,6 +37,11 @@ export type CalendarAction = {
     | 'delete_event';
   params?: CalendarParams;
 };
+
+export interface CalendarExecutionOptions {
+  /** Trusted embedding authority; never read from calendar parameters. */
+  externalAuthority?: (action: CalendarAction) => ExternalOperationAuthority | undefined;
+}
 
 const CALENDAR_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/calendar-action.schema.json'
@@ -190,7 +200,8 @@ function uniqueSelections(selections: CalendarBackendSelection[]): CalendarBacke
 
 export async function handleAction(
   action: CalendarAction,
-  registry: CalendarBackendRegistry = calendarBackendRegistry
+  registry: CalendarBackendRegistry = calendarBackendRegistry,
+  options: CalendarExecutionOptions = {}
 ): Promise<unknown> {
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
@@ -225,6 +236,26 @@ export async function handleAction(
     actuator: 'calendar-actuator',
   });
   traceCtx.addEvent('action.received', { op: valid.op, backend: backends.join(',') });
+  const mutation = ['create_event', 'update_event', 'delete_event'].includes(valid.op);
+  if (valid.op === 'update_event' && !selections[0].adapter.updateEvent) {
+    throw new Error(
+      `calendar-actuator: backend '${selections[0].adapter.id}' does not provide the event update capability`
+    );
+  }
+  if (valid.op === 'delete_event' && !selections[0].adapter.deleteEvent) {
+    throw new Error(
+      `calendar-actuator: backend '${selections[0].adapter.id}' does not provide the event delete capability`
+    );
+  }
+  const external: ExternalOperation | undefined = mutation
+    ? {
+        operationId: `calendar:${valid.op}`,
+        effect: { op: valid.op, backend: selections[0].adapter.id, params: selections[0].params },
+        requiresApproval: true,
+        delegable: valid.op !== 'delete_event',
+        authority: options.externalAuthority?.(valid),
+      }
+    : undefined;
   let result: unknown;
   try {
     switch (valid.op) {
@@ -273,7 +304,16 @@ export async function handleAction(
       }
       case 'create_event': {
         const [{ adapter, params: selectedParams }] = selections;
-        result = annotate(adapter, await adapter.createEvent(selectedParams));
+        result = annotate(
+          adapter,
+          await runCalendarExternalEffect(
+            selectedParams,
+            'create_event',
+            external!.effect,
+            () => adapter.createEvent(selectedParams),
+            external!.authority
+          )
+        );
         break;
       }
       case 'update_event': {
@@ -283,7 +323,16 @@ export async function handleAction(
             `calendar-actuator: backend '${adapter.id}' does not provide the event update capability`
           );
         }
-        result = annotate(adapter, await adapter.updateEvent(selectedParams));
+        result = annotate(
+          adapter,
+          await runCalendarExternalEffect(
+            selectedParams,
+            'update_event',
+            external!.effect,
+            () => adapter.updateEvent!(selectedParams),
+            external!.authority
+          )
+        );
         break;
       }
       case 'delete_event': {
@@ -293,7 +342,16 @@ export async function handleAction(
             `calendar-actuator: backend '${adapter.id}' does not provide the event delete capability`
           );
         }
-        result = annotate(adapter, await adapter.deleteEvent(selectedParams));
+        result = annotate(
+          adapter,
+          await runCalendarExternalEffect(
+            selectedParams,
+            'delete_event',
+            external!.effect,
+            () => adapter.deleteEvent!(selectedParams),
+            external!.authority
+          )
+        );
         break;
       }
       default: {
@@ -362,31 +420,31 @@ export const findSlots = (
 };
 export const createEvent = (
   params: CalendarParams,
-  registry: CalendarBackendRegistry = calendarBackendRegistry
-): Promise<CalendarEventMutation> => backendFor(params, registry).createEvent(params);
+  registry: CalendarBackendRegistry = calendarBackendRegistry,
+  options: CalendarExecutionOptions = {}
+): Promise<CalendarEventMutation> =>
+  handleAction({ op: 'create_event', params }, registry, options) as Promise<CalendarEventMutation>;
 export const updateEvent = (
   params: CalendarParams,
-  registry: CalendarBackendRegistry = calendarBackendRegistry
+  registry: CalendarBackendRegistry = calendarBackendRegistry,
+  options: CalendarExecutionOptions = {}
 ): Promise<CalendarEventMutation> => {
-  const adapter = backendFor(params, registry);
-  if (!adapter.updateEvent) {
-    throw new Error(
-      `calendar-actuator: backend '${adapter.id}' does not provide the event update capability`
-    );
-  }
-  return adapter.updateEvent(params);
+  return handleAction(
+    { op: 'update_event', params },
+    registry,
+    options
+  ) as Promise<CalendarEventMutation>;
 };
 export const deleteEvent = (
   params: CalendarParams,
-  registry: CalendarBackendRegistry = calendarBackendRegistry
+  registry: CalendarBackendRegistry = calendarBackendRegistry,
+  options: CalendarExecutionOptions = {}
 ): Promise<CalendarEventDeleteResult> => {
-  const adapter = backendFor(params, registry);
-  if (!adapter.deleteEvent) {
-    throw new Error(
-      `calendar-actuator: backend '${adapter.id}' does not provide the event delete capability`
-    );
-  }
-  return adapter.deleteEvent(params);
+  return handleAction(
+    { op: 'delete_event', params },
+    registry,
+    options
+  ) as Promise<CalendarEventDeleteResult>;
 };
 
 /** Backend ids in registration order. */
@@ -406,14 +464,16 @@ export const describeBackendCapabilities = (
  */
 export async function scheduleInFirstSlot(
   params: CalendarParams & { duration_minutes: number },
-  registry: CalendarBackendRegistry = calendarBackendRegistry
+  registry: CalendarBackendRegistry = calendarBackendRegistry,
+  options: CalendarExecutionOptions = {}
 ): Promise<{ slot: CalendarSlotResult['slots'][number]; event: CalendarEventMutation }> {
   const slots = await findSlots(params, registry);
   const slot = slots.slots[0];
   if (!slot) throw new Error('calendar-actuator: no free slot in the requested window');
   const event = await createEvent(
     { ...params, start_date: slot.start, end_date: slot.end },
-    registry
+    registry,
+    options
   );
   return { slot, event };
 }
