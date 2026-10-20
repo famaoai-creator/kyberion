@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadMemoryPromotionCandidate } from '@agent/core/knowledge/memory-promotion-queue';
-import { pathResolver } from '@agent/core/path-resolver';
 import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
-import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+  listMemoryPromotionCandidates,
+  memoryPromotionCandidateKey,
+  updateMemoryPromotionCandidateStatus,
+} from '@agent/core/knowledge/memory-promotion-queue';
+import { withExecutionContext } from '@agent/core/authority';
+import {
+  reviewMemoryPromotionCandidate,
+  assertMemoryPromotionReviewReady,
+} from '@agent/core/knowledge/memory-promotion-review';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import {
@@ -24,23 +25,12 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-/**
- * CS-03 記憶昇格キュー — record the HUMAN decision on one memory-promotion
- * candidate. Design principle (§0 of the CS plan): nothing is approved or
- * rejected without an explicit confirmed click; there is no scheduler and no
- * default decision. Queue state changes go exclusively through
- * scripts/mission_controller.ts (`memory-approve` / `memory-reject`), invoked
- * the same way the hygiene decision route does: the built controller under
- * dist/ as mission_controller (buildExecutionEnv: MISSION_ROLE, delegated under
- * SYSTEM_ROLE — AUTHORITY_MODEL 3.B2 DR-01) and cwd at the repo root.
- */
+/** Human decisions retain exact scope through shared review and atomic queue mutation. */
 
 const ALLOWED_DECISIONS = ['approve', 'reject'] as const;
 type MemoryDecision = (typeof ALLOWED_DECISIONS)[number];
 
 const CANDIDATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/;
-const CONTROLLER_RELATIVE = 'dist/scripts/mission_controller.js';
-const CONTROLLER_TIMEOUT_MS = 30_000;
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
@@ -54,8 +44,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const parsedBody = await readRequestObject(req, 'request body', ['decision']);
-    if (!parsedBody.ok)
+    const parsedBody = await readRequestObject(req, 'request body', ['decision', 'candidateKey']);
+    if (parsedBody.ok !== true)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
     const decision = ALLOWED_DECISIONS.includes(body?.decision as MemoryDecision)
@@ -70,13 +60,32 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     // list is narrowed, this write is not); the decision authorizes against
     // the candidate's own tenant. Decisions are one-shot: a decided candidate
     // is no longer pending.
-    const candidate = withExecutionContext('sovereign_concierge', () =>
-      loadMemoryPromotionCandidate(id)
-    );
+    const candidateKey = body.candidateKey;
+    if (
+      candidateKey !== undefined &&
+      (typeof candidateKey !== 'string' || !/^[a-f0-9]{64}$/.test(candidateKey))
+    )
+      return NextResponse.json({ ok: false, error: t('api.memory.invalid') }, { status: 400 });
+    const candidate = withExecutionContext('sovereign_concierge', () => {
+      const matches = listMemoryPromotionCandidates().filter(
+        (row) =>
+          row.candidate_id === id &&
+          (typeof candidateKey !== 'string' || memoryPromotionCandidateKey(row) === candidateKey)
+      );
+      return matches.length === 1 ? matches[0] : null;
+    });
     const visible = candidate && memoryCandidateVisibleToViewer(candidate, resolved.context);
     if (!visible) {
       return NextResponse.json({ ok: false, error: t('api.memory.not_found') }, { status: 404 });
     }
+    if (candidate.scope && candidate.proposed_memory_kind === 'sop' && decision !== 'reject')
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Scoped SOPs require the shared review and verified publication flow in Chronos.',
+        },
+        { status: 409 }
+      );
     if (candidate.status !== 'queued') {
       return NextResponse.json({ ok: false, error: t('api.memory.not_pending') }, { status: 409 });
     }
@@ -87,64 +96,62 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const decisionDenied = conciergeDecisionDenied(resolved.context, resourceTenant);
     if (decisionDenied) return decisionDenied;
 
-    const rootDir = pathResolver.rootDir();
-    const controllerPath = pathResolver.rootResolve(CONTROLLER_RELATIVE);
-    let controllerReady = false;
-    try {
-      const safeControllerPath = assertSafeRepositoryPath(controllerPath, {
-        allowMissingLeaf: true,
-      });
-      controllerReady =
-        safeExistsSync(safeControllerPath) && safeLstat(safeControllerPath).isFile();
-    } catch {
-      controllerReady = false;
-    }
-    if (!controllerReady) {
-      console.error(`[concierge/memory-queue] mission controller build missing: ${controllerPath}`);
-      return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 503 });
-    }
-
-    // FD-10 wave 1b: resolve the human member behind this decision, same
-    // best-effort fallback as FD-07's decidedBy seam — an unresolved
-    // principal (legacy synthetic identity) simply omits the flags, and the
-    // CLI keeps working without them.
+    if (candidate.scope && candidateKey !== memoryPromotionCandidateKey(candidate))
+      return NextResponse.json(
+        { ok: false, error: 'Exact scoped candidate key is required' },
+        { status: 409 }
+      );
+    // An unscoped address has no scope selector in the queue API; retain a
+    // unique identity instead of accidentally selecting a scoped sibling.
+    if (
+      !candidate.scope &&
+      withExecutionContext(
+        'sovereign_concierge',
+        () => listMemoryPromotionCandidates().filter((row) => row.candidate_id === id).length
+      ) !== 1
+    )
+      return NextResponse.json(
+        { ok: false, error: 'Candidate identity is ambiguous' },
+        { status: 409 }
+      );
     const decidedBy = resolveConciergeDecidedBy(resolved.context, resourceTenant);
-    const decidedByArgs = decidedBy
-      ? [
-          '--decided-by',
-          decidedBy.id,
-          '--decided-by-name',
-          decidedBy.display_name,
-          ...(decidedBy.role ? ['--decided-by-role', decidedBy.role] : []),
-        ]
-      : [];
-    const subcommand = decision === 'approve' ? 'memory-approve' : 'memory-reject';
-    const result = safeExecResult(
-      process.execPath,
-      [CONTROLLER_RELATIVE, subcommand, candidate.candidate_id, ...decidedByArgs],
-      {
-        env: buildExecutionEnv(process.env, 'mission_controller'),
-        cwd: rootDir,
-        timeoutMs: CONTROLLER_TIMEOUT_MS,
-        maxOutputMB: 5,
-      }
-    );
-
-    // Full controller output stays server-side; the UI gets a short honest verdict.
-    console.log(
-      `[concierge/memory-queue] ${subcommand} ${candidate.candidate_id} exit=${result.status}\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`
-    );
-
-    // Exit code 0 alone is not success: the controller logs-and-returns on a
-    // missing candidate. Verify the status transition on disk before claiming
-    // anything (see scripts/mission_controller.ts approve/rejectMemoryCandidate).
-    const after = withExecutionContext('sovereign_concierge', () =>
-      loadMemoryPromotionCandidate(candidate.candidate_id)
-    );
     const expected = decision === 'approve' ? 'approved' : 'rejected';
-    if (result.status !== 0 || after?.status !== expected) {
-      return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 502 });
-    }
+    const after = withExecutionContext('sovereign_concierge', () => {
+      if (decision === 'approve') {
+        const reviews = reviewMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+        if (
+          reviews.length !== 1 ||
+          memoryPromotionCandidateKey(reviews[0].candidate) !==
+            memoryPromotionCandidateKey(candidate)
+        )
+          throw new Error('[MEMORY_PROMOTION_AMBIGUOUS] Exact candidate review is required');
+        // Match memory-approve: no domain or curation edits are accepted by
+        // this surface, and the same evidence/audit/readiness floors apply.
+        assertMemoryPromotionReviewReady(
+          {
+            ...reviews[0],
+            blockers: reviews[0].blockers.filter(
+              (blocker) => blocker.code !== 'unclassified_domain'
+            ),
+          },
+          'approve'
+        );
+      }
+      return updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        scope: candidate.scope,
+        expectedStatus: candidate.status,
+        status: expected,
+        ratificationNote:
+          decision === 'approve'
+            ? 'Approved for promotion.'
+            : 'Rejected from the concierge memory review queue.',
+        ...(decision === 'approve' ? { approvalChannel: 'steward' as const } : {}),
+        ...(decidedBy ? { decidedBy: { ...decidedBy, kind: 'human' as const } } : {}),
+      });
+    });
+    if (after?.status !== expected)
+      return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 409 });
 
     return NextResponse.json({
       ok: true,

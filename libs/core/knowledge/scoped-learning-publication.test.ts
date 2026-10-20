@@ -318,6 +318,65 @@ describe('exact scoped learning publication', () => {
       expect(verifyScopedLearningPublication(promoted.candidate)).toBeDefined();
     }));
 
+  it.each(['markdown_only', 'conflicting_record', 'conflicting_markdown'] as const)(
+    'refuses %s partial publication without overwriting its evidence',
+    async (failure) =>
+      withExecutionContextAsync('ecosystem_architect', async () => {
+        registerReasoningBackend(stubReasoningBackend);
+        const f = fixture();
+        const approved = f.approve();
+        const distilled = createDistillCandidateRecord({
+          candidate_id: approved.candidate_id,
+          source_type: 'task_session',
+          task_session_id: approved.source_ref.slice('task_session:'.length),
+          tier: 'confidential',
+          scope: f.scope,
+          title: f.curation.title,
+          summary: f.curation.summary,
+          status: 'proposed',
+          target_kind: 'sop_candidate',
+          evidence_refs: approved.evidence_refs,
+          metadata: {
+            knowledge_domain: 'organization',
+            procedure_steps: [f.curation.content],
+            approved_payload_digest: approved.learning_approval!.payload_digest,
+          },
+        });
+        const partial = savePromotedMemoryRecord(distilled);
+        const mdPath = pathResolver.rootResolve(partial.logicalPath);
+        const jsonPath = mdPath.replace(/\.md$/, '.json');
+        if (failure === 'markdown_only') safeRmSync(jsonPath);
+        if (failure === 'conflicting_record')
+          safeWriteFile(
+            jsonPath,
+            JSON.stringify({
+              ...partial.record,
+              summary: 'Unapproved replacement procedure',
+            })
+          );
+        if (failure === 'conflicting_markdown')
+          safeWriteFile(mdPath, 'Unapproved replacement procedure');
+        const jsonBefore = safeExistsSync(jsonPath)
+          ? safeReadFile(jsonPath, { encoding: 'utf8' })
+          : undefined;
+        const markdownBefore = safeReadFile(mdPath, { encoding: 'utf8' });
+        await expect(
+          promoteMemoryCandidateToKnowledge({
+            candidateId: approved.candidate_id,
+            scope: f.scope,
+          })
+        ).rejects.toThrow(/LEARNING_PUBLICATION_(CONFLICT|INVALID)/);
+        expect(safeReadFile(mdPath, { encoding: 'utf8' })).toBe(markdownBefore);
+        if (jsonBefore === undefined) expect(safeExistsSync(jsonPath)).toBe(false);
+        else expect(safeReadFile(jsonPath, { encoding: 'utf8' })).toBe(jsonBefore);
+        expect(loadMemoryPromotionCandidate(approved.candidate_id, f.scope)?.status).toBe(
+          'approved'
+        );
+        const [channel, id] = f.approvalRef.split(':');
+        expect(loadApprovalRequest(channel!, id!)?.consumption).toBeUndefined();
+      })
+  );
+
   it('addresses exact project rows and never mutates approved evidence on re-enqueue', async () =>
     withExecutionContextAsync('ecosystem_architect', async () => {
       const f = fixture();

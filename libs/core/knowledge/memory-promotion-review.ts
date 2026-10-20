@@ -3,7 +3,7 @@ import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { auditChain } from '../governance/audit-chain.js';
-import { assertMemoryScope } from './memory-scope.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import {
   listMemoryPromotionCandidates,
   memoryPromotionScopeKey,
@@ -397,9 +397,12 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
 }
 
 export function reviewMemoryPromotionQueue(
-  status?: MemoryCandidate['status']
+  status?: MemoryCandidate['status'],
+  scope?: MemoryScopeEnvelope
 ): MemoryPromotionReview[] {
-  const allCandidates = listMemoryPromotionCandidates();
+  const allCandidates = listMemoryPromotionCandidates(scope).filter(
+    (row) => !scope || memoryPromotionScopeKey(row.scope) === memoryPromotionScopeKey(scope)
+  );
   const groups = new Map<string, MemoryCandidate[]>();
   for (const candidate of allCandidates) {
     const key = groupKey(candidate);
@@ -418,8 +421,13 @@ export function reviewMemoryPromotionQueue(
     .sort((a, b) => b.candidate.queued_at.localeCompare(a.candidate.queued_at));
 }
 
-export function reviewMemoryPromotionCandidate(candidateId: string): MemoryPromotionReview[] {
-  return reviewMemoryPromotionQueue().filter((review) => review.candidate_id === candidateId);
+export function reviewMemoryPromotionCandidate(
+  candidateId: string,
+  scope?: MemoryScopeEnvelope
+): MemoryPromotionReview[] {
+  return reviewMemoryPromotionQueue(undefined, scope).filter(
+    (review) => review.candidate_id === candidateId
+  );
 }
 
 export function assertMemoryPromotionReviewReady(

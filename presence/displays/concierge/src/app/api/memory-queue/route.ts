@@ -1,6 +1,8 @@
+import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   listMemoryPromotionCandidates,
+  memoryPromotionCandidateKey,
   type MemoryCandidate,
 } from '@agent/core/knowledge/memory-promotion-queue';
 import { withExecutionContext } from '@agent/core/authority';
@@ -21,6 +23,8 @@ export const dynamic = 'force-dynamic';
 const SUMMARY_MAX_CHARS = 400;
 
 export interface MemoryQueueItem {
+  learningReviewUrl?: string;
+  candidateKey?: string;
   id: string;
   kind: MemoryCandidate['proposed_memory_kind'];
   summary: string;
@@ -34,7 +38,18 @@ export interface MemoryQueueItem {
 
 function toItem(candidate: MemoryCandidate): MemoryQueueItem {
   const summary = String(candidate.summary || '').trim();
+  const scopedSop = Boolean(candidate.scope && candidate.proposed_memory_kind === 'sop');
+  const candidateKey = memoryPromotionCandidateKey(candidate);
+  const reviewUrl = scopedSop ? new URL(resolveSurfaceBrowserUrl('chronos')) : undefined;
+  if (reviewUrl) {
+    reviewUrl.searchParams.set('section', 'knowledge');
+    reviewUrl.searchParams.set('candidateKey', candidateKey);
+    if (candidate.scope?.tenant_slug)
+      reviewUrl.searchParams.set('tenant', candidate.scope.tenant_slug);
+  }
   return {
+    ...(candidate.scope ? { candidateKey } : {}),
+    ...(reviewUrl ? { learningReviewUrl: reviewUrl.href } : {}),
     id: candidate.candidate_id,
     kind: candidate.proposed_memory_kind,
     summary:
