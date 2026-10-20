@@ -7,6 +7,7 @@ import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
 import { normalizeDotProposal } from '../dot/dot-proposals.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
+import { buildWorkItemCreation } from '../workforce/work-coordination-identity.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { DotActionRecord } from '../dot/dot-action-ledger.js';
 import type { WorkItem, ReleaseWorkItemInput } from '../workforce/work-coordination-types.js';
@@ -16,6 +17,8 @@ import {
   authorMissionAdmissionBrief,
   recordVerifiedMissionAdmissionApproval,
   resolveDotMissionAdmission,
+  resolveDotMissionAdmissionScope,
+  assertMissionAdmissionActivation,
 } from './mission-admission.js';
 
 const mocks = vi.hoisted(() => {
@@ -183,6 +186,75 @@ beforeEach(() => {
 afterEach(() => safeRmSync(root, { recursive: true, force: true }));
 
 describe('Dot mission admission production and human receipt', () => {
+  it('admits an organization-only Dot through real WorkItem creation normalization', () => {
+    delete mocks.dot.scope.project_id;
+    mocks.item = buildWorkItemCreation(dotWorkItemInput(mocks.dot, mocks.rows[0]));
+    mocks.rows[0].work_item_id = mocks.item.item_id;
+    expect(mocks.item.context?.project_id).toBe('default');
+    expect(resolveDotMissionAdmission(mocks.item)).toEqual(admission);
+    expect(resolveDotMissionAdmissionScope(mocks.item)).toEqual({
+      tenant_slug: 'acme',
+      organization_id: 'org-1',
+    });
+    expect(() =>
+      assertMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+        organizationId: 'org-1',
+      })
+    ).not.toThrow();
+    mocks.state.relationships = {};
+    authorMissionAdmissionBrief(missionId, mocks.item.item_id);
+    expect(mocks.release).toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'done' }));
+  });
+  it('preserves an explicitly declared default project as a real mission binding', () => {
+    mocks.dot.scope.project_id = 'default';
+    mocks.item = buildWorkItemCreation(dotWorkItemInput(mocks.dot, mocks.rows[0]));
+    mocks.rows[0].work_item_id = mocks.item.item_id;
+    expect(resolveDotMissionAdmissionScope(mocks.item).project_id).toBe('default');
+    expect(() =>
+      assertMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+        organizationId: 'org-1',
+      })
+    ).toThrow('identity/scope mismatch');
+    expect(() =>
+      assertMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+        organizationId: 'org-1',
+        projectId: 'default',
+      })
+    ).not.toThrow();
+  });
+  it('rejects a real project on a projectless Dot and mismatched explicit projects', () => {
+    delete mocks.dot.scope.project_id;
+    mocks.item = buildWorkItemCreation(dotWorkItemInput(mocks.dot, mocks.rows[0]));
+    mocks.rows[0].work_item_id = mocks.item.item_id;
+    mocks.item.context!.project_id = 'unapproved-project';
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
+      'current Dot admission authority missing'
+    );
+    mocks.dot.scope.project_id = 'approved-project';
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
+      'current Dot admission authority missing'
+    );
+  });
+  it('retains tenant, organization and admitted action proof checks for normalized items', () => {
+    delete mocks.dot.scope.project_id;
+    const create = () => buildWorkItemCreation(dotWorkItemInput(mocks.dot, mocks.rows[0]));
+    mocks.item = create();
+    mocks.rows[0].work_item_id = mocks.item.item_id;
+    mocks.item.context!.tenant_slug = 'other-tenant';
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
+      'current Dot admission authority missing'
+    );
+    mocks.item = create();
+    mocks.item.context!.organization_id = 'other-org';
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
+      'current Dot admission authority missing'
+    );
+    mocks.item = create();
+    mocks.rows[0].work_item_id = 'other-item';
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
+      'mission intake differs from admitted action'
+    );
+  });
   it('retains structured proposal facts into deterministic tenant/org/project WorkItem metadata', () => {
     const proposal = normalizeDotProposal({
       title: 'Docs',

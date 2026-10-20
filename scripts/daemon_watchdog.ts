@@ -39,7 +39,10 @@ import {
 } from '@agent/core/workforce/work-coordination';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { evaluateMissionStartMandate } from '@agent/core/governance/mandate-shadow';
-import { resolveDotMissionAdmission } from '@agent/core/mission/mission-admission';
+import {
+  resolveDotMissionAdmission,
+  resolveDotMissionAdmissionScope,
+} from '@agent/core/mission/mission-admission';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -521,6 +524,7 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
           // Re-read governed authority after asynchronous loading. Revocation
           // and expiry must be checked at the actual admission boundary.
           if (!admission().covered) continue;
+          const missionScope = resolveDotMissionAdmissionScope(item, deps);
           claimed = claimWorkItem({
             itemId: item.item_id,
             actorPeerId: 'mission_controller',
@@ -546,7 +550,7 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             ...(item.context.organization_id
               ? ['--organization-id', item.context.organization_id]
               : []),
-            ...(item.context.project_id ? ['--project-id', item.context.project_id] : []),
+            ...(missionScope.project_id ? ['--project-id', missionScope.project_id] : []),
             '--tenant-slug',
             item.context.tenant_slug,
           ];

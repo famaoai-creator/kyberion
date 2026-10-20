@@ -10,6 +10,7 @@ import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
 import { getWorkItem, claimWorkItem, releaseWorkItem } from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
 import {
   evaluateMissionStartMandate,
   parseMissionAdmissionRequest,
@@ -34,12 +35,13 @@ export function assertMissionAdmissionActivation(
   deps: Deps & { organizationId?: string; projectId?: string } = {}
 ): void {
   const item = getWorkItem(workItemId, deps);
+  const scope = item ? resolveDotMissionAdmissionScope(item, deps) : undefined;
   if (
     !item ||
     item.metadata?.mission_id !== missionId ||
     item.context?.tenant_slug !== tenantSlug ||
     item.context?.organization_id !== deps.organizationId ||
-    item.context?.project_id !== deps.projectId
+    scope?.project_id !== deps.projectId
   )
     throw new Error('mission admission identity/scope mismatch');
   resolveDotMissionAdmission(item, deps);
@@ -48,6 +50,15 @@ export function resolveDotMissionAdmission(
   item: WorkItem,
   deps: Deps = {}
 ): MissionAdmissionRequest {
+  return verifiedDotMissionAdmission(item, deps).admission;
+}
+
+/** Actual declared scope, after current charter and immutable admission proof checks. */
+export function resolveDotMissionAdmissionScope(item: WorkItem, deps: Deps = {}) {
+  return verifiedDotMissionAdmission(item, deps).scope;
+}
+
+function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
   const admission = parseMissionAdmissionRequest(item.metadata?.mission_admission);
   const tenant = item.context?.tenant_slug;
   const dotId = item.metadata?.dot_id;
@@ -63,12 +74,15 @@ export function resolveDotMissionAdmission(
   )
     throw new Error('unbound mission intake');
   const dot = findDotCharter(dotId, deps.rootDir)?.charter;
+  // WorkItem creation canonicalizes an omitted project to its default bucket.
+  // Compare against the same canonical scope, retaining explicit project bindings.
+  const dotContext = dot ? normalizeWorkItemContext(dot.scope) : undefined;
   if (
     !dot ||
     dot.status !== 'active' ||
     dot.scope.tenant_slug !== tenant ||
     dot.scope.organization_id !== item.context?.organization_id ||
-    dot.scope.project_id !== item.context?.project_id ||
+    dotContext?.project_id !== item.context?.project_id ||
     !dot.authority.allowed_work_shapes?.includes('mission') ||
     !dot.authority.mission_mandate_refs?.includes(admission.mandate_ref)
   )
@@ -94,7 +108,14 @@ export function resolveDotMissionAdmission(
     ).covered
   )
     throw new Error('mission mandate no longer covers intake');
-  return admission;
+  return {
+    admission,
+    scope: {
+      tenant_slug: tenant,
+      ...(dot.scope.organization_id ? { organization_id: dot.scope.organization_id } : {}),
+      ...(dot.scope.project_id ? { project_id: dot.scope.project_id } : {}),
+    },
+  };
 }
 
 type AdmissionBrief = {
@@ -122,7 +143,7 @@ export function authorMissionAdmissionBrief(
   const item = getWorkItem(workItemId, deps);
   if (!item || item.metadata?.mission_id !== missionId)
     throw new Error('mission intake identity mismatch');
-  const admission = resolveDotMissionAdmission(item, deps);
+  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
   const state = loadState(missionId, deps);
   const missionDir = findMissionPath(missionId);
   if (
@@ -130,7 +151,7 @@ export function authorMissionAdmissionBrief(
     state.status !== 'active' ||
     state.tenant_slug !== item.context?.tenant_slug ||
     state.organization_id !== item.context?.organization_id ||
-    state.relationships?.project?.project_id !== item.context?.project_id ||
+    state.relationships?.project?.project_id !== scope.project_id ||
     !missionDir
   )
     throw new Error('mission activation receipt missing');
@@ -258,11 +279,11 @@ export function recordVerifiedMissionAdmissionApproval(
     !item ||
     item.metadata?.mission_id !== missionId ||
     item.context?.tenant_slug !== state.tenant_slug ||
-    item.context?.organization_id !== state.organization_id ||
-    item.context?.project_id !== state.relationships?.project?.project_id
+    item.context?.organization_id !== state.organization_id
   )
     return;
-  const admission = resolveDotMissionAdmission(item, deps);
+  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  if (scope.project_id !== state.relationships?.project?.project_id) return;
   if (
     computeApprovalPayloadHash(admission as unknown as Record<string, unknown>) !==
     computeApprovalPayloadHash(brief.missionAdmission as unknown as Record<string, unknown>)
