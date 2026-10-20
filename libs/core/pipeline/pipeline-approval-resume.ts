@@ -70,7 +70,10 @@ function approvalBindsToSuspendedRun(
 export function resumePipelineRunAfterApproval(
   record: ApprovalRequestRecord
 ): PipelineApprovalResumeOutcome {
-  if (record.status !== 'approved' || record.kind !== 'mission_gate') {
+  if (
+    !['approved', 'rejected', 'cancelled', 'expired'].includes(record.status) ||
+    record.kind !== 'mission_gate'
+  ) {
     return { status: 'not_applicable', reason: 'approval is not an approved mission gate' };
   }
   const context = record.requestedByContext;
@@ -88,7 +91,16 @@ export function resumePipelineRunAfterApproval(
     };
   }
 
-  const state = loadPipelineRunJournal(runId, missionId);
+  const journalScope = record.scope?.tenant_slug
+    ? { tier: record.scope.tier, tenantSlug: record.scope.tenant_slug }
+    : undefined;
+  const state = loadPipelineRunJournal(runId, missionId, journalScope);
+  if (record.status !== 'approved' && (!journalScope || !state.started?.library_execution)) {
+    return {
+      status: 'not_applicable',
+      reason: 'terminal denial continuation requires a scoped library journal',
+    };
+  }
   if (state.finished) {
     return { status: 'not_applicable', reason: 'pipeline run is already finished' };
   }
@@ -110,7 +122,14 @@ export function resumePipelineRunAfterApproval(
       ownerId: missionId || `pipeline:${runId}`,
       ownerType: 'pipeline-approval-resume',
       command: process.execPath,
-      args: [runnerPath, '--resume', runId],
+      args: [
+        runnerPath,
+        '--resume',
+        runId,
+        ...(state.started?.library_execution && journalScope
+          ? ['--journal-tier', journalScope.tier, '--journal-tenant', journalScope.tenantSlug!]
+          : []),
+      ],
       spawnOptions: {
         cwd: pathResolver.rootDir(),
         env,
@@ -133,7 +152,7 @@ export function resumePipelineRunAfterApproval(
 
   return {
     status: 'started',
-    reason: `pipeline resume started for approved step ${context?.stepId}`,
+    reason: `pipeline ${record.status === 'approved' ? 'resume' : 'denial settlement'} started for step ${context?.stepId}`,
     runId,
     resourceId,
   };

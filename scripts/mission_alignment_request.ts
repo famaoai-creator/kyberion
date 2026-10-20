@@ -38,6 +38,7 @@ import {
 import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path-resolver';
 import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
 import { observeMandateCoverage } from '@agent/core/governance/mandate-shadow';
+import { formatMissionAdmission } from './mission-alignment-gate/mission-brief.js';
 import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
 import {
   loadMissionBriefAtPath,
@@ -162,7 +163,10 @@ export function openAlignmentApproval(
     draft: {
       title: mt('mission_alignment:approval_title', { title: brief.title || missionId }),
       summary: brief.intent || mt('mission_alignment:approval_summary', { missionId }),
-      details: formatVictoryConditions(brief.victoryConditions),
+      details:
+        [formatVictoryConditions(brief.victoryConditions), formatMissionAdmission(brief)]
+          .filter(Boolean)
+          .join('\n\n') || undefined,
       severity: 'high',
     },
     source: { missionId },

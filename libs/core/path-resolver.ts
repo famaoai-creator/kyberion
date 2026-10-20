@@ -176,6 +176,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/logs/agent-runtime-supervisor/',
   'shared/exports/intent-contract-memory-sync/',
   'shared/runtime/pipeline-runs/',
+  'shared/runtime/pipeline-library-runs/',
+  'shared/runtime/autonomy-learning/',
   'shared/runtime/run-graphs/',
   'shared/runtime/artifacts/',
   'shared/runtime/distill-candidates/',

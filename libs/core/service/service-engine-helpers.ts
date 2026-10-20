@@ -262,11 +262,45 @@ function resolveRetryPolicy(...sources: Array<Record<string, unknown> | undefine
   return merged;
 }
 
+/** An uncertain effect must be reconciled before another transport is attempted. */
+export class ServiceEffectOutcomeUnknownError extends Error {
+  constructor() {
+    super('Service effect outcome is unknown; reconcile the original attempt before retrying.');
+    this.name = 'ServiceEffectOutcomeUnknownError';
+  }
+}
+
+export function isRetrySafeServiceOperation(
+  preset: Record<string, unknown>,
+  action: string,
+  alternative: Record<string, unknown>
+): boolean {
+  const operations = isPlainObject(preset.operations) ? preset.operations : {};
+  const operation = isPlainObject(operations[action]) ? operations[action] : {};
+  const sources = [operation, alternative];
+  if (
+    sources.some(
+      (source) =>
+        source.kind === 'apply' || source.risk === 'write' || source.risk === 'destructive'
+    )
+  )
+    return false;
+  if (
+    alternative.type === 'api' &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(String(alternative.method ?? 'GET').toUpperCase())
+  )
+    return false;
+  return (
+    sources.some((source) => source.kind === 'capture' || source.risk === 'read') ||
+    alternative.type === 'api'
+  );
+}
+
 export function buildRetryOptions(
   serviceConfig: Record<string, unknown>,
   preset: Record<string, unknown>,
   operation: Record<string, any>,
-  options: { recordUnclassifiedErrors?: boolean } = {}
+  options: { recordUnclassifiedErrors?: boolean; retrySafe?: boolean } = {}
 ): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
   const retryableCategories = new Set<string>();
   for (const source of [serviceConfig, preset, operation]) {
@@ -283,6 +317,7 @@ export function buildRetryOptions(
   };
 
   const shouldRetry = (error: Error) => {
+    if (options.retrySafe === false) return false;
     const classification = classifyError(error, {
       recordUnclassified: options.recordUnclassifiedErrors,
     });
@@ -297,7 +332,11 @@ export function buildRetryOptions(
     );
   };
 
-  return { ...resolvedRetry, shouldRetry };
+  return {
+    ...resolvedRetry,
+    ...(options.retrySafe === false ? { maxRetries: 0 } : {}),
+    shouldRetry,
+  };
 }
 
 export function resolveRequestEnvelope(params: unknown): {

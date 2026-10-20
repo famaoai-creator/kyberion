@@ -9,6 +9,8 @@ import {
   buildApiKeyQueryAuth,
   buildAuthHeaders,
   buildRetryOptions,
+  isRetrySafeServiceOperation,
+  ServiceEffectOutcomeUnknownError,
   isPlainObject,
   normalizePresetResult,
   prepareRequestBody,
@@ -21,6 +23,15 @@ import {
 import { resolveServiceBinding } from './service-binding.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { stripAuthorityEnvOverrides } from '../authority.js';
+import {
+  currentHumanExecutionAuthorization,
+  hasHumanExecutionContext,
+} from '../governance/human-execution.js';
+import {
+  currentDelegatedExecution,
+  delegatedExecutionEffectConfigurationHash,
+  hasDelegatedExecutionContext,
+} from '../governance/delegated-execution.js';
 
 const logger = createLogger('service-engine-execution');
 
@@ -148,6 +159,45 @@ export interface ServicePresetAlternativeExecutionContext {
   binding: ReturnType<typeof resolveServiceBinding>;
   /** Set only by the admitted, fixed authentication probe. */
   operatorProbe?: boolean;
+  /** Trusted service-engine selector, never taken from the request body. */
+  authSelector?: string;
+  /** Digest of the actual loaded transport config, supplied only by service-engine. */
+  effectConfigurationHash?: string;
+}
+
+function assertTransportAuthority(input: ServicePresetAlternativeExecutionContext): void {
+  const operationId = `service:preset:${input.serviceId}:${input.action}`;
+  const params = { request: input.params, auth: input.authSelector ?? 'none' };
+  const active =
+    currentHumanExecutionAuthorization(operationId, params) ??
+    currentDelegatedExecution(operationId, params);
+  if (
+    active &&
+    (!input.effectConfigurationHash ||
+      input.effectConfigurationHash !== delegatedExecutionEffectConfigurationHash(active.target))
+  ) {
+    throw new Error(
+      '[POLICY_VIOLATION] Loaded service configuration differs from authorized execution'
+    );
+  }
+  if (
+    hasHumanExecutionContext() &&
+    !currentHumanExecutionAuthorization(`service:preset:${input.serviceId}:${input.action}`, {
+      request: input.params,
+      auth: input.authSelector ?? 'none',
+    })
+  )
+    throw new Error('[POLICY_VIOLATION] Human service authority changed before transport dispatch');
+  if (
+    hasDelegatedExecutionContext() &&
+    !currentDelegatedExecution(`service:preset:${input.serviceId}:${input.action}`, {
+      request: input.params,
+      auth: input.authSelector ?? 'none',
+    })
+  )
+    throw new Error(
+      '[POLICY_VIOLATION] Delegated service authority changed before transport dispatch'
+    );
 }
 
 function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext) {
@@ -156,6 +206,7 @@ function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext
     // Authenticated provider failures may echo credentials. Classify for retry
     // in memory only; never feed raw text to the unclassified-error registry.
     recordUnclassifiedErrors: input.binding.authMode !== 'secret-guard',
+    retrySafe: isRetrySafeServiceOperation(input.preset, input.action, input.alt),
   });
   return input.binding.authMode === 'secret-guard'
     ? {
@@ -171,6 +222,27 @@ function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext
 
 export async function executeServicePresetAlternative(
   input: ServicePresetAlternativeExecutionContext
+): Promise<{ result: unknown } | null> {
+  let attempted = false;
+  try {
+    return await executeServicePresetAlternativeOnce(input, () => {
+      attempted = true;
+    });
+  } catch (error) {
+    if (
+      attempted &&
+      !input.operatorProbe &&
+      !isRetrySafeServiceOperation(input.preset, input.action, input.alt)
+    ) {
+      throw new ServiceEffectOutcomeUnknownError();
+    }
+    throw error;
+  }
+}
+
+async function executeServicePresetAlternativeOnce(
+  input: ServicePresetAlternativeExecutionContext,
+  markAttempted: () => void
 ): Promise<{ result: unknown } | null> {
   const runtimeVars = {
     ...input.mergedParams,
@@ -195,6 +267,8 @@ export async function executeServicePresetAlternative(
         ) as Record<string, unknown>
       );
       logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
+      assertTransportAuthority(input);
+      markAttempted();
       return execEnv ? safeExec(bin, args, { env: execEnv }) : safeExec(bin, args);
     }, alternativeRetryOptions(input));
 
@@ -212,6 +286,8 @@ export async function executeServicePresetAlternative(
 
     const mcpResult = await retry(async () => {
       logger.info(`🚀 [ENGINE:MCP_HTTP] Executing ${remoteUrl} for ${input.action}`);
+      assertTransportAuthority(input);
+      markAttempted();
       return await executeRemoteMcp(
         remoteUrl,
         {
@@ -243,6 +319,8 @@ export async function executeServicePresetAlternative(
 
     const mcpResult = await retry(async () => {
       logger.info(`🚀 [ENGINE:MCP] Executing ${bin} for ${input.action}`);
+      assertTransportAuthority(input);
+      markAttempted();
       return await executeMcp(
         bin,
         args,
@@ -302,6 +380,8 @@ export async function executeServicePresetAlternative(
           : undefined;
 
       logger.info(`🚀 [ENGINE:API] Executing ${input.serviceId}:${input.action}`);
+      assertTransportAuthority(input);
+      markAttempted();
       return await secureFetch({
         ...(input.operatorProbe
           ? { maxRedirects: 0, maxContentLength: 65536, timeout: 10000 }

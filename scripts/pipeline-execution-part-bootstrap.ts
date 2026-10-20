@@ -547,6 +547,8 @@ export interface RunStepsOptions {
   quiet?: boolean;
   /** Trusted execution-boundary signal for human-gated operations. */
   hasHuman?: boolean;
+  /** Trusted task/Dot admission mode; unrecognized effects need a human. */
+  delegatedExecution?: 'require';
   /** Explicit project-trust decision for pipeline/template loading. */
   trustResolved?: boolean;
   /** Durable human approval for the exact project-local resource being loaded. */

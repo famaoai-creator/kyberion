@@ -134,6 +134,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         organizationId?: string;
         /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
         decidedBy?: HumanDecidedBy;
+        admissionWorkItem?: string;
       }
     ) {
       await _startMission({
@@ -151,6 +152,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         ephemeral: options?.ephemeral,
         intentGoal: options?.intentGoal,
         decidedBy: options?.decidedBy,
+        ...(options?.admissionWorkItem ? { admissionWorkItem: options.admissionWorkItem } : {}),
       });
       await syncProjectOperationalStateIfLinked(id);
     },

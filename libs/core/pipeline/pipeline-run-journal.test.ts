@@ -6,11 +6,19 @@ import {
   hashPipelineOutput,
   loadPipelineRunJournal,
   newPipelineRunId,
+  pipelineRunJournalPath,
   pipelineJournalChannelSnapshot,
   readPipelineRunJournal,
 } from './pipeline-run-journal.js';
 
 describe('pipeline run journal', () => {
+  it('keeps protected library partitions inside the isolated runtime root in tests', () => {
+    const scope = { tier: 'confidential' as const, tenantSlug: 'acme' };
+    expect(pipelineRunJournalPath('isolated-run', undefined, scope)).toBe(
+      pathResolver.shared('runtime/pipeline-library-runs/confidential/acme/isolated-run.jsonl')
+    );
+    expect(pipelineRunJournalPath('isolated-run', undefined, scope)).toContain('vitest-live');
+  });
   it('records declared channel snapshots and restores completed nodes', () => {
     const runId = `test-${newPipelineRunId()}`;
     const journal = createPipelineRunJournal(runId, {

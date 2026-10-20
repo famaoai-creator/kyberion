@@ -21,6 +21,16 @@ vi.mock('./claude-agent-governance.js', () => ({
 import { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
 
 describe('ClaudeAgentReasoningBackend', () => {
+  it('keeps advisory delegation text-only even when native agent tools are enabled', async () => {
+    process.env.KYBERION_CLAUDE_AGENT_TOOLS = '1';
+    mocks.runClaudeAgentQuery.mockResolvedValue({ parsed: { answer: 'plan only' } });
+    const backend = new ClaudeAgentReasoningBackend({ model: 'sonnet' });
+    expect(
+      await backend.delegateTask('plan', undefined, { advisory: true, profile: 'planner' })
+    ).toBe('plan only');
+    expect(mocks.runClaudeAgentTask).not.toHaveBeenCalled();
+    expect(mocks.runClaudeAgentQuery).toHaveBeenCalledOnce();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;

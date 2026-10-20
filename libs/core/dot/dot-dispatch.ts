@@ -6,6 +6,12 @@ import {
 import { reconcileAdmittedDotAction } from './dot-admission-reconciliation.js';
 import { composeDotDigestText, dotCharterTimezone } from './dot-digest-composition.js';
 import { dotWorkItemInput } from './dot-work-item.js';
+import { assertDotAccountabilityCharter } from './dot-authority.js';
+import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
+import {
+  dotMissionAdmissionPrompt,
+  dotMissionAdmissionRefusal,
+} from './dot-mission-admission-bounds.js';
 import { sendDueDotDigest } from './dot-digest-delivery.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
@@ -298,6 +304,7 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
     )
     .map((other) => other.dot_id);
   return [
+    ...dotMissionAdmissionPrompt(charter, shapes, deps.now?.() ?? new Date()),
     shapes.length
       ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
       : 'No work_shape is available to you now; propose nothing and report status instead.',
@@ -387,9 +394,17 @@ function checkDotProposalScope(
     | 'pipeline_ref'
     | 'front_desk_execution'
     | 'continuous_work'
+    | 'mission_admission'
   >,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
+  try {
+    assertDotAccountabilityCharter(charter, deps);
+  } catch (error) {
+    return { ok: false, reason: `accountability authority refused: ${String(error)}` };
+  }
+  const missionRefusal = dotMissionAdmissionRefusal(charter, proposal, deps.now?.());
+  if (missionRefusal) return { ok: false, reason: missionRefusal };
   if (proposal.continuous_work) {
     try {
       parseContinuousWorkPlan(proposal.continuous_work);
@@ -506,7 +521,9 @@ export function evaluateDotProposalGate(
         return contributor.floor(charter, proposal, ctx);
       } catch (error) {
         extensionFailure('floor contributor', contributor.id, charter.dot_id, error);
-        return undefined;
+        // Authorization contributors are load-bearing; an unavailable limit
+        // must never disappear from the strictest floor.
+        return 'approve' as const;
       }
     })
   );
@@ -515,11 +532,12 @@ export function evaluateDotProposalGate(
     now: deps.now,
   });
   let floor = strictest(hardFloor, learned);
+  const intake = isDotIntakeAdmission(charter, proposal);
   const runGate = (requested: DotDecisionLevel | undefined) =>
     (deps.gate ?? evaluateAutonomousOpsAction)({
-      actionId: proposal.action_id,
+      actionId: intake ? loadDotExecutionPolicy().intake.action_id : proposal.action_id,
       ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
-      ...(proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
+      ...(!intake && proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
       ...(requested ? { requestedDecision: requested } : {}),
     });
   let gate = runGate(floor);
@@ -655,12 +673,13 @@ function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {
 }
 
 function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
+  const authority = ['floor contributor', 'pre-gate check', 'disposition override'].includes(kind);
   logger.warn(
-    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: governance continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
+    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: ${authority ? 'hold or require approval; repair the authorization extension' : 'optional observation continues without this section'} | evidence: libs/core/dot/dot-extension-bootstrap.ts`
   );
 }
 
-/** First override that turns the proposal into a record-only shadow row; throwing ones are skipped. */
+/** An unavailable authorization disposition keeps the proposal record-only. */
 function runDotDispositionOverrides(
   charter: DotCharter,
   proposal: DotProposal,
@@ -674,6 +693,7 @@ function runDotDispositionOverrides(
       if (verdict?.disposition === 'shadow') return { id: override.id, reason: verdict.reason };
     } catch (error) {
       extensionFailure('disposition override', override.id, charter.dot_id, error);
+      return { id: override.id, reason: `authorization disposition unavailable: ${String(error)}` };
     }
   }
   return undefined;
@@ -695,7 +715,7 @@ type DotPreGateVerdict =
 /**
  * Registered pre-gate checks in order. The first refusal wins; escalations
  * are merged (one forced operator decision carrying every check's context).
- * A throwing check is skipped, never a refusal.
+ * An unavailable authorization check refuses admission.
  */
 function runDotPreGateChecks(
   charter: DotCharter,
@@ -710,7 +730,11 @@ function runDotPreGateChecks(
       verdict = check.check(charter, proposal, ctx);
     } catch (error) {
       extensionFailure('pre-gate check', check.id, charter.dot_id, error);
-      continue;
+      return {
+        ok: false,
+        reason: `authorization check unavailable: ${String(error)}`,
+        check_id: check.id,
+      };
     }
     if (verdict.ok === false) return { ok: false, reason: verdict.reason, check_id: check.id };
     if (verdict.ok === 'escalate') {
@@ -1069,12 +1093,19 @@ function dispatchDotProposalsUnlocked(
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
       ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
       ...(proposal.continuous_work ? { continuous_work: proposal.continuous_work } : {}),
+      ...(proposal.mission_admission ? { mission_admission: proposal.mission_admission } : {}),
       ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
       ...(proposal.target ? { target: proposal.target } : {}),
       ...(proposal.intent ? { intent: proposal.intent } : {}),
       at: now.toISOString(),
     };
     try {
+      if (ordinalOffset + index >= loadDotExecutionPolicy().intake.max_proposals_per_wake) {
+        const reason = 'bounded intake fanout limit reached';
+        recordAudit(charter, proposal.action_id, 'denied', { reason }, deps);
+        records.push(appendActionRecord({ ...base, reason }, deps));
+        continue;
+      }
       const admissionScope = proposal.front_desk_execution
         ? frontDeskDispatchScope(proposal.front_desk_execution, charter)
         : undefined;
@@ -1102,6 +1133,22 @@ function dispatchDotProposalsUnlocked(
         escalation ? { ...proposal, requested_decision: 'approve' } : proposal,
         deps
       );
+      if (isDotIntakeAdmission(charter, proposal)) {
+        recordAudit(
+          charter,
+          proposal.action_id,
+          gate.allowed ? 'allowed' : 'denied',
+          {
+            phase: 'admission',
+            admission_only: true,
+            action_ref: base.action_ref,
+            gate_action_id: gate.actionId,
+            decision: gate.decision,
+            reason: `bounded internal enqueue; wake tools are proposal/memory/followup only; concrete effects require execution governance; ${gate.reason}`,
+          },
+          deps
+        );
+      }
       const disposition = runDotDispositionOverrides(
         charter,
         proposal,
@@ -1177,6 +1224,9 @@ function dispatchDotProposalsUnlocked(
       });
       const decided: DotActionRecord = {
         ...base,
+        ...(isDotIntakeAdmission(charter, proposal)
+          ? { admission_only: true, gate_action_id: gate.actionId }
+          : {}),
         decision: gate.decision,
         gate_decision: gate.decision,
         ...(floor ? { floor } : {}),

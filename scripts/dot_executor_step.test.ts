@@ -272,6 +272,14 @@ describe('buildDotExecutorPorts', () => {
     );
   });
 
+  it('refuses a native provider without planner enforcement before invocation', async () => {
+    const delegateTask = vi.fn(async () => 'must not execute');
+    await expect(
+      delegateDotText({ ...textBackend, name: 'codex-cli', delegateTask }, 'p', 5000)
+    ).rejects.toThrow('ADVISORY_BACKEND_DENIED');
+    expect(delegateTask).not.toHaveBeenCalled();
+  });
+
   it('cancels the delegated turn when the executor deadline aborts', async () => {
     const handle = {
       join: () => new Promise<string>(() => {}),

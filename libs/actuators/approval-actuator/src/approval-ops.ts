@@ -1,5 +1,9 @@
 import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
+import {
+  authorizeDelegatedExecution,
+  runtimeDelegatedTarget,
+} from '@agent/core/governance/delegated-execution';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { charterInputForDecision } from '@agent/core/governance/charter-call-site';
 import { charterDecisionFactError } from '@agent/core/pipeline/op-preflight-charter';
@@ -24,6 +28,8 @@ export interface EvaluateDecisionRightsInformationFlow {
 }
 
 export interface EvaluateDecisionRightsInput {
+  /** Optional concrete effect; caller declarations never substitute its actual payload facts. */
+  operation_target?: { operation_id: string; step_id: string; params: Record<string, unknown> };
   operation_id: string;
   correlation_id: string;
   decision_type: string;
@@ -52,6 +58,8 @@ export interface DecisionRightsResult {
   status: 'approved' | 'pending' | 'not_required';
   request_id?: string;
   message?: string;
+  /** A runtime-issued charter capability, explicitly not a human approval. */
+  delegated_execution?: { permit_id: string; target_step_id: string };
 }
 
 export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): DecisionRightsResult {
@@ -61,6 +69,21 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     throw new Error(
       '[evaluate_decision_rights] requires operation_id, correlation_id, and decision_type'
     );
+  }
+  if (input.operation_target) {
+    const concrete = input.operation_target;
+    const target = runtimeDelegatedTarget(concrete.operation_id, concrete.params, concrete.step_id);
+    if (target && (!input.tenant_slug || input.tenant_slug === target.tenantSlug)) {
+      const delegated = authorizeDelegatedExecution(target);
+      if (delegated.allowed)
+        return {
+          allowed: true,
+          status: 'not_required',
+          delegated_execution: { permit_id: delegated.permitId!, target_step_id: concrete.step_id },
+        };
+    }
+    // Unknown or outside-envelope effects retain the normal human request
+    // path below. No reusable capability is inferred from its legacy verdict.
   }
 
   const matrix = resolveDecisionRightsMatrix(input.tenant_slug ?? null);

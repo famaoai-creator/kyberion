@@ -8,6 +8,10 @@ import type { DotCharter } from './dot-charter.js';
 import type { DotProposal } from './dot-proposals.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
 
+export function dotAdmissionMissionId(actionRef: string): string {
+  return `MSN-DOT-${createHash('sha256').update(actionRef).digest('hex').slice(0, 24).toUpperCase()}`;
+}
+
 export function dotAdmissionScopeHash(charter: DotCharter): string {
   return recoveryEvidenceHash({ dot_id: charter.dot_id, scope: charter.scope });
 }

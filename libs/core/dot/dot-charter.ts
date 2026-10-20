@@ -115,6 +115,8 @@ export interface DotCharter {
     max_concurrent_delegations?: number;
     /** Repo-relative pipelines the executor may run for pipeline-shaped work. */
     allowed_pipelines?: string[];
+    /** Human-configured internal admission mandate references. */
+    mission_mandate_refs?: string[];
   };
   decisions?: {
     default_decision?: 'auto' | 'notify' | 'approve';

@@ -491,7 +491,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       model,
       ...(options?.effort ? ['--effort', options.effort] : []),
       ...permissionArgs,
-      ...this.extraArgs,
+      // Advice-only calls have a closed argv: custom extras must not append
+      // a second permission-mode flag after the governed planner projection.
+      ...(options?.advisory ? [] : this.extraArgs),
     ];
     return this.spawnCli(
       args,

@@ -6,6 +6,8 @@ import {
 } from './dot-event-continuation.js';
 import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
+import { assertDotAccountabilityCharter } from './dot-authority.js';
+import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 /**
  * Dot runtime: due-ness and one bounded goal turn per wake, called by the supervisor.
  * Durable loop memory under `active/shared/runtime/`:
@@ -79,7 +81,6 @@ import {
   parseDotProposalsFromText,
   DOT_PROPOSALS_FENCE,
   DOT_PROPOSE_TOOL_NAME,
-  MAX_DOT_PROPOSALS_PER_WAKE,
   type DotProposal,
 } from './dot-proposals.js';
 import {
@@ -1500,6 +1501,13 @@ export async function runDotWake(
     }
     const hasRole =
       deps.hasRole ?? ((role: string) => Boolean(loadAuthorityRoleIndex(deps.rootDir)[role]));
+    try {
+      assertDotAccountabilityCharter(current, deps);
+    } catch (error) {
+      const reason = `accountability authority refused: ${String(error)}`;
+      recordDotWakeFailure(current, deps.trigger, DOT_WAKE_FAILURE_CATEGORY.charter, reason, deps);
+      return { dot_id: current.dot_id, outcome: 'failed', reason };
+    }
     let roleOk = false;
     try {
       roleOk = hasRole(current.authority.authority_role);
@@ -1604,9 +1612,11 @@ export async function runDotWake(
             executeTool: (call) => {
               toolCallsSeen += 1;
               if (call.name === DOT_PROPOSE_TOOL_NAME) {
-                if (proposalInputs.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
+                if (
+                  proposalInputs.length >= loadDotExecutionPolicy().intake.max_proposals_per_wake
+                ) {
                   return {
-                    resultText: `Proposal limit (${MAX_DOT_PROPOSALS_PER_WAKE}) reached for this wake.`,
+                    resultText: `Proposal limit (${loadDotExecutionPolicy().intake.max_proposals_per_wake}) reached for this wake.`,
                   };
                 }
                 proposalInputs.push(call.input);

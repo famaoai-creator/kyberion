@@ -152,6 +152,7 @@ export interface MissionControllerRoutingContext {
       intentGoal?: string;
       force?: boolean;
       decidedBy?: HumanDecidedBy;
+      admissionWorkItem?: string;
     }
   ) => Awaitable<void>;
   pauseMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
@@ -813,6 +814,9 @@ export async function runMissionControllerAction(
           intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
           force: context.argv.includes('--force'),
           decidedBy,
+          ...(getValue('--admission-work-item', context.argv)
+            ? { admissionWorkItem: getValue('--admission-work-item', context.argv) }
+            : {}),
         }
       );
       await persistIntentTrackGate(intentTrack.intentTrackGate);

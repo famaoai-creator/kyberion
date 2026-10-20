@@ -49,6 +49,12 @@ Chronos shows tenant-scoped CLI commands beside organization intervention points
 
 ## Learning candidates
 
+For autonomous operation, separate event intake, work admission and actual tool
+authority as described in [delegated-autonomous-loop](./delegated-autonomous-loop.md).
+An admitted WorkItem or started mission does not grant its planned effects.
+Keep human intervention focused on the concrete missing authority and retain
+the original attempt when an external outcome is unknown.
+
 Incidents, routine exceptions, project closures and governance decisions become learning candidates with `learning enqueue`. Triage them with `learning transition`: `proposed → approved → promoted`, or `→ rejected` with `--reason`. Promote only after the learning is written into `knowledge/` in the same tier and tenant, and pass that document as `--promoted-ref`. `status` lists candidates still waiting.
 
 ## Objectives and key results

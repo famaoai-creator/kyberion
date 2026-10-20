@@ -16595,6 +16595,11 @@
       }
     },
     "mission_alignment": {
+      "admission_disclosure": {
+        "en": "Internal mission admission\nMandate: {mandate}\nWork: {work}\nPaths: {paths}\nEstimated cost: {cost} {currency}\nRisk: {risk}\nPlanned effects: {effects}\nExternal tool actions require separate authority.",
+        "ja": "ミッション開始の委任\n委任: {mandate}\n作業: {work}\n対象: {paths}\n費用見積: {cost} {currency}\nリスク: {risk}\n計画中の作用: {effects}\n外部への操作は別の権限確認が必要です。",
+        "qps-ploc": "⟦Ïñŧėřñȧŀ ɱïşşïőñ ȧḓɱïşşïőñ\nⱮȧñḓȧŧė: {mandate}\nẆőřķ: {work}\nṖȧŧħş: {paths}\nĖşŧïɱȧŧėḓ ƈőşŧ: {cost} {currency}\nŘïşķ: {risk}\nṖŀȧññėḓ ėƒƒėƈŧş: {effects}\nĖẋŧėřñȧŀ ŧőőŀ ȧƈŧïőñş řėɋůïřė şėṗȧřȧŧė ȧůŧħőřïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "approval_title": {
         "en": "Alignment approval: {title}",
         "ja": "アラインメント承認: {title}",

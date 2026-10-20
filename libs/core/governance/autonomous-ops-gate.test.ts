@@ -142,7 +142,7 @@ describe('autonomous-ops-gate', () => {
   it('registers matrix v2 actions in shadow mode so they never execute', () => {
     const policy = getAutonomousOpsPolicy();
     const matrixActions = Object.entries(policy.actions).filter(
-      ([, action]) => action.action_class
+      ([, action]) => action.action_class && action.action_class !== 'internal_work_intake'
     );
     expect(matrixActions.length).toBeGreaterThanOrEqual(13);
     for (const [actionId] of matrixActions) {

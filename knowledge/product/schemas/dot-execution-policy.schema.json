@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "intake", "learning"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "intake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "action_id", "allowed_work_shapes", "max_proposals_per_wake"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "action_id": { "const": "dot_intake_work" },
+        "allowed_work_shapes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["direct_reply", "task_session", "mission", "pipeline"] }
+        },
+        "max_proposals_per_wake": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "learning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "l2_release_approvals",
+        "l3_release_approvals",
+        "l3_decay_days",
+        "metrics_days"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "l2_release_approvals": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "l3_release_approvals": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "l3_decay_days": { "type": "number", "exclusiveMinimum": 0, "maximum": 36500 },
+        "metrics_days": { "type": "number", "exclusiveMinimum": 0, "maximum": 36500 }
+      }
+    }
+  }
+}

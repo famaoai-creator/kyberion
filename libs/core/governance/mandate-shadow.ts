@@ -6,6 +6,7 @@ import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 import { matchHighRiskPaths } from './autonomous-ops-gate.js';
+import { isValidTenantSlug } from '../entity-scope.js';
 
 const logger = createLogger('mandate-shadow');
 
@@ -27,6 +28,136 @@ export interface StandingMandate {
   allowed_path_globs: string[];
   max_risk_level: number;
   expires_at: string;
+  /** Explicit internal admission authority; absence retains shadow-only semantics. */
+  authority?: {
+    tenant_slug: string;
+    status: 'active' | 'revoked';
+    max_cost: number;
+    currency: string;
+    allowed_external_effects: string[];
+  };
+}
+
+export interface MissionAdmissionRequest {
+  mandate_ref: string;
+  mandate_facts: MissionMandateFacts;
+}
+
+export function parseMissionAdmissionRequest(value: unknown): MissionAdmissionRequest | undefined {
+  if (value === undefined) return;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('invalid mission_admission');
+  const raw = value as Record<string, unknown>;
+  const facts = raw.mandate_facts as MissionMandateFacts | undefined;
+  if (
+    typeof raw.mandate_ref !== 'string' ||
+    !raw.mandate_ref.trim() ||
+    !facts ||
+    typeof facts.work_type !== 'string' ||
+    !facts.work_type.trim() ||
+    !Array.isArray(facts.paths) ||
+    !facts.paths.length ||
+    facts.paths.some((p) => typeof p !== 'string') ||
+    typeof facts.estimated_cost !== 'number' ||
+    !Number.isFinite(facts.estimated_cost) ||
+    facts.estimated_cost < 0 ||
+    typeof facts.currency !== 'string' ||
+    !/^[A-Z]{3}$/.test(facts.currency) ||
+    !Array.isArray(facts.external_effects) ||
+    facts.external_effects.some((e) => typeof e !== 'string' || !e.trim()) ||
+    !Number.isInteger(facts.risk_level) ||
+    facts.risk_level < 0 ||
+    facts.risk_level > 5
+  )
+    throw new Error('invalid mission_admission facts');
+  return {
+    mandate_ref: raw.mandate_ref,
+    mandate_facts: {
+      work_type: facts.work_type,
+      paths: [...facts.paths],
+      estimated_cost: facts.estimated_cost,
+      currency: facts.currency,
+      external_effects: [...facts.external_effects],
+      risk_level: facts.risk_level,
+    },
+  };
+}
+
+export interface MissionMandateFacts {
+  work_type: string;
+  paths: string[];
+  estimated_cost: number;
+  currency: string;
+  external_effects: string[];
+  risk_level: number;
+}
+
+/** Internal mission admission only. This never authorizes a business effect. */
+export function evaluateMissionStartMandate(
+  input: { tenant_slug: string; mandate_id: unknown; facts: unknown },
+  options: { catalog?: MandateCatalog; now?: Date } = {}
+): MandateEvaluation {
+  const deny = (reason: string): MandateEvaluation => ({ covered: false, reasons: [reason] });
+  if (!isValidTenantSlug(input.tenant_slug) || typeof input.mandate_id !== 'string')
+    return deny('tenant and exact mandate id required');
+  const catalog = options.catalog ?? loadMandateCatalog();
+  const mandate = catalog.mandates.find((entry) => entry.id === input.mandate_id);
+  const authority = mandate?.authority;
+  if (
+    !mandate ||
+    !authority ||
+    authority.status !== 'active' ||
+    authority.tenant_slug !== input.tenant_slug
+  )
+    return deny('no active tenant-bound admission authority');
+  const now = (options.now ?? new Date()).getTime();
+  if (!Number.isFinite(Date.parse(mandate.expires_at)) || Date.parse(mandate.expires_at) <= now)
+    return deny('mandate expired or invalid');
+  const f = input.facts as Partial<MissionMandateFacts> | null;
+  if (
+    !f ||
+    typeof f !== 'object' ||
+    Array.isArray(f) ||
+    typeof f.work_type !== 'string' ||
+    !f.work_type.trim() ||
+    !Array.isArray(f.paths) ||
+    !f.paths.length ||
+    f.paths.some(
+      (p) =>
+        typeof p !== 'string' ||
+        !p ||
+        /\s/.test(p) ||
+        p.includes('\\') ||
+        p.startsWith('/') ||
+        p.split('/').some((s) => s === '..' || s === '.') ||
+        /[*?\[\]{}]/.test(p)
+    ) ||
+    typeof f.estimated_cost !== 'number' ||
+    !Number.isFinite(f.estimated_cost) ||
+    f.estimated_cost < 0 ||
+    typeof f.currency !== 'string' ||
+    !Array.isArray(f.external_effects) ||
+    f.external_effects.some((e) => typeof e !== 'string' || !e.trim()) ||
+    typeof f.risk_level !== 'number' ||
+    !Number.isInteger(f.risk_level) ||
+    f.risk_level < 0
+  )
+    return deny('trusted typed admission facts required');
+  if (
+    !Number.isFinite(authority.max_cost) ||
+    authority.max_cost < 0 ||
+    f.estimated_cost > authority.max_cost ||
+    f.currency !== authority.currency
+  )
+    return deny('cost outside mandate');
+  if (f.external_effects.some((effect) => !authority.allowed_external_effects.includes(effect)))
+    return deny('external effect outside mandate');
+  // Reuse settled work-type/risk/path/expiry checks, constrained to the exact
+  // authority above. Explicit effects are checked separately, never inferred.
+  return evaluateBriefAgainstMandates(
+    { title: f.work_type, scope: { in: f.paths }, gate: { riskLevel: f.risk_level } },
+    { catalog: { ...catalog, external_effect_patterns: [], mandates: [mandate] }, now: options.now }
+  );
 }
 
 export interface MandateCatalog {

@@ -1644,6 +1644,18 @@
       "types": "./dist/governance/charter-payment-settlement.d.ts",
       "default": "./dist/governance/charter-payment-settlement.js"
     },
+    "./governance/delegated-execution": {
+      "types": "./dist/governance/delegated-execution.d.ts",
+      "default": "./dist/governance/delegated-execution.js"
+    },
+    "./scope-envelope": {
+      "types": "./dist/scope-envelope.d.ts",
+      "default": "./dist/scope-envelope.js"
+    },
+    "./governance/human-execution": {
+      "types": "./dist/governance/human-execution.d.ts",
+      "default": "./dist/governance/human-execution.js"
+    },
     "./governance/accountability-digest": {
       "types": "./dist/governance/accountability-digest.d.ts",
       "default": "./dist/governance/accountability-digest.js"
@@ -3635,6 +3647,10 @@
     "./mission/mission-state": {
       "types": "./dist/mission/mission-state.d.ts",
       "default": "./dist/mission/mission-state.js"
+    },
+    "./mission/mission-admission": {
+      "types": "./dist/mission/mission-admission.d.ts",
+      "default": "./dist/mission/mission-admission.js"
     },
     "./mission/mission-state-reader": {
       "types": "./dist/mission/mission-state-reader.d.ts",

@@ -88,6 +88,7 @@ import {
 } from './dot-extensions.js';
 import { readDotFeedback, type DotFeedbackEntry } from './dot-feedback.js';
 import { dotOutcomeStats } from './dot-outcomes.js';
+import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 import type { DotDecisionLevel } from './dot-proposals.js';
 import {
   DOT_AUTONOMY_LEVELS,
@@ -108,18 +109,11 @@ export const DOT_AUTONOMY_DEFAULT_LEVEL: DotAutonomyLevel = 'L2';
 export const DOT_AUTONOMY_DEFAULT_MAX_LEVEL: DotAutonomyLevel = 'L3';
 /** Automatic demotion never goes below this unless the charter's min_level says so. */
 export const DOT_AUTONOMY_DEFAULT_DEMOTION_FLOOR: DotAutonomyLevel = 'L1';
-/** L3: human approvals after the latest rejection that lift the learned floor. */
-export const DOT_AUTONOMY_L3_RELEASE_APPROVALS = 1;
-/** L3: a rejection older than this no longer holds the learned floor. */
-export const DOT_AUTONOMY_L3_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
-/** Window for promotion metrics (decisions, outcomes, incidents). */
-export const DOT_AUTONOMY_METRICS_DAYS = 30;
 export const DOT_AUTONOMY_HISTORY_LIMIT = 50;
 /** Synthetic action id carried by promotion decision cards (never executed). */
 export const DOT_AUTONOMY_PROMOTION_ACTION_ID = 'dot_autonomy_promotion';
 /** libs/core governed stores (approvals) write under this shared role. */
 const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
-const L2_RELEASE_APPROVALS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DECISION_RANK: Record<DotDecisionLevel, number> = { auto: 0, notify: 1, approve: 2 };
 /** Gate escalations that a relaxation must never undercut. */
@@ -265,17 +259,23 @@ export function loadDotAutonomyPolicy(
   deps: Pick<DotAutonomyDeps, 'policy'> = {}
 ): DotAutonomyPolicy {
   if (deps.policy) return deps.policy;
+  const disabled: DotAutonomyPolicy = {
+    ...DEFAULT_DOT_AUTONOMY_POLICY,
+    relaxable_actions: [],
+    promotion: { ...DEFAULT_DOT_AUTONOMY_POLICY.promotion, min_decisions: Number.MAX_SAFE_INTEGER },
+  };
+  if (!loadDotExecutionPolicy().learning.enabled) return disabled;
   try {
     const section = (getAutonomousOpsPolicy() as { autonomy?: Partial<DotAutonomyPolicy> })
       .autonomy;
-    if (!section) return DEFAULT_DOT_AUTONOMY_POLICY;
+    if (!section) return disabled;
     return {
       relaxable_actions: section.relaxable_actions ?? DEFAULT_DOT_AUTONOMY_POLICY.relaxable_actions,
       promotion: { ...DEFAULT_DOT_AUTONOMY_POLICY.promotion, ...(section.promotion ?? {}) },
       demotion: { ...DEFAULT_DOT_AUTONOMY_POLICY.demotion, ...(section.demotion ?? {}) },
     };
   } catch {
-    return DEFAULT_DOT_AUTONOMY_POLICY;
+    return disabled;
   }
 }
 
@@ -385,12 +385,15 @@ export function dotLearnedFloorHolds(
     if (row.outcome === 'rejected') last = index;
   });
   if (last < 0) return false;
+  const learning = loadDotExecutionPolicy().learning;
+  if (!learning.enabled) return true;
   const approvals = rows.slice(last + 1).filter(isHumanApproval).length;
   if (dotAutonomyLevelRank(level) >= dotAutonomyLevelRank('L3')) {
-    if (at.getTime() - Date.parse(rows[last].recorded_at) >= DOT_AUTONOMY_L3_DECAY_MS) return false;
-    return approvals < DOT_AUTONOMY_L3_RELEASE_APPROVALS;
+    if (at.getTime() - Date.parse(rows[last].recorded_at) >= learning.l3_decay_days * DAY_MS)
+      return false;
+    return approvals < learning.l3_release_approvals;
   }
-  return approvals < L2_RELEASE_APPROVALS;
+  return approvals < learning.l2_release_approvals;
 }
 
 export interface DotAutonomyDecisionInput {
@@ -512,7 +515,7 @@ function nextLevel(c: DotCharter, level: DotAutonomyLevel): DotAutonomyLevel | u
 export function dotAutonomyMetrics(c: DotCharter, deps: DotAutonomyDeps = {}): DotAutonomyMetrics {
   const now = nowOf(deps);
   const state = readDotAutonomyState(c, deps);
-  const cutoff = now.getTime() - DOT_AUTONOMY_METRICS_DAYS * DAY_MS;
+  const cutoff = now.getTime() - loadDotExecutionPolicy().learning.metrics_days * DAY_MS;
   const since = Date.parse(state.since);
   const next = nextLevel(c, state.level);
   const shadow = readDotAutonomyShadow(c, deps).filter(
@@ -521,7 +524,7 @@ export function dotAutonomyMetrics(c: DotCharter, deps: DotAutonomyDeps = {}): D
       (!next || row.next_level === next) &&
       Date.parse(row.recorded_at) >= cutoff
   );
-  const outcomes = outcomeStats(c, DOT_AUTONOMY_METRICS_DAYS, deps);
+  const outcomes = outcomeStats(c, loadDotExecutionPolicy().learning.metrics_days, deps);
   const executor = executorIncidentsSince(c, cutoff, deps);
   const feedback = readDotFeedback(c.dot_id, deps);
   return {
@@ -571,7 +574,7 @@ function l4Eligible(
   if ((gate.escalations ?? []).some((rule) => HARD_ESCALATIONS.has(rule))) return false;
   if ((gate.highRiskPathMatches ?? []).length > 0) return false;
   if ((gate.axes?.reversibility ?? 3) >= 2) return false;
-  const outcomes = outcomeStats(c, DOT_AUTONOMY_METRICS_DAYS, deps);
+  const outcomes = outcomeStats(c, loadDotExecutionPolicy().learning.metrics_days, deps);
   return outcomes.judged > 0 && outcomes.success_rate >= policy.promotion.min_outcome_success;
 }
 
@@ -998,7 +1001,7 @@ export function runDotAutonomyStep(
         gate: forcedApproveGate(),
         title: `[${actor}] autonomy ${state.level} → ${to}`,
         question: `Promote ${c.title} from ${state.level} to ${to}?`,
-        recommendation: `Over ${DOT_AUTONOMY_METRICS_DAYS} days: ${metrics.decisions} decisions, agreement ${(metrics.agreement_rate * 100).toFixed(0)}%, outcome success ${(metrics.outcome_success_rate * 100).toFixed(0)}%, incidents ${metrics.incidents_30d}.`,
+        recommendation: `Over ${loadDotExecutionPolicy().learning.metrics_days} days: ${metrics.decisions} decisions, agreement ${(metrics.agreement_rate * 100).toFixed(0)}%, outcome success ${(metrics.outcome_success_rate * 100).toFixed(0)}%, incidents ${metrics.incidents_30d}.`,
         requestedBy: actor,
         source: { agentId: actor },
         dedupeKey: `dot-autonomy-${c.dot_id}-${to}`,

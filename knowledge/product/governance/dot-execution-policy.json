@@ -1,0 +1,17 @@
+{
+  "$schema": "../schemas/dot-execution-policy.schema.json",
+  "version": "1.0.0",
+  "intake": {
+    "enabled": true,
+    "action_id": "dot_intake_work",
+    "allowed_work_shapes": ["direct_reply", "task_session", "mission", "pipeline"],
+    "max_proposals_per_wake": 10
+  },
+  "learning": {
+    "enabled": true,
+    "l2_release_approvals": 3,
+    "l3_release_approvals": 1,
+    "l3_decay_days": 7,
+    "metrics_days": 30
+  }
+}
