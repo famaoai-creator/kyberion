@@ -1,9 +1,14 @@
+import { assertScopedLearningApproval } from './knowledge/scoped-learning-approval-verification.js';
 /** Read-only learning evidence and explicit handoff to the existing memory workflow.
  * Never decides a human review, invokes a model, or edits the procedure catalog.
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import {
+  assertScopedLearningScope,
+  verifyScopedLearningPublication,
+} from './knowledge/scoped-learning-publication.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './knowledge/memory-scope.js';
 import {
   executionFeedbackScopeKey,
@@ -30,7 +35,7 @@ export interface ExecutionFeedbackLearningReview {
   scope_disposition: 'canonical' | 'legacy_unscoped';
   queue: { status: 'not_queued' | 'invalid' | MemoryCandidate['status']; candidate_id?: string };
   human_review: { status: 'pending' | 'recorded' | 'rejected' | 'unverified'; decided_by?: string };
-  promotion: { status: 'none' | 'unverified'; reference?: string };
+  promotion: { status: 'none' | 'unverified' | 'verified'; reference?: string };
   retrieval: { status: 'unmeasured' };
   blockers: string[];
   next_action: string;
@@ -92,10 +97,17 @@ function unsupportedPromotionScope(scope?: MemoryScopeEnvelope): string[] {
   if (!scope) return ['legacy_unscoped'];
   const canonical = assertMemoryScope(scope);
   const unsupported = Object.keys(canonical).filter(
-    (key) => key !== 'tier' && key !== 'tenant_slug'
+    (key) => !['tier', 'tenant_slug', 'organization_id', 'project_id'].includes(key)
   );
   if (canonical.tier !== 'confidential') unsupported.push('tier');
   if (!canonical.tenant_slug) unsupported.push('tenant_slug');
+  if (!unsupported.length) {
+    try {
+      assertScopedLearningScope(scope);
+    } catch {
+      unsupported.push('invalid_scope');
+    }
+  }
   return unsupported;
 }
 
@@ -170,9 +182,19 @@ export function inspectExecutionFeedbackLearning(
         ? { status: queued.status === 'rejected' ? 'rejected' : 'recorded', decided_by: human.id }
         : { status: 'unverified' };
   }
+  if (queued.status === 'approved' || queued.status === 'promoted') {
+    try {
+      const receipt = assertScopedLearningApproval(queued);
+      result.human_review = { status: 'recorded', decided_by: receipt.decided_by.id };
+    } catch {
+      result.human_review = { status: 'unverified' };
+    }
+  }
   result.next_action =
     'Use the existing human memory review, then the governed memory promotion. Publication does not mean retrieval or execution.';
   if (queued.status === 'rejected') {
+    // A queue rejection is binding, but a caller label is not a verified human decision.
+    result.human_review = { status: 'unverified' };
     result.blockers.push('human_review_rejected');
     result.next_action =
       'This proposal was rejected. Keep it unchanged; submit revised feedback for a separate review if needed. Do not promote the rejected proposal.';
@@ -183,6 +205,13 @@ export function inspectExecutionFeedbackLearning(
     status: 'unverified',
     ...(queued.promoted_ref ? { reference: queued.promoted_ref } : {}),
   };
+  const proof = verifyScopedLearningPublication(queued);
+  if (proof) {
+    result.promotion = { status: 'verified', reference: proof.markdown_path };
+    result.next_action =
+      'Exact approved publication verified. Retrieval and application require separate work-item evidence; no authority is granted.';
+    return result;
+  }
   // Existing publication files do not bind the full scope/content, and usage
   // aggregates merge scopes. Neither is exact evidence for this proposal.
   result.blockers.push('exact_publication_proof_unavailable');

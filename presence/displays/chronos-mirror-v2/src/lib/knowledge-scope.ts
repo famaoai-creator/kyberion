@@ -2,32 +2,52 @@ import { findMissionPath } from '@agent/core/path-resolver';
 import { missionPathOrNull } from '@agent/core/mission-lookup';
 import { loadState } from '@agent/core/mission/mission-state';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
+import { assertMemoryScope, type MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
-import type { ViewerContext } from './viewer-context';
+import {
+  defaultTierAccess,
+  strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
+  type ViewerContext,
+} from './viewer-context';
 
-function readTenantState(missionId: string): string | undefined {
+function sourceScope(candidate: MemoryCandidate): MemoryScopeEnvelope | null {
   try {
-    const state = loadState(missionId);
-    return state?.tenant_slug || state?.tenant_id;
+    if (candidate.scope) return assertMemoryScope(candidate.scope);
+    const sourceRef = String(candidate.source_ref || '').trim();
+    const [, rawRef = ''] = sourceRef.split(':', 2);
+    if (candidate.source_type === 'artifact') {
+      const artifact = loadArtifactRecord(rawRef || sourceRef);
+      if (artifact)
+        return {
+          tier: candidate.sensitivity_tier,
+          tenant_slug: artifact.tenant_slug,
+          organization_id: artifact.organization_id,
+          project_id: artifact.project_id,
+        };
+    }
+    if (candidate.source_type === 'mission') {
+      const missionId = rawRef || sourceRef;
+      if (!missionPathOrNull(findMissionPath, missionId)) return null;
+      const state = loadState(missionId);
+      if (state)
+        return {
+          tier: state.tier,
+          tenant_slug: state.tenant_slug || state.tenant_id,
+          organization_id:
+            state.organization_id || state.relationships?.organization?.organization_id,
+          project_id: state.relationships?.project?.project_id,
+        };
+    }
+    return { tier: candidate.sensitivity_tier };
   } catch {
-    return undefined;
+    return null;
   }
 }
 
 export function resolveMemoryCandidateTenant(candidate: MemoryCandidate): string | undefined {
-  const sourceRef = String(candidate.source_ref || '').trim();
-  const [, rawRef = ''] = sourceRef.split(':', 2);
-  if (candidate.source_type === 'artifact') {
-    return loadArtifactRecord(rawRef || sourceRef)?.tenant_slug;
-  }
-  if (candidate.source_type === 'mission') {
-    const missionId = rawRef || sourceRef;
-    // A list filter: an ambiguous or hidden mission has no tenant here, which a
-    // tenant-scoped viewer is denied (Boolean(tenant && allowed.includes(tenant))).
-    if (!missionPathOrNull(findMissionPath, missionId)) return undefined;
-    return readTenantState(missionId);
-  }
-  return undefined;
+  return sourceScope(candidate)?.tenant_slug;
 }
 
 export function memoryCandidateVisibleToViewer(
@@ -35,14 +55,33 @@ export function memoryCandidateVisibleToViewer(
   viewer: ViewerContext,
   requestedTenant?: string
 ): boolean {
-  const tierAccess = viewer.tierAccess || [];
-  if (!tierAccess.includes(candidate.sensitivity_tier)) return false;
-  const tenant = resolveMemoryCandidateTenant(candidate);
-  const allowedTenants = requestedTenant
-    ? [requestedTenant]
-    : viewer.tenantSlugs === 'all'
-      ? 'all'
-      : viewer.tenantSlugs;
-  if (allowedTenants === 'all') return true;
-  return Boolean(tenant && allowedTenants.includes(tenant));
+  const tenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+  const organizations = strictViewerScopeOrganizationIds(viewer);
+  const projects = strictViewerScopeProjectIds(viewer);
+  const scope = sourceScope(candidate);
+  const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
+  // Destination sensitivity is not authority to read the source material.
+  if (
+    !scope ||
+    scope.tier === 'personal' ||
+    candidate.sensitivity_tier === 'personal' ||
+    !tiers.includes(scope.tier) ||
+    !tiers.includes(candidate.sensitivity_tier)
+  )
+    return false;
+  if (tenants !== 'all' && (!scope.tenant_slug || !tenants.includes(scope.tenant_slug)))
+    return false;
+  if (
+    organizations !== 'all' &&
+    (!scope.organization_id || !organizations.includes(scope.organization_id))
+  )
+    return false;
+  if (projects !== 'all' && (!scope.project_id || !projects.includes(scope.project_id)))
+    return false;
+  const principals = [viewer.principal?.actor.id, viewer.principalId].filter(Boolean);
+  const audience = scope.allowed_audience ?? [];
+  const audienceMatch = audience.some((id) => principals.includes(id));
+  if (audience.length && !audienceMatch) return false;
+  if (scope.owner_nhi && !principals.includes(scope.owner_nhi) && !audienceMatch) return false;
+  return true;
 }

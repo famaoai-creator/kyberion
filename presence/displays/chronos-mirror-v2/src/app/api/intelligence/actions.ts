@@ -7,6 +7,10 @@ import {
 } from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
+import {
+  DistillCandidateAmbiguityError,
+  resolveDistillCandidateForViewer,
+} from '../../../lib/distill-candidate-scope';
 import { applyBrowserSessionControl } from '../../../lib/browser-session-control';
 import {
   buildExecutionEnv,
@@ -27,7 +31,6 @@ import {
   listAgentRuntimeLeaseSummaries,
   listMemoryPromotionCandidates,
   listSurfaceOutboxMessages,
-  loadDistillCandidateRecord,
   loadMissionSeedRecord,
   loadProjectRecord,
   loadProjectTrackRecord,
@@ -388,42 +391,58 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
         { status: 400 }
       );
     }
-    const candidate = loadDistillCandidateRecord(candidateId);
+    const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+    let candidate;
+    try {
+      candidate = resolveDistillCandidateForViewer(
+        candidateId,
+        resolvedViewer.context,
+        requestedTenant
+      );
+    } catch (error) {
+      if (error instanceof DistillCandidateAmbiguityError)
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      throw error;
+    }
     if (!candidate) {
       return NextResponse.json({ error: 'Distill candidate not found' }, { status: 404 });
     }
-    const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
-    const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-    if (!intelligenceData.distillCandidateVisibleToTenant(candidate, allowedTenants)) {
-      return NextResponse.json(
-        { error: 'Distill candidate is outside the viewer tenant scope' },
-        { status: 403 }
-      );
-    }
     let updated = candidate;
     if (decision === 'archive') {
-      updated = updateDistillCandidateRecord(candidateId, { status: 'archived' }) || candidate;
+      updated = updateDistillCandidateRecord(candidateId, { status: 'archived' }, candidate.scope);
     } else {
       const saved = savePromotedMemoryRecord(candidate, { executionRole: 'chronos_gateway' });
-      updated =
-        updateDistillCandidateRecord(candidateId, {
+      updated = updateDistillCandidateRecord(
+        candidateId,
+        {
           status: 'promoted',
           promoted_ref: saved.logicalPath,
-        }) || candidate;
+        },
+        candidate.scope
+      );
     }
-    enqueueSurfaceNotification({
-      surface: 'presence',
-      requestId: updated.candidate_id,
-      title: decision === 'promote' ? 'Memory promoted' : 'Memory archived',
-      channel: 'chronos',
-      threadTs: updated.candidate_id,
-      sourceAgentId: 'chronos_gateway',
-      text:
-        decision === 'promote'
-          ? `${updated.title} was promoted for reuse.${intelligenceData.buildLearnedNotificationText({ projectId: updated.project_id, language: 'en' })}`
-          : `${updated.title} was archived from the memory queue.`,
-      status: 'success',
-    });
+    if (!updated)
+      return NextResponse.json(
+        { error: 'Distill candidate changed during the decision' },
+        { status: 409 }
+      );
+    // Presence still aggregates notifications without viewer authorization.
+    // Keep scoped content in the authorized response, never that broad feed.
+    if (!updated.scope)
+      enqueueSurfaceNotification({
+        surface: 'presence',
+        ...(updated.scope ? { scope: updated.scope } : {}),
+        requestId: updated.candidate_id,
+        title: decision === 'promote' ? 'Memory promoted' : 'Memory archived',
+        channel: 'chronos',
+        threadTs: updated.candidate_id,
+        sourceAgentId: 'chronos_gateway',
+        text:
+          decision === 'promote'
+            ? `${updated.title} was promoted for reuse.${intelligenceData.buildLearnedNotificationText({ projectId: updated.project_id, language: 'en', candidates: [updated] })}`
+            : `${updated.title} was archived from the memory queue.`,
+        status: 'success',
+      });
     return NextResponse.json({ ok: true, candidate: updated });
   },
   memory_promote_pending: async (body, resolvedViewer, action) => {

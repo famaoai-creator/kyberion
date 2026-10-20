@@ -144,25 +144,56 @@ describe('memory-promotion-review', () => {
       knowledgeDomain: 'personal',
       scope: { tier: 'personal' },
     });
-    enqueueMemoryPromotionCandidate({
-      ...candidate,
-      audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1',
-    });
+    expect(() =>
+      enqueueMemoryPromotionCandidate({
+        ...candidate,
+        audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1',
+      })
+    ).toThrow('Personal queue requires an explicit owner_nhi');
+    expect(safeExistsSync(queuePath)).toBe(false);
+
+    // Legacy unscoped rows remain inspectable, but cannot be approved without an owner.
+    const { scope: _scope, ...legacy } = candidate;
+    enqueueMemoryPromotionCandidate({ ...legacy, audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1' });
     const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
     expect(review.blockers.map((blocker) => blocker.code)).toContain('invalid_domain_scope');
-    const approved = updateMemoryPromotionCandidateStatus({
-      candidateId: candidate.candidate_id,
-      status: 'approved',
-      knowledgeDomain: 'personal',
-      scopeUpdate: { tier: 'personal', owner_nhi: 'nhi:test-owner' },
-      curation: {
-        title: 'Private lesson',
-        summary: 'A private lesson for this named knowledge owner.',
-        content: 'Keep this lesson within the named personal owner namespace.',
-        evidence_refs: candidate.evidence_refs,
-      },
-    });
-    expect(approved?.scope?.owner_nhi).toBe('nhi:test-owner');
+    const before = safeReadFile(queuePath, { encoding: 'utf8' });
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'approved',
+        knowledgeDomain: 'personal',
+        curation: {
+          title: 'Private lesson',
+          summary: 'A private lesson for this named knowledge owner.',
+          content: 'Keep this lesson within the named personal owner namespace.',
+          evidence_refs: candidate.evidence_refs,
+        },
+      })
+    ).toThrow('explicit owner_nhi');
+    expect(safeReadFile(queuePath, { encoding: 'utf8' })).toBe(before);
+    const ownerScope = {
+      tier: 'personal' as const,
+      owner_nhi: 'nhi:review-migration-' + process.pid,
+    };
+    const ownerQueuePath = memoryPromotionQueuePath(ownerScope);
+    expect(safeExistsSync(ownerQueuePath)).toBe(false);
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'approved',
+        knowledgeDomain: 'personal',
+        scopeUpdate: ownerScope,
+        curation: {
+          title: 'Private lesson',
+          summary: 'A private lesson for this named knowledge owner.',
+          content: 'Keep this lesson within the named personal owner namespace.',
+          evidence_refs: candidate.evidence_refs,
+        },
+      })
+    ).toThrow('MEMORY_SCOPE_MIGRATION_REQUIRED');
+    expect(safeReadFile(queuePath, { encoding: 'utf8' })).toBe(before);
+    expect(safeExistsSync(ownerQueuePath)).toBe(false);
   });
 
   it('rejects product-domain candidates that are not public and unscoped at enqueue', () => {

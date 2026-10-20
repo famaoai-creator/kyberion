@@ -39,3 +39,21 @@ export function parseWorkItemStatusInput(value: unknown): WorkItemStatusInput {
 
   return { itemId: body.itemId.trim(), status: body.status as WorkItemStatus };
 }
+
+export type WorkItemActionInput =
+  WorkItemStatusInput | { itemId: string; action: 'request_mission_alignment' };
+/** Explicit action, never an inferred status change or client-supplied scope. */
+export function parseWorkItemActionInput(value: unknown): WorkItemActionInput {
+  if (value && typeof value === 'object' && !Array.isArray(value) && 'action' in value) {
+    const body = value as Record<string, unknown>;
+    if (
+      Object.keys(body).some((key) => !['itemId', 'action'].includes(key)) ||
+      body.action !== 'request_mission_alignment' ||
+      typeof body.itemId !== 'string' ||
+      !SAFE_ITEM_ID.test(body.itemId.trim())
+    )
+      throw new Error('invalid work item alignment action');
+    return { itemId: body.itemId.trim(), action: 'request_mission_alignment' };
+  }
+  return parseWorkItemStatusInput(value);
+}

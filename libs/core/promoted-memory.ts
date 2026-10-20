@@ -1,3 +1,22 @@
+import {
+  buildPromotedMemoryRecord,
+  buildPromotedMemoryMarkdown,
+  normalizePromotedMemoryLines as normalizeLines,
+  type PromotedMemoryRecord,
+  type PromotedKnowledgeHintRecord,
+} from './promoted-memory-builder.js';
+export {
+  buildPromotedMemoryRecord,
+  buildPromotedMemoryMarkdown,
+} from './promoted-memory-builder.js';
+export type {
+  PromotedMemoryRecord,
+  PromotedPatternRecord,
+  PromotedSopRecord,
+  PromotedKnowledgeHintRecord,
+  PromotedReportTemplateRecord,
+} from './promoted-memory-builder.js';
+import { withLockSync } from './lock-utils.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -5,7 +24,7 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { nowIso } from './foundation/time.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
@@ -15,10 +34,15 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import type { DistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
-import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
+import { assertScopedLearningRecord } from './knowledge/scoped-learning-publication.js';
+import {
+  assertScopedLearningScope,
+  scopedLearningMarkdownPath,
+} from './knowledge/scoped-learning-domain.js';
 import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
 import {
   isPublicMemoryEvidencePath,
+  loadMemoryPromotionCandidate,
   type MemoryApprovalChannel,
 } from './knowledge/memory-promotion-queue.js';
 import {
@@ -29,73 +53,6 @@ import {
   type WorktreeFileWriter,
 } from './knowledge/memory-promotion-git.js';
 import { logger } from './core.js';
-import {
-  resolvePromotedReportAudience,
-  resolvePromotedReportOutputFormat,
-  resolvePromotedReportTemplateSections,
-} from './promoted-report-template-policy.js';
-
-interface PromotedMemoryRecordBase {
-  record_id: string;
-  kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
-  tier: 'personal' | 'confidential' | 'public';
-  knowledge_domain: 'product' | 'organization' | 'personal';
-  owner_nhi?: string;
-  title: string;
-  summary: string;
-  candidate_id: string;
-  supersedes?: string;
-  superseded_by?: string;
-  project_id?: string;
-  track_id?: string;
-  track_name?: string;
-  task_session_id?: string;
-  specialist_id?: string;
-  locale?: string;
-  work_loop?: OrganizationWorkLoopSummary;
-  artifact_ids?: string[];
-  evidence_refs?: string[];
-  created_at: string;
-  /** KL-05: branch of the checkout the record was written into (omitted when git is unavailable). */
-  source_branch?: string;
-  /** KL-05: HEAD commit of that checkout at promotion time. */
-  source_commit?: string;
-}
-
-export interface PromotedPatternRecord extends PromotedMemoryRecordBase {
-  kind: 'pattern';
-  applicability: string[];
-  reusable_steps: string[];
-  expected_outcome: string;
-}
-
-export interface PromotedSopRecord extends PromotedMemoryRecordBase {
-  kind: 'sop_candidate';
-  procedure_steps: string[];
-  safety_notes: string[];
-  escalation_conditions: string[];
-}
-
-export interface PromotedKnowledgeHintRecord extends PromotedMemoryRecordBase {
-  kind: 'knowledge_hint';
-  hint_scope: string;
-  hint_triggers: string[];
-  recommended_refs: string[];
-}
-
-export interface PromotedReportTemplateRecord extends PromotedMemoryRecordBase {
-  kind: 'report_template';
-  template_sections: string[];
-  audience: string;
-  output_format: string;
-}
-
-export type PromotedMemoryRecord =
-  | PromotedPatternRecord
-  | PromotedSopRecord
-  | PromotedKnowledgeHintRecord
-  | PromotedReportTemplateRecord;
-
 const validatorCache = new Map<string, ValidateFunction>();
 // Test isolation (env override): the distill E2E rewrites HINTS.md, and a
 // parallel catalog-integrity test can observe the mid-test dirty state.
@@ -198,6 +155,17 @@ function logicalDirFor(input: {
         : input.kind === 'pattern'
           ? 'patterns'
           : 'wisdom';
+  if (
+    input.domain === 'organization' &&
+    input.scope?.tier === 'confidential' &&
+    (input.scope.organization_id || input.scope.project_id || input.kind === 'sop_candidate')
+  ) {
+    if (input.kind !== 'sop_candidate')
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Narrow scoped publication currently supports SOP only'
+      );
+    return path.posix.dirname(scopedLearningMarkdownPath(input.scope, 'scope-path'));
+  }
   if (input.domain === 'product') return `knowledge/product/evolution/${kindDir}/generated`;
   if (input.domain === 'personal') {
     const ownerNhi = input.scope?.owner_nhi?.trim();
@@ -227,152 +195,6 @@ function logicalDirFor(input: {
     case 'report_template':
       return `knowledge/${input.tier}/common/templates/generated`;
   }
-}
-
-function normalizeLines(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(/\r?\n|;/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function fallbackSteps(summary: string, defaults: string[]): string[] {
-  const lines = summary
-    .split(/[。.!?\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return lines.length > 0 ? lines : defaults;
-}
-
-function yamlOptionalString(value: string | undefined): string {
-  return value?.trim() ? value : '""';
-}
-
-function buildMarkdown(record: PromotedMemoryRecord): string {
-  const frontmatter = [
-    `---`,
-    `record_id: ${record.record_id}`,
-    `kind: ${record.kind}`,
-    `tier: ${record.tier}`,
-    `knowledge_domain: ${record.knowledge_domain}`,
-    `owner_nhi: ${yamlOptionalString(record.owner_nhi)}`,
-    `candidate_id: ${record.candidate_id}`,
-    `supersedes: ${yamlOptionalString(record.supersedes)}`,
-    `superseded_by: ${yamlOptionalString(record.superseded_by)}`,
-    `project_id: ${yamlOptionalString(record.project_id)}`,
-    `task_session_id: ${yamlOptionalString(record.task_session_id)}`,
-    `specialist_id: ${yamlOptionalString(record.specialist_id)}`,
-    `locale: ${yamlOptionalString(record.locale)}`,
-    `created_at: ${record.created_at}`,
-    ...(record.source_branch ? [`source_branch: ${record.source_branch}`] : []),
-    ...(record.source_commit ? [`source_commit: ${record.source_commit}`] : []),
-    `---`,
-    ``,
-    `# ${record.title}`,
-    ``,
-    record.summary,
-    ``,
-  ];
-  if (record.kind === 'pattern') {
-    return [
-      ...frontmatter,
-      `## Applicability`,
-      ``,
-      ...record.applicability.map((item) => `- ${item}`),
-      ``,
-      `## Reusable Steps`,
-      ``,
-      ...record.reusable_steps.map((item, index) => `${index + 1}. ${item}`),
-      ``,
-      `## Expected Outcome`,
-      ``,
-      record.expected_outcome,
-      ``,
-      `## Evidence`,
-      ``,
-      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
-      ``,
-      `## Artifacts`,
-      ``,
-      ...(record.artifact_ids || []).map((id) => `- ${id}`),
-    ].join('\n');
-  }
-  if (record.kind === 'sop_candidate') {
-    return [
-      ...frontmatter,
-      `## Procedure Steps`,
-      ``,
-      ...record.procedure_steps.map((item, index) => `${index + 1}. ${item}`),
-      ``,
-      `## Safety Notes`,
-      ``,
-      ...record.safety_notes.map((item) => `- ${item}`),
-      ``,
-      `## Escalation Conditions`,
-      ``,
-      ...record.escalation_conditions.map((item) => `- ${item}`),
-      ``,
-      `## Evidence`,
-      ``,
-      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
-      ``,
-      `## Artifacts`,
-      ``,
-      ...(record.artifact_ids || []).map((id) => `- ${id}`),
-    ].join('\n');
-  }
-  if (record.kind === 'knowledge_hint') {
-    return [
-      ...frontmatter,
-      `## Hint Scope`,
-      ``,
-      record.hint_scope,
-      ``,
-      `## Trigger Phrases`,
-      ``,
-      ...record.hint_triggers.map((item) => `- ${item}`),
-      ``,
-      `## Recommended References`,
-      ``,
-      ...record.recommended_refs.map((item) => `- ${item}`),
-      ``,
-      `## Evidence`,
-      ``,
-      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
-      ``,
-      `## Artifacts`,
-      ``,
-      ...(record.artifact_ids || []).map((id) => `- ${id}`),
-    ].join('\n');
-  }
-  return [
-    ...frontmatter,
-    `## Audience`,
-    ``,
-    record.audience,
-    ``,
-    `## Output Format`,
-    ``,
-    record.output_format,
-    ``,
-    `## Template Sections`,
-    ``,
-    ...record.template_sections.map((item, index) => `${index + 1}. ${item}`),
-    ``,
-    `## Evidence`,
-    ``,
-    ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
-    ``,
-    `## Artifacts`,
-    ``,
-    ...(record.artifact_ids || []).map((id) => `- ${id}`),
-  ].join('\n');
 }
 
 function buildHintsBlock(record: PromotedKnowledgeHintRecord): string {
@@ -562,135 +384,6 @@ function backlinkSupersededRecord(record: PromotedMemoryRecord): void {
   updateFrontmatterField(targetPath, 'superseded_by', record.record_id);
 }
 
-export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): PromotedMemoryRecord {
-  if (candidate.target_kind === 'procedure') {
-    throw new Error(
-      'Procedure candidates use the procedure promotion gate, not promoted-memory records'
-    );
-  }
-  const tier =
-    candidate.tier === 'personal' || candidate.tier === 'public' ? candidate.tier : 'confidential';
-  const metadata = candidate.metadata || {};
-  const base: PromotedMemoryRecordBase = {
-    record_id: candidate.candidate_id,
-    kind: candidate.target_kind,
-    tier,
-    knowledge_domain:
-      metadata.knowledge_domain === 'product' || metadata.knowledge_domain === 'personal'
-        ? metadata.knowledge_domain
-        : 'organization',
-    ...(typeof metadata.personal_owner_nhi === 'string'
-      ? { owner_nhi: metadata.personal_owner_nhi }
-      : {}),
-    title: candidate.title,
-    summary: candidate.summary,
-    candidate_id: candidate.candidate_id,
-    supersedes:
-      typeof metadata.supersedes === 'string' && metadata.supersedes.trim()
-        ? metadata.supersedes.trim()
-        : undefined,
-    superseded_by:
-      typeof metadata.superseded_by === 'string' && metadata.superseded_by.trim()
-        ? metadata.superseded_by.trim()
-        : undefined,
-    project_id: candidate.project_id,
-    track_id: candidate.track_id,
-    track_name: candidate.track_name,
-    task_session_id: candidate.task_session_id,
-    specialist_id: candidate.specialist_id,
-    locale: candidate.locale,
-    work_loop: candidate.work_loop,
-    artifact_ids: candidate.artifact_ids,
-    evidence_refs: candidate.evidence_refs,
-    created_at: nowIso(),
-  };
-  if (candidate.target_kind === 'pattern') {
-    return {
-      ...base,
-      kind: 'pattern',
-      applicability:
-        normalizeLines(metadata.applicability).length > 0
-          ? normalizeLines(metadata.applicability)
-          : ['repeatable delivery work', candidate.specialist_id || 'general specialist'],
-      reusable_steps:
-        normalizeLines(metadata.reusable_steps).length > 0
-          ? normalizeLines(metadata.reusable_steps)
-          : fallbackSteps(candidate.summary, [
-              'review the prior outcome',
-              'adapt the pattern to the active request',
-              'verify the delivered result',
-            ]),
-      expected_outcome:
-        typeof metadata.expected_outcome === 'string' && metadata.expected_outcome.trim()
-          ? metadata.expected_outcome.trim()
-          : candidate.summary,
-    };
-  }
-  if (candidate.target_kind === 'sop_candidate') {
-    return {
-      ...base,
-      kind: 'sop_candidate',
-      procedure_steps:
-        normalizeLines(metadata.procedure_steps).length > 0
-          ? normalizeLines(metadata.procedure_steps)
-          : fallbackSteps(candidate.summary, [
-              'inspect the current state',
-              'apply the standard operator action',
-              'confirm the outcome and capture evidence',
-            ]),
-      safety_notes:
-        normalizeLines(metadata.safety_notes).length > 0
-          ? normalizeLines(metadata.safety_notes)
-          : [
-              'Require approval before irreversible or high-risk actions.',
-              'Capture evidence before and after the action.',
-            ],
-      escalation_conditions:
-        normalizeLines(metadata.escalation_conditions).length > 0
-          ? normalizeLines(metadata.escalation_conditions)
-          : [
-              'Unexpected runtime failure',
-              'Policy or approval mismatch',
-              'Result does not match the expected state',
-            ],
-    };
-  }
-  if (candidate.target_kind === 'knowledge_hint') {
-    return {
-      ...base,
-      kind: 'knowledge_hint',
-      hint_scope:
-        typeof metadata.hint_scope === 'string' && metadata.hint_scope.trim()
-          ? metadata.hint_scope.trim()
-          : candidate.specialist_id || 'general reasoning',
-      hint_triggers:
-        normalizeLines(metadata.hint_triggers).length > 0
-          ? normalizeLines(metadata.hint_triggers)
-          : [candidate.title, candidate.summary].filter(Boolean),
-      recommended_refs:
-        normalizeLines(metadata.recommended_refs).length > 0
-          ? normalizeLines(metadata.recommended_refs)
-          : candidate.evidence_refs || [],
-    };
-  }
-  return {
-    ...base,
-    kind: 'report_template',
-    template_sections:
-      normalizeLines(metadata.template_sections).length > 0
-        ? normalizeLines(metadata.template_sections)
-        : resolvePromotedReportTemplateSections(),
-    audience:
-      typeof metadata.audience === 'string' && metadata.audience.trim()
-        ? metadata.audience.trim()
-        : resolvePromotedReportAudience(),
-    output_format:
-      typeof metadata.output_format === 'string' && metadata.output_format.trim()
-        ? metadata.output_format.trim()
-        : resolvePromotedReportOutputFormat(),
-  };
-}
-
 /**
  * Pattern used to mark test-only tracks. Promotion is suppressed for these so
  * that running the test suite (or any TEST-tier mission) does not pollute the
@@ -817,7 +510,19 @@ export function savePromotedMemoryRecord(
   options: SavePromotedMemoryRecordOptions = {}
 ): { logicalPath: string; record: PromotedMemoryRecord; targetRoot?: string } {
   const metadata = candidate.metadata || {};
-  const domain = metadata.knowledge_domain;
+  const domain =
+    metadata.knowledge_domain === 'product' || metadata.knowledge_domain === 'personal'
+      ? metadata.knowledge_domain
+      : 'organization';
+  if (domain === 'organization' && candidate.scope) {
+    // Other publishers do not yet preserve the complete source restrictions.
+    // Refuse before provenance lookup, role assumption, locks or file writes.
+    if (candidate.target_kind !== 'sop_candidate')
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Scoped organization publication supports canonical approved SOPs only'
+      );
+    assertScopedLearningScope(candidate.scope);
+  }
   if (
     domain === 'product' &&
     (candidate.tier !== 'public' ||
@@ -871,59 +576,105 @@ export function savePromotedMemoryRecord(
     options.gitRunner
   );
   return withPromotedMemoryExecutionContext(executionRole, () => {
-    const record: PromotedMemoryRecord = { ...buildPromotedMemoryRecord(candidate), ...provenance };
-    const validate = ensureValidator(record.kind);
-    if (!validate(record)) {
-      const errors = (validate.errors || []).map(
-        (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-      );
-      throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
-    }
-    const logicalDir = logicalDirFor({
-      kind: record.kind,
-      tier: record.tier,
-      domain: record.knowledge_domain,
-      scope: candidate.scope,
-    });
-    const baseName = record.record_id;
-    if (externalTargetRoot) {
-      // The queue/distill state stays in this checkout; only the record files
-      // go to the target worktree. logicalDir is repo-relative for product
-      // knowledge, so the returned promoted_ref is valid in both checkouts.
-      (options.worktreeWriter || writePromotedFilesToWorktree)({
-        root: externalTargetRoot,
-        executionRole,
-        files: [
-          { path: `${logicalDir}/${baseName}.json`, content: JSON.stringify(record, null, 2) },
-          { path: `${logicalDir}/${baseName}.md`, content: buildMarkdown(record) },
-        ],
+    const publish = () => {
+      const record: PromotedMemoryRecord = {
+        ...buildPromotedMemoryRecord(candidate),
+        ...provenance,
+      };
+      if (domain === 'organization' && candidate.scope && record.kind === 'sop_candidate') {
+        const approved = loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+        if (!approved)
+          throw new Error(
+            '[LEARNING_APPROVAL_REQUIRED] Scoped publication requires its canonical queue candidate'
+          );
+        if (approved.status !== 'approved' && approved.status !== 'promoted')
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate is not approved');
+        assertScopedLearningRecord({ ...approved, status: 'approved' }, record);
+      }
+      const validate = ensureValidator(record.kind);
+      if (!validate(record)) {
+        const errors = (validate.errors || []).map(
+          (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
+        throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
+      }
+      const logicalDir = logicalDirFor({
+        kind: record.kind,
+        tier: record.tier,
+        domain: record.knowledge_domain,
+        scope: candidate.scope,
       });
+      const baseName = record.record_id;
+      if (externalTargetRoot) {
+        // The queue/distill state stays in this checkout; only the record files
+        // go to the target worktree. logicalDir is repo-relative for product
+        // knowledge, so the returned promoted_ref is valid in both checkouts.
+        (options.worktreeWriter || writePromotedFilesToWorktree)({
+          root: externalTargetRoot,
+          executionRole,
+          files: [
+            { path: `${logicalDir}/${baseName}.json`, content: JSON.stringify(record, null, 2) },
+            { path: `${logicalDir}/${baseName}.md`, content: buildPromotedMemoryMarkdown(record) },
+          ],
+        });
+        return {
+          logicalPath: `${logicalDir}/${baseName}.md`,
+          record,
+          targetRoot: externalTargetRoot,
+        };
+      }
+      const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
+        allowMissingLeaf: true,
+      });
+      if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
+      const jsonPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.json`), {
+        allowMissingLeaf: true,
+      });
+      const mdPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.md`), {
+        allowMissingLeaf: true,
+      });
+      if (
+        record.scope &&
+        record.approved_payload_digest &&
+        (safeExistsSync(jsonPath) || safeExistsSync(mdPath))
+      ) {
+        if (!safeExistsSync(jsonPath))
+          throw new Error(
+            '[LEARNING_PUBLICATION_CONFLICT] Markdown exists without its canonical record'
+          );
+        const prior = readJsonIfPresent<PromotedMemoryRecord>(jsonPath);
+        const approved = loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+        if (!approved)
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate disappeared');
+        if (approved.status !== 'approved' && approved.status !== 'promoted')
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate is not approved');
+        assertScopedLearningRecord({ ...approved, status: 'approved' }, prior);
+        const expectedMarkdown = buildPromotedMemoryMarkdown(prior);
+        if (safeExistsSync(mdPath) && readTextFile(mdPath) !== expectedMarkdown)
+          throw new Error(
+            '[LEARNING_PUBLICATION_CONFLICT] Existing Markdown differs from approved record'
+          );
+        if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, expectedMarkdown);
+        return { logicalPath: logicalDir + '/' + baseName + '.md', record: prior };
+      }
+      safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
+      const markdown = buildPromotedMemoryMarkdown(record);
+      safeWriteFile(mdPath, markdown);
+      backlinkSupersededRecord(record);
+      if (record.kind === 'knowledge_hint' && record.knowledge_domain === 'organization') {
+        appendGovernanceHintRecord(record, candidate.scope);
+      }
       return {
         logicalPath: `${logicalDir}/${baseName}.md`,
         record,
-        targetRoot: externalTargetRoot,
       };
-    }
-    const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
-      allowMissingLeaf: true,
-    });
-    if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
-    const jsonPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.json`), {
-      allowMissingLeaf: true,
-    });
-    const mdPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.md`), {
-      allowMissingLeaf: true,
-    });
-    safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
-    const markdown = buildMarkdown(record);
-    safeWriteFile(mdPath, markdown);
-    backlinkSupersededRecord(record);
-    if (record.kind === 'knowledge_hint' && record.knowledge_domain === 'organization') {
-      appendGovernanceHintRecord(record, candidate.scope);
-    }
-    return {
-      logicalPath: `${logicalDir}/${baseName}.md`,
-      record,
     };
+    return candidate.scope && domain === 'organization'
+      ? withLockSync(
+          'scoped-learning-publication:' +
+            createHash('sha256').update(candidate.candidate_id).digest('hex'),
+          publish
+        )
+      : publish();
   });
 }

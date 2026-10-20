@@ -254,7 +254,8 @@ export interface MissionControllerRoutingContext {
     curationJson?: string,
     decidedBy?: HumanDecidedBy,
     approvalChannel?: string,
-    print?: Print
+    print?: Print,
+    approvalOptions?: { requestApproval?: boolean; approvalRef?: string }
   ) => Awaitable<void>;
   rejectMemoryCandidate: (
     candidateId: string,
@@ -1060,7 +1061,11 @@ export async function runMissionControllerAction(
           '--approval-channel',
           MEMORY_APPROVAL_CHANNELS
         ),
-        context.print
+        context.print,
+        {
+          requestApproval: context.argv.includes('--request-approval'),
+          approvalRef: getValue('--approval-ref', context.argv),
+        }
       );
       break;
     case 'memory-reject':

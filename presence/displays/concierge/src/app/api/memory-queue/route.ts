@@ -5,7 +5,7 @@ import {
 } from '@agent/core/knowledge/memory-promotion-queue';
 import { withExecutionContext } from '@agent/core/authority';
 import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
-import { tenantVisibleToViewer } from '../../../lib/tenant-visibility';
+import { memoryCandidateVisibleToViewer } from '../../../lib/memory-candidate-visibility';
 import { conciergeErrorResponse } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -57,11 +57,7 @@ export function GET(req: NextRequest) {
       // Only undecided candidates are the operator's business here; approved/
       // rejected/promoted rows stay in the ledger for the CLI and audits.
       .filter((candidate) => candidate.status === 'queued')
-      .filter(
-        (candidate) =>
-          resolved.context.tierAccess.includes(candidate.sensitivity_tier) &&
-          tenantVisibleToViewer(resolved.context, candidate.scope?.tenant_slug)
-      )
+      .filter((candidate) => memoryCandidateVisibleToViewer(candidate, resolved.context))
       .sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)));
     return NextResponse.json({ ok: true, candidates: candidates.map(toItem) });
   } catch (error) {

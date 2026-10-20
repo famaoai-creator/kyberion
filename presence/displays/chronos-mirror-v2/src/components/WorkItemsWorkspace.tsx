@@ -18,6 +18,8 @@ import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText, uxTextOr, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
   parseWorkItemMutationResponse,
+  parseWorkItemAdmissionResponse,
+  type ClientMissionAdmission,
   parseWorkItemsResponse,
   type ClientWorkItem,
   type ClientWorkItemLineage,
@@ -26,6 +28,8 @@ import {
   parseWorkCoordinationResponse,
   type ClientWorkCoordinationSummary,
 } from '../lib/intelligence-work-coordination-response';
+
+import { WorkItemMissionAlignmentAction } from './WorkItemMissionAlignmentAction';
 
 type WorkItem = ClientWorkItem;
 type WorkItemLineage = ClientWorkItemLineage;
@@ -91,6 +95,8 @@ export function WorkItemsWorkspace({
     };
     lineage?: WorkItemLineage;
   } | null>(null);
+  const [admissions, setAdmissions] = React.useState<Record<string, ClientMissionAdmission>>({});
+  const preparing = React.useRef(new Set<string>());
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
@@ -104,11 +110,28 @@ export function WorkItemsWorkspace({
       const scopeQuery = scopeParams.toString();
       const [response, intelligenceResponse] = await Promise.all([
         fetch(`/api/workitems${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
-        fetch(`/api/intelligence${scopeQuery ? `?${scopeQuery}` : ''}`, { cache: 'no-store' }),
+        fetch(`/api/intelligence${scopeQuery ? `?${scopeQuery}` : ''}`, {
+          cache: 'no-store',
+        }),
       ]);
       const payload = parseWorkItemsResponse(await response.json().catch(() => null));
       if (!response.ok || !payload) throw new Error('Invalid work items response');
       setItems(payload.items);
+      setAdmissions(() => {
+        const next: Record<string, ClientMissionAdmission> = {};
+        for (const item of payload.items) {
+          const receipt = parseWorkItemAdmissionResponse({
+            ok: true,
+            item,
+            admission: item.metadata?.mission_alignment_decision,
+          });
+          if (receipt) {
+            next[item.item_id] = receipt.admission;
+            preparing.current.delete(item.item_id);
+          }
+        }
+        return next;
+      });
       setStatuses(payload.statuses);
       setProjection({
         scope: payload.scope,
@@ -157,13 +180,48 @@ export function WorkItemsWorkspace({
     [refresh]
   );
 
+  const requestAlignment = React.useCallback(
+    async (itemId: string) => {
+      if (preparing.current.has(itemId)) return;
+      preparing.current.add(itemId);
+      setBusyId(itemId);
+      try {
+        const response = await fetch('/api/workitems', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId, action: 'request_mission_alignment' }),
+          signal: AbortSignal.timeout(125_000),
+        });
+        const payload = parseWorkItemAdmissionResponse(await response.json().catch(() => null));
+        if (!response.ok || !payload)
+          throw new Error(
+            'Mission alignment request remains held; reload and inspect the work item'
+          );
+        setAdmissions((current) => ({ ...current, [itemId]: payload.admission }));
+        preparing.current.delete(itemId);
+        await refresh();
+      } catch (err) {
+        setError(
+          'Alignment outcome is unknown or held. Refresh and inspect the original work item approval before trying again.'
+        );
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [refresh]
+  );
+
   const statusLabel = (status: string) =>
     uxText(STATUS_LABEL_KEY[status] || 'chronos_status_unknown', locale);
 
   const visibleItems =
     statusFilter === 'all' ? items : items.filter((item) => item.status === statusFilter);
   const tabItems = [
-    { id: 'all', label: uxTextOr('chronos_ws_filter_all', 'All', locale), count: items.length },
+    {
+      id: 'all',
+      label: uxTextOr('chronos_ws_filter_all', 'All', locale),
+      count: items.length,
+    },
     ...statuses.map((status) => ({
       id: status,
       label: statusLabel(status),
@@ -313,6 +371,13 @@ export function WorkItemsWorkspace({
                             {compactDate(item.created_at)}
                           </span>
                           <WorkItemLineageChain context={item.context} locale={locale} />
+                          <WorkItemMissionAlignmentAction
+                            item={item}
+                            admission={admissions[item.item_id]}
+                            busy={busyId === item.item_id || preparing.current.has(item.item_id)}
+                            locale={locale}
+                            onRequest={requestAlignment}
+                          />
                           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                             <a
                               className="chronos-mission-cell__id"

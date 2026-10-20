@@ -1,4 +1,13 @@
-import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import {
+  resolveGovernedArtifactPath,
+  ensureRegularGovernedArtifactFile,
+} from './artifact-store-reader.js';
+export {
+  isGovernedArtifactPath,
+  resolveGovernedArtifactPath,
+  readGovernedArtifactJson,
+} from './artifact-store-reader.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
@@ -73,34 +82,6 @@ function withRole<T>(role: GovernedArtifactRole, fn: () => T): T {
   return withExecutionContext(role, fn);
 }
 
-export function isGovernedArtifactPath(logicalPath: string): boolean {
-  if (logicalPath.startsWith('active/shared/coordination/')) return true;
-  if (logicalPath.startsWith('active/shared/observability/')) return true;
-  if (logicalPath.startsWith('active/shared/runtime/')) return true;
-  if (logicalPath.startsWith('active/missions/') && logicalPath.includes('/coordination/'))
-    return true;
-  if (logicalPath.startsWith('active/missions/') && logicalPath.includes('/observability/'))
-    return true;
-  return false;
-}
-
-export function resolveGovernedArtifactPath(logicalPath: string): string {
-  if (!isGovernedArtifactPath(logicalPath)) {
-    throw new Error(
-      `Artifact path is outside governed coordination/observability scopes: ${logicalPath}`
-    );
-  }
-  return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
-    allowMissingLeaf: true,
-  });
-}
-
-function ensureRegularGovernedArtifactFile(filePath: string): void {
-  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
-    throw new Error(`governed artifact must be a regular file: ${filePath}`);
-  }
-}
-
 export function ensureGovernedArtifactDir(role: GovernedArtifactRole, logicalDir: string): string {
   return withRole(role, () => {
     const resolved = resolveGovernedArtifactPath(logicalDir);
@@ -137,13 +118,6 @@ export function appendGovernedArtifactJsonl(
     appendJsonLine(logicalPath, value);
     return resolved;
   });
-}
-
-export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
-  const resolved = resolveGovernedArtifactPath(logicalPath);
-  if (!safeExistsSync(resolved)) return null;
-  ensureRegularGovernedArtifactFile(resolved);
-  return readJson<T>(resolved);
 }
 
 export function listGovernedArtifacts(logicalDir: string): string[] {

@@ -1,4 +1,7 @@
 import * as path from 'node:path';
+import { knowledgeTextSha256 } from '../knowledge/knowledge-delivery-snapshot.js';
+import { resolveScopedLearningRetrieval } from '../knowledge/scoped-learning-retrieval.js';
+import { compileScopedContextPack } from '../context-security-scope.js';
 import {
   findRelevantDistilledKnowledge,
   type DistilledKnowledgeEntry,
@@ -101,14 +104,28 @@ function resolveSafePinnedKnowledgePath(repoRelativePath: string, rootDir?: stri
 
 function loadPinnedKnowledgeHint(
   repoRelativePath: string,
-  rootDir?: string
+  rootDir?: string,
+  consumerScope?: ScopeContext
 ): MissionContextPackKnowledgeHint | null {
+  repoRelativePath = path.posix.normalize(repoRelativePath.replaceAll('\\', '/'));
   try {
     const abs = resolveSafePinnedKnowledgePath(repoRelativePath, rootDir);
     if (!abs) return null;
     if (!safeExistsSync(abs)) return null;
     if (!safeLstat(abs).isFile()) return null;
     const raw = readTextFile(abs);
+    const frontmatter = raw.startsWith('---\n') ? raw.slice(4, raw.indexOf('\n---\n', 4)) : '';
+    const learning = resolveScopedLearningRetrieval({
+      documentPath: repoRelativePath,
+      sourceSha256: knowledgeTextSha256(raw),
+      consumerScope,
+      candidateId: frontmatter
+        .match(/^candidate_id:\s*(.+)$/m)?.[1]
+        ?.trim()
+        .replace(/^["']|["']$/g, ''),
+      scopeText: frontmatter.match(/^scope:\s*(.+)$/m)?.[1]?.trim(),
+    });
+    if (learning.governed && !learning.publication) return null;
     const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);
     const bodyWithoutHeading = body.replace(/^#\s+.+\n/, '');
     const title = frontmatterTitle || firstMarkdownHeading(body) || path.basename(repoRelativePath);
@@ -116,6 +133,8 @@ function loadPinnedKnowledgeHint(
       path: repoRelativePath,
       title,
       excerpt: truncatePinnedExcerpt(bodyWithoutHeading),
+      source_sha256: knowledgeTextSha256(raw),
+      ...(learning.publication ? { learning_publication: learning.publication } : {}),
       tags: [],
     };
   } catch {
@@ -201,7 +220,9 @@ export function organizationIdFromContext(input: {
     (!missionTenant || projectRecord.tenant_slug === missionTenant)
   );
   const fromRegistry = registryMatchesScope ? projectRecord?.organization_id : undefined;
-  const value = String(fromRegistry || fromMission || fromProject || '').trim();
+  const value = String(
+    input.missionState.organization_id || fromRegistry || fromMission || fromProject || ''
+  ).trim();
   return value || undefined;
 }
 
@@ -389,12 +410,41 @@ export async function loadKnowledgeHintsIfPossible(
     slicesPath: input.knowledgeSlicesPath,
   });
 
+  const consumerScope: ScopeContext = {
+    tier: normalizeTier(input.missionState.tier),
+    ...(sliceTenant ? { tenant_slug: sliceTenant } : {}),
+    ...(sliceOrganization ? { organization_id: sliceOrganization } : {}),
+    ...(sliceProject ? { project_id: sliceProject } : {}),
+    mission_id: input.missionState.mission_id,
+    ...(input.workItem?.item_id ? { task_id: input.workItem.item_id } : {}),
+  };
+  const commonGrantTenant = commonKnowledgeGrantTenant({
+    tier: consumerScope.tier,
+    tenantSlug: sliceTenant,
+    tenantKnowledgeRootDir: input.tenantKnowledgeRootDir,
+  });
+  const admitted = (hints: MissionContextPackKnowledgeHint[]) =>
+    compileScopedContextPack(
+      {
+        ...consumerScope,
+        tenant_slug: sliceTenant || 'default',
+        read_tiers: consumerScope.tier === 'public' ? ['public'] : ['public', consumerScope.tier],
+        write_tier: consumerScope.tier,
+        mission_id: input.missionState.mission_id,
+        purpose: input.teamRole || 'knowledge-retrieval',
+      },
+      hints.map((hint, index) => knowledgeHintFragment(hint, index, { commonGrantTenant }))
+    ).fragments.map((fragment) => fragment.content);
   const hintLimit = resolveScopeBudget(input.estimatedScope).hintLimit;
   const pinnedHints: MissionContextPackKnowledgeHint[] = [];
   for (const pinnedPath of slice.pinned) {
     if (pinnedHints.length >= hintLimit) break;
-    const hint = loadPinnedKnowledgeHint(pinnedPath);
-    if (hint) pinnedHints.push(hint);
+    const hint = loadPinnedKnowledgeHint(
+      pinnedPath,
+      pinnedPath.startsWith('knowledge/confidential/') ? input.tenantKnowledgeRootDir : undefined,
+      consumerScope
+    );
+    if (hint) pinnedHints.push(...admitted([hint]));
   }
 
   // Verification is tenant-level for confidential work, shared for public.
@@ -414,15 +464,21 @@ export async function loadKnowledgeHintsIfPossible(
       ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
     })) {
       if (alreadyPinned.has(changed.document_path)) continue;
-      const hint = loadPinnedKnowledgeHint(changed.document_path, input.tenantKnowledgeRootDir);
-      if (hint) pinnedHints.push({ ...hint, delivered_because: 'changed_since_verified' });
+      const hint = loadPinnedKnowledgeHint(
+        changed.document_path,
+        input.tenantKnowledgeRootDir,
+        consumerScope
+      );
+      if (hint)
+        pinnedHints.push(...admitted([{ ...hint, delivered_because: 'changed_since_verified' }]));
     }
   }
   const annotate = (hints: MissionContextPackKnowledgeHint[]) => {
     const verification = resolveKnowledgeVerification(
       hints.map((hint) => hint.path),
       verificationScope,
-      input.tenantKnowledgeRootDir
+      input.tenantKnowledgeRootDir,
+      new Map(hints.map((hint) => [hint.path, hint.source_sha256?.slice(0, 16)]))
     );
     return hints.map((hint) => {
       const resolved = verification.get(hint.path);
@@ -439,7 +495,7 @@ export async function loadKnowledgeHintsIfPossible(
   const candidateCap = judging ? remaining * 2 : remaining;
   const pinnedPaths = new Set(pinnedHints.map((hint) => hint.path));
   const narrow = async (hints: MissionContextPackKnowledgeHint[]) => {
-    const kept = await narrowKnowledgeHintsWithJudgment(hints, {
+    const kept = await narrowKnowledgeHintsWithJudgment(admitted(hints), {
       task: topic,
       tier: normalizeTier(input.missionState.tier),
       ...(sliceTenant ? { tenantSlug: sliceTenant } : {}),
@@ -494,6 +550,7 @@ export async function loadKnowledgeHintsIfPossible(
     path: entry.path,
     title: entry.title,
     excerpt: entry.excerpt,
+    ...(entry.source_sha256 ? { source_sha256: entry.source_sha256 } : {}),
     tags: entry.tags,
     ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
     ...(entry.category ? { category: entry.category } : {}),
@@ -517,6 +574,8 @@ export async function loadKnowledgeHintsIfPossible(
         path: hit.path,
         title: hit.title,
         excerpt: hit.excerpt,
+        ...(hit.source_sha256 ? { source_sha256: hit.source_sha256 } : {}),
+        ...(hit.learning_publication ? { learning_publication: hit.learning_publication } : {}),
         tags: hit.tags,
         score: hit.score,
       }));

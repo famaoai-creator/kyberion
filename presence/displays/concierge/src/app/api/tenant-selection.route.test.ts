@@ -119,10 +119,18 @@ vi.mock('@agent/core/ceo-surface-summary', () => ({
 vi.mock('@agent/core/knowledge/memory-promotion-queue', () => ({
   listMemoryPromotionCandidates: () => [
     {
+      candidate_id: 'm-beta-personal-source',
+      status: 'queued',
+      sensitivity_tier: 'confidential',
+      scope: { tier: 'personal', tenant_slug: 'beta', owner_nhi: 'user:private-owner' },
+      summary: 'PRIVATE SOURCE MUST NOT LEAK',
+      queued_at: '2026-10-10T00:00:00.000Z',
+    },
+    {
       candidate_id: 'm-acme',
       status: 'queued',
       sensitivity_tier: 'confidential',
-      scope: { tenant_slug: 'acme' },
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
       summary: 'acme memory',
       queued_at: '2026-10-10T00:00:00.000Z',
     },
@@ -130,7 +138,7 @@ vi.mock('@agent/core/knowledge/memory-promotion-queue', () => ({
       candidate_id: 'm-beta',
       status: 'queued',
       sensitivity_tier: 'confidential',
-      scope: { tenant_slug: 'beta' },
+      scope: { tier: 'confidential', tenant_slug: 'beta' },
       summary: 'beta memory',
       queued_at: '2026-10-10T00:00:00.000Z',
     },
@@ -425,5 +433,16 @@ describe('/api/response-status', () => {
   it('lists only company-less tasks in the system view', async () => {
     state.viewer = viewer('all');
     expect(await missions('/api/response-status?tenant=shared')).toEqual(['MSN-SYSTEM', '(none)']);
+  });
+});
+
+describe('memory queue source tier boundary', () => {
+  it('hides personal source in a confidential destination even for all-tenant viewers', async () => {
+    state.viewer = viewer('all');
+    const response = await memoryQueueGET(request('/api/memory-queue?tenant=beta'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.candidates.map((row: { id: string }) => row.id)).toEqual(['m-beta']);
+    expect(JSON.stringify(body)).not.toContain('PRIVATE SOURCE MUST NOT LEAK');
   });
 });

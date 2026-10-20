@@ -1,5 +1,10 @@
 /** Internal Dot -> mission admission. No business effect permission is issued. */
 import * as path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { evaluateAutonomousOpsAction } from '../governance/autonomous-ops-gate.js';
+import { withExecutionContext } from '../authority.js';
+import { resolveAccountableHuman } from '../organization/member-registry.js';
+import { isOperationsHalted } from '../governance/operations-halt.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
@@ -8,7 +13,12 @@ import { findDotCharter } from '../dot/dot-charter.js';
 import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
-import { getWorkItem, claimWorkItem, releaseWorkItem } from '../workforce/work-coordination.js';
+import {
+  getWorkItem,
+  claimWorkItem,
+  releaseWorkItem,
+  listActiveWorkLeases,
+} from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
 import {
@@ -16,9 +26,16 @@ import {
   parseMissionAdmissionRequest,
   type MissionAdmissionRequest,
 } from '../governance/mandate-shadow.js';
-import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import {
+  computeApprovalPayloadHash,
+  computeApprovalPresentedDigest,
+} from '../governance/approval-presentation.js';
 import { approvalUsabilityRefusal } from '../governance/approval-separation-of-duties.js';
-import { listApprovalRequests, loadApprovalRequest } from '../governance/approval-store-reader.js';
+import {
+  listApprovalRequests,
+  loadApprovalRequest,
+  isApprovalRequestExpired,
+} from '../governance/approval-store-reader.js';
 import { validateHumanFinalDecision } from '../governance/approval-human-decision.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
@@ -28,6 +45,21 @@ import {
 import { loadState } from './mission-state.js';
 
 type Deps = { rootDir?: string; now?: () => Date };
+interface HumanAdmissionApplyBinding {
+  workItemId: string;
+  requestId: string;
+  claimId: string;
+  leaseId: string;
+  attemptId: string;
+}
+const humanAdmissionApply = new AsyncLocalStorage<HumanAdmissionApplyBinding>();
+/** Carry the freshly acquired durable claim through the in-process controller call; not a reusable grant. */
+export function withHumanMissionAdmissionApply<T>(
+  binding: HumanAdmissionApplyBinding,
+  fn: () => T
+): T {
+  return humanAdmissionApply.run(binding, fn);
+}
 export function assertMissionAdmissionActivation(
   missionId: string,
   workItemId: string,
@@ -45,12 +77,144 @@ export function assertMissionAdmissionActivation(
   )
     throw new Error('mission admission identity/scope mismatch');
   resolveDotMissionAdmission(item, deps);
+  const gate = evaluateAutonomousOpsAction({
+    actionId: 'mission_start_mandate',
+    tenantSlug,
+  });
+  const hasBoundDecision = listApprovalRequests({
+    storageChannels: ['brief'],
+    kind: 'mission_gate',
+  }).some(
+    (record) => record.source?.missionId === missionId && record.source.taskId === workItemId
+  );
+  if (
+    item.metadata?.mission_alignment_preparation ||
+    hasBoundDecision ||
+    !(gate.allowed && gate.decision === 'auto')
+  ) {
+    const record = assertHumanMissionAdmissionApproval(item, deps);
+    const binding = humanAdmissionApply.getStore();
+    const lease = binding
+      ? listActiveWorkLeases().find(
+          (row) =>
+            row.lease_id === binding.leaseId &&
+            row.item_id === workItemId &&
+            row.holder_peer_id === 'mission_controller'
+        )
+      : undefined;
+    if (
+      !record.applyClaim ||
+      record.applyResult ||
+      !binding ||
+      binding.workItemId !== workItemId ||
+      binding.requestId !== record.id ||
+      binding.claimId !== record.applyClaim.claimId ||
+      binding.leaseId !== item.lease_id ||
+      item.claimed_by_peer_id !== 'mission_controller' ||
+      !lease ||
+      item.status !== 'in_progress' ||
+      binding.attemptId !== item.current_attempt_id
+    )
+      throw new Error('mission admission activation requires its current uncompleted apply claim');
+  }
 }
 export function resolveDotMissionAdmission(
   item: WorkItem,
   deps: Deps = {}
 ): MissionAdmissionRequest {
   return verifiedDotMissionAdmission(item, deps).admission;
+}
+
+/** Revalidate current human authority at the controller activation boundary, not only at dispatch. */
+export function assertHumanMissionAdmissionApproval(
+  item: WorkItem,
+  deps: Deps = {}
+): ApprovalRequestRecord {
+  if (isOperationsHalted()) throw new Error('mission admission operations halted');
+  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  const missionId = item.metadata!.mission_id as string;
+  const brief = buildMissionAdmissionBrief(item, admission, missionId);
+  const payloadHash = computeApprovalPayloadHash(brief);
+  // Re-read durable mission evidence at the final activation boundary, after async work.
+  const state = loadState(missionId, deps);
+  const dir = findMissionPath(missionId);
+  if (
+    !state ||
+    state.status !== 'planned' ||
+    state.tier !== 'confidential' ||
+    !dir ||
+    state.tenant_slug !== scope.tenant_slug ||
+    state.organization_id !== scope.organization_id ||
+    state.relationships?.project?.project_id !== scope.project_id ||
+    !safeExistsSync(path.join(dir, 'evidence', 'mission-brief.json')) ||
+    computeApprovalPayloadHash(
+      readMissionAdmissionBrief(path.join(dir, 'evidence', 'mission-brief.json'))
+    ) !== payloadHash
+  )
+    throw new Error('human admission planned mission evidence changed');
+  const effectBinding =
+    'mission-admission:' +
+    computeApprovalPayloadHash({
+      action: 'human_mission_alignment',
+      itemId: item.item_id,
+      missionId,
+      actionRef: item.metadata!.action_ref,
+      scope,
+    });
+  const records = listApprovalRequests({
+    storageChannels: ['brief'],
+    kind: 'mission_gate',
+  }).filter((row) => row.source?.missionId === missionId);
+  const record = records[0];
+  if (
+    records.length !== 1 ||
+    !record ||
+    record.status !== 'approved' ||
+    record.source?.taskId !== item.item_id ||
+    record.correlationId !== 'mission-alignment-' + missionId ||
+    record.accountability?.finalDecision !== 'human_only' ||
+    record.accountability.payloadHash !== payloadHash ||
+    record.accountability.effectBinding !== effectBinding ||
+    record.scope?.tier !== 'confidential' ||
+    record.scope.tenant_slug !== scope.tenant_slug ||
+    record.scope.organization_id !== scope.organization_id ||
+    record.scope.project_id !== scope.project_id ||
+    record.scope.mission_id !== missionId ||
+    record.scope.task_id !== item.item_id ||
+    !record.decidedBy?.trim() ||
+    record.decidedByIdentitySource === 'caller_supplied' ||
+    record.decidedInAgentSession ||
+    record.assuranceShortfall ||
+    !record.decidedAt ||
+    !Number.isFinite(Date.parse(record.decidedAt)) ||
+    !record.verifiedPresentedDigest ||
+    record.verifiedPresentedDigest !== computeApprovalPresentedDigest(record) ||
+    isApprovalRequestExpired(record) ||
+    approvalUsabilityRefusal(record, 'mission_admission_activation')
+  )
+    throw new Error('current exact human admission approval required');
+  validateHumanFinalDecision({
+    accountability: record.accountability,
+    decidedByType: record.decidedByType,
+    authenticated: record.authenticated,
+    authMethod: record.decidedAuthMethod,
+    phase: 'decision',
+    mode: 'enforce',
+    channel: record.channel,
+    payloadHash,
+    effectBinding,
+  });
+  const member = withExecutionContext('sovereign_concierge', () =>
+    resolveAccountableHuman(record.decidedBy!)
+  );
+  const membership = member?.memberships.find((row) => row.tenant_slug === scope.tenant_slug);
+  if (
+    member?.status !== 'active' ||
+    !membership ||
+    !['owner', 'approver'].includes(membership.role)
+  )
+    throw new Error('human admission requires current tenant approval authority');
+  return record;
 }
 
 /** Actual declared scope, after current charter and immutable admission proof checks. */
@@ -103,7 +267,11 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
     throw new Error('mission intake differs from admitted action');
   if (
     !evaluateMissionStartMandate(
-      { tenant_slug: tenant, mandate_id: admission.mandate_ref, facts: admission.mandate_facts },
+      {
+        tenant_slug: tenant,
+        mandate_id: admission.mandate_ref,
+        facts: admission.mandate_facts,
+      },
       { now: deps.now?.() }
     ).covered
   )
@@ -126,12 +294,73 @@ type AdmissionBrief = {
   source: { kind: string; ref: string; tenantSlug: string };
   [key: string]: unknown;
 };
-function readBrief(file: string): AdmissionBrief {
+export function readMissionAdmissionBrief(file: string): AdmissionBrief {
   return defineCatalog<AdmissionBrief>({
     id: 'mission-admission-brief',
     path: file,
     schema: pathResolver.knowledge('product/schemas/mission-brief.schema.json'),
   }).load();
+}
+
+/** Preparation is not activation: author the exact same brief on a planned mission. */
+export function prepareMissionAdmissionBrief(
+  missionId: string,
+  workItemId: string,
+  deps: Deps = {}
+): void {
+  const item = getWorkItem(workItemId, deps);
+  if (!item || item.metadata?.mission_id !== missionId)
+    throw new Error('mission intake identity mismatch');
+  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  const state = loadState(missionId, deps);
+  const dir = findMissionPath(missionId);
+  if (
+    !state ||
+    state.status !== 'planned' ||
+    !dir ||
+    state.tenant_slug !== scope.tenant_slug ||
+    state.organization_id !== scope.organization_id ||
+    state.relationships?.project?.project_id !== scope.project_id
+  )
+    throw new Error('planned mission preparation receipt missing');
+  const brief = buildMissionAdmissionBrief(item, admission, missionId);
+  withLockSync('mission-admission-brief:' + dir, () => {
+    const file = path.join(dir, 'evidence', 'mission-brief.json');
+    if (safeExistsSync(file)) {
+      if (
+        computeApprovalPayloadHash(readMissionAdmissionBrief(file)) !==
+        computeApprovalPayloadHash(brief)
+      )
+        throw new Error('mission admission brief drift');
+      return;
+    }
+    safeMkdir(path.dirname(file), { recursive: true });
+    safeWriteFile(file, JSON.stringify(brief, null, 2));
+  });
+}
+
+export function buildMissionAdmissionBrief(
+  item: WorkItem,
+  admission: MissionAdmissionRequest,
+  missionId: string
+): AdmissionBrief {
+  return {
+    missionId,
+    title: item.title,
+    intent: item.description,
+    tier: 'confidential',
+    scope: { in: admission.mandate_facts.paths },
+    gate: { riskLevel: admission.mandate_facts.risk_level, approvalRequired: true },
+    estimate: {
+      cost: admission.mandate_facts.estimated_cost + ' ' + admission.mandate_facts.currency,
+    },
+    missionAdmission: admission,
+    source: {
+      kind: 'dot_work_item',
+      ref: item.item_id,
+      tenantSlug: item.context!.tenant_slug!,
+    },
+  };
 }
 
 /** Called only by the governed controller after activation; never edits mission state. */
@@ -172,7 +401,7 @@ export function authorMissionAdmissionBrief(
     withLockSync(`mission-admission-brief:${missionDir}`, () => {
       const file = path.join(missionDir, 'evidence', 'mission-brief.json');
       if (safeExistsSync(file)) {
-        const existing = readBrief(file);
+        const existing = readMissionAdmissionBrief(file);
         if (
           existing.source?.ref !== item.item_id ||
           computeApprovalPayloadHash(
@@ -182,19 +411,7 @@ export function authorMissionAdmissionBrief(
           throw new Error('existing mission brief has different admission; human review required');
         return;
       }
-      const brief: AdmissionBrief = {
-        missionId,
-        title: item.title,
-        intent: item.description,
-        tier: state.tier,
-        scope: { in: admission.mandate_facts.paths },
-        gate: { riskLevel: admission.mandate_facts.risk_level, approvalRequired: true },
-        estimate: {
-          cost: `${admission.mandate_facts.estimated_cost} ${admission.mandate_facts.currency}`,
-        },
-        missionAdmission: admission,
-        source: { kind: 'dot_work_item', ref: item.item_id, tenantSlug: state.tenant_slug! },
-      };
+      const brief = buildMissionAdmissionBrief(item, admission, missionId);
       safeMkdir(path.dirname(file), { recursive: true });
       safeWriteFile(file, JSON.stringify(brief, null, 2));
     });
@@ -220,7 +437,10 @@ export function authorMissionAdmissionBrief(
   }
   // Approval-first resume also needs a receipt after the real activation;
   // the earlier store mutation may legitimately have observed a draft state.
-  const approved = listApprovalRequests({ storageChannels: ['brief'], kind: 'mission_gate' }).find(
+  const approved = listApprovalRequests({
+    storageChannels: ['brief'],
+    kind: 'mission_gate',
+  }).find(
     (record) =>
       record.source?.missionId === missionId &&
       record.correlationId === `mission-alignment-${missionId}`
@@ -266,7 +486,7 @@ export function recordVerifiedMissionAdmissionApproval(
   const state = loadState(missionId, deps);
   const missionDir = findMissionPath(missionId);
   if (!state || state.status !== 'active' || !state.tenant_slug || !missionDir) return;
-  const brief = readBrief(path.join(missionDir, 'evidence', 'mission-brief.json'));
+  const brief = readMissionAdmissionBrief(path.join(missionDir, 'evidence', 'mission-brief.json'));
   if (
     record.accountability.payloadHash !== computeApprovalPayloadHash(brief) ||
     !brief.missionAdmission ||

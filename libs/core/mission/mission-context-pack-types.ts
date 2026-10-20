@@ -28,6 +28,7 @@ export interface MissionStateSummary {
   mission_type?: string;
   tenant_id?: string;
   tenant_slug?: string;
+  organization_id?: string;
   vision_ref?: string;
   tier: MissionTier;
   status: MissionStatus | string;
@@ -132,6 +133,9 @@ export interface MissionContextPackKnowledgeHint {
   path: string;
   title: string;
   excerpt: string;
+  /** Full SHA-256 captured from the same source read as this excerpt. */
+  source_sha256?: string;
+  learning_publication?: import('../knowledge/scoped-learning-publication.js').ScopedLearningPublicationIdentity;
   tags: string[];
   score?: number;
   category?: string;
@@ -331,6 +335,8 @@ export interface BuildMissionContextPackInput {
 
 export interface ResolveMissionContextPackInput {
   missionId: string;
+  /** Keep rollups and the persisted pack under the same governed mission directory. */
+  missionPath?: string;
   tier?: MissionTier;
   tenantSlug?: string;
   recipientKind?: MissionContextRecipientKind;

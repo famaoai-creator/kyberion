@@ -53,6 +53,7 @@ import {
 } from '../provider/provider-egress-gate.js';
 import { getInstalledReasoningMode } from '../reasoning/reasoning-bootstrap.js';
 import { logger } from '../core.js';
+import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery-snapshot.js';
 import { formatKnowledgeVerificationLabel } from '../knowledge/knowledge-verification.js';
 import {
   appendPromptVisibilityRecord,
@@ -183,9 +184,7 @@ function renderContextStringForm(pack: MissionContextPack): string {
     lines.push(`Acceptance criteria: ${pack.task_guidance.acceptance_criteria.join('; ')}`);
   }
   if (pack.knowledge_hints && pack.knowledge_hints.length > 0) {
-    lines.push(
-      `Knowledge: ${pack.knowledge_hints.map((hint) => `${hint.title} (${hint.path})`).join('; ')}`
-    );
+    lines.push(...renderKnowledgeHintLines(pack.knowledge_hints, 200));
   }
   return lines.join('\n');
 }
@@ -211,7 +210,10 @@ export async function provisionTaskKnowledge(
   input: ProvisionTaskKnowledgeInput
 ): Promise<ProvisionTaskKnowledgeResult> {
   const { form = 'pack', missionPath, visibilityLedgerPath, provider, ...resolveInput } = input;
-  const pack = await resolveMissionContextPack(resolveInput);
+  const pack = await resolveMissionContextPack({
+    ...resolveInput,
+    ...(missionPath ? { missionPath } : {}),
+  });
   if (!pack) {
     return { pack: null, text: '', deliveredKnowledgeRefs: [] };
   }
@@ -272,22 +274,36 @@ export async function provisionTaskKnowledge(
   // their own observability without re-deriving it from `pack`.
   const delivery = recordKnowledgeDelivery({
     missionId: resolveInput.missionId,
-    taskId: resolveInput.workItem?.item_id || resolveInput.workItemId,
+    taskId: resolveInput.workItem?.item_id || resolveInput.workItemId || pack.scope.work_item_id,
     teamRole: resolveInput.teamRole,
     recipientKind: resolveInput.recipientKind,
-    ...(pack.scope.tenant_slug
-      ? {
-          scope: {
-            tier: pack.scope.tier,
-            tenant_slug: pack.scope.tenant_slug,
-            mission_id: pack.scope.mission_id,
-          },
-        }
-      : {}),
+    scope: {
+      tier: pack.scope.tier,
+      ...(pack.scope.tenant_slug ? { tenant_slug: pack.scope.tenant_slug } : {}),
+      ...(pack.scope.organization_id ? { organization_id: pack.scope.organization_id } : {}),
+      ...(pack.scope.project_id ? { project_id: pack.scope.project_id } : {}),
+      mission_id: pack.scope.mission_id,
+      ...(pack.scope.task_session_id ? { session_id: pack.scope.task_session_id } : {}),
+      ...(resolveInput.workItem?.item_id || resolveInput.workItemId || pack.scope.work_item_id
+        ? {
+            task_id:
+              resolveInput.workItem?.item_id || resolveInput.workItemId || pack.scope.work_item_id,
+          }
+        : {}),
+    },
     refs: (pack.knowledge_hints || []).map((hint) => ({
       path: hint.path,
       score: hint.score,
       title: hint.title,
+      snapshot: createKnowledgeDeliverySnapshot({
+        text: renderKnowledgeHintLines([hint], form === 'pack' ? 220 : 200)
+          .slice(1)
+          .join('\n'),
+        form,
+        context_pack_id: pack.context_pack_id,
+        ...(hint.source_sha256 ? { source_sha256: hint.source_sha256 } : {}),
+        ...(hint.learning_publication ? { learning_publication: hint.learning_publication } : {}),
+      }),
     })),
   });
   return {
