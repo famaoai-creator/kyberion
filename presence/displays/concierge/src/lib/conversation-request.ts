@@ -11,6 +11,7 @@ export interface ConversationRequestScope {
   tenant?: string;
   organizationId?: string;
   projectId?: string;
+  operationId?: string;
 }
 
 /** Management uses snake-case URLs; conversation transport uses camel-case fields. */
@@ -24,6 +25,7 @@ export function conversationScopeFromQuery(
     tenant: tenant || undefined,
     organizationId: query.get('organization_id') || query.get('organizationId') || undefined,
     projectId: query.get('project_id') || query.get('projectId') || undefined,
+    operationId: query.get('operation_id') || query.get('operationId') || undefined,
   };
 }
 export interface PendingConversationRequest {
@@ -43,6 +45,7 @@ const requestFields = new Set([
   'tenant',
   'organizationId',
   'projectId',
+  'operationId',
   'text',
   'locale',
   'requestId',
@@ -54,7 +57,7 @@ export function sameConversationRequestScope(
   a: ConversationRequestScope,
   b: ConversationRequestScope
 ): boolean {
-  return ['sessionId', 'tenant', 'organizationId', 'projectId'].every(
+  return ['sessionId', 'tenant', 'organizationId', 'projectId', 'operationId'].every(
     (key) => a[key as keyof ConversationRequestScope] === b[key as keyof ConversationRequestScope]
   );
 }
@@ -156,7 +159,7 @@ export function parsePendingConversationRequest(
     typeof payload.locale !== 'string' ||
     !payload.locale ||
     typeof payload.sessionId !== 'string' ||
-    ['tenant', 'organizationId', 'projectId'].some(
+    ['tenant', 'organizationId', 'projectId', 'operationId'].some(
       (key) => payload[key] !== undefined && typeof payload[key] !== 'string'
     ) ||
     !sameConversationRequestScope(payload as unknown as ConversationRequestScope, scope)

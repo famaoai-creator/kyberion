@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { loadDotCharter, type DotCharter } from './dot-charter.js';
+import { loadDotCharter, FRONT_DESK_DIAGNOSTIC_PIPELINE, type DotCharter } from './dot-charter.js';
+import { saveOrganizationOperationalState } from '../organization/organization-operating-model-persistence.js';
+import { saveOrganizationOperation } from '../organization/organization-operating-model-operations.js';
+import { dotAdmissionScopeHash } from './dot-admission-identity.js';
+import * as path from 'node:path';
 import {
   DOT_LIFECYCLE_AUDIT_PATH,
   createDraftDotCharter,
@@ -241,6 +245,149 @@ describe('checkDotActivationReadiness', () => {
 });
 
 describe('create public draft charter', () => {
+  it('keeps strict tenant-owned diagnostics public without admitting arbitrary public tenant drafts', () => {
+    writeTenantCharter('diagnostic-tenant', { ...DRAFT, dot_id: 'seed' });
+    const diagnostic = {
+      ...DRAFT,
+      scope: { tier: 'public' as const, tenant_slug: 'diagnostic-tenant' },
+      attention: { triggers: [] },
+      authority: {
+        authority_role: 'infrastructure_sentinel',
+        allowed_work_shapes: ['pipeline' as const],
+        allowed_pipelines: [FRONT_DESK_DIAGNOSTIC_PIPELINE],
+      },
+      decisions: { default_decision: 'approve' as const, escalate_channel: 'surface' },
+      notification: {
+        delivery_mode: 'inbox' as const,
+        deliver_to: { surface: 'surface', channel: 'inbox' },
+      },
+      runtime: { ...DRAFT.runtime, execution_mode: 'front_desk_diagnostic' as const },
+    };
+    expect(() => createDraftDotCharter({ ...DRAFT, scope: diagnostic.scope }, deps)).toThrow(
+      'Invalid front_desk_diagnostic'
+    );
+    const created = createDraftDotCharter(diagnostic, deps);
+    expect(created.scope).toEqual(diagnostic.scope);
+    expect(safeExistsSync(`${TEST_ROOT}/dots/${DRAFT.dot_id}.json`)).toBe(true);
+    expect(
+      safeExistsSync(
+        `${TEST_ROOT}/knowledge/confidential/diagnostic-tenant/dots/${DRAFT.dot_id}.json`
+      )
+    ).toBe(false);
+  });
+  it('requires actual public organization ownership rather than trusting a public label', () => {
+    writeTenantCharter('public-owner', { ...DRAFT, dot_id: 'seed' });
+    const state = {
+      organization_id: 'public-org',
+      name: 'Public org',
+      tier: 'public' as const,
+      tenant_slug: 'public-owner',
+      status: 'active' as const,
+      updated_at: '2026-10-21T00:00:00Z',
+    };
+    saveOrganizationOperationalState(state, { rootDir: path.resolve(TEST_ROOT) });
+    const draft = {
+      ...DRAFT,
+      scope: {
+        tier: 'public' as const,
+        tenant_slug: 'public-owner',
+        organization_id: 'public-org',
+      },
+    };
+    expect(createDraftDotCharter(draft, { ...deps, dryRun: true }).scope).toEqual(draft.scope);
+    saveOrganizationOperationalState(
+      { ...state, organization_id: 'private-only', tier: 'confidential' },
+      { rootDir: path.resolve(TEST_ROOT) }
+    );
+    expect(() =>
+      createDraftDotCharter(
+        { ...draft, scope: { ...draft.scope, organization_id: 'private-only' } },
+        { ...deps, dryRun: true }
+      )
+    ).toThrow();
+    expect(safeExistsSync(`${TEST_ROOT}/dots/${DRAFT.dot_id}.json`)).toBe(false);
+  });
+  it('validates an operation parent at authoring and activation and rejects stale rebinding under lock', () => {
+    const tenant = 'workspace-tenant';
+    const organization = 'workspace-org';
+    const operation = 'weekly-report';
+    writeTenantCharter(tenant, { ...DRAFT, dot_id: 'seed' });
+    const rootDir = path.resolve(TEST_ROOT);
+    const updated_at = '2026-10-21T00:00:00Z';
+    saveOrganizationOperationalState(
+      {
+        organization_id: organization,
+        name: organization,
+        tier: 'confidential',
+        tenant_slug: tenant,
+        status: 'active',
+        updated_at,
+      },
+      { rootDir }
+    );
+    saveOrganizationOperation(
+      {
+        version: '1.0.0',
+        operation_id: operation,
+        organization_id: organization,
+        name: operation,
+        operation_type: 'scheduled',
+        owner_role: 'infrastructure_sentinel',
+        trigger: { kind: 'schedule', expression: '0 9 * * *', timezone: 'UTC' },
+        automation_boundary: {
+          allowed_actions: [],
+          approval_required_actions: [],
+          forbidden_actions: [],
+        },
+        escalation_path: ['operator'],
+        evidence_outputs: ['report'],
+        execution_target: { kind: 'pipeline', ref: 'pipelines/ok.json' },
+        tier: 'confidential',
+        tenant_slug: tenant,
+        status: 'active',
+        updated_at,
+      },
+      { rootDir }
+    );
+    const bound = {
+      ...DRAFT,
+      scope: { tier: 'confidential' as const, tenant_slug: tenant, organization_id: organization },
+      work_binding: { operation_id: operation },
+    };
+    expect(() =>
+      createDraftDotCharter({ ...bound, work_binding: { operation_id: 'missing' } }, deps)
+    ).toThrow('WORKSPACE_SCOPE_UNAVAILABLE');
+    createDraftDotCharter(bound, deps);
+    expect(transitionDotCharterStatus(bound.dot_id, 'active', deps).status).toBe('active');
+    const paused = transitionDotCharterStatus(bound.dot_id, 'paused', deps);
+    const file = `${rootDir}/knowledge/confidential/${tenant}/dots/${bound.dot_id}.json`;
+    safeWriteFile(
+      file,
+      JSON.stringify({ ...paused, work_binding: { operation_id: 'other-operation' } })
+    );
+    expect(() =>
+      transitionDotCharterStatus(bound.dot_id, 'active', {
+        ...deps,
+        expectedAdmissionScopeHash: dotAdmissionScopeHash(paused),
+      })
+    ).toThrow('DOT_TRANSITION_CONFLICT');
+    expect(loadDotCharter(file).status).toBe('paused');
+  });
+  it('creates a registered tenant draft in its confidential source and runs the real lifecycle', () => {
+    writeTenantCharter('workspace-tenant', { ...DRAFT, dot_id: 'seed' });
+    const scoped = {
+      ...DRAFT,
+      scope: { tier: 'confidential' as const, tenant_slug: 'workspace-tenant' },
+    };
+    const result = createDraftDotCharter(scoped, deps);
+    const source = `${TEST_ROOT}/knowledge/confidential/workspace-tenant/dots/${DRAFT.dot_id}.json`;
+    expect(result.scope).toEqual(scoped.scope);
+    expect(loadDotCharter(source).status).toBe('draft');
+    expect(safeExistsSync(`${TEST_ROOT}/dots/${DRAFT.dot_id}.json`)).toBe(false);
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'active', deps).status).toBe('active');
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'paused', deps).status).toBe('paused');
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'active', deps).status).toBe('active');
+  });
   it('creates a complete draft and leaves activation explicit', () => {
     const value = createDraftDotCharter(DRAFT, deps);
     expect(value.status).toBe('draft');
@@ -252,7 +399,7 @@ describe('create public draft charter', () => {
     expect(() => createDraftDotCharter(DRAFT, deps)).toThrow('DOT_CREATE_EXISTS');
     expect(safeExistsSync(TEST_ROOT + '/dots/' + DRAFT.dot_id + '.json')).toBe(false);
   });
-  it('rejects active and non-public creation', () => {
+  it('rejects active creation and an unregistered tenant', () => {
     expect(() => createDraftDotCharter({ ...DRAFT, status: 'active' }, deps)).toThrow(
       'DOT_CREATE_DRAFT'
     );

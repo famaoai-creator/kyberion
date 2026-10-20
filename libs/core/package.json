@@ -16,6 +16,30 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./surface/workspace-work": {
+      "types": "./dist/surface/workspace-work.d.ts",
+      "default": "./dist/surface/workspace-work.js"
+    },
+    "./surface/workspace": {
+      "types": "./dist/surface/workspace.d.ts",
+      "default": "./dist/surface/workspace.js"
+    },
+    "./surface/workspace-autonomy": {
+      "types": "./dist/surface/workspace-autonomy.d.ts",
+      "default": "./dist/surface/workspace-autonomy.js"
+    },
+    "./surface/workspace-scope": {
+      "types": "./dist/surface/workspace-scope.d.ts",
+      "default": "./dist/surface/workspace-scope.js"
+    },
+    "./surface/workspace-query": {
+      "types": "./dist/surface/workspace-query.d.ts",
+      "default": "./dist/surface/workspace-query.js"
+    },
+    "./surface/scoped-workspace-ingest": {
+      "types": "./dist/surface/scoped-workspace-ingest.d.ts",
+      "default": "./dist/surface/scoped-workspace-ingest.js"
+    },
     "./chain-integrity": {
       "types": "./dist/chain-integrity.d.ts",
       "default": "./dist/chain-integrity.js"

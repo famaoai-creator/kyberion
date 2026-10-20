@@ -9,7 +9,16 @@ vi.mock('../../../lib/api-guard', () => ({
   requireChronosAccess: () => null,
 }));
 vi.mock('../../../lib/viewer-context', () => ({
-  resolveViewerContextForRequest: () => ({ context: { source: 'test' } }),
+  resolveViewerContextForRequest: () => ({
+    context: {
+      source: 'token',
+      role: 'localadmin',
+      tenantSlugs: ['acme'],
+      organizationIds: mocks.organizations,
+      projectIds: mocks.projects,
+      tierAccess: ['public', 'confidential'],
+    },
+  }),
   strictViewerScopeTenantSlugs: () => ['acme'],
   strictViewerScopeOrganizationIds: (_: unknown, requested?: string) => {
     if (requested && mocks.organizations !== 'all' && !mocks.organizations.includes(requested))
@@ -34,17 +43,63 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeReaddir: () => ['ORG-A', 'ORG-EMPTY', 'ORG-B'],
 }));
 vi.mock('@agent/core/organization/organization-operating-model-persistence', () => ({
-  loadOrganizationOperationalState: (id: string) => ({ organization_id: id }),
+  loadOrganizationOperationalState: (id: string, query: { tier: string; tenantSlug?: string }) =>
+    query.tier === 'confidential'
+      ? { organization_id: id, tenant_slug: query.tenantSlug, tier: query.tier }
+      : null,
+}));
+vi.mock('@agent/core/organization/organization-operating-model-operations', () => ({
+  loadOrganizationOperation: (
+    id: string,
+    query: { organizationId: string; tenantSlug?: string; tier: string }
+  ) => ({
+    operation_id: id,
+    organization_id: query.organizationId,
+    tenant_slug: query.tenantSlug,
+    tier: query.tier,
+  }),
+  listOrganizationOperations: (query: { organizationId: string; tenantSlug?: string }) => [
+    {
+      operation_id: `OP-${query.organizationId}`,
+      organization_id: query.organizationId,
+      tenant_slug: query.tenantSlug,
+      name: 'Operation',
+    },
+  ],
 }));
 vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: () => ['acme'],
-  readTenantProfile: () => ({ display_name: 'Acme', status: 'active' }),
+  readTenantProfile: () => ({ tenant_slug: 'acme', display_name: 'Acme', status: 'active' }),
 }));
 vi.mock('@agent/core/project/project-registry', () => ({
+  loadProjectRecord: (id: string) => ({
+    project_id: id,
+    organization_id: 'ORG-A',
+    tenant_slug: 'acme',
+    tier: 'confidential',
+  }),
   listProjectRecords: () => [
-    { project_id: 'PRJ-A', organization_id: 'ORG-A', tenant_slug: 'acme', name: 'A' },
-    { project_id: 'PRJ-B', organization_id: 'ORG-A', tenant_slug: 'acme', name: 'B' },
-    { project_id: 'PRJ-C', organization_id: 'ORG-B', tenant_slug: 'other', name: 'C' },
+    {
+      project_id: 'PRJ-A',
+      organization_id: 'ORG-A',
+      tenant_slug: 'acme',
+      tier: 'confidential',
+      name: 'A',
+    },
+    {
+      project_id: 'PRJ-B',
+      organization_id: 'ORG-A',
+      tenant_slug: 'acme',
+      tier: 'confidential',
+      name: 'B',
+    },
+    {
+      project_id: 'PRJ-C',
+      organization_id: 'ORG-B',
+      tenant_slug: 'other',
+      tier: 'confidential',
+      name: 'C',
+    },
   ],
 }));
 import { GET } from './route';
@@ -79,5 +134,21 @@ describe('tenant scope options', () => {
     expect(GET(new NextRequest('http://localhost/api/tenant-scope?project_id=PRJ-B')).status).toBe(
       403
     );
+  });
+  it('rejects mismatched parents and mutually exclusive project/operation selections', () => {
+    expect(
+      GET(
+        new NextRequest(
+          'http://localhost/api/tenant-scope?tenant=acme&organization_id=ORG-B&project_id=PRJ-A'
+        )
+      ).status
+    ).toBe(403);
+    expect(
+      GET(
+        new NextRequest(
+          'http://localhost/api/tenant-scope?tenant=acme&organization_id=ORG-A&project_id=PRJ-A&operation_id=OP-A'
+        )
+      ).status
+    ).toBe(403);
   });
 });

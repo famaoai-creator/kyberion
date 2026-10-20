@@ -32,7 +32,9 @@ const LIMIT = 20;
 function sameScope(c: DotCharter, item: WorkItem): boolean {
   return (
     item.context?.tenant_slug === c.scope.tenant_slug &&
-    item.context?.organization_id === c.scope.organization_id
+    item.context?.organization_id === c.scope.organization_id &&
+    (!c.scope.project_id || item.context?.project_id === c.scope.project_id) &&
+    (item.metadata?.operation_id ?? undefined) === c.work_binding?.operation_id
   );
 }
 function age(at: unknown, now: number): number | null {

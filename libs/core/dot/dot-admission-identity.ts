@@ -12,8 +12,23 @@ export function dotAdmissionMissionId(actionRef: string): string {
   return `MSN-DOT-${createHash('sha256').update(actionRef).digest('hex').slice(0, 24).toUpperCase()}`;
 }
 
-export function dotAdmissionScopeHash(charter: DotCharter): string {
-  return recoveryEvidenceHash({ dot_id: charter.dot_id, scope: charter.scope });
+export function dotAdmissionScopeHash(
+  charter: Pick<DotCharter, 'dot_id' | 'scope' | 'work_binding'>
+): string {
+  return recoveryEvidenceHash({
+    dot_id: charter.dot_id,
+    scope: charter.scope,
+    ...(charter.work_binding ? { work_binding: charter.work_binding } : {}),
+  });
+}
+
+export function dotRecordAdmissionMatches(
+  charter: DotCharter,
+  row: Pick<DotActionRecord, 'admission'>
+): boolean {
+  return row.admission
+    ? row.admission.scope_hash === dotAdmissionScopeHash(charter)
+    : !charter.work_binding;
 }
 export function genericDotActionIdentity(
   charter: DotCharter,
@@ -70,6 +85,10 @@ export function admissionForDotRecord(
   row: DotActionRecord
 ): NonNullable<DotActionRecord['admission']> {
   if (row.admission) return row.admission;
+  if (charter.work_binding)
+    throw new Error(
+      '[DOT_WORK_BINDING] Legacy unbound work cannot inherit a new operation responsibility.'
+    );
   const proposal: DotProposal = {
     action_id: row.action_id,
     title: row.title,

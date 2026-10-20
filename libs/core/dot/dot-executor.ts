@@ -1,4 +1,6 @@
 import { inspectDotExecution } from './dot-executor-diagnostics.js';
+import { dotItemWorkBindingMismatch } from './dot-executor-reports.js';
+import { assertOperationBinding } from './dot-lifecycle.js';
 import { orderExecutorCharters, recordExecutorTurn } from './dot-executor-scheduling.js';
 import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
 import { loadApprovalRequest } from '../governance/approval-store.js';
@@ -590,6 +592,28 @@ export async function executeDotWorkItem(
       'Managed continuous work requires the governed owner surface',
       deps
     );
+  }
+  if (dotItemWorkBindingMismatch(c, item)) {
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      'operation responsibility binding changed; automatic execution refused',
+      deps
+    );
+  }
+  if (c.work_binding) {
+    try {
+      assertOperationBinding(c, { rootDir: deps.rootDir });
+    } catch {
+      return skippedRow(
+        c,
+        item,
+        startedAt,
+        'operation binding parent is unavailable; automatic execution refused',
+        deps
+      );
+    }
   }
   if (denyCrossTenantItem(c, item, deps)) {
     return skippedRow(c, item, startedAt, DOT_EXECUTOR_CROSS_TENANT_DENIAL, deps);

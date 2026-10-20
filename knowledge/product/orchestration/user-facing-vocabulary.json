@@ -341,6 +341,181 @@
       }
     },
     "chronos": {
+      "chronos_workspace_clear_selection_retry": {
+        "en": "Clear selection and retry",
+        "ja": "選択を解除して再読み込み",
+        "qps-ploc": "⟦Ƈŀėȧř şėŀėƈŧïőñ ȧñḓ řėŧřẏ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_workspace_control_pending": {
+        "en": "Updating autonomy. Waiting for the confirmed result…",
+        "ja": "自律実行の設定を変更しています。確定した結果を確認中です…",
+        "qps-ploc": "⟦Ůṗḓȧŧïñɠ ȧůŧőñőɱẏ. Ẇȧïŧïñɠ ƒőř ŧħė ƈőñƒïřɱėḓ řėşůŀŧ… ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "chronos_workspace_personal_channels_unavailable": {
+        "en": "Conversation and uploads are unavailable for personal workspaces under the current access policy. Your personal scope is preserved.",
+        "ja": "現在のアクセス方針では、個人の作業場所から会話や資料のアップロードは利用できません。個人の範囲は維持されます。",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ ȧñḓ ůṗŀőȧḓş ȧřė ůñȧṽȧïŀȧƀŀė ƒőř ṗėřşőñȧŀ ẇőřķşṗȧƈėş ůñḓėř ŧħė ƈůřřėñŧ ȧƈƈėşş ṗőŀïƈẏ. Ẏőůř ṗėřşőñȧŀ şƈőṗė ïş ṗřėşėřṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "chronos_workspace_workspace_unavailable_check_the_selection_and_access": {
+        "en": "Workspace unavailable. Check the selection and access.",
+        "ja": "作業場所を読み込めません。選択とアクセス権を確認してください。",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ůñȧṽȧïŀȧƀŀė. Ƈħėƈķ ŧħė şėŀėƈŧïőñ ȧñḓ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_workspace_control_outcome_unconfirmed_refresh_to_verify_the_state": {
+        "en": "Control outcome unconfirmed. Refresh to verify the state.",
+        "ja": "変更結果を確認できません。更新して状態を確認してください。",
+        "qps-ploc": "⟦Ƈőñŧřőŀ őůŧƈőɱė ůñƈőñƒïřɱėḓ. Řėƒřėşħ ŧő ṽėřïƒẏ ŧħė şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_workspace_workspace": {
+        "en": "Workspace",
+        "ja": "作業場所",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
+      },
+      "chronos_workspace_keep_goals_work_resources_and_decisions_in_the": {
+        "en": "Keep goals, work, resources and decisions in the same scope.",
+        "ja": "同じ範囲で目的、仕事、資料、判断を確認します。",
+        "qps-ploc": "⟦Ķėėṗ ɠőȧŀş, ẇőřķ, řėşőůřƈėş ȧñḓ ḓėƈïşïőñş ïñ ŧħė şȧɱė şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_workspace_refresh": {
+        "en": "Refresh",
+        "ja": "更新",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "chronos_workspace_loading": {
+        "en": "Loading…",
+        "ja": "読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "chronos_workspace_unavailable": {
+        "en": "Unavailable: ",
+        "ja": "取得できません: ",
+        "qps-ploc": "⟦Ůñȧṽȧïŀȧƀŀė:  ŀőřė⟧"
+      },
+      "chronos_workspace_no_goal_is_configured_for_this_scope_yet": {
+        "en": "No goal is configured for this scope yet. Clarify it in a conversation.",
+        "ja": "この範囲の目的はまだ設定されていません。会話で整理できます。",
+        "qps-ploc": "⟦Ñő ɠőȧŀ ïş ƈőñƒïɠůřėḓ ƒőř ŧħïş şƈőṗė ẏėŧ. Ƈŀȧřïƒẏ ïŧ ïñ ȧ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chronos_workspace_workspace_navigation": {
+        "en": "Workspace navigation",
+        "ja": "この作業場所の画面",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ñȧṽïɠȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "chronos_workspace_discuss_goal": {
+        "en": "Discuss goal",
+        "ja": "目的を相談",
+        "qps-ploc": "⟦Ḓïşƈůşş ɠőȧŀ ŀőř⟧"
+      },
+      "chronos_workspace_work_and_progress": {
+        "en": "Work and progress",
+        "ja": "仕事と進捗",
+        "qps-ploc": "⟦Ẇőřķ ȧñḓ ṗřőɠřėşş ŀőřėɱ⟧"
+      },
+      "chronos_workspace_resources": {
+        "en": "Resources",
+        "ja": "資料",
+        "qps-ploc": "⟦Řėşőůřƈėş ŀőř⟧"
+      },
+      "chronos_workspace_learning": {
+        "en": "Learning",
+        "ja": "学びと知識",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ŀőř⟧"
+      },
+      "chronos_workspace_decisions": {
+        "en": "Decisions",
+        "ja": "判断と承認",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ŀőř⟧"
+      },
+      "chronos_workspace_work": {
+        "en": "Work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ẇőřķ ŀőř⟧"
+      },
+      "chronos_workspace_active": {
+        "en": "Active",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "chronos_workspace_blocked": {
+        "en": "Blocked",
+        "ja": "要対応",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "chronos_workspace_no_work_in_this_scope_yet": {
+        "en": "No work in this scope yet.",
+        "ja": "この範囲の仕事はまだありません。",
+        "qps-ploc": "⟦Ñő ẇőřķ ïñ ŧħïş şƈőṗė ẏėŧ. ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_workspace_add_resource": {
+        "en": "Add resource",
+        "ja": "資料を追加",
+        "qps-ploc": "⟦Ȧḓḓ řėşőůřƈė ŀőř⟧"
+      },
+      "chronos_workspace_shared_organization_resources_not_exclusive_to_this_operation": {
+        "en": "Shared organization resources; not exclusive to this operation.",
+        "ja": "組織で共有する資料です。継続業務だけに限定した資料ではありません。",
+        "qps-ploc": "⟦Şħȧřėḓ őřɠȧñïẑȧŧïőñ řėşőůřƈėş; ñőŧ ėẋƈŀůşïṽė ŧő ŧħïş őṗėřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_workspace_autonomy": {
+        "en": "Autonomy",
+        "ja": "自律実行",
+        "qps-ploc": "⟦Ȧůŧőñőɱẏ ŀőř⟧"
+      },
+      "chronos_workspace_pause_prevents_future_wakeups_it_does_not_cancel": {
+        "en": "Pause prevents future wakeups; it does not cancel work already running.",
+        "ja": "一時停止は次の起動を止めます。進行中の処理は取り消しません。",
+        "qps-ploc": "⟦Ṗȧůşė ṗřėṽėñŧş ƒůŧůřė ẇȧķėůṗş; ïŧ ḓőėş ñőŧ ƈȧñƈėŀ ẇőřķ ȧŀřėȧḓẏ řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chronos_workspace_shared_budget_usage_not_an_allocation_for_this": {
+        "en": "Shared budget usage (not an allocation for this workspace)",
+        "ja": "共有予算の利用状況（この作業場所だけの割当ではありません）",
+        "qps-ploc": "⟦Şħȧřėḓ ƀůḓɠėŧ ůşȧɠė (ñőŧ ȧñ ȧŀŀőƈȧŧïőñ ƒőř ŧħïş ẇőřķşṗȧƈė) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_workspace_partial": {
+        "en": " (partial)",
+        "ja": "（一部のみ）",
+        "qps-ploc": "⟦ (ṗȧřŧïȧŀ) ŀőř⟧"
+      },
+      "chronos_workspace_budget_is_unavailable_in_this_viewing_scope": {
+        "en": "Budget is unavailable in this viewing scope.",
+        "ja": "この閲覧範囲では予算を表示できません。",
+        "qps-ploc": "⟦Ƀůḓɠėŧ ïş ůñȧṽȧïŀȧƀŀė ïñ ŧħïş ṽïėẇïñɠ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "chronos_workspace_activate": {
+        "en": "Activate",
+        "ja": "有効化",
+        "qps-ploc": "⟦Ȧƈŧïṽȧŧė ŀőř⟧"
+      },
+      "chronos_workspace_resume": {
+        "en": "Resume",
+        "ja": "再開",
+        "qps-ploc": "⟦Řėşůɱė ŀőř⟧"
+      },
+      "chronos_workspace_pause": {
+        "en": "Pause",
+        "ja": "一時停止",
+        "qps-ploc": "⟦Ṗȧůşė ŀőř⟧"
+      },
+      "chronos_workspace_autonomy_is_not_configured_set_the_owner_goal": {
+        "en": "Autonomy is not configured. Set the owner, goal, authority and budget in organization operations.",
+        "ja": "自律実行は未設定です。組織の運用設定で担当者、目的、権限、予算を整えてください。",
+        "qps-ploc": "⟦Ȧůŧőñőɱẏ ïş ñőŧ ƈőñƒïɠůřėḓ. Şėŧ ŧħė őẇñėř, ɠőȧŀ, ȧůŧħőřïŧẏ ȧñḓ ƀůḓɠėŧ ïñ őřɠȧñïẑȧŧïőñ őṗėřȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "chronos_workspace_operation": {
+        "en": "Operation",
+        "ja": "継続業務",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ ŀőř⟧"
+      },
+      "chronos_workspace_select_operation": {
+        "en": "Select operation",
+        "ja": "継続業務を選択",
+        "qps-ploc": "⟦Şėŀėƈŧ őṗėřȧŧïőñ ŀőřėɱ⟧"
+      },
+      "chronos_workspace_showing_shared_organization_knowledge_not_operation_exclusive_knowledge": {
+        "en": "Showing shared organization knowledge, not operation-exclusive knowledge.",
+        "ja": "組織で共有する知識を表示しています。継続業務だけの知識ではありません。",
+        "qps-ploc": "⟦Şħőẇïñɠ şħȧřėḓ őřɠȧñïẑȧŧïőñ ķñőẇŀėḓɠė, ñőŧ őṗėřȧŧïőñ-ėẋƈŀůşïṽė ķñőẇŀėḓɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "chronos_learning_stale": {
         "en": "The displayed status may be outdated. Refresh before acting.",
         "ja": "表示中の状態は古い可能性があります。操作前に状態を再確認してください。",
@@ -6713,6 +6888,11 @@
       }
     },
     "cli": {
+      "cli_cmd_script_dot_create": {
+        "en": "Preview or apply a reviewed Dot draft; activate separately",
+        "ja": "レビュー済みの Dot 草案をプレビューまたは作成します。有効化は別操作です。",
+        "qps-ploc": "⟦Ṗřėṽïėẇ őř ȧṗṗŀẏ ȧ řėṽïėẇėḓ Ḓőŧ ḓřȧƒŧ; ȧƈŧïṽȧŧė şėṗȧřȧŧėŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "cli_readiness": {
         "en": "Readiness",
         "ja": "実行準備度",

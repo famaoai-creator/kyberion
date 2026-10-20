@@ -8,7 +8,8 @@ import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
-import { resolveApprovalTenant } from '../../../lib/su-surface-data';
+import { resolveApprovalTenant, approvalMatchesWorkspace } from '../../../lib/su-surface-data';
+import type { ResolvedWorkspaceScope } from '@agent/core/surface/workspace-scope';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import {
   DistillCandidateAmbiguityError,
@@ -174,6 +175,18 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     if (!approvalRecord) {
       return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     }
+    const workspaceViewer = resolvedViewer.context as typeof resolvedViewer.context &
+      Partial<ResolvedWorkspaceScope>;
+    if (
+      !approvalMatchesWorkspace(approvalRecord, {
+        tenantSlugs: workspaceViewer.tenantSlugs,
+        organizationIds: workspaceViewer.organizationIds ?? 'all',
+        projectIds: workspaceViewer.projectIds ?? 'all',
+        tierAccess: workspaceViewer.tierAccess ?? ['public', 'confidential'],
+        selection: workspaceViewer.selection ?? { kind: 'tenant' },
+      })
+    )
+      return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     if (
       !scopedLearningApprovalVisibleToViewer(
         approvalRecord,

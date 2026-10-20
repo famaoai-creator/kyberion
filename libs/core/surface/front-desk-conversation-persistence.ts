@@ -39,7 +39,10 @@ import {
 } from './front-desk-conversation-history.js';
 
 /** Server-owned authorization projection. No client identity/session can select a transcript. */
-export type FrontDeskConversationViewer = SurfaceViewerScope;
+export type FrontDeskConversationViewer = SurfaceViewerScope & {
+  /** Server-validated organization-owned work selection, not an authorization axis. */
+  workspaceOperationId?: string;
+};
 export function frontDeskConversationScope(viewer: FrontDeskConversationViewer): EventScopeInput {
   const tenant =
     viewer.tenantSlugs !== 'all' && viewer.tenantSlugs.length === 1
@@ -141,6 +144,7 @@ export function conversationRef(viewer: FrontDeskConversationViewer) {
         tenants: canonicalScope(viewer.tenantSlugs),
         organizations: canonicalScope(viewer.organizationIds),
         projects: canonicalScope(viewer.projectIds),
+        ...(viewer.workspaceOperationId ? { operation: viewer.workspaceOperationId } : {}),
         tiers: canonicalScope(viewer.tierAccess),
         scope,
       })
@@ -294,7 +298,10 @@ export function frontDeskRuntimeScope(viewer: FrontDeskConversationViewer): Even
   const scope = frontDeskConversationScope(viewer);
   const organizationId = viewer.organizationIds === 'all' ? undefined : viewer.organizationIds[0];
   const projectId = viewer.projectIds === 'all' ? undefined : viewer.projectIds[0];
-  if ((organizationId && !scope.tenant_slug) || (projectId && !organizationId))
+  if (
+    scope.tier === 'confidential' &&
+    ((organizationId && !scope.tenant_slug) || (projectId && !organizationId))
+  )
     throw new ConversationStoreError('scope_selection_required');
   return {
     ...scope,
@@ -314,7 +321,10 @@ function validExecutionViewer(value: unknown): value is FrontDeskConversationVie
     !['token', 'loopback'].includes(String(value.source)) ||
     !['localadmin', 'readonly'].includes(String(value.role)) ||
     !validText(value.principalId, 256) ||
-    (value.memberId !== undefined && !validText(value.memberId, 256))
+    (value.memberId !== undefined && !validText(value.memberId, 256)) ||
+    (value.workspaceOperationId !== undefined &&
+      (typeof value.workspaceOperationId !== 'string' ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value.workspaceOperationId)))
   )
     return false;
   for (const key of ['tenantSlugs', 'organizationIds', 'projectIds', 'tierAccess']) {

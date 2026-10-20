@@ -41,6 +41,35 @@ const viewer: ConciergeViewerContext = {
 beforeEach(() => files.clear());
 
 describe('server-owned durable conversation', () => {
+  it('isolates validated sibling operation conversations without altering the owner chain', () => {
+    const organization = { ...viewer, projectIds: 'all' as const };
+    const first = { ...organization, workspaceOperationId: 'weekly-report' };
+    const second = { ...organization, workspaceOperationId: 'monthly-close' };
+    beginConversationTurn(first, 'Weekly operation context');
+    expect(readConversationHistory(second).messages).toEqual([]);
+    expect(readConversationHistory(organization).messages).toEqual([]);
+    expect(conversationRef(first).sessionId).not.toBe(conversationRef(second).sessionId);
+    expect(frontDeskRuntimeScope(first)).toMatchObject({
+      scope_kind: 'organization',
+      organization_id: 'org-a',
+    });
+    expect(frontDeskRuntimeScope(first)).not.toHaveProperty('operation_id');
+  });
+  it('represents a public project without inventing tenant or organization parents', () => {
+    const publicProject = {
+      ...viewer,
+      tenantSlugs: 'all' as const,
+      organizationIds: 'all' as const,
+      tierAccess: ['public' as const],
+    };
+    expect(frontDeskRuntimeScope(publicProject)).toMatchObject({
+      scope_kind: 'project',
+      project_id: 'project-a',
+      tier: 'public',
+    });
+    expect(frontDeskRuntimeScope(publicProject)).not.toHaveProperty('tenant_slug');
+    expect(frontDeskRuntimeScope(publicProject)).not.toHaveProperty('organization_id');
+  });
   it('restores a pending request without executing it; completes the same turn later', () => {
     const id = beginConversationTurn(viewer, 'Hello from Alice');
     expect(readConversationHistory(viewer)).toMatchObject({

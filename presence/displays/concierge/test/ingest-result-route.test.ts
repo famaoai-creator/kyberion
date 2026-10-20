@@ -5,10 +5,18 @@ import { assetProvenanceRef, deriveAssetId } from '@agent/core/ingest-asset-ledg
 const child = vi.hoisted(() => ({ status: 0, stdout: '', stderr: '' }));
 vi.mock('../src/lib/api-guard', () => ({ requireConciergeMutationAccess: () => null }));
 vi.mock('../src/lib/viewer-context', () => ({
-  resolveConciergeViewer: () => ({ context: { tenantSlugs: ['acme'] } }),
+  resolveConciergeViewer: () => ({
+    context: {
+      tenantSlugs: ['acme'],
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: ['public', 'confidential'],
+    },
+  }),
 }));
 vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: () => ['acme'],
+  readTenantProfile: () => ({ tenant_slug: 'acme' }),
 }));
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),

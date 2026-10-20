@@ -253,6 +253,25 @@ describe('listClaimableDotWorkItems', () => {
 });
 
 describe('executeDotWorkItem', () => {
+  it('refuses a stale operation binding before claim or any effect, including handoff', async () => {
+    const c = charter({
+      scope: { tier: 'public', organization_id: 'org-a' },
+      work_binding: { operation_id: 'operation-b' },
+    });
+    const work = item(
+      'bound',
+      { operation_id: 'operation-a', handoff_to: c.dot_id },
+      { context: { organization_id: 'org-a' } }
+    );
+    const h = harness([work]);
+    const p = ports();
+    const result = await executeDotWorkItem(c, work, p, h.deps);
+    expect(result.status).toBe('skipped');
+    expect(result.summary).toContain('binding changed');
+    expect(h.claims).toEqual([]);
+    expect(p.runPipeline).not.toHaveBeenCalled();
+    expect(p.runGoalTurn).not.toHaveBeenCalled();
+  });
   it.each(['tool', 'delegated'] as const)(
     'attributes %s executor usage to the dot without counting SDK tokens twice',
     async (mode) => {

@@ -198,6 +198,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion dashboard`                     | `pnpm dashboard`                    | Open the sovereign dashboard                                                                                          |
 | `pnpm kyberion doc-drop server`               |                                     | Start the document drop pad                                                                                           |
 | `pnpm kyberion dot activate`                  |                                     | Activate a dot charter after the role/heartbeat gate passes                                                           |
+| `pnpm kyberion dot create`                    |                                     | Preview or apply a reviewed Dot draft; activate separately                                                            |
 | `pnpm kyberion dot event`                     |                                     | Ingest a local test event into the dot event ledger (--source, --file)                                                |
 | `pnpm kyberion dot inbox`                     |                                     | Append a wake-lane row to a resident dot's inbox                                                                      |
 | `pnpm kyberion dot pause`                     |                                     | Pause an active dot (triggers stop firing)                                                                            |

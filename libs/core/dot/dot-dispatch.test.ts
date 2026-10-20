@@ -554,6 +554,21 @@ describe('dispatchDotProposals — action scope and dedupe', () => {
 });
 
 describe('settleDotParkedActions + learning', () => {
+  it.each([undefined, { operation_id: 'monthly-close' }])(
+    'keeps old operation approval parked after binding removal or change: %j',
+    (work_binding) => {
+      const h = harness('approve');
+      const original = { ...CHARTER, work_binding: { operation_id: 'weekly-report' } };
+      dispatchDotProposals(original, [PROPOSAL], h.deps);
+      h.approvals.set('req-1', approval('approved'));
+      expect(
+        settleDotParkedActions({ ...CHARTER, ...(work_binding ? { work_binding } : {}) }, h.deps)
+      ).toEqual([]);
+      expect(h.items).toEqual([]);
+      expect(currentDotActions(CHARTER.dot_id, h.deps)[0].status).toBe('parked');
+      expect(readDotFeedback(CHARTER.dot_id, h.deps)).toEqual([]);
+    }
+  );
   it('executes an approved action and records approval feedback', () => {
     const h = harness('approve');
     dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
