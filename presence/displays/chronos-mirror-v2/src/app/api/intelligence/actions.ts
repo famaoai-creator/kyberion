@@ -1,3 +1,6 @@
+import { MEMORY_ACTION_HANDLERS } from './memory-actions';
+import { scopedLearningApprovalVisibleToViewer } from '../../../lib/scoped-learning-approval-visibility';
+import { isScopedLearningApprovalRequest } from '@agent/core/knowledge/scoped-learning-approval-visibility';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { nowIso } from '@agent/core/foundation';
@@ -47,7 +50,6 @@ import {
   startMissionOrchestrationWorker,
   stopAgentRuntime,
   updateDistillCandidateRecord,
-  updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { withExecutionContext } from '@agent/core/authority';
 import {
@@ -172,6 +174,14 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     if (!approvalRecord) {
       return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     }
+    if (
+      !scopedLearningApprovalVisibleToViewer(
+        approvalRecord,
+        resolvedViewer.context,
+        typeof body.tenant === 'string' ? body.tenant : undefined
+      )
+    )
+      return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     const approvalTenant = resolveApprovalTenant(approvalRecord);
     const allowedTenants = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
@@ -268,119 +278,25 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       note: decisionNote || 'Decision captured from Chronos approval panel.',
       reasonCategory: decisionReasonCategory,
     });
-    enqueueSurfaceNotification({
-      surface: 'presence',
-      requestId: updated.correlationId || updated.id,
-      title: `Approval ${decision}`,
-      channel: 'chronos',
-      threadTs: updated.correlationId || updated.id,
-      sourceAgentId: 'chronos_gateway',
-      text: intelligenceData.buildApprovalDecisionText({
-        title: updated.title,
-        decision,
-        missionId: updated.requestedByContext?.missionId,
-        serviceId: updated.target?.serviceId,
-      }),
-      status: decision === 'approved' ? 'success' : 'error',
-    });
+    if (!isScopedLearningApprovalRequest(updated))
+      enqueueSurfaceNotification({
+        surface: 'presence',
+        requestId: updated.correlationId || updated.id,
+        title: `Approval ${decision}`,
+        channel: 'chronos',
+        threadTs: updated.correlationId || updated.id,
+        sourceAgentId: 'chronos_gateway',
+        text: intelligenceData.buildApprovalDecisionText({
+          title: updated.title,
+          decision,
+          missionId: updated.requestedByContext?.missionId,
+          serviceId: updated.target?.serviceId,
+        }),
+        status: decision === 'approved' ? 'success' : 'error',
+      });
     return NextResponse.json({ ok: true, approval: updated });
   },
-  memory_promote_candidate: async (body, resolvedViewer, action) => {
-    const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
-    if (!candidateId) {
-      return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
-    }
-    const candidate = listMemoryPromotionCandidates().find(
-      (entry) => entry.candidate_id === candidateId
-    );
-    if (!candidate) {
-      return NextResponse.json({ error: 'Memory promotion candidate not found' }, { status: 404 });
-    }
-    const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
-    const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-    if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
-      return NextResponse.json(
-        { error: 'Memory candidate is outside the viewer scope' },
-        { status: 403 }
-      );
-    }
-    const promoted = await promoteMemoryCandidateToKnowledge({
-      candidateId,
-      executionRole: 'chronos_gateway',
-      ratificationNote: 'Promoted from the Chronos knowledge review page.',
-    });
-    return NextResponse.json({
-      ok: true,
-      candidate: promoted.candidate,
-      promotedRef: promoted.promotedRef,
-      tenantSlugs: allowedTenants,
-    });
-  },
-  memory_approve_candidate: async (body, resolvedViewer, action) => {
-    const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
-    if (!candidateId) {
-      return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
-    }
-    const candidate = listMemoryPromotionCandidates().find(
-      (entry) => entry.candidate_id === candidateId
-    );
-    const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
-    strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-    if (!candidate) {
-      return NextResponse.json({ error: 'Memory promotion candidate not found' }, { status: 404 });
-    }
-    if (candidate.status !== 'queued' || !candidate.ratification_required) {
-      return NextResponse.json(
-        { error: 'Only queued candidates requiring ratification can be approved' },
-        { status: 409 }
-      );
-    }
-    if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
-      return NextResponse.json(
-        { error: 'Memory candidate is outside the viewer scope' },
-        { status: 403 }
-      );
-    }
-    const updated = updateMemoryPromotionCandidateStatus({
-      candidateId,
-      status: 'approved',
-      ratificationNote: 'Approved from the Chronos knowledge review page.',
-    });
-    return NextResponse.json({ ok: true, candidate: updated || candidate });
-  },
-  memory_reject_candidate: async (body, resolvedViewer, action) => {
-    const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
-    if (!candidateId) {
-      return NextResponse.json({ error: 'Missing candidateId' }, { status: 400 });
-    }
-    const candidate = listMemoryPromotionCandidates().find(
-      (entry) => entry.candidate_id === candidateId
-    );
-    if (!candidate) {
-      return NextResponse.json({ error: 'Memory promotion candidate not found' }, { status: 404 });
-    }
-    const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
-    strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-    if (!memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)) {
-      return NextResponse.json(
-        { error: 'Memory candidate is outside the viewer scope' },
-        { status: 403 }
-      );
-    }
-    if (candidate.status !== 'queued' && candidate.status !== 'approved') {
-      return NextResponse.json(
-        { error: 'Only queued or approved candidates can be rejected' },
-        { status: 409 }
-      );
-    }
-    const note = typeof body?.note === 'string' ? body.note.trim() : '';
-    const updated = updateMemoryPromotionCandidateStatus({
-      candidateId,
-      status: 'rejected',
-      ratificationNote: note || 'Rejected from the Chronos knowledge review page.',
-    });
-    return NextResponse.json({ ok: true, candidate: updated || candidate });
-  },
+  ...MEMORY_ACTION_HANDLERS,
   distill_candidate_decision: async (body, resolvedViewer, action) => {
     const candidateId = typeof body?.candidateId === 'string' ? body.candidateId : '';
     const decision =
@@ -453,6 +369,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       .filter(
         (candidate) =>
           candidate.status === 'approved' &&
+          !(candidate.scope && candidate.proposed_memory_kind === 'sop') &&
           memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
       )
       .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
@@ -478,6 +395,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       try {
         await promoteMemoryCandidateToKnowledge({
           candidateId: candidate.candidate_id,
+          scope: candidate.scope,
           executionRole: 'chronos_gateway',
           ratificationNote: 'Promoted from Chronos control action memory_promote_pending.',
           supersedes,

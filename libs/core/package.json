@@ -7771,6 +7771,14 @@
     "./knowledge/scoped-learning-domain": {
       "types": "./dist/knowledge/scoped-learning-domain.d.ts",
       "default": "./dist/knowledge/scoped-learning-domain.js"
+    },
+    "./knowledge/scoped-learning-workflow": {
+      "types": "./dist/knowledge/scoped-learning-workflow.d.ts",
+      "default": "./dist/knowledge/scoped-learning-workflow.js"
+    },
+    "./knowledge/scoped-learning-approval-visibility": {
+      "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
+      "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
     }
   },
   "dependencies": {

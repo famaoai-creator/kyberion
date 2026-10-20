@@ -12,9 +12,31 @@ const ACTION_FIELDS: Record<string, readonly string[]> = {
     'tenant',
     'presentedDigest',
   ],
-  memory_promote_candidate: ['action', 'candidateId', 'tenant'],
-  memory_approve_candidate: ['action', 'candidateId', 'tenant'],
-  memory_reject_candidate: ['action', 'candidateId', 'tenant', 'note'],
+  memory_curate_candidate: [
+    'action',
+    'candidateId',
+    'candidateKey',
+    'expectedPayloadDigest',
+    'curation',
+    'tenant',
+  ],
+  memory_request_learning_approval: [
+    'action',
+    'candidateId',
+    'candidateKey',
+    'expectedPayloadDigest',
+    'tenant',
+  ],
+  memory_publish_learning: [
+    'action',
+    'candidateId',
+    'candidateKey',
+    'expectedPayloadDigest',
+    'tenant',
+  ],
+  memory_promote_candidate: ['action', 'candidateId', 'candidateKey', 'tenant'],
+  memory_approve_candidate: ['action', 'candidateId', 'candidateKey', 'tenant'],
+  memory_reject_candidate: ['action', 'candidateId', 'candidateKey', 'tenant', 'note'],
   distill_candidate_decision: ['action', 'candidateId', 'decision', 'tenant'],
   memory_promote_pending: ['action', 'tenant', 'dryRun', 'supersedes'],
   next_action_execute: ['action', 'actionId', 'operation', 'outcome', 'target', 'detail'],
@@ -122,10 +144,44 @@ function validateActionFields(body: Record<string, unknown>, action: ChronosInte
   if (unexpected) throw new Error(`unexpected intelligence field: ${unexpected}`);
 
   for (const field of allowed) {
-    if (field === 'action' || body[field] === undefined) continue;
+    if (field === 'action' || field === 'curation' || body[field] === undefined) continue;
     if (field === 'surfaceId' && body[field] === null) continue;
     optionalString(body, field);
   }
+}
+
+function validateLearningCuration(value: unknown): void {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !['title', 'summary', 'content', 'evidence_refs'].includes(key)
+    )
+  )
+    throw new Error('curation must contain only title, summary, content and evidence_refs');
+  for (const [field, max] of [
+    ['title', 200],
+    ['summary', 2000],
+    ['content', 20000],
+  ] as const) {
+    const text = value[field];
+    if (
+      typeof text !== 'string' ||
+      !text.trim() ||
+      text.length > max ||
+      /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u.test(text)
+    )
+      throw new Error('curation.' + field + ' must be nonempty bounded text');
+  }
+  if (
+    !Array.isArray(value.evidence_refs) ||
+    !value.evidence_refs.length ||
+    value.evidence_refs.length > 100 ||
+    value.evidence_refs.some(
+      (ref) => typeof ref !== 'string' || !ref.trim() || ref.length > 2000 || /\p{Cc}/u.test(ref)
+    ) ||
+    new Set(value.evidence_refs).size !== value.evidence_refs.length
+  )
+    throw new Error('curation.evidence_refs must be a nonempty unique list of bounded references');
 }
 
 export function parseChronosIntelligenceInput(value: unknown): ChronosIntelligenceInput {
@@ -138,6 +194,17 @@ export function parseChronosIntelligenceInput(value: unknown): ChronosIntelligen
   validateActionFields(value, action);
 
   switch (action) {
+    case 'memory_curate_candidate':
+      validateLearningCuration(value.curation);
+    // fall through: every scoped action is bound to a server-issued identity and revision.
+    case 'memory_request_learning_approval':
+    case 'memory_publish_learning':
+      requireIdentifier(value, 'candidateId');
+      for (const field of ['candidateKey', 'expectedPayloadDigest']) {
+        if (typeof value[field] !== 'string' || !/^[a-f0-9]{64}$/.test(value[field] as string))
+          throw new Error(field + ' must be a SHA-256 digest');
+      }
+      break;
     case 'approval_decision':
       requireIdentifier(value, 'requestId');
       requireString(value, 'storageChannel');

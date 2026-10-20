@@ -22,7 +22,17 @@ export function GET(req: NextRequest) {
       resolvedViewer.context,
       readChronosOptionalStringParam(url.searchParams.get('tenant'))
     );
+    const requestId = readChronosOptionalStringParam(url.searchParams.get('requestId'));
+    const storageChannel = readChronosOptionalStringParam(url.searchParams.get('storageChannel'));
+    if (Boolean(requestId) !== Boolean(storageChannel))
+      return NextResponse.json(
+        { error: 'Exact approval selection requires requestId and storageChannel' },
+        { status: 400 }
+      );
     const approvals = buildApprovalQueueItems({
+      requestId,
+      storageChannel,
+      viewer: resolvedViewer.context,
       query: readChronosOptionalStringParam(url.searchParams.get('query')),
       status: readChronosOptionalStringParam(url.searchParams.get('status')),
       kind: readChronosOptionalStringParam(url.searchParams.get('kind')),

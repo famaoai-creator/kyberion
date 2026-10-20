@@ -6,6 +6,7 @@ import {
 
 const candidate = {
   candidate_id: 'CAND-1',
+  candidateKey: 'a'.repeat(64),
   status: 'approved',
   proposed_memory_kind: 'heuristic',
   summary: 'Use the governed path',

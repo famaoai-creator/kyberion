@@ -1,5 +1,6 @@
 /** Independent publication proof; a recorded promotion reference is not proof. */
 import * as path from 'node:path';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonInput } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -14,6 +15,7 @@ import type { MemoryCandidate } from './memory-promotion-queue.js';
 import { assertScopedLearningApproval } from './scoped-learning-approval-verification.js';
 import {
   assertScopedLearningScope,
+  assertScopedLearningPublicationReferences,
   scopedLearningMarkdownPath,
   learningSha256,
   type ScopedLearningPublicationIdentity,
@@ -36,33 +38,43 @@ function regularPublicationPath(relative: string): string {
 export function inspectScopedLearningPublication(
   candidate: MemoryCandidate
 ): ScopedLearningPublicationIdentity {
+  assertScopedLearningPublicationReferences(candidate);
   const approval = assertScopedLearningApproval(candidate);
   const scope = assertScopedLearningScope(candidate.scope!);
   const markdownPath = scopedLearningMarkdownPath(scope, candidate.candidate_id);
   const recordPath = markdownPath.replace(/\.md$/, '.json');
-  if (candidate.promoted_ref && candidate.promoted_ref !== markdownPath)
-    throw new Error('[LEARNING_PUBLICATION_INVALID] Unexpected publication reference');
-  const jsonFile = regularPublicationPath(recordPath);
-  const mdFile = regularPublicationPath(markdownPath);
-  const jsonBytes = readTextFile(jsonFile);
-  const record = parseSafeJsonInput(
-    jsonBytes,
-    'scoped learning publication'
-  ) as PromotedMemoryRecord;
-  assertScopedLearningRecord(candidate, record);
-  const mdBytes = readTextFile(mdFile);
-  if (mdBytes !== buildPromotedMemoryMarkdown(record))
-    throw new Error('[LEARNING_PUBLICATION_INVALID] Markdown differs from record');
-  return {
-    version: 1,
-    candidate_id: candidate.candidate_id,
-    scope,
-    approved_payload_digest: approval.payload_digest,
-    record_path: recordPath,
-    markdown_path: markdownPath,
-    record_sha256: learningSha256(jsonBytes),
-    markdown_sha256: learningSha256(mdBytes),
-  };
+  // Canonical approval and exact scope determine both paths before assuming the
+  // existing publication reader role. This seam returns proof, never file content
+  // and never a caller-selected path or authority.
+  return withExecutionContext(
+    'mission_controller',
+    () => {
+      const jsonFile = regularPublicationPath(recordPath);
+      const mdFile = regularPublicationPath(markdownPath);
+      const jsonBytes = readTextFile(jsonFile);
+      const record = parseSafeJsonInput(
+        jsonBytes,
+        'scoped learning publication'
+      ) as PromotedMemoryRecord;
+      assertScopedLearningRecord(candidate, record);
+      const mdBytes = readTextFile(mdFile);
+      if (mdBytes !== buildPromotedMemoryMarkdown(record))
+        throw new Error('[LEARNING_PUBLICATION_INVALID] Markdown differs from record');
+      return {
+        version: 1,
+        candidate_id: candidate.candidate_id,
+        scope,
+        approved_payload_digest: approval.payload_digest,
+        record_path: recordPath,
+        markdown_path: markdownPath,
+        record_sha256: learningSha256(jsonBytes),
+        markdown_sha256: learningSha256(mdBytes),
+      };
+    },
+    undefined,
+    scope.tenant_slug,
+    scope.organization_id
+  );
 }
 export function assertScopedLearningRecord(
   candidate: MemoryCandidate,

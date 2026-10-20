@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   member: vi.fn(),
   rp: vi.fn(),
   rateLimited: vi.fn(),
+  learningVisible: vi.fn(),
+}));
+
+vi.mock('../../../../../lib/scoped-learning-approval-visibility', () => ({
+  scopedLearningApprovalVisibleToViewer: mocks.learningVisible,
 }));
 
 vi.mock('../../../../../lib/api-guard', () => ({
@@ -78,6 +83,7 @@ describe('concierge approval passkey route (HA-07)', () => {
     });
     mocks.rp.mockReturnValue(rp);
     mocks.rateLimited.mockReturnValue(null);
+    mocks.learningVisible.mockReturnValue(true);
     mocks.decideApprovalRequest.mockImplementation((_role: string, params: object) => ({
       status: 'approved',
       ...params,
@@ -241,4 +247,32 @@ describe('concierge approval passkey route (HA-07)', () => {
     expect(response.status).toBe(403);
     expect(mocks.createApprovalPasskeyOptions).not.toHaveBeenCalled();
   });
+});
+
+describe('scoped learning passkey visibility fence', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.rateLimited.mockReturnValue(null);
+    mocks.loadApprovalRequest.mockReturnValue({ id: 'req-1' });
+  });
+  it.each(['options', 'verify'])(
+    'denies %s before challenge issue, assertion verification or decision',
+    async (action) => {
+      mocks.learningVisible.mockReturnValue(false);
+      const response = await POST(
+        request({
+          action,
+          decision: 'approved',
+          presentedDigest: 'shown-digest',
+          challengeId: 'ch-1',
+          response: {},
+        }),
+        params
+      );
+      expect(response.status).toBe(404);
+      expect(mocks.createApprovalPasskeyOptions).not.toHaveBeenCalled();
+      expect(mocks.verifyApprovalPasskeyAssertion).not.toHaveBeenCalled();
+      expect(mocks.decideApprovalRequest).not.toHaveBeenCalled();
+    }
+  );
 });

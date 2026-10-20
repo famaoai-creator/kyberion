@@ -186,7 +186,8 @@ export async function GET(req: NextRequest) {
     );
     const pendingApprovals = intelligenceControlData.collectPendingApprovals(
       tenantSlugs,
-      tierAccess
+      tierAccess,
+      resolvedViewer.context
     );
     const workCoordination = intelligenceData.safeCollect(
       'intelligenceData.collectWorkCoordinationSummary',
@@ -387,16 +388,34 @@ export async function POST(req: NextRequest) {
     if (resolvedViewer.response) return resolvedViewer.response;
     const parsedBody = await readChronosJsonObject(req, 'Chronos intelligence');
     if (parsedBody.ok !== true)
-      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
-    const body = parseChronosIntelligenceInput(parsedBody.body);
+      return NextResponse.json(
+        { ok: false, outcome: 'not_applied', error: parsedBody.error },
+        { status: 400 }
+      );
+    let body;
+    try {
+      body = parseChronosIntelligenceInput(parsedBody.body);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          outcome: 'not_applied',
+          error: 'Invalid intelligence action',
+        },
+        { status: 400 }
+      );
+    }
     const action = body.action;
-    if (action === 'distill_candidate_decision') {
+    if (action === 'distill_candidate_decision' || action.startsWith('memory_')) {
       const selection = resolveDistillDecisionTenantSelection(
         typeof body.tenant === 'string' ? body.tenant : undefined,
         readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
       );
       if (selection.ok === false)
-        return NextResponse.json({ error: selection.error }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, outcome: 'not_applied', error: selection.error },
+          { status: 400 }
+        );
       strictViewerScopeTenantSlugs(resolvedViewer.context, selection.tenant);
       if (selection.tenant) body.tenant = selection.tenant;
     }
