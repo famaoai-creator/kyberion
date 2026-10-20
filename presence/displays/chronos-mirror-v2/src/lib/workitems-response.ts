@@ -285,3 +285,37 @@ export function parseWorkItemMutationResponse(
   const item = parseWorkItem(value.item);
   return item ? { ok: true, item } : undefined;
 }
+
+export type ClientMissionAdmission = {
+  requestId: string;
+  missionId: string;
+  status: string;
+};
+export function parseWorkItemAdmissionResponse(
+  value: unknown
+): { ok: true; item: ClientWorkItem; admission: ClientMissionAdmission } | undefined {
+  const parsed = parseWorkItemMutationResponse(value);
+  if (!parsed || !isRecord(value) || !isRecord(value.admission)) return undefined;
+  const a = value.admission;
+  if (
+    typeof a.requestId !== 'string' ||
+    !/^[0-9a-f-]{36}$/i.test(a.requestId) ||
+    !nonEmptyString(a.missionId) ||
+    typeof a.status !== 'string' ||
+    ![
+      'pending',
+      'approved',
+      'rejected',
+      'expired',
+      'cancelled',
+      'revoked',
+      'applied',
+      'failed',
+    ].includes(a.status)
+  )
+    return undefined;
+  return {
+    ...parsed,
+    admission: { requestId: a.requestId, missionId: a.missionId, status: a.status },
+  };
+}

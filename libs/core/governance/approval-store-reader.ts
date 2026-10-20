@@ -3,7 +3,7 @@ import { eventScopeMatches, normalizeEventScope, type EventScopeInput } from '..
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 /** Read-only approval addressing shared by the store and fenced recovery. */
 import type { ApprovalRequestRecord } from './approval-store.js';
-import { readGovernedArtifactJson } from '../workforce/artifact-store.js';
+import { readGovernedArtifactJson } from '../workforce/artifact-store-reader.js';
 import { approvalStoreRoots } from './approval-store-paths.js';
 
 const APPROVAL_CHANNEL_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;

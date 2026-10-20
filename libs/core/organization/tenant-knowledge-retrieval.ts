@@ -37,6 +37,7 @@
  */
 
 import * as path from 'node:path';
+import { resolveScopedLearningRetrieval } from '../knowledge/scoped-learning-retrieval.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   buildScopedIndex,
@@ -58,6 +59,8 @@ export interface TenantKnowledgeHit {
   path: string;
   title: string;
   excerpt: string;
+  source_sha256?: string;
+  learning_publication?: import('../knowledge/scoped-learning-publication.js').ScopedLearningPublicationIdentity;
   tags: string[];
   /** Lexical relevance score from `queryKnowledge` (0..1 band). */
   score: number;
@@ -219,14 +222,39 @@ function isTenantKnowledgeHitPathAllowed(
   );
 }
 
-function toHit(hint: KnowledgeHint, tenantSlug: string): TenantKnowledgeHit | null {
+function toHit(
+  hint: KnowledgeHint,
+  tenantSlug: string,
+  consumerScope?: ScopeContext
+): TenantKnowledgeHit | null {
   const hitPath = normalizeTenantKnowledgeSourcePath(hint.source);
   if (!hitPath || !isTenantKnowledgeHitPathAllowed(hint, hitPath, tenantSlug)) return null;
+  // A tenant/org reader does not inherit its narrower descendants' knowledge.
+  for (const [branch, key] of [
+    ['organizations', 'organization_id'],
+    ['projects', 'project_id'],
+    ['missions', 'mission_id'],
+    ['tasks', 'task_id'],
+    ['sessions', 'session_id'],
+  ] as const) {
+    const value = hitPath.match(new RegExp('/' + branch + '/([^/]+)'))?.[1];
+    if (value && consumerScope?.[key] !== value) return null;
+  }
+  const learning = resolveScopedLearningRetrieval({
+    documentPath: hitPath,
+    sourceSha256: hint.source_sha256,
+    candidateId: hint.learning_candidate_id,
+    scopeText: hint.scope,
+    consumerScope,
+  });
+  if (learning.governed && !learning.publication) return null;
   const excerpt = hint.hint.trim().replace(/\s+/g, ' ').slice(0, EXCERPT_MAX_CHARS);
   return {
     path: hitPath,
     title: hint.topic,
     excerpt: excerpt || hint.topic,
+    ...(hint.source_sha256 ? { source_sha256: hint.source_sha256 } : {}),
+    ...(learning.publication ? { learning_publication: learning.publication } : {}),
     tags: hint.tags ?? [],
     score: typeof hint.score === 'number' ? hint.score : 0,
     tenant_slug: tenantSlug,
@@ -264,7 +292,7 @@ export async function queryTenantKnowledge(
       // tenant's own subtree.
       let index;
       try {
-        index = await buildScopedIndex(scope, knowledgeBase);
+        index = await buildScopedIndex(scope, knowledgeBase, { hydrateEmbeddings: false });
       } catch (error) {
         const message = `[DA-07] tenant knowledge scope ${scope.tiers.join('+')}:${
           scope.customerId ?? '-'
@@ -281,7 +309,11 @@ export async function queryTenantKnowledge(
         ...(scope.scopeContext ? { scopeContext: scope.scopeContext } : {}),
       });
       for (const hint of results) {
-        const hit = toHit(hint, scopeSet.tenantSlug);
+        const hit = toHit(
+          hint,
+          scopeSet.tenantSlug,
+          input.scope || { tier: 'confidential', tenant_slug: input.tenantSlug }
+        );
         if (!hit) continue;
         const existing = byPath.get(hit.path);
         if (!existing || hit.score > existing.score) byPath.set(hit.path, hit);

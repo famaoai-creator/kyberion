@@ -53,6 +53,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'scripts/export_validation_bundle.ts': 'lifecycle',
   'scripts/mission-alignment-gate/serve-brief.ts': 'lifecycle',
   'scripts/mission_alignment_decision.ts': 'lifecycle',
+  // Prepared admission must fail closed on hidden/ambiguous owners, never create another mission.
+  'scripts/mission_admission_continuation.ts': 'lifecycle',
   'scripts/pipeline-execution-part-results.ts': 'lifecycle',
   'scripts/pipeline-reasoning-visibility.ts': 'lifecycle',
   // scope-derivation

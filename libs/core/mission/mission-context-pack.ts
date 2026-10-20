@@ -998,6 +998,8 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(organizationId ? { organization_id: organizationId } : {}),
     ...(projectId ? { project_id: projectId } : {}),
     mission_id: input.missionState.mission_id,
+    ...(workItemId ? { task_id: workItemId } : {}),
+    ...(taskSessionId ? { session_id: taskSessionId } : {}),
     ...(recipient.agent_id ? { participant_id: recipient.agent_id } : {}),
     read_tiers:
       missionTier === 'public'
@@ -1355,11 +1357,9 @@ export async function resolveMissionContextPack(
 
   return buildMissionContextPack({
     missionState,
-    missionPath: existingOrDescriptiveMissionDir(
-      input.missionId,
-      tier,
-      missionState.tenant_slug || undefined
-    ),
+    missionPath:
+      input.missionPath ||
+      existingOrDescriptiveMissionDir(input.missionId, tier, missionState.tenant_slug || undefined),
     recipientKind: input.recipientKind || (input.assigneePeerId ? 'agent' : 'subagent'),
     teamRole: input.teamRole,
     assigneePeerId: input.assigneePeerId,

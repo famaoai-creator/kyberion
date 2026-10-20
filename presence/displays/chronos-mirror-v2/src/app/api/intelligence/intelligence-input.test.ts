@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseChronosIntelligenceInput } from './intelligence-input';
+import {
+  parseChronosIntelligenceInput,
+  resolveDistillDecisionTenantSelection,
+} from './intelligence-input';
 
 describe('parseChronosIntelligenceInput', () => {
   it('accepts strict inputs for representative control actions', () => {
@@ -73,5 +76,24 @@ describe('parseChronosIntelligenceInput', () => {
         operation: 'start',
       })
     ).toMatchObject({ surfaceId: 'chronos', operation: 'start' });
+  });
+});
+
+describe('distill decision tenant selection', () => {
+  it('uses selected query tenant when the UI body omits it', () => {
+    expect(resolveDistillDecisionTenantSelection(undefined, 'acme')).toEqual({
+      ok: true,
+      tenant: 'acme',
+    });
+  });
+  it('accepts matching or body-only selections', () => {
+    expect(resolveDistillDecisionTenantSelection('acme', 'acme')).toEqual({
+      ok: true,
+      tenant: 'acme',
+    });
+    expect(resolveDistillDecisionTenantSelection('acme')).toEqual({ ok: true, tenant: 'acme' });
+  });
+  it('rejects contradictory selections before dispatch', () => {
+    expect(resolveDistillDecisionTenantSelection('acme', 'other').ok).toBe(false);
   });
 });

@@ -745,6 +745,8 @@ describe('mission-context-pack', () => {
       ])
     );
     expect(pack.security_scope).toEqual({
+      task_id: 'WIT-CONTEXT-PACK-001',
+      session_id: 'TSK-CONTEXT-PACK-001',
       tenant_slug: 'acme',
       tenant_id: 'acme',
       organization_id: 'ORG-CONTEXT-PACK-001',

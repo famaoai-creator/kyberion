@@ -1,0 +1,241 @@
+/** Shared governed alignment preparation; no CLI or admission-continuation dependency. */
+import * as path from 'node:path';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import {
+  computeApprovalPayloadHash,
+  createApprovalRequest,
+  listApprovalRequests,
+  type ApprovalRequestRecord,
+  type ApprovalRequestSource,
+} from '@agent/core/governance/approval-store';
+import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path-resolver';
+import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
+import { observeMandateCoverage } from '@agent/core/governance/mandate-shadow';
+import {
+  formatMissionAdmission,
+  loadMissionBriefAtPath,
+  type MissionBrief,
+} from './mission-brief.js';
+import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
+import type { EventScopeInput } from '@agent/core/event-scope';
+import { ALIGNMENT_BRIEF_RELATIVE_PATH } from '../mission_alignment_decision.js';
+
+/** The alignment approval always lands in the brief channel, whichever surface decides it. */
+export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
+
+function mt(key: VocabularyKey, params?: Record<string, string | number>): string {
+  return catalogT(key, params);
+}
+
+export interface OpenAlignmentApprovalResult {
+  missionId: string;
+  created: boolean;
+  requestId?: string;
+  payloadHash?: string;
+  briefPath: string;
+  reason?: string;
+}
+
+/**
+ * Opens (or reuses) the mission's pending alignment approval.
+ *
+ * Reuse is deliberate: re-running must not scatter duplicate pending requests
+ * across the surfaces. A pending request whose hash no longer matches the brief
+ * is NOT reused — the brief changed before anyone decided, so the stale request
+ * would bind the wrong content.
+ */
+export function openAlignmentApproval(
+  missionIdInput: string,
+  options: {
+    requestedBy?: string;
+    binding?: {
+      source: ApprovalRequestSource;
+      scope: EventScopeInput;
+      effectBinding: string;
+      expiresAt: string;
+    };
+  } = {}
+): OpenAlignmentApprovalResult {
+  const missionId = missionIdInput.trim().toUpperCase();
+  const missionDir = resolveMissionPath(missionId);
+  if (!missionDir) {
+    return {
+      missionId,
+      created: false,
+      briefPath: '',
+      reason: `Mission directory for ${missionId} not found.`,
+    };
+  }
+
+  const candidateBriefPath = path.join(missionDir, ALIGNMENT_BRIEF_RELATIVE_PATH);
+  let briefPath: string;
+  try {
+    briefPath = assertSafeRepositoryPath(candidateBriefPath, { allowMissingLeaf: true });
+  } catch (error) {
+    return {
+      missionId,
+      created: false,
+      briefPath: candidateBriefPath,
+      reason: `Alignment brief path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (!safeExistsSync(briefPath)) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief not found at ${briefPath}. Author it before requesting approval.`,
+    };
+  }
+  if (!safeLstat(briefPath).isFile()) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief must be a regular file: ${briefPath}.`,
+    };
+  }
+  if (!safeLstat(briefPath).isFile()) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief must be a regular file: ${briefPath}.`,
+    };
+  }
+
+  let brief: MissionBrief;
+  try {
+    brief = loadMissionBriefAtPath(briefPath);
+  } catch (error) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const payloadHash = computeApprovalPayloadHash(brief as unknown as Record<string, unknown>);
+
+  const existing = findPendingAlignmentApproval(missionId);
+  if (existing) {
+    if (existing.accountability?.payloadHash === payloadHash) {
+      return { missionId, created: false, requestId: existing.id, payloadHash, briefPath };
+    }
+    return {
+      missionId,
+      created: false,
+      requestId: existing.id,
+      briefPath,
+      reason:
+        `A pending alignment approval (${existing.id}) is bound to a different version of the brief. ` +
+        `Cancel it before requesting approval for the updated brief.`,
+    };
+  }
+
+  const record = createApprovalRequest(
+    options.binding ? 'infrastructure_sentinel' : 'surface_runtime',
+    {
+      channel: ALIGNMENT_APPROVAL_CHANNEL,
+      storageChannel: ALIGNMENT_APPROVAL_CHANNEL,
+      threadTs: missionId,
+      correlationId: `mission-alignment-${missionId}`,
+      requestedBy: options.requestedBy || 'planner',
+      kind: 'mission_gate',
+      draft: {
+        title: mt('mission_alignment:approval_title', { title: brief.title || missionId }),
+        summary: brief.intent || mt('mission_alignment:approval_summary', { missionId }),
+        details:
+          [formatVictoryConditions(brief.victoryConditions), formatMissionAdmission(brief)]
+            .filter(Boolean)
+            .join('\n\n') || undefined,
+        severity: 'high',
+      },
+      source: { missionId, ...options.binding?.source },
+      ...(options.binding
+        ? { scope: options.binding.scope, expiresAt: options.binding.expiresAt }
+        : {}),
+      requestedByContext: {
+        surface: 'brief',
+        actorId: options.requestedBy || 'planner',
+        actorRole: 'planner',
+        missionId,
+      },
+      // Binds the approval to this exact brief. mission_alignment_decision
+      // re-computes the hash at gate time and fails closed on any drift.
+      accountability: {
+        finalDecision: 'human_only',
+        payloadHash,
+        ...(options.binding ? { effectBinding: options.binding.effectBinding } : {}),
+      },
+      decisionCard: buildAlignmentDecisionCard(brief, briefPath),
+    }
+  );
+
+  // Shadow mode (P4): record whether a standing mandate would have covered this
+  // brief. Record-only — the gate above stays human_only whatever this says.
+  observeMandateCoverage(missionId, brief);
+
+  return { missionId, created: true, requestId: record.id, payloadHash, briefPath };
+}
+
+function isHighRiskBrief(brief: MissionBrief): boolean {
+  const level = brief.gate?.riskLevel;
+  if (typeof level === 'number') return level >= 3;
+  return typeof level === 'string' && /^(high|critical|3|4|5)$/iu.test(level.trim());
+}
+
+function buildAlignmentDecisionCard(brief: MissionBrief, briefPath: string): DecisionCard {
+  const riskReasons = (brief.risks ?? [])
+    .filter((item) => typeof item?.risk === 'string' && item.risk.trim() !== '')
+    .map((item) => {
+      const risk = String(item.risk).trim();
+      const mitigation = typeof item.mitigation === 'string' ? item.mitigation.trim() : '';
+      return mitigation ? `${risk} (${mitigation})` : risk;
+    });
+  const briefRef = path.relative(rootDir(), briefPath).split(path.sep).join('/');
+  return buildDecisionCard({
+    question: mt('mission_alignment:card_question'),
+    recommendation: mt('mission_alignment:card_recommendation'),
+    gate: evaluateAutonomousOpsAction({
+      actionId: isHighRiskBrief(brief) ? 'mission_start_high' : 'mission_start_medium',
+    }),
+    riskTier: 'approve',
+    riskReasons,
+    evidence:
+      briefRef.startsWith('..') || path.isAbsolute(briefRef)
+        ? []
+        : [{ label: mt('mission_alignment:brief_title'), ref: briefRef }],
+  });
+}
+
+function findPendingAlignmentApproval(missionId: string): ApprovalRequestRecord | undefined {
+  return listApprovalRequests({
+    storageChannels: [ALIGNMENT_APPROVAL_CHANNEL],
+    kind: 'mission_gate',
+    status: 'pending',
+  }).find(
+    (record) =>
+      record.source?.missionId?.toUpperCase() === missionId &&
+      record.correlationId === `mission-alignment-${missionId}`
+  );
+}
+
+function formatVictoryConditions(conditions: string[] | undefined): string | undefined {
+  if (!conditions?.length) return undefined;
+  return ['Victory Conditions:', ...conditions.map((entry) => `- ${entry}`)].join('\n');
+}
+
+export function formatAlignmentRequest(result: OpenAlignmentApprovalResult): string {
+  if (result.requestId && !result.reason) {
+    return (
+      `[alignment-request] ${result.created ? 'opened' : 'reusing'} ${result.requestId} for ${result.missionId}\n` +
+      `  brief : ${result.briefPath}\n` +
+      `  bound : ${result.payloadHash?.slice(0, 16)}…\n` +
+      `  ${mt('mission_alignment:approval_surfaces_notice')}`
+    );
+  }
+  return `[alignment-request] ${result.reason || 'Alignment approval was not created.'}`;
+}

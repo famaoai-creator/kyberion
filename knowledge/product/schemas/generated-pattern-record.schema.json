@@ -17,39 +17,137 @@
     "expected_outcome"
   ],
   "properties": {
-    "record_id": { "type": "string", "minLength": 1 },
-    "kind": { "type": "string", "const": "pattern" },
-    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
-    "knowledge_domain": { "type": "string", "enum": ["product", "organization", "personal"] },
-    "owner_nhi": { "type": "string", "minLength": 1 },
-    "title": { "type": "string", "minLength": 1 },
-    "summary": { "type": "string", "minLength": 1 },
-    "candidate_id": { "type": "string", "minLength": 1 },
-    "supersedes": { "type": "string" },
-    "superseded_by": { "type": "string" },
-    "project_id": { "type": "string" },
-    "track_id": { "type": "string" },
-    "track_name": { "type": "string" },
-    "task_session_id": { "type": "string" },
-    "specialist_id": { "type": "string" },
-    "locale": { "type": "string" },
-    "work_loop": { "$ref": "./organization-work-loop.schema.json" },
-    "artifact_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "created_at": { "type": "string", "minLength": 1 },
-    "source_branch": { "type": "string", "minLength": 1 },
-    "source_commit": { "type": "string", "minLength": 1 },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "pattern"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "knowledge_domain": {
+      "type": "string",
+      "enum": ["product", "organization", "personal"]
+    },
+    "owner_nhi": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersedes": {
+      "type": "string"
+    },
+    "superseded_by": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "track_id": {
+      "type": "string"
+    },
+    "track_name": {
+      "type": "string"
+    },
+    "task_session_id": {
+      "type": "string"
+    },
+    "specialist_id": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
+    "work_loop": {
+      "$ref": "./organization-work-loop.schema.json"
+    },
+    "artifact_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1
+    },
     "applicability": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "reusable_steps": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "expected_outcome": { "type": "string", "minLength": 1 }
+    "expected_outcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "tenant_slug"],
+      "properties": {
+        "tier": {
+          "const": "confidential"
+        },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "approved_payload_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
   },
   "additionalProperties": false
 }

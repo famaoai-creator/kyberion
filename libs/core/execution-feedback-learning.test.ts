@@ -131,8 +131,6 @@ describe('execution feedback learning handoff', () => {
     expect(loadExecutionFeedbackCandidate(row.candidate_id)?.scope).toBeUndefined();
   });
   it.each([
-    { organization_id: 'ORG-SYNTHETIC' },
-    { organization_id: 'ORG-SYNTHETIC', project_id: 'PRJ-SYNTHETIC' },
     { mission_id: 'MSN-SYNTHETIC' },
     { mission_id: 'MSN-SYNTHETIC', task_id: 'TASK-SYNTHETIC' },
     { owner_nhi: 'user:synthetic-a' },
@@ -180,18 +178,19 @@ describe('execution feedback learning handoff', () => {
   it('does not call a promoted label, file reference or merged usage aggregate proof', () => {
     const row = candidate();
     const review = queueExecutionFeedbackLearning(row.candidate_id, scope);
-    updateMemoryPromotionCandidateStatus({
-      candidateId: review.queue.candidate_id!,
-      scope,
-      status: 'promoted',
-      promotedRef: 'knowledge/confidential/synthetic-learning-a/evolution/operations/fake.md',
-      decidedBy: { kind: 'human', id: 'user:synthetic-fixture', role: 'owner' },
-    });
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: review.queue.candidate_id!,
+        scope,
+        status: 'promoted',
+        promotedRef: 'knowledge/confidential/synthetic-learning-a/evolution/operations/fake.md',
+        decidedBy: { kind: 'human', id: 'user:synthetic-fixture', role: 'owner' },
+      })
+    ).toThrow(/PUBLICATION_REQUIRED/);
     expect(inspectExecutionFeedbackLearning(row.candidate_id, scope)).toMatchObject({
-      queue: { status: 'promoted' },
-      promotion: { status: 'unverified' },
+      queue: { status: 'queued' },
+      promotion: { status: 'none' },
       retrieval: { status: 'unmeasured' },
-      blockers: ['exact_publication_proof_unavailable'],
     });
   });
 
@@ -228,7 +227,7 @@ describe('execution feedback learning handoff', () => {
     });
     expect(inspectExecutionFeedbackLearning(row.candidate_id, scope)).toMatchObject({
       queue: { status: 'rejected' },
-      human_review: { status: 'rejected' },
+      human_review: { status: 'unverified' },
       promotion: { status: 'none' },
       retrieval: { status: 'unmeasured' },
     });

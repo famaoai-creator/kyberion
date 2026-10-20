@@ -591,7 +591,8 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });
@@ -639,7 +640,7 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     expect(result.pack!.scope_audit).toBeUndefined();
   });
 
-  it('labels a delivered doc that changed since it last worked, in the rendered pack', async () => {
+  it('labels a delivered doc that changed since the recorded run, in the rendered pack', async () => {
     recordKnowledgeVerifiedRun({
       documentPaths: [TENANT_DOC],
       scope: { tier: 'confidential', tenant_slug: 'tenant-x' },
@@ -653,14 +654,15 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });
 
     const hint = result.pack!.knowledge_hints!.find((h) => h.path === TENANT_DOC);
     expect(hint?.verification?.state).toBe('changed_since_verified');
-    expect(result.text).toContain('changed since it last worked');
+    expect(result.text).toContain('changed since the recorded run');
   });
 
   it('delivery log line records the tenant doc path verbatim (repo-relative, not dropped)', async () => {
@@ -668,13 +670,15 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       tier: 'confidential' as const,
       tenant_slug: 'tenant-x',
       mission_id: missionId,
+      task_id: makeWorkItem().item_id,
     };
     await provisionTaskKnowledge({
       form: 'pack',
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });

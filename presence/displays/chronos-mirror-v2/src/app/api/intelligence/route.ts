@@ -13,6 +13,7 @@ import {
 } from '../../../lib/viewer-context';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
+import { listDistillCandidatesForViewer } from '../../../lib/distill-candidate-scope';
 import { collectAgentActivity } from '../../../lib/agent-message-feed';
 import { createIntelligenceObservationReadCache } from './intelligence-control-data';
 import {
@@ -26,7 +27,6 @@ import {
   listArtifactRecords,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-  listDistillCandidateRecords,
   listMemoryPromotionCandidates,
   listMissionSeedRecords,
   listProjectRecords,
@@ -41,7 +41,10 @@ import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 import * as intelligenceData from './intelligence-observation-data';
 import * as intelligenceControlData from './intelligence-control-data';
-import { parseChronosIntelligenceInput } from './intelligence-input';
+import {
+  parseChronosIntelligenceInput,
+  resolveDistillDecisionTenantSelection,
+} from './intelligence-input';
 import { INTELLIGENCE_ACTION_HANDLERS } from './actions';
 
 let intelligenceSnapshotRevision = 0;
@@ -222,8 +225,9 @@ export async function GET(req: NextRequest) {
     );
     const missionSeeds = listMissionSeedRecords().filter((seed) => projectIds.has(seed.project_id));
     const missionSeedAssessment = summarizeMissionSeedAssessment(missionSeeds);
-    const distillCandidates = listDistillCandidateRecords().filter((candidate) =>
-      Boolean(candidate.project_id && projectIds.has(candidate.project_id))
+    const distillCandidates = listDistillCandidatesForViewer(
+      resolvedViewer.context,
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     const memoryCandidates = listMemoryPromotionCandidates().filter((candidate) =>
       memoryCandidateVisibleToViewer(
@@ -386,6 +390,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     const body = parseChronosIntelligenceInput(parsedBody.body);
     const action = body.action;
+    if (action === 'distill_candidate_decision') {
+      const selection = resolveDistillDecisionTenantSelection(
+        typeof body.tenant === 'string' ? body.tenant : undefined,
+        readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
+      );
+      if (selection.ok === false)
+        return NextResponse.json({ error: selection.error }, { status: 400 });
+      strictViewerScopeTenantSlugs(resolvedViewer.context, selection.tenant);
+      if (selection.tenant) body.tenant = selection.tenant;
+    }
 
     const handler = INTELLIGENCE_ACTION_HANDLERS[action];
     if (!handler) {

@@ -26,6 +26,7 @@
  */
 
 import * as path from 'node:path';
+import { knowledgeTextSha256 } from './knowledge-delivery-snapshot.js';
 import * as pathResolver from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeReaddir, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -113,6 +114,7 @@ export interface DistilledKnowledgeEntry {
    * a brief excerpt for context injection without loading the whole body.
    */
   excerpt: string;
+  source_sha256?: string;
   /** Match score for the active query (set by findRelevant…). */
   score?: number;
 }
@@ -237,6 +239,7 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
             ? { last_updated: fm.audit_date }
             : {}),
         excerpt: firstParagraph(body),
+        source_sha256: knowledgeTextSha256(text),
       });
       seenKeys.add(key);
     }

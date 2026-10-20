@@ -59,6 +59,9 @@ export interface KnowledgeHint {
   topic: string;
   hint: string;
   source: string;
+  /** Exact source bytes read to derive this hint (including cached/chunked hints). */
+  source_sha256?: string;
+  learning_candidate_id?: string;
   confidence: number;
   tags?: string[];
   tier?: 'public' | 'confidential' | 'personal' | 'product' | 'customer';
@@ -544,7 +547,8 @@ const TIER1_SUBDIRS = [
  */
 export async function buildScopedIndex(
   scope: KnowledgeScope = DEFAULT_SCOPE,
-  rootDir?: string
+  rootDir?: string,
+  options: { hydrateEmbeddings?: boolean } = {}
 ): Promise<KnowledgeHintIndex> {
   const knowledgeBase = rootDir || pathResolver.knowledge();
   const hints: KnowledgeHint[] = [];
@@ -610,7 +614,8 @@ export async function buildScopedIndex(
 
   const index = new KnowledgeHintIndex(filteredHints, effectiveScope);
 
-  await _hydrateEmbedCache(index, effectiveScope);
+  // Lexical retrieval validates publication before any optional model use.
+  if (options.hydrateEmbeddings !== false) await _hydrateEmbedCache(index, effectiveScope);
 
   return index;
 }
@@ -782,28 +787,29 @@ function _scanConfidentialTier(
       ...(scopeContext.session_id ? ['sessions', scopeContext.session_id] : []),
     ];
     if (entitySegments.every((segment) => !segment.includes('/') && !segment.includes('\\'))) {
+      const entityBranches = new Set([
+        'organizations',
+        'projects',
+        'missions',
+        'tasks',
+        'sessions',
+      ]);
       if (entitySegments.length === 1) {
-        scanRoot(path.join(confidentialRoot, ...entitySegments), scopeContext.tenant_slug);
+        scanRoot(path.join(confidentialRoot, ...entitySegments), scopeContext.tenant_slug, {
+          excludeDirectories: entityBranches,
+        });
       } else {
         // A mission/task scope inherits tenant-level documents and the exact
         // entity chain, but must not recurse into sibling organizations,
         // projects, or missions. Scan each authorized prefix with the next
-        // containment branch excluded, then scan the exact leaf recursively.
-        const entityBranches = new Set([
-          'organizations',
-          'projects',
-          'missions',
-          'tasks',
-          'sessions',
-        ]);
+        // containment branches excluded, including at the exact leaf.
         scanRoot(path.join(confidentialRoot, scopeContext.tenant_slug), scopeContext.tenant_slug, {
           excludeDirectories: entityBranches,
         });
         for (let end = 2; end < entitySegments.length; end += 2) {
           const prefix = entitySegments.slice(0, end + 1);
-          const nextBranch = entitySegments[end + 1];
           scanRoot(path.join(confidentialRoot, ...prefix), scopeContext.tenant_slug, {
-            ...(nextBranch ? { excludeDirectories: new Set([nextBranch]) } : {}),
+            excludeDirectories: entityBranches,
           });
         }
       }
@@ -1012,16 +1018,15 @@ function _loadJsonHints(
       continue;
     }
     try {
-      const entries = parseSafeJsonEntriesInput(
-        readTextFile(filePath),
-        `knowledge hint file ${filePath}`
-      );
+      const sourceText = readTextFile(filePath);
+      const entries = parseSafeJsonEntriesInput(sourceText, `knowledge hint file ${filePath}`);
       const relSource = scannerSource(knowledgeBase, filePath);
       for (const entry of entries) {
         const parsedHint = parseKnowledgeHint(entry);
         if (parsedHint) {
           hints.push({
             ...parsedHint,
+            source_sha256: createHash('sha256').update(sourceText).digest('hex'),
             source: relSource,
             tier,
             ...(customerId ? { customerId } : {}),
@@ -1067,6 +1072,12 @@ function _scanMarkdownHints(
           const tags = _extractFrontmatterTags(content);
           const excerpt = _extractFirstParagraph(content);
           const rankingMetadata = _extractRankingMetadata(content, relSource);
+          const sourceIdentity = {
+            source_sha256: createHash('sha256').update(content).digest('hex'),
+            ...(_extractFrontmatterValue(content, 'candidate_id')
+              ? { learning_candidate_id: _extractFrontmatterValue(content, 'candidate_id') }
+              : {}),
+          };
           hints.push({
             topic: title,
             hint: excerpt ? `${title}. ${excerpt.slice(0, 200)}` : `See ${relSource} for details.`,
@@ -1075,6 +1086,7 @@ function _scanMarkdownHints(
             tags,
             tier,
             ...rankingMetadata,
+            ...sourceIdentity,
             ...(customerId ? { customerId } : {}),
           });
           // KM-02 Task 1: index the document body as chunks so terms that
@@ -1091,6 +1103,7 @@ function _scanMarkdownHints(
               tags,
               tier,
               ...rankingMetadata,
+              ...sourceIdentity,
               ...(customerId ? { customerId } : {}),
             });
           });

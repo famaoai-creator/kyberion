@@ -3,7 +3,10 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { prepareEffectSettlement } from '../workforce/work-effect-transitions.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import {
+  computeApprovalPayloadHash,
+  computeApprovalPresentedDigest,
+} from '../governance/approval-store.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
 import { normalizeDotProposal } from '../dot/dot-proposals.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
@@ -15,6 +18,10 @@ import type { MissionState } from './mission-types.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
   authorMissionAdmissionBrief,
+  prepareMissionAdmissionBrief,
+  buildMissionAdmissionBrief,
+  assertHumanMissionAdmissionApproval,
+  withHumanMissionAdmissionApply,
   recordVerifiedMissionAdmissionApproval,
   resolveDotMissionAdmission,
   resolveDotMissionAdmissionScope,
@@ -59,6 +66,9 @@ const mocks = vi.hoisted(() => {
     state,
     missionDir: '',
     covered: true,
+    memberActive: true,
+    autoAllowed: true,
+    leaseActive: true,
     execution: vi.fn(),
     decision: vi.fn(),
     claim: vi.fn(),
@@ -66,15 +76,42 @@ const mocks = vi.hoisted(() => {
     approvals: Array<ApprovalRequestRecord>(),
   };
 });
+vi.mock('../organization/member-registry.js', async (original) => ({
+  ...(await original<typeof import('../organization/member-registry.js')>()),
+  resolveAccountableHuman: () => ({
+    status: mocks.memberActive ? 'active' : 'suspended',
+    memberships: [{ tenant_slug: 'acme', role: 'approver' }],
+  }),
+}));
+vi.mock('../governance/autonomous-ops-gate.js', async (original) => ({
+  ...(await original<typeof import('../governance/autonomous-ops-gate.js')>()),
+  evaluateAutonomousOpsAction: () => ({
+    decision: 'auto',
+    allowed: mocks.autoAllowed,
+    shadow: !mocks.autoAllowed,
+  }),
+}));
 vi.mock('../dot/dot-charter.js', () => ({
   findDotCharter: () => ({ charter: mocks.dot }),
   dotGoalRefLabel: () => undefined,
 }));
-vi.mock('../dot/dot-action-ledger.js', () => ({ readDotActionLedgerStrict: () => mocks.rows }));
+vi.mock('../dot/dot-action-ledger.js', () => ({
+  readDotActionLedgerStrict: () => mocks.rows,
+}));
 vi.mock('../workforce/work-coordination.js', () => ({
   getWorkItem: () => mocks.item,
   claimWorkItem: (...args: unknown[]) => mocks.claim(...args),
   releaseWorkItem: (...args: unknown[]) => mocks.release(...args),
+  listActiveWorkLeases: () =>
+    mocks.leaseActive
+      ? [
+          {
+            lease_id: 'lease',
+            item_id: mocks.item.item_id,
+            holder_peer_id: 'mission_controller',
+          },
+        ]
+      : [],
 }));
 vi.mock('./mission-state.js', () => ({ loadState: () => mocks.state }));
 vi.mock('../path-resolver.js', async (original) => ({
@@ -116,6 +153,9 @@ const missionId = dotAdmissionMissionId('action-1');
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.covered = true;
+  mocks.memberActive = true;
+  mocks.autoAllowed = true;
+  mocks.leaseActive = true;
   mocks.approvals = [];
   mocks.missionDir = path.join(root, missionId);
   safeMkdir(mocks.missionDir, { recursive: true });
@@ -380,7 +420,174 @@ describe('Dot mission admission production and human receipt', () => {
     mocks.dot.authority.mission_mandate_refs = [];
     expect(() => resolveDotMissionAdmission(mocks.item)).toThrow('authority');
     mocks.dot.authority.mission_mandate_refs = ['docs'];
-    mocks.rows[0] = { ...mocks.rows[0], mission_admission: { ...admission, mandate_ref: 'other' } };
+    mocks.rows[0] = {
+      ...mocks.rows[0],
+      mission_admission: { ...admission, mandate_ref: 'other' },
+    };
     expect(() => resolveDotMissionAdmission(mocks.item)).toThrow('differs');
+  });
+});
+
+describe('planned human admission preparation', () => {
+  it('authors the same bound brief before activation without claiming or completing work', () => {
+    mocks.state.status = 'planned';
+    prepareMissionAdmissionBrief(missionId, mocks.item.item_id);
+    const brief = JSON.parse(
+      safeReadFile(path.join(mocks.missionDir, 'evidence', 'mission-brief.json'), 'utf8')
+    );
+    expect(brief.source.ref).toBe(mocks.item.item_id);
+    expect(brief.missionAdmission).toEqual(admission);
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
+    prepareMissionAdmissionBrief(missionId, mocks.item.item_id);
+  });
+});
+
+describe('human admission controller boundary', () => {
+  it('refuses direct typed admission in shadow even when no preparation pin exists', () => {
+    mocks.autoAllowed = false;
+    expect(() =>
+      assertMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+        organizationId: 'org-1',
+        projectId: 'proj-1',
+      })
+    ).toThrow('human admission');
+  });
+  function approved() {
+    mocks.state.status = 'planned';
+    safeMkdir(path.join(mocks.missionDir, 'evidence'), { recursive: true });
+    safeWriteFile(
+      path.join(mocks.missionDir, 'evidence', 'mission-brief.json'),
+      JSON.stringify(buildMissionAdmissionBrief(mocks.item, admission, missionId))
+    );
+    const scope = { tenant_slug: 'acme', organization_id: 'org-1', project_id: 'proj-1' };
+    const record = {
+      id: '00000000-0000-4000-8000-000000000001',
+      storageChannel: 'brief',
+      channel: 'brief',
+      kind: 'mission_gate',
+      title: 'Docs',
+      summary: 'Update docs',
+      requestedBy: 'mission_controller',
+      requestedAt: '2026-10-20T00:00:00Z',
+      threadTs: missionId,
+      correlationId: 'mission-alignment-' + missionId,
+      status: 'approved',
+      source: { missionId, taskId: mocks.item.item_id },
+      scope: {
+        ...scope,
+        tier: 'confidential',
+        mission_id: missionId,
+        task_id: mocks.item.item_id,
+        scope_kind: 'task',
+      },
+      accountability: {
+        finalDecision: 'human_only',
+        payloadHash: computeApprovalPayloadHash(
+          buildMissionAdmissionBrief(mocks.item, admission, missionId)
+        ),
+        effectBinding:
+          'mission-admission:' +
+          computeApprovalPayloadHash({
+            action: 'human_mission_alignment',
+            itemId: mocks.item.item_id,
+            missionId,
+            actionRef: 'action-1',
+            scope,
+          }),
+      },
+      decidedBy: 'user:test-approver',
+      decidedByType: 'human',
+      authenticated: true,
+      decidedAuthMethod: 'surface_session',
+      decidedByIdentitySource: 'server_resolved',
+      decidedAt: '2026-10-20T00:01:00Z',
+    } as ApprovalRequestRecord;
+    record.verifiedPresentedDigest = computeApprovalPresentedDigest(record);
+    mocks.approvals = [record];
+    return record;
+  }
+  it.each(['brief', 'cancelled', 'scope'])(
+    'rejects durable %s drift at the final activation boundary',
+    (kind) => {
+      approved();
+      if (kind === 'brief')
+        safeWriteFile(
+          path.join(mocks.missionDir, 'evidence', 'mission-brief.json'),
+          JSON.stringify({
+            ...buildMissionAdmissionBrief(mocks.item, admission, missionId),
+            intent: 'Changed after claim',
+          })
+        );
+      if (kind === 'cancelled') mocks.state.status = 'paused';
+      if (kind === 'scope') mocks.state.organization_id = 'different';
+      expect(() => assertHumanMissionAdmissionApproval(mocks.item)).toThrow('evidence changed');
+    }
+  );
+  it('accepts exact human consent but refuses revoked current membership', () => {
+    const record = approved();
+    expect(assertHumanMissionAdmissionApproval(mocks.item).id).toBe(record.id);
+    mocks.memberActive = false;
+    expect(() => assertHumanMissionAdmissionApproval(mocks.item)).toThrow('current tenant');
+  });
+  it.each(['weak', 'agent', 'digest', 'expired', 'content'] as const)(
+    'refuses %s consent at activation',
+    (kind) => {
+      const record = approved();
+      if (kind === 'weak') record.decidedAuthMethod = 'local_token';
+      if (kind === 'agent') record.decidedInAgentSession = 'worker';
+      if (kind === 'digest') record.verifiedPresentedDigest = 'changed';
+      if (kind === 'expired') record.expiresAt = '2000-01-01T00:00:00Z';
+      if (kind === 'content') mocks.item.description = 'Different outcome';
+      expect(() => assertHumanMissionAdmissionApproval(mocks.item)).toThrow();
+    }
+  );
+  it('requires the exact uncompleted apply claim for controller activation', () => {
+    const record = approved();
+    mocks.item.metadata = {
+      ...mocks.item.metadata,
+      mission_alignment_preparation: { fingerprint: 'pinned' },
+    };
+    const activate = () =>
+      assertMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+        organizationId: 'org-1',
+        projectId: 'proj-1',
+      });
+    expect(activate).toThrow('apply claim');
+    record.applyClaim = {
+      claimId: 'claim',
+      startedAt: '2026-10-20T00:02:00Z',
+      startedBy: 'mission_controller',
+    };
+    mocks.item.lease_id = 'lease';
+    mocks.item.status = 'in_progress';
+    mocks.item.current_attempt_id = 'attempt';
+    mocks.item.claimed_by_peer_id = 'mission_controller';
+    expect(activate).toThrow('apply claim');
+    expect(() =>
+      withHumanMissionAdmissionApply(
+        {
+          workItemId: mocks.item.item_id,
+          requestId: record.id,
+          claimId: 'claim',
+          leaseId: 'lease',
+          attemptId: 'attempt',
+        },
+        activate
+      )
+    ).not.toThrow();
+    mocks.leaseActive = false;
+    expect(() =>
+      withHumanMissionAdmissionApply(
+        {
+          workItemId: mocks.item.item_id,
+          requestId: record.id,
+          claimId: 'claim',
+          leaseId: 'lease',
+          attemptId: 'attempt',
+        },
+        activate
+      )
+    ).toThrow('apply claim');
   });
 });
