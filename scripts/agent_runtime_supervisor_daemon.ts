@@ -1,5 +1,6 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
+import { resolveLocalIpcAddress } from '@agent/core';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
@@ -630,11 +631,11 @@ function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'u
 }
 
 function resolveSocketPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
-  return (
+  const identity =
     options.socketPath ||
     registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH') ||
-    SOCKET_PATH
-  );
+    SOCKET_PATH;
+  return resolveLocalIpcAddress(identity);
 }
 
 function resolveLockPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
@@ -682,9 +683,10 @@ function toSnapshotResult(
   };
 }
 
-function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp'): void {
+function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp', lockPath: string): void {
   if (transport === 'tcp') return;
-  const socketDir = path.dirname(socketPath);
+  const socketDir =
+    process.platform === 'win32' ? path.dirname(lockPath) : path.dirname(socketPath);
   if (socketDir && !safeExistsSync(socketDir)) safeMkdir(socketDir, { recursive: true });
 }
 
@@ -1187,7 +1189,7 @@ export async function startAgentRuntimeSupervisorDaemon(
   const transport = resolveTransport(options);
   const socketPath = resolveSocketPath(options);
   const lockPath = resolveLockPath(options);
-  ensureSocketDir(socketPath, transport);
+  ensureSocketDir(socketPath, transport, lockPath);
   const listenTarget = resolveListenTarget(options, socketPath);
   let socketLabel = transport === 'tcp' ? '' : socketPath;
 
@@ -1266,7 +1268,8 @@ export async function startAgentRuntimeSupervisorDaemon(
     }
   }
 
-  if (transport === 'unix' && safeExistsSync(socketPath)) {
+  const filesystemSocket = process.platform !== 'win32';
+  if (transport === 'unix' && (!filesystemSocket || safeExistsSync(socketPath))) {
     const healthy = await probeDaemonHealth(listenTarget);
     if (healthy) {
       const message = `an existing healthy daemon is already bound at ${socketPath}`;
@@ -1274,12 +1277,14 @@ export async function startAgentRuntimeSupervisorDaemon(
       if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
       throw new Error(message);
     }
-    try {
-      safeUnlinkSync(socketPath);
-    } catch (error: any) {
-      logger.warn(
-        `[agent-runtime-supervisor-daemon] failed to remove stale socket before listen: ${error?.message || error}`
-      );
+    if (filesystemSocket) {
+      try {
+        safeUnlinkSync(socketPath);
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to remove stale socket before listen: ${error?.message || error}`
+        );
+      }
     }
   }
 
@@ -1340,7 +1345,9 @@ export async function startAgentRuntimeSupervisorDaemon(
           `[agent-runtime-supervisor-daemon] socket busy, retrying after stale socket cleanup: ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
         );
         try {
-          if (transport === 'unix' && safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
+          if (transport === 'unix' && process.platform !== 'win32' && safeExistsSync(socketPath)) {
+            safeUnlinkSync(socketPath);
+          }
           server.listen(listenTarget);
           return;
         } catch (retryError: any) {
@@ -1413,7 +1420,8 @@ export async function startAgentRuntimeSupervisorDaemon(
     };
     // Bind the socket 0600 (bind is synchronous in listen); the process-wide umask
     // also hits threadpool fs work racing this startup-only call (runbook §10).
-    const previousUmask = transport === 'unix' ? process.umask(0o177) : undefined;
+    const previousUmask =
+      transport === 'unix' && process.platform !== 'win32' ? process.umask(0o177) : undefined;
     try {
       server.listen(listenTarget, onListening);
     } finally {

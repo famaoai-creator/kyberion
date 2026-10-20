@@ -5,6 +5,7 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '@agent/core';
+import { resolveLocalIpcAddress } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -150,7 +151,7 @@ describe('agent_runtime_supervisor_daemon', () => {
     // mkdtempSync does not create missing parents.
     safeMkdir(pathResolver.sharedTmp(), { recursive: true });
     rootDir = fs.mkdtempSync(pathResolver.sharedTmp('kyb-'));
-    socketPath = path.join(rootDir, 's.sock');
+    socketPath = resolveLocalIpcAddress(path.join(rootDir, 's.sock'));
     lockPath = path.join(rootDir, 'lock');
     mocks.ensureAgentRuntime.mockResolvedValue({
       agentId: 'agent-1',
@@ -514,7 +515,11 @@ describe('agent_runtime_supervisor_daemon', () => {
       exitOnExistingHealthyDaemon: false,
     });
 
-    expect(fs.statSync(socketPath).mode & 0o777).toBe(0o600);
+    if (process.platform === 'win32') {
+      expect(socketPath).toMatch(/^\\\\\.\\pipe\\kyberion-/u);
+    } else {
+      expect(fs.statSync(socketPath).mode & 0o777).toBe(0o600);
+    }
   });
 
   it('does not replace an existing healthy daemon when a lock is ambiguous', async () => {
@@ -535,7 +540,7 @@ describe('agent_runtime_supervisor_daemon', () => {
         exitOnExistingHealthyDaemon: false,
       })
     ).rejects.toThrow(/existing healthy daemon/);
-    expect(fs.existsSync(socketPath)).toBe(true);
+    if (process.platform !== 'win32') expect(fs.existsSync(socketPath)).toBe(true);
   });
 
   it('rejects ask requests over the per-agent inflight limit and admits again once slots free up', async () => {

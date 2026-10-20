@@ -14,6 +14,7 @@ export * from './index-part-08.js';
 export * from './index-part-09.js';
 export * from './index-part-10.js';
 export * from './index-part-11.js';
+export * from './local-ipc.js';
 
 // Preserve the original explicit export precedence for names also surfaced by
 // broad compatibility barrels.
