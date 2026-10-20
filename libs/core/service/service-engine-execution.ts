@@ -200,8 +200,25 @@ function assertTransportAuthority(input: ServicePresetAlternativeExecutionContex
     );
 }
 
+/** Only reviewed read operations with exclusively read-only HTTP routes may replay. */
+export function isReplaySafeServiceOperation(operation: Record<string, unknown>): boolean {
+  if (operation.risk !== undefined && operation.risk !== 'read') return false;
+  const routes =
+    Array.isArray(operation.alternatives) && operation.alternatives.length
+      ? operation.alternatives
+      : [operation];
+  return routes.every(
+    (route: unknown) =>
+      isPlainObject(route) &&
+      (route.type ?? 'api') === 'api' &&
+      ['GET', 'HEAD'].includes(String(route.method ?? 'GET').toUpperCase())
+  );
+}
+
 function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext) {
-  if (input.operatorProbe) return { maxRetries: 0 };
+  if (input.operatorProbe || !isReplaySafeServiceOperation(input.preset.operations[input.action])) {
+    return { maxRetries: 0 };
+  }
   const options = buildRetryOptions(input.serviceConfig, input.preset, input.alt, {
     // Authenticated provider failures may echo credentials. Classify for retry
     // in memory only; never feed raw text to the unclassified-error registry.

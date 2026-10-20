@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// OAuth routing tests isolate shared admission; real admission is covered in
+// service-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  assertExternalOperationBatchResumable: vi.fn(),
+  admitExternalOperation: vi.fn(() => ({ allowed: true, status: 'not_required' })),
+  recordExternalOperationOutcome: vi.fn(),
+}));
+
 const oauth = vi.hoisted(() => ({
   beginServiceOAuth: vi.fn(),
   exchangeServiceOAuthCode: vi.fn(),

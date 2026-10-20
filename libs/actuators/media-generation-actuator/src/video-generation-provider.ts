@@ -20,6 +20,54 @@ import { sleep } from '@agent/core/async-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createSeam, coreSeamCatalog, type SeamProviderMetadata } from '@agent/core/seam';
 import * as path from 'node:path';
+import {
+  runExternalOperation,
+  stopExternalOperationForVerification,
+} from '@agent/core/governance/external-operation';
+
+const governedVideoMethods = new WeakSet<object>();
+function governVideoProvider<T extends VideoGenerationProvider>(provider: T): T {
+  const original = provider.submit;
+  if (governedVideoMethods.has(original)) return provider;
+  const submit = (request: VideoGenerationRequest) => {
+    const params = structuredClone(request);
+    return runExternalOperation<VideoGenerationSubmission>(
+      {
+        operationId: `media:video:${provider.provider}:submit`,
+        effect: { provider: provider.provider, params },
+        requiresApproval: true,
+        delegable: false,
+      },
+      () => original.call(provider, params),
+      (receipt) =>
+        typeof receipt.provider_job_id === 'string' &&
+        receipt.provider_job_id.trim() &&
+        ['submitted', 'running', 'succeeded'].includes(receipt.status)
+          ? 'succeeded'
+          : 'unknown'
+    );
+  };
+  governedVideoMethods.add(submit);
+  return new Proxy(provider, {
+    get(target, property) {
+      if (property === 'submit') return submit;
+      const value = Reflect.get(target, property, target);
+      if (property === 'cancel' && typeof value === 'function')
+        return (providerJobId: string) =>
+          runExternalOperation(
+            {
+              operationId: `media:video:${provider.provider}:cancel`,
+              effect: { provider: provider.provider, params: { provider_job_id: providerJobId } },
+              requiresApproval: true,
+              delegable: false,
+            },
+            () => value.call(target, providerJobId),
+            () => 'succeeded'
+          );
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
 
 export const VIDEO_GENERATION_PROVIDER_SEAM = 'video-generation-provider';
 const VIDEO_GENERATION_ADAPTER_SEAM = 'video-generation-provider-adapter';
@@ -711,7 +759,7 @@ export function createVideoGenerationProvider(
     throw new Error(`No video generation provider adapter registered for ${backend.provider}`);
   const provider: unknown = adapter.create();
   assertVideoGenerationProvider(backend.provider, provider);
-  return provider;
+  return governVideoProvider(provider);
 }
 
 export function normalizeVideoGenerationRequest(
@@ -770,27 +818,31 @@ export async function executeDirectVideoGeneration(
       ...(submission.metadata ? { provider_metadata: submission.metadata } : {}),
     };
   }
-  const completed = await waitForVideoGeneration(
-    provider,
-    submission.provider_job_id,
-    request,
-    params
-  );
-  const artifact = await collectDirectVideoArtifact(provider, completed, request);
-  return {
-    status: 'succeeded',
-    provider_job_id: submission.provider_job_id,
-    prompt_id: submission.provider_job_id,
-    artifact,
-    artifacts: [artifact],
-    output_path: artifact.path,
-    copied_to: artifact.path,
-    backend_id: backend.backend_id,
-    backend_kind: backend.kind,
-    backend_provider: backend.provider,
-    modality: 'video',
-    ...(completed.metadata ? { provider_metadata: completed.metadata } : {}),
-  };
+  try {
+    const completed = await waitForVideoGeneration(
+      provider,
+      submission.provider_job_id,
+      request,
+      params
+    );
+    const artifact = await collectDirectVideoArtifact(provider, completed, request);
+    return {
+      status: 'succeeded',
+      provider_job_id: submission.provider_job_id,
+      prompt_id: submission.provider_job_id,
+      artifact,
+      artifacts: [artifact],
+      output_path: artifact.path,
+      copied_to: artifact.path,
+      backend_id: backend.backend_id,
+      backend_kind: backend.kind,
+      backend_provider: backend.provider,
+      modality: 'video',
+      ...(completed.metadata ? { provider_metadata: completed.metadata } : {}),
+    };
+  } catch (error) {
+    stopExternalOperationForVerification(`media:video:${provider.provider}:submit`, error);
+  }
 }
 
 export async function refreshDirectVideoGeneration(

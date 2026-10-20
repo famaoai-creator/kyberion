@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -10,6 +10,11 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { parseA2ASecretValue, pollA2AInbox, sendA2AMessage } from './a2a-transport.js';
+
+// Transport serialization tests; shared admission has separate hermetic coverage.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 
 const A2A_INBOX = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
 const A2A_OUTBOX = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');

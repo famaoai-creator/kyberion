@@ -1,4 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('./external-vcs.js', () => ({
+  governVcsCommand: (_operation: string, _effect: object, execute: () => unknown) => execute(),
+}));
+vi.mock('../secure-io.js', async (original) => {
+  const actual = await original<typeof import('../secure-io.js')>();
+  return {
+    ...actual,
+    safeReadFile: (file: string, options?: Parameters<typeof actual.safeReadFile>[1]) =>
+      file === '/tmp/b.md' ? 'captured review body' : actual.safeReadFile(file, options),
+  };
+});
 import {
   ghPrChecks,
   ghPrChecksWait,
@@ -185,9 +196,18 @@ describe('libs/core/vcs', () => {
     expect(ghRepoDefaultBranch({}, run)).toBe('main');
   });
 
-  it('ghPrCreate builds the argv contract (body-file wins, draft honored)', () => {
+  it('ghPrCreate captures body-file content and pins repo/source with draft honored', () => {
     const { run, calls } = stubRunner([
       { match: (a) => a[0] === 'pr' && a[1] === 'create', stdout: 'https://example/pull/1' },
+      {
+        match: (a) => a[0] === 'repo',
+        stdout: JSON.stringify({
+          nameWithOwner: 'owner/repo',
+          url: 'https://github.com/owner/repo',
+        }),
+      },
+      { match: (a) => a[0] === 'rev-parse', stdout: 'a'.repeat(40) },
+      { match: (a) => a[0] === 'api', stdout: JSON.stringify({ sha: 'a'.repeat(40) }) },
     ]);
     const out = ghPrCreate(
       {
@@ -201,10 +221,10 @@ describe('libs/core/vcs', () => {
       run
     );
     expect(out.stdout).toContain('/pull/1');
-    const argv = calls[0].join(' ');
-    expect(argv).toContain('--body-file');
+    const argv = calls.find((args) => args[0] === 'pr' && args[1] === 'create')!.join(' ');
+    expect(argv).toContain('--body captured review body');
     expect(argv).toContain('--draft');
-    expect(argv).not.toContain('--body ');
+    expect(argv).not.toContain('ignored');
   });
 
   it('rejects flag-like values in every argv position (injection guard)', () => {

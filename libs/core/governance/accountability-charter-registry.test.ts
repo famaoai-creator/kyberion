@@ -21,6 +21,8 @@ import {
   loadCharterUsage,
   readCharter,
   recordTripwire,
+  recordCharterExecutionOutcome,
+  recordCharterExecutionStarted,
   type AcceptCharterInput,
 } from './accountability-charter-registry.js';
 
@@ -90,6 +92,115 @@ describe('accountability-charter-registry', () => {
     expect(() => accept('chr-acme-x', agentActor(NHI, 'user:owner'))).toThrow(/human actor/);
     expect(() => accept('chr-acme-x', humanActor('mallory'))).toThrow(/only the accountable human/);
     expect(listCharterIds(SCOPE, opts())).toEqual([]);
+  });
+
+  it('binds execution evidence to scoped consumption and fires only declared verified failure tripwires', () => {
+    const opts = () => ({ rootDir: path.join(root, 'outcome-fixture') });
+    const accept = (id: string) =>
+      acceptCharter(
+        {
+          draft: draft(id),
+          statement: 'I accept responsibility',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: NOW,
+        },
+        opts()
+      );
+    const c = accept('chr-outcome');
+    c.appetite.tripwires.push('external_operation_failure');
+    const action = {
+      actor: agentActor(NHI, 'user:owner'),
+      action_class: 'send_message_external',
+      reversible: true,
+    };
+    const evidence = {
+      actor: NHI,
+      action_class: action.action_class,
+      operation_id: 'service:send',
+      correlation_id: 'outcome-1',
+      effect_hash: 'hash',
+      outcome: 'unknown' as const,
+    };
+    expect(recordCharterExecutionOutcome(c, evidence, opts(), NOW)).toBe(false);
+    expect(() => recordCharterExecutionStarted(c, evidence, opts(), NOW)).toThrow(
+      'EXTERNAL_ADMISSION_MISSING'
+    );
+    const decision = {
+      decision: 'allow',
+      reasons: [],
+      consumption: { money: 0, loss: 0 },
+      responsible: 'user:owner',
+      charter_id: c.charter_id,
+    } as const;
+    recordCharterConsumption(
+      c,
+      action,
+      { ...decision, reasons: [] },
+      opts(),
+      NOW,
+      evidence.correlation_id
+    );
+    recordCharterExecutionStarted(c, evidence, opts(), NOW);
+    expect(() => recordCharterExecutionStarted(c, evidence, opts(), NOW)).toThrow(
+      'EXTERNAL_EXECUTION_ALREADY_STARTED'
+    );
+    expect(
+      recordCharterExecutionOutcome(
+        c,
+        { ...evidence, outcome: 'succeeded', effect_hash: 'changed-before-first-outcome' },
+        opts(),
+        NOW
+      )
+    ).toBe(false);
+    expect(
+      recordCharterExecutionOutcome(
+        c,
+        { ...evidence, outcome: 'succeeded', operation_id: 'service:other' },
+        opts(),
+        NOW
+      )
+    ).toBe(false);
+    expect(recordCharterExecutionOutcome(c, evidence, opts(), NOW)).toBe(true);
+    expect(recordCharterExecutionOutcome(c, evidence, opts(), NOW)).toBe(false);
+    expect(readCharterLedger(c, opts()).filter((e) => e.kind === 'tripwire')).toEqual([]);
+    expect(
+      recordCharterExecutionOutcome(
+        c,
+        { ...evidence, outcome: 'succeeded', effect_hash: 'changed' },
+        opts(),
+        NOW
+      )
+    ).toBe(false);
+    expect(
+      recordCharterExecutionOutcome(c, { ...evidence, outcome: 'succeeded' }, opts(), NOW)
+    ).toBe(true);
+    expect(recordCharterExecutionOutcome(c, { ...evidence, outcome: 'failed' }, opts(), NOW)).toBe(
+      false
+    );
+    const otherScope = { ...c, scope: { kind: 'organization', tenant_slug: 'other' } as const };
+    expect(recordCharterExecutionOutcome(otherScope, evidence, opts(), NOW)).toBe(false);
+    recordCharterConsumption(c, action, { ...decision, reasons: [] }, opts(), NOW, 'outcome-2');
+    expect(
+      recordCharterExecutionOutcome(
+        c,
+        { ...evidence, correlation_id: 'outcome-2', outcome: 'failed' },
+        opts(),
+        NOW
+      )
+    ).toBe(true);
+    expect(readCharterLedger(c, opts()).filter((e) => e.kind === 'tripwire')).toEqual([
+      expect.objectContaining({ tripwire: 'external_operation_failure' }),
+    ]);
+    const quiet = { ...c, appetite: { ...c.appetite, tripwires: [] } };
+    recordCharterConsumption(quiet, action, { ...decision, reasons: [] }, opts(), NOW, 'quiet-1');
+    recordCharterExecutionOutcome(
+      quiet,
+      { ...evidence, correlation_id: 'quiet-1', outcome: 'failed' },
+      opts(),
+      NOW
+    );
+    expect(readCharterLedger(quiet, opts()).filter((e) => e.kind === 'tripwire')).toHaveLength(1);
   });
 
   it('accepts, hashes the statement, persists, and refuses in-place edits', () => {

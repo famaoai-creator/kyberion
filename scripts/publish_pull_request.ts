@@ -13,7 +13,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/founda
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
-import { ghMust } from '@agent/core/vcs';
+import { ghMust, ghPrCreate } from '@agent/core/vcs';
 import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
@@ -285,7 +285,20 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   print('[pr:publish] Knowledge readiness check passed (KL-03).');
 
   const args = buildGhArgs(options);
-  const output = runGithubCli(args);
+  // Keep the established title/ref resolution and explicit body-file contract,
+  // but route publication through the typed, snapshot-bound approval boundary.
+  const result = ghPrCreate({
+    ...ghOpts(),
+    title: args[args.indexOf('--title') + 1],
+    base: args[args.indexOf('--base') + 1],
+    head: args[args.indexOf('--head') + 1],
+    bodyFile: options.bodyFile,
+    draft: options.draft,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(result.stderr?.trim() || result.error?.message || 'GitHub PR creation failed');
+  }
+  const output = result.stdout;
   if (output.trim()) print(output.trim());
 }
 

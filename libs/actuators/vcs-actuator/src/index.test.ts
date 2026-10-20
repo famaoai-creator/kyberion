@@ -6,7 +6,8 @@
  * (commit, pr_create) are covered by negative validation tests only — they
  * must never execute against the working tree in unit tests.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
 import { describeOps } from './op-catalog.js';
 import { handleAction, type VcsParams } from './vcs-helpers.js';
 

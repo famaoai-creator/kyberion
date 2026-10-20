@@ -17,6 +17,10 @@ import {
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
+// Transport/routing tests; real admission is covered separately.
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 
 const mocks = vi.hoisted(() => {
   const executeServicePreset = vi.fn();
@@ -326,7 +330,7 @@ describe('AdaptivePolicyRouter', () => {
     expect(candidates.map((c) => c.id)).toContain('gemini_service');
   });
 
-  it('automatically falls back to next provider on 429 rate limit error', async () => {
+  it('does not send to a second provider after an external 429 receipt', async () => {
     const rateLimitedProvider: ImageGenerationProvider = {
       id: 'gemini_fast',
       costTier: 'free',
@@ -360,14 +364,13 @@ describe('AdaptivePolicyRouter', () => {
       providerPreference: ['gemini_fast', 'gemini_service'],
     });
 
-    expect(result.status).toBe('succeeded');
-    expect(result.provider).toBe('gemini_service');
-    expect(result.path).toBe('/tmp/fallback-image.jpg');
+    expect(result.status).toBe('failed');
+    expect(result.provider).toBe('gemini_fast');
     expect(rateLimitedProvider.generate).toHaveBeenCalledTimes(1);
-    expect(fallbackProvider.generate).toHaveBeenCalledTimes(1);
+    expect(fallbackProvider.generate).not.toHaveBeenCalled();
   });
 
-  it('falls back when provider throws a 429 Error', async () => {
+  it('does not change provider after an external exception', async () => {
     const throwingProvider: ImageGenerationProvider = {
       id: 'gemini_fast',
       isAvailable: vi.fn().mockResolvedValue(true),
@@ -385,14 +388,13 @@ describe('AdaptivePolicyRouter', () => {
     };
 
     const router = new AdaptivePolicyRouter([throwingProvider, fallbackProvider]);
-    const result = await router.generateWithFallback({
-      prompt: 'a dog',
-      providerPreference: ['gemini_fast', 'local_flux'],
-    });
-
-    expect(result.status).toBe('succeeded');
-    expect(result.provider).toBe('local_flux');
-    expect(result.path).toBe('/tmp/local-fallback.jpg');
+    await expect(
+      router.generateWithFallback({
+        prompt: 'a dog',
+        providerPreference: ['gemini_fast', 'local_flux'],
+      })
+    ).rejects.toThrow('429');
+    expect(fallbackProvider.generate).not.toHaveBeenCalled();
   });
 
   it('detects rate limit or quota errors properly', () => {
@@ -1281,16 +1283,11 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
     });
   });
 
-  it('keeps rate-limit fallback along the ranked chain', async () => {
+  it('keeps ranked selection without executing fallback candidates', async () => {
     const router = build();
     const [first, second] = await router.resolveCandidateChain({ prompt: 'x', purpose: 'speed' });
-    vi.mocked(first.generate).mockResolvedValue({
-      status: 'failed',
-      provider: first.id,
-      elapsedMs: 1,
-      error: '429 rate limit',
-    });
     const result = await router.generateWithFallback({ prompt: 'x', purpose: 'speed' });
-    expect(result.provider).toBe(second.id);
+    expect(result.provider).toBe(first.id);
+    expect(second.id).not.toBe(first.id);
   });
 });

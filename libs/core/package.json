@@ -1688,6 +1688,22 @@
       "types": "./dist/governance/approval-gate.d.ts",
       "default": "./dist/governance/approval-gate.js"
     },
+    "./governance/external-operation-occurrence": {
+      "types": "./dist/governance/external-operation-occurrence.d.ts",
+      "default": "./dist/governance/external-operation-occurrence.js"
+    },
+    "./governance/external-operation-runtime": {
+      "types": "./dist/governance/external-operation-runtime.d.ts",
+      "default": "./dist/governance/external-operation-runtime.js"
+    },
+    "./governance/external-operation-store": {
+      "types": "./dist/governance/external-operation-store.d.ts",
+      "default": "./dist/governance/external-operation-store.js"
+    },
+    "./governance/external-operation": {
+      "types": "./dist/governance/external-operation.d.ts",
+      "default": "./dist/governance/external-operation.js"
+    },
     "./governance/approval-gate-summary": {
       "types": "./dist/governance/approval-gate-summary.d.ts",
       "default": "./dist/governance/approval-gate-summary.js"
@@ -2911,6 +2927,10 @@
     "./meeting-session-types": {
       "types": "./dist/meeting/meeting-session-types.d.ts",
       "default": "./dist/meeting/meeting-session-types.js"
+    },
+    "./meeting/calendar-external-effect": {
+      "types": "./dist/meeting/calendar-external-effect.d.ts",
+      "default": "./dist/meeting/calendar-external-effect.js"
     },
     "./meeting/calendar-provider-bridge": {
       "types": "./dist/meeting/calendar-provider-bridge.d.ts",

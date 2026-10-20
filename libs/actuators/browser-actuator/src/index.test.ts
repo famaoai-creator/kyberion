@@ -11,6 +11,13 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resetCurrentScope } from '@agent/core/scope-context';
 import type { ComputerInteractionAction } from './browser-interaction-helpers.js';
 
+// Existing transport/ref/secret fixtures execute the actual handler callback.
+// Admission and outcome fencing are covered in browser-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+}));
+
 function computerInteraction(
   sessionId: string,
   action: ComputerInteractionAction['action'],
@@ -367,7 +374,7 @@ describe('browser-actuator v3 contract', () => {
     expect(completed.completed_at).toEqual(expect.any(String));
   });
 
-  it('uses the manifest recovery policy for ref interactions', async () => {
+  it('keeps manifest timing defaults while disabling retries for external ref interactions', async () => {
     const { handleAction } = await import('./index');
 
     await handleAction({
@@ -387,7 +394,7 @@ describe('browser-actuator v3 contract', () => {
     expect(mocks.retry).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
-        maxRetries: 4,
+        maxRetries: 0,
         initialDelayMs: 250,
         maxDelayMs: 5000,
         factor: 2,

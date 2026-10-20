@@ -7,7 +7,7 @@ const ALLOWED_TRANSITIONS: Record<GenerationJobStatus, readonly GenerationJobSta
   running: ['succeeded', 'failed', 'canceled'],
   succeeded: [],
   failed: ['retrying'],
-  retrying: ['submitted', 'canceled'],
+  retrying: ['submitted', 'failed', 'canceled'],
   canceled: [],
   timed_out: [],
 };

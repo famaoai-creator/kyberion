@@ -30176,6 +30176,11 @@
         "ja": "憲章の範囲内で実行: {executed}件 ・ あなたの判断に回したもの: {denied}件",
         "qps-ploc": "⟦Řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř: {executed} · Ħėŀḓ ƒőř ẏőůř ḓėƈïşïőñ: {denied} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "charter_report_execution_outcomes": {
+        "en": "External outcomes: succeeded {succeeded} / failed {failed} / needs verification {unknown} (separate from admissions)",
+        "ja": "外部実行結果: 成功 {succeeded} / 失敗 {failed} / 要確認 {unknown}（認可件数とは別集計）",
+        "qps-ploc": "⟦Ėẋŧėřñȧŀ őůŧƈőɱėş: şůƈƈėėḓėḓ {succeeded} / ƒȧïŀėḓ {failed} / ñėėḓş ṽėřïƒïƈȧŧïőñ {unknown} (şėṗȧřȧŧė ƒřőɱ ȧḓɱïşşïőñş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
       "charter_report_money_day": {
         "en": "Spent today: {spent} / {limit} ({percent}%)",
         "ja": "本日の支出: {spent} / {limit}({percent}%)",
