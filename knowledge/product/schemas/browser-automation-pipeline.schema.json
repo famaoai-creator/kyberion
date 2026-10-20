@@ -50,6 +50,7 @@
           "type": { "enum": ["capture", "transform", "apply", "control"] },
           "op": {
             "enum": [
+              "local_session_probe",
               "distill_dom",
               "goto",
               "screenshot",

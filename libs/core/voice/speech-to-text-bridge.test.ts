@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 import * as fs from 'node:fs';
 import * as secureIo from '../secure-io.js';
 import { discoverLocalSttBackends } from '../local-stt-discovery.js';

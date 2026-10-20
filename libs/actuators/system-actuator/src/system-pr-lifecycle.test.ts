@@ -1,4 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
+// Lifecycle transport/readiness assertions isolate the shared external gate;
+// canonical VCS admission is covered in vcs-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/external-operation')>()),
+  runExternalOperationSync: (_input: object, execute: () => unknown) => execute(),
+}));
 import { runStandardPrLifecycle, type PrLifecycleDependencies } from './system-pr-lifecycle.js';
 const url = 'https://github.com/owner/repo/pull/123';
 const params = {
@@ -23,15 +29,31 @@ function setup(
       status: key === options.fail ? 1 : 0,
       stderr: key === options.fail ? 'failed' : '',
       stdout:
-        command === 'git' && args[0] === 'diff'
-          ? args.includes('--cached')
-            ? (options.cached ?? 'file\0')
-            : (options.files ?? 'a file\0line\nbreak\0')
-          : command === 'gh' && args[0] === 'pr' && args[1] === 'checks'
-            ? key === options.fail
-              ? ''
-              : (options.checks ?? '[{"name":"ci","bucket":"pass"}]')
-            : '',
+        command === 'git' && args[0] === 'remote'
+          ? 'https://github.com/owner/repo.git'
+          : command === 'git' && args[0] === 'rev-parse'
+            ? 'a'.repeat(40)
+            : command === 'gh' && args[0] === 'repo'
+              ? JSON.stringify({
+                  nameWithOwner: 'owner/repo',
+                  url: 'https://github.com/owner/repo',
+                })
+              : command === 'gh' && args[0] === 'pr' && args[1] === 'view'
+                ? JSON.stringify({
+                    number: 123,
+                    url,
+                    headRefOid: 'a'.repeat(40),
+                    baseRefOid: 'b'.repeat(40),
+                  })
+                : command === 'git' && args[0] === 'diff'
+                  ? args.includes('--cached')
+                    ? (options.cached ?? 'file\0')
+                    : (options.files ?? 'a file\0line\nbreak\0')
+                  : command === 'gh' && args[0] === 'pr' && args[1] === 'checks'
+                    ? key === options.fail
+                      ? ''
+                      : (options.checks ?? '[{"name":"ci","bucket":"pass"}]')
+                    : '',
     };
   });
   const write = vi.fn();
@@ -120,9 +142,27 @@ describe('standard PR lifecycle with fully mocked effects', () => {
   it('syncs by fast-forward only after successful explicit auto merge', async () => {
     const deps = setup();
     await runStandardPrLifecycle({ ...params, auto_merge: true }, deps);
-    expect(deps.exec.mock.calls.slice(-4).map(([c, a]) => [c, a])).toEqual([
+    const lifecycle = deps.exec.mock.calls.filter(
+      ([command, args]) =>
+        (command === 'gh' && args[0] === 'pr' && ['checks', 'merge'].includes(args[1])) ||
+        (command === 'git' && ['checkout', 'pull'].includes(args[0]))
+    );
+    expect(lifecycle.slice(-4).map(([c, a]) => [c, a])).toEqual([
       ['gh', ['pr', 'checks', url, '--json', 'name,state,bucket,link']],
-      ['gh', ['pr', 'merge', url, '--merge', '--delete-branch']],
+      [
+        'gh',
+        [
+          'pr',
+          'merge',
+          '123',
+          '--repo',
+          'https://github.com/owner/repo',
+          '--merge',
+          '--match-head-commit',
+          'a'.repeat(40),
+          '--delete-branch',
+        ],
+      ],
       ['git', ['checkout', 'main']],
       ['git', ['pull', '--ff-only', 'origin', 'main']],
     ]);

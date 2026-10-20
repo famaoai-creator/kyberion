@@ -31,6 +31,11 @@ import {
 } from '@agent/core/execution-bounds';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
+import {
+  runExternalOperation,
+  assertExternalOperationBatchResumable,
+} from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 
 /**
  * Network-Actuator v2.2.0 [A2A TRANSPORT ENABLED]
@@ -151,6 +156,31 @@ async function executePipeline(
   initialCtx: NetworkPipelineContext = {},
   options: NetworkPipelineOptions = {}
 ) {
+  const countExternal = (items: PipelineStep[]): number =>
+    items.reduce((count, step) => {
+      const params = isRecord(step.params) ? step.params : {};
+      if (step.op === 'shell' || step.op === 'a2a_send') return count + 1;
+      if (step.op === 'fetch') {
+        const method =
+          params.method === undefined ? 'GET' : String(params.method).trim().toUpperCase();
+        return count + (method === 'GET' || method === 'HEAD' ? 0 : 1);
+      }
+      const nested = (value: unknown) =>
+        Array.isArray(value) ? countExternal(value as PipelineStep[]) : 0;
+      if (step.op === 'if') return count + Math.max(nested(params.then), nested(params.else));
+      if (step.op === 'while') {
+        const effects = nested(params.pipeline);
+        return (
+          count +
+          (effects && (typeof params.max_iterations !== 'number' || params.max_iterations > 1)
+            ? Math.max(2, effects)
+            : effects)
+        );
+      }
+      return count;
+    }, 0);
+  assertExternalOperationBatchResumable(() => countExternal(steps));
+  let occurrence = 0;
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
@@ -170,10 +200,15 @@ async function executePipeline(
     context: ctx,
     options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
     handlers: {
-      capture: opCapture,
+      capture: (op, params, currentCtx) =>
+        withExternalOperationOccurrence(`network:${occurrence++}`, () =>
+          opCapture(op, params, currentCtx)
+        ),
       transform: opTransform,
       apply: async (op, params, currentCtx) => {
-        await opApply(op, params, currentCtx);
+        await withExternalOperationOccurrence(`network:${occurrence++}`, () =>
+          opApply(op, params, currentCtx)
+        );
         return currentCtx;
       },
       control: opControl,
@@ -237,18 +272,36 @@ async function opControl(
 async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
   const params = requireParams(rawParams, `network:${op}`);
   switch (op) {
-    case 'fetch':
-      const response = await retry(async () => {
-        return await secureFetch({
-          method: readStringParam(params, 'method', 'GET'),
-          url: resolveVars(params.url, ctx),
-          headers: readHeaders(params.headers),
-          data: params.data,
-          params: params.query,
-          timeout: readNumberParam(params, 'timeout', 20000),
-        });
-      }, buildRetryOptions(params));
+    case 'fetch': {
+      const method = readStringParam(params, 'method', 'GET').trim().toUpperCase();
+      const request = {
+        method,
+        url: resolveVars(params.url, ctx),
+        headers: readHeaders(params.headers),
+        data: params.data,
+        params: params.query,
+        timeout: readNumberParam(params, 'timeout', 20000),
+      };
+      const readOnly = method === 'GET' || method === 'HEAD';
+      const fetch = () => secureFetch(request);
+      const response = await runExternalOperation(
+        {
+          operationId: 'network:fetch',
+          effect: { params: request },
+          requiresApproval: !readOnly,
+          delegable: false,
+        },
+        () => (readOnly ? retry(fetch, buildRetryOptions(params)) : fetch()),
+        (result) =>
+          isRecord(result) &&
+          (result.ok === false ||
+            result.success === false ||
+            ['error', 'failed', 'denied'].includes(String(result.status)))
+            ? 'failed'
+            : 'succeeded'
+      );
       return { ...ctx, [exportKey(params, 'last_capture')]: response };
+    }
 
     case 'exposure_check': {
       // Batch reachability probe (external-asset inventory Phase 3): each item
@@ -258,7 +311,10 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
       if (!Array.isArray(rawItems)) throw new Error('network:exposure_check requires items: array');
       const maxItems = readNumberParam(params, 'max_items', 100);
       const timeout = readNumberParam(params, 'timeout', 8000);
-      const method = readStringParam(params, 'method', 'GET');
+      const method = readStringParam(params, 'method', 'GET').trim().toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD') {
+        throw new Error('network:exposure_check method must be GET or HEAD');
+      }
       const checkId = readStringParam(params, 'check_id', 'A-1-reachability');
       const checks: Array<Record<string, unknown>> = [];
       let malformed = 0;
@@ -274,10 +330,26 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
         let result: string;
         let evidence: string;
         try {
-          await secureFetch({ url: endpoint, method, timeout });
+          await runExternalOperation(
+            {
+              operationId: 'network:exposure_check',
+              effect: { params: { url: endpoint, method, timeout } },
+              requiresApproval: false,
+              delegable: false,
+            },
+            () => secureFetch({ url: endpoint, method, timeout }),
+            () => 'succeeded'
+          );
           result = 'reachable';
           evidence = `${method} ok`;
         } catch (err) {
+          if (
+            err &&
+            typeof err === 'object' &&
+            'adfControlFlow' in err &&
+            err.adfControlFlow === 'preflight'
+          )
+            throw err;
           const status = err instanceof SecureFetchError ? err.httpStatus : undefined;
           if (typeof status === 'number') {
             // Any HTTP response proves the endpoint is exposed.
@@ -308,10 +380,21 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
       };
     }
 
-    case 'shell':
+    case 'shell': {
       assertUnsafeShellAllowed();
       const cmd = String(resolveVars(params.cmd, ctx) ?? '');
-      return { ...ctx, [exportKey(params, 'last_capture')]: safeExec(cmd).trim() };
+      const output = await runExternalOperation(
+        {
+          operationId: 'network:shell',
+          effect: { params: { cmd } },
+          requiresApproval: true,
+          delegable: false,
+        },
+        async () => safeExec(cmd).trim(),
+        () => 'succeeded'
+      );
+      return { ...ctx, [exportKey(params, 'last_capture')]: output };
+    }
 
     case 'a2a_poll':
       const messages = await pollA2AInbox(readStringParam(params, 'method', 'local'));

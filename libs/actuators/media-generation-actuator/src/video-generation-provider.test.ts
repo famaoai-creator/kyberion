@@ -268,3 +268,6 @@ describe('purpose-driven video provider selection', () => {
     expect(await applyVideoProviderSelection(square)).toBe(square);
   });
 });
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));

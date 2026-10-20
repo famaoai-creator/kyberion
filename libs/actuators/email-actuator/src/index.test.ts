@@ -50,7 +50,7 @@ describe('email-actuator', () => {
   });
 
   it('creates a draft from direct parameters', async () => {
-    mocks.createDraft.mockResolvedValue({ message: 'draft-created' });
+    mocks.createDraft.mockResolvedValue({ status: 'succeeded', message: 'draft-created' });
 
     const result = await handleAction({
       action: 'create_draft',
@@ -71,7 +71,7 @@ describe('email-actuator', () => {
 
   it('reads body_file before sending', async () => {
     mocks.safeReadFile.mockReturnValue('Hello from file');
-    mocks.sendEmail.mockResolvedValue({ message: 'sent' });
+    mocks.sendEmail.mockResolvedValue({ status: 'succeeded', message: 'sent' });
 
     const result = await handleAction({
       action: 'send_from_file',

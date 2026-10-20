@@ -551,11 +551,10 @@ export function applyRestrictedActionGate(
 }
 
 /**
- * Execute every operator_self pending item: gate restricted items,
- * then for each allowed item, mark in_progress, delegate the plan to
- * the reasoning backend, and transition to completed (or blocked on
- * failure). Returns a structured report; mutates the action-item
- * store via `updateActionItemStatus`.
+ * Prepare plans for operator_self pending items after the restricted gate.
+ * Generated reasoning is not an execution receipt: retain the plan and block
+ * until actual execution is verified. Blocked items are not replanned on each
+ * loop. Returns the existing dispatched report and updates the action-item store.
  */
 export async function executeSelfActionItemsOp(input: {
   mission_id: string;
@@ -603,7 +602,7 @@ export async function executeSelfActionItemsOp(input: {
       plan = await delegateMeetingReasoning({
         backend,
         prompt: [
-          `You are dispatching an action item to the operator. Output ONLY a JSON object: { "plan": str (≤ 5 sentences), "completion_summary": str (≤ 3 sentences) }.`,
+          `Prepare an action-item execution plan. Output ONLY a JSON object: { "plan": str (≤ 5 sentences) }. Do not claim execution or completion.`,
           `No prose, no code fence. Language: ${language}.`,
           `Action item title: "${item.title}".`,
           item.summary ? `Summary: ${item.summary}` : '',
@@ -616,10 +615,8 @@ export async function executeSelfActionItemsOp(input: {
         work_item_id: input.work_item_id,
         task_id: `self-exec-${item.item_id}`,
       });
-      let summary = '';
       try {
         const parsed = parseMeetingModelObject(extractFirstJsonBlock(plan));
-        if (typeof parsed.completion_summary === 'string') summary = parsed.completion_summary;
         if (typeof parsed.plan === 'string') plan = parsed.plan;
       } catch {
         /* keep raw plan */
@@ -627,11 +624,12 @@ export async function executeSelfActionItemsOp(input: {
       updateActionItemStatus({
         mission_id: input.mission_id,
         item_id: item.item_id,
-        status: 'completed',
+        status: 'blocked',
+        blocked_reason: 'plan_ready_requires_execution_receipt',
         execution: {
           executed_via: 'agent_delegate',
           execution_ref: `delegateTask:self-exec:${item.item_id}`,
-          ...(summary ? { result_summary: summary } : {}),
+          result_summary: plan,
         },
       });
     } catch (err: any) {

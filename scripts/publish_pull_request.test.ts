@@ -5,6 +5,12 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   checkPrKnowledgeReadiness: vi.fn(),
+  ghPrCreate: vi.fn(),
+}));
+
+vi.mock('@agent/core/vcs', async (original) => ({
+  ...(await original<typeof import('@agent/core/vcs')>()),
+  ghPrCreate: mocks.ghPrCreate,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
@@ -33,6 +39,11 @@ import {
 
 /** Default `safeExec` stub covering every gh/git call `main()` makes before `gh pr create`. */
 function stubGhAndGit(): void {
+  mocks.ghPrCreate.mockReturnValue({
+    status: 0,
+    stdout: 'https://github.com/acme/repo/pull/1\n',
+    stderr: '',
+  });
   mocks.safeExec.mockImplementation((command: string, args: string[] = []) => {
     if (command === 'gh' && args[0] === '--version') return 'gh version 2.0.0\n';
     if (command === 'gh' && args[0] === 'auth') return 'Logged in to github.com\n';
@@ -249,7 +260,16 @@ describe('main() wiring (KL-03)', () => {
       '--skip-readiness',
     ]);
     const ghCalls = mocks.safeExec.mock.calls.filter(([command]) => command === 'gh');
-    expect(ghCalls.map(([, args]) => args[0])).toEqual(['--version', 'auth', 'repo', 'pr']);
+    expect(ghCalls.map(([, args]) => args[0])).toEqual(['--version', 'auth', 'repo']);
+    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: {
+          GH_TOKEN: undefined,
+          GITHUB_TOKEN: undefined,
+          [name]: 'fake-github-credential',
+        },
+      })
+    );
     for (const [, , options] of ghCalls) {
       expect(options.env).toEqual({
         GH_TOKEN: undefined,
@@ -281,11 +301,18 @@ describe('main() wiring (KL-03)', () => {
       expect.arrayContaining(['check']),
       expect.anything()
     );
-    expect(mocks.safeExec).toHaveBeenCalledWith(
-      'gh',
-      expect.arrayContaining(['pr', 'create']),
-      expect.anything()
+    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'fix(pr): guard knowledge readiness',
+        base: 'main',
+        head: 'agent/kl-03',
+        bodyFile: 'body.md',
+        draft: true,
+      })
     );
+    expect(
+      mocks.safeExec.mock.calls.some(([command, args]) => command === 'gh' && args[0] === 'pr')
+    ).toBe(false);
   });
 
   it('aborts before calling gh pr create when the knowledge check fails, even with --skip-readiness', async () => {
@@ -310,6 +337,47 @@ describe('main() wiring (KL-03)', () => {
       ([command, args]) => command === 'gh' && Array.isArray(args) && args[0] === 'pr'
     );
     expect(prCreateCalls).toEqual([]);
+    expect(mocks.ghPrCreate).not.toHaveBeenCalled();
+  });
+
+  it('preserves typed approval suspension without a generic mutation fallback', async () => {
+    stubGhAndGit();
+    const body = '  ## Knowledge\nnone — exact reviewed body\n\n';
+    mocks.safeReadFile.mockReturnValue(body);
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+    const pending = Object.assign(new Error('EXTERNAL_APPROVAL_REQUIRED'), {
+      adfControlFlow: 'preflight',
+    });
+    mocks.ghPrCreate.mockImplementation(() => {
+      throw pending;
+    });
+    await expect(
+      main([
+        '--title',
+        'fix(pr): typed publication',
+        '--body-file',
+        'review body.md',
+        '--skip-readiness',
+        '--no-draft',
+      ])
+    ).rejects.toBe(pending);
+    expect(mocks.checkPrKnowledgeReadiness).toHaveBeenCalledWith(expect.objectContaining({ body }));
+    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ bodyFile: 'review body.md', draft: false })
+    );
+    expect(
+      mocks.safeExec.mock.calls.some(([command, args]) => command === 'gh' && args[0] === 'pr')
+    ).toBe(false);
+  });
+
+  it('reports typed transport failure instead of printing a successful publication', async () => {
+    stubGhAndGit();
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+    mocks.ghPrCreate.mockReturnValue({ status: 1, stdout: '', stderr: 'publication failed' });
+    await expect(
+      main(['--title', 'fix(pr): typed publication', '--body-file', 'body.md', '--skip-readiness'])
+    ).rejects.toThrow('publication failed');
   });
 
   it('aborts before calling gh pr create when --body-file is missing (e.g. --fill)', async () => {

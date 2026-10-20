@@ -49,6 +49,14 @@ const BROWSER_CONTROL_SCHEMA: InputSchema = {
   additionalProperties: false,
 };
 const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
+  local_session_probe: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', minLength: 1 },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
   distill_dom: {
     type: 'object',
     properties: { export_as: { type: 'string' }, max_elements: { type: 'number' } },
@@ -292,6 +300,7 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
 };
 
 const BROWSER_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
+  local_session_probe: [{ path: 'active/shared/tmp/first-win-session.png' }],
   distill_dom: [{ max_elements: 50 }],
   console: [{ limit: 20 }],
   evaluate: [{ script: 'document.title' }],
@@ -346,6 +355,7 @@ export const BROWSER_ACTUATOR_CAPTURE_OPS = [
   'query_elements',
   'extract_text_ref',
   'session_health',
+  'local_session_probe',
   'action_trail',
   'screenshot',
   'snapshot',

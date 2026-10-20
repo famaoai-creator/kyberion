@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import type { AudioChunk } from '../meeting/meeting-session-types.js';
 import { pathResolver } from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -11,10 +12,15 @@ import {
   safeExecShellScript,
   safeMkdir,
   safeWriteFile,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeStat,
 } from '../secure-io.js';
 import { resolveVoicePath } from './voice-path-policy.js';
 import { clamp } from '../foundation/text.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { runExternalOperation } from '../governance/external-operation.js';
 
 export interface RecordVoiceSampleRequest {
   action: 'record_voice_sample';
@@ -234,25 +240,49 @@ export async function recordVoiceSample(
       };
     }
 
-    await prepareRecording(promptText, countdownSec, promptDisplayHoldMs);
     const selectedInput =
       String(input.input_device_preference || '').trim() || probe.inputs[0] || '';
     const chunks: AudioChunk[] = [];
+    let recordedMetrics: AudioCaptureMetrics | undefined;
     let capturedBytes = 0;
     let lastProgressSecond = -1;
-    for await (const chunk of bridge.captureStream(selectedInput || undefined, {
-      duration_sec: durationSec,
-      prompt_text: promptText || undefined,
-    })) {
-      chunks.push(chunk);
-      capturedBytes += chunk.payload.byteLength;
-      const capturedSec = capturedBytes / (chunk.format.sample_rate_hz * chunk.format.channels * 2);
-      const progressSecond = Math.floor(capturedSec);
-      if (progressSecond > lastProgressSecond) {
-        lastProgressSecond = progressSecond;
-        logger.info(`[VOICE] ${renderProgress(capturedSec, durationSec)}`);
-      }
-    }
+    await runExternalOperation(
+      {
+        operationId: 'voice:record_sample',
+        effect: {
+          params: {
+            backend: 'native-microphone',
+            input_device: selectedInput,
+            duration_sec: durationSec,
+            output_path: outputPath,
+            request_id: requestId,
+            sample_id: sampleId,
+            prompt: promptText,
+          },
+        },
+        requiresApproval: true,
+        delegable: true,
+      },
+      async () => {
+        await prepareRecording(promptText, countdownSec, promptDisplayHoldMs);
+        for await (const chunk of bridge.captureStream(selectedInput || undefined, {
+          duration_sec: durationSec,
+          prompt_text: promptText || undefined,
+        })) {
+          chunks.push(chunk);
+          capturedBytes += chunk.payload.byteLength;
+          const capturedSec =
+            capturedBytes / (chunk.format.sample_rate_hz * chunk.format.channels * 2);
+          const progressSecond = Math.floor(capturedSec);
+          if (progressSecond > lastProgressSecond) {
+            lastProgressSecond = progressSecond;
+            logger.info(`[VOICE] ${renderProgress(capturedSec, durationSec)}`);
+          }
+        }
+        if (chunks.length > 0) recordedMetrics = writeWavFromAudioChunks(outputPath, chunks);
+      },
+      () => (chunks.length > 0 ? 'succeeded' : 'unknown')
+    );
     if (chunks.length === 0) {
       return {
         status: 'blocked',
@@ -267,7 +297,7 @@ export async function recordVoiceSample(
       };
     }
 
-    const metrics = writeWavFromAudioChunks(outputPath, chunks);
+    const metrics = recordedMetrics!;
     const minDurationSec = Math.max(1, durationSec * 0.75);
     if (metrics.duration_sec < minDurationSec) {
       return {
@@ -344,10 +374,49 @@ export async function recordVoiceSample(
     sample_id: shellQuote(sampleId),
     request_id: shellQuote(requestId),
   });
-  safeExecShellScript(shell, command, {
-    login: true,
-    timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000),
-  });
+  const digestOutput = () =>
+    safeExistsSync(outputPath) && safeLstat(outputPath).isFile()
+      ? createHash('sha256')
+          .update(safeReadFile(outputPath) as Buffer)
+          .digest('hex')
+      : undefined;
+  const previousOutput = digestOutput();
+  await runExternalOperation(
+    {
+      operationId: 'voice:record_sample',
+      effect: {
+        params: {
+          backend: 'shell-command',
+          shell,
+          command,
+          duration_sec: durationSec,
+          output_path: outputPath,
+        },
+      },
+      requiresApproval: true,
+      delegable: false,
+    },
+    async () => {
+      safeExecShellScript(shell, command, {
+        login: true,
+        timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000),
+      });
+      if (
+        !safeExistsSync(outputPath) ||
+        !safeLstat(outputPath).isFile() ||
+        safeStat(outputPath).size <= 0 ||
+        !['.wav', '.mp3', '.ogg', '.aiff', '.aif', '.flac', '.m4a', '.aac', '.opus'].includes(
+          path.extname(outputPath).toLowerCase()
+        ) ||
+        digestOutput() === previousOutput
+      ) {
+        throw new Error(
+          '[VOICE_RECORDING_UNVERIFIED] Command did not create a new nonempty audio sample'
+        );
+      }
+    },
+    () => 'succeeded'
+  );
 
   return {
     status: 'succeeded',

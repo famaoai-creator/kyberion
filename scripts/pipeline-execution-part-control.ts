@@ -19,6 +19,11 @@ import {
   resolveCapabilityEffect,
 } from '@agent/core/actuator/actuator-manifest-index';
 import { logger } from '@agent/core/core';
+import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
+import {
+  withExternalOperationApprovalObserver,
+  type ExternalOperationApprovalBlock,
+} from '@agent/core/governance/external-operation';
 import { safeExistsSync, type SafeShell } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
@@ -1328,21 +1333,70 @@ async function dispatchResolvedActuatorOperation(
   const effectiveType = resolveStepType(step);
   const dispatch = await loadActuatorDispatch(domain, resolvedOperation);
   assertPipelineExecutionCurrent(opts);
-  const result = await runLeafEffect(step, ctx, opts, params, () =>
-    dispatch(
-      action,
-      {
-        ...params,
-        _reasoning_policy: stepPolicy,
-        _facets: step.facets,
-        _step_id: step.id || step.op,
-      },
-      ctx,
-      effectiveType,
-      opts.trace,
-      stepPolicy
-    )
-  );
+  const observed: { block?: ExternalOperationApprovalBlock } = {};
+  const throwObservedApproval = () => {
+    const block = observed.block;
+    if (!block) return;
+    const approval = block.approval;
+    if (
+      approval.requestId &&
+      (approval.requestStatus === 'created' || approval.requestStatus === 'pending') &&
+      opts.runId
+    ) {
+      throw new PipelineSuspendedError({
+        step_id: step.id || step.op,
+        approval_request_id: approval.requestId,
+        storage_channel: block.channel,
+        approval_correlation_id: block.correlationId,
+        on_timeout: 'deny',
+        reason: approval.message,
+      });
+    }
+    // A denied/rejected/expired/no-human decision is a terminal governance
+    // result, never a broken contract for the autonomous repair loop.
+    const denied = new Error(
+      approval.message || '[EXTERNAL_APPROVAL_REQUIRED] External admission blocked'
+    );
+    (denied as Error & { adfControlFlow: string }).adfControlFlow = 'preflight';
+    throw denied;
+  };
+  const result = await runLeafEffect(step, ctx, opts, params, async () => {
+    let admittedResult: Awaited<ReturnType<typeof dispatch>>;
+    try {
+      admittedResult = await withExternalOperationApprovalObserver(
+        (block) => {
+          observed.block ??= block;
+        },
+        () =>
+          withRuntimeExternalOperationAuthority(
+            {
+              runId: opts.runId,
+              stepId: step.id || step.op,
+              hasHuman: opts.hasHuman,
+            },
+            () =>
+              dispatch(
+                action,
+                {
+                  ...params,
+                  _reasoning_policy: stepPolicy,
+                  _facets: step.facets,
+                  _step_id: step.id || step.op,
+                },
+                ctx,
+                effectiveType,
+                opts.trace,
+                stepPolicy
+              )
+          )
+      );
+    } catch (error) {
+      throwObservedApproval();
+      throw error;
+    }
+    throwObservedApproval();
+    return admittedResult;
+  });
   if (!result.handled) {
     throw new Error(`Unsupported pipeline op: ${step.op}`);
   }

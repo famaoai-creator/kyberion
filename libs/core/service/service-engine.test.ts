@@ -297,6 +297,101 @@ describe('executeServicePreset', () => {
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 
+  it('never retries or switches alternatives after an ambiguous POST effect', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: {
+              send: {
+                risk: 'write',
+                alternatives: [
+                  { type: 'api', path: 'send', method: 'POST' },
+                  { type: 'api', path: 'fallback', method: 'POST' },
+                ],
+              },
+            },
+          })
+        : ''
+    );
+    mocks.secureFetch.mockRejectedValueOnce(new Error('connection lost after send'));
+    await expect(executeServicePreset('test-service', 'send', {}, 'none')).rejects.toThrow(
+      'outcome is unknown'
+    );
+    expect(mocks.secureFetch).toHaveBeenCalledTimes(1);
+    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { maxRetries: 0 });
+  });
+
+  it('never retries an opaque CLI operation even with read metadata', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            allow_unsafe_cli: true,
+            operations: {
+              send: {
+                risk: 'read',
+                type: 'cli',
+                command: 'opaque-cli',
+                args: [],
+              },
+            },
+          })
+        : ''
+    );
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockRejectedValueOnce(new Error('transport closed'));
+    await expect(executeServicePreset('test-service', 'send', {}, 'none')).rejects.toThrow(
+      'transport closed'
+    );
+    expect(mocks.safeExec).toHaveBeenCalledTimes(1);
+    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { maxRetries: 0 });
+  });
+
+  it('withholds provider secrets when propagating ambiguous authenticated mutations', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({ operations: { send: { type: 'api', path: 'send', method: 'POST' } } })
+        : ''
+    );
+    mocks.resolveServiceBinding.mockReturnValue({
+      accessToken: 'test-token',
+      authMode: 'secret-guard',
+    } as ReturnType<typeof mocks.resolveServiceBinding>);
+    mocks.secureFetch.mockRejectedValueOnce(new Error('Authorization: secret-token'));
+    const error = await executeServicePreset('test-service', 'send', {}, 'secret-guard').catch(
+      (failure: unknown) => failure
+    );
+    expect((error as Error).message).toContain('outcome is unknown');
+    expect((error as Error).message).not.toContain('secret-token');
+    expect(mocks.secureFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains retries for proven HTTP reads', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({ operations: { read: { type: 'api', path: 'items', method: 'GET' } } })
+        : ''
+    );
+    mocks.secureFetch
+      .mockRejectedValueOnce(new Error('temporary disconnect'))
+      .mockResolvedValueOnce({ ok: true });
+    mocks.retry.mockImplementationOnce(async (fn, options) => {
+      try {
+        return await fn();
+      } catch (error) {
+        if (!(Number((options as { maxRetries?: number }).maxRetries) > 0)) throw error;
+        return await fn();
+      }
+    });
+    await expect(executeServicePreset('test-service', 'read', {}, 'none')).resolves.toEqual({
+      ok: true,
+    });
+    expect(mocks.secureFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects direct calls for a tenant-bound service without actuator admission context', async () => {
     const { executeServicePreset, executeServicePresetCached } =
       await import('./service-engine.js');

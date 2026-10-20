@@ -9,6 +9,41 @@ import type {
   CalendarBackendAvailabilityOverrides,
   CalendarBackendPreference,
 } from './calendar-types.js';
+import {
+  runCalendarExternalEffect,
+  type CalendarMutationKind,
+} from '@agent/core/meeting/calendar-external-effect';
+import type { CalendarParams } from './calendar-types.js';
+
+function governCalendarBackend(adapter: CalendarBackendAdapter): CalendarBackendAdapter {
+  const mutations = {
+    createEvent: 'create_event',
+    updateEvent: 'update_event',
+    deleteEvent: 'delete_event',
+  } as const;
+  const methods = new Map<PropertyKey, unknown>();
+  return new Proxy(adapter, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (typeof value !== 'function') return value;
+      if (!methods.has(property)) {
+        const kind: CalendarMutationKind | undefined = Object.hasOwn(mutations, property)
+          ? mutations[property as keyof typeof mutations]
+          : undefined;
+        methods.set(
+          property,
+          kind
+            ? (params: CalendarParams) =>
+                runCalendarExternalEffect(params, kind, { backend: target.id, params }, () =>
+                  value.call(target, params)
+                )
+            : value.bind(target)
+        );
+      }
+      return methods.get(property);
+    },
+  });
+}
 
 export type {
   CalendarBackend,
@@ -58,7 +93,7 @@ export class CalendarBackendRegistry {
     if (this.adapters.has(id)) {
       throw new Error(`calendar-actuator: backend adapter "${id}" is already registered`);
     }
-    this.adapters.set(id, adapter);
+    this.adapters.set(id, governCalendarBackend(adapter));
     return this;
   }
 

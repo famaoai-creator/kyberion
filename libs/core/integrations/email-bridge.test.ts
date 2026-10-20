@@ -18,6 +18,12 @@ vi.mock('node:child_process', () => ({
   spawn: mocks.spawn,
 }));
 
+// Transport fixture tests retain real provider execution; admission is tested
+// separately with the real external-operation facade.
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_operation, execute) => execute()),
+}));
+
 describe('EmailPolicyRouter', () => {
   let mockMacMail: EmailProvider;
   let mockSmtp: EmailProvider;
@@ -58,7 +64,7 @@ describe('EmailPolicyRouter', () => {
 
   it('supports explicit backend selection without caller-specific branches', async () => {
     const router = new EmailPolicyRouter([mockMacMail, mockSmtp]);
-    await expect(router.selectProvider('send', 'smtp')).resolves.toBe(mockSmtp);
+    await expect(router.selectProvider('send', 'smtp')).resolves.toMatchObject({ id: mockSmtp.id });
     await expect(router.selectProvider('create_draft', 'smtp')).rejects.toThrow(
       /not available|does not support draft creation/i
     );
@@ -72,7 +78,7 @@ describe('EmailPolicyRouter', () => {
       createDraft: vi.fn(),
     };
     const registry = new EmailBackendRegistry([outlook]);
-    await expect(registry.resolve('outlook', 'send')).resolves.toBe(outlook);
+    await expect(registry.resolve('outlook', 'send')).resolves.toMatchObject({ id: outlook.id });
   });
 });
 

@@ -13,6 +13,10 @@ import { decideFromObservation } from '@agent/core/semantic-decide';
 import { getRetryDefaults } from '@agent/core/async-utils';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
+import { countBrowserExternalEffects } from './browser-external-governance.js';
+import { runLocalSessionProbe } from './browser-local-session-probe.js';
 import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
@@ -109,6 +113,15 @@ export async function executePipeline(
     const op = step.op.startsWith('browser:') ? step.op.slice('browser:'.length) : step.op;
     return { ...step, op: op === 'navigate' ? 'goto' : op };
   });
+  if (steps.some((step) => step.op === 'local_session_probe')) {
+    if (steps.length !== 1 || steps[0].type !== 'capture') {
+      throw new Error(
+        '[BROWSER_LOCAL_PROBE_CONTRACT] The isolated probe must be the only capture step.'
+      );
+    }
+    return runLocalSessionProbe(steps[0].params || {}, initialCtx);
+  }
+  assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
   const { sessionId, options } = preflightAutomationRuntime(
     steps,
     inputSessionId,
@@ -149,6 +162,7 @@ export async function executePipeline(
   if (options.record_video && !safeExistsSync(resolvedVideoDir))
     safeMkdir(resolvedVideoDir, { recursive: true });
 
+  const hadExistingLease = browserRuntimeHelpers.hasBrowserRuntimeLease(sessionId);
   const browserContext = await browserRuntimeHelpers.getOrCreateBrowserContext(
     sessionId,
     userDataDir,
@@ -281,6 +295,9 @@ export async function executePipeline(
   };
 
   let engineResult!: Awaited<ReturnType<typeof runAdfActuatorPipeline>>;
+  let externalOccurrence = 0;
+  const runStep = <T>(op: string, execute: () => Promise<T>) =>
+    withExternalOperationOccurrence(`browser-substep:${externalOccurrence++}:${op}`, execute);
   try {
     engineResult = await runAdfActuatorPipeline({
       actuatorId: 'browser',
@@ -289,11 +306,12 @@ export async function executePipeline(
       options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
       handlers: {
         capture: (op, params, stepCtx, resolveFn) =>
-          opCapture(op, params, runtime, stepCtx, resolveFn),
+          runStep(op, () => opCapture(op, params, runtime, stepCtx, resolveFn)),
         transform: (op, params, stepCtx, resolveFn) => opTransform(op, params, stepCtx, resolveFn),
-        apply: (op, params, stepCtx, resolveFn) => opApply(op, params, runtime, stepCtx, resolveFn),
+        apply: (op, params, stepCtx, resolveFn) =>
+          runStep(op, () => opApply(op, params, runtime, stepCtx, resolveFn)),
         control: (op, params, stepCtx, runSteps, resolveFn) =>
-          opControl(op, params, runtime, stepCtx, runSteps, resolveFn),
+          runStep(op, () => opControl(op, params, runtime, stepCtx, runSteps, resolveFn)),
       },
       hooks,
     });
@@ -363,7 +381,11 @@ export async function executePipeline(
       Number(options.lease_ms || 0) > 0 ||
       outerOptions?.keep_alive === true ||
       Number(outerOptions?.lease_ms || 0) > 0;
-    const shouldClose = ctx.__close_browser_session === true || !keepAlive;
+    // A denied/failed first step must not retain a newly allocated process.
+    // Existing shared sessions remain owned by their original caller.
+    const failedNewSession =
+      !hadExistingLease && (Boolean(ctx.error) || engineResult?.status === 'failed');
+    const shouldClose = ctx.__close_browser_session === true || !keepAlive || failedNewSession;
     const leaseExpiresAt = shouldClose
       ? undefined
       : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
@@ -421,7 +443,13 @@ export async function executePipeline(
         recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
         scope_fingerprint: sessionScopeFingerprint,
       } as any);
-      await browserContext.close();
+      if (failedNewSession) {
+        // The acquired lease may be a new connection to an existing CDP
+        // browser. Its release disconnects without destroying remote tabs.
+        await browserRuntimeHelpers.closeBrowserSession(sessionId);
+      } else {
+        await browserContext.close();
+      }
     } else {
       ctx.recorded_videos = [];
       ctx.video_output_dir = videoRecordingEnabled ? resolvedVideoDir : undefined;
@@ -567,8 +595,13 @@ export async function fillWithFallback(
     text: string;
     timeoutMs: number;
     fieldHint?: string;
+    singleAttempt?: boolean;
   }
 ): Promise<{ strategy: string }> {
+  if (input.singleAttempt) {
+    await page.fill(input.selector, input.text, { timeout: input.timeoutMs });
+    return { strategy: 'selector' };
+  }
   const attempts: string[] = [];
   const hint =
     input.fieldHint ||

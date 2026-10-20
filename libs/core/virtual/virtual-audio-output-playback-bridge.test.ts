@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+}));
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -28,7 +32,7 @@ vi.mock('../secure-io.js', async () => {
     safeRmSync: vi.fn(),
     safeCreateExclusiveFileSync: vi.fn(),
     safeExistsSync: vi.fn(() => false),
-    safeReadFile: vi.fn(),
+    safeReadFile: vi.fn((filePath: string) => actual.safeReadFile(filePath)),
     safeUnlink: vi.fn(),
   };
 });

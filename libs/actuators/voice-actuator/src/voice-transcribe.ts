@@ -75,6 +75,7 @@ export async function transcribeVoiceSample(input: {
       candidates.push(candidate);
       return candidate;
     } catch (error: any) {
+      if (error?.adfControlFlow === 'preflight') throw error;
       const normalized = error instanceof Error ? error : new Error(String(error));
       errors.push(normalized);
       logger.warn(`[VOICE] STT bridge ${bridge.name} unavailable: ${normalized.message}`);

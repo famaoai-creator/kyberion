@@ -73,7 +73,9 @@
       "active/shared/runtime/autonomy-learning/personal/",
       "active/shared/runtime/autonomy-learning/confidential/",
       "active/shared/runtime/pipeline-library-runs/personal/",
-      "active/shared/runtime/pipeline-library-runs/confidential/"
+      "active/shared/runtime/pipeline-library-runs/confidential/",
+      "active/shared/runtime/external-operations/personal/",
+      "active/shared/runtime/external-operations/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",

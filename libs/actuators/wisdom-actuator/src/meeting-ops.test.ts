@@ -1,5 +1,10 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// These synthetic tenant fixtures must not append customer audit mirrors.
+vi.mock('@agent/core/governance/audit-chain', () => ({
+  auditChain: { record: vi.fn(() => ({ id: 'meeting-ops-test-audit' })) },
+}));
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { ActionItem } from '@agent/core/action-item-store';
@@ -172,7 +177,7 @@ describe('action-item follow-up ops', () => {
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
   });
 
-  it('executeSelfActionItemsOp completes allowed pending self items and blocks restricted ones with reasons', async () => {
+  it('executeSelfActionItemsOp retains generated plans without claiming execution or replanning blocked items', async () => {
     recordActionItem({
       item_id: 'AI-SELF-1',
       mission_id: FIX_MISSION,
@@ -202,19 +207,38 @@ describe('action-item follow-up ops', () => {
         restriction_rule_id: 'rest.financial-transfer',
       }),
     ]);
-    expect(items.find((i) => i.item_id === 'AI-SELF-1')?.status).toBe('completed');
+    const planned = items.find((i) => i.item_id === 'AI-SELF-1');
+    expect(planned?.status).toBe('blocked');
+    expect(planned?.blocked_reason).toBe('plan_ready_requires_execution_receipt');
+    expect(planned?.execution?.result_summary).toBe(report.dispatched[0].plan);
+    expect(planned?.execution?.result_summary).not.toContain('completed self-exec:');
     expect(items.find((i) => i.item_id === 'AI-REST-1')?.status).toBe('blocked');
     expect(items.find((i) => i.item_id === 'AI-REST-1')?.blocked_reason).toContain(
       'restricted-action-kinds gate'
     );
     expect(summary.by_owner_kind.operator_self).toBe(2);
-    expect(summary.blocked_items).toEqual([
-      expect.objectContaining({
-        item_id: 'AI-REST-1',
-        owner_kind: 'operator_self',
-        blocked_reason: expect.stringContaining('restricted-action-kinds gate'),
-      }),
-    ]);
+    expect(summary.blocked_items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          item_id: 'AI-SELF-1',
+          owner_kind: 'operator_self',
+          blocked_reason: 'plan_ready_requires_execution_receipt',
+        }),
+        expect.objectContaining({
+          item_id: 'AI-REST-1',
+          owner_kind: 'operator_self',
+          blocked_reason: expect.stringContaining('restricted-action-kinds gate'),
+        }),
+      ])
+    );
+    expect(summary.blocked_items).toHaveLength(2);
+    const nextReport = await executeSelfActionItemsOp({
+      mission_id: FIX_MISSION,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF-NEXT').item_id,
+      policy: basePolicy(),
+    });
+    expect(nextReport.dispatched).toEqual([]);
+    expect(listActionItems(FIX_MISSION).find((i) => i.item_id === 'AI-SELF-1')).toEqual(planned);
   });
 
   it('trackPendingActionItemsOp reminds only pending team members and suppresses duplicate reminder records', async () => {

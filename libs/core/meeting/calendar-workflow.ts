@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { runCalendarExternalEffect } from './calendar-external-effect.js';
 import { clamp, isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import {
@@ -369,26 +370,28 @@ export async function createCalendarEvent(
 
   const attendees = input.attendees?.map((attendee) => attendee.trim()).filter(Boolean);
 
-  const response = await bridge.insertEvent({
-    calendarId,
-    summary,
-    start: normalizeRfc3339Value(start, timeZone || undefined),
-    end: normalizeRfc3339Value(end, timeZone || undefined),
-    ...(input.description?.trim() ? { description: input.description.trim() } : {}),
-    ...(input.location?.trim() ? { location: input.location.trim() } : {}),
-    ...(attendees?.length ? { attendees } : {}),
-    ...(withMeet ? { withMeet: true } : {}),
-    ...(conferenceRequestId ? { conferenceRequestId } : {}),
-    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
-  });
+  return runCalendarExternalEffect(input, 'create_event', { params: input }, async () => {
+    const response = await bridge.insertEvent({
+      calendarId,
+      summary,
+      start: normalizeRfc3339Value(start, timeZone || undefined),
+      end: normalizeRfc3339Value(end, timeZone || undefined),
+      ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+      ...(input.location?.trim() ? { location: input.location.trim() } : {}),
+      ...(attendees?.length ? { attendees } : {}),
+      ...(withMeet ? { withMeet: true } : {}),
+      ...(conferenceRequestId ? { conferenceRequestId } : {}),
+      ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+    });
 
-  return {
-    ok: true,
-    calendar_id: calendarId,
-    ...(conferenceRequestId ? { conference_request_id: conferenceRequestId } : {}),
-    with_meet: withMeet,
-    created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
-  };
+    return {
+      ok: true,
+      calendar_id: calendarId,
+      ...(conferenceRequestId ? { conference_request_id: conferenceRequestId } : {}),
+      with_meet: withMeet,
+      created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
+    };
+  });
 }
 
 export async function updateCalendarEvent(
@@ -409,29 +412,33 @@ export async function updateCalendarEvent(
   }
   const timeZone = input.time_zone?.trim() || '';
   const attendees = input.attendees?.map((attendee) => attendee.trim()).filter(Boolean);
-  const response = await bridge.updateEvent({
-    calendarId,
-    eventId,
-    ...(input.summary !== undefined ? { summary: input.summary.trim() } : {}),
-    ...(input.description !== undefined ? { description: input.description.trim() } : {}),
-    ...(input.location !== undefined ? { location: input.location.trim() } : {}),
-    ...(input.start?.trim()
-      ? { start: normalizeRfc3339Value(input.start, timeZone || undefined) }
-      : {}),
-    ...(input.end?.trim() ? { end: normalizeRfc3339Value(input.end, timeZone || undefined) } : {}),
-    ...(attendees ? { attendees } : {}),
-    ...(input.reminder_minutes_before_start !== undefined
-      ? { reminderMinutesBeforeStart: input.reminder_minutes_before_start }
-      : {}),
-    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
-  });
+  return runCalendarExternalEffect(input, 'update_event', { params: input }, async () => {
+    const response = await bridge.updateEvent!({
+      calendarId,
+      eventId,
+      ...(input.summary !== undefined ? { summary: input.summary.trim() } : {}),
+      ...(input.description !== undefined ? { description: input.description.trim() } : {}),
+      ...(input.location !== undefined ? { location: input.location.trim() } : {}),
+      ...(input.start?.trim()
+        ? { start: normalizeRfc3339Value(input.start, timeZone || undefined) }
+        : {}),
+      ...(input.end?.trim()
+        ? { end: normalizeRfc3339Value(input.end, timeZone || undefined) }
+        : {}),
+      ...(attendees ? { attendees } : {}),
+      ...(input.reminder_minutes_before_start !== undefined
+        ? { reminderMinutesBeforeStart: input.reminder_minutes_before_start }
+        : {}),
+      ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+    });
 
-  return {
-    ok: true,
-    calendar_id: calendarId,
-    with_meet: false,
-    created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
-  };
+    return {
+      ok: true,
+      calendar_id: calendarId,
+      with_meet: false,
+      created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
+    };
+  });
 }
 
 export async function deleteCalendarEvent(
@@ -443,10 +450,12 @@ export async function deleteCalendarEvent(
   const calendarId = input.calendar_id?.trim() || 'primary';
   const eventId = input.event_id.trim();
   if (!eventId) throw new Error('event_id is required');
-  await bridge.deleteEvent({
-    calendarId,
-    eventId,
-    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+  return runCalendarExternalEffect(input, 'delete_event', { params: input }, async () => {
+    await bridge.deleteEvent!({
+      calendarId,
+      eventId,
+      ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+    });
+    return { ok: true, calendar_id: calendarId, event_id: eventId };
   });
-  return { ok: true, calendar_id: calendarId, event_id: eventId };
 }

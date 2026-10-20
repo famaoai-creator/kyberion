@@ -12,7 +12,6 @@
  *   2. Audit emission — every session action emits `meeting.<verb>`.
  *   3. Persona binding via the active identity context.
  */
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { assertSafeRepositoryPath, safeLstat, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -25,6 +24,12 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import {
+  assertExternalOperationBatchResumable,
+  runExternalOperation,
+  type ExternalOperationAuthority,
+} from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
@@ -60,6 +65,11 @@ export { MEETING_ALL_SINGLE_OPS };
 
 type MeetingActuatorProvider = NonNullable<MeetingAction['params']['provider']>;
 type MeetingActuatorPlatform = MeetingAction['params']['platform'];
+
+export interface MeetingExecutionOptions {
+  /** Runtime authority callback, never copied from a JSON action or its context. */
+  externalAuthority?: (input: MeetingAction) => ExternalOperationAuthority | undefined;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -154,8 +164,17 @@ function meetingExport(
 async function executeMeetingPipeline(
   steps: MeetingPipelineAction['steps'],
   initialContext: Record<string, unknown> = {},
-  options: MeetingPipelineAction['options'] = {}
+  options: MeetingPipelineAction['options'] = {},
+  executionOptions: MeetingExecutionOptions = {}
 ) {
+  assertExternalOperationBatchResumable(
+    () => steps.filter((step) => ['join', 'listen', 'speak', 'chat'].includes(step.op)).length
+  );
+  let sessionStep = 0;
+  const runSessionStep = (input: MeetingAction) =>
+    withExternalOperationOccurrence(`meeting-substep:${sessionStep++}:${input.action}`, () =>
+      handleSessionAction(input, executionOptions)
+    );
   const result = await runAdfActuatorPipeline({
     actuatorId: 'meeting',
     steps,
@@ -196,7 +215,7 @@ async function executeMeetingPipeline(
         return meetingExport(
           context,
           params as Record<string, unknown>,
-          await handleSessionAction({ action: op as 'listen' | 'status', params }),
+          await runSessionStep({ action: op as 'listen' | 'status', params }),
           `${op}_result`
         );
       },
@@ -214,7 +233,7 @@ async function executeMeetingPipeline(
           return meetingExport(
             context,
             params,
-            await handleSessionAction({
+            await runSessionStep({
               action: op as MeetingAction['action'],
               params: params as unknown as MeetingAction['params'],
             }),
@@ -237,7 +256,10 @@ async function executeMeetingPipeline(
 }
 
 /** Session transport with provider resolution, consent gate, and audit. */
-async function handleSessionAction(input: MeetingAction): Promise<MeetingActionResult> {
+async function handleSessionAction(
+  input: MeetingAction,
+  options: MeetingExecutionOptions = {}
+): Promise<MeetingActionResult> {
   const providerAdapter = resolveMeetingProvider(input.params.provider, input.params.url);
   if (providerAdapter && input.params.provider === 'auto') {
     input = {
@@ -261,6 +283,27 @@ async function handleSessionAction(input: MeetingAction): Promise<MeetingActionR
     );
   }
   input = { ...input, params: preflight.input as MeetingAction['params'] };
+  return runExternalOperation(
+    {
+      operationId: `meeting:${input.action}`,
+      effect: { action: input.action, params: input.params },
+      requiresApproval: ['join', 'listen', 'speak', 'chat'].includes(input.action),
+      delegable: true,
+      authority: options.externalAuthority?.(input),
+    },
+    () => executeSessionTransport(input),
+    (result) =>
+      result.partial_state
+        ? 'unknown'
+        : result.status === 'success'
+          ? 'succeeded'
+          : result.status === 'error' || result.status === 'denied'
+            ? 'failed'
+            : 'unknown'
+  );
+}
+
+async function executeSessionTransport(input: MeetingAction): Promise<MeetingActionResult> {
   const traceCtx = createActuatorTrace('meeting-actuator', input.action, {
     pipelineId: input.params.meeting_id,
   });
@@ -270,7 +313,7 @@ async function handleSessionAction(input: MeetingAction): Promise<MeetingActionR
 
   // Explicit driver ids resolve through MeetingJoinDriver. `playwright`
   // keeps the established subprocess path; `auto` tries the operator's
-  // Chrome and falls back to Playwright for unattended runs.
+  // Chrome. Once a driver is attempted, an error cannot prove no join occurred.
   if (input.action === 'join' || input.action === 'listen') {
     // A step's own mission_id (listen accepts one) applies when MISSION_ID is
     // unset; a step naming another mission than the env is refused.
@@ -338,18 +381,16 @@ async function handleSessionAction(input: MeetingAction): Promise<MeetingActionR
         traceCtx.endSpan('ok');
         return { ...done, ...finalizeActuatorTrace(traceCtx) };
       } catch (err) {
-        if (requested !== 'auto') {
-          const failed = {
-            status: 'error',
-            message: err instanceof Error ? err.message : String(err),
-          } as MeetingActionResult;
-          failed.audit_event_id = recordMeetingEvent(input, failed);
-          traceCtx.endSpan('error', failed.message);
-          return { ...failed, ...finalizeActuatorTrace(traceCtx) };
-        }
-        logger.warn(
-          `[MEETING] chrome-extension join failed, falling back to playwright: ${err instanceof Error ? err.message : String(err)}`
-        );
+        const failed: MeetingActionResult = {
+          status: 'error',
+          message: err instanceof Error ? err.message : String(err),
+          partial_state: true,
+          partial_reason:
+            'Join outcome requires verification; no alternate transport was attempted.',
+        };
+        failed.audit_event_id = recordMeetingEvent(input, failed);
+        traceCtx.endSpan('error', failed.message);
+        return { ...failed, ...finalizeActuatorTrace(traceCtx) };
       }
     }
   }
@@ -391,12 +432,18 @@ async function handleIntelligenceOp(op: string, params: Record<string, unknown>)
 }
 
 export async function handleAction(
-  input: MeetingInput
+  input: MeetingInput,
+  executionOptions: MeetingExecutionOptions = {}
 ): Promise<MeetingActionResult | Record<string, unknown>> {
   const normalized = parseMeetingActionInput(input) as MeetingInput;
   if ((normalized as MeetingPipelineAction).action === 'pipeline') {
     const pipeline = normalized as MeetingPipelineAction;
-    return executeMeetingPipeline(pipeline.steps || [], pipeline.context || {}, pipeline.options);
+    return executeMeetingPipeline(
+      pipeline.steps || [],
+      pipeline.context || {},
+      pipeline.options,
+      executionOptions
+    );
   }
   if ((normalized as MeetingOpAction).op) {
     const single = normalized as MeetingOpAction;
@@ -410,10 +457,13 @@ export async function handleAction(
       };
     }
     if (isMeetingSessionOp(single.op)) {
-      return handleSessionAction({
-        action: single.op as MeetingAction['action'],
-        params: (single.params ?? {}) as MeetingAction['params'],
-      });
+      return handleSessionAction(
+        {
+          action: single.op as MeetingAction['action'],
+          params: (single.params ?? {}) as MeetingAction['params'],
+        },
+        executionOptions
+      );
     }
     return (await handleIntelligenceOp(
       single.op,
@@ -436,7 +486,7 @@ export async function handleAction(
       (action.params ?? {}) as unknown as Record<string, unknown>
     )) as Record<string, unknown>;
   }
-  return handleSessionAction(action);
+  return handleSessionAction(action, executionOptions);
 }
 
 const main = async () => {

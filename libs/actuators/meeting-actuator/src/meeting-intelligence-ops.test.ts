@@ -1,4 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Delegation fixtures verify WorkItem evidence without writing tenant audit mirrors.
+vi.mock('@agent/core/governance/audit-chain', () => ({
+  auditChain: { record: vi.fn(() => ({ id: 'meeting-intelligence-test-audit' })) },
+}));
 import {
   createWorkItem,
   getWorkItem,

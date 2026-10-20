@@ -1,4 +1,6 @@
 import { safeExecResult, type SafeExecOptions } from '../secure-io.js';
+import { governVcsCommand } from './external-vcs.js';
+import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 
 /**
  * Typed git verbs over the governed safeExecResult boundary — the single
@@ -31,6 +33,27 @@ export function gitRun(
   cwd: string,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  // Generic execution is local-only. Git global flags, aliases and additional
+  // network verbs must not smuggle publication around the canonical boundary.
+  const localVerbs = new Set([
+    'status',
+    'diff',
+    'log',
+    'branch',
+    'checkout',
+    'add',
+    'commit',
+    'worktree',
+    'check-ref-format',
+    'rev-parse',
+    'show-ref',
+    'symbolic-ref',
+    'rev-list',
+    'ls-files',
+  ]);
+  if (!localVerbs.has(args[0])) {
+    throw new Error('[VCS_TYPED_VERB_REQUIRED] Use the typed external git verb');
+  }
   return run('git', args, { cwd });
 }
 
@@ -160,11 +183,59 @@ export function gitPush(
 ): VcsCommandResult {
   if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
   if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
-  const args = ['push'];
-  if (options.setUpstream) args.push('-u');
-  args.push(options.remote?.trim() || 'origin');
-  if (options.ref?.trim()) args.push(options.ref.trim());
-  return gitRun(args, cwd, run);
+  const remote = options.remote?.trim() || 'origin';
+  const read = (args: string[]): string => {
+    const result = run('git', args, { cwd });
+    if (result.error || result.status !== 0 || !result.stdout.trim())
+      throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Cannot bind repository publication snapshot');
+    return result.stdout.trim();
+  };
+  const requestedSource = options.ref?.trim();
+  const source =
+    !requestedSource || requestedSource === 'HEAD'
+      ? read(['symbolic-ref', '--short', 'HEAD'])
+      : requestedSource;
+  if (
+    source.includes(':') ||
+    source.startsWith('+') ||
+    source.includes('*') ||
+    (source.startsWith('refs/') && !source.startsWith('refs/heads/'))
+  )
+    throw new Error('[VCS_GIT_INVALID] Push requires one local branch ref');
+  const branch = source.replace(/^refs\/heads\//, '');
+  const destination = `refs/heads/${branch}`;
+  const snapshot = () => ({
+    cwd,
+    remote,
+    url: read(['remote', 'get-url', '--push', remote]),
+    source,
+    head: read(['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]),
+    destination,
+    setUpstream: options.setUpstream === true,
+  });
+  const bound = snapshot();
+  if (!/^[a-f0-9]{40,64}$/i.test(bound.head))
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Invalid source commit');
+  return governVcsCommand(
+    'vcs:push',
+    bound,
+    () => {
+      if (computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound))
+        throw new Error('[VCS_SNAPSHOT_CHANGED] Publication target or source changed before send');
+      const result = run('git', ['push', '--', bound.url, `${bound.head}:${destination}`], { cwd });
+      if (result.status === 0 && !result.error && options.setUpstream) {
+        for (const args of [
+          ['config', `branch.${branch}.remote`, remote],
+          ['config', `branch.${branch}.merge`, destination],
+        ]) {
+          const configured = run('git', args, { cwd });
+          if (configured.error || configured.status !== 0) return configured;
+        }
+      }
+      return result;
+    },
+    true
+  );
 }
 
 export function gitFetch(
@@ -186,7 +257,12 @@ export function gitFetch(
     assertNotFlagLike(ref, 'ref');
     args.push(ref);
   }
-  return gitRun(args, cwd, run);
+  return governVcsCommand(
+    'vcs:fetch',
+    { cwd, remote, ref },
+    () => run('git', args, { cwd }),
+    false
+  );
 }
 
 export function gitPull(
@@ -210,7 +286,7 @@ export function gitPull(
     assertNotFlagLike(ref, 'ref');
     args.push(ref);
   }
-  return gitRun(args, cwd, run);
+  return governVcsCommand('vcs:pull', { cwd, remote, ref }, () => run('git', args, { cwd }), false);
 }
 
 export type GitWorktreeAction = 'list' | 'add' | 'remove' | 'prune';
