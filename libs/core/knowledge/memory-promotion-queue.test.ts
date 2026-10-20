@@ -85,6 +85,41 @@ describe('memory-promotion-queue', () => {
     expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(/evidence_ref/i);
   });
 
+  it('rejects stale disposition without overwriting a concurrently changed candidate', () => {
+    const candidate = createMemoryPromotionCandidate({
+      sourceType: 'task_session',
+      sourceRef: 'task_session:TSK-DISPOSITION-CAS',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A reviewed candidate must not be rejected from a stale queue view.',
+      evidenceRefs: ['artifact:ART-DISPOSITION-CAS'],
+      sensitivityTier: 'public',
+      ratificationRequired: false,
+    });
+    enqueueMemoryPromotionCandidate(candidate);
+    updateMemoryPromotionCandidateStatus({
+      candidateId: candidate.candidate_id,
+      status: 'approved',
+    });
+    const before = safeReadFile(queuePath, { encoding: 'utf8' });
+
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'rejected',
+        expectedStatus: 'queued',
+      })
+    ).toThrow('[MEMORY_PROMOTION_STALE_STATUS]');
+    expect(safeReadFile(queuePath, { encoding: 'utf8' })).toBe(before);
+
+    expect(
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'rejected',
+        expectedStatus: 'approved',
+      })?.status
+    ).toBe('rejected');
+  });
+
   it('rejects public-tier candidates that reference confidential or personal data', () => {
     const candidate = createMemoryPromotionCandidate({
       sourceType: 'artifact',

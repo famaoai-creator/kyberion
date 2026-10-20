@@ -431,6 +431,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/knowledge/scoped-learning-approval-verifier.ts#findScopedLearningApprovalRequest",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval-verifier.ts#hasCompletedPublication",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/knowledge/scoped-learning-approval-verifier.ts#verifyScopedLearningApprovalRef",
       "roles": ["infrastructure_sentinel", "sovereign_concierge"],
       "unresolved": []
@@ -451,13 +461,18 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApproval",
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
-      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-publication.ts#inspectScopedLearningPublication",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1774,11 +1789,6 @@
     {
       "site": "presence/displays/concierge/src/app/api/memory-queue/[id]/route.ts#POST",
       "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/app/api/memory-queue/[id]/route.ts#POST [delegated child role]",
-      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -3208,6 +3218,7 @@
         "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-input.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/intelligence/memory-actions.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/knowledge-feedback/knowledge-feedback-input.ts",
@@ -3270,6 +3281,7 @@
         "presence/displays/chronos-mirror-v2/src/components/FocusedOperatorViewModel.ts",
         "presence/displays/chronos-mirror-v2/src/components/HeadlessA2UIWorkspace.tsx",
         "presence/displays/chronos-mirror-v2/src/components/IdentityBadge.tsx",
+        "presence/displays/chronos-mirror-v2/src/components/KnowledgeLearningPanel.tsx",
         "presence/displays/chronos-mirror-v2/src/components/KnowledgeWorkspace.tsx",
         "presence/displays/chronos-mirror-v2/src/components/KyberionCharts.tsx",
         "presence/displays/chronos-mirror-v2/src/components/LiveTerminalDrawer.tsx",
@@ -3349,11 +3361,15 @@
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-sse-change-gate.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-work-coordination-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/json-record.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/knowledge-candidate-projection.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/knowledge-learning-client.ts",
         "presence/displays/chronos-mirror-v2/src/lib/knowledge-mutation-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/knowledge-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/knowledge-scope.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/knowledge-selection.ts",
         "presence/displays/chronos-mirror-v2/src/lib/live-sync.ts",
         "presence/displays/chronos-mirror-v2/src/lib/markdown.tsx",
+        "presence/displays/chronos-mirror-v2/src/lib/memory-candidate-selection.ts",
         "presence/displays/chronos-mirror-v2/src/lib/mission-history-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/mission-intelligence-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/mission-progress-client.ts",
@@ -3370,6 +3386,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/plugin-views-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/request-input.ts",
         "presence/displays/chronos-mirror-v2/src/lib/runtime-topology.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/scoped-learning-approval-visibility.ts",
         "presence/displays/chronos-mirror-v2/src/lib/scoped-read-path.ts",
         "presence/displays/chronos-mirror-v2/src/lib/su-surface-data.ts",
         "presence/displays/chronos-mirror-v2/src/lib/surface-auth-route.ts",
@@ -4265,6 +4282,7 @@
         "presence/displays/concierge/src/lib/response-status-scope.ts",
         "presence/displays/concierge/src/lib/review-watch.ts",
         "presence/displays/concierge/src/lib/scim-server.ts",
+        "presence/displays/concierge/src/lib/scoped-learning-approval-visibility.ts",
         "presence/displays/concierge/src/lib/selected-tenant.ts",
         "presence/displays/concierge/src/lib/settings-exit-guard.tsx",
         "presence/displays/concierge/src/lib/settings-types.ts",
@@ -4332,10 +4350,6 @@
         {
           "site": "presence/displays/concierge/src/app/api/ingest/route.ts#POST",
           "targets": ["scripts/ingest.ts"]
-        },
-        {
-          "site": "presence/displays/concierge/src/app/api/memory-queue/[id]/route.ts#POST",
-          "targets": ["scripts/mission_controller.ts"]
         },
         {
           "site": "presence/displays/concierge/src/lib/avatar-generation-jobs.ts#defaultRunner",

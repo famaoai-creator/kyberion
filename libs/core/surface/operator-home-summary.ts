@@ -1,3 +1,7 @@
+import {
+  isScopedLearningApprovalRequest,
+  resolveScopedLearningApprovalCandidate,
+} from '../knowledge/scoped-learning-approval-visibility.js';
 import * as path from 'node:path';
 import { MetricsCollector, metricsWithheldNotice } from '../metrics.js';
 import { listApprovalRequests } from '../governance/approval-store.js';
@@ -556,6 +560,20 @@ export function collectOperatorHomeSummary(
     ].some((allowed) => Array.isArray(allowed))
   );
   const approvalMatchesScope = (approval: OperatorHomeApprovalItem): boolean => {
+    if (isScopedLearningApprovalRequest(approval)) {
+      const candidate = resolveScopedLearningApprovalCandidate(approval);
+      if (!candidate?.scope) return false;
+      // Scoped learning never falls back to a mission label or another scope.
+      return missionMatchesScope(
+        {
+          tier: candidate.scope.tier,
+          tenantSlug: candidate.scope.tenant_slug,
+          organizationId: candidate.scope.organization_id,
+          projectId: candidate.scope.project_id,
+        },
+        input.scope
+      );
+    }
     if (!input.scope || !isScoped) return true;
     const scope = approval.scope;
     const missionId =

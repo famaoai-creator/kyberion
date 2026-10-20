@@ -341,6 +341,211 @@
       }
     },
     "chronos": {
+      "chronos_learning_stale": {
+        "en": "The displayed status may be outdated. Refresh before acting.",
+        "ja": "表示中の状態は古い可能性があります。操作前に状態を再確認してください。",
+        "qps-ploc": "⟦Ŧħė ḓïşṗŀȧẏėḓ şŧȧŧůş ɱȧẏ ƀė őůŧḓȧŧėḓ. Řėƒřėşħ ƀėƒőřė ȧƈŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_learning_source_summary": {
+        "en": "Original learning",
+        "ja": "元の学習内容",
+        "qps-ploc": "⟦Őřïɠïñȧŀ ŀėȧřñïñɠ ŀőřėɱ⟧"
+      },
+      "chronos_learning_unsupported": {
+        "en": "Read-only: unsupported scope",
+        "ja": "閲覧のみ：この公開範囲は未対応です",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ: ůñşůṗṗőřŧėḓ şƈőṗė ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_learning_draft": {
+        "en": "Draft",
+        "ja": "下書き",
+        "qps-ploc": "⟦Ḓřȧƒŧ ŀőř⟧"
+      },
+      "chronos_learning_pending": {
+        "en": "Awaiting human review",
+        "ja": "人間による確認待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ħůɱȧñ řėṽïėẇ ŀőřėɱ ⟧"
+      },
+      "chronos_learning_approved": {
+        "en": "Approved",
+        "ja": "承認済み",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "chronos_learning_rejected": {
+        "en": "Rejected",
+        "ja": "却下済み",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "chronos_learning_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
+      },
+      "chronos_learning_revoked": {
+        "en": "Revoked",
+        "ja": "承認取り消し",
+        "qps-ploc": "⟦Řėṽőķėḓ ŀőř⟧"
+      },
+      "chronos_learning_cancelled": {
+        "en": "Cancelled",
+        "ja": "キャンセル済み",
+        "qps-ploc": "⟦Ƈȧñƈėŀŀėḓ ŀőř⟧"
+      },
+      "chronos_learning_published": {
+        "en": "Published and verified",
+        "ja": "公開・検証済み",
+        "qps-ploc": "⟦Ṗůƀŀïşħėḓ ȧñḓ ṽėřïƒïėḓ ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_error": {
+        "en": "Verification unavailable",
+        "ja": "検証できません",
+        "qps-ploc": "⟦Ṽėřïƒïƈȧŧïőñ ůñȧṽȧïŀȧƀŀė ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_no_authority": {
+        "en": "Publication makes this reviewed SOP reusable within the same or narrower scope. It grants no execution authority.",
+        "ja": "公開すると、この確認済みSOPを同じ範囲またはそれより狭い範囲の仕事で再利用できます。実行権限は付与されません。",
+        "qps-ploc": "⟦Ṗůƀŀïƈȧŧïőñ ɱȧķėş ŧħïş řėṽïėẇėḓ ŞŐṖ řėůşȧƀŀė ẇïŧħïñ ŧħė şȧɱė őř ñȧřřőẇėř şƈőṗė. Ïŧ ɠřȧñŧş ñő ėẋėƈůŧïőñ ȧůŧħőřïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "chronos_learning_organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "chronos_learning_scope_unchanged": {
+        "en": "This scope cannot be published by this workflow. Owner and audience restrictions are preserved, not removed.",
+        "ja": "この範囲はこの手順では公開できません。所有者や閲覧者の制限は解除せず、そのまま維持します。",
+        "qps-ploc": "⟦Ŧħïş şƈőṗė ƈȧññőŧ ƀė ṗůƀŀïşħėḓ ƀẏ ŧħïş ẇőřķƒŀőẇ. Őẇñėř ȧñḓ ȧůḓïėñƈė řėşŧřïƈŧïőñş ȧřė ṗřėşėřṽėḓ, ñőŧ řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "chronos_learning_edit_draft": {
+        "en": "Prepare the review draft",
+        "ja": "確認に出す下書きを編集",
+        "qps-ploc": "⟦Ṗřėṗȧřė ŧħė řėṽïėẇ ḓřȧƒŧ ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_title": {
+        "en": "SOP title",
+        "ja": "SOPのタイトル",
+        "qps-ploc": "⟦ŞŐṖ ŧïŧŀė ŀőř⟧"
+      },
+      "chronos_learning_summary": {
+        "en": "Summary",
+        "ja": "要約",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ŀőř⟧"
+      },
+      "chronos_learning_content": {
+        "en": "Exact SOP content",
+        "ja": "公開するSOPの本文",
+        "qps-ploc": "⟦Ėẋȧƈŧ ŞŐṖ ƈőñŧėñŧ ŀőřėɱ⟧"
+      },
+      "chronos_learning_evidence": {
+        "en": "Evidence references, one per line",
+        "ja": "根拠の参照先（1行に1件）",
+        "qps-ploc": "⟦Ėṽïḓėñƈė řėƒėřėñƈėş, őñė ṗėř ŀïñė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_learning_save": {
+        "en": "Save draft",
+        "ja": "下書きを保存",
+        "qps-ploc": "⟦Şȧṽė ḓřȧƒŧ ŀőř⟧"
+      },
+      "chronos_learning_request": {
+        "en": "Request human review",
+        "ja": "人間による確認を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ħůɱȧñ řėṽïėẇ ŀőřėɱ ⟧"
+      },
+      "chronos_learning_unsaved": {
+        "en": "Save your changes before requesting review. Saving does not approve or publish this SOP.",
+        "ja": "確認を依頼する前に変更を保存してください。保存しても承認や公開は行われません。",
+        "qps-ploc": "⟦Şȧṽė ẏőůř ƈħȧñɠėş ƀėƒőřė řėɋůėşŧïñɠ řėṽïėẇ. Şȧṽïñɠ ḓőėş ñőŧ ȧṗṗřőṽė őř ṗůƀŀïşħ ŧħïş ŞŐṖ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_learning_open_review": {
+        "en": "Open shared review",
+        "ja": "共通の承認画面を開く",
+        "qps-ploc": "⟦Őṗėñ şħȧřėḓ řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "chronos_learning_publish": {
+        "en": "Publish approved SOP",
+        "ja": "承認済みSOPを公開",
+        "qps-ploc": "⟦Ṗůƀŀïşħ ȧṗṗřőṽėḓ ŞŐṖ ŀőřėɱ ⟧"
+      },
+      "chronos_learning_not_published": {
+        "en": "Human review is approved. This SOP has not been published yet.",
+        "ja": "人間による確認で承認されました。このSOPはまだ公開されていません。",
+        "qps-ploc": "⟦Ħůɱȧñ řėṽïėẇ ïş ȧṗṗřőṽėḓ. Ŧħïş ŞŐṖ ħȧş ñőŧ ƀėėñ ṗůƀŀïşħėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_learning_new_candidate": {
+        "en": "A new candidate is required for a new review. This decision is retained.",
+        "ja": "新しい確認には新しい候補が必要です。この判断の記録は保持されます。",
+        "qps-ploc": "⟦Ȧ ñėẇ ƈȧñḓïḓȧŧė ïş řėɋůïřėḓ ƒőř ȧ ñėẇ řėṽïėẇ. Ŧħïş ḓėƈïşïőñ ïş řėŧȧïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chronos_learning_destination": {
+        "en": "Verified publication destination",
+        "ja": "検証済みの公開先",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ṗůƀŀïƈȧŧïőñ ḓėşŧïñȧŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_learning_content_hash": {
+        "en": "Verified content SHA-256",
+        "ja": "検証済み本文のSHA-256",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ƈőñŧėñŧ ŞĦȦ-256 ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_refresh": {
+        "en": "Refresh status",
+        "ja": "状態を再確認",
+        "qps-ploc": "⟦Řėƒřėşħ şŧȧŧůş ŀőřė⟧"
+      },
+      "chronos_learning_load_failed": {
+        "en": "Could not load current knowledge status. Actions remain disabled.",
+        "ja": "学習内容の現在の状態を取得できません。操作は無効のままです。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ƈůřřėñŧ ķñőẇŀėḓɠė şŧȧŧůş. Ȧƈŧïőñş řėɱȧïñ ḓïşȧƀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "chronos_learning_action_rejected": {
+        "en": "The action was not applied. Review the current draft before trying again.",
+        "ja": "操作は適用されませんでした。現在の下書きを確認してからやり直してください。",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ẇȧş ñőŧ ȧṗṗŀïėḓ. Řėṽïėẇ ŧħė ƈůřřėñŧ ḓřȧƒŧ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "chronos_learning_outcome_unknown": {
+        "en": "Outcome not confirmed",
+        "ja": "操作の結果を確認できません",
+        "qps-ploc": "⟦Őůŧƈőɱė ñőŧ ƈőñƒïřɱėḓ ŀőřėɱ ⟧"
+      },
+      "chronos_learning_check_only": {
+        "en": "The action may already have completed. Refresh checks the saved state without resending it. An unchanged state is not proof that the action failed.",
+        "ja": "操作が完了している可能性があります。「状態を再確認」は操作を再送せず、保存済みの状態を読み取ります。状態が変わらなくても失敗した証拠にはなりません。",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ɱȧẏ ȧŀřėȧḓẏ ħȧṽė ƈőɱṗŀėŧėḓ. Řėƒřėşħ ƈħėƈķş ŧħė şȧṽėḓ şŧȧŧė ẇïŧħőůŧ řėşėñḓïñɠ ïŧ. Ȧñ ůñƈħȧñɠėḓ şŧȧŧė ïş ñőŧ ṗřőőƒ ŧħȧŧ ŧħė ȧƈŧïőñ ƒȧïŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "chronos_learning_recovery_unavailable": {
+        "en": "Recovery information is unavailable",
+        "ja": "結果を再確認するための情報を利用できません",
+        "qps-ploc": "⟦Řėƈőṽėřẏ ïñƒőřɱȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_learning_recovery_hint": {
+        "en": "Actions are disabled. Restore browser storage access and refresh. Do not clear recovery information to retry.",
+        "ja": "操作を無効にしています。ブラウザーの保存領域へのアクセスを復旧し、状態を再確認してください。再試行のために確認用の情報を削除しないでください。",
+        "qps-ploc": "⟦Ȧƈŧïőñş ȧřė ḓïşȧƀŀėḓ. Řėşŧőřė ƀřőẇşėř şŧőřȧɠė ȧƈƈėşş ȧñḓ řėƒřėşħ. Ḓő ñőŧ ƈŀėȧř řėƈőṽėřẏ ïñƒőřɱȧŧïőñ ŧő řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "chronos_learning_candidate_unavailable": {
+        "en": "This exact candidate is unavailable in your current scope",
+        "ja": "この候補は現在の閲覧範囲で確認できません",
+        "qps-ploc": "⟦Ŧħïş ėẋȧƈŧ ƈȧñḓïḓȧŧė ïş ůñȧṽȧïŀȧƀŀė ïñ ẏőůř ƈůřřėñŧ şƈőṗė ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_learning_review_load_failed": {
+        "en": "Could not load the current review. Refresh before making a decision.",
+        "ja": "現在の確認依頼を取得できません。判断する前に状態を再確認してください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ŧħė ƈůřřėñŧ řėṽïėẇ. Řėƒřėşħ ƀėƒőřė ɱȧķïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "chronos_learning_review_unavailable": {
+        "en": "This exact review is unavailable in your current scope",
+        "ja": "この確認依頼は現在の閲覧範囲で確認できません",
+        "qps-ploc": "⟦Ŧħïş ėẋȧƈŧ řėṽïėẇ ïş ůñȧṽȧïŀȧƀŀė ïñ ẏőůř ƈůřřėñŧ şƈőṗė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_learning_return": {
+        "en": "Return to knowledge",
+        "ja": "学習内容へ戻る",
+        "qps-ploc": "⟦Řėŧůřñ ŧő ķñőẇŀėḓɠė ŀőřėɱ ⟧"
+      },
+      "chronos_learning_review_only": {
+        "en": "This records the human review only. Return to Knowledge to explicitly publish the approved SOP; approval grants no execution authority.",
+        "ja": "ここでは人間による確認結果だけを記録します。承認済みSOPを公開するには学習内容へ戻って公開操作を行ってください。承認しても実行権限は付与されません。",
+        "qps-ploc": "⟦Ŧħïş řėƈőřḓş ŧħė ħůɱȧñ řėṽïėẇ őñŀẏ. Řėŧůřñ ŧő Ķñőẇŀėḓɠė ŧő ėẋṗŀïƈïŧŀẏ ṗůƀŀïşħ ŧħė ȧṗṗřőṽėḓ ŞŐṖ; ȧṗṗřőṽȧŀ ɠřȧñŧş ñő ėẋėƈůŧïőñ ȧůŧħőřïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
       "chronos_a2a_handoff_trail": {
         "en": "A2A Handoff Trail",
         "ja": "A2A Handoff Trail",
@@ -11136,6 +11341,11 @@
       }
     },
     "concierge": {
+      "memory.review_in_chronos": {
+        "en": "Review in Chronos",
+        "ja": "Chronosで確認",
+        "qps-ploc": "⟦Řėṽïėẇ ïñ Ƈħřőñőş ŀőřėɱ⟧"
+      },
       "concierge_escalation_hold_reply": {
         "en": "We will confirm and get back to you shortly.",
         "ja": "確認して回答します",

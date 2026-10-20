@@ -1,3 +1,4 @@
+import { projectKnowledgeCandidate } from '../../../lib/knowledge-candidate-projection';
 import { NextRequest, NextResponse } from 'next/server';
 import { listMemoryPromotionCandidates } from '@agent/core/knowledge/memory-promotion-queue';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
@@ -6,10 +7,7 @@ import {
   viewerErrorResponse,
   strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
-import {
-  memoryCandidateVisibleToViewer,
-  resolveMemoryCandidateTenant,
-} from '../../../lib/knowledge-scope';
+import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 export function GET(req: NextRequest) {
@@ -26,10 +24,7 @@ export function GET(req: NextRequest) {
       .filter((candidate) =>
         memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
       )
-      .map((candidate) => ({
-        ...candidate,
-        tenantSlug: resolveMemoryCandidateTenant(candidate),
-      }));
+      .map(projectKnowledgeCandidate);
     return NextResponse.json({
       ok: true,
       candidates,

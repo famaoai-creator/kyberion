@@ -8,6 +8,7 @@ import {
 } from '../governance/approval-assurance.js';
 import {
   loadApprovalRequest,
+  listApprovalRequests,
   isApprovalRequestExpired,
 } from '../governance/approval-store-reader.js';
 import { assertApprovalUsable } from '../governance/approval-separation-of-duties.js';
@@ -16,6 +17,7 @@ import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
   approvedLearningPayloadDigest,
   assertScopedLearningScope,
+  assertScopedLearningPublicationReferences,
   scopedLearningMarkdownPath,
   learningSha256,
   type ScopedLearningApproval,
@@ -54,11 +56,62 @@ export function assertScopedLearningApprovalBinding(
       '[LEARNING_APPROVAL_BINDING] Approval does not bind this exact content and publication destination'
     );
 }
+/** Exact identity lookup, including terminal decisions. A changed digest is not a new review. */
+export function findScopedLearningApprovalRequest(
+  candidate: MemoryCandidate
+): ApprovalRequestRecord | undefined {
+  const scope = assertScopedLearningScope(candidate.scope!);
+  const rows = withExecutionContext(ROLE, () =>
+    listApprovalRequests({ storageChannels: [CHANNEL] }).filter(
+      (record) =>
+        record.source?.taskId === candidate.candidate_id &&
+        record.scope?.tier === scope.tier &&
+        record.scope.tenant_slug === scope.tenant_slug &&
+        record.scope.organization_id === scope.organization_id &&
+        record.scope.project_id === scope.project_id &&
+        record.scope.mission_id === undefined &&
+        record.scope.task_id === undefined &&
+        (record.accountability?.effectBinding?.startsWith('scoped-learning:') ||
+          record.correlationId?.startsWith('scoped-learning:'))
+    )
+  );
+  if (rows.length > 1)
+    throw new Error(
+      '[LEARNING_APPROVAL_CONFLICT] Multiple scoped decisions require reconciliation'
+    );
+  return rows[0];
+}
+
+/** Queue writers call under the queue mutex: a canonical request freezes its payload. */
+export function assertScopedLearningReviewUnchanged(
+  current: MemoryCandidate,
+  next: MemoryCandidate
+): void {
+  if (!current.scope) return;
+  try {
+    assertScopedLearningScope(current.scope);
+  } catch {
+    return; // Restricted envelopes are review-only and cannot have a scoped publication request.
+  }
+  const record = findScopedLearningApprovalRequest(current);
+  if (!record) return;
+  try {
+    assertScopedLearningApprovalBinding(record, current);
+    if (approvedLearningPayloadDigest(next) !== record.accountability?.payloadHash)
+      throw new Error('payload changed');
+  } catch {
+    throw new Error(
+      '[LEARNING_APPROVAL_IMMUTABLE] Requested content and scope are frozen; use a new candidate'
+    );
+  }
+}
+
 /** Verifies real server-resolved human proof; caller-supplied labels never ratify knowledge. */
 export function verifyScopedLearningApprovalRef(
   candidate: MemoryCandidate,
   approvalRef: string
 ): ScopedLearningApproval {
+  assertScopedLearningPublicationReferences(candidate);
   const [channel, id, extra] = approvalRef.split(':');
   if (channel !== CHANNEL || !id || extra)
     throw new Error('[LEARNING_APPROVAL_REQUIRED] Expected terminal:request-id');
@@ -88,13 +141,6 @@ export function verifyScopedLearningApprovalRef(
   withExecutionContext(ROLE, () =>
     assertApprovalUsable(record, { consumer: 'scoped_learning_publication' })
   );
-  // Expiry fences a new publication, not ordinary reuse of a previously verified artifact.
-  // Historical approval must itself precede the expiry; revocation is checked on every read.
-  if (
-    isApprovalRequestExpired(record, Date.parse(record.decidedAt)) ||
-    (!hasCompletedPublication(record, candidate) && isApprovalRequestExpired(record))
-  )
-    throw new Error('[LEARNING_APPROVAL_EXPIRED] Review expired before publication');
   const member = withExecutionContext('sovereign_concierge', () =>
     resolveAccountableHuman(record.decidedBy!)
   );
@@ -109,6 +155,13 @@ export function verifyScopedLearningApprovalRef(
     throw new Error(
       '[LEARNING_APPROVAL_AUTHORITY] Reviewing member no longer has tenant approval authority'
     );
+  // Expiry fences a new publication, not ordinary reuse of a previously verified artifact.
+  // Historical approval must itself precede the expiry; revocation is checked on every read.
+  if (
+    isApprovalRequestExpired(record, Date.parse(record.decidedAt)) ||
+    (!hasCompletedPublication(record, candidate) && isApprovalRequestExpired(record))
+  )
+    throw new Error('[LEARNING_APPROVAL_EXPIRED] Review expired before publication');
   return {
     version: 1,
     payload_digest: approvedLearningPayloadDigest(candidate),
@@ -143,18 +196,25 @@ function hasCompletedPublication(
   )
     return false;
   try {
-    return [
-      [publication.markdown_path, publication.markdown_sha256],
-      [publication.record_path, publication.record_sha256],
-    ].every(([file, hash]) => {
-      const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(file!));
-      const stat = safeLstat(absolute);
-      return (
-        stat.isFile() &&
-        !stat.isSymbolicLink() &&
-        learningSha256(String(safeReadFile(absolute, { encoding: 'utf8' }))) === hash
-      );
-    });
+    return withExecutionContext(
+      'mission_controller',
+      () =>
+        [
+          [publication.markdown_path, publication.markdown_sha256],
+          [publication.record_path, publication.record_sha256],
+        ].every(([file, hash]) => {
+          const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(file!));
+          const stat = safeLstat(absolute);
+          return (
+            stat.isFile() &&
+            !stat.isSymbolicLink() &&
+            learningSha256(String(safeReadFile(absolute, { encoding: 'utf8' }))) === hash
+          );
+        }),
+      undefined,
+      candidate.scope!.tenant_slug,
+      candidate.scope!.organization_id
+    );
   } catch {
     return false;
   }

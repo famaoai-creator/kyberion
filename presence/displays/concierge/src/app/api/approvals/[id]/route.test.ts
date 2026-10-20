@@ -18,8 +18,12 @@ const mocks = vi.hoisted(() => ({
   decideApprovalRequest: vi.fn(),
   resolveViewer: vi.fn(),
   resolveMember: vi.fn(),
+  scopedVisible: vi.fn(),
 }));
 
+vi.mock('../../../../lib/scoped-learning-approval-visibility', () => ({
+  scopedLearningApprovalVisibleToViewer: mocks.scopedVisible,
+}));
 vi.mock('../../../../lib/api-guard', () => ({
   requireConciergeMutationAccess: () => null,
 }));
@@ -66,6 +70,7 @@ function request(overrides: Record<string, unknown> = {}): NextRequest {
 describe('concierge approval decision tenant binding', () => {
   beforeEach(() => {
     for (const mock of Object.values(mocks)) mock.mockReset();
+    mocks.scopedVisible.mockReturnValue(true);
     mocks.resolveViewer.mockReturnValue({ context: viewer });
     mocks.resolveMember.mockReturnValue({
       member_id: 'carol',
@@ -87,6 +92,27 @@ describe('concierge approval decision tenant binding', () => {
       ...input,
     }));
   });
+
+  it.each(['pending', 'approved', 'rejected'])(
+    'hides an unavailable scoped-learning %s request before decision',
+    async (status) => {
+      mocks.scopedVisible.mockReturnValue(false);
+      mocks.loadApprovalRequest.mockReturnValue({
+        id: 'req-1',
+        status,
+        scope: {
+          tier: 'confidential',
+          tenant_slug: 'acme',
+          organization_id: 'other-org',
+          project_id: 'other-project',
+        },
+      });
+      const response = await POST(request(), params);
+      expect(response.status).toBe(404);
+      expect(mocks.decideApprovalRequest).not.toHaveBeenCalled();
+      expect(mocks.resolveMember).not.toHaveBeenCalled();
+    }
+  );
 
   it('uses canonical scope for membership and decision attribution before legacy context', async () => {
     const response = await POST(request(), params);
@@ -163,6 +189,7 @@ describe('provider attestation through the real decision store', () => {
 
   beforeEach(() => {
     for (const mock of Object.values(mocks)) mock.mockReset();
+    mocks.scopedVisible.mockReturnValue(true);
     rootDir = pathResolver.sharedTmp(`provider-approval-route-${randomUUID()}`);
     safeMkdir(rootDir, { recursive: true });
     audit = vi.spyOn(auditChain, 'record').mockImplementation(() => ({}) as never);
