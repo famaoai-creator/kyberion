@@ -49,6 +49,10 @@ import {
   saveNotificationPreferences,
 } from '@agent/core/surface/operator-notifications';
 import { materializeExecutionFeedbackCandidate } from '@agent/core/execution-feedback';
+import {
+  assertAskScopeOptionsSupported,
+  buildAskConversationInput,
+} from './lib/operator-ask-scope.js';
 import { promoteDesktopProcedure } from '@agent/core/virtual/desktop-recording-compiler';
 import { reconcileDesktopPromotionTransaction } from '@agent/core/virtual/desktop-promotion-transaction';
 import {
@@ -313,27 +317,16 @@ async function handleAskSubcommand(
   text: string,
   json: boolean,
   explain: boolean,
-  clarify: boolean
+  clarify: boolean,
+  suppliedCorrelationId?: string
 ): Promise<void> {
   if (!text.trim()) {
     printOutput(ui('recorder:recorder_ask_usage'));
     throw new ScriptExitError(1, '', true);
   }
-  const correlationId = `kyberion-ask-${Date.now().toString(36)}`;
-  const result = await runSurfaceMessageConversation({
-    surface: 'cli',
-    text,
-    channel: 'kyberion-home',
-    threadTs: correlationId,
-    correlationId,
-    receivedAt: nowIso(),
-    locale: cliLocale,
-    actorId: 'operator',
-    senderAgentId: 'kyberion:home-cli',
-    agentId: 'cli-surface-agent',
-    delegationSummaryInstruction:
-      'Produce a concise terminal-friendly reply in the operator language. No A2A blocks.',
-  });
+  const result = await runSurfaceMessageConversation(
+    buildAskConversationInput(text, cliLocale, suppliedCorrelationId)
+  );
   const intentResolution = result.intentResolution;
   const improvement = result.executionFeedbackRecord
     ? materializeExecutionFeedbackCandidate({ feedback: result.executionFeedbackRecord })
@@ -1407,14 +1400,17 @@ async function mainImpl(args: string[] = []): Promise<void> {
       if (handleDealDocumentAction(ui, dealDocumentArgsFromArgv(argv), activePrint)) return;
       handleDealsSubcommand(ui, argv as { requirements?: string; json?: boolean }, activePrint);
       return;
-    case 'ask':
+    case 'ask': {
+      assertAskScopeOptionsSupported(args);
       await handleAskSubcommand(
         argv._.slice(1).map(String).join(' '),
         Boolean(argv.json),
         Boolean(argv.explain),
-        Boolean(argv.clarify)
+        Boolean(argv.clarify),
+        argv['correlation-id'] ? String(argv['correlation-id']) : undefined
       );
       return;
+    }
     case 'doctor':
       // Keep the user-facing single CLI as the canonical doctor entrypoint;
       // runtime-specific checks remain options of the shared doctor command.

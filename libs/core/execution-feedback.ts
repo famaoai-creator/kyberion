@@ -160,6 +160,7 @@ export function materializeExecutionFeedbackCandidate(input: {
     evidence_refs: [
       `execution-feedback:${input.feedback.feedback_id}`,
       `intent:${input.feedback.intent_id}`,
+      ...(input.feedback.correlation_id ? [`correlation:${input.feedback.correlation_id}`] : []),
     ],
     metadata: {
       improvement_kind: 'execution_feedback',

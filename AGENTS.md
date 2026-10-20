@@ -44,6 +44,8 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 
 ## 3. Lifecycle — intent → goal → result
 
+This lifecycle, the Intent Loop, enterprise control, user interaction and memory loop are projections of the same [Organization Work Loop](./knowledge/product/architecture/organization-work-loop.md#21-one-model-several-projections). Preserve shared scope/evidence and distinct approval, delegation, clarification, verification and learning responsibilities; do not add competing stores or treat confidence/learning as authority.
+
 The work loop is: **capture intent → agree on the goal before changing anything (③) → execute (④) → review and learn (⑤).**
 
 **Fresh-clone bootstrap**: if dependencies or the baseline entrypoint have not been built yet, first follow QUICKSTART’s install → build → toolchain → doctor → verify-session sequence, then run baseline. Do not repeatedly invoke a missing runtime or invent identity/tenant defaults. This does not bypass a runnable pipeline’s fatal error or recovery circuit breaker.

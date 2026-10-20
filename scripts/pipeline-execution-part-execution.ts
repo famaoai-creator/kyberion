@@ -10,6 +10,8 @@ import {
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation/text';
+import { isRecord } from '@agent/core/foundation/primitives';
+import { compileReportSchema } from '@agent/core/report-contract';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
@@ -293,13 +295,21 @@ export async function runStepsInternal(
               : 'judge_route')
         );
         const verdictKey = String(params.verdict_as || 'judge_verdict');
-        const fixtureVerdict =
-          params.fixture === true && params.verdict && typeof params.verdict === 'object'
-            ? (resolveVars(params.verdict, ctx) as Record<string, unknown>)
-            : undefined;
-        const schemaRef = String(judge.schema_ref || params.schema_ref || 'judge_route_verdict');
-        const verdict = fixtureVerdict
-          ? fixtureVerdict
+        const isFixture = params.fixture === true;
+        const schemaRef =
+          judge.schema_ref !== undefined
+            ? judge.schema_ref
+            : params.schema_ref !== undefined
+              ? params.schema_ref
+              : 'judge_route_verdict';
+        if (typeof schemaRef !== 'string' || !schemaRef.trim()) {
+          throw new Error('[JUDGE_ROUTE_SCHEMA_INVALID] schema_ref must be a non-empty string');
+        }
+        // Resolve before installing/calling a provider, and use exactly the same
+        // contract for fixture and generated verdicts. A schema name is not a prompt hint.
+        const compiled = compileReportSchema(schemaRef);
+        const verdict = isFixture
+          ? resolveVars(params.verdict, ctx)
           : await (async () => {
               const { delegateStructured, backend } = await structuredReasoning();
               const { z } = await import('zod');
@@ -316,18 +326,28 @@ export async function runStepsInternal(
                     )
                   ),
                   `Return a route verdict compatible with schema_ref=${schemaRef}.`,
+                  compiled.prompt,
                   `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
                 ].join('\n\n'),
                 z
-                  .object({
-                    label: z.string().min(1),
-                    reason: z.string().optional(),
-                    value: z.unknown().optional(),
-                  })
-                  .passthrough(),
+                  .object({})
+                  .passthrough()
+                  .superRefine((value, refinement) => {
+                    if (!compiled.validate(value)) {
+                      refinement.addIssue({
+                        code: 'custom',
+                        message: `[JUDGE_ROUTE_VERDICT_INVALID] ${schemaRef}: ${compiled.errors().join('; ')}`,
+                      });
+                    }
+                  }),
                 { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
               );
             })();
+        if (!isRecord(verdict) || !compiled.validate(verdict)) {
+          throw new Error(
+            `[JUDGE_ROUTE_VERDICT_INVALID] ${schemaRef}: ${isRecord(verdict) ? compiled.errors().join('; ') : 'verdict must be an object'}`
+          );
+        }
         const routes = Array.isArray(params.routes)
           ? (params.routes as Array<{
               when?: Record<string, unknown>;
@@ -347,7 +367,7 @@ export async function runStepsInternal(
           matched: decision.selection.matched,
           reason: decision.selection.reason,
           schema_ref: schemaRef,
-          source: fixtureVerdict ? 'fixture' : 'reasoning_backend',
+          source: isFixture ? 'fixture' : 'reasoning_backend',
         });
         if (decision.selection.next === 'ABORT') {
           throw new Error(`[JUDGE_ROUTE_ABORT] ${decision.selection.reason}`);
