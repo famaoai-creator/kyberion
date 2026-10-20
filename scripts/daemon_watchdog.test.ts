@@ -23,6 +23,11 @@ import * as mandates from '@agent/core/governance/mandate-shadow';
 import * as missionAdmission from '@agent/core/mission/mission-admission';
 import * as missionState from '@agent/core/mission/mission-state';
 import {
+  resolveIdentityContext,
+  resolveRole,
+  withExecutionContextAsync,
+} from '@agent/core/authority';
+import {
   recordDaemonHeartbeat,
   pathResolver,
   safeExistsSync,
@@ -137,75 +142,138 @@ describe('daemon_watchdog', () => {
     }
   });
 
-  it('claims typed intake, starts the deterministic scoped mission, and settles only after an active receipt', async () => {
-    const item = {
-      ...missionProposal,
-      status: 'ready' as const,
-      context: { tenant_slug: 'acme', organization_id: 'org-1', project_id: 'proj-1' },
-      metadata: { ...missionProposal.metadata, mission_id: 'MSN-DOT-VALID' },
-    };
-    const list = vi.spyOn(workCoordination, 'listWorkItems').mockReturnValue([item]);
-    const resolver = vi
-      .spyOn(missionAdmission, 'resolveDotMissionAdmission')
-      .mockReturnValue({ mandate_ref: 'docs', mandate_facts: {} as never });
-    const admission = vi
-      .spyOn(mandates, 'evaluateMissionStartMandate')
-      .mockReturnValue({ covered: true, mandate_id: 'docs', reasons: [] });
-    const gate = vi.spyOn(autonomyGate, 'evaluateAutonomousOpsAction').mockReturnValue({
-      actionId: 'mission_start_mandate',
-      decision: 'auto',
-      allowed: true,
-    } as ReturnType<typeof autonomyGate.evaluateAutonomousOpsAction>);
-    const claim = vi
-      .spyOn(workCoordination, 'claimWorkItem')
-      .mockReturnValue({ item, lease: { lease_id: 'mission-lease' } } as never);
-    const release = vi
-      .spyOn(workCoordination, 'releaseWorkItem')
-      .mockReturnValue({ item } as never);
-    const state = vi
-      .spyOn(missionState, 'loadState')
-      .mockReturnValue({ status: 'active', tenant_slug: 'acme' } as never);
-    const execution = vi
-      .spyOn(autonomyState, 'recordAutonomyExecution')
-      .mockImplementation(() => undefined);
-    routing.missionMain.mockClear();
-    try {
-      await sweepMissionStartCandidates({});
-      expect(claim).toHaveBeenCalledWith(
-        expect.objectContaining({
-          itemId: item.item_id,
-          requireNewLease: true,
-          expectedVersion: item.version,
-        })
-      );
-      expect(routing.missionMain).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          'MSN-DOT-VALID',
-          '--admission-work-item',
-          item.item_id,
-          '--organization-id',
-          'org-1',
-          '--project-id',
-          'proj-1',
+  it.each([
+    { projectId: undefined, fail: false },
+    { projectId: 'default', fail: false },
+    { projectId: 'proj-1', fail: false },
+    { projectId: undefined, fail: true },
+    { projectId: undefined, fail: false, callerRole: 'daemon_watchdog' },
+  ])(
+    'mediates the controller scope for project $projectId, failure $fail',
+    async ({ projectId, fail, callerRole = 'organization_operator' }) => {
+      const item = {
+        ...missionProposal,
+        status: 'ready' as const,
+        context: {
+          tenant_slug: 'acme',
+          organization_id: 'org-1',
+          project_id: projectId ?? 'default',
+        },
+        metadata: { ...missionProposal.metadata, mission_id: 'MSN-DOT-VALID' },
+      };
+      const list = vi.spyOn(workCoordination, 'listWorkItems').mockReturnValue([item]);
+      const resolver = vi
+        .spyOn(missionAdmission, 'resolveDotMissionAdmission')
+        .mockReturnValue({ mandate_ref: 'docs', mandate_facts: {} as never });
+      const scopeResolver = vi
+        .spyOn(missionAdmission, 'resolveDotMissionAdmissionScope')
+        .mockReturnValue({
+          tenant_slug: 'acme',
+          organization_id: 'org-1',
+          ...(projectId ? { project_id: projectId } : {}),
+        });
+      const admission = vi
+        .spyOn(mandates, 'evaluateMissionStartMandate')
+        .mockReturnValue({ covered: true, mandate_id: 'docs', reasons: [] });
+      const gate = vi.spyOn(autonomyGate, 'evaluateAutonomousOpsAction').mockReturnValue({
+        actionId: 'mission_start_mandate',
+        decision: 'auto',
+        allowed: true,
+      } as ReturnType<typeof autonomyGate.evaluateAutonomousOpsAction>);
+      const claim = vi
+        .spyOn(workCoordination, 'claimWorkItem')
+        .mockReturnValue({ item, lease: { lease_id: 'mission-lease' } } as never);
+      const release = vi
+        .spyOn(workCoordination, 'releaseWorkItem')
+        .mockReturnValue({ item } as never);
+      const state = vi
+        .spyOn(missionState, 'loadState')
+        .mockReturnValue({ status: 'active', tenant_slug: 'acme' } as never);
+      const execution = vi
+        .spyOn(autonomyState, 'recordAutonomyExecution')
+        .mockImplementation(() => undefined);
+      routing.missionMain.mockClear();
+      routing.missionMain.mockImplementation(async () => {
+        expect(resolveRole()).toBe('mission_controller');
+        expect(resolveIdentityContext().tenantSlug).toBe('acme');
+        expect(claim).toHaveBeenCalledTimes(1);
+        if (fail) throw new Error('controller rejected admission');
+      });
+      try {
+        await withExecutionContextAsync(
+          callerRole,
+          async () => {
+            expect(resolveRole()).toBe(callerRole);
+            await sweepMissionStartCandidates({});
+            expect(resolveRole()).toBe(callerRole);
+            expect(resolveIdentityContext().tenantSlug).toBe('acme');
+          },
+          undefined,
+          'acme',
+          'org-1'
+        );
+        expect(claim).toHaveBeenCalledWith(
+          expect.objectContaining({
+            itemId: item.item_id,
+            requireNewLease: true,
+            expectedVersion: item.version,
+          })
+        );
+        expect(routing.missionMain).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            'MSN-DOT-VALID',
+            '--admission-work-item',
+            item.item_id,
+            '--organization-id',
+            'org-1',
+            ...(projectId ? ['--project-id', projectId] : []),
+          ])
+        );
+        if (!projectId) expect(routing.missionMain.mock.calls[0][0]).not.toContain('--project-id');
+        if (fail) {
+          expect(release).toHaveBeenCalledWith(
+            expect.objectContaining({
+              itemId: item.item_id,
+              leaseId: 'mission-lease',
+              nextStatus: 'blocked',
+            })
+          );
+          expect(release).not.toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'done' }));
+          expect(execution).toHaveBeenCalledWith(
+            expect.objectContaining({ ok: false }),
+            expect.objectContaining({ tenantSlug: 'acme' })
+          );
+          return;
+        }
+        expect(release).toHaveBeenCalledWith(
+          expect.objectContaining({
+            itemId: item.item_id,
+            leaseId: 'mission-lease',
+            nextStatus: 'done',
+            effectDisposition: 'completed',
+          })
+        );
+        expect(execution).toHaveBeenCalledWith(
+          expect.objectContaining({ receipt_id: 'mission-start:acme:MSN-DOT-VALID', ok: true }),
+          expect.objectContaining({ tenantSlug: 'acme' })
+        );
+      } finally {
+        routing.missionMain.mockReset();
+        for (const spy of [
+          list,
+          resolver,
+          scopeResolver,
+          admission,
+          gate,
+          claim,
+          release,
+          state,
+          execution,
         ])
-      );
-      expect(release).toHaveBeenCalledWith(
-        expect.objectContaining({
-          itemId: item.item_id,
-          leaseId: 'mission-lease',
-          nextStatus: 'done',
-          effectDisposition: 'completed',
-        })
-      );
-      expect(execution).toHaveBeenCalledWith(
-        expect.objectContaining({ receipt_id: 'mission-start:acme:MSN-DOT-VALID', ok: true }),
-        expect.objectContaining({ tenantSlug: 'acme' })
-      );
-    } finally {
-      for (const spy of [list, resolver, admission, gate, claim, release, state, execution])
-        spy.mockRestore();
+          spy.mockRestore();
+      }
     }
-  });
+  );
 
   it('does not guess a tenant for unscoped mission proposals', async () => {
     const list = vi

@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-ASK-DOT-LOOP-PROBE-20261020-2026_10_20
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ASK-DOT-LOOP-PROBE-20261020-2026_10_20
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-20T00:58:55.922Z
+source_branch: fix/dot-advisory-host-io-20261020
+source_commit: 8a53cd18b97af91bb1d762cc4981145b984fa20f
+---
+
+# Verify autonomous intake with actual lineage receipts at every boundary
+
+Separate a native model response, governed intake, mission admission and full mission completion when testing enterprise autonomy.
+
+## Applicability
+
+- mission
+- mission:MSN-ASK-DOT-LOOP-PROBE-20261020
+
+## Reusable Steps
+
+1. Separate a native model response, governed intake, mission admission and full mission completion when testing enterprise autonomy
+
+## Expected Outcome
+
+Use an isolated checkout and synthetic tenant and organization. Feed an actual declared trigger to a native read-only planner, then trace the model proposal, immutable action, original WorkItem, current mandate, controller activation and execution receipt. Keep failures as audit evidence. Check omitted project scope against canonical WorkItem normalization without manufacturing a real project. A bounded production tick probe demonstrates only its observed interval. Explicit shadow-off verification settings do not establish default autonomy; an approval label without a durable request and resume continuation is not an actionable approval route. Ask ingress must retain trusted tenant and organization and must not broadcast confidential text into a global inbox.
+
+## Evidence
+
+- active/missions/public/MSN-ASK-DOT-LOOP-PROBE-20261020/evidence/ops-report.md
+- active/missions/public/MSN-ASK-DOT-LOOP-PROBE-20261020/evidence/operation-run-receipt.md
+- active/missions/public/MSN-ASK-DOT-LOOP-PROBE-20261020/evidence/REVIEW-draft-report.md
+
+## Artifacts

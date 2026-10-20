@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-19
+last_updated: 2026-10-20
 ---
 
 # Operations Hygiene Runbook
@@ -668,6 +668,24 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
 ---
 
 ## §7 LLM and provider calls
+
+**Host bookkeeping inside advisory execution.** A dot wake may stop before the provider call with
+`SANDBOX_WRITE_DENIED` on `observability/delegations.jsonl`: the planner's read-only sandbox also
+covers the host's delegation trace. Keep the planner sandbox in place. Serialize and validate
+records before entering a private synchronous host I/O leaf; permit only the exact trace or
+snapshot file and missing parent directories through an intersecting resource ceiling. Preserve
+the active role, tenant, network policy and any parent resource ceiling. Provider execution,
+cancel callbacks, completion notifications and model-controlled serialization never run inside
+the write exception. A tenantless read-only caller remains denied rather than receiving an
+invented tenant. Gate: `delegated-task-host-io.test.ts` exercises the real reasoning handle,
+started/completed/failed/cancelled records, denied provider/cancel/serialization writes and
+parent-capability denial; run it with `delegated-task-observability.test.ts` after changes.
+The same boundary applies when quota enforcement stops at
+`tenant-rate-limit-state.json.lock`: only the fixed quota state and lock leaf operations may
+write. Keep bucket computation, caller input getters and the `withTenantBudget` operation
+outside that exception; a read-only caller cannot select another tenant. Gate:
+`organization/tenant-rate-limiter.test.ts` checks debit, refusal, stale-lock cleanup, callback
+isolation and parent-capability denial with an ordinary organization operator.
 
 **Rules:**
 

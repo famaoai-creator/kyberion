@@ -34,6 +34,11 @@ import {
   safeExistsSync,
 } from '../secure-io.js';
 import { resolveIdentityContext } from '../authority.js';
+import {
+  currentResourceAccessScope,
+  runInResourceAccessScope,
+} from '../foundation/resource-access-scope.js';
+import { getActiveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 const POLICY_PATH = 'knowledge/product/governance/tenant-rate-limit-policy.json';
 const STATE_PATH = 'active/shared/runtime/tenant-rate-limit-state.json';
@@ -138,8 +143,50 @@ function loadState(): RateLimitState {
 function saveState(state: RateLimitState): void {
   const abs = pathResolver.rootResolve(STATE_PATH);
   const validated = stateCatalog.validate(state, abs);
-  safeMkdir(path.dirname(abs), { recursive: true });
-  safeWriteFile(abs, JSON.stringify(validated, null, 2) + '\n');
+  const serialized = JSON.stringify(validated, null, 2) + '\n';
+  writeRateLimitLeaf('save', serialized);
+}
+
+/** Only host quota bookkeeping may use this synchronous sandbox exception. */
+function writeRateLimitLeaf(
+  operation: 'save' | 'create-lock' | 'unlink-lock',
+  serialized = ''
+): void {
+  const target = pathResolver.rootResolve(operation === 'save' ? STATE_PATH : LOCK_PATH);
+  const directory = path.dirname(target);
+  const missing: string[] = [];
+  if (operation !== 'unlink-lock') {
+    for (let current = directory; !safeExistsSync(current); current = path.dirname(current))
+      missing.push(current);
+  }
+  const leaf = () => {
+    if (missing.length) safeMkdir(directory, { recursive: true });
+    if (operation === 'save') safeWriteFile(target, serialized, { mkdir: false });
+    else if (operation === 'create-lock') safeCreateExclusiveFileSync(target, serialized);
+    else safeUnlinkSync(target);
+  };
+  const policy = getActiveSandboxPolicy();
+  const tenantSlug = resolveIdentityContext().tenantSlug;
+  if (policy?.mode !== 'read-only' || !tenantSlug) return leaf();
+  const parent = currentResourceAccessScope();
+  const relative = (value: string) =>
+    path.relative(pathResolver.rootDir(), value).split(path.sep).join('/');
+  runInResourceAccessScope(
+    {
+      tenantSlug,
+      ...(parent?.organizationId ? { organizationId: parent.organizationId } : {}),
+      ...(parent?.projectId ? { projectId: parent.projectId } : {}),
+      readExact: [],
+      writeExact: [relative(target)],
+      mkdirExact: missing.map(relative),
+      allowProductKnowledgeRead: true,
+    },
+    () =>
+      withSandboxPolicy(
+        { ...policy, mode: 'workspace-write', writableRoots: [directory, ...missing] },
+        leaf
+      )
+  );
 }
 
 function sleepSync(ms: number): void {
@@ -170,20 +217,18 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
 
   while (Date.now() - startedAt < LOCK_TIMEOUT_MS) {
     try {
-      safeCreateExclusiveFileSync(
-        lockAbs,
-        JSON.stringify({
-          pid: process.pid,
-          created_at: nowIso(),
-          resource: 'tenant-rate-limit-state',
-        })
-      );
+      const serialized = JSON.stringify({
+        pid: process.pid,
+        created_at: nowIso(),
+        resource: 'tenant-rate-limit-state',
+      });
+      writeRateLimitLeaf('create-lock', serialized);
       ownsLock = true;
       break;
     } catch (err: any) {
       if (err?.code !== 'EEXIST') throw err;
       if (isStaleLock(lockAbs)) {
-        safeUnlinkSync(lockAbs);
+        writeRateLimitLeaf('unlink-lock');
         continue;
       }
       sleepSync(50 + Math.floor(Math.random() * 50));
@@ -199,7 +244,7 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
   try {
     return fn();
   } finally {
-    safeUnlinkSync(lockAbs);
+    writeRateLimitLeaf('unlink-lock');
   }
 }
 
@@ -247,6 +292,9 @@ export function consumeTenantBudget(input: {
   const ctx = resolveIdentityContext();
   const tenantSlug = input.tenantSlug ?? ctx.tenantSlug;
   if (!tenantSlug) return { allowed: true };
+  if (getActiveSandboxPolicy()?.mode === 'read-only' && tenantSlug !== ctx.tenantSlug) {
+    throw new Error('[RESOURCE_SCOPE_DENIED] Advisory quota accounting requires the active tenant');
+  }
 
   const persona = input.personaOverride ?? ctx.persona ?? '';
   if ((policy.exempt_personas ?? []).includes(persona)) {
