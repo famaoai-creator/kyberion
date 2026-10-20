@@ -1,4 +1,9 @@
-import { appendJsonLine } from './foundation/json.js';
+import {
+  currentResourceAccessScope,
+  runInResourceAccessScope,
+} from './foundation/resource-access-scope.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
+import { getActiveSandboxPolicy, withSandboxPolicy } from './shell/sandbox-policy.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -11,6 +16,7 @@ import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
+  safeAppendFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -137,18 +143,45 @@ function resolveStoreDir(): string {
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
-function ensureTraceDir(): void {
-  const traceDir = assertSafeRepositoryPath(path.dirname(resolveTracePath()), {
-    allowMissingLeaf: true,
-  });
-  if (!safeExistsSync(traceDir)) {
-    safeMkdir(traceDir, { recursive: true });
+/** Host-owned bookkeeping only: callers must serialize before entering this leaf. */
+function writeObservabilityLeaf(filePath: string, serialized: string, append: boolean): void {
+  const directory = path.dirname(filePath);
+  const mkdirPaths: string[] = [];
+  for (let current = directory; !safeExistsSync(current); current = path.dirname(current)) {
+    mkdirPaths.push(current);
   }
+  const write = () => {
+    if (mkdirPaths.length) safeMkdir(directory, { recursive: true });
+    if (append) safeAppendFileSync(filePath, serialized);
+    else safeWriteFile(filePath, serialized, { mkdir: false });
+  };
+  const policy = getActiveSandboxPolicy();
+  const scope = currentResourceAccessScope();
+  const tenantSlug = scope?.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug;
+  if (policy?.mode !== 'read-only' || !tenantSlug) return write();
+  const relative = (target: string) =>
+    path.relative(pathResolver.rootDir(), target).split(path.sep).join('/');
+  runInResourceAccessScope(
+    {
+      tenantSlug,
+      ...(scope?.organizationId ? { organizationId: scope.organizationId } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+      readExact: [],
+      writeExact: [relative(filePath)],
+      mkdirExact: mkdirPaths.map(relative),
+      allowProductKnowledgeRead: true,
+    },
+    () =>
+      withSandboxPolicy(
+        { ...policy, mode: 'workspace-write', writableRoots: [directory, ...mkdirPaths] },
+        write
+      )
+  );
 }
 
 function appendTrace(record: DelegatedTaskTrace): void {
-  ensureTraceDir();
-  appendJsonLine(resolveTracePath(), record);
+  const serialized = `${JSON.stringify(record)}\n`;
+  writeObservabilityLeaf(resolveTracePath(), serialized, true);
 }
 
 function recordPath(delegationId: string): string {
@@ -442,13 +475,12 @@ function persistRecord(trace: DelegatedTaskTrace): void {
 }
 
 function persistRecordStrict(trace: DelegatedTaskTrace): void {
-  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const { trace_id, ...rest } = trace;
   const record: DelegatedTaskRecord = { delegation_id: trace_id, ...rest };
   const filePath = recordPath(trace_id);
   const canonical = delegatedTaskRecordCatalog(filePath).validate(record, filePath);
-  safeWriteFile(filePath, `${JSON.stringify(canonical, null, 2)}\n`);
+  const serialized = `${JSON.stringify(canonical, null, 2)}\n`;
+  writeObservabilityLeaf(filePath, serialized, false);
 }
 
 export function startDelegatedTaskTrace(input: {

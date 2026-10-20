@@ -1,6 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withExecutionContextAsync } from '../authority.js';
+import {
+  currentResourceAccessScope,
+  runInResourceAccessScope,
+} from '../foundation/resource-access-scope.js';
+import {
+  getActiveSandboxPolicy,
+  withSandboxPolicy,
+  type SandboxPolicy,
+} from '../shell/sandbox-policy.js';
 import {
   consumeTenantBudget,
   inspectTenantBudget,
@@ -18,6 +34,21 @@ describe('tenant-rate-limiter (IP-29)', () => {
   const externalLockPath = pathResolver.sharedTmp('tenant-rate-limit-external.lock');
   let savedTenant: string | undefined;
   let savedPersona: string | undefined;
+  const readonly: SandboxPolicy = {
+    mode: 'read-only',
+    networkAccess: true,
+    networkAllowlist: ['localhost'],
+    provider: 'kyberion',
+    enforcement: 'full',
+    enforcement_reason: 'advisory quota regression',
+  };
+  const advisory = <T>(fn: () => Promise<T>) =>
+    withExecutionContextAsync(
+      'organization_operator',
+      () => withSandboxPolicy(readonly, fn),
+      undefined,
+      'quota-host-test'
+    );
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
@@ -37,6 +68,75 @@ describe('tenant-rate-limiter (IP-29)', () => {
     safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
+  });
+
+  it('accounts quota and releases its lock while the actual operation stays read-only', async () => {
+    const arbitrary = pathResolver.sharedTmp('quota-model-write.txt');
+    await advisory(async () => {
+      await expect(
+        withTenantBudget({ op: 'planner', cost: 1 }, async () => {
+          expect(getActiveSandboxPolicy()).toEqual(readonly);
+          expect(currentResourceAccessScope()).toBeUndefined();
+          expect(() => safeWriteFile(arbitrary, 'effect')).toThrow('SANDBOX_WRITE_DENIED');
+          return 'plan';
+        })
+      ).resolves.toBe('plan');
+      expect(inspectTenantBudget('quota-host-test').tokens).toBeLessThan(60);
+      expect(safeExistsSync(lockPath)).toBe(false);
+      expect(getActiveSandboxPolicy()).toEqual(readonly);
+    });
+    expect(safeExistsSync(arbitrary)).toBe(false);
+  });
+
+  it('reclaims a malformed lock under the exact host scope and continues enforcing denial', async () => {
+    safeWriteFile(lockPath, '{');
+    await advisory(async () => {
+      expect(consumeTenantBudget({ op: 'planner', cost: 9999 }).allowed).toBe(false);
+      expect(safeExistsSync(lockPath)).toBe(false);
+      expect(getActiveSandboxPolicy()).toEqual(readonly);
+    });
+  });
+
+  it('does not relax the sandbox for input getters or other tenants', async () => {
+    await advisory(async () => {
+      const input = {
+        op: 'planner',
+        get cost() {
+          expect(getActiveSandboxPolicy()).toEqual(readonly);
+          safeWriteFile(pathResolver.sharedTmp('quota-getter-write.txt'), 'effect');
+          return 1;
+        },
+      };
+      expect(() => consumeTenantBudget(input)).toThrow('SANDBOX_WRITE_DENIED');
+      expect(() => consumeTenantBudget({ op: 'planner', tenantSlug: 'other-tenant' })).toThrow(
+        'RESOURCE_SCOPE_DENIED'
+      );
+      expect(safeExistsSync(lockPath)).toBe(false);
+    });
+    await withSandboxPolicy(readonly, async () => {
+      expect(() => consumeTenantBudget({ op: 'planner', tenantSlug: 'quota-host-test' })).toThrow(
+        'RESOURCE_SCOPE_DENIED'
+      );
+    });
+  });
+
+  it('preserves a restrictive parent capability on quota lock creation', async () => {
+    await advisory(async () => {
+      runInResourceAccessScope(
+        {
+          tenantSlug: 'quota-host-test',
+          readExact: [],
+          writeExact: [],
+          mkdirExact: [],
+          allowProductKnowledgeRead: true,
+        },
+        () => {
+          expect(() => consumeTenantBudget({ op: 'planner' })).toThrow('RESOURCE_SCOPE_DENIED');
+          expect(getActiveSandboxPolicy()).toEqual(readonly);
+        }
+      );
+      expect(safeExistsSync(lockPath)).toBe(false);
+    });
   });
 
   it('normalizes lock records and rejects unsafe PID shapes', () => {
