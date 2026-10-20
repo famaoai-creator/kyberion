@@ -12,6 +12,11 @@ import { evaluateApprovalUsability, type ApprovalRequestRecord } from './approva
  * adding it here and to the doc; removing a check fails this test.
  */
 const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
+  { file: 'libs/core/mission/mission-admission.ts', consumer: 'mission_admission_activation' },
+  {
+    file: 'libs/core/knowledge/scoped-learning-approval-verifier.ts',
+    consumer: 'scoped_learning_publication',
+  },
   { file: 'libs/core/governance/approval-gate.ts', consumer: 'approval_gate' },
   { file: 'libs/core/governance/approval-gate.ts', consumer: 'approval_gate_session_cache' },
   { file: 'libs/core/governance/approval-apply-claim.ts', consumer: 'apply_claim' },

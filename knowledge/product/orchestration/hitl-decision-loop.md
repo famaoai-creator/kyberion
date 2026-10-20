@@ -113,9 +113,28 @@ A card records a decision; the effect-specific adapter owns safe resumption. Bin
 
 Pending-only deduplication does not make rejected, expired, revoked or applied effects safe to reopen. Recurring callers need terminal-state and content-bound continuation semantics. Reconcile unknown outcomes rather than obtaining new approval and repeating an effect.
 
-The four levels do not imply every shadow action produces a card. An auto gate in shadow can remain none with proceed=false; do not claim a human request exists. Watchdog mission admission needs an explicit bound continuation before it is approve-and-resume. Preserve shadow policy while that integration is absent.
+The four levels do not imply every shadow action produces a card. An auto gate in shadow can remain none with proceed=false; do not claim a human request exists. Human-directed mission preparation is a distinct supported path: explicitly request alignment for the original typed WorkItem, create its planned mission once, decide the exact shared card, then let the watchdog resume that same work using a fresh approval apply claim and active work lease. Direct mission start cannot replay that claim. Autonomous shadow is not relaxed. Partial or unknown mission creation/activation stays held for reconciliation, rather than spawning another mission.
 
 Clarification, approval, request changes and learning review are distinct user acts. Keep work context visible and explain what is blocked. A change request changes the proposal, not old approval.
+
+### 4.2 Supported same-work user journey
+
+In the existing Chronos Work items view, a held typed mission intake offers
+**Request mission approval**. The existing local-admin action route resolves the
+viewer and exact tenant/organization/project scope on the server; browser scope
+parameters are not authority. Preparation returns the exact shared approval
+request, not a completed task. Refresh derives its display from the canonical
+receipt, never from client or stored display metadata.
+
+The link opens that exact request in the existing approval workspace. After an
+authenticated human decision, the watchdog resumes the original WorkItem under
+the current authority, active lease and fresh apply claim. The controller checks
+the planned mission and stored brief again at activation. Rejection, expiry,
+cancellation, revocation and unknown outcomes stay visibly distinct holds.
+The CLI equivalent is `mission_alignment_request --work-item <WORK_ITEM_ID>`.
+
+Route/adapter tests, rendered component state and a direct click-callback test
+cover this connection. They do not establish live browser or real-user execution.
 
 ## 5. Operations
 

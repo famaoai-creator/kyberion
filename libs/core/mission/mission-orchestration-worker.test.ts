@@ -289,6 +289,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
 
       const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+      // This case exercises a standalone public mission. The shared legacy
+      // project fixture has no organization and is not a valid learning scope.
+      const standaloneState = JSON.parse(
+        String(safeReadFile(missionPath + '/mission-state.json', { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      safeWriteFile(
+        missionPath + '/mission-state.json',
+        JSON.stringify({ ...standaloneState, relationships: {} }, null, 2)
+      );
       safeWriteFile(`${missionPath}/deliverables/REVIEW-task-bootstrap.md`, '# review followup');
       safeWriteFile(
         `${missionPath}/NEXT_TASKS.json`,
@@ -416,9 +425,17 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       const { listMemoryPromotionCandidates } =
         await import('../knowledge/memory-promotion-queue.js');
       const candidates = listMemoryPromotionCandidates();
-      expect(
-        candidates.some((c) => c.summary.includes('kp-05 integration test knowledge gap'))
-      ).toBe(true);
+      const gapCandidate = candidates.find((candidate) =>
+        candidate.summary.includes('kp-05 integration test knowledge gap')
+      );
+      expect(gapCandidate).toMatchObject({
+        scope: { tier: 'public', mission_id: 'MSN-FOLLOWUP' },
+        sensitivity_tier: 'confidential',
+        ratification_required: true,
+        status: 'queued',
+      });
+      expect(gapCandidate?.scope).not.toHaveProperty('tenant_slug');
+      expect(gapCandidate?.scope).not.toHaveProperty('project_id');
 
       expect(dispatched).toEqual([
         { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },

@@ -2066,6 +2066,26 @@
         "ja": "失敗",
         "qps-ploc": "⟦ƒȧïŀėḓ ŀőř⟧"
       },
+      "chronos_work_item_request_alignment": {
+        "en": "Request mission approval",
+        "ja": "ミッション承認を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ɱïşşïőñ ȧṗṗřőṽȧŀ ŀőřėɱ ï⟧"
+      },
+      "chronos_work_item_alignment_pending": {
+        "en": "Awaiting your decision; work has not started",
+        "ja": "承認待ちです。作業はまだ開始していません",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ẏőůř ḓėƈïşïőñ; ẇőřķ ħȧş ñőŧ şŧȧřŧėḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "chronos_work_item_alignment_approved": {
+        "en": "Approved; waiting for governed activation",
+        "ja": "承認済み。管理された開始処理を待っています",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ; ẇȧïŧïñɠ ƒőř ɠőṽėřñėḓ ȧƈŧïṽȧŧïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_work_item_alignment_held": {
+        "en": "Admission remains held",
+        "ja": "開始は保留されています",
+        "qps-ploc": "⟦Ȧḓɱïşşïőñ řėɱȧïñş ħėŀḓ ŀőřėɱ ï⟧"
+      },
       "chronos_action_route_to_approvals": {
         "en": "route to approvals",
         "ja": "承認画面へ移動",

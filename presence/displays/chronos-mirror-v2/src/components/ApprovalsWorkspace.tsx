@@ -58,26 +58,41 @@ function approvalTenantLabel(item: Approval, locale: SupportedLocale): string | 
 export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
   const locale = useChronosLocale();
   const [items, setItems] = React.useState<Approval[]>([]);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(() =>
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('request')
+  );
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
   const [note, setNote] = React.useState('');
-  const selected = items.find((item) => item.id === selectedId) || items[0] || null;
+  const selected = selectedId
+    ? items.find((item) => item.id === selectedId) || null
+    : items[0] || null;
 
   const refresh = React.useCallback(async () => {
     try {
-      const query = new URLSearchParams({ status: 'pending', limit: '50' });
+      const location =
+        typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
+      const query = new URLSearchParams({ limit: '50' });
+      if (location?.get('request') && location.get('mission'))
+        query.set('missionId', location.get('mission')!);
+      else query.set('status', 'pending');
       if (tenant) query.set('tenant', tenant);
-      const response = await fetch(`/api/approvals?${query.toString()}`, { cache: 'no-store' });
+      const response = await fetch(`/api/approvals?${query.toString()}`, {
+        cache: 'no-store',
+      });
       const payload = parseApprovalsResponse(await response.json().catch(() => null));
       if (!response.ok || !payload) throw new Error('Invalid approval queue response');
       setAccessRole(payload.accessRole);
       setItems(payload.approvals);
       setSelectedId((current) =>
-        payload.approvals.some((item) => item.id === current)
-          ? current
-          : payload.approvals[0]?.id || null
+        location?.get('request')
+          ? location.get('request')
+          : payload.approvals.some((item) => item.id === current)
+            ? current
+            : payload.approvals[0]?.id || null
       );
       setError(null);
     } catch (err) {
@@ -315,13 +330,13 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             <Button
               label={uxText('chronos_approve', locale)}
               variant="primary"
-              disabled={busy || !localAdmin}
+              disabled={busy || !localAdmin || selected.status !== 'pending'}
               onClick={() => void decide('approved')}
             />
             <Button
               label={uxText('chronos_reject', locale)}
               variant="danger"
-              disabled={busy || !localAdmin}
+              disabled={busy || !localAdmin || selected.status !== 'pending'}
               onClick={() => void decide('rejected')}
             />
           </div>

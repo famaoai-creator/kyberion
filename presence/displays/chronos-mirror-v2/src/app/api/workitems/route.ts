@@ -24,7 +24,8 @@ import {
   readChronosOptionalStringParam,
   readChronosStringParam,
 } from '../../../lib/request-input';
-import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemStatusInput } from './work-item-input';
+import { requestWorkItemMissionAlignment, readWorkItemMissionAlignment } from './mission-alignment';
+import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemActionInput } from './work-item-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,7 +87,29 @@ export function GET(req: NextRequest) {
       statuses: CHRONOS_WORK_ITEM_STATUSES,
       scope: projection.scope,
       view: projection.view,
-      items: projection.items,
+      items: projection.items.map((rawItem) => {
+        const metadata = { ...rawItem.metadata };
+        delete metadata.mission_alignment_decision;
+        const item = { ...rawItem, metadata };
+        if (!item.metadata?.mission_alignment_preparation) return item;
+        try {
+          const current = withViewerExecutionContext(viewer, () => getWorkItem(item.item_id));
+          if (
+            !current ||
+            current.context?.tenant_slug !== item.context?.tenant_slug ||
+            current.context?.organization_id !== item.context?.organization_id ||
+            current.context?.project_id !== item.context?.project_id
+          )
+            return item;
+          const receipt = readWorkItemMissionAlignment(current);
+          return {
+            ...item,
+            metadata: { ...item.metadata, mission_alignment_decision: receipt.admission },
+          };
+        } catch {
+          return item;
+        }
+      }),
       counts: projection.counts,
       quality: projection.quality,
       lineage: projection.lineage,
@@ -109,7 +132,8 @@ export async function POST(req: NextRequest) {
     if (parsedBody.ok !== true) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
-    const { itemId, status } = parseWorkItemStatusInput(parsedBody.body);
+    const input = parseWorkItemActionInput(parsedBody.body);
+    const { itemId } = input;
     const current = withViewerExecutionContext(viewer, () => getWorkItem(itemId));
     if (!current)
       return NextResponse.json({ ok: false, error: 'work item not found' }, { status: 404 });
@@ -141,7 +165,23 @@ export async function POST(req: NextRequest) {
     if (projectIds !== 'all' && (!currentProject || !projectIds.includes(currentProject))) {
       throw new Error('viewer is not authorized for this work item project');
     }
-    const updated = withViewerExecutionContext(viewer, () => updateWorkItem({ itemId, status }));
+    if ('action' in input) {
+      if (
+        !current.context?.tenant_slug ||
+        current.metadata?.requested_work_shape !== 'mission' ||
+        current.metadata?.admission_only !== true ||
+        !['ready', 'blocked'].includes(current.status)
+      )
+        return NextResponse.json(
+          { ok: false, error: 'only a held typed mission intake can request alignment' },
+          { status: 409 }
+        );
+      const result = await requestWorkItemMissionAlignment(current);
+      return NextResponse.json({ ok: true, ...result });
+    }
+    const updated = withViewerExecutionContext(viewer, () =>
+      updateWorkItem({ itemId, status: input.status })
+    );
     return NextResponse.json({ ok: true, item: updated });
   } catch (error) {
     return viewerErrorResponse(

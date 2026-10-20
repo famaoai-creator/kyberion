@@ -560,6 +560,26 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
 
 ## §6 Tenant scope and governed facades
 
+**Learning source, destination, and storage are distinct.** Preserve the observed source
+scope; a conservative confidential promotion destination never authorizes reading personal
+source content. Exact-scope distill lookups use the full canonical envelope and have no global
+fallback. Owner-only personal queues, distill records, and feedback use the protected
+active/personal/owners/<owner-hash>/ namespace and require an explicit owner; shared
+candidate lists never enumerate those owner queues. Do not invent a tenant or infer ownership
+from an executing agent. Existing ownerless/legacy records are not silently migrated.
+
+Before changing a scoped store, audit every list, ID lookup, mutation, notification, and
+publication caller. Server-derived tenant/org/project/tier restrictions and source owner/audience
+restrictions must all hold. Reject ambiguous IDs, scope removal, tier drift, copied hash/path
+records, and symlinked ancestors before writes. Unsupported scoped non-SOP publication is
+fail-closed; the exact-scope SOP approval proof is not a generic grant to publish other kinds.
+Keep tests for real store round-trips, wrong-owner reads, unchanged shared files, and actual
+publisher refusal, not only mocked route failures. Regression suites: distill-candidate-scope,
+memory-promotion-owner-scope, promoted-memory-scope, knowledge-feedback-loop, and the
+Chronos/Concierge memory visibility suites.
+
+Legacy unscoped candidates retain their existing storage compatibility; this does not authorize a scoped personal source without an explicit owner. Owner learning state is declared review-required only, without a retention duration or automatic cleanup. Personal wrong/stale feedback keeps its owner-private receipt but does not enter the shared verification ledger, whose schema cannot preserve owner scope.
+
 **Rules:**
 
 - **Registry paths are not tenants — but are not shared either.** The tenant classifier
@@ -1709,3 +1729,45 @@ input, bounded generated-verdict retry, organization isolation, envelope/payload
 conflict before side effects and original execution correlation after feedback.
 These deterministic tests do not establish live authenticated approval, mission
 resume or organization-scoped promoted-memory consumption.
+
+## Governed continuation and version-pinned learning
+
+Human-directed alignment is not an override of autonomous mandate shadow. Prepare a
+planned mission through its lifecycle owner, bind the original WorkItem and exact
+brief, then retain that request across polling and restart. A rejected, expired,
+cancelled or revoked revision must not silently acquire a fresh approval. Changes
+to intent, scope, authority or the approved effect invalidate the old consent.
+Revalidate immediately before activation, claim the original work and approval,
+and settle only from exact active-state and admission-brief evidence. A stale
+lease, missing response or partial mission is not proof of nonexecution. Keep an
+unknown attempt held for reconciliation rather than creating a replacement.
+
+Promotion must preserve the entire supported source envelope through the existing
+queue, intermediate distill record and published artifacts. Refuse unsupported
+owner/audience or narrower restrictions rather than dropping fields. Bind human
+review to curated content, not a mutable status timestamp or summary-only digest;
+verify canonical paths and both artifact digests before reporting publication.
+Do not copy project lessons into tenant-wide hints or global intermediate storage.
+
+The real provisioning path must pin the rendered hint and the source version read
+to produce it. Keep that snapshot unchanged for its dispatch; explicit additional
+retrieval creates another delivery receipt. Task-result attribution accepts only
+references actually delivered to that exact work/scope. Never hash the current
+file at completion to credit a previously delivered version. Delivery, a worker's
+reported use, verified task evidence and measured improvement remain distinct.
+None of these observations grants execution authority or renews human consent.
+
+Regression coverage must exercise real store/lifecycle boundaries, repeated and
+concurrent polls, changed approved content, all terminal decisions, interrupted
+creation/activation, exact publication tampering, sibling-scope denial, forged
+use references and a source edit between delivery and completion. Isolated
+fixtures do not establish a live authenticated business outcome.
+
+The acceptance sequence in `knowledge-learning-delivery.e2e.test.ts` crosses the
+real feedback queue, canonical approval store, publisher, exact-scope retrieval,
+task provisioning and result stores; only worker transport is mocked. It must
+prove sibling exclusion, unchanged in-flight delivery after a source edit, old
+version credit, rejection of forged references and repeated-result idempotency.
+The editorial request/apply/publish steps still use the existing memory CLI;
+the shared approval surface decides the presented content. Do not describe this
+as a fully graphical SOP editor or as measured outcome improvement.

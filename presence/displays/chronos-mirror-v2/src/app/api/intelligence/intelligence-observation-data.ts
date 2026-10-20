@@ -740,9 +740,11 @@ export function buildMissionSeedPromotionMetadata(
 export function buildLearnedNotificationText(input: {
   projectId?: string;
   language?: SupportedLocale;
+  /** Already viewer-authorized rows; absent preserves legacy global-only behavior. */
+  candidates?: ReturnType<typeof listDistillCandidateRecords>;
 }): string {
   if (!input.projectId) return '';
-  const titles = listDistillCandidateRecords()
+  const titles = (input.candidates ?? listDistillCandidateRecords())
     .filter((candidate) => candidate.project_id === input.projectId && candidate.promoted_ref)
     .map((candidate) => candidate.title)
     .filter(Boolean)

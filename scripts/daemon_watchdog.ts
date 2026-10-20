@@ -43,6 +43,7 @@ import {
   resolveDotMissionAdmission,
   resolveDotMissionAdmissionScope,
 } from '@agent/core/mission/mission-admission';
+import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -486,7 +487,7 @@ if (
  * starts; unknown facts stay blocked. Only verified execution builds learning.
  */
 export async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
-  const items = listWorkItems({ status: ['blocked', 'ready'], ...deps });
+  const items = listWorkItems({ status: ['blocked', 'ready', 'in_progress'], ...deps });
   for (const item of items) {
     if (item.metadata?.requested_work_shape !== 'mission') continue;
     try {
@@ -509,10 +510,20 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
       });
       // A verdict is not an execution receipt. Blocked/allowed evaluations
       // alone must never bootstrap promotion into authority.
-      // Auto-fire: only when the gate itself allows (auto tier, shadow lifted by
-      // evidence promotion). mission_start never reaches here today — the
-      // unknown action fail-closes to approve — so only in-mandate proposals
-      // can auto-start after successful execution evidence permits promotion.
+      // Automatic admission requires explicit current gate permission; shadow remains held.
+      // Human alignment is a separate controller workflow, not an override of shadow.
+      // Once preparation began, only its exact durable continuation may activate it.
+      if (item.metadata?.mission_alignment_preparation) {
+        const continuation = await continueHumanMissionAdmission(item.item_id, deps);
+        if (continuation.status === 'reconciliation_required')
+          logger.warn(
+            '[WATCHDOG] mission admission held — ' +
+              continuation.reason +
+              ' | next: reconcile original admission | evidence: ' +
+              item.item_id
+          );
+        continue;
+      }
       if (verdict.allowed && verdict.decision === 'auto') {
         let claimed: ReturnType<typeof claimWorkItem> | undefined;
         try {

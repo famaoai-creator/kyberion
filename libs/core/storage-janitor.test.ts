@@ -1435,6 +1435,31 @@ describe('storage-janitor', () => {
       expect(fs.existsSync(lock)).toBe(true);
     });
 
+    it('keeps owner learning evidence unchanged without automatic retention', () => {
+      const catalog = JSON.parse(
+        fs.readFileSync(
+          path.join(REPO_ROOT, 'knowledge/product/governance/storage-retention-catalog.json'),
+          'utf8'
+        )
+      );
+      const entry = catalog.entries.find(
+        (row: { path: string }) => row.path === 'active/personal/owners'
+      );
+      expect(entry).toMatchObject({ artifact_class: 'state', action: 'review_required' });
+      expect(entry.ttl_days).toBeUndefined();
+      expect(entry.status_rules).toBeUndefined();
+      writeCatalogFile({ version: catalog.version, entries: [entry] });
+      const record = path.join(
+        testRootDir(),
+        'active/personal/owners/owner-hash/memory/promotion-queue.jsonl'
+      );
+      writeFile(record, 'owner-private-evidence');
+      setMtime(record, 400 * RETENTION_DAY_MS);
+      const report = runJanitor({ dryRun: false });
+      expect(report.reviewRequiredDirs).toContain('active/personal/owners');
+      expect(fs.readFileSync(record, 'utf8')).toBe('owner-private-evidence');
+    });
+
     it('review_required is honored even when the entry carries a ttl_days', () => {
       writeCatalogFile({
         version: '1.1.0',

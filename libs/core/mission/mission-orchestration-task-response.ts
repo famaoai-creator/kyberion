@@ -5,6 +5,8 @@ import type {
 import { recordKnowledgeVerifiedRun } from '../knowledge/knowledge-verification.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { nowIso } from '../foundation/time.js';
+import { knowledgeTextSha256 } from '../knowledge/knowledge-delivery-snapshot.js';
+import type { ScopeContext } from '../scope-context.js';
 import { serializeDelegationChain, type DelegationChain } from './delegation-chain.js';
 import {
   recordKnowledgeUsageFeedback,
@@ -92,13 +94,17 @@ export async function obtainTaskResultResponse(
   notes: string[];
 }> {
   const notes: string[] = [];
+  // Freeze this dispatch's receipts across provider awaits and retries.
+  const deliveredKnowledgeRefs: DeliveredKnowledgeRef[] = structuredClone(
+    input.deliveredKnowledgeRefs || []
+  );
   deps.recordMissionVisiblePrompt({
     missionId: input.missionId,
     taskId: input.task.task_id,
     content: input.prompt,
     form: 'task_dispatch',
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
-    knowledgeRefs: input.deliveredKnowledgeRefs,
+    knowledgeRefs: deliveredKnowledgeRefs,
     securityScope: input.securityScope,
   });
   let response = await a2aBridge.route({
@@ -174,7 +180,7 @@ export async function obtainTaskResultResponse(
       taskId: input.task.task_id,
       teamRole: input.teamRole,
       needs: taskResult?.needs || [],
-      deliveredKnowledgeRefs: input.deliveredKnowledgeRefs || [],
+      deliveredKnowledgeRefs,
       securityScope: input.securityScope,
     });
     const retryPrompt = deps.buildTaskResultRetryPrompt({
@@ -193,7 +199,7 @@ export async function obtainTaskResultResponse(
       content: retryPrompt,
       form: 'task_result_retry',
       ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
-      knowledgeRefs: input.deliveredKnowledgeRefs,
+      knowledgeRefs: deliveredKnowledgeRefs,
       securityScope: input.securityScope,
     });
     response = await a2aBridge.route({
@@ -259,49 +265,48 @@ export async function obtainTaskResultResponse(
       notes.push(`surface parse errors after retry: ${surfaceParseErrors.join('; ')}`);
   }
 
-  // KP-05: fold any knowledge_feedback the worker reported into the
-  // delivered/used aggregate and enqueue missing_topics as knowledge-gap
-  // promotion candidates. Fails open (recordKnowledgeUsageFeedback swallows
-  // its own errors) — telemetry must never block task dispatch.
+  // Worker usage is not a verifier decision. Attribute it only to persisted
+  // delivery receipts, and retain the exact scope through both telemetry stores.
+  const security = input.securityScope;
+  const tenant = security?.tenant_slug || security?.tenant_id;
+  const scope: ScopeContext = {
+    tier: security?.write_tier || 'public',
+    ...(tenant && !(security?.write_tier === 'public' && tenant === 'default')
+      ? { tenant_slug: tenant }
+      : {}),
+    ...(security?.organization_id ? { organization_id: security.organization_id } : {}),
+    ...(security?.project_id ? { project_id: security.project_id } : {}),
+    mission_id: input.missionId,
+    task_id: input.task.task_id,
+    ...(security?.session_id ? { session_id: security.session_id } : {}),
+  };
+  const complete =
+    !!taskResult &&
+    parseErrors.length === 0 &&
+    surfaceParseErrors.length === 0 &&
+    (taskResult.gaps || []).length === 0 &&
+    (taskResult.needs || []).length === 0 &&
+    (taskResult.verification_done || []).some((entry) => entry.trim()) &&
+    !(taskResult.acceptance_evidence || []).some((entry) => entry.status !== 'passed');
   if (taskResult?.knowledge_feedback) {
-    recordKnowledgeUsageFeedback({
+    const feedback = recordKnowledgeUsageFeedback({
       missionId: input.missionId,
       taskId: input.task.task_id,
       feedback: taskResult.knowledge_feedback,
-      ...(input.securityScope?.tenant_slug
-        ? {
-            scope: {
-              tier: input.securityScope.write_tier,
-              tenant_slug: input.securityScope.tenant_slug,
-              mission_id: input.securityScope.mission_id,
-              task_id: input.task.task_id,
-            },
-          }
-        : {}),
+      scope,
+      deliveredRefs: deliveredKnowledgeRefs,
+      resultId: knowledgeTextSha256(JSON.stringify({ ...taskResult, provenance: undefined })),
+      outcome: complete ? 'worker_report_complete' : 'incomplete',
     });
-  }
-
-  // A finished task (no gaps, no open needs, parseable result) that reports
-  // using delivered documents is evidence those documents' current text
-  // works. Only delivered paths count; a failed task is not blamed on them.
-  const usedDelivered = (taskResult?.knowledge_feedback?.used || []).filter((usedPath) =>
-    (input.deliveredKnowledgeRefs || []).some((ref) => ref.path === usedPath)
-  );
-  if (
-    taskResult &&
-    usedDelivered.length > 0 &&
-    parseErrors.length === 0 &&
-    (taskResult.gaps || []).length === 0 &&
-    (taskResult.needs || []).length === 0
-  ) {
-    const scope = input.securityScope;
-    const tenant =
-      scope?.write_tier === 'confidential' ? scope.tenant_slug || scope.tenant_id : undefined;
-    recordKnowledgeVerifiedRun({
-      documentPaths: usedDelivered,
-      ...(tenant ? { scope: { tier: 'confidential' as const, tenant_slug: tenant } } : {}),
-      ...(scope?.project_id ? { projectId: scope.project_id } : {}),
-    });
+    if (complete && feedback.usedRefs?.length) {
+      recordKnowledgeVerifiedRun({
+        documentSnapshots: feedback.usedRefs,
+        scope,
+        ...(feedback.receiptId ? { receiptId: feedback.receiptId } : {}),
+        ...(security?.project_id ? { projectId: security.project_id } : {}),
+        evidence: 'worker_report',
+      });
+    }
   }
 
   // XP-05 closeout: this is the worker's persist point — see

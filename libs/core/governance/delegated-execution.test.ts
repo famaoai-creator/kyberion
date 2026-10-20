@@ -7,6 +7,7 @@ import * as pathResolver from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   acceptCharter,
+  findActiveCharter,
   loadCharterUsage,
   recordTripwire,
   retireCharter,
@@ -157,9 +158,17 @@ describe('operation-bound delegated execution', () => {
             statement: 'I accept responsibility.',
             acceptedBy: humanActor('owner'),
             validation: { holder_role: 'owner' },
+            now: NOW,
           },
-          {},
-          NOW
+          {}
+        );
+        // Acceptance and evaluation share an explicit clock, not CI wall time.
+        expect(findActiveCharter(productionScope, new Date(NOW.getTime() - 1))).toBeNull();
+        expect(findActiveCharter(productionScope, NOW)?.accountable.accepted_at).toBe(
+          NOW.toISOString()
+        );
+        expect(findActiveCharter(productionScope, new Date(NOW.getTime() + 1))?.charter_id).toBe(
+          charter.charter_id
         );
         await withExecutionContextAsync(
           role,

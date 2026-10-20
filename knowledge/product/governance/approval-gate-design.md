@@ -195,6 +195,8 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     drain は他の held action を続ける）、`agent_prompt_approval`、`system_actuator_computer`、
     `approval_actuator_request_review`
   - script: `audit_mirror_reconcile`、`entity_governance_cleanup`、`mission_alignment_gate`、`video_production`（動画の原型画像・全編視聴の採用確認）、
+    `mission_admission_activation`（実行直前のミッション受入承認）、
+    `scoped_learning_publication`（スコープ付き SOP の認証済み内容承認）、
     `organization_decision`、`org_security_policy_write`（`scripts/org.ts`）、`personal_workbench`
   - service recording: `service_recording_review`（`scripts/service_recording.ts` の review が承認を
     recording に書く前）、`service_recording_promotion`（promotion が review の承認を確かめる。

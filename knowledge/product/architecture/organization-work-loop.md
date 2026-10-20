@@ -274,17 +274,17 @@ The user sees request → necessary clarification/decision → understandable pr
 ## 9. Implementation boundaries and acceptance evidence
 
 The loop is a design obligation, not a claim that all surfaces are wired end to end.
-At the 2026-10-20 integration baseline:
+At the 2026-10-20 governed-continuation integration:
 
-| Boundary             | Existing mechanism and limit                                                                                                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scope                | scope-context, entity-scope and typed WorkItems exist. Metadata is not authority; adapters must preserve runtime isolation.                                                               |
-| Human intervention   | DecisionCard, approval-store, routing and apply claims exist. Watchdog mission admission held in shadow lacks a complete bound continuation; never disable shadow to simulate completion. |
-| Delegation           | Preflight/task contracts bound eligible workers. Organization-only surface A2A is not supported merely by attaching metadata when the receiver requires mission-bound security scope.     |
-| Judgment integration | Canonical sensitive failures must not enter autonomous repair; declared verdict schemas and meaningful predicates must be enforced before routing.                                        |
-| Feedback             | Canonical memory scope and correlation exist. Legacy unscoped records remain legacy, never silently adopted into a tenant.                                                                |
-| Promotion            | Feedback-to-memory admission supports tenant-wide confidential proposals only; narrower scopes remain review-only until publication/retrieval preserve them.                              |
-| Learning evidence    | A promotion reference is not exact publication proof; aggregate usage is not exact retrieval or outcome improvement.                                                                      |
+| Boundary             | Existing mechanism and limit                                                                                                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                | scope-context, entity-scope and typed WorkItems exist. Metadata is not authority; adapters must preserve runtime isolation.                                                                                      |
+| Human intervention   | Explicit human-directed preparation binds the original WorkItem to a planned mission and shared alignment review. The watchdog resumes only its exact fresh approval claim; autonomous shadow remains unchanged. |
+| Delegation           | Preflight/task contracts bound eligible workers. Organization-only surface A2A is not supported merely by attaching metadata when the receiver requires mission-bound security scope.                            |
+| Judgment integration | Canonical sensitive failures must not enter autonomous repair; declared verdict schemas and meaningful predicates must be enforced before routing.                                                               |
+| Feedback             | Canonical memory scope and correlation exist. Legacy unscoped records remain legacy, never silently adopted into a tenant.                                                                                       |
+| Promotion            | Authenticated review publishes confidential tenant, organization or project SOPs at exact scoped paths. Unsupported owner/audience/mission/task restrictions remain review-only, never broadened.                |
+| Learning evidence    | Canonical publication receipts bind both artifact hashes; delivered snapshots bind exact bytes to work. Delivery, cited use and verified outcome are separate evidence, not proof of measured improvement.       |
 
 The acceptance suite must cover continuity across clarification, delegation, approval hold/resume, verified delivery, scoped feedback, review/promotion and next-work use. Each work item traverses only the applicable stages; simple work does not acquire unnecessary questions or approval gates. Cover duplicate inputs, denial/expiry, changed approved content, unknown outcomes and cross-scope contamination. Mocked tests, recorded closure and builds are separate evidence classes from authenticated live business execution.
 

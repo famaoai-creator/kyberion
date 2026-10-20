@@ -208,3 +208,13 @@ export function parseChronosIntelligenceInput(value: unknown): ChronosIntelligen
 
   return { ...value, action };
 }
+
+/** A query selection narrows the same decision as the body; it never grants scope. */
+export function resolveDistillDecisionTenantSelection(
+  bodyTenant?: string,
+  queryTenant?: string
+): { ok: true; tenant?: string } | { ok: false; error: string } {
+  if (bodyTenant && queryTenant && bodyTenant !== queryTenant)
+    return { ok: false, error: 'Query and body tenant selections conflict' };
+  return { ok: true, tenant: bodyTenant || queryTenant };
+}

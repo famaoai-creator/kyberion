@@ -80,3 +80,55 @@ describe('relevance narrowing keeps the hint budget', () => {
     expect(hints.map((h) => h.path)).toEqual(distill.slice(0, 3).map((d) => d.path));
   });
 });
+
+describe('retrieval scope and source snapshot precede provider judgment', () => {
+  it('keeps organization/project siblings out of every relevance payload', async () => {
+    gate.ready = true;
+    const own = {
+      ...distill[0],
+      path: 'knowledge/confidential/tenant-a/organizations/org-a/projects/PRJ-A/own.md',
+    };
+    const sibling = {
+      ...distill[1],
+      path: 'knowledge/confidential/tenant-a/organizations/org-b/projects/PRJ-B/secret.md',
+      excerpt: 'DO NOT EGRESS',
+    };
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([own, sibling, distill[2]]);
+    relevance.selectRelevantKnowledge.mockImplementation(async ({ candidates }) => ({
+      source: 'judgment',
+      kept: candidates,
+      dropped: [],
+    }));
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: {
+        ...missionState,
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        relationships: { project: { project_id: 'PRJ-A' } },
+      },
+      knowledgeSlicesPath: '/nonexistent/knowledge-slices.json',
+    });
+    expect(hints.map((hint) => hint.path)).not.toContain(sibling.path);
+    expect(JSON.stringify(relevance.selectRelevantKnowledge.mock.calls)).not.toContain(
+      'DO NOT EGRESS'
+    );
+    expect(vi.mocked(findRelevantDistilledKnowledge).mock.calls[0][0].scope).toMatchObject({
+      organization_id: 'org-a',
+      project_id: 'PRJ-A',
+    });
+  });
+
+  it('retains the source hash paired with the extracted hint across awaited judgment', async () => {
+    gate.ready = true;
+    const source = { ...distill[0], source_sha256: 'a'.repeat(64) };
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([source, distill[1]]);
+    relevance.selectRelevantKnowledge.mockImplementation(async ({ candidates }) => {
+      source.source_sha256 = 'b'.repeat(64);
+      source.excerpt = 'later source version';
+      return { source: 'judgment', kept: candidates, dropped: [] };
+    });
+    const hints = await load();
+    expect(hints[0]).toMatchObject({ source_sha256: 'a'.repeat(64), excerpt: distill[0].excerpt });
+  });
+});
