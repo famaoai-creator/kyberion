@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   buildExecutionFeedbackHints,
   loadExecutionFeedbackStore,
+  listExecutionFeedbackCandidates,
   materializeExecutionFeedbackCandidate,
   parseExecutionFeedbackText,
   recordExecutionFeedback,
@@ -22,6 +23,7 @@ describe('execution feedback loop', () => {
   let originalExists = false;
   let originalRaw: string | null = null;
   const createdCandidateIds = new Set<string>();
+  const scopedRoots = new Set<string>();
 
   beforeAll(() => {
     originalExists = safeExistsSync(feedbackPath);
@@ -47,6 +49,8 @@ describe('execution feedback loop', () => {
       });
     }
     createdCandidateIds.clear();
+    for (const root of scopedRoots) safeRmSync(root, { recursive: true, force: true });
+    scopedRoots.clear();
     safeRmSync(
       executionFeedbackScopeRoot({ tier: 'confidential', tenant_slug: 'synthetic-feedback-a' }),
       { recursive: true, force: true }
@@ -215,6 +219,50 @@ describe('execution feedback loop', () => {
         scope: { tier: 'confidential' },
       })
     ).toThrow(/tenant_slug/);
+  });
+
+  it('keeps organization feedback separate and aggregates source correlations without changing identity', () => {
+    const scopes = ['org-a', 'org-b'].map((organization_id) => ({
+      tier: 'confidential' as const,
+      tenant_slug: 'synthetic-feedback-a',
+      organization_id,
+    }));
+    const candidates = scopes.map((scope, index) => {
+      scopedRoots.add(executionFeedbackScopeRoot(scope));
+      const feedback = recordExecutionFeedback({
+        scenario_id: 'use-case-scoped-provenance',
+        intent_id: 'scoped-provenance',
+        outcome: 'dissatisfied',
+        correction: 'Check the original brief.',
+        scope,
+        correlation_id: 'execution-' + index,
+      });
+      return materializeExecutionFeedbackCandidate({ feedback }).candidate!;
+    });
+    expect(candidates[0].candidate_id).not.toBe(candidates[1].candidate_id);
+    for (const [index, scope] of scopes.entries()) {
+      expect(listExecutionFeedbackCandidates(scope).map((row) => row.candidate_id)).toEqual([
+        candidates[index].candidate_id,
+      ]);
+      expect(candidates[index].scope).toEqual(scope);
+    }
+    const feedback = recordExecutionFeedback({
+      scenario_id: 'use-case-scoped-provenance',
+      intent_id: 'scoped-provenance',
+      outcome: 'dissatisfied',
+      correction: 'Check the original brief.',
+      scope: scopes[0],
+      correlation_id: 'execution-next',
+    });
+    const aggregated = materializeExecutionFeedbackCandidate({ feedback }).candidate!;
+    expect(aggregated.candidate_id).toBe(candidates[0].candidate_id);
+    expect(aggregated.evidence_refs).toEqual(
+      expect.arrayContaining(['correlation:execution-0', 'correlation:execution-next'])
+    );
+    expect(aggregated.evidence_refs).not.toContain('correlation:execution-1');
+    expect(aggregated.task_session_id).toBe('execution-0');
+    expect(aggregated.metadata?.learning_link).toBeUndefined();
+    expect(aggregated.status).toBe('proposed');
   });
 
   it('materializes a non-positive result as a reviewable procedure candidate', () => {

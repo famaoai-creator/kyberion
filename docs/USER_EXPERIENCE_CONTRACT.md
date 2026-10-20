@@ -238,3 +238,21 @@ Minimum checks:
 - approval-required responses explain both:
   - consequence of waiting or rejection
   - concrete unblock action
+
+## One work loop, one conversation
+
+The Organization Work Loop is the parent model. Intent → Plan → Result is its user-facing projection, not a separate execution engine.
+
+The user asks for an outcome, answers only necessary clarification or authority questions, receives understandable progress and a verified result, and can request a correction without repeating the work context.
+
+## Approval hold, return and correction
+
+Use the existing DecisionCard and approval-store. Explain the exact proposed effect, recommendation, evidence, reversibility and consequence of silence. Distinguish missing intent from missing permission.
+
+A held action retains its work identity, complete context and content/revision binding. Approval resumes only a supported continuation after current authority and scope checks. Rejection, expiry, revocation, changes and unknown outcomes are different states. Never claim resumed execution merely because an approval record exists, and never replay an uncertain effect.
+
+A correction stays linked to the delivered work. Revise the result within authorization; any resulting learning candidate is separately reviewed and scoped. Explain honestly when capture is supported but publication or next-work reuse is not yet verified.
+
+## Evidence language
+
+Say what was actually verified: prepared, tested with fixtures, executed with a real provider, delivered, or confirmed by the user. Do not call worker completion verified delivery or promotion proven improvement. When an integration cannot preserve scope, explain the supported next step rather than silently dropping context.

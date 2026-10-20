@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, organization, intent, outcome, execution, evidence, learning]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-20
 kind: evergreen
 ---
 
@@ -38,6 +38,36 @@ Intent
 ```
 
 This is the generalized model for how organizations convert goals into governed work.
+It is a conceptual ordering, not a linear script: scope, authority and outcome checks recur at every consequential transition. Teaming proposes a capable executor; it never grants permission.
+
+### 2.1 One model, several projections
+
+| Projection                                                            | Meaning within the same work loop                                       | Canonical owner                  |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------- |
+| User: Intent → Plan → Result                                          | Ask, answer necessary questions, inspect results and request changes    | docs/USER_EXPERIENCE_CONTRACT.md |
+| Intent: receive → clarify → retain → execute → verify → learn         | Preserve intent and evidence throughout; retention is continuous        | docs/INTENT_LOOP_CONCEPT.md      |
+| Enterprise: Intent → Resolve → Approve → Execute → Account → Learn    | Company-scale control; Approve means evaluate authority, not always ask | enterprise-operating-kernel.md   |
+| Agent lifecycle: onboarding/recovery → alignment → execution → review | Session entry and governed mission lifecycle                            | AGENTS.md and phase protocols    |
+| Memory: Execute → Capture → Assess → Distill → Promote → Reuse        | Accounting/Learning returns to the next Context and Resolution          | corporate-memory-loop.md         |
+
+These are not competing state machines. Existing WorkItems, mission state, approval-store, execution receipts and memory-promotion records retain their ownership. Link them rather than adding another loop ledger. Historical comparisons in older concept documents are not current readiness evidence.
+
+### 2.2 Shared judgment envelope, distinct decisions
+
+Retain original intent, success criterion, work identity/revision, canonical context, evidence, policy/approval references, proposed effect, accountable owner and verification requirement. Reuse existing typed contracts; this is not a new all-purpose decision store.
+
+Common decision axes:
+
+1. **Meaning and scope:** Is the outcome clear, and does tenant → organization → project → mission → task context survive? Tier is separate.
+2. **Authority:** Is this exact effect permitted now by policy and still-valid approval?
+3. **Capability and delegation:** Which eligible executor can produce the result within the same or narrower authority, budget and data boundary?
+4. **Risk and uncertainty:** Is evidence or outcome-changing clarification missing, or must an authorized human decide? Confidence and trust scores are evidence, never grants.
+5. **Verification and continuity:** What proves the effect occurred, and what can safely resume?
+6. **Learning applicability:** Is a lesson supported, reviewed as required, and usable in this scope and snapshot?
+
+Clarification supplies intent; approval permits an effect; delegation assigns responsibility; verification accepts evidence; promotion makes reviewed knowledge eligible for retrieval. Do not collapse these into one approve/reject flag. Models recommend; deterministic contracts and authority boundaries enforce. Another model or learned shortcut cannot override denied permission.
+
+Decision sophistication can evolve behind its existing seam. Consumers depend on validated outputs and these invariants, not on a provider or score formula.
 
 ## 3. Layer Model
 
@@ -228,7 +258,37 @@ A capability fits the work loop only if all of the following are true:
 
 If any of these fail, the capability is not yet part of the governed work loop.
 
-## 8. Companion Documents
+## 8. Return paths and user interaction
+
+- **Missing intent:** ask an outcome-changing question and keep work identity. An answer does not approve an unrelated effect.
+- **Approval required:** use existing DecisionCard/approval-store; explain exact effect, evidence and silence semantics. Park that effect and continue independent authorized work.
+- **Approved:** re-read current scope, policy and bound content, use an existing apply claim/receipt where supported, and verify the effect. Approval alone does not prove a continuation exists or ran.
+- **Rejected, expired or revoked:** do not execute, reopen on every tick, or reinterpret silence. Changed requests are new revisions with applicable checks.
+- **Unknown outcome:** reconcile the original attempt before retrying. Process death or lease expiry does not prove no effect occurred.
+- **Verification failure:** classify evidence and repair only within authority and retry budget. Permission/authentication/governance failures are not repair mandates.
+- **Correction:** link feedback to delivered work and scope, revise the result, and capture a separate candidate if useful. Capture is not approval/publication.
+- **Next work:** retrieve a stable eligible snapshot, record the applied lesson and measure the outcome. Storage or promotion is not proof of use or improvement.
+
+The user sees request → necessary clarification/decision → understandable progress → verified result → correction if needed, without repeating the request across internal handoffs.
+
+## 9. Implementation boundaries and acceptance evidence
+
+The loop is a design obligation, not a claim that all surfaces are wired end to end.
+At the 2026-10-20 integration baseline:
+
+| Boundary             | Existing mechanism and limit                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                | scope-context, entity-scope and typed WorkItems exist. Metadata is not authority; adapters must preserve runtime isolation.                                                               |
+| Human intervention   | DecisionCard, approval-store, routing and apply claims exist. Watchdog mission admission held in shadow lacks a complete bound continuation; never disable shadow to simulate completion. |
+| Delegation           | Preflight/task contracts bound eligible workers. Organization-only surface A2A is not supported merely by attaching metadata when the receiver requires mission-bound security scope.     |
+| Judgment integration | Canonical sensitive failures must not enter autonomous repair; declared verdict schemas and meaningful predicates must be enforced before routing.                                        |
+| Feedback             | Canonical memory scope and correlation exist. Legacy unscoped records remain legacy, never silently adopted into a tenant.                                                                |
+| Promotion            | Feedback-to-memory admission supports tenant-wide confidential proposals only; narrower scopes remain review-only until publication/retrieval preserve them.                              |
+| Learning evidence    | A promotion reference is not exact publication proof; aggregate usage is not exact retrieval or outcome improvement.                                                                      |
+
+The acceptance suite must cover continuity across clarification, delegation, approval hold/resume, verified delivery, scoped feedback, review/promotion and next-work use. Each work item traverses only the applicable stages; simple work does not acquire unnecessary questions or approval gates. Cover duplicate inputs, denial/expiry, changed approved content, unknown outcomes and cross-scope contamination. Mocked tests, recorded closure and builds are separate evidence classes from authenticated live business execution.
+
+## 10. Companion Documents
 
 - `knowledge/product/architecture/enterprise-operating-kernel.md`
 - `knowledge/product/architecture/project-mission-artifact-service-model.md`

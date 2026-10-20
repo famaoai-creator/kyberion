@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, memory, distillation, sop, patterns, learning]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-20
 kind: evergreen
 ---
 
@@ -28,7 +28,7 @@ Execute
 -> Reuse
 ```
 
-This is the learning half of the enterprise operating model.
+This is the Accounting/Learning return path of the [Organization Work Loop](organization-work-loop.md), not an independent execution or approval system. Reuse returns to the next work item's Context and Resolution.
 
 ## 3. Stages
 
@@ -54,19 +54,7 @@ The system should retain:
 
 This stage is about preserving enough material for later explanation and improvement.
 
-### 3.3 Distill
-
-The system should extract reusable understanding such as:
-
-- what pattern worked
-- what failed
-- what caused delay
-- what template should be reused
-- what guardrail should be strengthened
-
-Distillation should prefer structured records over raw log accumulation.
-
-### 3.4 Assess
+### 3.3 Assess
 
 Not every completed execution should become a candidate.
 
@@ -79,6 +67,18 @@ Examples:
 - generic completions should remain as execution records only
 
 Assessment is a gate, not a memory object.
+
+### 3.4 Distill
+
+The system should extract reusable understanding such as:
+
+- what pattern worked
+- what failed
+- what caused delay
+- what template should be reused
+- what guardrail should be strengthened
+
+Distillation should prefer structured records over raw log accumulation.
 
 ### 3.5 Promote
 
@@ -190,6 +190,20 @@ It is better future work:
 ### 7.5 Human ratification for structural change
 
 Changes to high-impact procedures or organizational rules should be reviewable and, where appropriate, approved before promotion.
+
+### 7.6 Preserve scope, provenance and authority
+
+Feedback binds to trusted work context, not scope claimed by a model or correction payload. Preserve tier, tenant, organization, project, mission/task and owner/audience restrictions where applicable, together with source feedback/correlation and evidence. An aggregated candidate may link several work items; it must not pretend they were one execution or combine different scopes.
+
+A legacy unscoped candidate is not silently adopted into the current organization. If the publisher cannot preserve a narrower scope, keep the proposal review-only; never drop fields to make promotion succeed. The current execution-feedback handoff supports tenant-wide confidential proposals only. Narrower scopes need preserving publication and retrieval before that boundary can open.
+
+Approval precedents explain past decisions. They do not renew consent, grant permissions, change security policy or authorize new external effects. Delegation and repair retain the current authority floor after learning.
+
+### 7.7 Prove consumption, not just storage
+
+Distinguish candidate capture, assessment, review, promotion, exact publication verification, retrieval into a stable snapshot, application to a work item, and measured outcome. A queue state or promoted reference proves only that recorded stage. Aggregate usage cannot establish which scoped lesson improved which result.
+
+Reuse the existing memory-promotion queue and snapshot protocol. Do not add a second inbox to hide unsupported transitions. Corrections that invalidate a lesson are new reviewable evidence; running sessions do not silently replace their pinned snapshot.
 
 ## 8. Success Criteria
 

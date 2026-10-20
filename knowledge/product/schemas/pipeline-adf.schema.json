@@ -355,7 +355,7 @@
           "properties": {
             "role": { "type": "string" },
             "persona": { "type": "string" },
-            "schema_ref": { "type": "string" },
+            "schema_ref": { "type": "string", "minLength": 1 },
             "prompt": { "type": "string" },
             "instruction_ref": { "type": "string" },
             "inputs": {}
@@ -367,18 +367,36 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["next"],
+            "required": ["when", "next"],
             "properties": {
               "when": {
                 "type": "object",
                 "properties": {
                   "label": { "type": "string" },
-                  "field": { "type": "string" },
+                  "field": { "type": "string", "minLength": 1 },
                   "eq": {},
                   "in": { "type": "array" },
                   "matches": { "type": "string" }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "anyOf": [
+                  { "required": ["label"] },
+                  { "required": ["eq"] },
+                  { "required": ["in"] },
+                  { "required": ["matches"] }
+                ],
+                "allOf": [
+                  {
+                    "if": { "required": ["field"] },
+                    "then": {
+                      "anyOf": [
+                        { "required": ["eq"] },
+                        { "required": ["in"] },
+                        { "required": ["matches"] }
+                      ]
+                    }
+                  }
+                ]
               },
               "next": { "type": "string", "minLength": 1 },
               "reason": { "type": "string" }
@@ -386,6 +404,7 @@
             "additionalProperties": false
           }
         },
+        "schema_ref": { "type": "string", "minLength": 1 },
         "on_no_match": { "enum": ["abort", "complete", "continue"] },
         "max_route_hops": { "type": "integer", "minimum": 1 },
         "fixture": { "type": "boolean" },
