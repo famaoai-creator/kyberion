@@ -104,50 +104,26 @@ function readValidatedPipeline(file: string): any | null {
 export function validateVerifySessionPipeline(pipeline: any): string[] {
   const violations: string[] = [];
   const steps = Array.isArray(pipeline?.steps) ? pipeline.steps : [];
-  const stepOps = new Set(steps.map((step: any) => String(step?.op || '')));
-  if (pipeline?.options?.headless !== true) {
+  if (steps.length !== 1 || steps[0]?.op !== 'browser:local_session_probe') {
     violations.push(
-      'pipelines/verify-session.json: options.headless must be true for clean first-win smoke'
+      'pipelines/verify-session.json: requires one browser:local_session_probe with engine-owned offline content and cleanup'
     );
   }
-  const userDataDir = String(pipeline?.options?.user_data_dir || '');
-  if (!userDataDir.startsWith('active/shared/tmp/')) {
+  if (pipeline?.options && Object.keys(pipeline.options).length > 0) {
     violations.push(
-      'pipelines/verify-session.json: user_data_dir must stay under active/shared/tmp/'
+      'pipelines/verify-session.json: launch/session options must remain engine-owned'
     );
   }
-  if (!stepOps.has('browser:goto')) {
-    violations.push('pipelines/verify-session.json: missing browser:goto first-win navigation');
-  }
-  if (!stepOps.has('browser:evaluate')) {
-    violations.push('pipelines/verify-session.json: missing browser:evaluate state capture');
-  }
-  if (!stepOps.has('browser:screenshot')) {
-    violations.push('pipelines/verify-session.json: missing browser:screenshot artifact capture');
-  }
-  if (!stepOps.has('browser:close_session')) {
-    violations.push('pipelines/verify-session.json: missing browser:close_session cleanup step');
-  }
-  const gotoStep = steps.find((step: any) => step?.op === 'browser:goto');
-  const rawGotoUrl = String(gotoStep?.params?.url || '');
-  const defaultTargetUrl = String(
-    pipeline?.context?.TARGET_URL || pipeline?.inputs?.TARGET_URL?.default || ''
-  );
-  const gotoUrl = rawGotoUrl.includes('{{TARGET_URL}}')
-    ? defaultTargetUrl
-    : rawGotoUrl || defaultTargetUrl;
-  if (!gotoUrl.includes('data:text/html')) {
+  if (pipeline?.context?.TARGET_URL || pipeline?.inputs?.TARGET_URL) {
     violations.push(
-      'pipelines/verify-session.json: first-win navigation must use a local data URL'
+      'pipelines/verify-session.json: TARGET_URL must not configure the fixed local probe'
     );
   }
-  if (!String(pipeline?.context?.TARGET_URL || '').includes('data:text/html')) {
-    violations.push(
-      'pipelines/verify-session.json: context.TARGET_URL must provide the local data URL default'
-    );
+  const params = steps[0]?.params ?? {};
+  if (Object.keys(params).some((key) => key !== 'path')) {
+    violations.push('pipelines/verify-session.json: probe accepts only the screenshot path');
   }
-  const screenshotStep = steps.find((step: any) => step?.op === 'browser:screenshot');
-  if (screenshotStep?.params?.path !== 'active/shared/tmp/first-win-session.png') {
+  if (params.path !== 'active/shared/tmp/first-win-session.png') {
     violations.push(
       'pipelines/verify-session.json: screenshot path must be active/shared/tmp/first-win-session.png'
     );
