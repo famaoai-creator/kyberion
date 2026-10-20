@@ -158,6 +158,26 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
     expect(mocks.recordExecutionFeedback).not.toHaveBeenCalled();
   });
 
+  it('does not let the local scoped feedback path override ask-only authority', async () => {
+    mocks.parseExecutionFeedbackText.mockReturnValue({
+      scenario_id: 'use-case-synthetic',
+      intent_id: 'synthetic',
+      outcome: 'dissatisfied',
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await runSurfaceConversation({
+      agentId: 'cli-surface-agent',
+      surface: 'cli',
+      query: 'feedback use-case-synthetic: dissatisfied',
+      senderAgentId: 'test-sender',
+      workAuthority: 'ask_only',
+      scope: { scope_kind: 'tenant', tenant_slug: 'acme', tier: 'confidential' },
+    });
+    expect(mocks.recordExecutionFeedback).not.toHaveBeenCalled();
+    expect(mocks.a2aRoute).not.toHaveBeenCalled();
+    expect(mocks.createTaskSession).not.toHaveBeenCalled();
+  });
+
   it('runs an isolated tenant turn on a tool-less per-tenant runtime without delegating', async () => {
     mocks.getAgentRuntimeHandle.mockReturnValue(undefined);
     // No rule-based receiver: only the isolation guard keeps the compiler away.

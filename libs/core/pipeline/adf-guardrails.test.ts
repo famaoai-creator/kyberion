@@ -278,6 +278,31 @@ describe('semantic-op placement lint (LC-05)', () => {
 });
 
 describe('TAKT judge_route guardrails', () => {
+  it.each([undefined, {}, { field: 'status' }, { field: 'status', label: 'approve' }])(
+    'rejects a judge route without a complete predicate: %j',
+    (when) => {
+      const report = validatePipelineGuardrails({
+        steps: [
+          {
+            id: 'judge',
+            op: 'core:judge_route',
+            params: {
+              max_route_hops: 3,
+              routes: [{ when, next: 'COMPLETE' }],
+            },
+          },
+        ],
+      } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
+      expect(report.ok).toBe(false);
+      expect(report.findings).toContainEqual(
+        expect.objectContaining({
+          code: 'judge-route-invalid-condition',
+          severity: 'error',
+        })
+      );
+    }
+  );
+
   it('rejects an unknown route target and fails closed on a back-edge', () => {
     const report = validatePipelineGuardrails({
       steps: [

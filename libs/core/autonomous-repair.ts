@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import type { ErrorCategory } from './error-classifier.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { validateAndRepairAdf } from './pipeline/adf-repair-agent.js';
 import type { ReasoningCallOptions } from './reasoning/reasoning-backend.js';
@@ -50,14 +51,28 @@ export interface AutonomousRepairRequest {
 // Repairs that would touch .env / authority / config / secrets MUST NOT run
 // without operator approval (AO-03 §4, SA-02). Unattended runs have no
 // approval channel, so we fail closed and escalate.
-const SENSITIVE_CATEGORIES = ['permission_error', 'auth_error', 'config_error', 'env_error'];
+const SENSITIVE_CLASSIFIER_CATEGORIES = [
+  'auth',
+  'permission_denied',
+  'missing_secret',
+  'governance_block',
+  'tier_violation',
+] as const satisfies readonly ErrorCategory[];
+const SENSITIVE_CATEGORIES = new Set<string>([
+  ...SENSITIVE_CLASSIFIER_CATEGORIES,
+  // Keep accepting callers of the legacy compatibility boundary.
+  'permission_error',
+  'auth_error',
+  'config_error',
+  'env_error',
+]);
 
 export async function attemptAutonomousRepair(request: AutonomousRepairRequest): Promise<boolean> {
   const { step, failure, pipelinePath, trustResolved, projectTrustApprovalId, policy, validate } =
     request;
   const prefix = request.logPrefix || '[REPAIR]';
   try {
-    if (SENSITIVE_CATEGORIES.includes(failure.category)) {
+    if (SENSITIVE_CATEGORIES.has(failure.category)) {
       logger.warn(
         `  ${prefix} Repair category "${failure.category}" involves .env/auth/config changes ` +
           `— autonomous mutation of sensitive paths is prohibited (AO-03 §4). Escalating to operator.`

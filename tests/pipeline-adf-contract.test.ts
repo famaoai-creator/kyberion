@@ -21,6 +21,43 @@ describe('Pipeline ADF contract', () => {
     expect(() => validatePipelineAdf({ steps: [{ params: {} }] })).toThrow(/Invalid pipeline ADF/);
   });
 
+  it.each([undefined, {}, { field: 'status' }, { field: 'status', label: 'approve' }])(
+    'rejects judge route conditions without a predicate: %j',
+    (when) => {
+      expect(() =>
+        validatePipelineAdf({
+          steps: [
+            {
+              id: 'judge',
+              op: 'core:judge_route',
+              params: {
+                routes: [{ ...(when ? { when } : {}), next: 'COMPLETE' }],
+              },
+            },
+          ],
+        })
+      ).toThrow(/Invalid pipeline ADF/);
+    }
+  );
+
+  it.each([{ label: 'approve' }, { field: 'approve', eq: true }])(
+    'accepts judge route conditions with explicit predicates: %j',
+    (when) => {
+      const pipeline = {
+        steps: [
+          {
+            id: 'judge',
+            op: 'core:judge_route',
+            params: {
+              routes: [{ when, next: 'COMPLETE' }],
+            },
+          },
+        ],
+      };
+      expect(validatePipelineAdf(pipeline)).toEqual(pipeline);
+    }
+  );
+
   it('derives a failed pipeline status from step failures', () => {
     expect(derivePipelineStatus([{ op: 'x', status: 'success' }])).toBe('succeeded');
     expect(

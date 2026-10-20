@@ -28,13 +28,14 @@ export interface PipelineReportContract {
   export_as?: string;
 }
 
-interface CompiledReportSchema {
+export interface CompiledReportSchema {
   validate: (value: unknown) => boolean;
   errors: () => string[];
   prompt: string;
 }
 
 const BUILTIN_SCHEMA_NAMES = new Set([
+  'judge_route_verdict',
   'planning_packet',
   'task_result',
   'planning_review_verdict',
@@ -69,7 +70,7 @@ function schemaPathFromRef(schemaRef: string): string {
   return safeCandidate;
 }
 
-function compileReportSchema(schemaRef: string): CompiledReportSchema {
+export function compileReportSchema(schemaRef: string): CompiledReportSchema {
   if (BUILTIN_SCHEMA_NAMES.has(schemaRef)) {
     const schema = resolveStructuredOutputSchema(schemaRef as StructuredOutputSchemaRef);
     const json = renderStructuredOutputSchemaPrompt(schemaRef as StructuredOutputSchemaRef);

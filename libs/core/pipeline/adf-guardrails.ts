@@ -10,7 +10,7 @@ import {
 import { evaluateEgressPolicy } from '../egress-policy.js';
 import type { PipelineAdf, PipelineAdfStep, StepHook } from './pipeline-contract.js';
 import { deriveExecutionGraph } from '../graph-scheduler.js';
-import { resolveMaxRouteHops } from '../judge-route.js';
+import { isJudgeRouteCondition, resolveMaxRouteHops } from '../judge-route.js';
 import { type SandboxPolicy, requireSandboxEnforcement } from '../shell/sandbox-policy.js';
 
 export interface AdfGuardrailFinding {
@@ -485,6 +485,15 @@ export function validatePipelineGuardrails(
               path: `${stepPath}.params.routes[${routeIndex}]`,
             });
             continue;
+          }
+          if (!isJudgeRouteCondition((rawRoute as Record<string, unknown>).when)) {
+            findings.push({
+              code: 'judge-route-invalid-condition',
+              severity: 'error',
+              message:
+                'judge_route requires an explicit label or value predicate; field alone is not a condition.',
+              path: `${stepPath}.params.routes[${routeIndex}].when`,
+            });
           }
           const next = String((rawRoute as Record<string, unknown>).next || '').trim();
           if (!next) {

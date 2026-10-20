@@ -106,7 +106,14 @@ import type {
   SurfaceTenantIsolation,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
-import { parseExecutionFeedbackText, recordExecutionFeedback } from '../execution-feedback.js';
+import {
+  parseExecutionFeedbackText,
+  recordExecutionFeedback,
+  type ExecutionFeedbackInput,
+} from '../execution-feedback.js';
+import { executionFeedbackScopeKey } from '../execution-feedback-candidates.js';
+import { assertMemoryScope } from '../knowledge/memory-scope.js';
+import { normalizeEventScope, parseEventScopeInput } from '../event-scope.js';
 import * as surfaceRuntimeData from './surface-runtime-conversation-data.js';
 
 export {
@@ -1099,6 +1106,58 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
 ];
 
 /**
+ * Scope selection classifies feedback; it never grants execution authority.
+ * Event scope_kind is transport metadata, not a memory-envelope field.
+ */
+function bindExecutionFeedbackToTurn(
+  input: Pick<SurfaceConversationInput, 'scope' | 'correlationId' | 'surface'>,
+  feedback: ExecutionFeedbackInput
+): ExecutionFeedbackInput {
+  const eventScope = input.scope
+    ? normalizeEventScope(parseEventScopeInput(input.scope))
+    : undefined;
+  const memoryContext = eventScope
+    ? (({ scope_kind: _kind, ...context }) => context)(eventScope)
+    : undefined;
+  const scope =
+    memoryContext &&
+    (memoryContext.tier !== 'public' || Object.keys(memoryContext).some((key) => key !== 'tier'))
+      ? assertMemoryScope(memoryContext)
+      : undefined;
+  if (
+    feedback.scope !== undefined &&
+    executionFeedbackScopeKey(feedback.scope) !== executionFeedbackScopeKey(scope)
+  ) {
+    throw new Error(
+      '[FEEDBACK_SCOPE_MISMATCH] Feedback must match the current turn scope; payload scope is not authority'
+    );
+  }
+  return {
+    ...feedback,
+    scope,
+    ...(input.correlationId && !feedback.correlation_id
+      ? { correlation_id: input.correlationId }
+      : {}),
+    ...(input.surface && !feedback.surface ? { surface: input.surface } : {}),
+  };
+}
+
+function isScopedCliFeedbackContext(
+  input: Pick<
+    SurfaceConversationInput,
+    'surface' | 'scope' | 'workAuthority' | 'isolation' | 'conversationKey'
+  >
+): boolean {
+  return (
+    input.surface === 'cli' &&
+    Boolean(input.scope) &&
+    input.workAuthority !== 'ask_only' &&
+    !input.isolation &&
+    input.conversationKey === undefined
+  );
+}
+
+/**
  * IT-02: the reply locale of a turn — explicit request locale, else the
  * language the user wrote in, else the locale stored for the turn's scope,
  * else the locale an enclosing caller already entered (a bridge's turn
@@ -1139,22 +1198,23 @@ async function runSurfaceConversationTurn(
   input: SurfaceConversationInput,
   runtime?: ScopedSurfaceConversationRuntime
 ): Promise<SurfaceConversationResult> {
-  // Shared execution feedback is a write to a process-wide store with no
-  // tenant attribution. Isolated, ask-only, and tenant-scoped speakers cannot
-  // add records to it.
+  // Only the local CLI feedback path can preserve a selected scope here.
+  // Other tenant speakers remain excluded from legacy feedback recording.
   const askOnly = input.workAuthority === 'ask_only' || Boolean(input.isolation);
-  const mayRecordSharedFeedback = !askOnly && !input.scope?.tenant_slug;
+  const scopedCliFeedback = isScopedCliFeedbackContext(input);
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
-  if (parsedExecutionFeedback && mayRecordSharedFeedback) {
+  if (scopedCliFeedback && !parsedExecutionFeedback) {
+    throw new Error(
+      '[SURFACE_CLI_SCOPE_UNSUPPORTED] Scoped ask currently supports execution feedback only; use an explicitly scoped workflow for other work.'
+    );
+  }
+  const mayRecordFeedback = !askOnly && (!input.scope?.tenant_slug || scopedCliFeedback);
+  if (parsedExecutionFeedback && mayRecordFeedback) {
     assertScopedSurfaceCapabilitySupported(input, 'shared_feedback_recording');
-    const record = recordExecutionFeedback({
-      ...parsedExecutionFeedback,
-      ...(input.correlationId && !parsedExecutionFeedback.correlation_id
-        ? { correlation_id: input.correlationId }
-        : {}),
-      ...(input.surface && !parsedExecutionFeedback.surface ? { surface: input.surface } : {}),
-    });
+    const record = recordExecutionFeedback(
+      bindExecutionFeedbackToTurn(input, parsedExecutionFeedback)
+    );
     recordFeedbackSignal(input, record);
     return {
       ...emptySurfaceResult(surfaceRuntimeData.buildFeedbackAcknowledgement(record)),
@@ -1520,6 +1580,25 @@ export async function runSurfaceMessageConversation(
 async function runSurfaceMessageConversationTurn(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
+  const scopedCliFeedback = isScopedCliFeedbackContext(input);
+  const feedback =
+    input.executionFeedback || (scopedCliFeedback ? parseExecutionFeedbackText(input.text) : null);
+  if (scopedCliFeedback && !feedback) {
+    throw new Error(
+      '[SURFACE_CLI_SCOPE_UNSUPPORTED] Scoped ask currently supports execution feedback only; use an explicitly scoped workflow for other work.'
+    );
+  }
+  if (
+    feedback &&
+    input.workAuthority !== 'ask_only' &&
+    !input.isolation &&
+    input.conversationKey === undefined &&
+    (!input.scope?.tenant_slug || scopedCliFeedback)
+  ) {
+    // Validate before any background side effect, and never feed scoped
+    // feedback text to a reviewer that cannot preserve the complete scope.
+    input = { ...input, executionFeedback: bindExecutionFeedbackToTurn(input, feedback) };
+  }
   // Team Channel E: an isolated turn never feeds the background-review fork,
   // which runs on the general (tool-capable) backend with unscoped knowledge.
   if (input.conversationKey !== undefined) {
@@ -1532,7 +1611,7 @@ async function runSurfaceMessageConversationTurn(
     logger.warn(
       '[SURFACE_CONVERSATION_BACKGROUND_REVIEW_UNSUPPORTED] Automatic review cannot preserve viewer scope | next: use an explicitly scoped review workflow | evidence: conversationKey mode'
     );
-  } else if (!input.isolation) {
+  } else if (!input.isolation && !scopedCliFeedback) {
     await surfaceRuntimeData.startSurfaceBackgroundReview(input);
   }
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));

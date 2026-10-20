@@ -40,19 +40,47 @@ function getPathValue(value: unknown, path: string): unknown {
   return path
     .split('.')
     .map((part) => part.trim())
-    .filter(Boolean)
     .reduce<unknown>((current, part) => {
       if (!current || typeof current !== 'object') return undefined;
+      if (!Object.hasOwn(current, part)) return undefined;
       return (current as Record<string, unknown>)[part];
     }, value);
+}
+
+/** A field selects a value; it is never a predicate or an implicit fallback. */
+export function isJudgeRouteCondition(condition: unknown): condition is JudgeRouteCondition {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) return false;
+  const candidate = condition as JudgeRouteCondition;
+  if (candidate.label !== undefined && typeof candidate.label !== 'string') return false;
+  if (
+    candidate.field !== undefined &&
+    (typeof candidate.field !== 'string' || candidate.field.split('.').some((part) => !part.trim()))
+  )
+    return false;
+  if (candidate.in !== undefined && !Array.isArray(candidate.in)) return false;
+  if (candidate.matches !== undefined) {
+    if (typeof candidate.matches !== 'string') return false;
+    try {
+      new RegExp(candidate.matches);
+    } catch {
+      return false;
+    }
+  }
+  const hasValuePredicate =
+    candidate.eq !== undefined || candidate.in !== undefined || candidate.matches !== undefined;
+  if (candidate.field !== undefined && !hasValuePredicate) return false;
+  return candidate.label !== undefined || hasValuePredicate;
 }
 
 function matchesCondition(
   verdict: Record<string, unknown>,
   condition: JudgeRouteCondition
 ): boolean {
-  const value = condition.field ? getPathValue(verdict, condition.field) : verdict.label;
-  if (condition.label !== undefined && verdict.label !== condition.label) return false;
+  if (!isJudgeRouteCondition(condition)) return false;
+  const label = getPathValue(verdict, 'label');
+  const value = condition.field ? getPathValue(verdict, condition.field) : label;
+  if (value === undefined) return false;
+  if (condition.label !== undefined && label !== condition.label) return false;
   if (condition.eq !== undefined && value !== condition.eq) return false;
   if (condition.in !== undefined && !condition.in.some((candidate) => candidate === value)) {
     return false;
@@ -66,13 +94,7 @@ function matchesCondition(
     }
     if (!expression.test(String(value ?? ''))) return false;
   }
-  return (
-    condition.label !== undefined ||
-    condition.field !== undefined ||
-    condition.eq !== undefined ||
-    condition.in !== undefined ||
-    condition.matches !== undefined
-  );
+  return true;
 }
 
 /** Select the first matching route. No implicit fallback is permitted. */

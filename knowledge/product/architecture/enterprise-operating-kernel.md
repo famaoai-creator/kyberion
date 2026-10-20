@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, enterprise, intent, approval, execution, accountability, learning]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-20
 kind: evergreen
 ---
 
@@ -37,7 +37,11 @@ Intent
 -> Learn
 ```
 
-This extends the simpler interaction contract of `Intent -> Plan -> Result` into a company-scale control model built on top of the broader organization work loop.
+This is a projection of the [Organization Work Loop](organization-work-loop.md), not another lifecycle or decision store. It extends Intent → Plan → Result into company-scale control.
+
+Approve means evaluate current authority for the effect. Work already permitted by policy and a bounded mandate proceeds without a redundant question. Required human approval, denied authority and unresolved scope cannot be replaced by confidence, a capable delegate or a learned precedent. Repeat checks when action, scope, content or conditions change.
+
+The parent model owns shared decision axes and return paths. Existing approval-store, mission/WorkItem ownership, execution receipts and memory-promotion contracts retain their state responsibilities.
 
 ## 3. Human and System Responsibilities
 
