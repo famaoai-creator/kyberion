@@ -13,13 +13,17 @@ import type { CharterScope } from '../governance/accountability-charter.js';
 /** Exact reviewed names have distinct durable identities, including lossy slug forms. */
 export function normalizeOnboardingAgentSlug(agentId: string): string {
   if (!agentId.trim()) throw new Error('Reviewed agent identity is required.');
-  const normalized = agentId
+  let normalized = agentId
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/-+/g, '-');
+  // Runs are collapsed, so each boundary contains at most one hyphen.
+  if (normalized.startsWith('-')) normalized = normalized.slice(1);
+  if (normalized.endsWith('-')) normalized = normalized.slice(0, -1);
   const prefix = /^[a-z]/.test(normalized) ? normalized : `agent-${normalized}`;
-  return `${prefix.slice(0, 40).replace(/-+$/, '')}-${createHash('sha256').update(agentId).digest('hex')}`;
+  const short = prefix.slice(0, 40);
+  const readable = short.endsWith('-') ? short.slice(0, -1) : short;
+  return `${readable}-${createHash('sha256').update(agentId).digest('hex')}`;
 }
 
 /** Preserve a prior explicit link only for the exact reviewed name and accountable human. */

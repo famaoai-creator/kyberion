@@ -92,6 +92,9 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
     }
   );
   it('does not alias distinct reviewed names that previously normalized to the same slug', async () => {
+    expect(runtime.normalizeOnboardingAgentSlug('-'.repeat(100_000))).toMatch(
+      /^agent-[a-f0-9]{64}$/
+    );
     expect(runtime.normalizeOnboardingAgentSlug('Foo_Bar')).not.toBe(
       runtime.normalizeOnboardingAgentSlug('foo-bar')
     );

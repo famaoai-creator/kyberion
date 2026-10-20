@@ -19,10 +19,11 @@ const response = (value: unknown, status = 200) =>
   NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'onboarding_authority_unavailable';
-  return response(
-    { ok: false, error: message },
-    /owner|outside|member|required.*scope/.test(message) ? 403 : 400
-  );
+  const requiredAt = message.indexOf('required');
+  const denied =
+    ['owner', 'outside', 'member'].some((part) => message.includes(part)) ||
+    (requiredAt >= 0 && message.indexOf('scope', requiredAt + 'required'.length) >= 0);
+  return response({ ok: false, error: message }, denied ? 403 : 400);
 }
 export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
