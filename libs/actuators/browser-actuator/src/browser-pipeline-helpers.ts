@@ -16,6 +16,7 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { countBrowserExternalEffects } from './browser-external-governance.js';
+import { runLocalSessionProbe } from './browser-local-session-probe.js';
 import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
@@ -112,6 +113,14 @@ export async function executePipeline(
     const op = step.op.startsWith('browser:') ? step.op.slice('browser:'.length) : step.op;
     return { ...step, op: op === 'navigate' ? 'goto' : op };
   });
+  if (steps.some((step) => step.op === 'local_session_probe')) {
+    if (steps.length !== 1 || steps[0].type !== 'capture') {
+      throw new Error(
+        '[BROWSER_LOCAL_PROBE_CONTRACT] The isolated probe must be the only capture step.'
+      );
+    }
+    return runLocalSessionProbe(steps[0].params || {}, initialCtx);
+  }
   assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
   const { sessionId, options } = preflightAutomationRuntime(
     steps,
@@ -153,6 +162,7 @@ export async function executePipeline(
   if (options.record_video && !safeExistsSync(resolvedVideoDir))
     safeMkdir(resolvedVideoDir, { recursive: true });
 
+  const hadExistingLease = browserRuntimeHelpers.hasBrowserRuntimeLease(sessionId);
   const browserContext = await browserRuntimeHelpers.getOrCreateBrowserContext(
     sessionId,
     userDataDir,
@@ -371,7 +381,11 @@ export async function executePipeline(
       Number(options.lease_ms || 0) > 0 ||
       outerOptions?.keep_alive === true ||
       Number(outerOptions?.lease_ms || 0) > 0;
-    const shouldClose = ctx.__close_browser_session === true || !keepAlive;
+    // A denied/failed first step must not retain a newly allocated process.
+    // Existing shared sessions remain owned by their original caller.
+    const failedNewSession =
+      !hadExistingLease && (Boolean(ctx.error) || engineResult?.status === 'failed');
+    const shouldClose = ctx.__close_browser_session === true || !keepAlive || failedNewSession;
     const leaseExpiresAt = shouldClose
       ? undefined
       : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
@@ -429,7 +443,13 @@ export async function executePipeline(
         recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
         scope_fingerprint: sessionScopeFingerprint,
       } as any);
-      await browserContext.close();
+      if (failedNewSession) {
+        // The acquired lease may be a new connection to an existing CDP
+        // browser. Its release disconnects without destroying remote tabs.
+        await browserRuntimeHelpers.closeBrowserSession(sessionId);
+      } else {
+        await browserContext.close();
+      }
     } else {
       ctx.recorded_videos = [];
       ctx.video_output_dir = videoRecordingEnabled ? resolvedVideoDir : undefined;

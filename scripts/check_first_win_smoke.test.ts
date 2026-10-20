@@ -88,12 +88,36 @@ describe('check_first_win_smoke', () => {
 
     expect(violations).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('headless must be true'),
-        expect.stringContaining('user_data_dir must stay under active/shared/tmp/'),
-        expect.stringContaining('local data URL'),
+        expect.stringContaining('launch/session options must remain engine-owned'),
+        expect.stringContaining('requires one browser:local_session_probe'),
+        expect.stringContaining('TARGET_URL must not configure'),
         expect.stringContaining('first-win-session.png'),
       ])
     );
+  });
+
+  it('accepts the fixed local probe and rejects injected script parameters', () => {
+    const pipeline = {
+      fallback_pipeline: 'pipelines/verify-session-fallback.json',
+      steps: [
+        {
+          op: 'browser:local_session_probe',
+          params: { path: 'active/shared/tmp/first-win-session.png' },
+        },
+      ],
+    };
+    expect(validateVerifySessionPipeline(pipeline)).toEqual([]);
+    expect(
+      validateVerifySessionPipeline({
+        ...pipeline,
+        steps: [
+          {
+            ...pipeline.steps[0],
+            params: { ...pipeline.steps[0].params, script: 'fetch("https://example.com")' },
+          },
+        ],
+      })
+    ).toContain('pipelines/verify-session.json: probe accepts only the screenshot path');
   });
 
   it('requires the weekly lifecycle smoke to remain dry-run only', () => {

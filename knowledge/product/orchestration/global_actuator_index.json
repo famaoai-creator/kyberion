@@ -69,7 +69,7 @@
       "path": "libs/actuators/browser-actuator",
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "capability_count": 2,
       "ops": ["computer_interaction", "pipeline"],
       "contract_schema": "knowledge/product/schemas/browser-automation-pipeline.schema.json",

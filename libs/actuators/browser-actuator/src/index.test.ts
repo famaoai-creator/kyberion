@@ -10,6 +10,7 @@ import {
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resetCurrentScope } from '@agent/core/scope-context';
 import type { ComputerInteractionAction } from './browser-interaction-helpers.js';
+import { runExternalOperation } from '@agent/core/governance/external-operation';
 
 // Existing transport/ref/secret fixtures execute the actual handler callback.
 // Admission and outcome fencing are covered in browser-external-governance.test.ts.
@@ -1225,6 +1226,54 @@ describe('browser-actuator v3 contract', () => {
     });
   });
 
+  it('closes a newly created keep_alive session when external admission fails', async () => {
+    const { handleAction } = await import('./index');
+    vi.mocked(runExternalOperation).mockRejectedValueOnce(new Error('EXTERNAL_APPROVAL_REQUIRED'));
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'new-denied-session',
+      options: { keep_alive: true },
+      steps: [{ type: 'capture', op: 'goto', params: { url: 'https://example.com' } }],
+    });
+    expect(result.status).toBe('failed');
+    expect(mocks.page.goto).not.toHaveBeenCalled();
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a preexisting shared session when external admission fails', async () => {
+    const { handleAction } = await import('./index');
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'existing-denied-session',
+      options: { keep_alive: true },
+      steps: [{ type: 'capture', op: 'title', params: {} }],
+    });
+    vi.mocked(runExternalOperation).mockRejectedValueOnce(new Error('EXTERNAL_APPROVAL_REQUIRED'));
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'existing-denied-session',
+      options: { keep_alive: true },
+      steps: [{ type: 'capture', op: 'goto', params: { url: 'https://example.com' } }],
+    });
+    expect(result.status).toBe('failed');
+    expect(mocks.close).not.toHaveBeenCalled();
+  });
+
+  it('disconnects a newly acquired CDP connection on denial without closing the remote context', async () => {
+    const { handleAction } = await import('./index');
+    vi.mocked(runExternalOperation).mockRejectedValueOnce(new Error('EXTERNAL_APPROVAL_REQUIRED'));
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'new-cdp-denied',
+      options: { keep_alive: true, connect_over_cdp: true, cdp_port: 9333 },
+      steps: [{ type: 'capture', op: 'goto', params: { url: 'https://example.com' } }],
+    });
+    expect(result.status).toBe('failed');
+    expect(mocks.page.goto).not.toHaveBeenCalled();
+    expect(mocks.connectedBrowser.close).toHaveBeenCalledOnce();
+    expect(mocks.context.close).not.toHaveBeenCalled();
+  });
+
   it('reuses leased browser sessions within the same process and can close them explicitly', async () => {
     const { handleAction } = await import('./index');
 
@@ -1575,12 +1624,13 @@ describe('browser-actuator v3 contract', () => {
   it('closes and restarts browser sessions through exported helpers', async () => {
     const { handleAction, closeBrowserSession, restartBrowserSession } = await import('./index');
 
-    await handleAction({
+    const initial = await handleAction({
       action: 'pipeline',
       session_id: 'browser-admin',
-      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      steps: [{ type: 'capture', op: 'title', params: {} }],
       options: { headless: true, lease_ms: 60_000 },
     });
+    expect(initial.status).toBe('succeeded');
 
     expect(await restartBrowserSession('browser-admin')).toBe(true);
     expect(mocks.close).toHaveBeenCalledTimes(1);

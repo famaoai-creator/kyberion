@@ -18,7 +18,8 @@ const EXTRA_HANDLERS: Record<'capture' | 'transform' | 'apply', string[]> = {
   apply: ['navigate', 'goto'],
 };
 const REGISTERED_WITHOUT_HANDLER: Record<'capture' | 'transform' | 'apply', string[]> = {
-  capture: [],
+  // Dedicated single-step isolated runtime, dispatched before session creation.
+  capture: ['local_session_probe'],
   transform: ['llm_decide'],
   apply: ['extension_session'],
 };

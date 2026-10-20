@@ -1652,6 +1652,14 @@ Missing keys fail closed before bridge installation; key rotation invalidates
 prior approval. Gate: voice-camera-credential-fingerprint tests cover module
 reload, password/host/port/key drift, missing-key refusal and secret absence.
 
+First-win browser diagnostics must not require an external-effect approval or
+reuse an authenticated browser session. Use an isolated fixed-content probe
+with JavaScript disabled and all network requests blocked; never exempt
+arbitrary data URLs or JavaScript evaluation from admission. Close newly owned
+browser resources on admission failure even when successful sessions would
+normally stay alive. Enforce this through the first-win contract and browser
+probe/cleanup tests.
+
 Do not reinstall a named virtual-camera bridge on every start/stop request:
 seam multiplicity is enforced outside Vitest too. Reuse the owner's exact
 configuration, reject target drift before effects, and never replace a custom

@@ -111,6 +111,22 @@ describe('browser external governance', () => {
     expect(page.click).not.toHaveBeenCalled();
   });
 
+  it('still gates arbitrary data HTML navigation even when the origin policy allows it', async () => {
+    runtime.navigationPolicy = { allow_data_url: true };
+    await expect(
+      opCapture(
+        'goto',
+        {
+          url: 'data:text/html,<script>fetch("https://outside.example")</script>',
+        },
+        runtime,
+        {},
+        resolve
+      )
+    ).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
+    expect(page.goto).not.toHaveBeenCalled();
+  });
+
   it('gates capture evaluate while keeping fixed read captures automatic', async () => {
     await expect(
       opCapture('evaluate', { script: 'fetch("https://outside.example")' }, runtime, {}, resolve)
