@@ -4,8 +4,8 @@
  *
  * The terminal actuator keeps PTY sessions in an in-memory engine, so a
  * one-shot `pnpm playground` process loses every session when it exits.
- * This script fronts the actuator's `--serve` NDJSON mode with a Unix
- * socket daemon:
+ * This script fronts the actuator's `--serve` NDJSON mode with a local IPC
+ * daemon:
  *
  *   pnpm terminal serve                          # resident daemon (foreground)
  *   pnpm terminal <action> --params '<json>'     # client; auto-starts daemon
@@ -29,6 +29,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getRegisteredEnv, nowIso } from '@agent/core/foundation';
+import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import {
   defineScript,
   isDirectScript,
@@ -38,7 +39,8 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUNTIME_DIR = path.join(ROOT, 'active/shared/runtime/terminal-daemon');
-const SOCK = path.join(RUNTIME_DIR, 'terminal-daemon.sock');
+const SOCK = resolveLocalIpcAddress(path.join(RUNTIME_DIR, 'terminal-daemon.sock'));
+const FILESYSTEM_SOCKET = !isWindowsNamedPipeAddress(SOCK);
 const PIDFILE = path.join(RUNTIME_DIR, 'daemon.pid');
 const LOGFILE = path.join(RUNTIME_DIR, 'daemon.log');
 const ACTUATOR = path.join(ROOT, 'dist/libs/actuators/terminal-actuator/src/index.js');
@@ -130,10 +132,12 @@ async function startDaemon(): Promise<void> {
     logLine(message);
     throw new ScriptExitError(1, message, false);
   }
-  try {
-    unlinkSync(SOCK);
-  } catch {
-    /* no stale socket */
+  if (FILESYSTEM_SOCKET) {
+    try {
+      unlinkSync(SOCK);
+    } catch {
+      /* no stale socket */
+    }
   }
 
   const actuator: ChildProcess = spawn(process.execPath, [ACTUATOR, '--serve'], {
@@ -230,13 +234,7 @@ async function startDaemon(): Promise<void> {
         /* already closed */
       }
     }
-    for (const file of [SOCK, PIDFILE]) {
-      try {
-        unlinkSync(file);
-      } catch {
-        /* absent */
-      }
-    }
+    cleanupDaemonFiles(process.pid);
     setProcessExitCode(code);
   };
 
@@ -276,7 +274,7 @@ export function requestOn(
   timeoutMs = REQUEST_TIMEOUT_MS
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const conn = net.createConnection(sockPath);
+    const conn = net.createConnection(resolveLocalIpcAddress(sockPath));
     let buf = '';
     const done = <T>(fn: (v: T) => void, v: T): void => {
       clearTimeout(timer);
@@ -325,6 +323,13 @@ function readPid(): number | null {
   }
 }
 
+export function shouldRemovePidFileForOwner(
+  currentPid: number | null,
+  expectedPid: number | null | undefined
+): boolean {
+  return expectedPid === undefined || currentPid === expectedPid;
+}
+
 function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -339,10 +344,17 @@ function daemonAlive(): boolean {
   return pid !== null && pidAlive(pid);
 }
 
-function cleanupDaemonFiles(): void {
-  for (const file of [SOCK, PIDFILE]) {
+function cleanupDaemonFiles(expectedPid?: number | null): void {
+  if (FILESYSTEM_SOCKET) {
     try {
-      unlinkSync(file);
+      unlinkSync(SOCK);
+    } catch {
+      /* absent */
+    }
+  }
+  if (shouldRemovePidFileForOwner(readPid(), expectedPid)) {
+    try {
+      unlinkSync(PIDFILE);
     } catch {
       /* absent */
     }
@@ -367,14 +379,28 @@ function startupFailure(reason: string): Error {
 
 async function ensureDaemon(): Promise<void> {
   mkdirSync(RUNTIME_DIR, { recursive: true });
-  if (existsSync(SOCK) && (await pingDaemon())) return;
+  if ((FILESYSTEM_SOCKET ? existsSync(SOCK) : true) && (await pingDaemon())) return;
+
+  const existingPid = readPid();
+  if (existingPid !== null && pidAlive(existingPid)) {
+    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+    while (Date.now() < deadline && pidAlive(existingPid)) {
+      if (await pingDaemon()) return;
+      await sleep(150);
+    }
+    if (pidAlive(existingPid)) {
+      throw startupFailure(
+        `terminal daemon pid ${existingPid} is alive but its local IPC endpoint is not responding`
+      );
+    }
+  }
 
   if (!existsSync(ACTUATOR)) {
     throw new Error(
       `terminal actuator bundle missing: ${ACTUATOR}\nRun \`pnpm build:actuators\` first.`
     );
   }
-  cleanupDaemonFiles();
+  cleanupDaemonFiles(existingPid);
 
   const child = withSafeAppendFile(LOGFILE, (logFd) =>
     spawn(process.execPath, ['--import', pathToFileURL(TS_LOADER).href, SELF, 'serve'], {
@@ -395,13 +421,13 @@ async function ensureDaemon(): Promise<void> {
 
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (existsSync(SOCK) && (await pingDaemon())) return;
+    if ((FILESYSTEM_SOCKET ? existsSync(SOCK) : true) && (await pingDaemon())) return;
     if (childError !== null) {
       throw startupFailure(`terminal daemon failed to spawn: ${childError}`);
     }
     if (childExit !== null) {
       // A racing client may have won the bind — accept it if it answers.
-      if (existsSync(SOCK) && (await pingDaemon())) return;
+      if ((FILESYSTEM_SOCKET ? existsSync(SOCK) : true) && (await pingDaemon())) return;
       throw startupFailure(`terminal daemon exited during startup (code ${childExit})`);
     }
     await sleep(150);
@@ -411,7 +437,7 @@ async function ensureDaemon(): Promise<void> {
 
 async function daemonStatus(): Promise<Record<string, unknown>> {
   const pid = readPid();
-  const socket = existsSync(SOCK);
+  const socket = FILESYSTEM_SOCKET ? existsSync(SOCK) : await pingDaemon();
   let ping: unknown = null;
   if (socket) {
     try {
@@ -441,7 +467,7 @@ async function stopDaemon(): Promise<Record<string, unknown>> {
     while (Date.now() < deadline && pidAlive(pid)) await sleep(100);
   }
   const stillRunning = pid !== null && pidAlive(pid);
-  if (!stillRunning) cleanupDaemonFiles();
+  if (!stillRunning) cleanupDaemonFiles(pid);
   return { stopped: !stillRunning, pid };
 }
 

@@ -152,7 +152,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Unix-domain socket path for local agent runtime supervisor RPC; keep it under the governed runtime area.",
+      "description": "Logical local IPC identity for agent runtime supervisor RPC; POSIX uses a Unix-domain socket, Windows derives a named pipe. Keep it under the governed runtime area.",
       "documented": true
     },
     {
@@ -170,7 +170,7 @@
       "type": "enum",
       "enum": ["unix", "tcp"],
       "required": false,
-      "description": "Transport used by the agent runtime supervisor; unix is the local default, while tcp requires an explicitly controlled host and port.",
+      "description": "Transport used by the agent runtime supervisor; unix selects platform-local IPC (UDS on POSIX, named pipe on Windows), while tcp requires an explicitly controlled host and port.",
       "documented": true
     },
     {

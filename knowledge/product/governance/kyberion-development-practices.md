@@ -120,6 +120,12 @@ Every one of these took a red CI round to learn (PR #475):
   (`/home/runner/work/...`) blow the budget. Sockets go in `os.tmpdir()`
   with short names — this is the one sanctioned exception to the
   `active/shared/tmp/` temp rule.
+- **Local IPC is platform-specific.** Node `net` filesystem socket paths fail on
+  Windows; route stable socket identities through `resolveLocalIpcAddress()` so
+  POSIX keeps UDS and Windows uses a named pipe. A named pipe is not a filesystem
+  leaf: health-probe it instead of `exists`/unlink cleanup. Integration tests must
+  exercise listen/connect on the host platform, and direct-entry checks must
+  normalize separators and case before comparing Windows paths.
 - **Linux runners have no CJK fonts.** Anything exercising CJK rendering
   needs `fonts-noto-cjk` in the workflow (already in ci.yml,
   pr-validation.yml, cross-os.yml — keep new workflows consistent).

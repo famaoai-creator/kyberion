@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
   findMissionProcessBindingViolations,
+  parseMissionProcessFrontmatter,
   readMissionProcessBindingsTextFile,
 } from './check_mission_process_bindings.js';
 
@@ -31,5 +32,16 @@ describe('mission process bindings checker', () => {
     expect(() => readMissionProcessBindingsTextFile(pathResolver.rootResolve('knowledge'))).toThrow(
       'must be a regular file'
     );
+  });
+
+  it('parses CRLF frontmatter', () => {
+    expect(
+      parseMissionProcessFrontmatter(
+        '---\r\ntitle: Example\r\nruntime_stages: [planning]\r\n---\r\n'
+      )
+    ).toEqual({
+      title: 'Example',
+      runtime_stages: ['planning'],
+    });
   });
 });

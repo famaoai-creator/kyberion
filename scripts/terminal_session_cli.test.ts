@@ -3,10 +3,12 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ACTUATOR_SERVE_RESULT_PREFIX } from '@agent/core/cli-utils';
+import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import {
   inputForCli,
   parseServeResultLine,
   requestOn,
+  shouldRemovePidFileForOwner,
   uniqueRequestId,
 } from './terminal_session_cli.js';
 
@@ -18,6 +20,7 @@ function startStubServer(
     os.tmpdir(),
     `terminal-cli-test-${process.pid}-${Math.random().toString(36).slice(2)}.sock`
   );
+  const address = resolveLocalIpcAddress(sockPath);
   const server = net.createServer((conn) => {
     let buf = '';
     conn.on('data', (chunk) => {
@@ -34,7 +37,7 @@ function startStubServer(
     conn.on('error', () => {});
   });
   return new Promise((resolve) => {
-    server.listen(sockPath, () => resolve({ sockPath, server }));
+    server.listen(address, () => resolve({ sockPath: address, server }));
   });
 }
 
@@ -91,6 +94,15 @@ describe('terminal_session_cli input shaping', () => {
   });
 });
 
+describe('terminal_session_cli pidfile ownership', () => {
+  it('preserves a daemon PID written by the winning named-pipe listener', () => {
+    expect(shouldRemovePidFileForOwner(100, 200)).toBe(false);
+    expect(shouldRemovePidFileForOwner(200, 200)).toBe(true);
+    expect(shouldRemovePidFileForOwner(null, null)).toBe(true);
+    expect(shouldRemovePidFileForOwner(100, undefined)).toBe(true);
+  });
+});
+
 describe('terminal_session_cli request round-trip', () => {
   it('resolves with the framed response for a matching request', async () => {
     const { sockPath, server } = await startStubServer((req) => ({
@@ -113,7 +125,7 @@ describe('terminal_session_cli request round-trip', () => {
       conn.on('data', () => conn.write('this is not json\n'));
       conn.on('error', () => {});
     });
-    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    await new Promise<void>((resolve) => server.listen(resolveLocalIpcAddress(sockPath), resolve));
     servers.push(server);
     await expect(requestOn(sockPath, { action: 'list' }, 3000)).rejects.toThrow(
       'malformed daemon response'

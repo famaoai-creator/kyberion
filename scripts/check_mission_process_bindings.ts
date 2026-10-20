@@ -37,13 +37,18 @@ function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
   }
 }
 
-function parseFrontmatter(path: string): JsonRecord {
-  const raw = readMissionProcessBindingsTextFile(rel(path));
-  if (!raw.startsWith('---\n')) return {};
-  const end = raw.indexOf('\n---', 4);
+export function parseMissionProcessFrontmatter(raw: string): JsonRecord {
+  const firstLineEnd = raw.indexOf('\n');
+  if (firstLineEnd < 0 || raw.slice(0, firstLineEnd).replace(/\r$/u, '') !== '---') return {};
+  const start = firstLineEnd + 1;
+  const end = raw.indexOf('\n---', start);
   if (end < 0) return {};
-  const parsed = yaml.load(raw.slice(4, end));
+  const parsed = yaml.load(raw.slice(start, end));
   return parsed && typeof parsed === 'object' ? (parsed as JsonRecord) : {};
+}
+
+function parseFrontmatter(filePath: string): JsonRecord {
+  return parseMissionProcessFrontmatter(readMissionProcessBindingsTextFile(rel(filePath)));
 }
 
 function allGateIds(
