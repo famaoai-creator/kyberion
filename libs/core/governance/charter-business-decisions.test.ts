@@ -15,7 +15,10 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),
 }));
-vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('./audit-chain.js', async () => ({
+  auditChain: { record: vi.fn() },
+  registerLockIo: (await import('../foundation/lock-utils.js')).registerLockIo,
+}));
 vi.mock('./governance-action-recorder.js', () => ({ recordGovernanceAction: vi.fn() }));
 vi.mock('../surface/operator-notifications.js', () => ({ notifyOperator: vi.fn() }));
 vi.mock('../decision-rights.js', () => ({
