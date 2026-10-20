@@ -2,7 +2,7 @@
 title: ask から dots と組織ミッションへの実行経路検証
 tags: [autonomy, governance, dots, ask, organization, runtime-probe]
 last_updated: 2026-10-20
-status: investigation
+status: partial
 ---
 
 # ask から dots と組織ミッションへの実行経路検証
