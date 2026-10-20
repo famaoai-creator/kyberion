@@ -1,3 +1,9 @@
+import {
+  changeWorkspaceSelection,
+  workspaceQuery,
+  workspaceSelectionFromQuery,
+} from '@agent/core/surface/workspace-query';
+
 /**
  * The rail's company switcher. The selection travels as the page URL's
  * `?tenant=` and the `kyberion_selected_tenant` cookie; both are hints only.
@@ -24,10 +30,11 @@ export function needsWorkspaceSelection(
 /** Explicit workspace transitions drop hierarchy belonging to the previous selection. */
 export function workspaceDestinationHref(href: string, tenant: string): string {
   const url = new URL(href, window.location.href);
-  for (const key of ['organizationId', 'projectId', 'organization_id', 'project_id']) {
-    url.searchParams.delete(key);
+  const current = new URL(window.location.href);
+  if ((current.searchParams.get('tenant') || readSelectedTenant()) === tenant) {
+    return withSelectedTenant(href, tenant, 'snake');
   }
-  url.searchParams.set(SELECTED_TENANT_PARAM, tenant);
+  url.search = changeWorkspaceSelection(url.searchParams, 'tenant', tenant).toString();
   return url.origin === window.location.origin ? url.pathname + url.search + url.hash : url.href;
 }
 
@@ -54,10 +61,7 @@ export function announceTenantChange(tenantSlug: string): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   if (url.searchParams.get('tenant') !== tenantSlug) {
-    url.searchParams.delete('organizationId');
-    url.searchParams.delete('projectId');
-    url.searchParams.delete('organization_id');
-    url.searchParams.delete('project_id');
+    url.search = changeWorkspaceSelection(url.searchParams, 'tenant', tenantSlug).toString();
   }
   url.searchParams.set('tenant', tenantSlug);
   window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
@@ -145,10 +149,7 @@ export function reflectResolvedSelection(value: string): void {
  */
 export function selectionSwitchHref(href: string, value: string): string {
   const url = new URL(href);
-  for (const key of ['organizationId', 'projectId', 'organization_id', 'project_id']) {
-    url.searchParams.delete(key);
-  }
-  url.searchParams.set(SELECTED_TENANT_PARAM, value);
+  url.search = changeWorkspaceSelection(url.searchParams, 'tenant', value).toString();
   return url.pathname + url.search + url.hash;
 }
 
@@ -171,14 +172,21 @@ export function withSelectedTenant(
   const url = new URL(path, window.location.href);
   if (tenant) url.searchParams.set('tenant', tenant);
   const current = new URL(window.location.href);
-  for (const [camel, snake] of [
-    ['organizationId', 'organization_id'],
-    ['projectId', 'project_id'],
-  ]) {
-    const selected = current.searchParams.get(camel) ?? current.searchParams.get(snake);
-    const key = scopeQueryStyle === 'snake' ? snake : camel;
-    url.searchParams.delete(scopeQueryStyle === 'snake' ? camel : snake);
-    if (selected) url.searchParams.set(key, selected);
-  }
+  const currentSelection = workspaceSelectionFromQuery(current.searchParams);
+  const sameTenant = !tenant || (currentSelection.tenant_slug || readSelectedTenant()) === tenant;
+  for (const key of [
+    'organizationId',
+    'organization_id',
+    'projectId',
+    'project_id',
+    'operationId',
+    'operation_id',
+    'tier',
+  ])
+    url.searchParams.delete(key);
+  if (sameTenant)
+    for (const [key, selected] of workspaceQuery(currentSelection, scopeQueryStyle)) {
+      if (key !== 'tenant') url.searchParams.set(key, selected);
+    }
   return url.origin === window.location.origin ? url.pathname + url.search + url.hash : url.href;
 }

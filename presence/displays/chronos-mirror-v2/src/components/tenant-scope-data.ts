@@ -9,6 +9,7 @@ export interface ChronosTenantOption {
 export interface ChronosOrganizationOption {
   id: string;
   tenant_slug?: string;
+  tier?: string;
 }
 
 export interface ChronosProjectOption {
@@ -17,12 +18,14 @@ export interface ChronosProjectOption {
   organization_id?: string;
   tenant_slug?: string;
   status?: string;
+  tier?: string;
 }
 
 export interface ChronosTenantScopeData {
   tenants: ChronosTenantOption[];
   organizations: ChronosOrganizationOption[];
   projects: ChronosProjectOption[];
+  operations: ChronosProjectOption[];
 }
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -72,8 +75,13 @@ function parseOrganizations(value: unknown): ChronosOrganizationOption[] | null 
   const organizations = value.map((entry) => {
     if (!isJsonRecord(entry) || !nonEmptyString(entry.id)) return undefined;
     const tenantSlug = optionalString(entry, 'tenant_slug');
-    if (tenantSlug === null) return undefined;
-    return { id: entry.id.trim(), ...(tenantSlug ? { tenant_slug: tenantSlug } : {}) };
+    const tier = optionalString(entry, 'tier');
+    if (tenantSlug === null || tier === null) return undefined;
+    return {
+      id: entry.id.trim(),
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+      ...(tier ? { tier } : {}),
+    };
   });
   return organizations.every((entry): entry is ChronosOrganizationOption => entry !== undefined)
     ? organizations
@@ -89,7 +97,14 @@ function parseProjects(value: unknown): ChronosProjectOption[] | null {
     const organizationId = optionalString(entry, 'organization_id');
     const tenantSlug = optionalString(entry, 'tenant_slug');
     const status = optionalString(entry, 'status');
-    if (name === null || organizationId === null || tenantSlug === null || status === null) {
+    const tier = optionalString(entry, 'tier');
+    if (
+      name === null ||
+      organizationId === null ||
+      tenantSlug === null ||
+      status === null ||
+      tier === null
+    ) {
       return undefined;
     }
     return {
@@ -98,6 +113,7 @@ function parseProjects(value: unknown): ChronosProjectOption[] | null {
       ...(organizationId ? { organization_id: organizationId } : {}),
       ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
       ...(status ? { status } : {}),
+      ...(tier ? { tier } : {}),
     };
   });
   return projects.every((entry): entry is ChronosProjectOption => entry !== undefined)
@@ -114,6 +130,7 @@ export function normalizeChronosTenantScopePayload(
   if (!tenants.every((entry): entry is ChronosTenantOption => entry !== undefined)) return null;
   const organizations = parseOrganizations(payload.organizations);
   const projects = parseProjects(payload.projects);
-  if (!organizations || !projects) return null;
-  return { tenants, organizations, projects };
+  const operations = parseProjects(payload.operations);
+  if (!organizations || !projects || !operations) return null;
+  return { tenants, organizations, projects, operations };
 }

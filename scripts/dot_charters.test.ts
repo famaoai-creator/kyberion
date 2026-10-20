@@ -32,6 +32,10 @@ vi.mock('@agent/core/dot/dot-lifecycle', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/dot/dot-lifecycle')>();
   return {
     ...actual,
+    createDraftDotCharter: (
+      input: unknown,
+      deps: Parameters<typeof actual.createDraftDotCharter>[1]
+    ) => actual.createDraftDotCharter(input, { ...deps, rootDir: mocks.rootDir }),
     enableDotEventContinuation: (
       dotId: string,
       deps: Parameters<typeof actual.enableDotEventContinuation>[1]
@@ -110,6 +114,23 @@ afterEach(() => {
 });
 
 describe('dot charter CLI identity resolution', () => {
+  it('previews a reviewed draft without writing, then creates only on explicit apply', async () => {
+    const file = `${TEST_ROOT}/reviewed.json`;
+    safeMkdir(TEST_ROOT, { recursive: true });
+    safeWriteFile(file, JSON.stringify({ ...CHARTER, status: 'draft' }));
+    expect(await runDotCharters(['create', '--file', file, '--json', '--quiet'])).toMatchObject({
+      ok: true,
+      applied: false,
+      status: 'draft',
+    });
+    expect(
+      await runDotCharters(['create', '--file', file, '--apply', '--json', '--quiet'])
+    ).toMatchObject({ ok: true, applied: true, status: 'draft' });
+    expect(
+      await runDotCharters(['create', '--file', file, '--apply', '--json', '--quiet'])
+    ).toBeUndefined();
+    expect(process.exitCode).toBe(1);
+  });
   it('refuses a targeted inbox write for a duplicate identity', async () => {
     // Two repo charters share the ID: same-scope duplicates have no owner.
     writeCharter(CHARTER, 'one');

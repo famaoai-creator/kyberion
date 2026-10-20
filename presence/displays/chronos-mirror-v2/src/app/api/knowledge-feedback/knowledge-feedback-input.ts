@@ -10,6 +10,8 @@ export interface KnowledgeFeedbackRequestInput {
   tenant?: string;
   organizationId?: string;
   projectId?: string;
+  operationId?: string;
+  tier?: 'public' | 'confidential' | 'personal';
   reason?: string;
 }
 
@@ -18,9 +20,16 @@ export function parseKnowledgeFeedbackInput(
 ): KnowledgeFeedbackRequestInput {
   const unexpected = Object.keys(value).find(
     (key) =>
-      !['document_path', 'verdict', 'tenant', 'organization_id', 'project_id', 'reason'].includes(
-        key
-      )
+      ![
+        'document_path',
+        'verdict',
+        'tenant',
+        'organization_id',
+        'project_id',
+        'operation_id',
+        'tier',
+        'reason',
+      ].includes(key)
   );
   if (unexpected) throw new Error(`unexpected knowledge feedback field: ${unexpected}`);
 
@@ -42,6 +51,8 @@ export function parseKnowledgeFeedbackInput(
     ['tenant', 'tenant'],
     ['organization_id', 'organizationId'],
     ['project_id', 'projectId'],
+    ['operation_id', 'operationId'],
+    ['tier', 'tier'],
     ['reason', 'reason'],
   ];
   const parsed: Record<string, string> = {};
@@ -52,6 +63,8 @@ export function parseKnowledgeFeedbackInput(
     }
     if (typeof raw === 'string' && raw.trim()) parsed[targetKey] = raw.trim();
   }
+  if (parsed.tier && !['public', 'confidential', 'personal'].includes(parsed.tier))
+    throw new Error('tier is invalid');
 
   return {
     documentPath,
@@ -59,6 +72,8 @@ export function parseKnowledgeFeedbackInput(
     ...(parsed.tenant ? { tenant: parsed.tenant } : {}),
     ...(parsed.organizationId ? { organizationId: parsed.organizationId } : {}),
     ...(parsed.projectId ? { projectId: parsed.projectId } : {}),
+    ...(parsed.operationId ? { operationId: parsed.operationId } : {}),
+    ...(parsed.tier ? { tier: parsed.tier as KnowledgeFeedbackRequestInput['tier'] } : {}),
     ...(parsed.reason ? { reason: parsed.reason } : {}),
   };
 }

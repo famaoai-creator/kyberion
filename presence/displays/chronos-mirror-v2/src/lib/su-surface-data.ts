@@ -1,5 +1,11 @@
 import { scopedLearningApprovalVisibleToViewer } from './scoped-learning-approval-visibility';
 import type { ViewerContext } from './viewer-context';
+import { loadProjectRecord } from '@agent/core/project/project-registry';
+import {
+  workspaceScopeMatchesResource,
+  type ResolvedWorkspaceScope,
+  type WorkspaceSelection,
+} from '@agent/core/surface/workspace-scope';
 import * as path from 'node:path';
 import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
 import { executionMetricsReadFor } from '@agent/core/cost-report';
@@ -169,6 +175,7 @@ function approvalTenantFields(
 }
 
 export interface ApprovalQueueQuery {
+  workspace?: ResolvedWorkspaceScope;
   requestId?: string;
   storageChannel?: string;
   viewer?: ViewerContext;
@@ -180,6 +187,66 @@ export interface ApprovalQueueQuery {
   tenantSlugs?: string[] | 'all';
   channel?: string;
   limit?: number;
+}
+
+/** An approval belongs to an operation only through explicit record provenance. */
+export function approvalMatchesWorkspace(
+  record: ApprovalRequestRecord,
+  workspace: ResolvedWorkspaceScope
+): boolean {
+  const contexts: Record<string, unknown>[] = [];
+  for (const value of [record.scope, record.requestedByContext, record.work_loop?.context])
+    if (value && typeof value === 'object')
+      contexts.push(value as unknown as Record<string, unknown>);
+  const resource: WorkspaceSelection = {};
+  for (const [key, alias] of [
+    ['tenant_slug', 'tenantSlug'],
+    ['organization_id', 'organizationId'],
+    ['project_id', 'projectId'],
+    ['operation_id', 'operationId'],
+    ['tier', 'tier'],
+  ] as const) {
+    const values = contexts
+      .flatMap((context) => [context[key], context[alias]])
+      .filter((value): value is string => typeof value === 'string' && Boolean(value));
+    if (new Set(values).size > 1) return false;
+    if (values[0]) Object.assign(resource, { [key]: values[0] });
+  }
+  resource.tenant_slug ??= resolveApprovalTenant(record);
+  if (!resource.tier) {
+    try {
+      const missionId = record.requestedByContext?.missionId || record.steering?.missionId;
+      const mission = missionId && findMissionPath(missionId) ? loadState(missionId!) : undefined;
+      const project =
+        !mission && resource.project_id ? loadProjectRecord(resource.project_id) : undefined;
+      const authoritative: WorkspaceSelection | undefined = mission
+        ? {
+            tier: mission.tier,
+            tenant_slug: mission.tenant_slug || mission.tenant_id,
+            organization_id:
+              mission.organization_id || mission.relationships?.organization?.organization_id,
+            project_id: mission.relationships?.project?.project_id,
+          }
+        : project
+          ? {
+              tier: project.tier,
+              tenant_slug: project.tenant_slug,
+              organization_id: project.organization_id,
+              project_id: project.project_id,
+            }
+          : undefined;
+      if (authoritative) {
+        for (const key of ['tier', 'tenant_slug', 'organization_id', 'project_id'] as const) {
+          if (resource[key] && authoritative[key] && resource[key] !== authoritative[key])
+            return false;
+          if (authoritative[key]) Object.assign(resource, { [key]: authoritative[key] });
+        }
+      }
+    } catch {
+      return false;
+    }
+  }
+  return workspaceScopeMatchesResource(workspace, resource);
 }
 
 function readMissionManagementDirs(): string[] {
@@ -565,6 +632,7 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       if (query.requestId && record.id !== query.requestId) return false;
       if (query.storageChannel && record.storageChannel !== query.storageChannel) return false;
       if (!scopedLearningApprovalVisibleToViewer(record, query.viewer, query.tenant)) return false;
+      if (query.workspace && !approvalMatchesWorkspace(record, query.workspace)) return false;
       if (statusFilter && !statusFilter.has(record.status)) return false;
       if (kindFilter && !kindFilter.has(record.kind)) return false;
       if (missionFilter && record.requestedByContext?.missionId?.toUpperCase() !== missionFilter)

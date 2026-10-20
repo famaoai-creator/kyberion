@@ -1402,16 +1402,43 @@ function ledgerRoleReadGrant(
  * case-insensitively and on its resolved spellings.
  */
 function roleDenyReadDecision(
-  policy: { authority_role_permissions?: Record<string, { deny_read?: unknown } | undefined> },
+  policy: {
+    authority_role_permissions?: Record<
+      string,
+      { deny_read?: unknown; deny_read_descendants?: unknown } | undefined
+    >;
+  },
   relativePath: string,
   identity: ReturnType<typeof resolvePolicyIdentityContext>
 ): { allowed: false; reason: string } | undefined {
   const currentRole = identity.role;
   if (!currentRole) return undefined;
-  const deniedPatterns: unknown = policy.authority_role_permissions?.[currentRole]?.deny_read;
-  if (!Array.isArray(deniedPatterns) || deniedPatterns.length === 0) return undefined;
   const currentMission = resolveProjectScope().missionId;
   const candidates = denyCandidatePaths(relativePath);
+  const rules = policy.authority_role_permissions?.[currentRole];
+  // A listing grant can admit the directory itself while denying every child.
+  // Keep policy in the catalog and enforce all physical aliases, just as deny_read.
+  const listingRoots = rules?.deny_read_descendants;
+  if (
+    Array.isArray(listingRoots) &&
+    listingRoots.some((root) => {
+      if (typeof root !== 'string') return false;
+      const expanded = expandPolicyPath(root, currentMission, identity.tenantSlug);
+      return (
+        expanded !== null &&
+        candidates.some((candidate) =>
+          denyComparisonKey(candidate).startsWith(denyComparisonKey(expanded) + '/')
+        )
+      );
+    })
+  ) {
+    return {
+      allowed: false,
+      reason: '[ROLE_VIOLATION] Directory listing permission does not allow reading descendants.',
+    };
+  }
+  const deniedPatterns: unknown = rules?.deny_read;
+  if (!Array.isArray(deniedPatterns) || deniedPatterns.length === 0) return undefined;
   if (
     deniedPatterns.some(
       (pattern) =>

@@ -72,6 +72,8 @@ export interface ApprovalRequestDraft {
 }
 
 export interface ApprovalRequesterContext {
+  /** Frozen organization-owned work provenance; confers no operation authority. */
+  operationId?: string;
   /**
    * MO-11 S-2: `brief` is the mission-brief HTML surface (report-review). It is
    * a distinct value rather than an alias of `presence` because the origin of

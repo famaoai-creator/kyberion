@@ -1,11 +1,16 @@
 import { dotGoalRefLabel, type DotCharter } from './dot-charter.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
 import type { CreateWorkItemInput } from '../workforce/work-coordination-types.js';
-import { dotAdmissionItemId, dotAdmissionMissionId } from './dot-admission-identity.js';
+import {
+  dotAdmissionItemId,
+  dotAdmissionMissionId,
+  dotRecordAdmissionMatches,
+} from './dot-admission-identity.js';
 
 function workItemDescription(charter: DotCharter, record: DotActionRecord): string {
   return [
     record.objective,
+    charter.work_binding ? `Organization operation: ${charter.work_binding.operation_id}` : '',
     record.rationale ? `\nRationale: ${record.rationale}` : '',
     `\nProposed by ${'dot:' + charter.dot_id} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.work_shape}; decision: ${record.decision ?? 'n/a'}.`,
     dotGoalRefLabel(charter) ? `Contributes to: ${dotGoalRefLabel(charter)}` : '',
@@ -21,6 +26,10 @@ export function dotWorkItemInput(
   rootDir?: string,
   existing?: { item_id: string; source_ref: string }
 ): CreateWorkItemInput & { itemId: string } {
+  if (!dotRecordAdmissionMatches(charter, record))
+    throw new Error(
+      '[DOT_WORK_BINDING] Operation responsibility differs from the admitted work; reconcile instead of relabeling.'
+    );
   const legacy =
     existing &&
     !record.front_desk_execution &&
@@ -48,6 +57,7 @@ export function dotWorkItemInput(
       work_shape: 'routine_operation',
     },
     metadata: {
+      ...(charter.work_binding ? { operation_id: charter.work_binding.operation_id } : {}),
       ...(record.mission_admission
         ? {
             mission_admission: record.mission_admission,

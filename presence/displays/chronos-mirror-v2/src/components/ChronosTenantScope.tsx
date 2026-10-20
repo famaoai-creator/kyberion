@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { changeWorkspaceSelection } from '@agent/core/surface/workspace-query';
 import { Building2, ShieldCheck } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useChronosLocale } from '../lib/hooks';
@@ -32,17 +33,51 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
   const [tenants, setTenants] = React.useState<ChronosTenantOption[]>([]);
   const [organizations, setOrganizations] = React.useState<ChronosOrganizationOption[]>([]);
   const [projects, setProjects] = React.useState<ChronosProjectOption[]>([]);
+  const [operations, setOperations] = React.useState<ChronosProjectOption[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [retry, setRetry] = React.useState(0);
   const selected = searchParams.get('tenant') || '';
   const selectedOrganization = searchParams.get('organization_id') || '';
   const selectedProject = searchParams.get('project_id') || '';
+  const selectedOperation = searchParams.get('operation_id') || '';
+  const selectedTier = searchParams.get('tier') || '';
+  const scopeKey = JSON.stringify([
+    locale,
+    selected,
+    selectedOrganization,
+    selectedProject,
+    selectedOperation,
+    selectedTier,
+  ]);
+  const [loadedScope, setLoadedScope] = React.useState<string | null>(null);
+  const unavailable = loadedScope !== scopeKey || !!loadError;
+  const organizationValue = (organization: ChronosOrganizationOption) =>
+    JSON.stringify([
+      organization.id,
+      organization.tenant_slug || '',
+      organization.tier || 'confidential',
+    ]);
+  const currentOrganization = organizations.find(
+    (organization) =>
+      organization.id === selectedOrganization &&
+      (organization.tenant_slug || '') === selected &&
+      (!selectedTier || (organization.tier || 'confidential') === selectedTier)
+  );
 
   React.useEffect(() => {
     let cancelled = false;
+    setLoadedScope(null);
+    setLoadError(null);
+    setTenants([]);
+    setOrganizations([]);
+    setProjects([]);
+    setOperations([]);
     const params = new URLSearchParams();
     if (selected) params.set('tenant', selected);
     if (selectedOrganization) params.set('organization_id', selectedOrganization);
     if (selectedProject) params.set('project_id', selectedProject);
+    if (selectedOperation) params.set('operation_id', selectedOperation);
+    if (selectedTier) params.set('tier', selectedTier);
     void fetch(`/api/tenant-scope${params.size ? `?${params.toString()}` : ''}`, {
       cache: 'no-store',
     })
@@ -56,7 +91,9 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
           setTenants(normalized.tenants);
           setOrganizations(normalized.organizations);
           setProjects(normalized.projects);
+          setOperations(normalized.operations);
           setLoadError(null);
+          setLoadedScope(scopeKey);
         } else if (!cancelled) {
           setLoadError(uxText('chronos_tenant_scope_unavailable', locale));
         }
@@ -67,17 +104,52 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [locale, selected, selectedOrganization, selectedProject]);
+  }, [
+    locale,
+    selected,
+    selectedOrganization,
+    selectedProject,
+    selectedOperation,
+    selectedTier,
+    scopeKey,
+    retry,
+  ]);
 
-  const updateScope = (key: 'tenant' | 'organization_id' | 'project_id', value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    if (key === 'tenant') {
-      params.delete('organization_id');
-      params.delete('project_id');
-    } else if (key === 'organization_id') {
-      params.delete('project_id');
+  const updateScope = (
+    key: 'tenant' | 'organization_id' | 'project_id' | 'operation_id',
+    value: string,
+    organizationOption?: ChronosOrganizationOption
+  ) => {
+    let params = changeWorkspaceSelection(new URLSearchParams(searchParams.toString()), key, value);
+    if (
+      key === 'organization_id' &&
+      organizationOption &&
+      (organizationOption.tier || 'confidential') !== (selectedTier || 'confidential')
+    ) {
+      params = changeWorkspaceSelection(params, 'organization_id', '');
+      params = changeWorkspaceSelection(params, 'organization_id', value);
+    }
+    if (key === 'project_id' && value) {
+      const project = projects.find((item) => item.id === value);
+      if (project) {
+        for (const [name, parent] of [
+          ['tenant', project.tenant_slug],
+          ['organization_id', project.organization_id],
+          ['tier', project.tier],
+        ] as const) {
+          if (parent) params.set(name, parent);
+          else params.delete(name);
+        }
+      }
+    }
+    if (key === 'organization_id' && value) {
+      const organization =
+        organizationOption ||
+        organizations.find((item) => item.id === value && (item.tenant_slug || '') === selected);
+      if (organization) {
+        if (organization.tier) params.set('tier', organization.tier);
+        else params.delete('tier');
+      }
     }
     router.replace(`${pathname}${params.size ? `?${params.toString()}` : ''}`, { scroll: false });
   };
@@ -99,6 +171,7 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
         <select
           aria-label={uxText('chronos_tenant_scope_label', locale)}
           value={selected}
+          disabled={unavailable}
           onChange={(event) => updateScope('tenant', event.target.value)}
           className="kb-input kb-select chronos-scope__select"
         >
@@ -116,16 +189,27 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
       <span className="kb-select-wrap chronos-scope__field">
         <select
           aria-label={uxText('chronos_organization_scope_label', locale)}
-          value={selectedOrganization}
-          onChange={(event) => updateScope('organization_id', event.target.value)}
+          value={currentOrganization ? organizationValue(currentOrganization) : ''}
+          disabled={unavailable}
+          onChange={(event) => {
+            const organization = organizations.find(
+              (item) => organizationValue(item) === event.target.value
+            );
+            updateScope('organization_id', organization?.id || '', organization);
+          }}
           className="kb-input kb-select chronos-scope__select"
         >
           <option value="">{uxText('chronos_all_organizations', locale)}</option>
-          {organizations.map((organization) => (
-            <option key={organization.id} value={organization.id}>
-              {organization.id}
-            </option>
-          ))}
+          {organizations
+            .filter((organization) => (organization.tenant_slug || '') === selected)
+            .map((organization) => (
+              <option key={organizationValue(organization)} value={organizationValue(organization)}>
+                {organization.id}
+                {organization.tier && organization.tier !== 'confidential'
+                  ? ` · ${organization.tier}`
+                  : ''}
+              </option>
+            ))}
         </select>
       </span>
       <span className="chronos-scope__sep" aria-hidden="true">
@@ -135,6 +219,7 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
         <select
           aria-label={uxText('chronos_project_scope_label', locale)}
           value={selectedProject}
+          disabled={unavailable}
           onChange={(event) => updateScope('project_id', event.target.value)}
           className="kb-input kb-select chronos-scope__select"
         >
@@ -150,11 +235,50 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
             ))}
         </select>
       </span>
+      <span className="kb-select-wrap chronos-scope__field">
+        <select
+          aria-label={uxText('chronos_workspace_operation', locale)}
+          value={selectedOperation}
+          disabled={unavailable || !selectedOrganization}
+          onChange={(event) => updateScope('operation_id', event.target.value)}
+          className="kb-input kb-select chronos-scope__select"
+        >
+          <option value="">{uxText('chronos_workspace_select_operation', locale)}</option>
+          {operations
+            .filter(
+              (operation) =>
+                (operation.tenant_slug || '') === selected &&
+                (!selectedTier || (operation.tier || 'confidential') === selectedTier) &&
+                (!selectedOrganization || operation.organization_id === selectedOrganization)
+            )
+            .map((operation) => (
+              <option key={operation.id} value={operation.id}>
+                {operation.name || operation.id}
+              </option>
+            ))}
+        </select>
+      </span>
       <span className="chronos-scope__note">
         <ShieldCheck size={11} aria-hidden="true" />
         {uxText('chronos_scope_server_authorized', locale)}
       </span>
-      {loadError ? <span className="chronos-scope__error">{loadError}</span> : null}
+      {loadError ? (
+        <>
+          <span role="alert" className="chronos-scope__error">
+            {loadError}
+          </span>
+          <button
+            type="button"
+            className="kb-button"
+            onClick={() => {
+              router.push(pathname);
+              setRetry((value) => value + 1);
+            }}
+          >
+            {uxText('chronos_workspace_clear_selection_retry', locale)}
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

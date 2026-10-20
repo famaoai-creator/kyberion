@@ -221,7 +221,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           window.location.href
         );
         const requestScope = currentRequestScope('', tenant);
-        for (const key of ['organizationId', 'projectId'] as const) {
+        for (const key of ['organizationId', 'projectId', 'operationId'] as const) {
           historyUrl.searchParams.delete(key);
           if (requestScope[key]) historyUrl.searchParams.set(key, requestScope[key]);
         }

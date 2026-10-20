@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { KnowledgeLearningPanel, learningStateLabel } from './KnowledgeLearningPanel';
 import { knowledgeSelectionAfterRefresh } from '../lib/knowledge-selection';
+import { workspaceQuery, workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
 import {
   LEARNING_PENDING_PREFIX,
   parseLearningPending,
@@ -50,13 +51,28 @@ function knowledgeStatusLabel(value: string, locale: SupportedLocale): string {
   return uxText(labels[value] || 'chronos_unknown', locale);
 }
 
-export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
+export function KnowledgeWorkspace({
+  tenant,
+  organizationId,
+  projectId,
+}: {
+  tenant?: string;
+  organizationId?: string;
+  projectId?: string;
+}) {
   const locale = useChronosLocale();
   const [items, setItems] = React.useState<Candidate[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const requestedKey = searchParams.get('candidateKey');
+  const workspace = {
+    ...workspaceSelectionFromQuery(new URLSearchParams(searchParams.toString())),
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+  };
+  const scopeKey = workspaceQuery(workspace).toString();
   const requestedKeyRef = React.useRef(requestedKey);
   requestedKeyRef.current = requestedKey;
   const [selectedKey, setSelectedKey] = React.useState<string | null>(requestedKey);
@@ -65,8 +81,8 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
   const [recoveryError, setRecoveryError] = React.useState(false);
   const requestVersion = React.useRef(0);
   const mutationInFlight = React.useRef(false);
-  const view = React.useRef(tenant);
-  view.current = tenant;
+  const view = React.useRef(scopeKey);
+  view.current = scopeKey;
   const [promotedBody, setPromotedBody] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
@@ -93,10 +109,10 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
 
   const refresh = React.useCallback(async () => {
     const version = ++requestVersion.current;
-    const originalTenant = tenant;
+    const originalTenant = scopeKey;
     setFresh(false);
     try {
-      const query = tenant ? '?tenant=' + encodeURIComponent(tenant) : '';
+      const query = scopeKey ? '?' + scopeKey : '';
       const response = await fetch('/api/knowledge' + query, { cache: 'no-store' });
       const payload = parseKnowledgeResponse(await response.json().catch(() => null));
       if (!response.ok || !payload) throw new Error(uxText('chronos_learning_load_failed', locale));
@@ -134,7 +150,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       if (version !== requestVersion.current || originalTenant !== view.current) return;
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [tenant, locale]);
+  }, [scopeKey, locale]);
 
   React.useEffect(() => {
     setItems([]);
@@ -154,7 +170,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
     if (!selected?.promoted_ref || selected.learning) return;
     let cancelled = false;
     void fetch(
-      `/api/knowledge-ref?path=${encodeURIComponent(selected.promoted_ref)}${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`,
+      `/api/knowledge-ref?path=${encodeURIComponent(selected.promoted_ref)}${scopeKey ? `&${scopeKey}` : ''}`,
       { cache: 'no-store' }
     )
       .then(async (response) => {
@@ -173,7 +189,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
     return () => {
       cancelled = true;
     };
-  }, [selected, tenant, locale]);
+  }, [selected, scopeKey, locale]);
 
   const runLearning = async (action: LearningAction, curation?: ClientKnowledgeCuration) => {
     const candidate = selected;
@@ -187,7 +203,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       mutationInFlight.current
     )
       return;
-    const originalTenant = tenant;
+    const originalTenant = scopeKey;
     mutationInFlight.current = true;
     setBusy(true);
     const marker: LearningPending = {
@@ -224,6 +240,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           candidateKey: candidate.candidateKey,
           expectedPayloadDigest: marker.expectedPayloadDigest,
           tenant,
+          ...Object.fromEntries(workspaceQuery(workspace)),
           ...(curation ? { curation } : {}),
         }),
       });
@@ -276,7 +293,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       mutationInFlight.current
     )
       return;
-    const originalTenant = tenant;
+    const originalTenant = scopeKey;
     mutationInFlight.current = true;
     setBusy(true);
     setError(null);
@@ -289,6 +306,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
           candidateId: candidate.candidate_id,
           candidateKey: candidate.candidateKey,
           tenant,
+          ...Object.fromEntries(workspaceQuery(workspace)),
           ...(action === 'memory_reject_candidate' ? { note: decisionNote } : {}),
         }),
       });
@@ -314,12 +332,17 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
   const recordFeedback = async (verdict: 'useful' | 'not_useful') => {
     if (!selected?.promoted_ref || !fresh || selected.learning) return;
     const originalKey = selected.candidateKey;
-    const originalTenant = tenant;
+    const originalTenant = scopeKey;
     try {
       const response = await fetch('/api/knowledge-feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document_path: selected.promoted_ref, verdict, tenant }),
+        body: JSON.stringify({
+          document_path: selected.promoted_ref,
+          verdict,
+          tenant,
+          ...Object.fromEntries(workspaceQuery(workspace)),
+        }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error('Failed to record feedback');
@@ -335,7 +358,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
   };
 
   const localAdmin = accessRole === 'localadmin';
-  const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
+  const scopeLabel = `${[tenant, organizationId, projectId, workspace.operation_id].filter(Boolean).join(' / ') || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
   const canDecide = selected?.status === 'queued' || selected?.status === 'approved';
   const pendingSelected = selected ? pending[selected.candidateKey] : undefined;
 
@@ -347,6 +370,14 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />
+          {workspace.operation_id ? (
+            <p className="kb-text kb-text--muted">
+              {uxText(
+                'chronos_workspace_showing_shared_organization_knowledge_not_operation_exclusive_knowledge',
+                locale
+              )}
+            </p>
+          ) : null}
           <Button
             label={uxText('chronos_learning_refresh', locale)}
             variant="secondary"

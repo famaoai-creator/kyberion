@@ -3,6 +3,7 @@
  *
  * Usage:
  *   pnpm kyberion dot list [--all|--status=<s>] [--json]
+ *   pnpm kyberion dot create --file <reviewed-draft.json> [--apply] # preview by default
  *   pnpm kyberion dot validate [<dot_id>]        # schema + activation gate check
  *   pnpm kyberion dot activate <dot_id>          # governed draft|paused → active
  *   pnpm kyberion dot pause <dot_id>             # active → paused (wakes stop)
@@ -46,6 +47,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import {
   checkDotActivationReadiness,
+  createDraftDotCharter,
   enableDotEventContinuation,
   transitionDotCharterStatus,
 } from '@agent/core/dot/dot-lifecycle';
@@ -61,6 +63,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
 const SUBCOMMANDS = [
+  'create',
   'list',
   'validate',
   'activate',
@@ -149,6 +152,30 @@ function reportValidate(argv: string[]) {
     ok: errors.length === 0 && results.every((r) => r.activation_ready),
     results,
     schema_errors: errors,
+  };
+}
+
+function reportCreate(argv: string[]) {
+  const index = argv.indexOf('--file');
+  const file = index >= 0 ? argv[index + 1] : undefined;
+  if (!file || file.startsWith('--'))
+    throw new Error('usage: pnpm kyberion dot create --file <reviewed-draft.json> [--apply]');
+  const input = parseSafeJsonObjectInput(
+    safeReadFile(file, { encoding: 'utf8' }) as string,
+    'dot draft'
+  );
+  const applied = argv.includes('--apply');
+  const charter = createDraftDotCharter(input, { dryRun: !applied });
+  return {
+    ok: true,
+    applied,
+    dot_id: charter.dot_id,
+    status: charter.status,
+    scope: charter.scope,
+    ...(charter.work_binding ? { work_binding: charter.work_binding } : {}),
+    next: applied
+      ? `pnpm kyberion dot validate ${charter.dot_id}; activate separately after reviewing readiness`
+      : 'Review the draft and rerun with --apply; activation remains separate.',
   };
 }
 
@@ -414,6 +441,8 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
     : 'list';
   const args = subcommand === sub ? rest : argv;
   switch (subcommand) {
+    case 'create':
+      return reportCreate(args);
     case 'validate':
       return reportValidate(args);
     case 'activate':

@@ -153,6 +153,14 @@
       "description": "The standing responsibility this dot owns, in one or two sentences."
     },
     "status": { "enum": ["draft", "active", "paused", "retired"] },
+    "work_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id"],
+      "properties": {
+        "operation_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" }
+      }
+    },
     "scope": {
       "type": "object",
       "additionalProperties": false,

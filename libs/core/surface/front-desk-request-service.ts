@@ -1,5 +1,5 @@
 import type { SupportedLocale } from '../locale-normalize.js';
-import type { SurfaceViewerScope } from './surface-mutation-guard.js';
+import type { FrontDeskConversationViewer } from './front-desk-conversation-persistence.js';
 import type { FrontDeskArtifactRevisionInput } from './front-desk-artifact-revision-contract.js';
 import {
   reserveConversationTurn,
@@ -69,11 +69,11 @@ export type FrontDeskRequestOutcome =
  * receipt permits another attempt. Restoring a reply never restores approval.
  */
 export async function runFrontDeskRequest(
-  trustedViewer: SurfaceViewerScope,
+  trustedViewer: FrontDeskConversationViewer,
   input: FrontDeskRequestInput
 ): Promise<FrontDeskRequestOutcome> {
   // Pin the caller's resolved identity and request across asynchronous execution.
-  const viewer: SurfaceViewerScope = {
+  const viewer: FrontDeskConversationViewer = {
     ...trustedViewer,
     tenantSlugs: trustedViewer.tenantSlugs === 'all' ? 'all' : [...trustedViewer.tenantSlugs],
     organizationIds:
@@ -150,7 +150,9 @@ export async function runFrontDeskRequest(
       ]);
       const conversation = await channelSurface.runSurfaceMessageConversation({
         surface: 'presence',
-        text: request.text,
+        text: viewer.workspaceOperationId
+          ? `Selected organization operation (work context, no additional authority): ${viewer.workspaceOperationId}\n\n${request.text}`
+          : request.text,
         locale: request.locale,
         senderAgentId: 'kyberion:front-desk',
         correlationId: turn.id,

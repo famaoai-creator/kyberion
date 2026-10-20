@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { normalizeChronosTenantScopePayload } from './tenant-scope-data';
 
 describe('normalizeChronosTenantScopePayload', () => {
+  it('accepts organization-owned operations without inventing a project parent', () => {
+    const operation = {
+      id: 'daily',
+      name: 'Daily review',
+      tenant_slug: 'acme',
+      organization_id: 'sales',
+    };
+    expect(
+      normalizeChronosTenantScopePayload({ ok: true, tenants: [], operations: [operation] })
+        ?.operations
+    ).toEqual([operation]);
+    expect(
+      normalizeChronosTenantScopePayload({
+        ok: true,
+        tenants: [],
+        operations: [{ ...operation, name: 42 }],
+      })
+    ).toBeNull();
+  });
   it('normalizes valid options without accepting malformed records', () => {
     expect(
       normalizeChronosTenantScopePayload({
@@ -17,6 +36,7 @@ describe('normalizeChronosTenantScopePayload', () => {
       ],
       organizations: [{ id: 'org-a', tenant_slug: 'tenant-a' }],
       projects: [{ id: 'project-a', name: 'Project A', organization_id: 'org-a' }],
+      operations: [],
     });
   });
 
@@ -27,6 +47,7 @@ describe('normalizeChronosTenantScopePayload', () => {
       tenants: [],
       organizations: [],
       projects: [],
+      operations: [],
     });
   });
 

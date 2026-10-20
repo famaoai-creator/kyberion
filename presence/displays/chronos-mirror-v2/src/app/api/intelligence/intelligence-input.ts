@@ -140,6 +140,9 @@ function requireIdentifier(body: Record<string, unknown>, field: string): string
 
 function validateActionFields(body: Record<string, unknown>, action: ChronosIntelligenceAction) {
   const allowed = new Set(ACTION_FIELDS[action]);
+  if (action.startsWith('memory_') || action === 'approval_decision')
+    for (const field of ['organization_id', 'project_id', 'operation_id', 'tier'])
+      allowed.add(field);
   const unexpected = Object.keys(body).find((field) => !allowed.has(field));
   if (unexpected) throw new Error(`unexpected intelligence field: ${unexpected}`);
 

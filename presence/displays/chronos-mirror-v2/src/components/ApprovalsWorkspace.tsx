@@ -27,6 +27,7 @@ import {
   type ClientApproval,
 } from '../lib/approvals-response';
 import { approvalWorkspaceQuery, knowledgeCandidateHref } from '../lib/knowledge-learning-client';
+import { workspaceQuery, workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
 
 type Approval = ClientApproval;
 function approvalRiskLabel(value: string | undefined, locale: SupportedLocale): string {
@@ -66,10 +67,25 @@ function approvalStatusLabel(status: string, locale: SupportedLocale): string {
 }
 const selectionKey = (item: Approval) => JSON.stringify([item.storageChannel, item.id]);
 
-export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
+export function ApprovalsWorkspace({
+  tenant,
+  organizationId,
+  projectId,
+}: {
+  tenant?: string;
+  organizationId?: string;
+  projectId?: string;
+}) {
   const locale = useChronosLocale();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
+  const workspace = {
+    ...workspaceSelectionFromQuery(new URLSearchParams(search)),
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+  };
+  const scopeKey = workspaceQuery(workspace).toString();
   const requestedId = searchParams.get('request');
   const requestedChannel = searchParams.get('storageChannel');
   const returnCandidateKey = searchParams.get('candidateKey');
@@ -82,8 +98,8 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
   const [note, setNote] = React.useState('');
   const refreshVersion = React.useRef(0);
   const mutationInFlight = React.useRef(false);
-  const view = React.useRef({ tenant, search });
-  view.current = { tenant, search };
+  const view = React.useRef({ tenant: scopeKey, search });
+  view.current = { tenant: scopeKey, search };
   const selected = selectedKey
     ? items.find((item) => selectionKey(item) === selectedKey) || null
     : null;
@@ -93,13 +109,14 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
     setFresh(false);
     try {
       const query = approvalWorkspaceQuery(search, tenant);
+      for (const [key, value] of workspaceQuery(workspace)) query.set(key, value);
       const response = await fetch('/api/approvals?' + query.toString(), { cache: 'no-store' });
       const payload = parseApprovalsResponse(await response.json().catch(() => null));
       if (!response.ok || !payload)
         throw new Error(uxText('chronos_learning_review_load_failed', locale));
       if (
         version !== refreshVersion.current ||
-        tenant !== view.current.tenant ||
+        scopeKey !== view.current.tenant ||
         search !== view.current.search
       )
         return;
@@ -126,13 +143,13 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
     } catch (err) {
       if (
         version !== refreshVersion.current ||
-        tenant !== view.current.tenant ||
+        scopeKey !== view.current.tenant ||
         search !== view.current.search
       )
         return;
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [tenant, search, requestedId, requestedChannel, locale]);
+  }, [scopeKey, search, requestedId, requestedChannel, locale]);
   React.useEffect(() => {
     setItems([]);
     setSelectedKey(null);
@@ -169,6 +186,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           decision,
           note,
           tenant,
+          ...Object.fromEntries(workspaceQuery(workspace)),
           ...(selected.presentedDigest ? { presentedDigest: selected.presentedDigest } : {}),
         }),
       });
@@ -181,11 +199,11 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
         typeof payload.approval?.status !== 'string'
       )
         throw new Error(uxText('chronos_learning_outcome_unknown', locale));
-      if (tenant !== view.current.tenant || search !== view.current.search) return;
+      if (scopeKey !== view.current.tenant || search !== view.current.search) return;
       setNote('');
       await refresh();
     } catch (err) {
-      if (tenant !== view.current.tenant || search !== view.current.search) return;
+      if (scopeKey !== view.current.tenant || search !== view.current.search) return;
       setFresh(false);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -195,13 +213,19 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
   };
 
   const localAdmin = accessRole === 'localadmin';
-  const scopeLabel = (tenant || uxText('chronos_ac_scope_all', locale)) + ' · ' + items.length;
+  const scopeLabel =
+    ([tenant, organizationId, projectId, workspace.operation_id].filter(Boolean).join(' / ') ||
+      uxText('chronos_ac_scope_all', locale)) +
+    ' · ' +
+    items.length;
   const kindFallback = uxTextOr('chronos_ws_approval_kind_default', 'Approval', locale);
   const learningReview =
     selected?.justification?.requestedEffects?.some((effect) =>
       effect.startsWith('scoped-learning:')
     ) === true;
-  const returnHref = returnCandidateKey ? knowledgeCandidateHref(returnCandidateKey, tenant) : null;
+  const returnHref = returnCandidateKey
+    ? knowledgeCandidateHref(returnCandidateKey, tenant, workspace)
+    : null;
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
