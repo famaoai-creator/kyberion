@@ -7,6 +7,7 @@ import {
 } from '@agent/core/knowledge/memory-promotion-review';
 import {
   listMemoryPromotionCandidates,
+  formatMemoryEvidenceRef,
   MEMORY_APPROVAL_CHANNELS,
   updateMemoryPromotionCandidateStatus,
   type MemoryApprovalChannel,
@@ -27,6 +28,10 @@ import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { getOptionValue } from './mission-cli-args.js';
 import { ScriptExitError } from '../lib/harness.js';
+
+import { requestScopedLearningApproval } from '@agent/core/knowledge/scoped-learning-approval';
+import { isScopedLearningCandidate } from '@agent/core/knowledge/scoped-learning-contract';
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 
 type Print = (value: unknown) => void;
 
@@ -147,7 +152,8 @@ export function approveMemoryCandidate(
   curationJson?: string,
   decidedBy?: HumanDecidedBy,
   approvalChannel?: string,
-  print: Print = () => undefined
+  print: Print = () => undefined,
+  approvalOptions: { requestApproval?: boolean; approvalRef?: string } = {}
 ) {
   if (!candidateId) {
     throw new ScriptExitError(
@@ -228,9 +234,45 @@ export function approveMemoryCandidate(
       ),
     };
     assertMemoryPromotionReviewReady(reviewForApproval, 'approve');
+    const effectiveCandidate: MemoryCandidate = {
+      ...review.candidate,
+      ...(selectedDomain ? { knowledge_domain: selectedDomain } : {}),
+      ...(curation
+        ? {
+            curation: {
+              ...curation,
+              evidence_refs: curation.evidence_refs.map(formatMemoryEvidenceRef),
+            },
+          }
+        : {}),
+    };
+    if (approvalOptions.requestApproval && approvalOptions.approvalRef)
+      throw new Error('Use --request-approval or --approval-ref, not both.');
+    if (approvalOptions.requestApproval) {
+      if (!isScopedLearningCandidate(effectiveCandidate))
+        throw new Error('--request-approval supports exact-scope organization SOPs only.');
+      const opened = requestScopedLearningApproval({
+        candidate: effectiveCandidate,
+        requester: () => resolveCliApprovalRequester({ legacy: 'memory-review-cli' }),
+      });
+      print(
+        JSON.stringify(
+          {
+            ...opened,
+            next:
+              'Decide on the authenticated approval surface, then rerun memory-approve with identical curation and --approval-ref ' +
+              opened.ref,
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
     const updated = updateMemoryPromotionCandidateStatus({
       candidateId,
       status: 'approved',
+      ...(approvalOptions.approvalRef ? { learningApprovalRef: approvalOptions.approvalRef } : {}),
       ...(selectedDomain ? { knowledgeDomain: selectedDomain } : {}),
       ratificationNote: note || 'Approved for promotion.',
       ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),

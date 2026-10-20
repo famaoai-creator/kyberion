@@ -1,4 +1,5 @@
 import { a2aBridge } from '../mesh/a2a-bridge.js';
+import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery-snapshot.js';
 import { clamp, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
@@ -961,28 +962,37 @@ export async function buildNeedsKnowledgeReinforcementLines(input: {
       .slice(0, NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT);
     if (fresh.length === 0) return [];
 
-    recordKnowledgeDelivery({
+    const delivery = recordKnowledgeDelivery({
       missionId: input.missionId,
       taskId: input.taskId,
       teamRole: input.teamRole,
       recipientKind: 'agent',
-      ...(input.securityScope?.tenant_slug
-        ? {
-            scope: {
-              tier: input.securityScope.write_tier,
-              tenant_slug: input.securityScope.tenant_slug,
-              mission_id: input.securityScope.mission_id,
-              task_id: input.taskId,
-            },
-          }
-        : {}),
+      scope: {
+        tier: scope?.write_tier || 'public',
+        ...(scope?.tenant_slug || scope?.tenant_id
+          ? (scope?.tenant_slug || scope?.tenant_id) === 'default' && scope?.write_tier === 'public'
+            ? {}
+            : { tenant_slug: scope?.tenant_slug || scope?.tenant_id }
+          : {}),
+        ...(scope?.organization_id ? { organization_id: scope.organization_id } : {}),
+        ...(scope?.project_id ? { project_id: scope.project_id } : {}),
+        mission_id: input.missionId,
+        task_id: input.taskId,
+        ...(scope?.session_id ? { session_id: scope.session_id } : {}),
+      },
       refs: fresh.map((entry) => ({
         path: entry.path,
         ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
         ...(entry.title ? { title: entry.title } : {}),
+        snapshot: createKnowledgeDeliverySnapshot({
+          text: `- ${entry.title} (${entry.path})\n  ${entry.excerpt.trim().replace(/\s+/g, ' ').slice(0, 200)}`,
+          form: 'needs_retry',
+          ...(entry.source_sha256 ? { source_sha256: entry.source_sha256 } : {}),
+        }),
       })),
     });
 
+    if (delivery) input.deliveredKnowledgeRefs.push(...delivery.refs);
     const lines = [
       'Additional knowledge retrieved for the unresolved needs (not in the original context pack):',
     ];

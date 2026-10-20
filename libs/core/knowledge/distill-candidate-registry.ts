@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
@@ -11,7 +11,9 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
-import type { MemoryScopeEnvelope } from './memory-scope.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
+import { physicalScopedPath } from '../physical-namespace.js';
+import * as path from 'node:path';
 
 export interface DistillCandidateRecord {
   candidate_id: string;
@@ -42,8 +44,27 @@ export interface DistillCandidateRecord {
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/distill-candidate-record.schema.json');
 const DISTILL_DIR = pathResolver.shared('runtime/distill-candidates');
 
-function recordPath(candidateId: string): string {
-  return `${DISTILL_DIR}/${candidateId}.json`;
+export function distillCandidateRecordPath(
+  candidateId: string,
+  scope?: MemoryScopeEnvelope
+): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/.test(candidateId))
+    throw new Error('[DISTILL_CANDIDATE_INVALID] Invalid candidate id');
+  if (!scope) return path.join(DISTILL_DIR, candidateId + '.json');
+  const canonical = assertMemoryScope(scope);
+  if (!canonical.tenant_slug)
+    throw new Error('[DISTILL_SCOPE_REQUIRED] Scoped records require a tenant');
+  const key = createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  return pathResolver.rootResolve(
+    physicalScopedPath(
+      'active/shared/runtime',
+      canonical,
+      'distill-candidates',
+      canonical.tier,
+      key,
+      candidateId + '.json'
+    )
+  );
 }
 
 const distillCandidateRecordCatalog = defineCatalog<DistillCandidateRecord>({
@@ -100,7 +121,7 @@ export function validateDistillCandidateRecord(value: unknown): value is Distill
 }
 
 export function saveDistillCandidateRecord(record: DistillCandidateRecord): string {
-  const filePath = recordPath(record.candidate_id);
+  const filePath = distillCandidateRecordPath(record.candidate_id, record.scope);
   const updated: DistillCandidateRecord = {
     ...record,
     updated_at: nowIso(),
@@ -113,28 +134,48 @@ export function saveDistillCandidateRecord(record: DistillCandidateRecord): stri
       `Invalid distill candidate record: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  if (!safeExistsSync(DISTILL_DIR)) safeMkdir(DISTILL_DIR, { recursive: true });
+  if (!safeExistsSync(path.dirname(filePath)))
+    safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   distillCandidateListCache = null;
   return filePath;
 }
 
-export function loadDistillCandidateRecord(candidateId: string): DistillCandidateRecord | null {
-  const filePath = recordPath(candidateId);
+export function loadDistillCandidateRecord(
+  candidateId: string,
+  scope?: MemoryScopeEnvelope
+): DistillCandidateRecord | null {
+  const filePath = distillCandidateRecordPath(candidateId, scope);
   try {
     const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeFilePath)) return null;
     if (!safeLstat(safeFilePath).isFile()) {
       throw new Error(`[DISTILL_CANDIDATE] record must be a regular file: ${filePath}`);
     }
-    return distillCandidateRecordCatalogAtPath(safeFilePath).load();
+    const row = distillCandidateRecordCatalogAtPath(safeFilePath).load();
+    if (
+      scope &&
+      JSON.stringify(row.scope ? assertMemoryScope(row.scope) : null) !==
+        JSON.stringify(assertMemoryScope(scope))
+    )
+      return null;
+    return row;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
     throw error;
   }
 }
 
-export function listDistillCandidateRecords(): DistillCandidateRecord[] {
+export function listDistillCandidateRecords(scope?: MemoryScopeEnvelope): DistillCandidateRecord[] {
+  if (scope) {
+    const dir = path.dirname(distillCandidateRecordPath('scope-list', scope));
+    if (!safeExistsSync(dir)) return [];
+    return safeReaddir(dir)
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => loadDistillCandidateRecord(name.slice(0, -5), scope))
+      .filter((row): row is DistillCandidateRecord => Boolean(row))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
   if (!safeExistsSync(DISTILL_DIR)) {
     distillCandidateListCache = null;
     return [];
@@ -157,10 +198,17 @@ export function listDistillCandidateRecords(): DistillCandidateRecord[] {
 
 export function updateDistillCandidateRecord(
   candidateId: string,
-  patch: Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>>
+  patch: Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>>,
+  scope?: MemoryScopeEnvelope
 ): DistillCandidateRecord | null {
-  const current = loadDistillCandidateRecord(candidateId);
+  const current = loadDistillCandidateRecord(candidateId, scope);
   if (!current) return null;
+  if (
+    patch.scope &&
+    JSON.stringify(assertMemoryScope(patch.scope)) !==
+      JSON.stringify(current.scope ? assertMemoryScope(current.scope) : null)
+  )
+    throw new Error('[DISTILL_SCOPE_MISMATCH] Scope cannot change during update');
   const next: DistillCandidateRecord = {
     ...current,
     ...patch,

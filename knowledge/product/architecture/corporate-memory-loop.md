@@ -195,7 +195,7 @@ Changes to high-impact procedures or organizational rules should be reviewable a
 
 Feedback binds to trusted work context, not scope claimed by a model or correction payload. Preserve tier, tenant, organization, project, mission/task and owner/audience restrictions where applicable, together with source feedback/correlation and evidence. An aggregated candidate may link several work items; it must not pretend they were one execution or combine different scopes.
 
-A legacy unscoped candidate is not silently adopted into the current organization. If the publisher cannot preserve a narrower scope, keep the proposal review-only; never drop fields to make promotion succeed. The current execution-feedback handoff supports tenant-wide confidential proposals only. Narrower scopes need preserving publication and retrieval before that boundary can open.
+A legacy unscoped candidate is not silently adopted into the current organization. If the publisher cannot preserve a narrower scope, keep the proposal review-only; never drop fields to make promotion succeed. The scoped SOP handoff preserves confidential tenant, organization and project scope through authenticated review, exact publication and scoped retrieval. Owner/audience/mission/task restrictions and other unsupported scope fields remain review-only. A success does not grant execution authority.
 
 Approval precedents explain past decisions. They do not renew consent, grant permissions, change security policy or authorize new external effects. Delegation and repair retain the current authority floor after learning.
 
@@ -203,7 +203,24 @@ Approval precedents explain past decisions. They do not renew consent, grant per
 
 Distinguish candidate capture, assessment, review, promotion, exact publication verification, retrieval into a stable snapshot, application to a work item, and measured outcome. A queue state or promoted reference proves only that recorded stage. Aggregate usage cannot establish which scoped lesson improved which result.
 
-Reuse the existing memory-promotion queue and snapshot protocol. Do not add a second inbox to hide unsupported transitions. Corrections that invalidate a lesson are new reviewable evidence; running sessions do not silently replace their pinned snapshot.
+Reuse the existing memory-promotion queue and snapshot protocol. Do not add a second inbox to hide unsupported transitions. Corrections that invalidate a lesson are new reviewable evidence; running sessions do not silently replace their pinned snapshot. Same-scope subsequent work retrieves an independently verified publication without repeating its completed review. Approval revocation and current reviewer authority remain checked; completed publication proof, not a status label, permits ordinary reuse after the original review window expires. Completion attribution uses the delivered immutable bytes even when the source file has since changed.
+
+### 7.8 Supported review-to-use operator sequence
+
+For a uniquely identified confidential scoped SOP candidate, use the existing
+mission controller and keep the identical curation throughout:
+
+1. Inspect with `memory-review <ID> --tenant-slug <TENANT>`.
+2. Open the exact human card with `memory-approve <ID> --tenant-slug <TENANT> --curation-json <JSON> --request-approval`.
+3. Decide in the authenticated shared approval surface. A typed human label is not proof.
+4. Apply that review with the same curation and `--approval-ref terminal:<REQUEST_ID>` instead of `--request-approval`.
+5. Publish with `memory-promote <ID> --tenant-slug <TENANT>`; preserve its exact organization/project scope from the candidate. Unsupported restrictions or ambiguous IDs stay held.
+6. Later same-scope work retrieves the verified snapshot through normal task provisioning. It does not repeat completed review or acquire any new execution authority.
+
+The curation/request/apply/publish steps are currently CLI-mediated; the shared UI
+approves the presented content. This is not a new graphical editorial workflow.
+The real-store acceptance test is `knowledge-learning-delivery.e2e.test.ts`;
+its worker transport is mocked, so passing it is not live business execution.
 
 ## 8. Success Criteria
 

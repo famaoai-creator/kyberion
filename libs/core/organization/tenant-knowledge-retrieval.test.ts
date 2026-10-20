@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';
 import * as path from 'node:path';
 
 import { pathResolver } from '../path-resolver.js';
@@ -262,6 +263,34 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
       expect(prev.score > curr.score || (prev.score === curr.score && prev.path < curr.path)).toBe(
         true
       );
+    }
+  });
+});
+
+describe('lexical scoped retrieval never embeds unadmitted knowledge', () => {
+  it('skips embedding entirely and excludes narrower branches when only a tenant is requested', async () => {
+    delete process.env.KYBERION_DISABLE_EMBEDDINGS;
+    const embed = vi.fn(async () => new Float32Array([1, 0]));
+    const embedBatch = vi.fn(async (texts: string[]) => texts.map(() => new Float32Array([1, 0])));
+    registerEmbeddingBackend({ name: 'synthetic-snapshot', dimensions: 2, embed, embedBatch });
+    try {
+      writeDoc(
+        'knowledge/confidential/tenant-x/organizations/org-secret/projects/PRJ-SECRET/quantum.md',
+        'PRIVATE PROJECT quantum billing reconciliation'
+      );
+      const hits = await queryTenantKnowledge({
+        tenantSlug: 'tenant-x',
+        topic: TOPIC,
+        limit: 20,
+        rootDir: fixtureRoot,
+        env: fixtureEnv,
+      });
+      expect(hits.some((hit) => hit.path.includes('org-secret'))).toBe(false);
+      expect(hits.every((hit) => /^[a-f0-9]{64}$/.test(hit.source_sha256 || ''))).toBe(true);
+      expect(embed).not.toHaveBeenCalled();
+      expect(embedBatch).not.toHaveBeenCalled();
+    } finally {
+      resetEmbeddingBackend();
     }
   });
 });

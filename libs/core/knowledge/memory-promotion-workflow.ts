@@ -1,3 +1,4 @@
+import { recordScopedLearningPublicationConsumption } from './scoped-learning-approval.js';
 import {
   createDistillCandidateRecord,
   loadDistillCandidateRecord,
@@ -23,6 +24,12 @@ import {
 } from './memory-promotion-queue.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
+import { assertScopedLearningApproval } from './scoped-learning-approval-verification.js';
+import { isScopedLearningCandidate } from './scoped-learning-contract.js';
+import {
+  inspectScopedLearningPublication,
+  verifyScopedLearningPublication,
+} from './scoped-learning-publication.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import {
@@ -108,6 +115,14 @@ function formatKnowledgeMatch(match: PromotionKnowledgeMatch, index: number): st
 
 async function inspectPromotionReview(candidate: MemoryCandidate): Promise<PromotionReview> {
   const reviewedAt = nowIso();
+  // Scoped publication is a deterministic, human-reviewed lane. Do not hydrate a
+  // broader semantic index or send other project content to a model here.
+  if (isScopedLearningCandidate(candidate))
+    return {
+      reviewed_at: reviewedAt,
+      backend: 'deterministic-scoped-review',
+      similar_knowledge: [],
+    };
   try {
     const index = await buildScopedIndex(promotionKnowledgeScope(candidate));
     const similar = await queryKnowledgeHybrid(index, candidate.summary, {
@@ -279,6 +294,9 @@ function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unkn
   const curatedContent = candidate.curation?.content || candidate.summary;
   const base = {
     knowledge_domain: candidate.knowledge_domain || 'organization',
+    ...(candidate.learning_approval
+      ? { approved_payload_digest: candidate.learning_approval.payload_digest }
+      : {}),
     ...(candidate.knowledge_domain === 'personal' && candidate.scope?.owner_nhi
       ? { personal_owner_nhi: candidate.scope.owner_nhi }
       : {}),
@@ -475,6 +493,14 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
   const domain = candidate.knowledge_domain || 'organization';
+  const scopedLearning = isScopedLearningCandidate(candidate);
+  if (scopedLearning) {
+    assertScopedLearningApproval(candidate);
+    if (input.supersedes)
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Superseding another publication requires a separately approved effect'
+      );
+  }
   if (domain === 'unclassified')
     throw new Error(
       `Memory promotion candidate ${candidateId} requires an explicit knowledge domain classification.`
@@ -517,7 +543,10 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     }
   }
   if (candidate.status === 'promoted') {
-    const storedReview = loadDistillCandidateRecord(candidateId)?.metadata?.promotion_review;
+    if (scopedLearning && !verifyScopedLearningPublication(candidate))
+      throw new Error('[LEARNING_PUBLICATION_INVALID] Stored publication proof no longer verifies');
+    const storedReview = loadDistillCandidateRecord(candidateId, candidate.scope)?.metadata
+      ?.promotion_review;
     return {
       candidate,
       promotedRef: candidate.promoted_ref || '',
@@ -600,10 +629,14 @@ export async function promoteMemoryCandidateToKnowledge(input: {
       );
       // Distill candidate has no 'rejected' status — use 'archived' to mark
       // that it is no longer in the promotion pipeline.
-      updateDistillCandidateRecord(distillCandidate.candidate_id, {
-        status: 'archived',
-        promoted_ref: '',
-      });
+      updateDistillCandidateRecord(
+        distillCandidate.candidate_id,
+        {
+          status: 'archived',
+          promoted_ref: '',
+        },
+        candidate.scope
+      );
       updateMemoryPromotionCandidateStatus({
         candidateId: distillCandidate.candidate_id,
         status: 'rejected',
@@ -617,15 +650,24 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     }
     throw err;
   }
-  updateDistillCandidateRecord(distillCandidate.candidate_id, {
-    status: 'promoted',
-    promoted_ref: promoted.logicalPath,
-  });
+  const publication = scopedLearning
+    ? inspectScopedLearningPublication({ ...candidate, promoted_ref: promoted.logicalPath })
+    : undefined;
+  if (publication) recordScopedLearningPublicationConsumption(candidate, publication);
+  updateDistillCandidateRecord(
+    distillCandidate.candidate_id,
+    {
+      status: 'promoted',
+      promoted_ref: promoted.logicalPath,
+    },
+    candidate.scope
+  );
   updateMemoryPromotionCandidateStatus({
     candidateId: distillCandidate.candidate_id,
     status: 'promoted',
     ratificationNote: input.ratificationNote || 'Promoted to governed knowledge.',
     promotedRef: promoted.logicalPath,
+    ...(publication ? { learningPublication: publication } : {}),
     ...(candidate.scope ? { scope: candidate.scope } : {}),
   });
   const updated = loadMemoryPromotionCandidate(candidateId, candidate.scope);

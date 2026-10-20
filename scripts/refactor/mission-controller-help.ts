@@ -69,7 +69,7 @@ Queue Commands:
                                  Show readiness, blockers, and physical duplicate count
   memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
                                  Show summary, target, evidence, scope, audit, and next action
-  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>] [--approval-channel steward|pr_review]
+  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>] [--approval-channel steward|pr_review] [--request-approval | --approval-ref terminal:<ID>]
                                  Curate mission knowledge and approve only when review preflight is clear
                                  (pr_review: product knowledge ratified by PR merge, checked at finish against origin/main)
   memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]

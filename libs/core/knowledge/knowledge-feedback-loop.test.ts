@@ -131,7 +131,7 @@ describe('recordKnowledgeDelivery', () => {
     });
 
     expect(result).toBeDefined();
-    expect(result!.refs).toEqual([
+    expect(result!.refs).toMatchObject([
       { path: 'knowledge/product/architecture/foo.md', score: 0.42, title: 'Foo' },
       { path: 'knowledge/product/architecture/bar.md', score: 0.31 },
     ]);
@@ -214,17 +214,18 @@ describe('recordKnowledgeDelivery', () => {
       organization_id: 'org-a',
       project_id: 'PRJ-A',
       mission_id: 'MSN-USAGE',
+      task_id: 'T1',
     };
-    recordKnowledgeDelivery({ missionId: 'MSN-USAGE', refs: [{ path: doc }], scope: missionScope });
+    recordKnowledgeDelivery({
+      missionId: 'MSN-USAGE',
+      taskId: 'T1',
+      refs: [{ path: doc }],
+      scope: missionScope,
+    });
     recordKnowledgeUsageFeedback({
       missionId: 'MSN-USAGE',
       taskId: 'T1',
-      scope: {
-        tier: 'confidential',
-        tenant_slug: 'tenant-a',
-        mission_id: 'MSN-USAGE',
-        task_id: 'T1',
-      },
+      scope: missionScope,
       feedback: { used: [doc] },
     });
 
@@ -389,6 +390,11 @@ describe('recordKnowledgeUsageFeedback', () => {
   });
 
   it('treats a path listed in both used and not_used as used only', () => {
+    recordKnowledgeDelivery({
+      missionId: 'MSN-KP05-CONFLICT',
+      taskId: 'T3',
+      refs: [{ path: 'knowledge/product/foo.md' }],
+    });
     const result = recordKnowledgeUsageFeedback({
       missionId: 'MSN-KP05-CONFLICT',
       taskId: 'T3',

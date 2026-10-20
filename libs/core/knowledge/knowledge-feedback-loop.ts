@@ -1,3 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import { withLockSync } from '../foundation/lock-utils.js';
+import {
+  createKnowledgeDeliverySnapshot,
+  knowledgeAttributionScopeKey,
+  knowledgeTextSha256,
+  validKnowledgeDeliverySnapshot,
+  type KnowledgeDeliverySnapshot,
+} from './knowledge-delivery-snapshot.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 /**
@@ -29,13 +38,19 @@ import * as path from 'node:path';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+} from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
 } from './memory-promotion-queue.js';
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
-import { scopeContextKey, type ScopeContext } from '../scope-context.js';
+import { type ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import { recordKnowledgeProblem } from './knowledge-verification.js';
 import {
@@ -50,9 +65,13 @@ export interface DeliveredKnowledgeRef {
   path: string;
   score?: number;
   title?: string;
+  snapshot?: KnowledgeDeliverySnapshot;
+  delivery_id?: string;
+  scope_context?: ScopeContext;
 }
 
 export interface KnowledgeDeliveryRecord {
+  delivery_id?: string;
   mission_id: string;
   task_id?: string;
   team_role?: string;
@@ -265,7 +284,7 @@ export function knowledgeUsageAggregatePath(scope?: ScopeContext): string {
   return usageAggregatePath(scope);
 }
 
-function scopedFeedbackPath(kind: 'human' | 'gaps', scope?: ScopeContext): string {
+function scopedFeedbackPath(kind: 'human' | 'gaps' | 'usage', scope?: ScopeContext): string {
   const feedbackDir = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_DIR')?.trim();
   const base = safeRuntimeOverride(feedbackDir, pathResolver.shared('runtime/feedback-loop'));
   const scopedDirectory = scopedRuntimePath(base, scope);
@@ -412,6 +431,9 @@ function normalizeRefs(refs: DeliveredKnowledgeRef[]): DeliveredKnowledgeRef[] {
       path: p,
       ...(typeof ref.score === 'number' ? { score: ref.score } : {}),
       ...(ref.title ? { title: String(ref.title).trim() } : {}),
+      ...(validKnowledgeDeliverySnapshot(ref.snapshot)
+        ? { snapshot: createKnowledgeDeliverySnapshot({ ...ref.snapshot }) }
+        : {}),
     });
   }
   return normalized;
@@ -460,12 +482,18 @@ function bumpUsageAggregate(
 ): void {
   const entries = loadUsageAggregate(scope);
   const cap = loadKnowledgeFeedbackCap(scope);
+  // Advisory tenant-level ranking only. Exact attribution belongs to scoped receipts.
+  const aggregateScope = scope?.tenant_slug
+    ? { tier: scope.tier, tenant_slug: scope.tenant_slug }
+    : scope
+      ? { tier: scope.tier }
+      : undefined;
   const index = entries.findIndex((entry) => entry.document_path === documentPath);
   if (index >= 0) {
     const current = entries[index];
     entries[index] = {
       ...current,
-      ...(scope ? { scope_context_key: scopeContextKey(scope) } : {}),
+      ...(scope ? { scope_context_key: knowledgeAttributionScopeKey(aggregateScope) } : {}),
       delivered_count: current.delivered_count + (delta.delivered_count || 0),
       used_count: current.used_count + (delta.used_count || 0),
       not_used_count: current.not_used_count + (delta.not_used_count || 0),
@@ -481,7 +509,7 @@ function bumpUsageAggregate(
     }
     entries.push({
       document_path: documentPath,
-      ...(scope ? { scope_context_key: scopeContextKey(scope) } : {}),
+      ...(scope ? { scope_context_key: knowledgeAttributionScopeKey(aggregateScope) } : {}),
       delivered_count: delta.delivered_count || 0,
       used_count: delta.used_count || 0,
       not_used_count: delta.not_used_count || 0,
@@ -524,7 +552,12 @@ export function recordKnowledgeDelivery(input: {
   refs: DeliveredKnowledgeRef[];
   scope?: ScopeContext;
 }): { deliveryRecordPath: string; refs: DeliveredKnowledgeRef[] } | undefined {
-  const refs = normalizeRefs(input.refs || []);
+  const deliveryId = randomUUID();
+  const refs = normalizeRefs(input.refs || []).map((ref) => ({
+    ...ref,
+    delivery_id: deliveryId,
+    ...(input.scope ? { scope_context: { ...input.scope } } : {}),
+  }));
   if (refs.length === 0) return undefined;
 
   const dir = deliveryLogDir(input.scope);
@@ -533,6 +566,7 @@ export function recordKnowledgeDelivery(input: {
   const day = now.slice(0, 10);
   const filePath = path.join(dir, `delivery-${day}.jsonl`);
   const record: KnowledgeDeliveryRecord = {
+    delivery_id: deliveryId,
     mission_id: input.missionId,
     ...(input.taskId ? { task_id: input.taskId } : {}),
     ...(input.teamRole ? { team_role: input.teamRole } : {}),
@@ -560,28 +594,155 @@ export function recordKnowledgeDelivery(input: {
   return { deliveryRecordPath: filePath, refs };
 }
 
+/** Resolve only receipts persisted for this exact dispatch scope and task. */
+function deliveredRefsForFeedback(input: {
+  missionId: string;
+  taskId?: string;
+  scope?: ScopeContext;
+  deliveredRefs?: DeliveredKnowledgeRef[];
+}): DeliveredKnowledgeRef[] {
+  const dir = deliveryLogDir(input.scope);
+  if (!safeExistsSync(dir)) return [];
+  const refs: DeliveredKnowledgeRef[] = [];
+  for (const name of safeReaddir(dir).filter((name) =>
+    /^delivery-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)
+  )) {
+    const file = path.join(dir, name);
+    ensureRegularFeedbackFile(file);
+    for (const record of readJsonLines<KnowledgeDeliveryRecord>(file, { onMalformed: 'skip' })) {
+      if (
+        record.mission_id !== input.missionId ||
+        record.task_id !== input.taskId ||
+        knowledgeAttributionScopeKey(record.scope_context) !==
+          knowledgeAttributionScopeKey(input.scope)
+      )
+        continue;
+      for (const ref of record.refs || []) {
+        if (!record.delivery_id || ref.delivery_id !== record.delivery_id) continue;
+        if (
+          input.deliveredRefs &&
+          !input.deliveredRefs.some(
+            (expected) =>
+              expected.delivery_id === ref.delivery_id &&
+              expected.path === ref.path &&
+              expected.snapshot?.sha256 === ref.snapshot?.sha256 &&
+              knowledgeAttributionScopeKey(expected.scope_context) ===
+                knowledgeAttributionScopeKey(input.scope)
+          )
+        )
+          continue;
+        refs.push(ref);
+      }
+    }
+  }
+  // A path-only worker claim cannot disambiguate two delivered versions.
+  return refs.filter(
+    (ref, index) =>
+      refs.findIndex((other) => other.path === ref.path) === index &&
+      !refs.some(
+        (other) => other.path === ref.path && other.snapshot?.sha256 !== ref.snapshot?.sha256
+      )
+  );
+}
+
 /**
  * Fold a task_result's `knowledge_feedback` into the usage aggregate and
  * enqueue `missing_topics` as knowledge-gap promotion candidates. Called
  * once per received task_result that actually carries the (optional) field
  * — absent/empty feedback is a no-op.
  */
-export function recordKnowledgeUsageFeedback(input: {
+export function recordKnowledgeUsageFeedback(
+  input: Parameters<typeof recordKnowledgeUsageFeedbackUnlocked>[0]
+): ReturnType<typeof recordKnowledgeUsageFeedbackUnlocked> {
+  try {
+    return withLockSync('knowledge-usage:' + usageAggregatePath(input.scope), () =>
+      recordKnowledgeUsageFeedbackUnlocked(input)
+    );
+  } catch (error) {
+    logger.warn(
+      '[KP-05] usage receipt not recorded — ' +
+        String(error) +
+        ' | next: inspect feedback storage and lock contention'
+    );
+    return { usageUpdated: false, promotionCandidateIds: [] };
+  }
+}
+
+function recordKnowledgeUsageFeedbackUnlocked(input: {
   missionId: string;
   taskId?: string;
   feedback: TaskResultKnowledgeFeedback | undefined;
   scope?: ScopeContext;
-}): { usageUpdated: boolean; promotionCandidateIds: string[] } {
+  deliveredRefs?: DeliveredKnowledgeRef[];
+  resultId?: string;
+  outcome?: 'worker_report_complete' | 'incomplete';
+}): {
+  usageUpdated: boolean;
+  promotionCandidateIds: string[];
+  usedRefs?: DeliveredKnowledgeRef[];
+  receiptId?: string;
+} {
   const feedback = input.feedback;
   if (!feedback) return { usageUpdated: false, promotionCandidateIds: [] };
 
-  const used = normalizeTopicList(feedback.used);
-  const notUsed = normalizeTopicList(feedback.not_used).filter((path) => !used.includes(path));
+  let delivered: DeliveredKnowledgeRef[];
+  try {
+    delivered = deliveredRefsForFeedback(input);
+  } catch {
+    delivered = [];
+  }
+  const allowedPaths = new Set(delivered.map((ref) => ref.path));
+  const used = normalizeTopicList(feedback.used).filter((path) => allowedPaths.has(path));
+  const notUsed = normalizeTopicList(feedback.not_used).filter(
+    (path) => allowedPaths.has(path) && !used.includes(path)
+  );
+  const usedRefs = delivered.filter((ref) => used.includes(ref.path));
+  const receiptId = input.resultId
+    ? knowledgeTextSha256(
+        JSON.stringify([
+          input.missionId,
+          input.taskId,
+          knowledgeAttributionScopeKey(input.scope),
+          input.resultId,
+          input.outcome || 'incomplete',
+          delivered.map((ref) => [ref.delivery_id, ref.path, ref.snapshot?.sha256]),
+        ])
+      )
+    : undefined;
+  const usageLog = scopedFeedbackPath('usage', input.scope);
+  if (
+    receiptId &&
+    readJsonLines<{ receipt_id?: string }>(usageLog, { onMalformed: 'skip' }).some(
+      (record) => record.receipt_id === receiptId
+    )
+  ) {
+    return { usageUpdated: false, promotionCandidateIds: [], usedRefs, receiptId };
+  }
   const missingTopics = normalizeTopicList(feedback.missing_topics);
   const now = nowIso();
 
   let usageUpdated = false;
+  let receiptRecorded = false;
   try {
+    safeMkdir(path.dirname(usageLog), { recursive: true });
+    ensureRegularFeedbackFile(usageLog);
+    appendJsonLine(usageLog, {
+      receipt_id: receiptId,
+      mission_id: input.missionId,
+      task_id: input.taskId,
+      scope_context: input.scope,
+      recorded_at: now,
+      evidence: 'worker_report',
+      outcome: input.outcome || 'incomplete',
+      used: usedRefs,
+      not_used: delivered.filter((ref) => notUsed.includes(ref.path)),
+      rejected_paths: [
+        ...normalizeTopicList(feedback.used),
+        ...normalizeTopicList(feedback.not_used),
+      ].filter((path) => !allowedPaths.has(path)),
+      missing_topics: missingTopics,
+    });
+    receiptRecorded = true;
     for (const documentPath of used) {
       bumpUsageAggregate(documentPath, { used_count: 1 }, now, input.scope);
       usageUpdated = true;
@@ -634,7 +795,12 @@ export function recordKnowledgeUsageFeedback(input: {
     }
   }
 
-  return { usageUpdated, promotionCandidateIds };
+  return {
+    usageUpdated,
+    promotionCandidateIds,
+    usedRefs: receiptRecorded ? usedRefs : [],
+    ...(receiptRecorded && receiptId ? { receiptId } : {}),
+  };
 }
 
 export function loadKnowledgeUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {

@@ -16,12 +16,18 @@
     "queued_at"
   ],
   "properties": {
-    "candidate_id": { "type": "string", "minLength": 1 },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "source_type": {
       "type": "string",
       "enum": ["mission", "task_session", "artifact", "incident"]
     },
-    "source_ref": { "type": "string", "minLength": 1 },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
     "knowledge_domain": {
       "type": "string",
       "enum": ["product", "organization", "personal", "unclassified"]
@@ -37,69 +43,177 @@
         "archive_advisory"
       ]
     },
-    "summary": { "type": "string", "minLength": 1 },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
     "curation": {
       "type": "object",
       "additionalProperties": false,
       "required": ["title", "summary", "content", "evidence_refs"],
       "properties": {
-        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
-        "summary": { "type": "string", "minLength": 12, "maxLength": 1000 },
-        "content": { "type": "string", "minLength": 20, "maxLength": 12000 },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 1000
+        },
+        "content": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 12000
+        },
         "evidence_refs": {
           "type": "array",
-          "items": { "$ref": "#/definitions/evidenceRef" },
+          "items": {
+            "$ref": "#/definitions/evidenceRef"
+          },
           "minItems": 1
         }
       }
     },
     "evidence_refs": {
       "type": "array",
-      "items": { "$ref": "#/definitions/evidenceRef" },
+      "items": {
+        "$ref": "#/definitions/evidenceRef"
+      },
       "minItems": 1
     },
     "sensitivity_tier": {
       "type": "string",
       "enum": ["public", "confidential", "personal"]
     },
-    "ratification_required": { "type": "boolean" },
+    "ratification_required": {
+      "type": "boolean"
+    },
     "status": {
       "type": "string",
       "enum": ["queued", "approved", "rejected", "promoted"]
     },
-    "queued_at": { "type": "string", "minLength": 1 },
-    "content_hash": { "type": "string", "minLength": 1 },
-    "occurrences": { "type": "integer", "minimum": 1 },
-    "last_seen": { "type": "string", "minLength": 1 },
-    "ratified_at": { "type": "string", "minLength": 1 },
-    "ratified_commit": { "type": "string", "minLength": 1 },
-    "ratification_target": { "type": "string", "minLength": 1 },
-    "approval_channel": { "type": "string", "enum": ["steward", "pr_review"] },
-    "ratification_note": { "type": "string", "minLength": 1 },
-    "promoted_ref": { "type": "string", "minLength": 1 },
-    "audit_ref": { "type": "string", "minLength": 1 },
+    "queued_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurrences": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_seen": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ratified_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ratified_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ratification_target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_channel": {
+      "type": "string",
+      "enum": ["steward", "pr_review"]
+    },
+    "ratification_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "promoted_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_ref": {
+      "type": "string",
+      "minLength": 1
+    },
     "scope": {
       "type": "object",
       "additionalProperties": false,
       "required": ["tier"],
       "properties": {
-        "tenant_slug": { "type": "string", "minLength": 1 },
-        "customer_stance": { "type": "string", "minLength": 1 },
-        "organization_id": { "type": "string", "minLength": 1 },
-        "project_id": { "type": "string", "minLength": 1 },
-        "mission_id": { "type": "string", "minLength": 1 },
-        "task_id": { "type": "string", "minLength": 1 },
-        "session_id": { "type": "string", "minLength": 1 },
-        "work_shape": { "type": "string", "minLength": 1 },
-        "tier": { "enum": ["personal", "confidential", "public"] },
-        "viewer_principal": { "type": "string", "minLength": 1 },
-        "nhi_id": { "type": "string", "minLength": 1 },
-        "owner_nhi": { "type": "string", "minLength": 1 },
-        "retention_policy": { "type": "string", "minLength": 1 },
-        "allowed_audience": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "promotion_policy": { "enum": ["same_scope", "brokered", "human_review"] },
-        "provenance_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "redacted": { "type": "boolean" }
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "customer_stance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "work_shape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "enum": ["personal", "confidential", "public"]
+        },
+        "viewer_principal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nhi_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_nhi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_audience": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "promotion_policy": {
+          "enum": ["same_scope", "brokered", "human_review"]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "redacted": {
+          "type": "boolean"
+        }
       }
     },
     "promotion": {
@@ -107,11 +221,24 @@
       "additionalProperties": false,
       "required": ["source_tenant_slug", "target_tier", "redacted"],
       "properties": {
-        "source_tenant_slug": { "type": "string", "minLength": 1 },
-        "target_tier": { "enum": ["public", "confidential", "personal"] },
-        "redacted": { "type": "boolean" },
-        "approved_by": { "type": "string", "minLength": 1 },
-        "approved_at": { "type": "string", "minLength": 1 }
+        "source_tenant_slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_tier": {
+          "enum": ["public", "confidential", "personal"]
+        },
+        "redacted": {
+          "type": "boolean"
+        },
+        "approved_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_at": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "decided_by": {
@@ -119,10 +246,20 @@
       "additionalProperties": false,
       "required": ["kind", "id"],
       "properties": {
-        "kind": { "const": "human" },
-        "id": { "type": "string", "pattern": "^user:[a-z][a-z0-9-]{1,30}$" },
-        "display_name": { "type": "string", "minLength": 1 },
-        "role": { "enum": ["owner", "approver", "viewer"] }
+        "kind": {
+          "const": "human"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^user:[a-z][a-z0-9-]{1,30}$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": ["owner", "approver", "viewer"]
+        }
       }
     },
     "distill_experience": {
@@ -130,26 +267,221 @@
       "additionalProperties": false,
       "required": ["cue", "lesson", "evidence", "confidence"],
       "properties": {
-        "cue": { "type": "string", "minLength": 1 },
-        "lesson": { "type": "string", "minLength": 1 },
-        "evidence": { "type": "string", "minLength": 1 },
-        "confidence": { "enum": ["high", "medium", "low"] }
+        "cue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lesson": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": ["high", "medium", "low"]
+        }
       }
     },
-    "distill_experience_declined": { "type": "boolean" }
+    "distill_experience_declined": {
+      "type": "boolean"
+    },
+    "learning_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "payload_digest",
+        "decided_by",
+        "approved_at",
+        "channel",
+        "approval_ref"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "payload_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "decided_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": {
+              "const": "human"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^user:[a-z][a-z0-9-]{1,30}$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "role": {
+              "enum": ["owner", "approver", "viewer"]
+            }
+          }
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "channel": {
+          "const": "steward"
+        },
+        "approval_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "learning_publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "candidate_id",
+        "scope",
+        "approved_payload_digest",
+        "record_path",
+        "markdown_path",
+        "record_sha256",
+        "markdown_sha256"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier"],
+          "properties": {
+            "tenant_slug": {
+              "type": "string",
+              "minLength": 1
+            },
+            "customer_stance": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organization_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "project_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mission_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "session_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "work_shape": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tier": {
+              "enum": ["personal", "confidential", "public"]
+            },
+            "viewer_principal": {
+              "type": "string",
+              "minLength": 1
+            },
+            "nhi_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner_nhi": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retention_policy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allowed_audience": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "promotion_policy": {
+              "enum": ["same_scope", "brokered", "human_review"]
+            },
+            "provenance_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "redacted": {
+              "type": "boolean"
+            }
+          }
+        },
+        "approved_payload_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "record_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "markdown_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "markdown_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
   },
   "additionalProperties": false,
   "definitions": {
     "evidenceRef": {
       "description": "Tagged evidence reference. Legacy plain strings remain valid: 'artifact:<id>' denotes an artifact_id, any other string denotes a knowledge_path. Canonical parsing lives in parseMemoryEvidenceRef() (libs/core/knowledge/memory-promotion-queue.ts).",
       "anyOf": [
-        { "type": "string", "minLength": 1 },
+        {
+          "type": "string",
+          "minLength": 1
+        },
         {
           "type": "object",
           "required": ["kind", "artifact_id"],
           "properties": {
-            "kind": { "const": "artifact_id" },
-            "artifact_id": { "type": "string", "minLength": 1 }
+            "kind": {
+              "const": "artifact_id"
+            },
+            "artifact_id": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         },
@@ -157,8 +489,13 @@
           "type": "object",
           "required": ["kind", "knowledge_path"],
           "properties": {
-            "kind": { "const": "knowledge_path" },
-            "knowledge_path": { "type": "string", "minLength": 1 }
+            "kind": {
+              "const": "knowledge_path"
+            },
+            "knowledge_path": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         }
@@ -172,26 +509,43 @@
         "properties": {
           "scope": {
             "type": "object",
-            "properties": { "tier": { "const": "confidential" } }
+            "properties": {
+              "tier": {
+                "const": "confidential"
+              }
+            }
           }
         }
       },
       "then": {
         "properties": {
-          "scope": { "type": "object", "required": ["tenant_slug"] }
+          "scope": {
+            "type": "object",
+            "required": ["tenant_slug"]
+          }
         }
       }
     },
     {
       "description": "A promotion grant is meaningless without the scope envelope it was brokered from.",
-      "if": { "required": ["promotion"] },
-      "then": { "required": ["scope"] }
+      "if": {
+        "required": ["promotion"]
+      },
+      "then": {
+        "required": ["scope"]
+      }
     },
     {
       "description": "A row holding a distilled experience is never 'declined' — the flag cannot be true while a lesson is present.",
-      "if": { "required": ["distill_experience"] },
+      "if": {
+        "required": ["distill_experience"]
+      },
       "then": {
-        "properties": { "distill_experience_declined": { "const": false } }
+        "properties": {
+          "distill_experience_declined": {
+            "const": false
+          }
+        }
       }
     },
     {
@@ -199,11 +553,18 @@
       "if": {
         "required": ["sensitivity_tier", "scope"],
         "properties": {
-          "sensitivity_tier": { "const": "public" },
-          "scope": { "type": "object", "required": ["tenant_slug"] }
+          "sensitivity_tier": {
+            "const": "public"
+          },
+          "scope": {
+            "type": "object",
+            "required": ["tenant_slug"]
+          }
         }
       },
-      "then": { "required": ["promotion"] }
+      "then": {
+        "required": ["promotion"]
+      }
     }
   ]
 }

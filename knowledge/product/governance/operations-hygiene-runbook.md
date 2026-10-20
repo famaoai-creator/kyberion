@@ -1709,3 +1709,45 @@ input, bounded generated-verdict retry, organization isolation, envelope/payload
 conflict before side effects and original execution correlation after feedback.
 These deterministic tests do not establish live authenticated approval, mission
 resume or organization-scoped promoted-memory consumption.
+
+## Governed continuation and version-pinned learning
+
+Human-directed alignment is not an override of autonomous mandate shadow. Prepare a
+planned mission through its lifecycle owner, bind the original WorkItem and exact
+brief, then retain that request across polling and restart. A rejected, expired,
+cancelled or revoked revision must not silently acquire a fresh approval. Changes
+to intent, scope, authority or the approved effect invalidate the old consent.
+Revalidate immediately before activation, claim the original work and approval,
+and settle only from exact active-state and admission-brief evidence. A stale
+lease, missing response or partial mission is not proof of nonexecution. Keep an
+unknown attempt held for reconciliation rather than creating a replacement.
+
+Promotion must preserve the entire supported source envelope through the existing
+queue, intermediate distill record and published artifacts. Refuse unsupported
+owner/audience or narrower restrictions rather than dropping fields. Bind human
+review to curated content, not a mutable status timestamp or summary-only digest;
+verify canonical paths and both artifact digests before reporting publication.
+Do not copy project lessons into tenant-wide hints or global intermediate storage.
+
+The real provisioning path must pin the rendered hint and the source version read
+to produce it. Keep that snapshot unchanged for its dispatch; explicit additional
+retrieval creates another delivery receipt. Task-result attribution accepts only
+references actually delivered to that exact work/scope. Never hash the current
+file at completion to credit a previously delivered version. Delivery, a worker's
+reported use, verified task evidence and measured improvement remain distinct.
+None of these observations grants execution authority or renews human consent.
+
+Regression coverage must exercise real store/lifecycle boundaries, repeated and
+concurrent polls, changed approved content, all terminal decisions, interrupted
+creation/activation, exact publication tampering, sibling-scope denial, forged
+use references and a source edit between delivery and completion. Isolated
+fixtures do not establish a live authenticated business outcome.
+
+The acceptance sequence in `knowledge-learning-delivery.e2e.test.ts` crosses the
+real feedback queue, canonical approval store, publisher, exact-scope retrieval,
+task provisioning and result stores; only worker transport is mocked. It must
+prove sibling exclusion, unchanged in-flight delivery after a source edit, old
+version credit, rejection of forged references and repeated-result idempotency.
+The editorial request/apply/publish steps still use the existing memory CLI;
+the shared approval surface decides the presented content. Do not describe this
+as a fully graphical SOP editor or as measured outcome improvement.

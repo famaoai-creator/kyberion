@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-LOOP-CONTINUATION-20261020-2026_10_20",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Preserve authority and evidence across the governed work loop",
+  "summary": "Connect intent, approval, execution, and learning through the same scoped work identity while preserving each stage’s authority. Approval permits only its exact bound effect; published knowledge informs later work but never grants permission.",
+  "candidate_id": "mem-MSN-LOOP-CONTINUATION-20261020-2026_10_20",
+  "evidence_refs": [
+    "active/missions/public/MSN-LOOP-CONTINUATION-20261020/evidence/implementation-report.md",
+    "active/missions/public/MSN-LOOP-CONTINUATION-20261020/evidence/test-report.md",
+    "active/missions/public/MSN-LOOP-CONTINUATION-20261020/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-20T07:37:45.381Z",
+  "applicability": ["mission", "mission:MSN-LOOP-CONTINUATION-20261020"],
+  "reusable_steps": [
+    "Connect intent, approval, execution, and learning through the same scoped work identity while preserving each stage’s authority",
+    "Approval permits only its exact bound effect; published knowledge informs later work but never grants permission"
+  ],
+  "expected_outcome": "Require an explicit human-directed admission route. A denied or shadow automatic gate must not silently become permission to request approval and run.\n\nBind approval to the exact work item, current scope, payload and effect. Recheck current authority and durable inputs at execution; reject semantic drift.\n\nPersist application claims before execution. Reconcile unknown outcomes from canonical receipts rather than replaying the action. Preserve rejection, cancellation, expiry and revocation as distinct states.\n\nPublish only approved immutable content into its exact authorized scope. Verify both structured records and rendered artifacts against the approved payload.\n\nFilter scope before provider processing. Pin the bytes actually delivered, and attribute use only to those delivery records. A worker report establishes reported use, not independently verified success or improved outcomes.\n\nComplete formatting and generated-artifact checks before the final source freeze. Then validate builds, types, integration tests and gates serially when they share runtime state or compete for compiler memory. Keep mission/evidence writes quiet while a live-state leak detector is measuring the test run.\n\nThese are evidence-backed engineering safeguards, not a claim of measured business improvement or permission to broaden tenant scope.",
+  "source_branch": "feat/governed-loop-continuation",
+  "source_commit": "762ff1ac05961e7e06573db810146ec878fce1a1"
+}

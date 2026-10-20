@@ -2464,6 +2464,14 @@
       "types": "./dist/knowledge/procedure-types.d.ts",
       "default": "./dist/knowledge/procedure-types.js"
     },
+    "./knowledge/scoped-learning-approval": {
+      "types": "./dist/knowledge/scoped-learning-approval.d.ts",
+      "default": "./dist/knowledge/scoped-learning-approval.js"
+    },
+    "./knowledge/scoped-learning-contract": {
+      "types": "./dist/knowledge/scoped-learning-contract.d.ts",
+      "default": "./dist/knowledge/scoped-learning-contract.js"
+    },
     "./knowledge/vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",
       "default": "./dist/knowledge/vocabulary-catalog.js"

@@ -253,6 +253,8 @@ A held action retains its work identity, complete context and content/revision b
 
 A correction stays linked to the delivered work. Revise the result within authorization; any resulting learning candidate is separately reviewed and scoped. Explain honestly when capture is supported but publication or next-work reuse is not yet verified.
 
+Human-directed alignment retains the original WorkItem through preparation, the shared approval card and watchdog resumption. A pending card does not mark work complete. Repeated requests reuse the exact bound decision; rejected, expired, cancelled or changed proposals do not silently reopen. Unknown effects remain held for reconciliation. Reviewed confidential SOPs may be automatically retrieved by later work in the same or narrower supported scope without repeating completed review. The delivered immutable snapshot, not a later source-file version, is the unit of usage attribution. Delivery, cited use, verified outcome and measured improvement remain distinct claims.
+
 ## Evidence language
 
 Say what was actually verified: prepared, tested with fixtures, executed with a real provider, delivered, or confirmed by the user. Do not call worker completion verified delivery or promotion proven improvement. When an integration cannot preserve scope, explain the supported next step rather than silently dropping context.

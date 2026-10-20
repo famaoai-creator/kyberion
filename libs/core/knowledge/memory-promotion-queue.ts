@@ -1,3 +1,4 @@
+import { withLockSync } from '../lock-utils.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -22,6 +23,13 @@ import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { scopeContextKey } from '../scope-context.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { physicalScopedPath } from '../physical-namespace.js';
+import { verifyScopedLearningApprovalRef } from './scoped-learning-approval-verifier.js';
+import {
+  approvedLearningPayloadDigest,
+  isScopedLearningCandidate,
+  type ScopedLearningApproval,
+  type ScopedLearningPublicationIdentity,
+} from './scoped-learning-contract.js';
 import type { HumanDecidedBy } from '../mission/mission-types.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
@@ -106,6 +114,8 @@ export interface MemoryCandidate {
   /** FD-10 wave 1b: the human member who approved/rejected this candidate. */
   decided_by?: HumanDecidedBy;
   promoted_ref?: string;
+  learning_approval?: ScopedLearningApproval;
+  learning_publication?: ScopedLearningPublicationIdentity;
   /** Hash-chain audit entry created when this candidate was first enqueued. */
   audit_ref?: string;
   /** Scope envelope retained with the candidate; absent only for legacy records. */
@@ -504,6 +514,11 @@ export function validateMemoryPromotionCandidate(value: unknown): {
 }
 
 export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): string {
+  return withLockSync('memory-promotion-queue-mutations', () =>
+    enqueueMemoryPromotionCandidateUnlocked(candidate)
+  );
+}
+function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): string {
   if ((candidate.evidence_refs || []).length === 0) {
     throw new Error('Memory promotion candidate requires at least one evidence_ref.');
   }
@@ -604,6 +619,13 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
             }
           : {}),
     };
+    if (
+      current.learning_approval &&
+      approvedLearningPayloadDigest(next) !== current.learning_approval.payload_digest
+    )
+      throw new Error(
+        '[LEARNING_APPROVAL_IMMUTABLE] Re-enqueue cannot change approved evidence or content'
+      );
     assertPublicTierReferencesSafe(next);
     const updatedValidation = validateMemoryPromotionCandidate(next);
     if (!updatedValidation.valid) {
@@ -663,16 +685,33 @@ export function loadMemoryPromotionCandidate(
   const normalized = String(candidateId || '').trim();
   if (!normalized) return null;
   return (
-    listMemoryPromotionCandidates(scope).find((row) => row.candidate_id === normalized) || null
+    listMemoryPromotionCandidates(scope).find(
+      (row) =>
+        row.candidate_id === normalized &&
+        (!scope || resolveScopeKey(row.scope) === resolveScopeKey(scope))
+    ) || null
   );
 }
 
-export function updateMemoryPromotionCandidateStatus(input: {
+export function updateMemoryPromotionCandidateStatus(
+  input: Parameters<typeof updateMemoryPromotionCandidateStatusUnlocked>[0]
+): MemoryCandidate | null {
+  return withLockSync(
+    'scoped-learning-publication:' + createHash('sha256').update(input.candidateId).digest('hex'),
+    () =>
+      withLockSync('memory-promotion-queue-mutations', () =>
+        updateMemoryPromotionCandidateStatusUnlocked(input)
+      )
+  );
+}
+function updateMemoryPromotionCandidateStatusUnlocked(input: {
   candidateId: string;
   status: MemoryCandidateStatus;
   knowledgeDomain?: MemoryKnowledgeDomain;
   ratificationNote?: string;
   promotedRef?: string;
+  learningPublication?: ScopedLearningPublicationIdentity;
+  learningApprovalRef?: string;
   scope?: MemoryScopeEnvelope;
   /** Replace candidate scope during an explicit ownership/domain classification. */
   scopeUpdate?: MemoryScopeEnvelope;
@@ -742,6 +781,12 @@ export function updateMemoryPromotionCandidateStatus(input: {
       ) {
         continue;
       }
+      if (
+        isScopedLearningCandidate(current) &&
+        current.status === 'rejected' &&
+        input.status !== 'rejected'
+      )
+        throw new Error('[LEARNING_REJECTED] Rejected scoped learning requires a new candidate');
       const requestedDomain = input.knowledgeDomain || current.knowledge_domain;
       // D7: tagged curation refs are normalized to the canonical string form before
       // the subset check; plain strings are compared verbatim (legacy behavior).
@@ -829,6 +874,50 @@ export function updateMemoryPromotionCandidateStatus(input: {
         ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
         ...(input.decidedBy ? { decided_by: input.decidedBy } : {}),
       };
+      if (input.status === 'approved' && isScopedLearningCandidate(next)) {
+        const payloadDigest = approvedLearningPayloadDigest(next);
+        if (current.learning_approval && current.learning_approval.payload_digest !== payloadDigest)
+          throw new Error('[LEARNING_APPROVAL_IMMUTABLE] Revised content requires a new candidate');
+        if (!current.learning_approval) {
+          if (!input.learningApprovalRef || approvalChannel === 'pr_review')
+            throw new Error(
+              '[LEARNING_APPROVAL_REQUIRED] Canonical authenticated human approval reference is required'
+            );
+          next.learning_approval = verifyScopedLearningApprovalRef(next, input.learningApprovalRef);
+          next.decided_by = next.learning_approval.decided_by;
+          next.ratified_at = next.learning_approval.approved_at;
+        }
+      }
+      if (
+        current.learning_approval &&
+        approvedLearningPayloadDigest(next) !== current.learning_approval.payload_digest
+      )
+        throw new Error('[LEARNING_APPROVAL_IMMUTABLE] Approved content and scope cannot change');
+      if (input.status === 'promoted' && isScopedLearningCandidate(next)) {
+        if (current.status !== 'approved' && current.status !== 'promoted')
+          throw new Error(
+            '[LEARNING_PUBLICATION_REQUIRED] Only approved candidates can be promoted'
+          );
+        if (!input.learningPublication || !next.learning_approval)
+          throw new Error(
+            '[LEARNING_PUBLICATION_REQUIRED] Scoped promotion requires exact publication evidence'
+          );
+        // A status label must never turn an expired unused approval into historical consent.
+        verifyScopedLearningApprovalRef(
+          { ...next, status: 'approved' },
+          next.learning_approval.approval_ref
+        );
+      }
+      if (input.learningPublication) {
+        if (
+          !next.learning_approval ||
+          input.learningPublication.approved_payload_digest !==
+            next.learning_approval.payload_digest ||
+          input.status !== 'promoted'
+        )
+          throw new Error('[LEARNING_PUBLICATION_INVALID] Publication must match the approval');
+        next.learning_publication = input.learningPublication;
+      }
       assertPublicTierReferencesSafe(next);
       if (next.status === 'approved' && next.source_type === 'mission' && !next.curation) {
         throw new Error(

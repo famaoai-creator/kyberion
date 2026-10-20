@@ -1,3 +1,7 @@
+import {
+  scopedLearningMarkdownPath,
+  isScopedLearningCandidate,
+} from './scoped-learning-contract.js';
 import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -94,6 +98,15 @@ function targetDirectory(
   candidate: MemoryCandidate,
   kind: MemoryPromotionReview['target_kind']
 ): string {
+  if (isScopedLearningCandidate(candidate)) {
+    try {
+      return path.posix.dirname(
+        scopedLearningMarkdownPath(candidate.scope!, candidate.candidate_id)
+      );
+    } catch {
+      return 'knowledge/unclassified/scope-preservation-required/operations';
+    }
+  }
   const domain = candidate.knowledge_domain || 'organization';
   const tenant = candidate.scope?.tier === 'confidential' ? candidate.scope.tenant_slug : undefined;
   const kindDir =

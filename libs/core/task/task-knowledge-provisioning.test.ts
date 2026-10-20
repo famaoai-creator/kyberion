@@ -236,6 +236,40 @@ describe('provisionTaskKnowledge', () => {
     expect(result.missionContextPackPath).toBeUndefined();
   });
 
+  it.each(['pack', 'system_prompt', 'context_string'] as const)(
+    'pins exactly rendered hint bytes and scope in %s',
+    async (form) => {
+      const pack = buildFixturePack();
+      pack.scope.tenant_slug = 'tenant-a';
+      pack.scope.organization_id = 'org-a';
+      pack.knowledge_hints![0].source_sha256 = 'a'.repeat(64);
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+      const result = await provisionTaskKnowledge({
+        form,
+        missionId: pack.scope.mission_id,
+        workItem: pack.work_item,
+      });
+      const ref = result.deliveredKnowledgeRefs[0];
+      expect(ref.scope_context).toMatchObject({
+        tier: 'public',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        project_id: pack.scope.project_id,
+        mission_id: pack.scope.mission_id,
+        task_id: pack.scope.work_item_id,
+      });
+      expect(ref.snapshot).toMatchObject({
+        version: 1,
+        form,
+        source_sha256: 'a'.repeat(64),
+        context_pack_id: pack.context_pack_id,
+      });
+      expect(result.text).toContain(ref.snapshot!.text);
+      pack.knowledge_hints![0].excerpt = 'late replacement not delivered';
+      expect(ref.snapshot!.text).not.toContain('late replacement');
+    }
+  );
+
   describe('KP-05 delivery telemetry', () => {
     it('records a delivery record and exposes deliveredKnowledgeRefs when hints are delivered', async () => {
       const pack = buildFixturePack();
@@ -248,7 +282,7 @@ describe('provisionTaskKnowledge', () => {
         workItem: pack.work_item ?? undefined,
       });
 
-      expect(result.deliveredKnowledgeRefs).toEqual([
+      expect(result.deliveredKnowledgeRefs).toMatchObject([
         {
           path: 'knowledge/product/architecture/kp01-fixture-hint.md',
           title: 'KP-01 Fixture Hint',

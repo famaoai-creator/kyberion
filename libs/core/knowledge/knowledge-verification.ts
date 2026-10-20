@@ -26,6 +26,9 @@
  */
 
 import { createHash } from 'node:crypto';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { validKnowledgeDeliverySnapshot } from './knowledge-delivery-snapshot.js';
+import type { DeliveredKnowledgeRef } from './knowledge-feedback-loop.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
@@ -59,6 +62,11 @@ export interface KnowledgeVerificationEntry {
   last_success_at?: string;
   /** Fingerprint of the document text at the last successful run. */
   last_success_fingerprint?: string;
+  last_success_snapshot_sha256?: string;
+  last_success_delivery_id?: string;
+  last_success_scope_context?: ScopeContext;
+  /** Result replay protection, scoped to this document. */
+  success_receipt_ids?: string[];
   /** Project of the last successful run, when it had one. */
   last_success_project_id?: string;
   /** Absent on entries written before evidence was recorded: a worker report. */
@@ -161,8 +169,27 @@ function upsert(
  * Record that a run using these documents finished successfully. Fails open:
  * verification is telemetry and never blocks the task it describes.
  */
-export function recordKnowledgeVerifiedRun(input: {
-  documentPaths: string[];
+export function recordKnowledgeVerifiedRun(
+  input: Parameters<typeof recordKnowledgeVerifiedRunUnlocked>[0]
+): void {
+  try {
+    withLockSync('knowledge-verification:' + ledgerPath(input.scope), () =>
+      recordKnowledgeVerifiedRunUnlocked(input)
+    );
+  } catch (error) {
+    logger.warn(
+      '[knowledge-verification] receipt lock unavailable — ' +
+        String(error) +
+        ' | next: inspect feedback storage'
+    );
+  }
+}
+
+function recordKnowledgeVerifiedRunUnlocked(input: {
+  documentPaths?: string[];
+  /** Supplied by task delivery receipts. Never re-read their mutable paths. */
+  documentSnapshots?: DeliveredKnowledgeRef[];
+  receiptId?: string;
   scope?: ScopeContext;
   projectId?: string;
   /** Defaults to `worker_report`. */
@@ -170,15 +197,38 @@ export function recordKnowledgeVerifiedRun(input: {
   at?: string;
   rootDir?: string;
 }): void {
-  const paths = [...new Set(input.documentPaths.map((p) => p.trim()).filter(Boolean))];
+  const paths = [
+    ...new Set(
+      (input.documentSnapshots?.map((ref) => ref.path) || input.documentPaths || [])
+        .map((p) => p.trim())
+        .filter(Boolean)
+    ),
+  ];
   if (paths.length === 0) return;
   try {
     const entries = loadLedger(input.scope);
     const at = input.at ?? nowIso();
     for (const documentPath of paths) {
-      const fingerprint = knowledgeDocumentFingerprint(documentPath, input.rootDir);
+      const delivered = input.documentSnapshots?.find((ref) => ref.path === documentPath);
+      const snapshot = delivered?.snapshot;
+      const fingerprint = input.documentSnapshots
+        ? validKnowledgeDeliverySnapshot(snapshot)
+          ? snapshot.source_sha256?.slice(0, 16)
+          : undefined
+        : knowledgeDocumentFingerprint(documentPath, input.rootDir);
       if (!fingerprint) continue;
       const entry = upsert(entries, documentPath);
+      if (input.receiptId && entry.success_receipt_ids?.includes(input.receiptId)) continue;
+      if (input.receiptId)
+        entry.success_receipt_ids = [...(entry.success_receipt_ids || []), input.receiptId].slice(
+          -1000
+        );
+      if (snapshot) entry.last_success_snapshot_sha256 = snapshot.sha256;
+      else delete entry.last_success_snapshot_sha256;
+      if (delivered?.delivery_id) entry.last_success_delivery_id = delivered.delivery_id;
+      else delete entry.last_success_delivery_id;
+      if (input.scope) entry.last_success_scope_context = { ...input.scope };
+      else delete entry.last_success_scope_context;
       entry.last_success_at = at;
       entry.last_success_fingerprint = fingerprint;
       if (input.projectId) entry.last_success_project_id = input.projectId;
@@ -253,7 +303,8 @@ function stateOf(
 export function resolveKnowledgeVerification(
   documentPaths: string[],
   scope?: ScopeContext,
-  rootDir?: string
+  rootDir?: string,
+  sourceFingerprints?: ReadonlyMap<string, string | undefined>
 ): Map<string, KnowledgeVerification> {
   const out = new Map<string, KnowledgeVerification>();
   if (documentPaths.length === 0) return out;
@@ -261,7 +312,12 @@ export function resolveKnowledgeVerification(
   for (const documentPath of documentPaths) {
     const entry = entries.get(documentPath);
     if (!entry) continue;
-    const resolved = stateOf(entry, knowledgeDocumentFingerprint(documentPath, rootDir));
+    const resolved = stateOf(
+      entry,
+      sourceFingerprints
+        ? sourceFingerprints.get(documentPath)
+        : knowledgeDocumentFingerprint(documentPath, rootDir)
+    );
     if (resolved) out.set(documentPath, resolved);
   }
   return out;
@@ -307,9 +363,9 @@ export function formatKnowledgeVerificationLabel(verification?: KnowledgeVerific
     case 'verified':
       return verification.evidence === 'golden'
         ? ` [passed its success check in a run on ${day(verification.last_success_at)}]`
-        : ` [worked in a run on ${day(verification.last_success_at)}]`;
+        : ` [worker reported use in a completed run on ${day(verification.last_success_at)}; not an independent success check]`;
     case 'changed_since_verified':
-      return ` [changed since it last worked (${day(verification.last_success_at)}) — not yet confirmed; check the steps you rely on]`;
+      return ` [changed since the recorded run (${day(verification.last_success_at)}) — not yet confirmed; check the steps you rely on]`;
     case 'reported_problem':
       return verification.last_problem_kind === 'failed_check'
         ? ` [failed its success check in a run on ${day(verification.last_problem_at)} — verify before relying on it]`

@@ -59,7 +59,7 @@ describe('knowledge verification ledger', () => {
     });
   });
 
-  it('flags a document whose text changed since it last worked, until it works again', () => {
+  it('flags a document whose text changed since the recorded run, until a later completed run is recorded', () => {
     recordKnowledgeVerifiedRun({
       documentPaths: [RUNBOOK],
       scope: tenantA,
@@ -153,13 +153,13 @@ describe('knowledge verification ledger', () => {
         state: 'verified',
         last_success_at: '2026-10-01T00:00:00Z',
       })
-    ).toContain('worked in a run on 2026-10-01');
+    ).toContain('worker reported use in a completed run on 2026-10-01');
     expect(
       formatKnowledgeVerificationLabel({
         state: 'changed_since_verified',
         last_success_at: '2026-10-01T00:00:00Z',
       })
-    ).toContain('changed since it last worked');
+    ).toContain('changed since the recorded run');
     expect(
       formatKnowledgeVerificationLabel({
         state: 'reported_problem',

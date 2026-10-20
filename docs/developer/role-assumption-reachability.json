@@ -431,6 +431,36 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/knowledge/scoped-learning-approval-verifier.ts#verifyScopedLearningApprovalRef",
+      "roles": ["infrastructure_sentinel", "sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApproval",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/locale.ts#resolveScopedLocale",
       "roles": ["scope_locale_reader"],
       "unresolved": []
@@ -694,6 +724,11 @@
     {
       "site": "libs/core/metrics.ts#aggregateMetricsForEnforcement",
       "roles": ["metrics_cap_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-admission.ts#assertHumanMissionAdmissionApproval",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -1555,6 +1590,16 @@
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts#recordRuntimeRemediationArtifacts (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["chronos_gateway"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/workitems/mission-alignment.ts#readWorkItemMissionAlignment",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/workitems/mission-alignment.ts#requestWorkItemMissionAlignment [delegated child role]",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -2567,8 +2612,33 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission_alignment_request.ts#openAlignmentApproval (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["surface_runtime"],
+      "site": "scripts/mission-alignment-gate/alignment-approval.ts#openAlignmentApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#assertCurrentHumanDecision",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission",
+      "roles": ["infrastructure_sentinel", "mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#missionRead",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -3157,6 +3227,7 @@
         "presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/trace-log/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/traces/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/workitems/mission-alignment.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/workitems/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/workitems/work-item-input.ts",
         "presence/displays/chronos-mirror-v2/src/app/auth/callback/route.ts",
@@ -3216,6 +3287,7 @@
         "presence/displays/chronos-mirror-v2/src/components/SurfaceControlWorkspace.tsx",
         "presence/displays/chronos-mirror-v2/src/components/SurfaceStatusPanel.tsx",
         "presence/displays/chronos-mirror-v2/src/components/TraceViewer.tsx",
+        "presence/displays/chronos-mirror-v2/src/components/WorkItemMissionAlignmentAction.tsx",
         "presence/displays/chronos-mirror-v2/src/components/WorkItemsWorkspace.tsx",
         "presence/displays/chronos-mirror-v2/src/components/chronos-a2ui-adapter.ts",
         "presence/displays/chronos-mirror-v2/src/components/chronos-kb-i18n.tsx",
@@ -3340,6 +3412,10 @@
         {
           "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
           "targets": ["scripts/mission_controller.ts"]
+        },
+        {
+          "site": "presence/displays/chronos-mirror-v2/src/app/api/workitems/mission-alignment.ts#requestWorkItemMissionAlignment",
+          "targets": ["scripts/mission_alignment_request.ts"]
         },
         {
           "site": "scripts/run_baseline_check.ts#maybeSubmitJanitorMaintenanceJob",
@@ -6824,9 +6900,10 @@
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
             "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
-            "scripts/mission_alignment_request.ts#openAlignmentApproval [child process]",
-            "scripts/mission_alignment_request.ts#buildAlignmentDecisionCard",
-            "libs/core/governance/autonomous-ops-gate.ts#evaluateAutonomousOpsAction",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
             "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
             "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
