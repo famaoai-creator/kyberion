@@ -13,6 +13,9 @@ import { decideFromObservation } from '@agent/core/semantic-decide';
 import { getRetryDefaults } from '@agent/core/async-utils';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
+import { countBrowserExternalEffects } from './browser-external-governance.js';
 import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
@@ -109,6 +112,7 @@ export async function executePipeline(
     const op = step.op.startsWith('browser:') ? step.op.slice('browser:'.length) : step.op;
     return { ...step, op: op === 'navigate' ? 'goto' : op };
   });
+  assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
   const { sessionId, options } = preflightAutomationRuntime(
     steps,
     inputSessionId,
@@ -281,6 +285,9 @@ export async function executePipeline(
   };
 
   let engineResult!: Awaited<ReturnType<typeof runAdfActuatorPipeline>>;
+  let externalOccurrence = 0;
+  const runStep = <T>(op: string, execute: () => Promise<T>) =>
+    withExternalOperationOccurrence(`browser-substep:${externalOccurrence++}:${op}`, execute);
   try {
     engineResult = await runAdfActuatorPipeline({
       actuatorId: 'browser',
@@ -289,11 +296,12 @@ export async function executePipeline(
       options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
       handlers: {
         capture: (op, params, stepCtx, resolveFn) =>
-          opCapture(op, params, runtime, stepCtx, resolveFn),
+          runStep(op, () => opCapture(op, params, runtime, stepCtx, resolveFn)),
         transform: (op, params, stepCtx, resolveFn) => opTransform(op, params, stepCtx, resolveFn),
-        apply: (op, params, stepCtx, resolveFn) => opApply(op, params, runtime, stepCtx, resolveFn),
+        apply: (op, params, stepCtx, resolveFn) =>
+          runStep(op, () => opApply(op, params, runtime, stepCtx, resolveFn)),
         control: (op, params, stepCtx, runSteps, resolveFn) =>
-          opControl(op, params, runtime, stepCtx, runSteps, resolveFn),
+          runStep(op, () => opControl(op, params, runtime, stepCtx, runSteps, resolveFn)),
       },
       hooks,
     });
@@ -567,8 +575,13 @@ export async function fillWithFallback(
     text: string;
     timeoutMs: number;
     fieldHint?: string;
+    singleAttempt?: boolean;
   }
 ): Promise<{ strategy: string }> {
+  if (input.singleAttempt) {
+    await page.fill(input.selector, input.text, { timeout: input.timeoutMs });
+    return { strategy: 'selector' };
+  }
   const attempts: string[] = [];
   const hint =
     input.fieldHint ||

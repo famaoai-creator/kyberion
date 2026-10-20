@@ -93,6 +93,8 @@ export interface PipelineRunSuspendedPayload {
   step_id: string;
   approval_request_id: string;
   storage_channel: string;
+  /** Exact external admission correlation; absent for legacy await_decision. */
+  approval_correlation_id?: string;
   on_timeout: 'abort' | 'deny' | 'escalate';
   timeout_at?: string;
   reason?: string;
@@ -231,6 +233,7 @@ pipelineJournalKernel.defineOp('pipeline.run_suspended', {
       .optional(),
     approval_request_id: z.string(),
     storage_channel: z.string(),
+    approval_correlation_id: z.string().optional(),
     on_timeout: z.enum(['abort', 'deny', 'escalate']),
     timeout_at: z.string().optional(),
     reason: z.string().optional(),

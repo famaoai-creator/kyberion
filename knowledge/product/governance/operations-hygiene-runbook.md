@@ -1606,6 +1606,61 @@ Regression gates: discussion-readiness, Discussion readiness/execution HTTP rout
 
 ## Delegated authority facts and learned autonomy
 
+External actuator admission and execution are separate evidence. Service and
+meeting boundaries use `external-operation.ts`; install the owner authority
+resolver at the runtime boundary, never from action JSON. Preserve independent
+consent, tenant binding and egress checks. Bind every effect to a durable
+invocation identity and hash; a pending approval does not reserve execution,
+while an admitted execution reserves before the external call. A process crash,
+timeout or missing receipt never releases that reservation for an automatic
+retry. Reconcile by querying the remote effect, not by sending it again.
+
+Email, calendar, network and deployment boundaries share the same rule. A
+policy floor such as `config:update` must join the common approval request,
+not create a second decision that cannot resume the run. Calendar forwarding
+capabilities bind one exact input, hash and kind and are consumed once.
+SMTP partial recipient refusal is unknown, never confirmed delivery. A failed
+or unknown mutation receipt must stop the outer run even if the SDK absorbs
+its exception; changing the operation through model repair is not recovery.
+
+Approval presentation references are part of the effect binding. Preserve the
+same scoped review reference when an interactive run resumes headlessly; human
+presence must not change its authorization payload hash. Validate this with the
+real email actuator, approval store, durable pipeline journal and headless
+runner in `scripts/external-actuator-pipeline-simulation.test.ts`, with only the
+final transport and process launch simulated. A mocked gate alone cannot catch
+this integration defect.
+
+Browser UI/script effects bind the actual session/tab/URL and resolved target;
+origin and secret/ref/passkey checks remain required. Never retry a click or
+fall back after a fill was attempted. Canonical Git publication binds the
+push URL and source SHA; merge binds the PR head with match-head protection.
+Generic git/gh helpers must not accept alternate flags/aliases that bypass
+the typed publication boundary. Physical voice output and remote media input
+bind file-content digests, not paths alone; revalidate before use and prefer
+immutable bytes for native uploads. A remote render plus playback is two
+effects: checkpoint them separately. A generation status/download failure
+must never automatically submit a second paid/provider job. Gates include
+browser/vcs/voice/media external-governance tests and the sync facade tests.
+
+Do not reinstall a named virtual-camera bridge on every start/stop request:
+seam multiplicity is enforced outside Vitest too. Reuse the owner's exact
+configuration, reject target drift before effects, and never replace a custom
+registration while preparing a command. Shell microphone capture needs a new,
+nonempty supported recording artifact, not exit code zero alone. A provider
+submission receipt followed by poll/download/persistence failure must signal
+the same terminal verification stop through SDK envelopes; a model repair
+must not change providers and submit again.
+
+Mutations and opaque CLI/MCP calls must not retry or fall through to another
+transport after execution has started. Only proven reads may replay; a binary
+known missing before invocation may select another route. Record actual outcomes
+in the same tenant charter ledger. Unknown or missing outcomes require
+verification, not promotion; fire only a predeclared failure tripwire on a
+verified failure. A model-generated action plan never completes a meeting action
+item. Gates: external-operation, service engine replay, meeting external
+governance, charter ledger/report and meeting self-action regression tests.
+
 Evaluate a decision only with its declared metric: require an authorized role,
 finite nonnegative numeric facts or a recognized risk level. Missing facts and
 unsupported metrics require escalation; an absent value never means zero risk.

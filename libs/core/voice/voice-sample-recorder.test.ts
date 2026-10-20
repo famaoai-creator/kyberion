@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 
 const mocks = vi.hoisted(() => ({
-  safeExecShellScript: vi.fn(() => ''),
+  recordingWritten: false,
+  safeExecShellScript: vi.fn(() => {
+    mocks.recordingWritten = true;
+    return '';
+  }),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   sharedTmp: vi.fn((value: string) => `/tmp/${value}`),
@@ -20,6 +27,16 @@ vi.mock('../secure-io.js', async () => {
     safeExecShellScript: mocks.safeExecShellScript,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
+    safeExistsSync: vi.fn((filePath: string) =>
+      filePath.endsWith('.wav') ? mocks.recordingWritten : actual.safeExistsSync(filePath)
+    ),
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
+    safeStat: vi.fn(() => ({ size: 4096 })),
+    safeReadFile: vi.fn((filePath: string, options?: unknown) =>
+      filePath.endsWith('.wav')
+        ? Buffer.from('captured sample')
+        : actual.safeReadFile(filePath, options as never)
+    ),
   };
 });
 
@@ -64,6 +81,7 @@ describe('voice-sample-recorder', () => {
   });
 
   beforeEach(() => {
+    mocks.recordingWritten = false;
     Object.defineProperty(process, 'platform', {
       configurable: true,
       value: 'darwin',

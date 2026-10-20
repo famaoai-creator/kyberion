@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { handleAction } from './index.js';
 
+// These tests isolate network operations; admission is covered by network-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+}));
+
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn().mockReturnValue('file content'),
 }));

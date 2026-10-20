@@ -6,12 +6,19 @@ import {
   safeMkdir,
   safeRmSync,
   safeWriteFile,
+  safeReadFile,
 } from '../secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from '../voice/audio-device-lease.js';
 import { pathResolver } from '../path-resolver.js';
 import { clamp, sanitizeIdSegment } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
+import {
+  runExternalOperation,
+  assertExternalOperationBatchResumable,
+} from '../governance/external-operation.js';
+import { withExternalOperationOccurrence } from '../governance/external-operation-occurrence.js';
+import { createHash } from 'node:crypto';
 import {
   createVirtualDeviceInventoryBridge,
   type VirtualDeviceInventoryBridge,
@@ -290,6 +297,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     const selectedOutputs = (targets && targets.length > 0 ? targets : probe.outputs)
       .map((name) => name.trim())
       .filter(Boolean);
+    assertExternalOperationBatchResumable(selectedOutputs.length);
     if (selectedOutputs.length === 0) {
       return {
         bridge_id: VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID,
@@ -312,6 +320,9 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     }
 
     const results: VirtualAudioOutputPlaybackTargetResult[] = [];
+    const sourceHash = createHash('sha256')
+      .update(safeReadFile(playbackPath) as Buffer)
+      .digest('hex');
     const leaseManager = new AudioDeviceLeaseManager();
 
     for (const outputName of selectedOutputs) {
@@ -339,11 +350,40 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
         if (!adapter) {
           throw new Error(`unsupported platform ${process.platform}`);
         }
-        const output = await adapter.play({
-          source_path: playbackPath,
-          device_name: candidate.name,
-          options: this.opts,
-        });
+        const output = await withExternalOperationOccurrence(`audio-output:${results.length}`, () =>
+          runExternalOperation(
+            {
+              operationId: 'voice:playback',
+              effect: {
+                params: {
+                  source_hash: sourceHash,
+                  format: path.extname(playbackPath).toLowerCase(),
+                  device_name: candidate.name,
+                  backend: adapter.backend,
+                },
+              },
+              requiresApproval: true,
+              delegable: true,
+            },
+            async () => {
+              if (
+                createHash('sha256')
+                  .update(safeReadFile(playbackPath) as Buffer)
+                  .digest('hex') !== sourceHash
+              ) {
+                throw new Error('[VOICE_AUDIO_CHANGED] Playback source changed after admission');
+              }
+              // The adapter reopens by path; retain exclusive source ownership
+              // until playback completes to avoid writes after this check.
+              return adapter.play({
+                source_path: playbackPath,
+                device_name: candidate.name,
+                options: this.opts,
+              });
+            },
+            () => 'succeeded'
+          )
+        );
         results.push({
           device_name: candidate.name,
           status: 'played',
@@ -354,6 +394,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           output: output.trim() || undefined,
         });
       } catch (error: any) {
+        if (error?.adfControlFlow === 'preflight') throw error;
         results.push({
           device_name: candidate.name,
           status: 'failed',

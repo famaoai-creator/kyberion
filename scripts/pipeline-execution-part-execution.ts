@@ -7,6 +7,7 @@ import {
   runtimeDelegatedTarget,
   withDelegatedExecutionFrame,
 } from '@agent/core/governance/delegated-execution';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation/text';
@@ -754,7 +755,7 @@ export async function runStepsInternal(
       },
 
       foreach: async (dctx) => {
-        const { params, ctx } = dctx;
+        const { params, ctx, currentStep } = dctx;
         const items = resolveVars(params.items, ctx);
         const subSteps = params.do as PipelineAdfStep[];
         if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
@@ -763,11 +764,9 @@ export async function runStepsInternal(
         let workingCtx = ctx;
         for (const [itemIndex, item] of items.entries()) {
           const loopCtx = { ...workingCtx, [itemName]: item };
-          const nested = await runBody(
-            subSteps,
-            loopCtx,
-            'core:foreach item failed',
-            String(itemIndex)
+          const nested = await withExternalOperationOccurrence(
+            `foreach:${currentStep?.id || 'core:foreach'}:${itemIndex}`,
+            () => runBody(subSteps, loopCtx, 'core:foreach item failed', String(itemIndex))
           );
           workingCtx = { ...nested.context };
           if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
@@ -851,7 +850,11 @@ export async function runStepsInternal(
           const loopCtx = { ...originalSharedCtx, [itemName]: item };
           const nested = await withDelegatedExecutionFrame(
             `${currentStep?.id || rawOp}:${index}`,
-            () => runNestedSteps(preparedBody, loopCtx)
+            () =>
+              withExternalOperationOccurrence(
+                `parallel_foreach:${currentStep?.id || rawOp}:${index}`,
+                () => runNestedSteps(preparedBody, loopCtx)
+              )
           );
           if (nested.status === 'failed') {
             throw new Error(

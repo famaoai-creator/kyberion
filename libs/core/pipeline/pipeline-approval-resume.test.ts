@@ -153,4 +153,40 @@ describe('pipeline approval resume', () => {
     });
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
   });
+
+  it('resumes the exact external-channel approval with its recorded effect correlation', () => {
+    const correlationId = `external:${'a'.repeat(64)}`;
+    const state = mocks.loadPipelineRunJournal();
+    state.suspended.storage_channel = 'external-operation';
+    state.suspended.approval_correlation_id = correlationId;
+    const external = {
+      ...record,
+      channel: 'external-operation',
+      storageChannel: 'external-operation',
+      correlationId,
+      accountability: {
+        finalDecision: 'human_only' as const,
+        effectBinding: 'meeting:chat',
+        payloadHash: 'payload-hash',
+      },
+    };
+    expect(resumePipelineRunAfterApproval(external).status).toBe('started');
+    resetPipelineApprovalResumeState();
+    expect(
+      resumePipelineRunAfterApproval({ ...external, correlationId: `external:${'b'.repeat(64)}` })
+        .status
+    ).toBe('not_applicable');
+    expect(resumePipelineRunAfterApproval({ ...external, accountability: undefined }).status).toBe(
+      'not_applicable'
+    );
+    expect(resumePipelineRunAfterApproval({ ...external, id: 'other-approval' }).status).toBe(
+      'not_applicable'
+    );
+    expect(
+      resumePipelineRunAfterApproval({
+        ...external,
+        requestedByContext: { ...external.requestedByContext!, missionId: 'other-mission' },
+      }).status
+    ).toBe('not_applicable');
+  });
 });

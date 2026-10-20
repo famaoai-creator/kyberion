@@ -1,5 +1,5 @@
 import { getDeploymentAdapter } from '@agent/core/actuator/deployment-adapter';
-import { requireApprovalForOp, RISKY_OPS } from '@agent/core/risky-op-registry';
+import { RISKY_OPS } from '@agent/core/risky-op-registry';
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
@@ -9,6 +9,11 @@ import { resolveVars } from '@agent/core/logic-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { nowIso } from '@agent/core/foundation';
+import {
+  runExternalOperation,
+  assertExternalOperationBatchResumable,
+} from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { describeOps } from './op-catalog.js';
 
 export interface DeploymentParams {
@@ -35,37 +40,36 @@ async function deployRelease(params: DeploymentParams) {
   if (!params.mission_id || !params.project_name || !params.version || !params.environment) {
     throw new Error('[deploy_release] requires mission_id, project_name, version, and environment');
   }
-  const approval = requireApprovalForOp({
-    opId: RISKY_OPS.CONFIG_UPDATE,
-    agentId: 'mission_controller',
-    correlationId: `${params.mission_id}:deploy:${params.environment}`,
-    channel: 'system',
-    payload: {
-      scope: 'governance',
-      environment: params.environment,
-      version: params.version,
-      projectName: params.project_name,
+  const adapter = getDeploymentAdapter();
+  const result = await runExternalOperation(
+    {
+      operationId: 'deployment:deploy_release',
+      effect: { adapter: adapter.name, params: { ...params } },
+      requiresApproval: true,
+      approvalPolicy: { intentId: RISKY_OPS.CONFIG_UPDATE, scope: 'governance' },
+      // Release effects/costs are adapter-specific; no generic delegation grant.
+      delegable: false,
     },
-    draft: {
-      title: `Deploy ${params.project_name}@${params.version} → ${params.environment}`,
-      summary: `Mission ${params.mission_id} requests release deployment.`,
-      severity: params.environment === 'prod' ? 'high' : 'medium',
-    },
-  });
-  if (!approval.allowed) {
-    return {
-      status: 'blocked_by_approval',
-      approval_status: approval.status,
-      approval_request_id: approval.requestId,
-      message: approval.message,
-    };
+    () =>
+      adapter.deploy({
+        environment: params.environment,
+        projectName: params.project_name,
+        version: params.version,
+        releaseNotesPath: params.release_notes_path,
+      }),
+    (result) => (result.status === 'triggered' ? 'succeeded' : 'unknown')
+  );
+  if (result.status !== 'triggered') {
+    throw Object.assign(
+      new Error(
+        `[DEPLOYMENT_UNVERIFIED] ${result.status}; verify the release before any new invocation`
+      ),
+      {
+        adfControlFlow: 'preflight' as const,
+      }
+    );
   }
-  return getDeploymentAdapter().deploy({
-    environment: params.environment,
-    projectName: params.project_name,
-    version: params.version,
-    releaseNotesPath: params.release_notes_path,
-  });
+  return result;
 }
 
 export async function handleDeploymentAction(input: DeploymentAction) {
@@ -83,6 +87,10 @@ export async function handleDeploymentAction(input: DeploymentAction) {
     }
     return deployRelease(preflight.input as unknown as DeploymentParams);
   }
+  assertExternalOperationBatchResumable(
+    (input.steps || []).filter((step) => step.op === 'deploy_release').length
+  );
+  let occurrence = 0;
   const result = await runAdfActuatorPipeline({
     actuatorId: 'deployment',
     steps: input.steps || [],
@@ -108,7 +116,9 @@ export async function handleDeploymentAction(input: DeploymentAction) {
         const params = Object.fromEntries(
           Object.entries(rawParams || {}).map(([key, value]) => [key, resolveVars(value, context)])
         ) as unknown as DeploymentParams & { export_as?: string };
-        const value = await deployRelease(params);
+        const value = await withExternalOperationOccurrence(`deployment:${occurrence++}`, () =>
+          deployRelease(params)
+        );
         return { ...context, [params.export_as || 'deploy_result']: value };
       },
     },

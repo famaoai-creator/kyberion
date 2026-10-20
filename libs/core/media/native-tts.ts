@@ -21,6 +21,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { runExternalOperation } from '../governance/external-operation.js';
 
 export type Platform = 'darwin' | 'linux' | 'win32';
 
@@ -111,68 +112,74 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
     return { ok: false, platform: PLATFORM, command: 'unsupported', error: err };
   }
 
-  return await new Promise<SpeakResult>((resolve) => {
-    let resolved = false;
-    const child = spawn(built.cmd, built.args, { stdio: ['ignore', 'ignore', 'pipe'] });
-    let stderr = '';
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    const timer = setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      try {
-        child.kill('SIGTERM');
-      } catch (_) {
-        /* ignore */
-      }
-      const err = `TTS timed out after ${timeoutMs}ms`;
-      if (!silent) {
-        // Defer the throw to next tick so the caller's await still observes the resolution path.
-        Promise.resolve().then(() => {
-          throw new Error(err);
+  return runExternalOperation(
+    {
+      operationId: 'voice:speak',
+      effect: { text, options: { voice: opts.voice, rate: opts.rate, timeoutMs } },
+      requiresApproval: true,
+      delegable: true,
+    },
+    () =>
+      new Promise<SpeakResult>((resolve, reject) => {
+        let resolved = false;
+        const child = spawn(built.cmd, built.args, { stdio: ['ignore', 'ignore', 'pipe'] });
+        let stderr = '';
+        child.stderr?.on('data', (chunk) => {
+          stderr += chunk.toString();
         });
-      }
-      resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: err });
-    }, timeoutMs);
 
-    child.on('error', (err) => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timer);
-      const message = err.message;
-      if (!silent) {
-        Promise.resolve().then(() => {
-          throw err;
-        });
-      }
-      resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: message });
-    });
+        const timer = setTimeout(() => {
+          if (resolved) return;
+          resolved = true;
+          try {
+            child.kill('SIGTERM');
+          } catch (_) {
+            /* ignore */
+          }
+          const err = `TTS timed out after ${timeoutMs}ms`;
+          if (!silent) {
+            reject(new Error(err));
+            return;
+          }
+          resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: err });
+        }, timeoutMs);
 
-    child.on('close', (code) => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timer);
-      if (code === 0) {
-        resolve({ ok: true, platform: PLATFORM, command: built.cmd, exitCode: 0 });
-      } else {
-        const err = `${built.cmd} exited ${code}: ${stderr.slice(0, 500)}`;
-        if (!silent) {
-          Promise.resolve().then(() => {
-            throw new Error(err);
-          });
-        }
-        resolve({
-          ok: false,
-          platform: PLATFORM,
-          command: built.cmd,
-          exitCode: code ?? -1,
-          error: err,
+        child.on('error', (err) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          const message = err.message;
+          if (!silent) {
+            reject(err);
+            return;
+          }
+          resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: message });
         });
-      }
-    });
-  });
+
+        child.on('close', (code) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          if (code === 0) {
+            resolve({ ok: true, platform: PLATFORM, command: built.cmd, exitCode: 0 });
+          } else {
+            const err = `${built.cmd} exited ${code}: ${stderr.slice(0, 500)}`;
+            if (!silent) {
+              reject(new Error(err));
+              return;
+            }
+            resolve({
+              ok: false,
+              platform: PLATFORM,
+              command: built.cmd,
+              exitCode: code ?? -1,
+              error: err,
+            });
+          }
+        });
+      }),
+    (result) => (result.ok ? 'succeeded' : 'unknown')
+  );
 }
 
 /**

@@ -27,6 +27,12 @@ const mocks = vi.hoisted(() => ({
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
+vi.mock('@agent/core/governance/external-operation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/external-operation')>()),
+  admitExternalOperation: vi.fn(() => ({ allowed: true, status: 'not_required' })),
+  recordExternalOperationOutcome: vi.fn(),
+}));
+
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {

@@ -3,7 +3,8 @@ import * as path from 'node:path';
 import { parseSafeJsonInput, getRegisteredEnvText } from '@agent/core/foundation';
 import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExec, safeExecResult, safeMkdir } from '@agent/core/secure-io';
+import { safeExec, safeExecResult, safeMkdir, safeReadFile } from '@agent/core/secure-io';
+import { runExternalOperation } from '@agent/core/governance/external-operation';
 import {
   resolveFfmpegBin,
   resolveFfprobeBin,
@@ -12,10 +13,36 @@ import {
 import { resolveVoicePath } from '@agent/core/voice/voice-path-policy';
 import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';
 import { installV4l2VirtualCameraOutputBridge } from '@agent/core/v4l2-virtual-camera-output';
-import { resolveCameraOutputBridge } from '@agent/core/camera-output-bridge';
+import {
+  resolveCameraOutputBridge,
+  listCameraOutputBridges,
+} from '@agent/core/camera-output-bridge';
 
 const STT_READY_SAMPLE_RATE = 16000;
 const STT_READY_CHANNELS = 1;
+const ownedCameraConfigs = new Map<string, { fingerprint: string; implementation: object }>();
+
+function installOwnedCamera(
+  id: string,
+  config: Record<string, unknown>,
+  install: () => unknown
+): void {
+  const fingerprint = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+  const existing = listCameraOutputBridges().find((bridge) => bridge.bridge_id === id);
+  const owned = ownedCameraConfigs.get(id);
+  if (existing) {
+    if (owned && owned.implementation !== existing) ownedCameraConfigs.delete(id);
+    if (owned?.implementation === existing && owned.fingerprint !== fingerprint)
+      throw new Error(
+        '[VOICE_CAMERA_CONFIG_DRIFT] Existing camera backend has different target configuration; stop and reconfigure it through its owner'
+      );
+    // An externally registered backend is never overwritten or claimed here.
+    return;
+  }
+  install();
+  const installed = listCameraOutputBridges().find((bridge) => bridge.bridge_id === id);
+  if (installed) ownedCameraConfigs.set(id, { fingerprint, implementation: installed });
+}
 
 interface AudioStreamProbe {
   codec?: string;
@@ -279,7 +306,7 @@ export function renderTalkingAvatar(input: {
   };
 }
 
-export function outputToVirtualCamera(input: {
+export async function outputToVirtualCamera(input: {
   action: 'output_to_virtual_camera';
   video_path?: string;
   backend?: string;
@@ -292,63 +319,119 @@ export function outputToVirtualCamera(input: {
   obs_password?: string;
   v4l2_device_path?: string;
 }): Promise<Record<string, unknown>> {
+  input = { ...input };
   const password =
     String(input.obs_password || '').trim() ||
     String(getRegisteredEnvText('KYBERION_OBS_WS_PASSWORD') || '').trim();
-  installObsVirtualCameraOutputBridge({
+  const backend = String(input.backend || 'auto').trim() || 'auto';
+  const obsOptions = {
     ...(String(input.obs_host || '').trim() ? { host: String(input.obs_host).trim() } : {}),
     ...(Number.isFinite(Number(input.obs_port)) ? { port: Number(input.obs_port) } : {}),
     ...(password ? { password } : {}),
-  });
-  installV4l2VirtualCameraOutputBridge({
+  };
+  const v4l2Options = {
     ...(String(input.v4l2_device_path || '').trim()
       ? { devicePath: String(input.v4l2_device_path).trim() }
       : {}),
-  });
-  const backend = String(input.backend || 'auto').trim() || 'auto';
+  };
+  if (backend === 'auto' || backend === 'obs-virtual-cam')
+    installOwnedCamera('obs-virtual-cam', obsOptions, () =>
+      installObsVirtualCameraOutputBridge(obsOptions)
+    );
+  if (backend === 'auto' || backend === 'v4l2-virtual-cam')
+    installOwnedCamera('v4l2-virtual-cam', v4l2Options, () =>
+      installV4l2VirtualCameraOutputBridge(v4l2Options)
+    );
+  const bridge = await resolveCameraOutputBridge(backend);
+  if (bridge.bridge_id === 'v4l2-virtual-cam' && !String(input.v4l2_device_path || '').trim()) {
+    throw new Error(
+      '[VOICE_CAMERA_TARGET_REQUIRED] An explicit v4l2_device_path is required to bind camera output approval'
+    );
+  }
+  if (
+    !ownedCameraConfigs.has(bridge.bridge_id) &&
+    (input.obs_host || input.obs_port || input.obs_password || input.v4l2_device_path)
+  ) {
+    throw new Error(
+      '[VOICE_CAMERA_BACKEND_OWNERSHIP] Configure external camera backends through their registered owner'
+    );
+  }
+  const target = {
+    backend: bridge.bridge_id,
+    obs_host: String(input.obs_host || '127.0.0.1').trim() || '127.0.0.1',
+    obs_port: Number(input.obs_port) || 4455,
+    credential_hash: password ? createHash('sha256').update(password).digest('hex') : undefined,
+    v4l2_device_path: String(input.v4l2_device_path || '').trim(),
+  };
   if (input.stop) {
-    return resolveCameraOutputBridge(backend)
-      .then((bridge) => bridge.stopAvatarOutput())
-      .then(() => ({
-        status: 'succeeded',
-        action: 'output_to_virtual_camera',
-        backend,
-        stopped: true,
-      }))
-      .catch((err: unknown) => {
-        throw new Error(
-          `[VOICE] camera output stop failed: ${err instanceof Error ? err.message : String(err)}`
-        );
-      });
+    const stop = bridge.stopAvatarOutput.bind(bridge);
+    await runExternalOperation(
+      {
+        operationId: 'voice:camera_output',
+        effect: { target, stop: true },
+        requiresApproval: true,
+        delegable: false,
+      },
+      stop,
+      () => 'succeeded'
+    );
+    return {
+      status: 'succeeded',
+      action: 'output_to_virtual_camera',
+      backend,
+      stopped: true,
+    };
   }
   const requestedVideo = String(input.video_path || '').trim();
   if (!requestedVideo) {
     throw new Error('[VOICE] output_to_virtual_camera needs video_path (or stop: true)');
   }
   const videoPath = resolveVoicePath(requestedVideo, 'audio-input');
-  return resolveCameraOutputBridge(backend)
-    .then((bridge) =>
-      bridge.startAvatarOutput({
-        videoPath,
-        ...(String(input.scene_name || '').trim()
-          ? { sceneName: String(input.scene_name).trim() }
-          : {}),
-        ...(String(input.source_name || '').trim()
-          ? { sourceName: String(input.source_name).trim() }
-          : {}),
-        ...(input.loop !== undefined ? { loop: Boolean(input.loop) } : {}),
-      })
-    )
-    .then((result) => ({
-      status: 'succeeded',
-      action: 'output_to_virtual_camera',
-      backend,
-      video_path: videoPath,
-      ...result,
-    }))
-    .catch((err: unknown) => {
-      throw new Error(
-        `[VOICE] camera output failed: ${err instanceof Error ? err.message : String(err)}`
-      );
-    });
+  const digest = () =>
+    createHash('sha256')
+      .update(safeReadFile(videoPath) as Buffer)
+      .digest('hex');
+  const sourceHash = digest();
+  const request = Object.freeze({
+    videoPath,
+    ...(String(input.scene_name || '').trim()
+      ? { sceneName: String(input.scene_name).trim() }
+      : {}),
+    ...(String(input.source_name || '').trim()
+      ? { sourceName: String(input.source_name).trim() }
+      : {}),
+    ...(input.loop !== undefined ? { loop: Boolean(input.loop) } : {}),
+  });
+  const start = bridge.startAvatarOutput.bind(bridge);
+  const result = await runExternalOperation(
+    {
+      operationId: 'voice:camera_output',
+      effect: {
+        target,
+        source_hash: sourceHash,
+        source_format: path.extname(videoPath).toLowerCase(),
+        scene: request.sceneName,
+        source: request.sourceName,
+        loop: request.loop,
+      },
+      requiresApproval: true,
+      delegable: false,
+    },
+    async () => {
+      if (digest() !== sourceHash)
+        throw new Error('[VOICE_VIDEO_CHANGED] Camera source changed after admission');
+      const result = await start(request);
+      if (!result.virtualCamStarted)
+        throw new Error('[VOICE_CAMERA_UNVERIFIED] Provider did not confirm camera output started');
+      return result;
+    },
+    (result) => (result.virtualCamStarted ? 'succeeded' : 'unknown')
+  );
+  return {
+    status: 'succeeded',
+    action: 'output_to_virtual_camera',
+    backend,
+    video_path: videoPath,
+    ...result,
+  };
 }

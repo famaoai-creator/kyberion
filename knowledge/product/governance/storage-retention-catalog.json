@@ -16,6 +16,12 @@
       "note": "Tenant-partitioned execution receipts and learned autonomy overrides. Never delete automatically: removing incident or deduplication evidence could relax authority or replay execution credit. Retire through explicit retention review."
     },
     {
+      "path": "active/shared/runtime/external-operations",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Immutable external-effect execution reservations, partitioned by tier and tenant; contains hashes only. Never auto-expire: deleting a reservation can replay a mutation after a crash or timeout. Retire only after all matching invocation retry paths are retired, through explicit retention or tenant offboarding review."
+    },
+    {
       "path": "active/shared/runtime/governance",
       "artifact_class": "state",
       "action": "review_required",

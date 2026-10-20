@@ -4,6 +4,14 @@ import actuatorManifestSchema from '../../../../knowledge/product/schemas/actuat
 import serviceManifestSchema from '../../../../knowledge/product/schemas/service-manifest.schema.json';
 import serviceActuatorManifest from '../manifest.json';
 
+// Transport/process tests isolate shared admission; its real boundary is
+// covered in service-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', () => ({
+  assertExternalOperationBatchResumable: vi.fn(),
+  admitExternalOperation: vi.fn(() => ({ allowed: true, status: 'not_required' })),
+  recordExternalOperationOutcome: vi.fn(),
+}));
+
 const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(),
   assertSafeRepositoryPath: vi.fn((candidate: string) => {
@@ -107,6 +115,19 @@ vi.mock('@agent/core/path-resolver', () => ({
 vi.mock('@agent/core/service/service-engine', () => ({
   executeServicePreset: mocks.executeServicePreset,
   executeMcp: vi.fn(),
+}));
+vi.mock('@agent/core/service/service-preset-registry', () => ({
+  getServicePresetRecord: () => ({
+    service_id: 'slack',
+    operations: {
+      post_message: { type: 'api', method: 'POST', risk: 'write' },
+    },
+  }),
+}));
+vi.mock('@agent/core/service/service-harness', () => ({
+  describeServiceHarness: () => ({
+    operations: [{ action: 'post_message', risk: 'write', approval_required: true }],
+  }),
 }));
 vi.mock('@agent/core/service/service-validator', () => ({
   validateServiceAuth: mocks.validateServiceAuth,

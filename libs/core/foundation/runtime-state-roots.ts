@@ -7,6 +7,7 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   pipeline_library_runs: 'active/shared/runtime/pipeline-library-runs',
   /** Evidence and per-action autonomy overrides; never shared across tenants. */
   autonomy_learning: 'active/shared/runtime/autonomy-learning',
+  external_operations: 'active/shared/runtime/external-operations',
   hearing: 'active/shared/runtime/hearing',
   discussion_create_requests: 'active/shared/runtime/discussion-create-requests',
   /** PG-03 standing grants (governance/grant-store.ts). */

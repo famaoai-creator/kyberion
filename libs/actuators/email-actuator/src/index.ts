@@ -13,7 +13,6 @@
 
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
-import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { sendEmail, createDraft } from '@agent/core/integrations/email-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -28,6 +27,8 @@ import {
   runActuatorPipeline,
 } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
+import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 
 interface EmailParams {
   backend?: string;
@@ -92,13 +93,11 @@ async function executeEmailOp(
   switch (op) {
     case 'create_draft': {
       logger.info(`[EMAIL] Creating draft → To: ${params.to}, Subject: ${params.subject}`);
-      const result = await retry(() => createDraft(params), {
-        maxRetries: 2,
-        initialDelayMs: 1000,
-        maxDelayMs: 8000,
-        factor: 2,
-        jitter: true,
-      });
+      const result = await createDraft(params);
+      if (result.status !== 'succeeded')
+        throw new Error(
+          result.error || '[EMAIL_DRAFT_UNVERIFIED] Draft creation needs verification'
+        );
       logger.success(`[EMAIL] Draft created`);
       if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
       break;
@@ -106,13 +105,9 @@ async function executeEmailOp(
     case 'send':
     case 'send_from_file': {
       logger.info(`[EMAIL] Sending → To: ${params.to ?? ''}, Subject: ${params.subject ?? ''}`);
-      const result = await retry(() => sendEmail(params), {
-        maxRetries: 2,
-        initialDelayMs: 1000,
-        maxDelayMs: 8000,
-        factor: 2,
-        jitter: true,
-      });
+      const result = await sendEmail(params);
+      if (result.status !== 'succeeded')
+        throw new Error(result.error || '[EMAIL_SEND_UNVERIFIED] Send needs verification');
       logger.success(`[EMAIL] Sent → To: ${params.to}, Subject: ${params.subject}`);
       if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
       break;
@@ -133,11 +128,21 @@ export async function handleAction(input: {
     input.context ?? (input.params?.context as Record<string, unknown>) ?? {};
 
   if (input.action === 'pipeline' && Array.isArray(input.steps)) {
+    assertExternalOperationBatchResumable(
+      () =>
+        input.steps!.filter((step) =>
+          EMAIL_ACTUATOR_OPS.includes(step.op as (typeof EMAIL_ACTUATOR_OPS)[number])
+        ).length
+    );
+    let index = 0;
     return runActuatorPipeline({
       actuatorId: 'email',
       steps: input.steps,
       context: ctx,
-      execute: executeEmailOp,
+      execute: (op, params, context) =>
+        withExternalOperationOccurrence(`email-substep:${index++}:${op}`, () =>
+          executeEmailOp(op, params, context)
+        ),
     });
   }
 
@@ -150,6 +155,7 @@ export async function handleAction(input: {
     context: ctx,
     execute: executeEmailOp,
   });
+  // executeEmailOp throws on every unverified/failed transport result.
   return { ...newCtx, status: 'succeeded' };
 }
 

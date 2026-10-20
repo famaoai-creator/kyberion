@@ -9,6 +9,11 @@ import { normalizeEventScope } from '@agent/core/event-scope';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { runActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  assertExternalOperationBatchResumable,
+  stopExternalOperationForVerification,
+} from '@agent/core/governance/external-operation';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import type { GenerationJob } from '@agent/core/contracts/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
@@ -68,60 +73,27 @@ const PROMPT_BASED_ACTIONS = new Set([
   'run_workflow',
 ]);
 async function retryGenerationJob(job: GenerationJob): Promise<GenerationJob> {
-  const classification = String(job.result?.retry_classification || 'unknown');
-  const retryableCategories = loadRecoveryPolicy().retryable_categories;
-  if (!Array.isArray(retryableCategories) || !retryableCategories.includes(classification)) {
-    return writeJob(job);
-  }
-  const maxAttempts = Number(job.retry_policy?.max_attempts || 1);
-  if ((job.attempts || 1) >= maxAttempts) {
-    return writeJob(job);
-  }
-  const backoffSeconds = Number(job.retry_policy?.backoff_seconds || 0);
-  const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
-  const retryingJob = transitionGenerationJob(job, 'retrying', {
-    next_retry_at: nextRetryAt,
-    updated_at: nowIso(),
+  // This job already has an external submission receipt. A failed status poll
+  // or artifact download is not evidence that generating again is safe.
+  return writeJob({
+    ...job,
+    next_retry_at: undefined,
+    result: { ...job.result, verification_required: true },
   });
-  return writeJob(retryingJob);
 }
 
 async function resumeRetriedGenerationJob(job: GenerationJob): Promise<GenerationJob> {
-  const nextRetryAt = job.next_retry_at ? new Date(job.next_retry_at).getTime() : 0;
-  if (nextRetryAt > Date.now()) {
-    return job;
-  }
-  const retried = await submitGenerationJob({
-    action: job.action,
-    params: job.request,
-    retry_policy: job.retry_policy,
-    existing_job_id: job.job_id,
-    next_attempt: (job.attempts || 1) + 1,
-    created_at: job.created_at,
-    scope: job.scope,
-  });
-  if (retried.status === 'failed' || !('job_id' in retried)) {
-    return writeJob({
-      ...job,
-      status: 'failed',
+  return writeJob(
+    transitionGenerationJob(job, 'failed', {
       result: {
         ...job.result,
-        error: (retried as any).message || 'retry submission failed',
+        verification_required: true,
+        error: 'Legacy retry stopped: verify the existing provider job before any new submission',
       },
       next_retry_at: undefined,
       updated_at: nowIso(),
-      completed_at: nowIso(),
-    });
-  }
-  const resubmitted = transitionGenerationJob(job, 'submitted', {
-    ...retried,
-    result: {
-      ...job.result,
-      ...retried.result,
-    },
-    next_retry_at: undefined,
-  });
-  return writeJob(resubmitted);
+    })
+  );
 }
 
 async function handlePromptBasedGeneration(action: string, params: any) {
@@ -137,6 +109,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
     ),
   });
   let result: any = null;
+  let hasProviderReceipt = false;
   try {
     if (action === 'generate_video') params = await applyVideoProviderSelection(params);
     const prepared = preparePromptBasedGeneration(action, params);
@@ -271,6 +244,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
 
     const { compiled, workflow } = prepared;
     result = await executePreparedGeneration(action, { ...prepared, workflow });
+    hasProviderReceipt = Boolean(result?.provider_job_id || result?.prompt_id);
 
     const backend = resolveGenerationBackend(action, prepared.params);
     result = {
@@ -323,6 +297,8 @@ async function handlePromptBasedGeneration(action: string, params: any) {
     traceCtx.endSpan('ok');
     return { ...collected, ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {
+    if (err?.adfControlFlow === 'preflight') throw err;
+    if (hasProviderReceipt) stopExternalOperationForVerification(`media:generation:${action}`, err);
     traceCtx.endSpan('error', err?.message ?? String(err));
     return {
       status: 'failed',
@@ -334,6 +310,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
 }
 
 async function submitGenerationJob(params: any) {
+  let hasProviderReceipt = false;
   const traceCtx = createActuatorTrace('media-generation-actuator', 'submit_generation', {
     pipelineId: String(params?.existing_job_id || params?.job_id || ''),
   });
@@ -369,6 +346,7 @@ async function submitGenerationJob(params: any) {
     if (!providerJobId) {
       throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
     }
+    hasProviderReceipt = true;
 
     const backend = resolveGenerationBackend(action, innerParams);
     const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
@@ -426,6 +404,8 @@ async function submitGenerationJob(params: any) {
     traceCtx.endSpan('ok');
     return { ...job, ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {
+    if (err?.adfControlFlow === 'preflight') throw err;
+    if (hasProviderReceipt) stopExternalOperationForVerification('media:generation:submit', err);
     traceCtx.endSpan('error', err?.message ?? String(err));
     return {
       status: 'failed',
@@ -799,6 +779,14 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
   );
   traceCtx.startSpan(`media-generation:${String(input?.action || 'unknown')}`);
   if (input.action === 'pipeline') {
+    assertExternalOperationBatchResumable(
+      () =>
+        (input.steps || []).filter(
+          (step) =>
+            PROMPT_BASED_ACTIONS.has(String(step.action)) || step.action === 'submit_generation'
+        ).length
+    );
+    let occurrence = 0;
     const continueOnError = input.continue_on_error !== false;
     try {
       const results: Array<Record<string, unknown>> = [];
@@ -817,12 +805,22 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
             context: { result: undefined as MediaActionResult | undefined },
             execute: async (op, params, context) => ({
               ...context,
-              result: await executeSingleAction({ action: op, params }),
+              result: await withExternalOperationOccurrence(`media:${occurrence++}`, () =>
+                executeSingleAction({ action: op, params })
+              ),
             }),
           });
           const stepResult = pipeline.result || { action, status: 'succeeded' };
           results.push(stepResult);
           if (stepResult?.status === 'failed') {
+            if (PROMPT_BASED_ACTIONS.has(action) || action === 'submit_generation') {
+              throw Object.assign(
+                new Error(
+                  '[GENERATION_UNVERIFIED] Verify the submitted generation before continuing'
+                ),
+                { adfControlFlow: 'preflight' }
+              );
+            }
             pipelineFailed = true;
             traceCtx.endSpan(
               'error',
@@ -834,6 +832,7 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
             traceCtx.endSpan('ok');
           }
         } catch (err: unknown) {
+          if (err && typeof err === 'object' && 'adfControlFlow' in err) throw err;
           const error = err instanceof Error ? err : new Error(String(err));
           pipelineFailed = true;
           traceCtx.endSpan('error', error.message);
@@ -858,6 +857,7 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
         ...finalizeActuatorTrace(traceCtx),
       };
     } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'adfControlFlow' in err) throw err;
       const error = err instanceof Error ? err : new Error(String(err));
       traceCtx.endSpan('error', error.message);
       return { status: 'failed', message: error.message, ...finalizeActuatorTrace(traceCtx) };
@@ -868,6 +868,7 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
     traceCtx.endSpan('ok');
     return mergeTraceEvidence(result, finalizeActuatorTrace(traceCtx));
   } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'adfControlFlow' in err) throw err;
     const error = err instanceof Error ? err : new Error(String(err));
     traceCtx.endSpan('error', error.message);
     return { status: 'failed', message: error.message, ...finalizeActuatorTrace(traceCtx) };

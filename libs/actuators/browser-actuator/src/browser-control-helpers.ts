@@ -10,8 +10,35 @@ import {
 } from './browser-passkey-helpers.js';
 import type { Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
+import {
+  browserOperationRequiresAdmission,
+  runBrowserMutation,
+} from './browser-external-governance.js';
 
 export async function opControl(
+  op: string,
+  params: unknown,
+  runtime: BrowserRuntime,
+  ctx: Record<string, unknown>,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: Record<string, unknown>
+  ) => Promise<AdfRunResult<Record<string, unknown>>>,
+  resolve: (value: unknown) => unknown
+): Promise<Record<string, unknown>> {
+  if (browserOperationRequiresAdmission('control', op)) {
+    if (!isRecord(params))
+      throw new Error(`[INVALID_PARAMS] ${op} control params must be an object`);
+    return runBrowserMutation(
+      { op, params, runtime, page: browserRuntimeHelpers.getActivePage(runtime), resolve },
+      (boundParams, resolveBound) =>
+        executeControl(op, boundParams, runtime, ctx, runSteps, resolveBound)
+    );
+  }
+  return executeControl(op, params, runtime, ctx, runSteps, resolve);
+}
+
+async function executeControl(
   op: string,
   params: unknown,
   runtime: BrowserRuntime,

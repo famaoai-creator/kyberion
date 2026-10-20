@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+  assertExternalOperationBatchResumable: vi.fn(),
+  assertExternalOperationReplayIdentity: vi.fn(),
+}));
 
 const mocks = vi.hoisted(() => ({
   compileSchemaFromPath: vi.fn(() => {
@@ -365,6 +370,7 @@ vi.mock('@agent/core/secure-io', () => ({
   safeRmSync: mocks.safeRmSync,
 }));
 vi.mock('@agent/core/camera-output-bridge', () => ({
+  listCameraOutputBridges: vi.fn(() => []),
   registerCameraOutputBridge: vi.fn(),
   resolveCameraOutputBridge: vi.fn(async () => {
     throw new Error('OBS is not reachable at ws://127.0.0.1:1');
@@ -599,7 +605,7 @@ describe('voice actuator', () => {
       ])
     );
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
-    expect(mocks.retry).toHaveBeenCalled();
+    expect(mocks.retry).not.toHaveBeenCalled();
   });
 
   it('reports governed voice runtime health', async () => {
@@ -727,7 +733,7 @@ describe('voice actuator', () => {
       '/tmp/voice-generation/req-1.wav',
     ]);
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
-    expect(mocks.retry).toHaveBeenCalled();
+    expect(mocks.retry).not.toHaveBeenCalled();
   });
 
   it('blocks generate_voice when personal voice is required but engine falls back', async () => {

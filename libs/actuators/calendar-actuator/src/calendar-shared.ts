@@ -136,7 +136,8 @@ export function normalizeCalendarEventMutation(value: unknown): CalendarEventMut
 export async function runJxa<T>(
   scriptBody: string,
   params: Record<string, unknown>,
-  normalize: (value: unknown) => T
+  normalize: (value: unknown) => T,
+  mutation = false
 ): Promise<T> {
   const paramsLiteral = JSON.stringify(JSON.stringify(params));
   const script = `
@@ -147,7 +148,7 @@ export async function runJxa<T>(
   `;
   const output = await retry(
     async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]),
-    buildRetryOptions()
+    mutation ? { maxRetries: 0 } : buildRetryOptions()
   );
   const trimmed = String(output).trim();
   try {

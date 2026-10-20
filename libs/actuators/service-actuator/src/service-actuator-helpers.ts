@@ -65,7 +65,15 @@ import {
 } from '@agent/core/service/service-pid-registry';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import {
+  admitExternalOperation,
+  assertExternalOperationBatchResumable,
+  recordExternalOperationOutcome,
+  type ExternalOperation,
+  type ExternalOperationAuthority,
+} from '@agent/core/governance/external-operation';
 import { secureFetch } from '@agent/core/network';
+import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -98,6 +106,8 @@ export interface ServiceAction {
 }
 
 export interface ServiceActionExecutionOptions {
+  /** Trusted embedding boundary; never populated from params/context. */
+  externalAuthority?: (input: ServiceAction) => ExternalOperationAuthority | undefined;
   /** Trusted caller-side presence signal for approval-gated service actions. */
   hasHuman?: boolean;
   /** Trusted caller-side resolver for an already-bound approval decision. */
@@ -371,26 +381,34 @@ export async function handleAction(
     const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
     let ctx = { ...input.context };
     const steps = input.steps || [];
-    for (const step of steps) {
+    // Even a read can require a tenant-binding decision. Inner service steps
+    // have no checkpoints, so resumable runs use one service call per outer step.
+    assertExternalOperationBatchResumable(
+      () => steps.filter((step) => step.op.toLowerCase() !== 'harness').length
+    );
+    for (const [stepIndex, step] of steps.entries()) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await (async () => {
-        return await handleSingleAction(
-          {
-            service_id: step.params.service_id,
-            mode: step.op.toUpperCase() as ServiceAction['mode'],
-            action: step.params.action,
-            params: step.params.params,
-            auth: step.params.auth,
-            method: step.params.method,
-            // The pipeline envelope is authoritative. A step may add context
-            // but cannot weaken or redirect the parent mission scope.
-            context: { ...(step.params.context || {}), ...input.context },
-          },
-          undefined,
-          false,
-          options
-        );
-      })();
+      const stepResult = await withExternalOperationOccurrence(
+        `service-substep:${stepIndex}:${step.op}`,
+        async () => {
+          return await handleSingleAction(
+            {
+              service_id: step.params.service_id,
+              mode: step.op.toUpperCase() as ServiceAction['mode'],
+              action: step.params.action,
+              params: step.params.params,
+              auth: step.params.auth,
+              method: step.params.method,
+              // The pipeline envelope is authoritative. A step may add context
+              // but cannot weaken or redirect the parent mission scope.
+              context: { ...(step.params.context || {}), ...input.context },
+            },
+            undefined,
+            false,
+            options
+          );
+        }
+      );
 
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
@@ -407,6 +425,44 @@ export async function handleAction(
   return await handleSingleAction(input, onEvent, true, options);
 }
 
+/** Reviewed preset risk is authoritative; opaque routes never infer read from action names. */
+export function describeServiceExternalEffect(
+  input: ServiceAction
+): Pick<ExternalOperation, 'requiresApproval' | 'delegable'> {
+  if (input.action === 'pipeline' || input.mode === 'HARNESS') {
+    return { requiresApproval: false, delegable: false };
+  }
+  if (input.mode === 'PRESET') {
+    const declared = getServicePresetRecord(input.service_id)?.operations?.[input.action];
+    const descriptor = describeServiceHarness(input.service_id, { detail: true });
+    const op = descriptor.operations.find((candidate) => candidate.action === input.action);
+    if (!op)
+      throw new Error(
+        `[UNKNOWN_OP] Undeclared service operation ${input.service_id}:${input.action}`
+      );
+    const routes =
+      Array.isArray(declared?.alternatives) && declared.alternatives.length
+        ? declared.alternatives
+        : [declared];
+    const knownRead =
+      declared?.risk === 'read' ||
+      routes.every(
+        (route: unknown) =>
+          isRecord(route) &&
+          route.type === 'api' &&
+          ['GET', 'HEAD'].includes(String(route.method ?? declared?.method).toUpperCase())
+      );
+    return {
+      requiresApproval: op.approval_required || op.risk !== 'read' || !knownRead,
+      delegable: op.risk === 'write',
+    };
+  }
+  return {
+    requiresApproval: !(input.mode === 'API' && input.method === 'GET'),
+    delegable: false,
+  };
+}
+
 async function handleSingleAction(
   input: ServiceAction,
   onEvent?: (data: any) => void,
@@ -414,6 +470,18 @@ async function handleSingleAction(
   options: ServiceActionExecutionOptions = {}
 ) {
   if (!alreadyAdmitted) input = await admitServiceAction(input, options);
+  const bindingAuthorization = authorizeTenantServiceBinding(input);
+  const scope = resolveTrustedScope(input.context ?? {}, Boolean(bindingAuthorization.bindingId));
+  const effectDescription = describeServiceExternalEffect(input);
+  const external: ExternalOperation = {
+    operationId: `service:${input.service_id}:${input.mode.toLowerCase()}:${input.action}`,
+    effect: input as unknown as Record<string, unknown>,
+    ...effectDescription,
+    requiresApproval: effectDescription.requiresApproval || bindingAuthorization.approvalRequired,
+    ...(scope ? { tenantSlug: resolveTenantAlias(scope) } : {}),
+    authority: options.externalAuthority?.(input),
+  };
+  // Scope/introduction/egress validation happens before consuming a charter budget.
   logger.info(
     `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
   );
@@ -422,6 +490,28 @@ async function handleSingleAction(
   enforceResourceIntroduction(input);
 
   const egressContext = prepareServiceEgressContext(input);
+  const serviceTarget = delegatedServiceTarget(input);
+  if (
+    hasDelegatedExecutionContext() &&
+    !currentDelegatedExecution(`service:preset:${input.service_id}:${input.action}`, {
+      request: input.params,
+      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+    })
+  ) {
+    throw new Error('[POLICY_VIOLATION] Service action differs from active delegated execution');
+  }
+  const explicitHumanApproval = options.approvalGranted
+    ? await options.approvalGranted(input)
+    : false;
+  const humanExecution = currentHumanExecutionAuthorization(
+    `service:preset:${input.service_id}:${input.action}`,
+    {
+      request: input.params,
+      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+    }
+  );
+  if (hasHumanExecutionContext() && !humanExecution)
+    throw new Error('[POLICY_VIOLATION] Service action differs from human-authorized effect');
 
   const execute = async (): Promise<unknown> => {
     switch (input.mode) {
@@ -500,37 +590,51 @@ async function handleSingleAction(
     }
   };
 
-  const serviceTarget = delegatedServiceTarget(input);
-  const invoke = () =>
-    egressContext ? withEgressPayloadContext(egressContext, execute) : execute();
-  if (
-    hasDelegatedExecutionContext() &&
-    !currentDelegatedExecution(`service:preset:${input.service_id}:${input.action}`, {
-      request: input.params,
-      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
-    })
-  ) {
-    throw new Error('[POLICY_VIOLATION] Service action differs from active delegated execution');
-  }
-  const explicitHumanApproval = options.approvalGranted
-    ? await options.approvalGranted(input)
-    : false;
-  const humanExecution = currentHumanExecutionAuthorization(
-    `service:preset:${input.service_id}:${input.action}`,
-    {
-      request: input.params,
-      auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+  const invoke = async () => {
+    // Main's delegated wrapper must establish the real exact execution proof
+    // before the shared external boundary can reuse it without a second gate.
+    admitExternalOperation(external);
+    if (bindingAuthorization.bindingId) {
+      input = {
+        ...input,
+        context: {
+          ...input.context,
+          service_binding_id: bindingAuthorization.bindingId,
+          service_binding_approval_granted: true,
+        },
+      };
     }
+    return egressContext ? await withEgressPayloadContext(egressContext, execute) : await execute();
+  };
+  let result: unknown;
+  try {
+    result =
+      !explicitHumanApproval &&
+      !humanExecution &&
+      serviceTarget &&
+      hasDelegatedOperationMapping(serviceTarget.operationId)
+        ? await runDelegatedExecution(serviceTarget, invoke)
+        : await invoke();
+  } catch (error) {
+    recordExternalOperationOutcome(external, external.requiresApproval ? 'unknown' : 'failed');
+    throw error;
+  }
+  const resultRecord =
+    result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
+  const failed =
+    resultRecord.ok === false ||
+    resultRecord.success === false ||
+    ['error', 'failed', 'denied'].includes(String(resultRecord.status));
+  recordExternalOperationOutcome(
+    external,
+    failed
+      ? 'failed'
+      : resultRecord.ok === true ||
+          resultRecord.success === true ||
+          ['success', 'succeeded', 'reconciled'].includes(String(resultRecord.status))
+        ? 'succeeded'
+        : 'unknown'
   );
-  if (hasHumanExecutionContext() && !humanExecution)
-    throw new Error('[POLICY_VIOLATION] Service action differs from human-authorized effect');
-  const result =
-    !explicitHumanApproval &&
-    !humanExecution &&
-    serviceTarget &&
-    hasDelegatedOperationMapping(serviceTarget.operationId)
-      ? await runDelegatedExecution(serviceTarget, invoke)
-      : await invoke();
 
   // Capture only canonical PRESET calls when an explicit recording session is
   // attached by the caller. The session stores operation metadata and bounded
@@ -624,9 +728,7 @@ async function admitServiceAction(
     context: input.context,
     source: 'actuator',
     requiresApproval:
-      bindingAuthorization.approvalRequired ||
-      input.params?._approval_required === true ||
-      input.context?._approval_required === true,
+      input.params?._approval_required === true || input.context?._approval_required === true,
     approvalGranted: humanApproval || Boolean(exactHumanApproval) || delegatedApproval,
     ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
   });

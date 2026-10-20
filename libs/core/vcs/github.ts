@@ -1,4 +1,6 @@
-import { safeExec, safeExecResult, type SafeExecOptions } from '../secure-io.js';
+import { safeExec, safeExecResult, safeReadFile, type SafeExecOptions } from '../secure-io.js';
+import { governVcsCommand } from './external-vcs.js';
+import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
 import { redactActiveSecretsForHostLog } from '../secret/secret-guard.js';
@@ -172,7 +174,33 @@ export function ghRun(
   // attach the *registered* values explicitly — the same explicit-override
   // channel publish_pull_request/pr_shadow use. Without this, the gh ops
   // only work where keyring auth exists (a GH_TOKEN-only CI env fails).
-  return run('gh', args, ghExecOptions(options));
+  assertGhRead(args);
+  return governVcsCommand(
+    'vcs:github:read',
+    { args, cwd: options.cwd },
+    () => run('gh', args, ghExecOptions(options)),
+    false
+  );
+}
+
+function assertGhRead(args: string[]): void {
+  if (
+    args[0] === '--version' ||
+    ['auth status', 'pr view', 'pr list', 'pr checks', 'repo view'].includes(
+      `${args[0]} ${args[1]}`
+    )
+  )
+    return;
+  if (
+    args[0] === 'api' &&
+    args.length === 4 &&
+    args[2] === '--hostname' &&
+    /^repos\/[\w.-]+\/[\w.-]+\/commits\/[^\s]+$/.test(args[1])
+  )
+    return;
+  throw new Error(
+    '[VCS_TYPED_VERB_REQUIRED] Use a typed mutation verb with a bound publication snapshot'
+  );
 }
 
 export function ghMust(
@@ -208,7 +236,17 @@ export function ghMust(
   // Default path uses the throwing safeExec — the seam existing callers and
   // their tests already intercept (publish_pull_request's credential checks).
   try {
-    return safeExec('gh', args, ghExecOptions(options));
+    assertGhRead(args);
+    return governVcsCommand(
+      'vcs:github:read',
+      { args, cwd: options.cwd },
+      () => ({
+        status: 0,
+        stdout: safeExec('gh', args, ghExecOptions(options)),
+        stderr: '',
+      }),
+      false
+    ).stdout;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const diagnostic = diagnoseGhResult(
@@ -429,9 +467,53 @@ export function ghPrMerge(
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
   assertNotFlagLike(params.ref, 'pr ref');
-  const args = ['pr', 'merge', params.ref, `--${params.method || 'merge'}`];
+  const repository = ghPrRepository(params, run);
+  const snapshot = () =>
+    ghJsonSnapshot(
+      [
+        'pr',
+        'view',
+        params.ref,
+        '--repo',
+        repository.url,
+        '--json',
+        'number,url,headRefOid,baseRefOid,baseRefName,headRefName',
+      ],
+      params,
+      run
+    );
+  const bound = snapshot();
+  if (!Number.isInteger(bound.number) || !/^[a-f0-9]{40,64}$/i.test(String(bound.headRefOid)))
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] PR identity and head commit required');
+  if (bound.url !== `${repository.url.replace(/\/$/, '')}/pull/${bound.number}`) {
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] PR belongs to a different repository');
+  }
+  const args = [
+    'pr',
+    'merge',
+    String(bound.number),
+    '--repo',
+    repository.url,
+    `--${params.method || 'merge'}`,
+    '--match-head-commit',
+    String(bound.headRefOid),
+  ];
   if (params.deleteBranch !== false) args.push('--delete-branch');
-  return ghRun(args, params, run);
+  return governVcsCommand(
+    'vcs:pr_merge',
+    {
+      repository,
+      ...bound,
+      method: params.method || 'merge',
+      deleteBranch: params.deleteBranch !== false,
+    },
+    () => {
+      if (computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound))
+        throw new Error('[VCS_SNAPSHOT_CHANGED] PR changed before merge');
+      return run('gh', args, ghExecOptions(params));
+    },
+    true
+  );
 }
 
 export function ghPrCreate(
@@ -448,11 +530,122 @@ export function ghPrCreate(
   if (!params.title?.trim()) throw new Error('[VCS_GH_INVALID] pr create requires a title');
   if (params.head !== undefined) assertNotFlagLike(params.head, 'head');
   if (params.base !== undefined) assertNotFlagLike(params.base, 'base');
-  const args = ['pr', 'create', '--title', params.title.trim()];
-  if (params.bodyFile) args.push('--body-file', params.bodyFile);
-  else if (params.body?.trim()) args.push('--body', params.body.trim());
-  if (params.base?.trim()) args.push('--base', params.base.trim());
-  if (params.head?.trim()) args.push('--head', params.head.trim());
+  const repository = ghPrRepository(params, run);
+  const localRead = (args: string[]) => {
+    const result = run('git', args, { cwd: params.cwd });
+    if (result.error || result.status !== 0 || !result.stdout.trim())
+      throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Cannot resolve PR source');
+    return result.stdout.trim();
+  };
+  const head = params.head?.trim() || localRead(['symbolic-ref', '--short', 'HEAD']);
+  const base = params.base?.trim() || ghRepoDefaultBranch(params, run);
+  assertNotFlagLike(head, 'head');
+  assertNotFlagLike(base, 'base');
+  const body = params.bodyFile
+    ? String(safeReadFile(params.bodyFile, { encoding: 'utf8' }))
+    : params.body?.trim() || '';
+  const snapshot = () => ({
+    head,
+    base,
+    headSha: localRead(['rev-parse', '--verify', `${head}^{commit}`]),
+    remoteHead: ghJsonSnapshot(
+      [
+        'api',
+        `repos/${repository.slug}/commits/${encodeURIComponent(head)}`,
+        '--hostname',
+        repository.host,
+      ],
+      params,
+      run
+    ).sha,
+    remoteBase: ghJsonSnapshot(
+      [
+        'api',
+        `repos/${repository.slug}/commits/${encodeURIComponent(base)}`,
+        '--hostname',
+        repository.host,
+      ],
+      params,
+      run
+    ).sha,
+  });
+  const bound = snapshot();
+  if (
+    !/^[a-f0-9]{40,64}$/i.test(bound.headSha) ||
+    bound.remoteHead !== bound.headSha ||
+    !/^[a-f0-9]{40,64}$/i.test(String(bound.remoteBase))
+  )
+    throw new Error(
+      '[VCS_SNAPSHOT_UNAVAILABLE] Push the exact PR source commit before creating a PR'
+    );
+  const args = [
+    'pr',
+    'create',
+    '--repo',
+    repository.url,
+    '--title',
+    params.title.trim(),
+    '--body',
+    body,
+    '--base',
+    base,
+    '--head',
+    head,
+  ];
   if (params.draft) args.push('--draft');
-  return ghRun(args, params, run);
+  return governVcsCommand(
+    'vcs:pr_create',
+    { repository, ...bound, title: params.title.trim(), body, draft: params.draft === true },
+    () => {
+      if (
+        computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound) ||
+        (params.bodyFile && String(safeReadFile(params.bodyFile, { encoding: 'utf8' })) !== body)
+      )
+        throw new Error(
+          '[VCS_SNAPSHOT_CHANGED] PR source, base or review text changed before creation'
+        );
+      return run('gh', args, ghExecOptions(params));
+    },
+    true
+  );
+}
+
+function ghJsonSnapshot(
+  args: string[],
+  options: GhCallOptions,
+  run: VcsCommandRunner
+): Record<string, unknown> {
+  const result = ghRun(args, options, run);
+  if (result.error || result.status !== 0)
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Cannot read GitHub publication snapshot');
+  let value: unknown;
+  try {
+    value = JSON.parse(result.stdout);
+  } catch {
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Invalid GitHub snapshot JSON');
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Invalid GitHub snapshot');
+  return value as Record<string, unknown>;
+}
+
+function ghPrRepository(
+  options: GhCallOptions,
+  run: VcsCommandRunner
+): { slug: string; url: string; host: string } {
+  const snapshot = ghJsonSnapshot(['repo', 'view', '--json', 'nameWithOwner,url'], options, run);
+  const repo = snapshot.nameWithOwner;
+  if (typeof repo !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(repo))
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Repository identity required');
+  const url = new URL(String(snapshot.url));
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname.replace(/^\//, '').replace(/\/$/, '') !== repo
+  )
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Repository URL required');
+  return { slug: repo, url: url.toString(), host: url.host };
 }

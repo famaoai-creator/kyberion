@@ -8,6 +8,21 @@
  * Set NODE_ENV=test (default in vitest) so the module does not auto-run main().
  */
 import { describe, it, expect, vi } from 'vitest';
+// Transport/validation fixtures isolate admission; real boundary regressions
+// live in calendar-external-governance.test.ts.
+vi.mock('@agent/core/governance/external-operation', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/external-operation')>()),
+  admitExternalOperation: vi.fn(),
+  recordExternalOperationOutcome: vi.fn(),
+}));
+vi.mock('@agent/core/meeting/calendar-external-effect', () => ({
+  runCalendarExternalEffect: (
+    _input: object,
+    _kind: string,
+    _effect: object,
+    execute: () => unknown
+  ) => execute(),
+}));
 import { actuator, handleAction } from './index.js';
 import { CalendarBackendRegistry, type CalendarBackendAdapter } from './calendar-backend.js';
 

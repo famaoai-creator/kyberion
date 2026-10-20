@@ -136,8 +136,9 @@ export class JxaCalendarBackend implements CalendarBackendAdapter {
       );
     }
 
-    return runJxa<CalendarEventMutation>(
-      `
+    return runCalendarExternalEffect(params, 'create_event', { backend: this.id, params }, () =>
+      runJxa<CalendarEventMutation>(
+        `
         const app = Application("Calendar");
         const cal = app.calendars.byName(PARAMS.calendar_name);
         if (!cal.exists()) {
@@ -153,15 +154,18 @@ export class JxaCalendarBackend implements CalendarBackendAdapter {
         cal.events.push(event);
         return JSON.stringify({ status: "success", title: PARAMS.title });
       `,
-      {
-        calendar_name: calendar,
-        title,
-        start_iso: start.toISOString(),
-        end_iso: end.toISOString(),
-        location: params.location?.trim() || '',
-        description: params.description?.trim() || '',
-      },
-      normalizeCalendarEventMutation
+        {
+          calendar_name: calendar,
+          title,
+          start_iso: start.toISOString(),
+          end_iso: end.toISOString(),
+          location: params.location?.trim() || '',
+          description: params.description?.trim() || '',
+        },
+        normalizeCalendarEventMutation,
+        true
+      )
     );
   }
 }
+import { runCalendarExternalEffect } from '@agent/core/meeting/calendar-external-effect';

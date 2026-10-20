@@ -338,6 +338,25 @@ export type LedgerEntry =
       resolution: 'not_executed' | 'compensated';
     }
   | {
+      kind: 'execution_started';
+      ts: string;
+      actor: string;
+      action_class: string;
+      operation_id: string;
+      correlation_id: string;
+      effect_hash: string;
+    }
+  | {
+      kind: 'execution_outcome';
+      ts: string;
+      actor: string;
+      action_class: string;
+      operation_id: string;
+      correlation_id: string;
+      effect_hash: string;
+      outcome: 'succeeded' | 'failed' | 'unknown';
+    }
+  | {
       kind: 'consumption';
       ts: string;
       actor: string;
@@ -412,6 +431,112 @@ export function appendDelegatedExecutionRecord(
   options: CharterPathOptions = {}
 ): void {
   appendLedger(charter.scope, charter.charter_id, entry, options);
+}
+
+/** Execution evidence is distinct from admission/budget consumption. */
+export function recordCharterExecutionOutcome(
+  charter: Charter,
+  evidence: Omit<Extract<LedgerEntry, { kind: 'execution_outcome' }>, 'kind' | 'ts'>,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): boolean {
+  return withCharterDecisionLock(charter.scope, () => {
+    const entries = readLedger(charter.scope, charter.charter_id, options);
+    // An arbitrary charter object is never proof that this operation was admitted.
+    if (
+      !entries.some(
+        (e) =>
+          e.kind === 'consumption' &&
+          e.correlation_id === evidence.correlation_id &&
+          e.action_class === evidence.action_class &&
+          e.actor === evidence.actor
+      )
+    )
+      return false;
+    const started = entries.find(
+      (e) => e.kind === 'execution_started' && e.correlation_id === evidence.correlation_id
+    );
+    if (
+      started?.kind === 'execution_started' &&
+      (started.effect_hash !== evidence.effect_hash ||
+        started.operation_id !== evidence.operation_id ||
+        started.actor !== evidence.actor ||
+        started.action_class !== evidence.action_class)
+    )
+      return false;
+    const previous = entries
+      .filter(
+        (e): e is Extract<LedgerEntry, { kind: 'execution_outcome' }> =>
+          e.kind === 'execution_outcome' && e.correlation_id === evidence.correlation_id
+      )
+      .at(-1);
+    // Reconciliation appends verified evidence; it never re-executes the effect.
+    if (
+      previous &&
+      (previous.outcome !== 'unknown' ||
+        evidence.outcome === 'unknown' ||
+        previous.effect_hash !== evidence.effect_hash ||
+        previous.operation_id !== evidence.operation_id ||
+        previous.actor !== evidence.actor ||
+        previous.action_class !== evidence.action_class)
+    )
+      return false;
+    appendLedger(
+      charter.scope,
+      charter.charter_id,
+      {
+        kind: 'execution_outcome',
+        ts: now.toISOString(),
+        ...evidence,
+      },
+      options
+    );
+    if (
+      evidence.outcome === 'failed' &&
+      charter.appetite.tripwires.includes('external_operation_failure')
+    ) {
+      recordTripwire(charter, 'external_operation_failure', evidence.operation_id, options, now);
+    }
+    return true;
+  });
+}
+
+/** Fail-closed pre-effect evidence, bound to an existing scoped admission. */
+export function recordCharterExecutionStarted(
+  charter: Charter,
+  evidence: Omit<Extract<LedgerEntry, { kind: 'execution_started' }>, 'kind' | 'ts'>,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): void {
+  withCharterDecisionLock(charter.scope, () => {
+    const entries = readLedger(charter.scope, charter.charter_id, options);
+    if (
+      !entries.some(
+        (e) =>
+          e.kind === 'consumption' &&
+          e.correlation_id === evidence.correlation_id &&
+          e.action_class === evidence.action_class &&
+          e.actor === evidence.actor
+      )
+    ) {
+      throw new Error(
+        '[EXTERNAL_ADMISSION_MISSING] Execution start requires scoped charter consumption'
+      );
+    }
+    if (
+      entries.some(
+        (e) => e.kind === 'execution_started' && e.correlation_id === evidence.correlation_id
+      )
+    ) {
+      throw new Error('[EXTERNAL_EXECUTION_ALREADY_STARTED] Verify the earlier effect');
+    }
+    appendLedger(
+      charter.scope,
+      charter.charter_id,
+      { kind: 'execution_started', ts: now.toISOString(), ...evidence },
+      options
+    );
+  });
 }
 
 export function readCharterLedger(

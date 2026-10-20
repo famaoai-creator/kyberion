@@ -5,6 +5,9 @@ import { pathResolver } from '../path-resolver.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { runExternalOperation } from '../governance/external-operation.js';
+import { currentScopeEnvelope } from '../scope-envelope.js';
+import { resolveScopeContext } from '../scope-context.js';
 
 export type EmailBackendOperation = 'create_draft' | 'send';
 
@@ -112,41 +115,59 @@ export class MacMailAppEmailProvider implements EmailProvider {
   }
 
   private async runJxa(op: 'create_draft' | 'send', params: EmailParams): Promise<EmailResult> {
-    const script = buildJxaScript(op, params);
-    return new Promise((resolve) => {
-      const child = spawn('osascript', ['-l', 'JavaScript', '-e', script], {
-        cwd: pathResolver.rootDir(),
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (chunk) => {
-        stdout += String(chunk);
-      });
-      child.stderr.on('data', (chunk) => {
-        stderr += String(chunk);
-      });
-
-      superviseEmailChild(child, ({ code, error }) => {
-        if (!error && code === 0 && stdout.trim() === 'ok') {
-          resolve({
-            status: 'succeeded',
-            provider: this.id,
-            message: 'JXA mail operation completed successfully.',
+    const frozen = {
+      to: params.to ?? '',
+      cc: params.cc ?? '',
+      subject: params.subject ?? '(no subject)',
+      body: params.body ?? '',
+      from: params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? '',
+    };
+    const script = buildJxaScript(op, frozen);
+    return runExternalOperation(
+      {
+        operationId: `email:${op}`,
+        tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext()).tenant_slug,
+        effect: { backend: this.id, params: frozen },
+        requiresApproval: true,
+        delegable: op === 'send',
+      },
+      () =>
+        new Promise<EmailResult>((resolve) => {
+          const child = spawn('osascript', ['-l', 'JavaScript', '-e', script], {
+            cwd: pathResolver.rootDir(),
+            stdio: ['ignore', 'pipe', 'pipe'],
           });
-        } else {
-          resolve({
-            status: 'failed',
-            provider: this.id,
-            error: error
-              ? `osascript ${error}`
-              : stderr.trim() || `JXA script failed with exit code ${code}`,
+
+          let stdout = '';
+          let stderr = '';
+
+          child.stdout.on('data', (chunk) => {
+            stdout += String(chunk);
           });
-        }
-      });
-    });
+          child.stderr.on('data', (chunk) => {
+            stderr += String(chunk);
+          });
+
+          superviseEmailChild(child, ({ code, error }) => {
+            if (!error && code === 0 && stdout.trim() === 'ok') {
+              resolve({
+                status: 'succeeded',
+                provider: this.id,
+                message: 'JXA mail operation completed successfully.',
+              });
+            } else {
+              resolve({
+                status: 'failed',
+                provider: this.id,
+                error: error
+                  ? `osascript ${error}`
+                  : stderr.trim() || `JXA script failed with exit code ${code}`,
+              });
+            }
+          });
+        }),
+      classifyEmailOutcome
+    );
   }
 }
 
@@ -155,11 +176,14 @@ const SMTP_SEND_SCRIPT = `
 import json, smtplib, ssl, sys
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import getaddresses
 
 p = json.load(sys.stdin)
 msg = MIMEMultipart()
 msg['From'] = p['from']
 msg['To'] = p['to']
+if p['cc']:
+    msg['Cc'] = p['cc']
 msg['Subject'] = p['subject']
 msg.attach(MIMEText(p['body'], 'plain', 'utf-8'))
 
@@ -168,8 +192,9 @@ with smtplib.SMTP(p['host'], int(p['port'])) as server:
     server.ehlo()
     server.starttls(context=ctx)
     server.login(p['user'], p['pass'])
-    server.sendmail(p['from'], p['to'], msg.as_string())
-print("ok")
+    recipients = [address for _, address in getaddresses([p['to'], p['cc']]) if address]
+    refused = server.sendmail(p['from'], recipients, msg.as_string())
+print("partial" if refused else "ok")
 `.trim();
 
 export class SmtpEmailProvider implements EmailProvider {
@@ -204,55 +229,79 @@ export class SmtpEmailProvider implements EmailProvider {
     const port = parseInt(getRegisteredEnvText('KYBERION_SMTP_PORT') ?? '587', 10);
     const from = params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? user ?? '';
     const to = params.to ?? '';
+    const cc = params.cc ?? '';
     const subject = params.subject ?? '(no subject)';
     const body = params.body ?? '';
 
     // G20: the script is static; credentials and the message travel as JSON on
     // stdin so no secret ever appears in argv / process listings.
-    const payload = JSON.stringify({ host, port, user, pass, from, to, subject, body });
+    const payload = JSON.stringify({ host, port, user, pass, from, to, cc, subject, body });
 
-    return new Promise((resolve) => {
-      const child = spawn('python3', ['-c', SMTP_SEND_SCRIPT], {
-        cwd: pathResolver.rootDir(),
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      // A child that dies before reading stdin must not crash the caller (EPIPE).
-      child.stdin?.on('error', () => undefined);
-      child.stdin?.end(payload);
-
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (chunk) => {
-        stdout += String(chunk);
-      });
-      child.stderr.on('data', (chunk) => {
-        stderr += String(chunk);
-      });
-
-      superviseEmailChild(child, ({ code, error }) => {
-        if (!error && code === 0 && stdout.trim() === 'ok') {
-          resolve({
-            status: 'succeeded',
-            provider: this.id,
-            message: 'SMTP email sent successfully.',
+    return runExternalOperation(
+      {
+        operationId: 'email:send',
+        tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext()).tenant_slug,
+        effect: {
+          backend: this.id,
+          account: { host, port, user },
+          params: { from, to, subject, body, cc },
+        },
+        requiresApproval: true,
+        delegable: true,
+      },
+      () =>
+        new Promise<EmailResult>((resolve) => {
+          const child = spawn('python3', ['-c', SMTP_SEND_SCRIPT], {
+            cwd: pathResolver.rootDir(),
+            stdio: ['pipe', 'pipe', 'pipe'],
           });
-        } else {
-          resolve({
-            status: 'failed',
-            provider: this.id,
-            error: error
-              ? `SMTP python3 ${error}`
-              : stderr.trim() || `SMTP python execution failed with exit code ${code}`,
+          // A child that dies before reading stdin must not crash the caller (EPIPE).
+          child.stdin?.on('error', () => undefined);
+          child.stdin?.end(payload);
+
+          let stdout = '';
+          let stderr = '';
+
+          child.stdout.on('data', (chunk) => {
+            stdout += String(chunk);
           });
-        }
-      });
-    });
+          child.stderr.on('data', (chunk) => {
+            stderr += String(chunk);
+          });
+
+          superviseEmailChild(child, ({ code, error }) => {
+            if (!error && code === 0 && stdout.trim() === 'ok') {
+              resolve({
+                status: 'succeeded',
+                provider: this.id,
+                message: 'SMTP email sent successfully.',
+              });
+            } else {
+              resolve({
+                status: 'failed',
+                provider: this.id,
+                error: error
+                  ? `SMTP python3 ${error}`
+                  : stdout.trim() === 'partial'
+                    ? 'SMTP accepted only some recipients; verify delivery before any further send.'
+                    : stderr.trim() || `SMTP python execution failed with exit code ${code}`,
+              });
+            }
+          });
+        }),
+      classifyEmailOutcome
+    );
   }
 
   async createDraft(params: EmailParams): Promise<EmailResult> {
     throw new Error(this.unavailableMessage('create_draft'));
   }
+}
+
+/** Success confirms transport acceptance/creation, never final delivery.
+ * A failed child may already have sent the message, so it needs verification. */
+function classifyEmailOutcome(result: EmailResult): 'succeeded' | 'unknown' {
+  return result.status === 'succeeded' ? 'succeeded' : 'unknown';
 }
 
 function supportsOperation(provider: EmailProvider, operation: EmailBackendOperation): boolean {
@@ -295,7 +344,64 @@ export class EmailBackendRegistry {
     if (this.adapters.has(id)) {
       throw new Error(`email-bridge: backend adapter "${id}" is already registered`);
     }
-    this.adapters.set(id, adapter);
+    // Native methods already own the final transport boundary. Custom and
+    // overridden provider methods receive the same admission before dispatch.
+    const nativeSend =
+      adapter.send === MacMailAppEmailProvider.prototype.send ||
+      adapter.send === SmtpEmailProvider.prototype.send;
+    const nativeDraft =
+      adapter.createDraft === MacMailAppEmailProvider.prototype.createDraft ||
+      adapter.createDraft === SmtpEmailProvider.prototype.createDraft;
+    if (nativeSend && nativeDraft) {
+      this.adapters.set(id, adapter);
+    } else {
+      const methods = new Map<PropertyKey, unknown>();
+      this.adapters.set(
+        id,
+        new Proxy(adapter, {
+          get(target, property) {
+            if (methods.has(property)) return methods.get(property);
+            const original = Reflect.get(target, property, target);
+            if (typeof original !== 'function') return original;
+            const operation =
+              property === 'send'
+                ? 'send'
+                : property === 'createDraft'
+                  ? 'create_draft'
+                  : undefined;
+            const native = property === 'send' ? nativeSend : nativeDraft;
+            const method =
+              operation && !native
+                ? (params: EmailParams) => {
+                    const snapshot: EmailParams = {
+                      to: params.to,
+                      cc: params.cc,
+                      from: params.from,
+                      subject: params.subject,
+                      body: params.body,
+                    };
+                    return runExternalOperation(
+                      {
+                        operationId: `email:${operation}`,
+                        tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext())
+                          .tenant_slug,
+                        effect: { backend: id, params: snapshot },
+                        requiresApproval: true,
+                        // A custom adapter's hidden account/defaults are not
+                        // classified by this boundary; require human review.
+                        delegable: false,
+                      },
+                      () => original.call(target, snapshot),
+                      classifyEmailOutcome
+                    );
+                  }
+                : original.bind(target);
+            methods.set(property, method);
+            return method;
+          },
+        })
+      );
+    }
     return this;
   }
 
@@ -407,8 +513,9 @@ export function listEmailBackends(
 export class EmailPolicyRouter {
   private readonly registry: EmailBackendRegistry;
 
-  constructor(providers: EmailBackendAdapter[]) {
-    this.registry = new EmailBackendRegistry(providers);
+  constructor(providers: EmailBackendAdapter[] | EmailBackendRegistry) {
+    this.registry =
+      providers instanceof EmailBackendRegistry ? providers : new EmailBackendRegistry(providers);
   }
 
   async selectProvider(
@@ -423,7 +530,7 @@ let globalRouter: EmailPolicyRouter | null = null;
 
 function getRouter(): EmailPolicyRouter {
   if (!globalRouter) {
-    globalRouter = new EmailPolicyRouter([new MacMailAppEmailProvider(), new SmtpEmailProvider()]);
+    globalRouter = new EmailPolicyRouter(emailBackendRegistry);
   }
   return globalRouter;
 }

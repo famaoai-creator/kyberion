@@ -17,6 +17,7 @@
  */
 
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -28,6 +29,7 @@ import {
   safeLstat,
   safeExecResult,
   safeWriteFile,
+  safeReadFile,
 } from '../secure-io.js';
 import { rootResolve } from '../path-resolver.js';
 import { resolveLocale } from '../locale.js';
@@ -43,6 +45,7 @@ import {
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
+import { runExternalOperation } from '../governance/external-operation.js';
 import {
   primaryLanguageSubtag,
   supportsSpeechLanguage,
@@ -142,7 +145,58 @@ export function registerSpeechToTextBridge(
 ): () => void {
   const name = String(bridge.name || '').trim();
   if (!name) throw new Error('SpeechToTextBridge.name is required');
-  const disposeFromSeam = speechToTextSeam.register(name, bridge, metadata);
+  const transcribe = bridge.transcribe.bind(bridge);
+  const localOnly = bridge.capabilities?.local_only === true;
+  const guarded: SpeechToTextBridge = {
+    ...bridge,
+    name,
+    capabilities: bridge.capabilities ? Object.freeze({ ...bridge.capabilities }) : undefined,
+    priority: bridge.priority,
+    transcribe: (input) => {
+      const snapshot = Object.freeze({ ...input });
+      if (localOnly) return transcribe(snapshot);
+      const file = assertSafeRepositoryPath(snapshot.audioPath, { allowMissingLeaf: false });
+      const digest = () =>
+        createHash('sha256')
+          .update(safeReadFile(file) as Buffer)
+          .digest('hex');
+      const audioHash = digest();
+      return runExternalOperation(
+        {
+          operationId: 'voice:transcribe_provider',
+          effect: { provider: name, params: snapshot, audio_hash: audioHash },
+          requiresApproval: true,
+          delegable: true,
+        },
+        async () => {
+          // Revalidate immediately before the provider call. Providers reopen the
+          // file by path: callers must retain exclusive ownership through upload.
+          // This detects changed pending-approval inputs, not arbitrary concurrent
+          // writes after a provider begins consuming a mutable source file.
+          if (digest() !== audioHash)
+            throw new Error('[VOICE_AUDIO_CHANGED] Audio content changed after admission');
+          const result = await transcribe(snapshot);
+          if (
+            typeof result?.text !== 'string' ||
+            typeof result.backend !== 'string' ||
+            result.synthetic === true
+          ) {
+            throw new Error(
+              '[VOICE_TRANSCRIPT_UNVERIFIED] Provider did not confirm a real transcript result'
+            );
+          }
+          return result;
+        },
+        (result) =>
+          typeof result?.text === 'string' &&
+          typeof result.backend === 'string' &&
+          result.synthetic !== true
+            ? 'succeeded'
+            : 'unknown'
+      );
+    },
+  };
+  const disposeFromSeam = speechToTextSeam.register(name, Object.freeze(guarded), metadata);
   const dispose = () => {
     disposeFromSeam();
     if (registeredDisposers.get(name) === dispose) registeredDisposers.delete(name);

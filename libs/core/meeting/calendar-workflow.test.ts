@@ -420,3 +420,13 @@ describe('calendar-workflow helpers', () => {
     ).rejects.toThrow('invalid_calendar_event_response');
   });
 });
+// Provider transport fixtures isolate admission; boundary coverage lives in
+// calendar-external-effect.test.ts and calendar-external-governance.test.ts.
+vi.mock('./calendar-external-effect.js', () => ({
+  runCalendarExternalEffect: (
+    _input: object,
+    _kind: string,
+    _effect: object,
+    execute: () => unknown
+  ) => execute(),
+}));

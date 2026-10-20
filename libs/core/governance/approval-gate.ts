@@ -28,6 +28,7 @@ import {
   type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
+  type ApprovalRequesterContext,
 } from './approval-store.js';
 import { approvalUsabilityRefusal } from './approval-linked-usability.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
@@ -42,6 +43,8 @@ import {
 } from './approval-gate-charter.js';
 
 export interface ApprovalGateParams {
+  /** Trusted operation boundary floor; a charter may satisfy it, payload flags cannot remove it. */
+  requireApproval?: boolean;
   /** Intent being executed. */
   intentId?: string;
   /** Specific operation (e.g. 'secret:set', 'config:update'). */
@@ -73,6 +76,9 @@ export interface ApprovalGateParams {
   actionDescriptor?: ApprovalActionDescriptor;
   /** KC-03: originating mission/task/agent, persisted for source-scoped cancellation. */
   source?: ApprovalRequestSource;
+  /** Trusted pipeline embedding metadata for exact suspended-run resumption. */
+  requestedByContext?: ApprovalRequesterContext;
+  kind?: ApprovalRequestRecord['kind'];
   /**
    * Trusted caller-side presence signal. `false` means that this boundary is
    * non-interactive and must not create a human approval prompt. Omission is
@@ -101,6 +107,8 @@ export interface ApprovalGateParams {
 }
 
 export interface ApprovalGateResult {
+  /** Actual accepted charter returned only by the delegated admission branch. */
+  acceptedCharter?: import('./accountability-charter.js').Charter;
   allowed: boolean;
   status: 'approved' | 'pending' | 'not_required';
   requestId?: string;
@@ -352,14 +360,20 @@ export function enforceApprovalGate(
     return { allowed: false, status: 'pending', message: charterOutcome.message };
   }
   if (charterOutcome.kind === 'allow' && delegationEligible) {
-    return { allowed: true, status: 'not_required', message: charterOutcome.message };
+    return {
+      allowed: true,
+      status: 'not_required',
+      message: charterOutcome.message,
+      acceptedCharter: charterOutcome.acceptedCharter,
+    };
   }
   // Outside the charter: a human decides, even where decision rights or the
   // legacy policy would have let the action through (the charter only tightens).
   // A matrix escalation needs a human whether or not a policy rule lists its type.
   const charterForcesApproval = charterOutcome.kind === 'require_approval';
   const decisionRightsForcesApproval = decisionRightsEvaluation?.requiresEscalation === true;
-  const forceApproval = charterForcesApproval || decisionRightsForcesApproval;
+  const forceApproval =
+    params.requireApproval === true || charterForcesApproval || decisionRightsForcesApproval;
 
   if (
     !forceApproval &&
@@ -691,7 +705,12 @@ export function enforceApprovalGate(
     threadTs: nowIso(),
     correlationId,
     ...(renewableExpiresAt !== undefined ? { expiresAt: renewableExpiresAt } : {}),
-    requestedBy: agentId,
+    requestedBy:
+      params.kind === 'mission_gate' && params.requestedByContext
+        ? params.requestedByContext.actorId
+        : agentId,
+    ...(params.kind ? { kind: params.kind } : {}),
+    ...(params.requestedByContext ? { requestedByContext: params.requestedByContext } : {}),
     draft,
     source: params.source,
     accountability: {

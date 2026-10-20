@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import type { ImageGenerationProvider, ImageGenerationRequest } from './image-generation-types.js';
+vi.mock('../governance/external-operation.js', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
 
 const mocks = vi.hoisted(() => ({
   executeServicePreset: vi.fn(),
