@@ -23,7 +23,12 @@ describe('scope governance invariants', () => {
           !line.includes('scope-envelope.ts:') &&
           !line.includes('.test.ts:') &&
           // Dispatch boundaries stamp the envelope — the only legitimate sites.
-          !line.includes('coordinated-agent-execution-port.ts:')
+          !line.includes('coordinated-agent-execution-port.ts:') &&
+          // Protected library-run continuation is a dispatch boundary: mint
+          // from the immutable original scope snapshot, never approval input
+          // or the resumed process environment. Exercised by the real library
+          // approval continuation integration (including changed ambient task).
+          !line.startsWith('scripts/pipeline-execution-part-results.ts:')
       );
     expect(offenders).toEqual([]);
   });

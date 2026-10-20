@@ -434,8 +434,9 @@ export async function runDotSweepOnce(
         )(loaded.charter);
       } catch (error) {
         logger.warn(
-          `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes proceed; check spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
+          `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes held; repair spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
         );
+        budgetThrottle = 'hard';
       }
       if (budgetThrottle === 'hard') {
         notifyDotBudgetStopOnce(loaded.charter, 'budget-hard', now);

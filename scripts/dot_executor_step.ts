@@ -29,6 +29,8 @@ import {
  */
 
 import { getWorkItem } from '@agent/core/workforce/work-coordination';
+import { assertAdvisoryBackendPermission } from '@agent/core/provider/provider-permission-profiles';
+import { resolveSandboxPolicy, withSandboxPolicy } from '@agent/core/shell/sandbox-policy';
 import {
   FRONT_DESK_RECEIPT_PIPELINE,
   prepareFrontDeskExecution,
@@ -69,17 +71,17 @@ export interface DotExecutorStepDeps extends DotExecutorDeps {
     charter: DotCharter,
     signal?: AbortSignal,
     assertExecutionCurrent?: () => void
-  ) => Promise<{ status: 'succeeded' | 'failed'; summary: string }>;
+  ) => ReturnType<DotExecutorPorts['runPipeline']>;
   maxPerSweep?: number;
 }
 
 /**
- * Request advice-only behavior. Provider restrictions differ: this option is
- * not proof that native tools or writes are mechanically impossible.
+ * Advice-only behavior: the actual adapter must have a governed planner
+ * projection, and failover rechecks each candidate before it can execute.
  */
 export const DOT_EXECUTOR_DELEGATE_OPTIONS = { advisory: true, profile: 'planner' } as const;
 
-/** Bounded advisory turn; cancellation and absence of effects remain unverified. */
+/** Bounded planner turn; unsupported native tool restrictions fail closed. */
 export async function delegateDotText(
   backend: DotWakeBackend,
   prompt: string,
@@ -107,21 +109,27 @@ export async function delegateDotText(
       else signal.addEventListener('abort', onAbort, { once: true });
     });
   const options = { ...DOT_EXECUTOR_DELEGATE_OPTIONS, ...(signal ? { signal } : {}) };
+  if (backend.name) assertAdvisoryBackendPermission(backend.name, options);
   try {
-    if (backend.delegateTaskHandle) {
-      const handle = backend.delegateTaskHandle(prompt, undefined, options);
-      const cancel = (reason: string) => void handle.cancel(reason).catch(() => {});
-      return await Promise.race([
-        handle.join(),
-        timeout(() => cancel(`wall_clock budget ${timeoutMs}ms exceeded`)),
-        aborted(cancel),
-      ]);
-    }
-    return await Promise.race([
-      backend.delegateTask(prompt, undefined, options),
-      timeout(),
-      aborted(),
-    ]);
+    return await withSandboxPolicy(
+      resolveSandboxPolicy({ mode: 'read-only', networkAccess: true }),
+      async () => {
+        if (backend.delegateTaskHandle) {
+          const handle = backend.delegateTaskHandle(prompt, undefined, options);
+          const cancel = (reason: string) => void handle.cancel(reason).catch(() => {});
+          return await Promise.race([
+            handle.join(),
+            timeout(() => cancel(`wall_clock budget ${timeoutMs}ms exceeded`)),
+            aborted(cancel),
+          ]);
+        }
+        return await Promise.race([
+          backend.delegateTask(prompt, undefined, options),
+          timeout(),
+          aborted(),
+        ]);
+      }
+    );
   } finally {
     if (timer) clearTimeout(timer);
     if (signal && onAbort) signal.removeEventListener('abort', onAbort);
@@ -134,7 +142,7 @@ async function defaultExecutePipeline(
   charter: DotCharter,
   deps: DotExecutorStepDeps = {},
   assertExecutionCurrent?: () => void
-): Promise<{ status: 'succeeded' | 'failed'; summary: string }> {
+): ReturnType<DotExecutorPorts['runPipeline']> {
   const { executePipelineFile } = await import('./pipeline-execution-part-results.js');
   try {
     // Preflight: a missing or invalid pipeline fails before any step runs.
@@ -187,15 +195,38 @@ async function defaultExecutePipeline(
     context: { ...ctx, dot_executor: true },
     quiet: true,
     hasHuman: false,
+    // Trusted runner option; proposal/context flags cannot grant effects.
+    delegatedExecution: 'require',
+    ...(charter.scope.tenant_slug && typeof ctx.work_item_id === 'string'
+      ? {
+          delegatedWorkItem: {
+            id: ctx.work_item_id,
+            tenantSlug: charter.scope.tenant_slug,
+            agentId: `dot:${charter.dot_id}`,
+            attemptId: typeof ctx.attempt_id === 'string' ? ctx.attempt_id : undefined,
+          },
+        }
+      : {}),
     payloadScope: {
       tier: charter.scope.tier,
       ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
       purpose: `dot ${charter.dot_id} pipeline ${ref}`,
     },
   });
+  if (result.status === 'suspended')
+    return {
+      status: 'suspended',
+      runId: result.runId,
+      approvalRequestId: result.approvalRequestId,
+      storageChannel: result.storageChannel,
+      summary: `Awaiting approval ${result.approvalRequestId}; original pipeline run ${result.runId} resumes after that decision without replaying completed steps.`,
+    };
   const failed = result.results.filter((entry) => entry.status === 'failed');
+  const executedSteps = result.results.filter(
+    (entry) => entry.status === 'success' || entry.status === 'recovered'
+  ).length;
   return failed.length === 0
-    ? { status: 'succeeded', summary: `${result.results.length} step(s) succeeded` }
+    ? { status: 'succeeded', summary: `${result.results.length} step(s) succeeded`, executedSteps }
     : {
         status: 'failed',
         summary: `${failed.length} of ${result.results.length} step(s) failed${

@@ -135,7 +135,7 @@ describe('service-actuator handleAction', () => {
     expect(seen).toEqual(['actuator:service:preset:create_issue']);
   });
 
-  it('uses the manifest retry policy for service pipeline steps', async () => {
+  it('does not add an outer retry around service pipeline effects', async () => {
     mocks.executeServicePreset.mockResolvedValue({ ok: true });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-actuator/manifest.json')) {
@@ -170,16 +170,8 @@ describe('service-actuator handleAction', () => {
       ],
     } as any);
 
-    expect(mocks.retry).toHaveBeenCalledWith(
-      expect.any(Function),
-      expect.objectContaining({
-        maxRetries: 4,
-        initialDelayMs: 250,
-        maxDelayMs: 2000,
-        factor: 3,
-        jitter: false,
-      })
-    );
+    expect(mocks.retry).not.toHaveBeenCalled();
+    expect(mocks.executeServicePreset).toHaveBeenCalledTimes(1);
   });
 
   it('delegates PRESET mode to the shared service engine', async () => {

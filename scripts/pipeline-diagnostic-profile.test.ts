@@ -175,7 +175,8 @@ describe('bounded diagnostic canonical pipeline', () => {
     expect(safeReadFile(context().front_desk_output_path, { encoding: 'utf8' })).toBe(
       'local receipt'
     );
-    expect(opts.validateLoadedPipeline).toHaveBeenCalledTimes(2);
+    // Initial load, dispatch preflight, and the immediate effect authorization boundary.
+    expect(opts.validateLoadedPipeline).toHaveBeenCalledTimes(3);
     expectNoProviders();
   });
   it('fails an ordinary write error once without classification, repair or feedback', async () => {

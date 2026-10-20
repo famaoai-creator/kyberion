@@ -1,6 +1,6 @@
+import { withApprovalRecordLock } from './approval-apply-claim.js';
 import {
   normalizeApprovalChannel,
-  normalizeApprovalRequestId,
   approvalRequestsLogicalDir,
   approvalRequestLogicalPath,
   loadApprovalRequest,
@@ -15,12 +15,10 @@ export {
 } from './approval-store-reader.js';
 import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
 import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import {
-  assertApprovalUsable,
   auditSeparationOfDutiesRefusal,
   evaluateSeparationOfDuties,
   SEPARATION_OF_DUTIES_MESSAGES,
@@ -56,7 +54,6 @@ import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
 import { validateDecisionCard, type DecisionCard } from './decision-card.js';
 import type { ApprovalVetoWindow } from './approval-veto-window.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
-import { safeFsyncFile } from '../secure-io.js';
 import {
   getDefaultWorkerEventStream,
   type WorkerEventPayloadMap,
@@ -92,6 +89,10 @@ export interface ApprovalRequesterContext {
   targetStepId?: string;
   /** Durable pipeline run that must be resumed after this approval. */
   pipelineRunId?: string;
+  /** Actual effect + runtime tenant/actor/task/path binding, independent of human decision. */
+  executionBindingHash?: string;
+  /** Stable task/WorkItem effect slot, distinct from mutable payload and pipeline run. */
+  executionIdentity?: string;
 }
 
 export interface ApprovalTargetDescriptor {
@@ -643,17 +644,7 @@ export function approvalWorkerEventSource(record: ApprovalRequestRecord): Worker
 }
 
 /** Serialize competing decision/cancellation/expiry/revocation transitions for one canonical record. */
-export function withApprovalRecordLock<T>(
-  role: GovernedArtifactRole,
-  params: { channel: string; storageChannel?: string; requestId: string },
-  fn: () => T
-): T {
-  const channel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const id = normalizeApprovalRequestId(params.requestId);
-  return withExecutionContext(role, () =>
-    withLockSync('approval-record-' + channel + '-' + id, fn)
-  );
-}
+export { withApprovalRecordLock } from './approval-apply-claim.js';
 /** Persist the terminal expiry transition exactly once. */
 export function expireApprovalRequest(
   role: GovernedArtifactRole,
@@ -697,6 +688,9 @@ function expireApprovalRequestUnlocked(
     },
     approvalWorkerEventSource(updated)
   );
+  if (updated.kind === 'mission_gate' && updated.requestedByContext?.pipelineRunId) {
+    schedulePipelineApprovalResume(role, storageChannel, updated);
+  }
   return updated;
 }
 
@@ -746,6 +740,9 @@ function cancelApprovalRequestUnlocked(
     },
     approvalWorkerEventSource(updated)
   );
+  if (updated.kind === 'mission_gate' && updated.requestedByContext?.pipelineRunId) {
+    schedulePipelineApprovalResume(role, storageChannel, updated);
+  }
   return updated;
 }
 
@@ -1165,13 +1162,36 @@ function decideApprovalRequestUnlocked(
   if (updated.status === 'approved' && updated.steering) {
     scheduleSteeringApprovalExecution(role, storageChannel, updated);
   }
+  if (
+    (updated.status === 'approved' || updated.status === 'rejected') &&
+    updated.decidedByType === 'human' &&
+    updated.correlationId?.startsWith('mission-alignment-')
+  ) {
+    // Learning follows a durable human mutation, never a read-only assessor.
+    void import('../mission/mission-admission.js')
+      .then(async ({ recordVerifiedMissionAdmissionApproval }) => {
+        const { recordMandateOutcome } = await import('./mandate-shadow.js');
+        if (updated.source?.missionId)
+          recordMandateOutcome(updated.source.missionId, updated.status as 'approved' | 'rejected');
+        withExecutionContext('mission_controller', () =>
+          recordVerifiedMissionAdmissionApproval(updated)
+        );
+      })
+      .catch((error) =>
+        import('../logger.js').then(({ createLogger }) =>
+          createLogger('mission-admission').warn(
+            `[mission-admission] learning receipt unavailable — ${String(error)} | next: inspect current tenant intake and brief evidence`
+          )
+        )
+      );
+  }
   // SC-04: a rejected held-effect request must settle the held action too —
   // rejections do not run the steering-apply pipeline, so they bridge here.
   if (updated.status === 'rejected' && updated.steering?.kind === 'held_effect') {
     scheduleHeldEffectRejection(updated);
   }
   if (
-    updated.status === 'approved' &&
+    ['approved', 'rejected'].includes(updated.status) &&
     updated.kind === 'mission_gate' &&
     updated.requestedByContext?.pipelineRunId
   ) {
@@ -1218,6 +1238,9 @@ function schedulePipelineApprovalResume(
         auditRef: error instanceof Error ? error.message : String(error),
       };
     }
+    // Exact effect requests reserve applyClaim/applyResult for the actual
+    // one-shot operation. Launching its continuation is not applying it.
+    if (record.requestedByContext?.executionBindingHash) return;
     try {
       recordApprovalApplyResult(role, {
         channel: record.channel,
@@ -1337,63 +1360,7 @@ export function drainPendingSteeringApprovalExecutions(): Promise<void> {
  * survives process crashes and terminal receipts never erase it. This is an
  * at-most-once fence, not an automatic retry or rollback mechanism.
  */
-export function claimApprovalApply(
-  role: GovernedArtifactRole,
-  params: {
-    channel: string;
-    storageChannel?: string;
-    requestId: string;
-    appliedBy: string;
-    expectedRecordHash: string;
-    /** Exact command that opens a fresh request, quoted in a refusal. */
-    rerequestCommand?: string;
-  }
-): ApprovalRequestRecord & { applyClaim: ApprovalApplyClaim } {
-  return withApprovalRecordLock(role, params, () => {
-    const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-    const record = loadApprovalRequest(storageChannel, params.requestId);
-    if (!record) throw new Error('[POLICY_VIOLATION] Approval request not found');
-    if (params.expectedRecordHash !== computeApprovalPayloadHash({ record })) {
-      throw new Error('[POLICY_VIOLATION] Approval request changed before apply');
-    }
-    if (record.status !== 'approved' || isApprovalRequestExpired(record)) {
-      throw new Error('[POLICY_VIOLATION] A current approved request is required before apply');
-    }
-    if (record.applyClaim || record.applyResult) {
-      throw new Error('[POLICY_VIOLATION] Approval apply already started; recovery required');
-    }
-    if (!params.appliedBy.trim()) {
-      throw new Error('[POLICY_VIOLATION] Approval apply requires an actor');
-    }
-    // A decision recorded before separation of duties was switched on must
-    // not slip through at apply time.
-    assertApprovalUsable(record, {
-      consumer: 'apply_claim',
-      rerequestCommand: params.rerequestCommand,
-    });
-    const updated = {
-      ...record,
-      applyClaim: { claimId: randomUUID(), startedAt: nowIso(), startedBy: params.appliedBy },
-    };
-    const claimPath = writeGovernedArtifactJson(
-      role,
-      approvalRequestLogicalPath(storageChannel, record.id),
-      updated
-    );
-    // The side effect must not start until the claim is flushed successfully.
-    safeFsyncFile(claimPath);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-      ts: nowIso(),
-      event: 'apply_started',
-      request_id: record.id,
-      correlation_id: record.correlationId,
-      channel: record.channel,
-      thread_ts: record.threadTs,
-      apply_claim: updated.applyClaim,
-    });
-    return updated;
-  });
-}
+export { claimApprovalApply } from './approval-apply-claim.js';
 
 /** Persist an approval request's terminal apply outcome (SO-04 Task 3). */
 export function recordApprovalApplyResult(

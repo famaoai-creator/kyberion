@@ -48,6 +48,10 @@ export interface FrontDeskArtifactVerification {
 }
 
 export interface DotWorkResultRow {
+  awaiting_approval?: boolean;
+  pipeline_run_id?: string;
+  approval_request_id?: string;
+  storage_channel?: string;
   /** Readback evidence, persisted before releasing the request WorkItem. */
   front_desk_verification?: FrontDeskArtifactVerification;
   dot_id: string;

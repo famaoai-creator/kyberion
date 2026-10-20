@@ -62,7 +62,7 @@ vi.mock('../network.js', async () => {
 
 vi.mock('../platform.js', async () => {
   const actual = await vi.importActual<typeof import('../platform.js')>('../platform.js');
-  return { ...actual, checkBinary: mocks.checkBinary };
+  return { ...actual, platform: { ...actual.platform, checkBinary: mocks.checkBinary } };
 });
 
 vi.mock('../customer-resolver.js', () => ({
@@ -269,6 +269,32 @@ describe('executeServicePreset', () => {
     await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).resolves.toEqual({
       res: 'api-success',
     });
+  });
+
+  it('does not fall back after a write transport has an uncertain result', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: {
+              do_action: {
+                risk: 'write',
+                alternatives: [
+                  { type: 'cli', command: 'writer', args: ['run'] },
+                  { type: 'api', path: 'action', method: 'POST' },
+                ],
+              },
+            },
+          })
+        : ''
+    );
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockRejectedValue(new Error('network timeout'));
+    await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).rejects.toThrow(
+      'outcome is unknown'
+    );
+    expect(mocks.safeExec).toHaveBeenCalledTimes(1);
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 
   it('rejects direct calls for a tenant-bound service without actuator admission context', async () => {

@@ -18,6 +18,7 @@ import {
   type FrontDeskExecutionRecoveryReceipt,
 } from '../surface/front-desk-recovery-receipt.js';
 import type { DotWorkShape, DotDecisionLevel, DotProposal } from './dot-proposals.js';
+import { parseMissionAdmissionRequest } from '../governance/mandate-shadow.js';
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
 export interface DotActionLedgerDeps {
   rootDir?: string;
@@ -28,6 +29,9 @@ export type DotActionStatus =
   'admitted' | 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
 
 export interface DotActionRecord {
+  /** Trusted admission class; external effect authority is never inherited. */
+  admission_only?: boolean;
+  gate_action_id?: string;
   /** Immutable generic operation identity, persisted before an executable item exists. */
   admission?: {
     scope_hash: string;
@@ -47,6 +51,7 @@ export interface DotActionRecord {
   title: string;
   objective: string;
   work_shape: DotWorkShape;
+  mission_admission?: DotProposal['mission_admission'];
   status: DotActionStatus;
   proposal_hash: string;
   decision?: DotDecisionLevel;
@@ -146,6 +151,8 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
         'disposition_by',
       ].every((key) => value[key] === undefined || typeof value[key] === 'string') ||
       (value.admission !== undefined && !isDotAdmissionIdentity(value.admission)) ||
+      (value.admission_only !== undefined && typeof value.admission_only !== 'boolean') ||
+      (value.gate_action_id !== undefined && typeof value.gate_action_id !== 'string') ||
       (value.front_desk_execution !== undefined &&
         !parseFrontDeskExecutionBinding(value.front_desk_execution)) ||
       (value.recovery_receipt !== undefined &&
@@ -153,6 +160,8 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
           value.status !== 'declined'))
     )
       throw new Error('invalid_action_evidence');
+    if (value.mission_admission !== undefined)
+      parseMissionAdmissionRequest(value.mission_admission);
     const object = (entry: unknown): entry is Record<string, unknown> =>
       Boolean(entry && typeof entry === 'object' && !Array.isArray(entry));
     const link = (entry: unknown): boolean =>

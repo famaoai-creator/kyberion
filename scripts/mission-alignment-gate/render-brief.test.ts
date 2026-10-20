@@ -7,6 +7,30 @@ import { RV_SAVE_CONFIG_CLOSE, RV_SAVE_CONFIG_OPEN } from '../report-review/revi
 import { renderMissionBriefHtml } from './render-brief.js';
 
 describe('renderMissionBriefHtml approval state', () => {
+  it('discloses admission limits and escapes proposed effect text before human approval', () => {
+    const html = renderMissionBriefHtml(
+      {
+        missionAdmission: {
+          mandate_ref: 'finance',
+          mandate_facts: {
+            work_type: '<script>alert(1)</script>',
+            paths: ['docs/invoices.md'],
+            estimated_cost: 50,
+            currency: 'JPY',
+            external_effects: ['payment'],
+            risk_level: 1,
+          },
+        },
+      },
+      { locale: 'en' }
+    );
+    expect(html).toContain('50 JPY');
+    expect(html).toContain('docs/invoices.md');
+    expect(html).toContain('payment');
+    expect(html).toContain('External tool actions require separate authority.');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+  });
   it('serializes settled decision metadata for report-review readers', () => {
     const html = renderMissionBriefHtml(
       { missionId: 'MSN-RENDER-TEST', title: 'render test' },

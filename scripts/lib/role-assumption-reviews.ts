@@ -76,7 +76,7 @@ export interface ReviewedChildProcess {
 const EXTERNAL_BINARY = 'runs an external binary, never a Kyberion entry point';
 
 export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
-  'libs/core/service/service-engine-execution.ts#executeServicePresetAlternative': {
+  'libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce': {
     targets: [],
     rationale:
       'runs a service preset CLI alternative through safeExec with an env built only from the preset (buildChildEnv), so buildSafeExecEnv never passes SYSTEM_ROLE on',

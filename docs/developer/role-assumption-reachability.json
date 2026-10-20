@@ -4,7 +4,7 @@
   "description": "RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts`; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
   "assumption_sites": [
     {
-      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -65,7 +65,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -115,7 +115,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -125,7 +125,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -135,7 +135,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -204,7 +204,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -221,7 +221,7 @@
       ]
     },
     {
-      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -311,7 +311,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -321,7 +321,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -331,7 +331,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -346,12 +346,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore",
+      "roles": ["autonomy_learning_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -366,7 +376,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -377,6 +387,16 @@
     },
     {
       "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -707,7 +727,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -836,7 +856,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -851,7 +871,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -896,7 +916,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -948,7 +968,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -958,7 +978,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -968,7 +988,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1018,7 +1038,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1088,7 +1108,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1108,7 +1128,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1118,7 +1138,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1292,13 +1312,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-management-mutations.ts#audit",
-      "roles": [],
-      "unresolved": [
-        "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
-      ]
-    },
-    {
       "site": "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization",
       "roles": ["concierge_management_reader"],
       "unresolved": []
@@ -1460,13 +1473,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
-      "roles": [],
-      "unresolved": [
-        "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot"
-      ]
-    },
-    {
       "site": "libs/core/workforce/work-coordination.ts#appendJsonl",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1532,7 +1538,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["chronos_gateway"],
       "unresolved": []
     },
@@ -1611,7 +1617,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1621,7 +1627,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1771,7 +1777,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2001,7 +2007,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -2123,7 +2129,7 @@
       ]
     },
     {
-      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -2148,7 +2154,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2343,7 +2349,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2491,7 +2497,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2501,7 +2507,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2681,7 +2687,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2729,6 +2735,13 @@
       "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
+    },
+    {
+      "site": "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+      "roles": [],
+      "unresolved": [
+        "role argument `snapshot.identity.role` could not be resolved at scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun"
+      ]
     },
     {
       "site": "scripts/pipeline_promote.ts#appendCatalogRow",
@@ -2986,9 +2999,6 @@
     "libs/core/shell/shell-streaming-stt-bridge.ts#ShellStreamingSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/surface/surface-management-mutations.ts#audit": [
-      "role argument `resolveRole()` could not be resolved at libs/core/surface/surface-management-mutations.ts#audit"
-    ],
     "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -3015,9 +3025,6 @@
     ],
     "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
-    ],
-    "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot": [
-      "role argument `resolveRole()` could not be resolved at libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot"
     ],
     "presence/displays/operator-surface/src/lib/view.ts#<module>": [
       "module specifier '@agent/shared-ui/vanilla' does not resolve to an analysed source (presence/displays/operator-surface/src/lib/view.ts#<module>)"
@@ -3057,6 +3064,9 @@
     ],
     "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun": [
+      "role argument `snapshot.identity.role` could not be resolved at scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun"
     ],
     "scripts/refactor/adf-input.ts#readWorkflowModuleInput": [
       "dynamic import with a computed specifier at scripts/refactor/adf-input.ts#readWorkflowModuleInput"
@@ -3350,6 +3360,16 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
@@ -3593,7 +3613,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3603,6 +3622,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -3660,6 +3680,25 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -3933,7 +3972,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3943,6 +3981,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -4234,6 +4273,15 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/secrets/introduce/route.ts#POST",
+            "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction",
+            "libs/core/governance/autonomous-ops-gate.ts#evaluateAutonomousOpsAction",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -4457,9 +4505,7 @@
         "libs/core/shell/pty-engine.ts#PtyRegistry",
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
-        "libs/core/surface/surface-management-mutations.ts#audit",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4469,6 +4515,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -4532,6 +4579,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -4751,7 +4812,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4761,6 +4821,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -4778,13 +4839,24 @@
             "libs/core/script-harness.ts#<module>",
             "libs/core/authority.ts#<module>"
           ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "scripts/event_intake_surface.ts#<module>",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/dot/dot-runtime.ts#<module>",
+            "libs/core/dot/dot-dispatch.ts#<module>",
+            "libs/core/workforce/work-coordination.ts#<module>",
+            "libs/core/workforce/work-coordination.ts#appendLeaseSnapshot",
+            "libs/core/workforce/work-coordination.ts#appendJsonl"
+          ]
         }
       },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
+        "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
-        "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
@@ -4856,6 +4928,22 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5098,7 +5186,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5108,6 +5195,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5171,6 +5259,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5398,7 +5500,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5408,6 +5509,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5526,6 +5628,31 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -5861,7 +5988,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5871,6 +5997,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -5911,6 +6038,7 @@
       },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
+        "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
         "infrastructure_sentinel",
@@ -6013,6 +6141,27 @@
           "example_path": [
             "presence/displays/operator-surface/src/lib/selection-service.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6225,7 +6374,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "presence/displays/operator-surface/src/lib/view.ts#<module>",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -6236,6 +6384,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -6300,6 +6449,25 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6570,7 +6738,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -6580,6 +6747,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -6645,6 +6813,17 @@
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_alignment_request.ts#openAlignmentApproval [child process]",
+            "scripts/mission_alignment_request.ts#buildAlignmentDecisionCard",
+            "libs/core/governance/autonomous-ops-gate.ts#evaluateAutonomousOpsAction",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -6839,7 +7018,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -6849,6 +7027,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -6913,6 +7092,21 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -7144,7 +7338,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7154,6 +7347,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7221,6 +7415,7 @@
       },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
+        "autonomy_learning_store",
         "chronos_tenant_runner",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -7274,6 +7469,16 @@
       "reachable_roles": {
         "audit_mirror_writer": {
           "example_path": ["scripts/config_mission.ts#<module>", "libs/core/authority.ts#<module>"]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
         },
         "chronos_gateway": {
           "example_path": [
@@ -7467,7 +7672,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7477,6 +7681,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7540,6 +7745,20 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#startMission",
+            "libs/core/mission/mission-admission.ts#recordVerifiedMissionAdmissionApproval",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyOutcome",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -7759,7 +7978,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -7769,6 +7987,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -7850,6 +8069,27 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -8052,7 +8292,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
         "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
@@ -8064,6 +8303,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],
@@ -8120,6 +8360,27 @@
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
           ]
         },
         "chronos_gateway": {
@@ -8319,7 +8580,6 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/workforce/work-coordination-snapshot.ts#withImmutableWorkItemInventorySnapshot",
         "satellites/shared/supervise-child.ts#spawnSupervisedChild",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -8330,6 +8590,7 @@
         "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
         "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
         "scripts/run_checks.ts#executeCheckGate"
       ],

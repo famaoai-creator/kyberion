@@ -1,5 +1,12 @@
+import { runWithRepair } from './pipeline-step-repair.js';
+export { runWithRepair } from './pipeline-step-repair.js';
 import { assertPipelineExecutionCurrent } from './pipeline-execution-part-bootstrap.js';
-import { refineErrorClassification } from '@agent/core/error-classifier-judgment';
+import {
+  delegatedExecutionBindingHash,
+  delegatedExecutionIdentity,
+  runtimeDelegatedTarget,
+  withDelegatedExecutionFrame,
+} from '@agent/core/governance/delegated-execution';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation/text';
@@ -19,7 +26,6 @@ import {
 import {
   assertDiagnosticPipelineProfile,
   firePipelineLifecycleHooks,
-  DIAGNOSTIC_OPERATOR_GUIDANCE,
 } from './pipeline-diagnostic-profile.js';
 import {
   getDefaultWorkerEventStream,
@@ -48,11 +54,11 @@ import {
 
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { formatPipelineFailure } from './pipeline-result-reporting.js';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 
 import {
   registeredEnv,
+  resolveParamsRecursive,
   resolveStepType,
   resolveExportKey,
   normalizeReasoningPolicy,
@@ -65,18 +71,14 @@ import {
   coercePositiveInt,
   runParallelBatches,
 } from './pipeline-execution-part-bootstrap.js';
-import type {
-  RunStepResult,
-  ReasoningStepPolicy,
-  RunStepsOptions,
-} from './pipeline-execution-part-bootstrap.js';
+import type { RunStepResult, RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
 import {
   prepareEngineSteps,
   parseFragmentJson,
   isSkip,
   dispatchLeafOp,
   findStepByIdRecursive,
-  hasBoundApproval,
+  hasBoundExecutionAuthorization,
 } from './pipeline-execution-part-control.js';
 
 /** Install on first use so a step that actually judges does not depend on the eager pre-pass. */
@@ -93,115 +95,6 @@ export function readPipelineIncludeTextFile(filePath: string): string {
     throw new Error(`${filePath} must be a regular file`);
   }
   return readTextFile(filePath);
-}
-
-/**
- * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
- * function that wraps a single step-execution attempt, instead of being
- * loop machinery inlined in runSteps. The canonical engine
- * (executeAdfSteps) has no built-in retry, so Phase C delegation needs
- * retry/repair as something a handler opts into, not something the engine
- * itself does — this is the shape that opt-in takes.
- */
-export async function runWithRepair(
-  step: PipelineAdfStep,
-  opts: RunStepsOptions,
-  stepPolicy: ReasoningStepPolicy,
-  attemptOnce: () => Promise<Record<string, unknown> | AdfSkippedStep>
-): Promise<Record<string, unknown> | AdfSkippedStep> {
-  if (opts.executionMode) {
-    // runSteps validated the original ADF before the engine added its internal
-    // type/resolved-parameter fields. Never classify or repair this attempt.
-    if (opts.executionMode !== 'front_desk_diagnostic')
-      throw new Error('Invalid bounded diagnostic execution mode');
-    try {
-      return await attemptOnce();
-    } catch (error) {
-      throw new Error(
-        String(error instanceof Error ? error.message : error) + '; ' + DIAGNOSTIC_OPERATOR_GUIDANCE
-      );
-    }
-  }
-  let attempt = 0;
-  let lastError: any = null;
-  while (attempt < 2) {
-    try {
-      return await attemptOnce();
-    } catch (err: any) {
-      if (err?.adfControlFlow === 'preflight') throw err;
-      assertPipelineExecutionCurrent(opts);
-      lastError = err;
-      // classifyError(), refined only by a calibrated judgment (inert until a fit lands).
-      const failure = await refineErrorClassification(err);
-
-      // Don't repair if we already tried and the error message didn't change (prevents loops)
-      if (attempt === 0 && failure.repairAction) {
-        if (!opts.quiet) {
-          logger.warn(
-            `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
-          );
-          logger.info(
-            // i18n-exempt: JA operator log (product language)
-            `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
-          );
-        }
-        const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
-        const repaired = await attemptAutonomousRepair({
-          step: { op: step.op, id: step.id, params: step.params },
-          failure,
-          pipelinePath: opts.pipelinePath,
-          trustResolved: opts.trustResolved,
-          projectTrustApprovalId: opts.projectTrustApprovalId,
-          policy: {
-            ...(stepPolicy.effort ? { effort: stepPolicy.effort } : {}),
-            ...(stepPolicy.budget ? { budget: stepPolicy.budget } : {}),
-          },
-          logPrefix: '[SYS_PIPELINE:REPAIR]',
-        });
-        if (repaired) {
-          if (!opts.quiet) {
-            logger.success(
-              `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
-            );
-          }
-          try {
-            // Reload fully from disk to get the REPAIRED definition. Search
-            // recursively — the failing step may be nested inside
-            // core:if/foreach/while/on_error.fallback — and match by id only.
-            const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!, {
-              trustResolved: opts.trustResolved,
-              projectTrustApprovalId: opts.projectTrustApprovalId,
-            });
-            const refreshedStep = step.id
-              ? findStepByIdRecursive(refreshedPipeline.steps, step.id)
-              : undefined;
-
-            if (refreshedStep) {
-              // Update the step object in place so the next attempt picks it up
-              step.op = refreshedStep.op;
-              step.params = refreshedStep.params;
-              logger.info(
-                `  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${(step.params as any).path}`
-              );
-            } else if (!opts.quiet) {
-              logger.warn(
-                `  [SYS_PIPELINE] Could not uniquely re-locate step "${step.id || step.op}" in the repaired ADF (missing/unmatched id) — retrying with the original step definition unchanged.`
-              );
-            }
-
-            attempt++;
-            continue; // Re-evaluate normalizedOp/domain/action/params with the (possibly unchanged) values
-          } catch (reloadErr: any) {
-            logger.warn(
-              `  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`
-            );
-          }
-        }
-      }
-      throw lastError;
-    }
-  }
-  throw lastError;
 }
 
 export async function runSteps(
@@ -303,9 +196,13 @@ export async function runStepsInternal(
     const runBody = async (
       body: PipelineAdfStep[],
       seedCtx: Record<string, unknown>,
-      failureLabel: string
+      failureLabel: string,
+      iteration = 'branch'
     ) => {
-      const nested = await runNestedSteps(prepareEngineSteps(body), seedCtx);
+      const nested = await withDelegatedExecutionFrame(
+        `${currentStep?.id || rawOp}:${iteration}`,
+        () => runNestedSteps(prepareEngineSteps(body), seedCtx)
+      );
       if (nested.status === 'failed') {
         throw new Error(nested.results.find((r) => r.status === 'failed')?.error || failureLabel);
       }
@@ -336,7 +233,12 @@ export async function runStepsInternal(
         if (condition !== undefined && action !== 'retry_until_quality') {
           if (!evaluateCondition(condition, workingCtx)) break;
         }
-        const nested = await runBody(body, workingCtx, `${rawOp} iteration failed`);
+        const nested = await runBody(
+          body,
+          workingCtx,
+          `${rawOp} iteration failed`,
+          String(loopCount)
+        );
         workingCtx = nested.context;
         iterations.push({
           iteration: loopCount + 1,
@@ -506,7 +408,29 @@ export async function runStepsInternal(
           typeof params.approval_for === 'string' && params.approval_for.trim()
             ? params.approval_for.trim()
             : undefined;
-        const storageChannel = String(params.storage_channel || 'pipeline-approval');
+        let storageChannel = String(params.storage_channel || 'pipeline-approval');
+        const effectStep = targetStepId
+          ? findStepByIdRecursive(
+              prepareEngineSteps(steps) as unknown as PipelineAdfStep[],
+              targetStepId
+            )
+          : undefined;
+        const concreteTarget = effectStep
+          ? runtimeDelegatedTarget(
+              normalizePipelineOp(effectStep.op),
+              resolveParamsRecursive(effectStep.params || {}, ctx) as Record<string, unknown>,
+              effectStep.id!
+            )
+          : undefined;
+        const executionBindingHash = concreteTarget
+          ? delegatedExecutionBindingHash(concreteTarget)
+          : undefined;
+        const executionIdentity = concreteTarget
+          ? delegatedExecutionIdentity(concreteTarget)
+          : undefined;
+        if (opts.delegatedExecution === 'require' && concreteTarget) {
+          storageChannel = `pipeline-execution-${concreteTarget.tenantSlug}`;
+        }
         const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
           params.on_timeout as 'abort' | 'deny' | 'escalate'
         )
@@ -567,12 +491,28 @@ export async function runStepsInternal(
                 requestedBy: `pipeline:${opts.runId || 'pending'}`,
                 kind: 'mission_gate',
                 expiresAt: new Date(Date.now() + escalationTimeoutMs).toISOString(),
+                ...(concreteTarget && executionBindingHash
+                  ? {
+                      scope: {
+                        tenant_slug: concreteTarget.tenantSlug,
+                        mission_id: concreteTarget.source.missionId,
+                        task_id: concreteTarget.source.taskId,
+                      },
+                      accountability: {
+                        finalDecision: 'human_only' as const,
+                        payloadHash: executionBindingHash,
+                        effectBinding: `pipeline:${opts.runId}:${targetStepId}:${executionBindingHash}`,
+                      },
+                    }
+                  : {}),
                 requestedByContext: {
                   surface: 'system',
                   actorId: `pipeline:${opts.runId || 'pending'}`,
                   actorRole: 'pipeline',
                   stepId,
                   ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
+                  ...(executionBindingHash ? { executionBindingHash } : {}),
+                  ...(executionIdentity ? { executionIdentity } : {}),
                   ...(existing?.requestedByContext?.targetStepId
                     ? { targetStepId: existing.requestedByContext.targetStepId }
                     : {}),
@@ -584,7 +524,11 @@ export async function runStepsInternal(
                   ...(registeredEnv('MISSION_ID')
                     ? { missionId: registeredEnv('MISSION_ID') }
                     : {}),
-                  agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+                  ...(concreteTarget?.source ?? {}),
+                  agentId:
+                    concreteTarget?.agentId ??
+                    registeredEnv('KYBERION_AGENT_ID') ??
+                    'pipeline-orchestrator',
                 },
                 draft: {
                   title: `Escalated pipeline decision: ${stepId}`,
@@ -599,6 +543,7 @@ export async function runStepsInternal(
               throw new PipelineSuspendedError({
                 step_id: stepId,
                 approval_request_id: escalation.id,
+                execution_binding_hash: executionBindingHash,
                 storage_channel: suspended.storage_channel,
                 on_timeout: 'abort',
                 timeout_at: escalation.expiresAt,
@@ -624,6 +569,20 @@ export async function runStepsInternal(
           requestedBy: `pipeline:${opts.runId || 'pending'}`,
           kind: 'mission_gate',
           expiresAt: timeoutAt,
+          ...(concreteTarget && executionBindingHash
+            ? {
+                scope: {
+                  tenant_slug: concreteTarget.tenantSlug,
+                  mission_id: concreteTarget.source.missionId,
+                  task_id: concreteTarget.source.taskId,
+                },
+                accountability: {
+                  finalDecision: 'human_only' as const,
+                  payloadHash: executionBindingHash,
+                  effectBinding: `pipeline:${opts.runId}:${targetStepId}:${executionBindingHash}`,
+                },
+              }
+            : {}),
           requestedByContext: {
             surface: 'system',
             actorId: `pipeline:${opts.runId || 'pending'}`,
@@ -631,11 +590,17 @@ export async function runStepsInternal(
             stepId,
             ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
             ...(targetStepId ? { targetStepId } : {}),
+            ...(executionBindingHash ? { executionBindingHash } : {}),
+            ...(executionIdentity ? { executionIdentity } : {}),
             ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
           },
           source: {
             ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-            agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+            ...(concreteTarget?.source ?? {}),
+            agentId:
+              concreteTarget?.agentId ??
+              registeredEnv('KYBERION_AGENT_ID') ??
+              'pipeline-orchestrator',
           },
           draft: {
             title: String(approval.title || `Pipeline decision: ${stepId}`),
@@ -662,6 +627,7 @@ export async function runStepsInternal(
         throw new PipelineSuspendedError({
           step_id: stepId,
           approval_request_id: record.id,
+          execution_binding_hash: executionBindingHash,
           storage_channel: storageChannel,
           on_timeout: onTimeout,
           timeout_at: timeoutAt,
@@ -775,9 +741,14 @@ export async function runStepsInternal(
         const itemName = (params.as as string) || 'item';
         const originalItemValue = (ctx as any)[itemName];
         let workingCtx = ctx;
-        for (const item of items) {
+        for (const [itemIndex, item] of items.entries()) {
           const loopCtx = { ...workingCtx, [itemName]: item };
-          const nested = await runBody(subSteps, loopCtx, 'core:foreach item failed');
+          const nested = await runBody(
+            subSteps,
+            loopCtx,
+            'core:foreach item failed',
+            String(itemIndex)
+          );
           workingCtx = { ...nested.context };
           if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
           else (workingCtx as any)[itemName] = originalItemValue;
@@ -858,7 +829,10 @@ export async function runStepsInternal(
         }> = [];
         await runParallelBatches(items, concurrency, async (item, index) => {
           const loopCtx = { ...originalSharedCtx, [itemName]: item };
-          const nested = await runNestedSteps(preparedBody, loopCtx);
+          const nested = await withDelegatedExecutionFrame(
+            `${currentStep?.id || rawOp}:${index}`,
+            () => runNestedSteps(preparedBody, loopCtx)
+          );
           if (nested.status === 'failed') {
             throw new Error(
               `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
@@ -930,7 +904,8 @@ export async function runStepsInternal(
           const nested = await runBody(
             subSteps,
             { ...ctx, [itemName]: task },
-            'core:team_lead worker failed'
+            'core:team_lead worker failed',
+            String(index)
           );
           if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
           outputs[index] = {
@@ -982,7 +957,10 @@ export async function runStepsInternal(
           return {
             claims,
             run: async (): Promise<Record<string, unknown>> => {
-              const nested = await runNestedSteps([step], ctx);
+              const nested = await withDelegatedExecutionFrame(
+                `${currentStep?.id || rawOp}:${index}`,
+                () => runNestedSteps([step], ctx)
+              );
               if (nested.status === 'failed') {
                 throw new Error(
                   nested.results.find((r) => r.status === 'failed')?.error ||
@@ -1499,7 +1477,11 @@ export async function runStepsInternal(
             : 1,
         ...(opts.hasHuman !== undefined ? { hasHuman: opts.hasHuman } : {}),
         approvalGranted: (step, context) =>
-          hasBoundApproval(step as PipelineAdfStep, context as Record<string, unknown>),
+          hasBoundExecutionAuthorization(
+            step as PipelineAdfStep,
+            context as Record<string, unknown>,
+            opts
+          ),
         resumeCompletedNodeIds: new Set(opts.resumeState?.completed_nodes.keys()),
         onGraphNodeSettled: graphArtifact
           ? (node, outcome, durationMs) =>

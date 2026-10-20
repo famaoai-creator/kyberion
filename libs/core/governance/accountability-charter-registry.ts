@@ -1,3 +1,6 @@
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { resolveRole, withExecutionContext } from '../authority.js';
 /**
  * Accountability charter — persistence, acceptance and the consumption ledger.
  *
@@ -78,33 +81,81 @@ function safePath(file: string, options: CharterPathOptions): string {
   return assertSafeRepositoryPath(file, { allowMissingLeaf: true, rootDir: options.rootDir });
 }
 
+/** Narrow, synchronous I/O mediation; caller role is preserved for decisions. */
+function scopedCharterIo<T>(
+  scope: CharterScope,
+  files: string[],
+  writes: string[],
+  action: () => T
+): T {
+  const identity = currentExecutionScope();
+  if (scope.kind !== 'organization' || !identity?.tenantSlug) return action();
+  if (identity.tenantSlug !== scope.tenant_slug)
+    throw new Error('[CHARTER_SCOPE_DENIED] Caller tenant differs from charter tenant');
+  const relative = (file: string) => {
+    const value = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    if (!value || value.startsWith('../') || path.isAbsolute(value))
+      throw new Error('[CHARTER_SCOPE_DENIED] Charter resource outside repository');
+    return value;
+  };
+  const role = resolveRole();
+  return runInResourceAccessScope(
+    {
+      tenantSlug: scope.tenant_slug,
+      readExact: files.map(relative),
+      writeExact: writes.map(relative),
+      mkdirExact: [],
+    },
+    () =>
+      withExecutionContext(
+        role,
+        action,
+        'ecosystem_architect',
+        scope.tenant_slug,
+        identity.organizationId
+      )
+  );
+}
+
 export function readCharter(
   scope: CharterScope,
   charterId: string,
   options: CharterPathOptions = {}
 ): Charter | null {
-  const file = safePath(charterPath(scope, charterId, options), options);
-  if (!safeExistsSync(file)) return null;
-  const parsed = parseSafeJsonInput(readTextFile(file), `charter '${charterId}'`) as Charter;
-  if (parsed?.charter_id !== charterId) {
-    throw new Error(`[charter] file '${file}' declares charter_id '${parsed?.charter_id}'`);
-  }
-  return parsed;
+  return scopedCharterIo(scope, [charterPath(scope, charterId, options)], [], () => {
+    const file = safePath(charterPath(scope, charterId, options), options);
+    if (!safeExistsSync(file)) return null;
+    const parsed = parseSafeJsonInput(readTextFile(file), `charter '${charterId}'`) as Charter;
+    if (parsed?.charter_id !== charterId) {
+      throw new Error(`[charter] file '${file}' declares charter_id '${parsed?.charter_id}'`);
+    }
+    if (
+      parsed.scope?.kind !== scope.kind ||
+      (scope.kind === 'organization' &&
+        (parsed.scope.kind !== 'organization' || parsed.scope.tenant_slug !== scope.tenant_slug))
+    )
+      throw new Error(
+        '[CHARTER_SCOPE_DENIED] Persisted charter scope differs from requested resource'
+      );
+    return parsed;
+  });
 }
 
 export function listCharterIds(scope: CharterScope, options: CharterPathOptions = {}): string[] {
-  let dir: string;
-  try {
-    dir = safePath(charterDir(scope, options), options);
-  } catch {
-    return [];
-  }
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((f) => f.endsWith('.json'))
-    .map((f) => f.slice(0, -'.json'.length))
-    .filter((id) => CHARTER_ID_PATTERN.test(id))
-    .sort();
+  return scopedCharterIo(scope, [charterDir(scope, options)], [], () => {
+    let dir: string;
+    try {
+      dir = safePath(charterDir(scope, options), options);
+    } catch {
+      return [];
+    }
+    if (!safeExistsSync(dir)) return [];
+    return safeReaddir(dir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => f.slice(0, -'.json'.length))
+      .filter((id) => CHARTER_ID_PATTERN.test(id))
+      .sort();
+  });
 }
 
 /** The one in-force charter for a scope, or null (=> the legacy approval gate applies). */
@@ -255,6 +306,29 @@ export function retireCharter(
 
 export type LedgerEntry =
   | {
+      kind: 'delegated_execution';
+      ts: string;
+      permit_id: string;
+      binding_hash: string;
+      charter_sha256: string;
+      mapping_sha256: string;
+      expires_at: string;
+      state: 'issued' | 'executing' | 'succeeded' | 'unknown';
+      operation_id: string;
+      actor_id: string;
+      actor_role?: string;
+      source: {
+        organizationId?: string;
+        projectId?: string;
+        missionId?: string;
+        taskId?: string;
+        workItemId?: string;
+      };
+      step_id: string;
+      correlation_id: string;
+      decision_type: string;
+    }
+  | {
       kind: 'reservation_release';
       ts: string;
       correlation_id: string;
@@ -310,9 +384,34 @@ function appendLedger(
   entry: LedgerEntry,
   options: CharterPathOptions
 ): void {
-  const file = safePath(ledgerPath(scope, charterId, options), options);
-  safeMkdir(path.dirname(file), { recursive: true });
-  appendJsonLine(file, entry);
+  const file = ledgerPath(scope, charterId, options);
+  const append = () => {
+    const safeFile = safePath(file, options);
+    safeMkdir(path.dirname(safeFile), { recursive: true });
+    appendJsonLine(safeFile, entry);
+  };
+  if (
+    entry.kind === 'consumption' ||
+    entry.kind === 'delegated_execution' ||
+    entry.kind === 'denied'
+  ) {
+    // Only an existing validated charter grants an exact ledger append capability.
+    if (!readCharter(scope, charterId, options))
+      throw new Error('[CHARTER_SCOPE_DENIED] Existing charter required');
+    return scopedCharterIo(scope, [file], [file], () =>
+      appendJsonLine(safePath(file, options), entry)
+    );
+  }
+  append();
+}
+
+/** Runtime-owned delegated execution records share the charter's audit ledger. */
+export function appendDelegatedExecutionRecord(
+  charter: Charter,
+  entry: Extract<LedgerEntry, { kind: 'delegated_execution' }>,
+  options: CharterPathOptions = {}
+): void {
+  appendLedger(charter.scope, charter.charter_id, entry, options);
 }
 
 export function readCharterLedger(
@@ -327,9 +426,11 @@ function readLedger(
   charterId: string,
   options: CharterPathOptions
 ): LedgerEntry[] {
-  const file = safePath(ledgerPath(scope, charterId, options), options);
-  // A malformed ledger line throws: usage must never be silently under-counted.
-  return readJsonLines<LedgerEntry>(file);
+  return scopedCharterIo(scope, [ledgerPath(scope, charterId, options)], [], () => {
+    const file = safePath(ledgerPath(scope, charterId, options), options);
+    // A malformed ledger line throws: usage must never be silently under-counted.
+    return readJsonLines<LedgerEntry>(file);
+  });
 }
 
 export function recordTripwire(

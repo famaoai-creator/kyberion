@@ -1,5 +1,8 @@
 import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
-import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
+import {
+  listCliReasoningProviderDescriptors,
+  resolveReasoningProviderDescriptor,
+} from '../reasoning/reasoning-provider-registry.js';
 import {
   getActiveSandboxPolicy,
   requireSandboxEnforcement,
@@ -41,6 +44,22 @@ import {
 
 export type ProviderId =
   'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'opencode' | 'devin';
+
+/** Evaluate the ACTUAL serving adapter, including every failover candidate. */
+export function assertAdvisoryBackendPermission(
+  identifier: string,
+  options?: { advisory?: boolean; profile?: string }
+): void {
+  if (!options?.advisory) return;
+  const descriptor = resolveReasoningProviderDescriptor(identifier);
+  if (!descriptor) throw new Error(`[ADVISORY_BACKEND_DENIED] unknown adapter '${identifier}'`);
+  if (!descriptor.cli) return; // API adapters return text/tool requests; they do not execute tools.
+  const permission = resolveProviderPermissionArgs('planner', descriptor.provider as ProviderId);
+  if (permission.kind === 'refused')
+    throw new Error(`[ADVISORY_BACKEND_DENIED] ${identifier}: ${permission.reason}`);
+  if (options.profile !== 'planner')
+    throw new Error(`[ADVISORY_BACKEND_DENIED] ${identifier} requires an explicit planner profile`);
+}
 
 export const PROVIDER_IDS: readonly ProviderId[] = [
   'claude',

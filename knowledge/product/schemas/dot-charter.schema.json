@@ -336,6 +336,12 @@
           "description": "Work shapes the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
         },
         "max_concurrent_delegations": { "type": "integer", "minimum": 1 },
+        "mission_mandate_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 50,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "allowed_pipelines": {
           "type": "array",
           "maxItems": 50,

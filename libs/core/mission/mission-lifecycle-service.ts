@@ -161,6 +161,7 @@ export interface MissionLifecycleCreateOptions extends MissionLifecycleVerbOptio
 }
 
 export interface MissionLifecycleStartOptions extends MissionLifecycleCreateOptions {
+  admissionWorkItem?: string;
   force?: boolean;
 }
 
@@ -332,6 +333,7 @@ export function buildMissionLifecycleService(
             force: options?.force,
             organizationId: options?.organizationId,
             decidedBy: options?.decidedBy,
+            ...(options?.admissionWorkItem ? { admissionWorkItem: options.admissionWorkItem } : {}),
           }
         )
       );

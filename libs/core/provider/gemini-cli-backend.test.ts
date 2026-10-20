@@ -43,6 +43,15 @@ function createChild(stdoutText: string, exitCode = 0): FakeChild {
 }
 
 describe('gemini-cli-backend sandbox projection', () => {
+  it('projects advisory planner calls to plan mode and strips caller YOLO overrides', async () => {
+    spawnMock.mockReturnValue(createChild('{"response":"plan"}'));
+    const backend = new GeminiCliBackend({ extraArgs: ['-y', '--approval-mode=yolo'] });
+    await backend.delegateTask('only plan', undefined, { advisory: true, profile: 'planner' });
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args).toEqual(expect.arrayContaining(['--sandbox', '--approval-mode', 'plan']));
+    expect(args).not.toContain('-y');
+    expect(args).not.toContain('--approval-mode=yolo');
+  });
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();

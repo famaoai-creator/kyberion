@@ -38,6 +38,16 @@ const APPROVAL_PROPERTIES = {
   workflow: { type: 'object' },
   role: { type: 'string' },
   operation_id: { type: 'string' },
+  operation_target: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['operation_id', 'step_id', 'params'],
+    properties: {
+      operation_id: { type: 'string', minLength: 1 },
+      step_id: { type: 'string', minLength: 1 },
+      params: { type: 'object', additionalProperties: true },
+    },
+  },
   correlation_id: { type: 'string' },
   decision_type: { type: 'string' },
   agent_id: { type: 'string' },

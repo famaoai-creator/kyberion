@@ -33,6 +33,7 @@ const FILES: Record<string, string> = {
     version: 1,
     surfaces: [
       { id: 'literal-surface', command: 'node', args: ['dist/apps/literal.js'] },
+      { id: 'spoof-role-surface', command: 'node', args: ['dist/apps/spoof-role.js'] },
       {
         id: 'custom-next-surface',
         command: 'node',
@@ -120,6 +121,7 @@ const FILES: Record<string, string> = {
   ].join('\n'),
   'apps/unknown-next/src/app/api/check/route.ts': 'export function GET() { return 0; }',
   'libs/core/authority.ts': [
+    'export function resolveRole(): string { return process.env.MISSION_ROLE || "unknown"; }',
     'export function withExecutionContext<T>(role: string, fn: () => T): T {',
     '  return fn();',
     '}',
@@ -237,9 +239,17 @@ const FILES: Record<string, string> = {
     'export function useBarrel(): void { barrel.viaBarrel(); }',
   ].join('\n'),
   'apps/literal.ts': [
+    `import { resolveRole as ambientRole } from '${CORE}/authority.js';`,
+    'const capturedRole = ambientRole();',
+    'withExecutionContext(capturedRole, () => undefined);',
     `import { withExecutionContext } from '${CORE}/authority.js';`,
     `import { writeAsSharedWriter } from '${CORE}/stores.js';`,
     "withExecutionContext('role_literal', () => writeAsSharedWriter());",
+  ].join('\n'),
+  'apps/spoof-role.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    'function resolveRole(): string { return process.env.INPUT_ROLE || "unknown"; }',
+    'withExecutionContext(resolveRole(), () => undefined);',
   ].join('\n'),
   'apps/wrapper.ts': [
     `import { withStoreRole } from '${CORE}/stores.js';`,
@@ -411,6 +421,13 @@ describe('RN-02 role assumption reachability analysis', () => {
     expect(surface.unresolved_sites).toEqual([]);
     // role_extra is granted but provably unreachable.
     expect(surface.policy_roles_not_reachable).toEqual(['role_extra']);
+  });
+
+  it('does not exempt a lookalike role resolver from unresolved-role analysis', () => {
+    expect(report.system_roles.spoof_role_surface.unresolved_sites).toEqual([
+      'apps/spoof-role.ts#<module>',
+    ]);
+    expect(report.unresolved_sites['apps/spoof-role.ts#<module>'][0]).toContain('resolveRole()');
   });
 
   it('follows member accesses to renamed, default, typed and computed-key declarations only', () => {

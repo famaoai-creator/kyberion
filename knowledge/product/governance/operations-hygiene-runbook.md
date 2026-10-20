@@ -1593,6 +1593,26 @@ autonomous-ops-gate, autonomy-learning-policy, daemon_watchdog, charter payment
 settlement, op-preflight-charter and charter-view tests. Cover invalid policies,
 tenant isolation, repeated receipt IDs and uncertain concurrent effects.
 
+Intake admission and mission admission are not authority to perform their planned
+effects. Bind declared DotCharter references to the current accepted tenant
+charter, and keep authorization/precheck/budget failures closed. Validate standing
+mandates immediately before mission start; learning from human approval requires
+the exact typed admission facts in the approved brief hash. Advisory model turns,
+queued WorkItems and empty/skipped pipelines are not successful effect receipts.
+
+Generic service writes run once per transport dispatch. Disable outer pipeline
+retries as well as transport retries for writes or unknown operations; an
+idempotency declaration alone is insufficient. After a dispatched effect fails,
+raise the shared unknown-outcome signal and stop alternative fallback. Definite
+pre-dispatch validation failures may still choose another configured alternative.
+Read retries remain governed by preset read metadata and safe HTTP methods.
+
+Regression gates additionally cover dot authority/dispatch/executor policies,
+mission-start-mandate and alignment admission binding, delegated-execution,
+service-engine-execution.retry and service-actuator. Include changed input under
+one execution identity, interrupted reservation/claim publication, nested calls,
+revocation before dispatch and no replay after restart.
+
 ## Discussion uncertain-create request recovery
 
 Before persisting a browser pending marker, resolve the authenticated actor and canonical tenant/organization/project/mission routing through the read-only request-context endpoint. It reserves nothing and never calls a provider. Require an existing selected tenant (or tenant-bound confidential mission); do not invent an unscoped tenant or relabel a public mission. Validate the local input and freeze the submission snapshot across this check. A context failure is pre-submit and must not strand a pending request.
