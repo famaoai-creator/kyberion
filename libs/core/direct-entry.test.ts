@@ -19,4 +19,21 @@ describe('isDirectEntry', () => {
     );
     expect(isDirectEntry(moduleUrl, 'satellites/slack-bridge/src/index.ts', entryPath)).toBe(false);
   });
+
+  it.skipIf(process.platform !== 'win32')(
+    'normalizes Windows entry paths before suffix matching',
+    () => {
+      const windowsEntry = path.resolve(
+        'C:/repo/dist/libs/actuators/terminal-actuator/src/index.js'
+      );
+      const windowsModuleUrl = pathToFileURL(windowsEntry).href;
+      expect(
+        isDirectEntry(
+          windowsModuleUrl,
+          'libs/actuators/terminal-actuator/src/index.ts',
+          windowsEntry
+        )
+      ).toBe(true);
+    }
+  );
 });

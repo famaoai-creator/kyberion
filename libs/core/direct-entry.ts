@@ -9,8 +9,12 @@ export function isDirectEntry(
 ): boolean {
   if (!entryPath) return false;
 
-  const actual = path.resolve(entryPath);
-  const modulePath = path.resolve(fileURLToPath(importMetaUrl));
+  const normalizePath = (value: string): string => {
+    const normalized = path.resolve(value).replaceAll('\\', '/');
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  };
+  const actual = normalizePath(entryPath);
+  const modulePath = normalizePath(fileURLToPath(importMetaUrl));
   const expected = expectedFile.replaceAll('\\', '/').replace(/^\.\//u, '');
   const candidates = [expected, expected.replace(/\.ts$/u, '.js')];
   return actual === modulePath && candidates.some((candidate) => actual.endsWith(candidate));
