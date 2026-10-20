@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-imports -- PTC owns the short-lived UDS transport. */
+/* eslint-disable no-restricted-imports -- PTC owns its short-lived local IPC transport. */
 import { randomUUID } from 'node:crypto';
 import * as net from 'node:net';
 import * as path from 'node:path';
@@ -9,6 +9,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
 import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool/tool-repeat-advisor.js';
+import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from './local-ipc.js';
 
 export const PROGRAMMATIC_TOOL_SANDBOX_ALLOWLIST = [
   'system:read_file',
@@ -238,7 +239,7 @@ function parseRunnerOutput(raw: string): RunnerOutput {
 
 /**
  * Run model-written glue in a short-lived child. The parent owns every typed
- * op call over an authenticated UDS; only the child’s captured stdout returns.
+ * op call over authenticated local IPC; only the child’s captured stdout returns.
  */
 export async function executeProgrammaticToolCall(
   options: ProgrammaticToolCallOptions
@@ -249,7 +250,7 @@ export async function executeProgrammaticToolCall(
   const token = randomUUID().replaceAll('-', '').slice(0, 16);
   const socketDir = pathResolver.sharedTmp('ptc');
   safeMkdir(socketDir, { recursive: true });
-  const socketPath = path.join(socketDir, `${token}.sock`);
+  const socketPath = resolveLocalIpcAddress(path.join(socketDir, `${token}.sock`));
   const server = net.createServer();
   let connection: net.Socket | undefined;
   let callCount = 0;
@@ -390,6 +391,16 @@ export async function executeProgrammaticToolCall(
     child.stderr?.on('data', (chunk) => {
       stderr += String(chunk).slice(0, 2_000);
     });
+    child.once('error', (error) => connectionFailed?.(error));
+    child.once('exit', (code, signal) => {
+      if (!connection) {
+        connectionFailed?.(
+          new Error(
+            `[PTC_RUNNER] child exited before connecting (${code ?? signal ?? 'unknown'}): ${stderr.slice(0, 500)}`
+          )
+        );
+      }
+    });
     const envelope: RunnerEnvelope = {
       socket_path: socketPath,
       token,
@@ -402,7 +413,18 @@ export async function executeProgrammaticToolCall(
     child.stdin?.end(JSON.stringify(envelope));
     // Child startup is separate from script/op execution; do not make a
     // 25ms tool budget impossible to use on a cold Node process.
-    await withTimeout(connected, Math.max(normalized.timeoutMs, 5_000), 'child connection timeout');
+    try {
+      await withTimeout(
+        connected,
+        Math.max(normalized.timeoutMs, 5_000),
+        'child connection timeout'
+      );
+    } catch (error) {
+      if (stderr) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}: ${stderr}`);
+      }
+      throw error;
+    }
     const exit = await withTimeout(
       new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
         child?.once('error', reject);
@@ -432,6 +454,8 @@ export async function executeProgrammaticToolCall(
     child?.kill();
     connection?.destroy();
     server.close();
-    if (safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
+    if (!isWindowsNamedPipeAddress(socketPath) && safeExistsSync(socketPath)) {
+      safeUnlinkSync(socketPath);
+    }
   }
 }

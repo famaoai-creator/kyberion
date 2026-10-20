@@ -6,13 +6,14 @@ import {
   resolveProgrammaticToolGrant,
 } from './programmatic-tool-calling.js';
 import { pathResolver } from './path-resolver.js';
+import { pathToFileURL } from 'node:url';
 
 function sourceRunner() {
   return {
     command: process.execPath,
     args: [
       '--import',
-      pathResolver.rootResolve('scripts/ts-loader.mjs'),
+      pathToFileURL(pathResolver.rootResolve('scripts/ts-loader.mjs')).href,
       pathResolver.rootResolve('scripts/programmatic_tool_runner.ts'),
     ],
     cwd: pathResolver.rootDir(),

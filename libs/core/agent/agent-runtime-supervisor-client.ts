@@ -22,6 +22,7 @@ import {
   type EventScopeInput,
 } from '../event-scope.js';
 import { createLogger } from '../logger.js';
+import { resolveLocalIpcAddress } from '../local-ipc.js';
 const logger = createLogger('agent-runtime-supervisor-client');
 
 function errorMessage(error: unknown): string {
@@ -403,7 +404,9 @@ function ensureSocketDir(): void {
 
 function socketPath(): string {
   ensureSocketDir();
-  return assertSafeRepositoryPath(SOCKET_PATH, { allowMissingLeaf: true });
+  const identity =
+    getRegisteredEnvText('KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH') || SOCKET_PATH;
+  return resolveLocalIpcAddress(assertSafeRepositoryPath(identity, { allowMissingLeaf: true }));
 }
 
 function spawnLockPath(): string {
