@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { attemptAutonomousRepair } from './autonomous-repair.js';
 import { sendOpsAlert } from './ops-alert.js';
+import { classifyError } from './error-classifier.js';
 
 vi.mock('./core.js', () => ({
   logger: {
@@ -47,6 +48,65 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
       })
     );
   });
+
+  it.each([
+    'auth',
+    'permission_denied',
+    'missing_secret',
+    'governance_block',
+    'tier_violation',
+    'permission_error',
+    'auth_error',
+    'config_error',
+    'env_error',
+  ])('blocks file-backed repairs for sensitive category %s', async (category) => {
+    expect(
+      await attemptAutonomousRepair({
+        step: { op: 'system:exec' },
+        failure: { category, repairAction: 'change the environment' },
+        pipelinePath: 'pipelines/sample.json',
+      })
+    ).toBe(false);
+    expect(validateAndRepairAdfMock).not.toHaveBeenCalled();
+    expect(sendOpsAlert).toHaveBeenCalledOnce();
+    expect(sendOpsAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ error_category: category }) })
+    );
+  });
+
+  it.each([
+    ['TIER_VIOLATION: access denied', 'tier_violation'],
+    ['path-scope-policy refused this write', 'permission_denied'],
+    ['VISUAL_REVIEW_GATE_BLOCKED', 'governance_block'],
+  ])('blocks actual classifier output for %s', async (message, category) => {
+    const failure = classifyError(new Error(message));
+    expect(failure.category).toBe(category);
+    expect(failure.repairAction).toBeTruthy();
+    expect(
+      await attemptAutonomousRepair({
+        step: { op: 'file:write_file' },
+        failure,
+        pipelinePath: 'pipelines/sample.json',
+      })
+    ).toBe(false);
+    expect(validateAndRepairAdfMock).not.toHaveBeenCalled();
+    expect(sendOpsAlert).toHaveBeenCalledOnce();
+  });
+
+  it.each(['invalid_input', 'typed_flow', 'preflight'])(
+    'preserves ordinary ADF repair for %s',
+    async (category) => {
+      expect(
+        await attemptAutonomousRepair({
+          step: { op: 'core:validate_flow' },
+          failure: { category, repairAction: 'repair the contract' },
+          pipelinePath: 'pipelines/sample.json',
+        })
+      ).toBe(true);
+      expect(validateAndRepairAdfMock).toHaveBeenCalledOnce();
+      expect(sendOpsAlert).not.toHaveBeenCalled();
+    }
+  );
 
   it('delegates file-backed repairs to the canonical ADF repair agent', async () => {
     const repaired = await attemptAutonomousRepair({

@@ -205,6 +205,16 @@ export function buildFeedbackAcknowledgement(record: ExecutionFeedbackRecord): s
     partially_satisfied: t('surface:feedback_outcome_partially_satisfied'),
     dissatisfied: t('surface:feedback_outcome_dissatisfied'),
   }[record.outcome];
+  if (record.scope) {
+    // Scoped recording is not proof of publication, retrieval, or future use.
+    // Reuse the existing localized review contract rather than promising that
+    // a tenant/organization correction will affect an unscoped scenario.
+    return [
+      t('recorder:recorder_feedback_recorded', { id: record.feedback_id, outcome: outcomeLabel }),
+      t('recorder:recorder_catalog_review_note'),
+      t('recorder:recorder_learning_next'),
+    ].join('\n');
+  }
   return t('surface:feedback_recorded', { outcome: outcomeLabel, scenarioId: record.scenario_id });
 }
 

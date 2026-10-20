@@ -1,113 +1,61 @@
 ---
 title: 意図ループ — Kyberion 中核コンセプト
 category: Concept
-tags: [concept, intent-loop, governance, decision-support, agi]
+tags: [concept, intent-loop, governance, decision-support]
 importance: 10
-author: famao
-last_updated: 2026-04-20
+last_updated: 2026-10-20
 ---
 
 # 意図ループ — Kyberion 中核コンセプト
 
-Kyberion が解く本質問題を、層構造ではなく **ループ** として定義し直す文書。
-実装の詳細は可換だが、このループが閉じ続けることは不可換。
+## 一つの仕事ループを、意図の保持から見る
 
----
+Kyberion は「意図を受け取り、任された範囲で成果まで運び、検証した学びを次の仕事へ戻す」。
+親概念は Organization Work Loop。意図ループ、企業の運営モデル、エージェントのライフサイクル、ユーザー体験、学習は、その同じ流れの見方であり、別の実行系や記録系ではない。
 
-## 1. 前提
+意図ループは 受信 → 明確化 → 保持 → 実行 → 検証 → 学習。
+保持は一度だけの段階ではなく、目的・成功条件・対象範囲・判断根拠・作業IDを引き継ぎ続ける責務である。
+各見方と実装の正本の対応は knowledge/product/architecture/organization-work-loop.md に置く。
 
-- AGI / ASI が近づきつつある。推論能力は年単位で上がり続け、*どの CLI / モデル* が担うかは揺れる。
-- 指示は常に曖昧で届く。CEO は全体感を重視し、細部は「成果が出るなら任せたい」立場。
-- したがって Kyberion が保証すべきは「曖昧な入力を、意図を失わず、成果まで運ぶ」こと。
-- この保証は *推論モデルの賢さ* に依存させない。**仕組みで担保する**。
+## 判断を統一するとは何か
 
-## 2. 意図ループ
+単一モデルに全権を渡すことではない。判断に必要な根拠と、判断結果を受け取る契約を揃える。
 
-```
-  ┌──────────────────────────────────────────────────────────┐
-  │                                                          │
-  │   ① 受信 ── ② 明確化 ── ③ 保管 ── ④ 実行 ── ⑤ 検証 ── ⑥ 学習
-  │                                                          │
-  └──────────────────────────────────────────────────────────┘
-             ↑                                     ↓
-        次の受信は既に 保管済み意図 と 過去学習 を参照する
-```
+- 意図と範囲：何を達成し、誰のどの組織・案件・仕事に属するか。
+- 承認：この具体的な行為を、今の権限と承認で行えるか。
+- 委任：その範囲内で誰が実行でき、何を成果として返すか。
+- 不確実性：追加証拠で解消できるか、利用者の意図確認か、権限者の判断が必要か。
+- 検証と継続：何をもって完了とし、停止後に何を確認して戻るか。
+- 学習：何が再利用可能で、どの範囲と時点の知識として使えるか。
 
-| 段 | 担うこと | 失敗モード |
-|---|---|---|
-| **① 受信** | 曖昧な自然言語 / 作業依頼を取り込む | 文字通り解釈しすぎる / 重要度を見誤る |
-| **② 明確化** | 複数解釈のうち必要なものだけ確認する | 聞きすぎて進まない / 聞かずに暴走する |
-| **③ 保管** | 確定した意図を構造化して保持する | どこにあるか分からなくなる / 途中で変質する |
-| **④ 実行** | 意図に沿って actuator / agent を動かす | 途中の手続きで意図がズレる / 境界を越える |
-| **⑤ 検証** | 成果が意図に合致しているか判定する | 表面的な完了だけを見て合致判定を省く |
-| **⑥ 学習** | 意図・実行・成果の差分を知識へ還元する | 溜まるだけで参照されない / 誤学習が混ざる |
+承認、委任、質問、検証、知識昇格は別の判断である。
+モデルの確信度や委任先の能力、過去の成功は、権限の代わりにならない。
 
-**ループ閉包の原則**：①〜⑥ のどこかで意図が欠落・変質したら、その時点で検知してループを前段に戻す。成果物があっても意図合致が取れていない出力は「完了」と呼ばない。
+## 自律性は「止まらない」ではなく「安全に戻れる」
 
-## 3. 現状の保有機構マッピング
+承認待ちは対象行為を保留する。他に独立して進められる仕事は続ける。
+承認後は同じ仕事と提案版に戻り、現在の権限・対象・内容を再検証し、重複適用を防ぐ既存の claim/receipt を使い、結果不明なら照合する。
+拒否・失効・撤回・修正要求を区別し、結果不明なら再実行前に照合する。
+権限拒否を自動修復で突破しない。ユーザーの修正は元の成果と範囲に結びつける。
 
-origin/main と未 push ローカルの両系統は、このループの異なる段を担っている。**両者は補完関係**であり、合流すれば初めてループが閉じる。
+## 学びを次の仕事へ戻す
 
-| 段 | origin/main（統治基盤） | ローカル（判断支援） |
-|---|---|---|
-| ① 受信 | intent-classifier-routing / archetype 検出 | USE_CASES.md / CEO_SCENARIOS.md（入力空間の具体化） |
-| ② 明確化 | mission classification / workflow catalog | hypothesis-tree / counterfactual / intuition-capture |
-| ③ 保管 | mission-state / team blueprint-ledger / execution-receipt | negotiation-state / relationship-graph / heuristic-entry / dissent-log |
-| ④ 実行 | delegation preflight / path-scope / team composition / voice・video stack | nemawashi orchestrator / rehearsal / decision-ops |
-| ⑤ 検証 | review gate registry / golden scenario evaluator / execution-receipt validation | (薄い — 追加必要) |
-| ⑥ 学習 | hardening-backlog / model-harness adaptation | intuition-capture → heuristic accrual（feedback 欠） |
+既存の Corporate Memory Loop を使う。
+実行 → 記録 → 再利用性評価 → 蒸留 → 審査・昇格 → 次の仕事で利用。
+保存、昇格、検索、適用、改善効果は別々に検証する。学習は権限を拡張しない。
+実行中の知識スナップショットは安定させ、次の仕事で適切な版を使う。
 
-**ギャップ**：⑤ で判断支援側が薄い、⑥ で heuristic の検証ループが閉じていない、②③ で両側の成果物が *同じループの同じ段* を別名で実装している箇所がある（要統合）。
+## 利用者に見せる流れ
 
-## 4. INTP 補完の位置づけ
+頼む → 必要な確認・判断だけ答える → 進み具合を知る → 証拠付きの成果を受け取る → 必要なら直す。
+内部の mission、ADF、承認ストア、知識キューを理解してもらうことを前提にしない。
 
-利用者（CEO）は全体感を起点に動く。細部担保を仕組みに委ねる。システム側は以下を自動で効かせる：
+## 実装と構想を混同しない
 
-- **前に**：preflight（ADF / path-scope / delegation）
-- **途中で**：review gate（段階ごと）/ execution-receipt（手続き証跡）
-- **後に**：golden scenario による突き合わせ / orchestration evaluator
-- **外側で**：hardening-backlog と model-harness adaptation による *仕組みそのもの* の更新
+本書は概念の契約であり、全経路の実装完了宣言ではない。
+2026-10-20 の確認では、shadow で保留されるミッション開始の承認・再開接続、組織単位の会話委任、狭いスコープの知識公開・利用証明に残る課題がある。
+局所試験やビルド成功を実モデル・本人認証・実サービスでの業務完了と同一視しない。
+過去の origin/main と未公開ローカルの比較、および Intent Delta が未実装という古い記述は、現行実装の状態説明として用いない。
 
-origin/main の 64 commits は **ほぼ全てこの「INTP が落としがちな細部を機構で担保する」方向の投資**。意図ループ思想と整合している。
-
-## 5. 汎用骨格と文化 variant の分離
-
-AGI/ASI 時代は推論層が可換。したがって Kyberion の schema / primitive は **文化非依存の骨格** に保つ。日本的管理術（nemawashi / honne-tatemae / 根回し順序）は **enum 値 / variant 実装 / 設定データ** として表現する。
-
-具体例：
-
-- schema 名 `nemawashi-protocol` → `stakeholder-consensus-protocol`（汎用）
-- 実装 variant として `nemawashi`（日本式）/ `round-table`（欧米式）/ `pre-read-memo`（Amazon 式）等を並置
-- `communication_style` enum に `honne` / `tatemae` を残すのは可（*データ* としての文化表現）
-
-原則：**骨格は普遍・値は具体**。後者は自由に増減できる形で保つ。
-
-## 6. 意図計装（Intent Delta）
-
-現状の欠落機構。ミッション各段で「元指示の解釈」と「現在作業中の解釈」の差分を **観測可能にする**仕掛けを入れる。
-
-- 各段階遷移時に `intent_snapshot` を生成（短い構造化要約）
-- 段階間で `intent_delta` を自動算出（追加・削除・意味ズレ）
-- 閾値超過時は review gate が blocking
-- 完了時の intent_delta 累積はミッション品質指標として記録
-
-これが入れば、意図ループの「閉じているか否か」を *事後ではなく実行中に* 検知できる。INTP 補完の最後のピース。
-
-## 7. このループが不可換で、他は可換
-
-- 推論モデル世代：可換（4.6 → 4.7 → X）
-- CLI ホスト：可換（Claude Code / Codex / Gemini / 将来）
-- Actuator 実装：可換（voice engine / browser backend）
-- Schema 名称・variant：可換（文化適応）
-- **意図ループ 6 段の存在と閉包**：**不可換**
-
-この一点だけ守れば、他は AGI/ASI の進化に合わせて自由に組み替えられる。
-
----
-
-## 参照
-
-- `docs/archive/CONCEPT_INTEGRATION_BACKLOG.md` — 本概念に沿った実装タスク（アーカイブ済 — 主要項目は完了、残りは `docs/PRODUCTIZATION_ROADMAP.md` で追跡）
-- `knowledge/product/architecture/kyberion-concept-map.md` — 既存コンセプト地図（要更新）
-- `knowledge/product/architecture/hardening-backlog.md` — 実行細部の担保計画
-- `knowledge/product/architecture/cli-harness-coordination-model.md` — 可換層の責務分割
+モデル・CLI・Actuator は可換。変えてはいけないのは、意図・範囲・権限・証拠・継続性が引継ぎの途中で失われないこと。
+文化や管理手法の違いは共通契約の上の variant として扱い、別の権限体系にしない。

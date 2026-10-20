@@ -185,7 +185,17 @@ export const ProcedureRankingSchema = z
   })
   .strict();
 
+/** Default route verdict; explicit schema_ref contracts may use other object fields. */
+export const JudgeRouteVerdictSchema = z
+  .object({
+    label: z.string().min(1),
+    reason: z.string().optional(),
+    value: z.unknown().optional(),
+  })
+  .passthrough();
+
 export const structuredOutputSchemas = {
+  judge_route_verdict: JudgeRouteVerdictSchema,
   planning_packet: PlanningPacketSchema,
   task_result: TaskResultSchema,
   planning_review_verdict: PlanningReviewVerdictSchema,

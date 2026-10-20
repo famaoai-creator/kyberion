@@ -1680,6 +1680,32 @@ scope shapes remain review-only until the promotion foundation preserves them.
 Legacy proposals require explicit read-only inspection and cannot be adopted
 through a scoped lookup. Promotion references remain unverified and retrieval
 remains unmeasured until exact attributable evidence is available; neither
-aggregate counts nor candidate labels are proof. Tenant-scoped natural-language
-surface feedback and subsequent scenario hint reuse remain separate integration
-gaps, not completion claims of this CLI handoff.
+aggregate counts nor candidate labels are proof. Scoped local CLI feedback capture and subsequent scenario hint reuse are distinct integration boundaries; capture does not prove promoted memory was consumed. Unsupported authenticated surface execution and narrower-scope publication must remain blocked until their complete authority and storage contracts are preserved.
+
+## Unified work-loop boundary regressions
+
+Treat clarification, delegation, authority, verification and learning promotion as
+distinct gates over the same scoped work. A repair proposal is not permission:
+canonical authentication, permission, secret, governance and tier failures must
+stop before repair delegation, including supported legacy category aliases.
+Judge-route fixtures and generated verdicts must satisfy the same declared
+report schema before routing; a field-only predicate is not a condition and a
+missing or inherited field is not evidence of a match. Keep this validation seam
+independent of decision scoring and provider sophistication.
+
+Local CLI intake must preserve selected canonical scope and caller correlation.
+Structured feedback cannot supply a different scope from its event envelope.
+Record scoped feedback without starting unrelated background execution; reject
+unsupported scoped non-feedback execution rather than silently dropping scope.
+Feedback capture, candidate publication and next-work retrieval require separate
+evidence. Narrower-scope publication stays blocked until the existing publisher
+and retrieval path preserve every scope dimension.
+
+Regression gates: autonomous-repair, judge-route, pipeline/adf-guardrails,
+pipeline-adf-contract and pipeline-judge-route; kyberion_home.ask-scope,
+surface-runtime-orchestrator.feedback-scope, surface-runtime-orchestrator.ask-only
+and execution-feedback. Include no provider calls for invalid fixture/schema
+input, bounded generated-verdict retry, organization isolation, envelope/payload
+conflict before side effects and original execution correlation after feedback.
+These deterministic tests do not establish live authenticated approval, mission
+resume or organization-scoped promoted-memory consumption.

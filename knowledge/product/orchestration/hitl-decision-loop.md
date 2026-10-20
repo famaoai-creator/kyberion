@@ -4,10 +4,12 @@ category: Orchestration
 tags: [orchestration, autonomy, approval, hitl, decision-card, veto-window, digest, mobile]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-01
+last_updated: 2026-10-20
 ---
 
 # HITL Decision Loop
+
+The human-intervention projection of the [Organization Work Loop](../architecture/organization-work-loop.md), using the existing approval-store rather than a parallel inbox.
 
 One contract for every "does a human need to look at this?" moment. Agents never decide their own
 intervention level; the autonomous-ops gate does. The operator never has to guess what silence means:
@@ -25,6 +27,8 @@ Plan and status: `docs/developer/improvement-plans-2026-09/AUTONOMOUS_OPERATION_
 | `fyi`    | `notify`                              | proceeds                    | nothing; listed in the digest        | no                                 |
 | `veto`   | `notify` + `veto_window_minutes`      | parks, resumes when settled | acts **only to object**              | once, when the card is sent        |
 | `decide` | `approve` (score, escalation, shadow) | parks, does other work      | **must decide**; the request expires | once (digest if `blocking: false`) |
+
+The table describes non-shadow execution. Always honor the gate's allowed/proceed result: a level alone is not permission, and shadow mode may prevent execution even at none/fyi.
 
 Reminders go through the digest, never repeated pushes. Parked does not mean stopped: an agent
 that parks one action picks up other work and resumes when the approval-store request settles.
@@ -100,8 +104,18 @@ else if (routed.parked) parkAndContinue(routed.requestId);
   (`daemon_restart`) and `auto_checkpoint.ts` route this way once
   `KYBERION_AUTONOMY_DECISION_ROUTING=1` is set; unset, they keep their report-only behavior.
 - Ask a stricter tier with the gate's `requestedDecision`; there is no way to ask for a looser one.
-- Before raising a `decide`, try another agent and `knowledge/` first (plan D, "相談の自己解決").
+- Before raising a `decide` caused by factual or planning uncertainty, consult an eligible agent or scoped knowledge when useful (plan D, "相談の自己解決"). This never substitutes for required human authority: permission, policy-floor, separation-of-duties and human-only decisions remain human-required regardless of confidence or agreement.
 - A change request is a new instruction, not a retry signal: read `changeRequest.instruction` and change the approach.
+
+### 4.1 The card is not the continuation
+
+A card records a decision; the effect-specific adapter owns safe resumption. Bind it to original work identity, complete scope and exact content/revision. Revalidate current policy and authority, use existing apply claims/receipts, and verify the effect. A worker response is not delivery evidence.
+
+Pending-only deduplication does not make rejected, expired, revoked or applied effects safe to reopen. Recurring callers need terminal-state and content-bound continuation semantics. Reconcile unknown outcomes rather than obtaining new approval and repeating an effect.
+
+The four levels do not imply every shadow action produces a card. An auto gate in shadow can remain none with proceed=false; do not claim a human request exists. Watchdog mission admission needs an explicit bound continuation before it is approve-and-resume. Preserve shadow policy while that integration is absent.
+
+Clarification, approval, request changes and learning review are distinct user acts. Keep work context visible and explain what is blocked. A change request changes the proposal, not old approval.
 
 ## 5. Operations
 
