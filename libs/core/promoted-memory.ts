@@ -38,7 +38,7 @@ import { assertScopedLearningRecord } from './knowledge/scoped-learning-publicat
 import {
   assertScopedLearningScope,
   scopedLearningMarkdownPath,
-} from './knowledge/scoped-learning-contract.js';
+} from './knowledge/scoped-learning-domain.js';
 import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
 import {
   isPublicMemoryEvidencePath,
@@ -514,8 +514,15 @@ export function savePromotedMemoryRecord(
     metadata.knowledge_domain === 'product' || metadata.knowledge_domain === 'personal'
       ? metadata.knowledge_domain
       : 'organization';
-  if (domain === 'organization' && candidate.scope && candidate.target_kind === 'sop_candidate')
+  if (domain === 'organization' && candidate.scope) {
+    // Other publishers do not yet preserve the complete source restrictions.
+    // Refuse before provenance lookup, role assumption, locks or file writes.
+    if (candidate.target_kind !== 'sop_candidate')
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Scoped organization publication supports canonical approved SOPs only'
+      );
     assertScopedLearningScope(candidate.scope);
+  }
   if (
     domain === 'product' &&
     (candidate.tier !== 'public' ||

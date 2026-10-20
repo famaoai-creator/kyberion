@@ -35,10 +35,7 @@ import {
   approvalStoreRoots,
 } from '../governance/approval-store.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
-import {
-  scopedLearningMarkdownPath,
-  assertScopedLearningScope,
-} from './scoped-learning-contract.js';
+import { scopedLearningMarkdownPath, assertScopedLearningScope } from './scoped-learning-domain.js';
 import { verifyScopedLearningPublication } from './scoped-learning-publication.js';
 import { savePromotedMemoryRecord, buildPromotedMemoryMarkdown } from '../promoted-memory.js';
 import {

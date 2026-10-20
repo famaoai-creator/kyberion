@@ -19,7 +19,7 @@ import {
   scopedLearningMarkdownPath,
   learningSha256,
   type ScopedLearningApproval,
-} from './scoped-learning-contract.js';
+} from './scoped-learning-domain.js';
 import type { MemoryCandidate } from './memory-promotion-queue.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeLstat, assertSafeRepositoryPath } from '../secure-io.js';

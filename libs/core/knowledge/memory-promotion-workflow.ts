@@ -25,7 +25,7 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { assertScopedLearningApproval } from './scoped-learning-approval-verification.js';
-import { isScopedLearningCandidate } from './scoped-learning-contract.js';
+import { isScopedLearningCandidate } from './scoped-learning-domain.js';
 import {
   inspectScopedLearningPublication,
   verifyScopedLearningPublication,

@@ -7739,6 +7739,10 @@
     "./service/service-preflight": {
       "types": "./dist/service/service-preflight.d.ts",
       "default": "./dist/service/service-preflight.js"
+    },
+    "./knowledge/scoped-learning-domain": {
+      "types": "./dist/knowledge/scoped-learning-domain.d.ts",
+      "default": "./dist/knowledge/scoped-learning-domain.js"
     }
   },
   "dependencies": {

@@ -50,7 +50,7 @@ import {
   enqueueMemoryPromotionCandidate,
 } from './memory-promotion-queue.js';
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
-import { type ScopeContext } from '../scope-context.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import { recordKnowledgeProblem } from './knowledge-verification.js';
 import {
@@ -67,7 +67,7 @@ export interface DeliveredKnowledgeRef {
   title?: string;
   snapshot?: KnowledgeDeliverySnapshot;
   delivery_id?: string;
-  scope_context?: ScopeContext;
+  scope_context?: MemoryScopeEnvelope;
 }
 
 export interface KnowledgeDeliveryRecord {
@@ -78,7 +78,7 @@ export interface KnowledgeDeliveryRecord {
   recipient_kind?: string;
   delivered_at: string;
   refs: DeliveredKnowledgeRef[];
-  scope_context?: ScopeContext;
+  scope_context?: MemoryScopeEnvelope;
   scope_disposition?: 'canonical' | 'unscoped-legacy';
 }
 
@@ -88,7 +88,7 @@ export interface HumanKnowledgeFeedback {
   reason?: string;
   actor?: string;
   source?: string;
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface SlackKnowledgeReactionInput {
@@ -133,7 +133,7 @@ export interface KnowledgeGapRecord {
   topic: string;
   source_ref: string;
   recorded_at: string;
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface KnowledgeFeedbackCap {
@@ -173,7 +173,7 @@ const knowledgeFeedbackPolicyCatalog = defineCatalog<KnowledgeFeedbackPolicyFile
   schema: pathResolver.knowledge('product/schemas/knowledge-feedback-policy.schema.json'),
 });
 
-export function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {
+export function loadKnowledgeFeedbackCap(scope?: MemoryScopeEnvelope): KnowledgeFeedbackCap {
   const filePath = feedbackPolicyPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP };
   const parsed = knowledgeFeedbackPolicyCatalog.load();
@@ -195,45 +195,62 @@ export function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbac
   };
 }
 
-function scopedRuntimePath(base: string, scope?: ScopeContext): string {
-  if (!scope?.tenant_slug) return base;
-  try {
-    const eventScope = {
-      ...scope,
-      scope_kind: scope.session_id
-        ? 'session'
-        : scope.task_id
-          ? 'task'
-          : scope.mission_id
-            ? 'mission'
-            : scope.project_id
-              ? 'project'
-              : scope.organization_id
-                ? 'organization'
-                : 'tenant',
-    } as const;
-    const rootDir = pathResolver.rootDir();
-    const relativeBase = path.relative(rootDir, base).replace(/\\/g, '/');
-    const feedbackRoot = 'active/shared/runtime/feedback-loop';
-    if (relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)) {
-      const suffix = relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '');
-      return assertSafeRepositoryPath(
-        pathResolver.rootResolve(
-          path.posix.join(
-            physicalScopedPath(feedbackRoot, eventScope),
-            ...(suffix ? suffix.split('/') : [])
-          )
-        ),
-        { allowMissingLeaf: true }
+function scopedRuntimePath(base: string, scope?: MemoryScopeEnvelope, personalSuffix = ''): string {
+  if (scope?.tier === 'personal') {
+    const canonical = assertMemoryScope(scope);
+    if (!canonical.owner_nhi)
+      throw new Error(
+        '[KNOWLEDGE_FEEDBACK_OWNER_REQUIRED] Personal feedback requires explicit owner_nhi'
       );
-    }
+    // Runtime overrides and tenant context must never move private feedback to a shared floor.
     return assertSafeRepositoryPath(
-      pathResolver.rootResolve(physicalScopedPath(relativeBase, eventScope)),
+      pathResolver.rootResolve(
+        path.posix.join(
+          'active/personal/owners',
+          knowledgeTextSha256(canonical.owner_nhi),
+          'feedback-loop',
+          knowledgeTextSha256(JSON.stringify(canonical)),
+          personalSuffix
+        )
+      ),
       { allowMissingLeaf: true }
     );
-  } catch {
-    return assertSafeRepositoryPath(base, { allowMissingLeaf: true });
   }
+  if (!scope?.tenant_slug) return base;
+  const eventScope = {
+    ...scope,
+    scope_kind: scope.session_id
+      ? 'session'
+      : scope.task_id
+        ? 'task'
+        : scope.mission_id
+          ? 'mission'
+          : scope.project_id
+            ? 'project'
+            : scope.organization_id
+              ? 'organization'
+              : 'tenant',
+  } as const;
+  const rootDir = pathResolver.rootDir();
+  const relativeBase = path.relative(rootDir, base).replaceAll('\\', '/');
+  const feedbackRoot = 'active/shared/runtime/feedback-loop';
+  if (relativeBase === feedbackRoot || relativeBase.startsWith(feedbackRoot + '/')) {
+    const suffix = relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '');
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        path.posix.join(
+          physicalScopedPath(feedbackRoot, eventScope),
+          ...(suffix ? suffix.split('/') : [])
+        )
+      ),
+      { allowMissingLeaf: true }
+    );
+  }
+  // Invalid scoped paths fail closed, never retry against the unscoped base.
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(physicalScopedPath(relativeBase, eventScope)),
+    { allowMissingLeaf: true }
+  );
 }
 
 function safeRuntimeOverride(override: string | undefined, fallback: string): string {
@@ -249,42 +266,44 @@ function safeRuntimeOverride(override: string | undefined, fallback: string): st
   return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
 }
 
-function deliveryLogDir(scope?: ScopeContext): string {
+function deliveryLogDir(scope?: MemoryScopeEnvelope): string {
   const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_DELIVERY_DIR')?.trim();
   const base = safeRuntimeOverride(
     override,
     pathResolver.shared('runtime/feedback-loop/knowledge-delivery')
   );
-  return scopedRuntimePath(base, scope);
+  return scopedRuntimePath(base, scope, 'knowledge-delivery');
 }
 
-function usageAggregatePath(scope?: ScopeContext): string {
+function usageAggregatePath(scope?: MemoryScopeEnvelope): string {
   const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_USAGE_PATH')?.trim();
   const base = safeRuntimeOverride(
     override,
     pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json')
   );
+  if (scope?.tier === 'personal')
+    return scopedRuntimePath(base, scope, 'knowledge-usage/usage.json');
   if (!scope?.tenant_slug) return base;
   // The aggregate is a tenant-level ranking signal (weight proposals, curation
   // and usage_yield all read it per tenant). Writers sit at mission or task
   // scope, so partitioning by the full chain left every reader looking at a
   // file no writer touched. The JSONL delivery log keeps the full chain.
-  const tenantScope: ScopeContext = { tier: scope.tier, tenant_slug: scope.tenant_slug };
+  const tenantScope: MemoryScopeEnvelope = { tier: scope.tier, tenant_slug: scope.tenant_slug };
   const directory = scopedRuntimePath(path.dirname(base), tenantScope);
   return assertSafeRepositoryPath(path.join(directory, path.basename(base)), {
     allowMissingLeaf: true,
   });
 }
 
-export function knowledgeDeliveryLogDir(scope?: ScopeContext): string {
+export function knowledgeDeliveryLogDir(scope?: MemoryScopeEnvelope): string {
   return deliveryLogDir(scope);
 }
 
-export function knowledgeUsageAggregatePath(scope?: ScopeContext): string {
+export function knowledgeUsageAggregatePath(scope?: MemoryScopeEnvelope): string {
   return usageAggregatePath(scope);
 }
 
-function scopedFeedbackPath(kind: 'human' | 'gaps' | 'usage', scope?: ScopeContext): string {
+function scopedFeedbackPath(kind: 'human' | 'gaps' | 'usage', scope?: MemoryScopeEnvelope): string {
   const feedbackDir = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_DIR')?.trim();
   const base = safeRuntimeOverride(feedbackDir, pathResolver.shared('runtime/feedback-loop'));
   const scopedDirectory = scopedRuntimePath(base, scope);
@@ -337,7 +356,12 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   ensureRegularFeedbackFile(target);
   appendJsonLine(target, record);
-  if (input.verdict === 'wrong' || input.verdict === 'stale') {
+  // The verification ledger has no owner partition. Keep personal reports only
+  // in the owner-scoped receipt and aggregate until that sink supports owners.
+  if (
+    input.scope?.tier !== 'personal' &&
+    (input.verdict === 'wrong' || input.verdict === 'stale')
+  ) {
     recordKnowledgeProblem({
       documentPath,
       kind: input.verdict,
@@ -360,7 +384,7 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
 export function recordKnowledgeGap(input: {
   topic: string;
   sourceRef: string;
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
   promoteOnCluster?: boolean;
 }): string | undefined {
   const topic = input.topic.trim();
@@ -402,8 +426,8 @@ export function recordKnowledgeGap(input: {
         ...(input.scope
           ? {
               scope: {
+                // Source scope is not the conservative destination sensitivity tier.
                 ...input.scope,
-                tier: 'confidential',
                 promotion_policy: 'same_scope' as const,
                 provenance_refs: [sourceRef, target],
               },
@@ -452,7 +476,7 @@ function normalizeTopicList(value: string[] | undefined): string[] {
   return normalized;
 }
 
-function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {
+function loadUsageAggregate(scope?: MemoryScopeEnvelope): KnowledgeUsageAggregateEntry[] {
   const filePath = usageAggregatePath(scope);
   try {
     return loadKnowledgeUsageAggregateAtPath(filePath);
@@ -461,7 +485,10 @@ function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[
   }
 }
 
-function saveUsageAggregate(entries: KnowledgeUsageAggregateEntry[], scope?: ScopeContext): void {
+function saveUsageAggregate(
+  entries: KnowledgeUsageAggregateEntry[],
+  scope?: MemoryScopeEnvelope
+): void {
   const filePath = usageAggregatePath(scope);
   writeKnowledgeUsageAggregateAtPath(filePath, entries);
 }
@@ -478,7 +505,7 @@ function bumpUsageAggregate(
     Pick<KnowledgeUsageAggregateEntry, 'delivered_count' | 'used_count' | 'not_used_count'>
   >,
   at: string,
-  scope?: ScopeContext
+  scope?: MemoryScopeEnvelope
 ): void {
   const entries = loadUsageAggregate(scope);
   const cap = loadKnowledgeFeedbackCap(scope);
@@ -550,7 +577,7 @@ export function recordKnowledgeDelivery(input: {
   teamRole?: string;
   recipientKind?: string;
   refs: DeliveredKnowledgeRef[];
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
 }): { deliveryRecordPath: string; refs: DeliveredKnowledgeRef[] } | undefined {
   const deliveryId = randomUUID();
   const refs = normalizeRefs(input.refs || []).map((ref) => ({
@@ -598,7 +625,7 @@ export function recordKnowledgeDelivery(input: {
 function deliveredRefsForFeedback(input: {
   missionId: string;
   taskId?: string;
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
   deliveredRefs?: DeliveredKnowledgeRef[];
 }): DeliveredKnowledgeRef[] {
   const dir = deliveryLogDir(input.scope);
@@ -655,7 +682,12 @@ export function recordKnowledgeUsageFeedback(
   input: Parameters<typeof recordKnowledgeUsageFeedbackUnlocked>[0]
 ): ReturnType<typeof recordKnowledgeUsageFeedbackUnlocked> {
   try {
-    return withLockSync('knowledge-usage:' + usageAggregatePath(input.scope), () =>
+    const aggregatePath = usageAggregatePath(input.scope);
+    // New private paths carry two hashes; do not exceed the lock filename limit.
+    // Preserve existing shared lock identities for rolling-version compatibility.
+    const lockResource =
+      input.scope?.tier === 'personal' ? knowledgeTextSha256(aggregatePath) : aggregatePath;
+    return withLockSync('knowledge-usage:' + lockResource, () =>
       recordKnowledgeUsageFeedbackUnlocked(input)
     );
   } catch (error) {
@@ -672,7 +704,7 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
   missionId: string;
   taskId?: string;
   feedback: TaskResultKnowledgeFeedback | undefined;
-  scope?: ScopeContext;
+  scope?: MemoryScopeEnvelope;
   deliveredRefs?: DeliveredKnowledgeRef[];
   resultId?: string;
   outcome?: 'worker_report_complete' | 'incomplete';
@@ -778,8 +810,8 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
         ...(input.scope
           ? {
               scope: {
+                // Preserve the observed source; sensitivityTier describes the destination.
                 ...input.scope,
-                tier: 'confidential',
                 promotion_policy: 'same_scope' as const,
                 provenance_refs: [sourceRef],
               },
@@ -803,6 +835,8 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
   };
 }
 
-export function loadKnowledgeUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[] {
+export function loadKnowledgeUsageAggregate(
+  scope?: MemoryScopeEnvelope
+): KnowledgeUsageAggregateEntry[] {
   return loadUsageAggregate(scope);
 }

@@ -16,6 +16,7 @@ import {
   type ConciergeMessageKey,
 } from '../../../../lib/i18n';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { memoryCandidateVisibleToViewer } from '../../../../lib/memory-candidate-visibility';
 import {
   conciergeDecisionDenied,
   resolveConciergeDecidedBy,
@@ -72,15 +73,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const candidate = withExecutionContext('sovereign_concierge', () =>
       loadMemoryPromotionCandidate(id)
     );
-    const visible =
-      candidate &&
-      resolved.context.tierAccess.includes(candidate.sensitivity_tier) &&
-      (resolved.context.tenantSlugs === 'all'
-        ? true
-        : Boolean(
-            candidate.scope?.tenant_slug &&
-            resolved.context.tenantSlugs.includes(candidate.scope.tenant_slug)
-          ));
+    const visible = candidate && memoryCandidateVisibleToViewer(candidate, resolved.context);
     if (!visible) {
       return NextResponse.json({ ok: false, error: t('api.memory.not_found') }, { status: 404 });
     }

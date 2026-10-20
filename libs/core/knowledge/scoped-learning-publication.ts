@@ -17,12 +17,12 @@ import {
   scopedLearningMarkdownPath,
   learningSha256,
   type ScopedLearningPublicationIdentity,
-} from './scoped-learning-contract.js';
+} from './scoped-learning-domain.js';
 export {
   assertScopedLearningScope,
   approvedLearningPayloadDigest,
   type ScopedLearningPublicationIdentity,
-} from './scoped-learning-contract.js';
+} from './scoped-learning-domain.js';
 
 function regularPublicationPath(relative: string): string {
   const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(relative));

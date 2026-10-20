@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import { knowledgeTextSha256 } from './knowledge-delivery-snapshot.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -22,12 +23,19 @@ import {
   listMemoryPromotionCandidates,
   memoryPromotionQueuePath,
 } from './memory-promotion-queue.js';
-import { resolveKnowledgeVerification } from './knowledge-verification.js';
+import {
+  knowledgeVerificationLedgerPath,
+  resolveKnowledgeVerification,
+} from './knowledge-verification.js';
 
 // Hermetic isolation: point the delivery log dir, the usage aggregate file,
 // and the memory promotion queue at unique per-process tmp paths so this
 // suite never touches (or races on) the real active/shared/runtime files —
 // same convention as memory-promotion-queue.ts's KYBERION_MEMORY_QUEUE_PATH.
+const personalOwnerNhi = 'nhi:feedback-test-' + process.pid;
+const personalOwnerRoot = pathResolver.rootResolve(
+  'active/personal/owners/' + knowledgeTextSha256(personalOwnerNhi)
+);
 const suiteRoot = pathResolver.sharedTmp(`kp05-knowledge-feedback-loop-test/${process.pid}`);
 const deliveryDirOverride = `${suiteRoot}/knowledge-delivery`;
 const usagePathOverride = `${suiteRoot}/knowledge-usage/usage.json`;
@@ -58,6 +66,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  safeRmSync(personalOwnerRoot, { recursive: true, force: true });
   safeRmSync(suiteRoot, { recursive: true, force: true });
   if (originalDeliveryDir === undefined) delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
   else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalDeliveryDir;
@@ -114,6 +123,107 @@ describe('knowledge feedback policy', () => {
 
     safeWriteFile(policyPathOverride, JSON.stringify({ defaults: { max_usage_entries: 0 } }));
     expect(() => loadKnowledgeFeedbackCap()).toThrow('Invalid catalog knowledge-feedback-policy');
+  });
+});
+
+describe('personal feedback storage boundary', () => {
+  it.each(['wrong', 'stale'] as const)(
+    'keeps a real personal %s report out of the shared verification ledger',
+    (verdict) => {
+      delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+      delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+      const scope = { tier: 'personal' as const, owner_nhi: personalOwnerNhi };
+      const ledger = knowledgeVerificationLedgerPath();
+      const readLedger = () =>
+        safeExistsSync(ledger) ? String(safeReadFile(ledger, { encoding: 'utf8' })) : null;
+      const before = readLedger();
+      const receipt = recordHumanKnowledgeFeedback({
+        document_path: 'knowledge/personal/private-report.md',
+        verdict,
+        reason: 'private owner-only correction',
+        scope,
+      });
+      expect(receipt).toContain(personalOwnerRoot + '/feedback-loop/');
+      expect(JSON.parse(String(safeReadFile(receipt, { encoding: 'utf8' })).trim())).toMatchObject({
+        verdict,
+        reason: 'private owner-only correction',
+        scope,
+      });
+      expect(loadKnowledgeUsageAggregate(scope)[0]).toMatchObject({ not_used_count: 1 });
+      expect(readLedger()).toEqual(before);
+    }
+  );
+
+  it('stores actual personal delivery, gaps and usage only under its explicit owner without overrides', () => {
+    delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+    delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+    delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+    delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    const scope = { tier: 'personal' as const, owner_nhi: personalOwnerNhi };
+    const foreignScope = { ...scope, owner_nhi: personalOwnerNhi + '-other' };
+    const day = new Date().toISOString().slice(0, 10);
+    const sharedFiles = [
+      knowledgeDeliveryLogDir() + '/delivery-' + day + '.jsonl',
+      knowledgeUsageAggregatePath(),
+      pathResolver.shared('runtime/feedback-loop/knowledge-gaps.jsonl'),
+      pathResolver.shared('runtime/feedback-loop/knowledge-usage.jsonl'),
+    ];
+    const readIfPresent = (file: string) =>
+      safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : null;
+    const before = sharedFiles.map(readIfPresent);
+    const delivery = recordKnowledgeDelivery({
+      missionId: 'MSN-PRIVATE-FEEDBACK',
+      taskId: 'TASK-PRIVATE',
+      scope,
+      refs: [{ path: 'knowledge/personal/private-procedure.md' }],
+    });
+    expect(delivery?.deliveryRecordPath).toContain(personalOwnerRoot + '/feedback-loop/');
+    expect(delivery?.deliveryRecordPath).not.toContain('/active/shared/');
+    const gap = recordKnowledgeGap({
+      topic: 'private procedure',
+      sourceRef: 'mission:MSN-PRIVATE-FEEDBACK',
+      scope,
+    });
+    expect(gap).toContain(personalOwnerRoot + '/feedback-loop/');
+    expect(safeExistsSync(gap!)).toBe(true);
+    const feedback = recordKnowledgeUsageFeedback({
+      missionId: 'MSN-PRIVATE-FEEDBACK',
+      taskId: 'TASK-PRIVATE',
+      scope,
+      feedback: { used: ['knowledge/personal/private-procedure.md'] },
+    });
+    expect(feedback.usageUpdated).toBe(true);
+    expect(knowledgeUsageAggregatePath(scope)).toContain(personalOwnerRoot + '/feedback-loop/');
+    expect(loadKnowledgeUsageAggregate(scope)[0]).toMatchObject({
+      delivered_count: 1,
+      used_count: 1,
+    });
+    expect(loadKnowledgeUsageAggregate(foreignScope)).toEqual([]);
+    expect(knowledgeDeliveryLogDir(foreignScope)).not.toBe(knowledgeDeliveryLogDir(scope));
+    expect(sharedFiles.map(readIfPresent)).toEqual(before);
+  });
+
+  it('does not infer a personal owner from nhi_id or fall back to shared storage', () => {
+    const scope = { tier: 'personal' as const, nhi_id: 'nhi:not-an-owner-grant' };
+    expect(() => knowledgeDeliveryLogDir(scope)).toThrow('explicit owner_nhi');
+    expect(() => knowledgeUsageAggregatePath(scope)).toThrow('explicit owner_nhi');
+    expect(() =>
+      recordKnowledgeGap({ topic: 'private gap', sourceRef: 'mission:PRIVATE', scope })
+    ).toThrow('explicit owner_nhi');
+    expect(
+      recordKnowledgeUsageFeedback({
+        missionId: 'MSN-PRIVATE',
+        scope,
+        feedback: { missing_topics: ['private gap'] },
+      })
+    ).toEqual({ usageUpdated: false, promotionCandidateIds: [] });
+    expect(listMemoryPromotionCandidates()).toEqual([]);
+  });
+
+  it('rejects an invalid scoped path instead of returning the shared directory', () => {
+    expect(() =>
+      knowledgeDeliveryLogDir({ tier: 'confidential', tenant_slug: '../escape' })
+    ).toThrow();
   });
 });
 
@@ -274,6 +384,30 @@ describe('recordKnowledgeDelivery', () => {
     expect(loadKnowledgeUsageAggregate(scope)[0]).toMatchObject({ occurrences: 1 });
   });
 
+  it.each(['public', 'personal'] as const)(
+    'retains a %s source when repeated gaps enter review',
+    (tier) => {
+      const scope = { tier, ...(tier === 'personal' ? { owner_nhi: personalOwnerNhi } : {}) };
+      for (let index = 0; index < 3; index += 1) {
+        recordKnowledgeGap({
+          topic: 'source-specific operating instructions',
+          sourceRef: 'mission:MSN-SOURCE-GAP:' + index,
+          scope,
+          promoteOnCluster: true,
+        });
+      }
+      expect(listMemoryPromotionCandidates(scope)).toMatchObject([
+        {
+          scope: { ...scope, promotion_policy: 'same_scope' },
+          sensitivity_tier: 'confidential',
+          ratification_required: true,
+          status: 'queued',
+        },
+      ]);
+      expect(listMemoryPromotionCandidates(scope)[0]?.scope).not.toHaveProperty('tenant_slug');
+    }
+  );
+
   it('promotes the third repeated gap only inside the same tenant scope', () => {
     const scope = {
       tier: 'confidential' as const,
@@ -388,6 +522,35 @@ describe('recordKnowledgeUsageFeedback', () => {
     expect(rows[0]?.summary).toContain('how to configure the widget exporter');
     expect(safeExistsSync(memoryPromotionQueuePath())).toBe(true);
   });
+
+  it.each(['public', 'personal'] as const)(
+    'preserves a %s no-tenant source separately from the confidential review destination',
+    (tier) => {
+      const sourceScope = { tier, ...(tier === 'personal' ? { owner_nhi: personalOwnerNhi } : {}) };
+      const result = recordKnowledgeUsageFeedback({
+        missionId: 'MSN-KP05-SOURCE-SCOPE',
+        taskId: 'T-SOURCE',
+        scope: sourceScope,
+        feedback: { missing_topics: ['source-scoped configuration instructions'] },
+      });
+      expect(result.promotionCandidateIds).toHaveLength(1);
+      const rows = listMemoryPromotionCandidates(sourceScope);
+      const candidate = rows.find((row) => row.candidate_id === result.promotionCandidateIds[0]);
+      expect(candidate).toMatchObject({
+        scope: {
+          ...sourceScope,
+          promotion_policy: 'same_scope',
+          provenance_refs: ['mission:MSN-KP05-SOURCE-SCOPE:task:T-SOURCE'],
+        },
+        sensitivity_tier: 'confidential',
+        ratification_required: true,
+        status: 'queued',
+      });
+      expect(candidate?.scope).not.toHaveProperty('tenant_slug');
+      expect(candidate).not.toHaveProperty('promotion');
+      expect(candidate).not.toHaveProperty('learning_approval');
+    }
+  );
 
   it('treats a path listed in both used and not_used as used only', () => {
     recordKnowledgeDelivery({

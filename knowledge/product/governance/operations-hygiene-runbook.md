@@ -560,6 +560,26 @@ as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 a
 
 ## §6 Tenant scope and governed facades
 
+**Learning source, destination, and storage are distinct.** Preserve the observed source
+scope; a conservative confidential promotion destination never authorizes reading personal
+source content. Exact-scope distill lookups use the full canonical envelope and have no global
+fallback. Owner-only personal queues, distill records, and feedback use the protected
+active/personal/owners/<owner-hash>/ namespace and require an explicit owner; shared
+candidate lists never enumerate those owner queues. Do not invent a tenant or infer ownership
+from an executing agent. Existing ownerless/legacy records are not silently migrated.
+
+Before changing a scoped store, audit every list, ID lookup, mutation, notification, and
+publication caller. Server-derived tenant/org/project/tier restrictions and source owner/audience
+restrictions must all hold. Reject ambiguous IDs, scope removal, tier drift, copied hash/path
+records, and symlinked ancestors before writes. Unsupported scoped non-SOP publication is
+fail-closed; the exact-scope SOP approval proof is not a generic grant to publish other kinds.
+Keep tests for real store round-trips, wrong-owner reads, unchanged shared files, and actual
+publisher refusal, not only mocked route failures. Regression suites: distill-candidate-scope,
+memory-promotion-owner-scope, promoted-memory-scope, knowledge-feedback-loop, and the
+Chronos/Concierge memory visibility suites.
+
+Legacy unscoped candidates retain their existing storage compatibility; this does not authorize a scoped personal source without an explicit owner. Owner learning state is declared review-required only, without a retention duration or automatic cleanup. Personal wrong/stale feedback keeps its owner-private receipt but does not enter the shared verification ledger, whose schema cannot preserve owner scope.
+
 **Rules:**
 
 - **Registry paths are not tenants — but are not shared either.** The tenant classifier

@@ -2,7 +2,7 @@ import { verifyScopedLearningApprovalRef } from './scoped-learning-approval-veri
 import {
   approvedLearningPayloadDigest,
   type ScopedLearningApproval,
-} from './scoped-learning-contract.js';
+} from './scoped-learning-domain.js';
 import type { MemoryCandidate } from './memory-promotion-queue.js';
 export function assertScopedLearningApproval(candidate: MemoryCandidate): ScopedLearningApproval {
   const receipt = candidate.learning_approval;

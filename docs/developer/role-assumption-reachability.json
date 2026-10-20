@@ -1632,6 +1632,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/chronos-mirror-v2/src/lib/distill-candidate-scope.ts#listDistillCandidatesForViewer",
+      "roles": ["chronos_localadmin"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/chronos-mirror-v2/src/lib/plugin-host-boot.ts#isKnownChronosTenant",
       "roles": ["chronos_localadmin"],
       "unresolved": []
@@ -3330,6 +3335,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/discussion-request-context.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-request-scope.ts",
         "presence/displays/chronos-mirror-v2/src/lib/discussion-run-contract.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/distill-candidate-scope.ts",
         "presence/displays/chronos-mirror-v2/src/lib/focused-operator-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/headless-a2ui-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/headless-a2ui.ts",
@@ -3462,7 +3468,7 @@
         },
         "chronos_localadmin": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/lib/plugin-host-boot.ts#isKnownChronosTenant"
+            "presence/displays/chronos-mirror-v2/src/lib/distill-candidate-scope.ts#listDistillCandidatesForViewer"
           ]
         },
         "chronos_operator": {
@@ -4232,6 +4238,7 @@
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
         "presence/displays/concierge/src/lib/management-server.ts",
+        "presence/displays/concierge/src/lib/memory-candidate-visibility.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
         "presence/displays/concierge/src/lib/observation-review.ts",

@@ -591,7 +591,8 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });
@@ -653,7 +654,8 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });
@@ -669,14 +671,14 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
       tenant_slug: 'tenant-x',
       mission_id: missionId,
       task_id: makeWorkItem().item_id,
-      project_id: makeWorkItem().project_id,
     };
     await provisionTaskKnowledge({
       form: 'pack',
       missionId,
       tier: 'confidential',
       missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
-      workItem: makeWorkItem(),
+      // Dispatch uses the mission id as the placeholder for project-less work.
+      workItem: { ...makeWorkItem(), project_id: missionId },
       provider: 'claude',
       tenantKnowledgeRootDir: fixtureRoot,
     });

@@ -30,7 +30,7 @@ import { getOptionValue } from './mission-cli-args.js';
 import { ScriptExitError } from '../lib/harness.js';
 
 import { requestScopedLearningApproval } from '@agent/core/knowledge/scoped-learning-approval';
-import { isScopedLearningCandidate } from '@agent/core/knowledge/scoped-learning-contract';
+import { isScopedLearningCandidate } from '@agent/core/knowledge/scoped-learning-domain';
 import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 
 type Print = (value: unknown) => void;

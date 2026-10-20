@@ -2,7 +2,7 @@
 import type { DistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
 import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
-import { assertScopedLearningScope } from './knowledge/scoped-learning-contract.js';
+import { assertScopedLearningScope } from './knowledge/scoped-learning-domain.js';
 import { nowIso } from './foundation/time.js';
 import {
   resolvePromotedReportAudience,

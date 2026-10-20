@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
 import {
   assessServiceDistillCandidate,
   buildServiceProcedureCandidate,
 } from './service-distill-candidate.js';
-import { loadDistillCandidateRecord } from '../knowledge/distill-candidate-registry.js';
+import {
+  loadDistillCandidateRecord,
+  distillCandidateRecordPath,
+  type DistillCandidateRecord,
+} from '../knowledge/distill-candidate-registry.js';
 
 const recording = {
   schema_version: 'service-recording.v1',
@@ -27,11 +30,11 @@ const recording = {
 };
 
 describe('service-distill-candidate', () => {
-  const candidateIds: string[] = [];
+  const candidates: DistillCandidateRecord[] = [];
 
   afterEach(() => {
-    for (const candidateId of candidateIds.splice(0)) {
-      safeRmSync(pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`), {
+    for (const candidate of candidates.splice(0)) {
+      safeRmSync(distillCandidateRecordPath(candidate.candidate_id, candidate.scope), {
         force: true,
       });
     }
@@ -46,7 +49,7 @@ describe('service-distill-candidate', () => {
       tenantSlug: 'acme-corp',
       tier: 'confidential',
     });
-    candidateIds.push(result.candidate.candidate_id);
+    candidates.push(result.candidate);
 
     expect(result.preflight.ok).toBe(true);
     expect(result.pipeline._draft).toBe(true);
@@ -63,9 +66,38 @@ describe('service-distill-candidate', () => {
       },
       metadata: { executable: false, review_required: true, promotion_state: 'review_required' },
     });
-    expect(loadDistillCandidateRecord(result.candidate.candidate_id)?.candidate_id).toBe(
-      result.candidate.candidate_id
-    );
+    expect(loadDistillCandidateRecord(result.candidate.candidate_id)).toBeNull();
+    expect(
+      loadDistillCandidateRecord(result.candidate.candidate_id, {
+        ...result.candidate.scope!,
+        tenant_slug: 'other-tenant',
+      })
+    ).toBeNull();
+    expect(
+      loadDistillCandidateRecord(result.candidate.candidate_id, result.candidate.scope)
+        ?.candidate_id
+    ).toBe(result.candidate.candidate_id);
+  });
+
+  it('preserves a personal owner-only service candidate without inventing a tenant', () => {
+    const result = buildServiceProcedureCandidate(recording, {
+      intentPhrases: ['create an issue'],
+      tier: 'personal',
+      ownerNhi: 'nhi:service-owner',
+    });
+    candidates.push(result.candidate);
+    expect(result.candidate.scope?.tenant_slug).toBeUndefined();
+    expect(
+      loadDistillCandidateRecord(result.candidate.candidate_id, result.candidate.scope)
+        ?.candidate_id
+    ).toBe(result.candidate.candidate_id);
+    expect(loadDistillCandidateRecord(result.candidate.candidate_id)).toBeNull();
+    expect(
+      loadDistillCandidateRecord(result.candidate.candidate_id, {
+        ...result.candidate.scope!,
+        owner_nhi: 'nhi:other-owner',
+      })
+    ).toBeNull();
   });
 
   it('rejects recordings with observation validation errors before persistence', () => {

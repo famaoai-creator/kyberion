@@ -1,7 +1,4 @@
-import {
-  scopedLearningMarkdownPath,
-  isScopedLearningCandidate,
-} from './scoped-learning-contract.js';
+import { scopedLearningMarkdownPath, isScopedLearningCandidate } from './scoped-learning-domain.js';
 import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';

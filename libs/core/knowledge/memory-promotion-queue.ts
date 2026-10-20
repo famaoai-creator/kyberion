@@ -29,7 +29,7 @@ import {
   isScopedLearningCandidate,
   type ScopedLearningApproval,
   type ScopedLearningPublicationIdentity,
-} from './scoped-learning-contract.js';
+} from './scoped-learning-domain.js';
 import type { HumanDecidedBy } from '../mission/mission-types.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
@@ -166,18 +166,29 @@ function tenantQueueScope(scope: MemoryScopeEnvelope): {
 // queue until the migration steward adopts them.
 function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
   const override = getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim();
-  const candidate = override
-    ? pathResolver.rootResolve(override)
-    : scope?.tenant_slug
-      ? pathResolver.rootResolve(
-          physicalScopedPath(
-            'active/shared/runtime',
-            tenantQueueScope(scope),
-            'memory',
-            'promotion-queue.jsonl'
+  const canonical = scope ? assertMemoryScope(scope) : undefined;
+  if (canonical?.tier === 'personal' && !canonical.owner_nhi)
+    throw new Error('[MEMORY_SCOPE_UNSUPPORTED] Personal queue requires an explicit owner_nhi');
+  const ownerKey =
+    canonical?.tier === 'personal'
+      ? createHash('sha256').update(canonical.owner_nhi!).digest('hex')
+      : undefined;
+  const candidate = ownerKey
+    ? pathResolver.rootResolve(
+        path.posix.join('active/personal/owners', ownerKey, 'memory', 'promotion-queue.jsonl')
+      )
+    : override
+      ? pathResolver.rootResolve(override)
+      : scope?.tenant_slug
+        ? pathResolver.rootResolve(
+            physicalScopedPath(
+              'active/shared/runtime',
+              tenantQueueScope(scope),
+              'memory',
+              'promotion-queue.jsonl'
+            )
           )
-        )
-      : pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
+        : pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
@@ -654,7 +665,11 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
         correlationId: nextCandidate.candidate_id,
         metadata: {
           candidate_id: nextCandidate.candidate_id,
-          source_ref: nextCandidate.source_ref,
+          // Source references may be private artifact filenames. Keep correlation,
+          // but never copy owner-private paths into shared audit/SIEM metadata.
+          ...(nextCandidate.scope?.tier === 'personal'
+            ? {}
+            : { source_ref: nextCandidate.source_ref }),
           sensitivity_tier: nextCandidate.sensitivity_tier,
         },
       });
@@ -737,11 +752,7 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
   }
   const requestedScopeKey = input.scope ? resolveScopeKey(input.scope) : undefined;
   const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
-  const candidatePaths = input.allMatching
-    ? queuePathsForAllScopes()
-    : candidateQueuePath
-      ? [candidateQueuePath]
-      : queuePathsForAllScopes();
+  const candidatePaths = candidateQueuePath ? [candidateQueuePath] : queuePathsForAllScopes();
   const matchingQueuePaths = candidatePaths.filter((candidatePath) => {
     const rows = readQueueRows(candidatePath);
     return rows.some(
@@ -874,6 +885,17 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
         ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
         ...(input.decidedBy ? { decided_by: input.decidedBy } : {}),
       };
+      // Owner assignment/reassignment is a migration, not an in-place review update.
+      // Never put owner-scoped content into an existing shared or another owner's queue.
+      if (
+        (current.scope?.tier === 'personal' || next.scope?.tier === 'personal') &&
+        (current.scope?.tier !== next.scope?.tier ||
+          current.scope?.owner_nhi !== next.scope?.owner_nhi ||
+          resolveQueuePath(next.scope) !== queuePath)
+      )
+        throw new Error(
+          '[MEMORY_SCOPE_MIGRATION_REQUIRED] Personal scope cannot change its queue partition'
+        );
       if (input.status === 'approved' && isScopedLearningCandidate(next)) {
         const payloadDigest = approvedLearningPayloadDigest(next);
         if (current.learning_approval && current.learning_approval.payload_digest !== payloadDigest)
