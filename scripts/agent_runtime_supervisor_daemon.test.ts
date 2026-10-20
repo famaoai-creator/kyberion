@@ -5,7 +5,7 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '@agent/core';
-import { resolveLocalIpcAddress } from '@agent/core';
+import { resolveLocalIpcAddress } from '../libs/core/local-ipc.js';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),

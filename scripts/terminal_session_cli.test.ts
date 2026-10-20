@@ -3,7 +3,7 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ACTUATOR_SERVE_RESULT_PREFIX } from '@agent/core/cli-utils';
-import { resolveLocalIpcAddress } from '@agent/core';
+import { resolveLocalIpcAddress } from '../libs/core/local-ipc.js';
 import {
   inputForCli,
   parseServeResultLine,
