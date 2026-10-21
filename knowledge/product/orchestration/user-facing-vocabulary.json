@@ -6893,6 +6893,11 @@
         "ja": "レビュー済みの Dot 草案をプレビューまたは作成します。有効化は別操作です。",
         "qps-ploc": "⟦Ṗřėṽïėẇ őř ȧṗṗŀẏ ȧ řėṽïėẇėḓ Ḓőŧ ḓřȧƒŧ; ȧƈŧïṽȧŧė şėṗȧřȧŧėŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
+      "cli_cmd_script_onboarding_authority": {
+        "en": "Review, request and apply human-approved scoped GitHub and browser authority",
+        "ja": "GitHub とブラウザの対象を限定した操作権限を確認し、人間の承認を要求して適用します",
+        "qps-ploc": "⟦Řėṽïėẇ, řėɋůėşŧ ȧñḓ ȧṗṗŀẏ ħůɱȧñ-ȧṗṗřőṽėḓ şƈőṗėḓ ƓïŧĦůƀ ȧñḓ ƀřőẇşėř ȧůŧħőřïŧẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
       "cli_readiness": {
         "en": "Readiness",
         "ja": "実行準備度",
@@ -11521,6 +11526,216 @@
       }
     },
     "concierge": {
+      "authority.github_transport": {
+        "en": "GitHub account OAuth and pull-request execution are separate connections. Pull requests use the runtime's gh CLI, which must already be authenticated. Account connection and an approved grant do not prove that transport is ready.",
+        "ja": "GitHub アカウントの OAuth 接続と、プルリクエストの実行経路は別です。プルリクエストには実行環境で認証済みの gh CLI が必要です。アカウント接続と権限の承認だけでは、実行経路の準備完了を意味しません。",
+        "qps-ploc": "⟦ƓïŧĦůƀ ȧƈƈőůñŧ ŐȦůŧħ ȧñḓ ṗůŀŀ-řėɋůėşŧ ėẋėƈůŧïőñ ȧřė şėṗȧřȧŧė ƈőññėƈŧïőñş. Ṗůŀŀ řėɋůėşŧş ůşė ŧħė řůñŧïɱė'ş ɠħ ƇĿÏ, ẇħïƈħ ɱůşŧ ȧŀřėȧḓẏ ƀė ȧůŧħėñŧïƈȧŧėḓ. Ȧƈƈőůñŧ ƈőññėƈŧïőñ ȧñḓ ȧñ ȧṗṗřőṽėḓ ɠřȧñŧ ḓő ñőŧ ṗřőṽė ŧħȧŧ ŧřȧñşṗőřŧ ïş řėȧḓẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "authority.renew_existing": {
+        "en": "Renew expired charter with displayed existing limits",
+        "ja": "表示された既存の制限を引き継いで、期限切れの憲章を更新する",
+        "qps-ploc": "⟦Řėñėẇ ėẋṗïřėḓ ƈħȧřŧėř ẇïŧħ ḓïşṗŀȧẏėḓ ėẋïşŧïñɠ ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "authority.renewal_limits": {
+        "en": "Existing limits and grants to review before renewal",
+        "ja": "更新前に確認する既存の制限と権限",
+        "qps-ploc": "⟦Ėẋïşŧïñɠ ŀïɱïŧş ȧñḓ ɠřȧñŧş ŧő řėṽïėẇ ƀėƒőřė řėñėẇȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "authority.proposal_explanation": {
+        "en": "The receiving agent requests delegation from its accountable owner. This is owner consent, not an independent review.",
+        "ja": "権限を受けるエージェントが責任者に委任を申請します。これは責任者の同意であり、独立した審査ではありません。",
+        "qps-ploc": "⟦Ŧħė řėƈėïṽïñɠ ȧɠėñŧ řėɋůėşŧş ḓėŀėɠȧŧïőñ ƒřőɱ ïŧş ȧƈƈőůñŧȧƀŀė őẇñėř. Ŧħïş ïş őẇñėř ƈőñşėñŧ, ñőŧ ȧñ ïñḓėṗėñḓėñŧ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "authority.runtime_ready": {
+        "en": "The registered agent is active.",
+        "ja": "登録済みのエージェントは有効です。",
+        "qps-ploc": "⟦Ŧħė řėɠïşŧėřėḓ ȧɠėñŧ ïş ȧƈŧïṽė. ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.runtime_unavailable": {
+        "en": "Agent execution is not ready. A recorded grant alone does not make it ready:",
+        "ja": "エージェントを実行できる状態ではありません。権限の記録だけでは実行可能になりません：",
+        "qps-ploc": "⟦Ȧɠėñŧ ėẋėƈůŧïőñ ïş ñőŧ řėȧḓẏ. Ȧ řėƈőřḓėḓ ɠřȧñŧ ȧŀőñė ḓőėş ñőŧ ɱȧķė ïŧ řėȧḓẏ: ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "authority.connecting": {
+        "en": "Preparing account authentication…",
+        "ja": "アカウントの認証を準備中です…",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ ȧƈƈőůñŧ ȧůŧħėñŧïƈȧŧïőñ… ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "authority.approve": {
+        "en": "Approve this reviewed authority",
+        "ja": "確認した権限を承認する",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŧħïş řėṽïėẇėḓ ȧůŧħőřïŧẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.reject": {
+        "en": "Reject this authority request",
+        "ja": "この権限要求を拒否する",
+        "qps-ploc": "⟦Řėĵėƈŧ ŧħïş ȧůŧħőřïŧẏ řėɋůėşŧ ŀőřėɱ ïṗş⟧"
+      },
+      "authority.passkey_setup": {
+        "en": "Set up a passkey for strong approval",
+        "ja": "強い承認のためにパスキーを設定する",
+        "qps-ploc": "⟦Şėŧ ůṗ ȧ ṗȧşşķėẏ ƒőř şŧřőñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "authority.oauth_invalid": {
+        "en": "The authorization service returned an invalid HTTPS destination.",
+        "ja": "認証サービスが返した HTTPS の接続先を確認できません。",
+        "qps-ploc": "⟦Ŧħė ȧůŧħőřïẑȧŧïőñ şėřṽïƈė řėŧůřñėḓ ȧñ ïñṽȧŀïḓ ĦŦŦṖŞ ḓėşŧïñȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "authority.title": {
+        "en": "External service authority",
+        "ja": "外部サービスの操作権限",
+        "qps-ploc": "⟦Ėẋŧėřñȧŀ şėřṽïƈė ȧůŧħőřïŧẏ ŀőřėɱ ïṗ⟧"
+      },
+      "authority.separate": {
+        "en": "Connecting an account does not authorize actions. Review authority separately.",
+        "ja": "アカウント接続だけでは操作を許可しません。操作権限は別に確認します。",
+        "qps-ploc": "⟦Ƈőññėƈŧïñɠ ȧñ ȧƈƈőůñŧ ḓőėş ñőŧ ȧůŧħőřïẑė ȧƈŧïőñş. Řėṽïėẇ ȧůŧħőřïŧẏ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "authority.bounds": {
+        "en": "Only public data and the exact reviewed repository or origin are delegated. Clicking, evaluating scripts and merging require individual review.",
+        "ja": "委任するのは公開データと確認済みのリポジトリまたはオリジンに限ります。クリック、スクリプト評価、マージは個別の確認が必要です。",
+        "qps-ploc": "⟦Őñŀẏ ṗůƀŀïƈ ḓȧŧȧ ȧñḓ ŧħė ėẋȧƈŧ řėṽïėẇėḓ řėṗőşïŧőřẏ őř őřïɠïñ ȧřė ḓėŀėɠȧŧėḓ. Ƈŀïƈķïñɠ, ėṽȧŀůȧŧïñɠ şƈřïṗŧş ȧñḓ ɱėřɠïñɠ řėɋůïřė ïñḓïṽïḓůȧŀ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "authority.scope": {
+        "en": "Accountable scope",
+        "ja": "責任を持つ範囲",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė şƈőṗė ŀőřėɱ⟧"
+      },
+      "authority.person": {
+        "en": "Me",
+        "ja": "自分",
+        "qps-ploc": "⟦Ɱė ŀőř⟧"
+      },
+      "authority.organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "authority.tenant": {
+        "en": "Organization tenant",
+        "ja": "組織のテナント",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŧėñȧñŧ ŀőřėɱ ⟧"
+      },
+      "authority.choose": {
+        "en": "Choose explicitly",
+        "ja": "明示的に選択してください",
+        "qps-ploc": "⟦Ƈħőőşė ėẋṗŀïƈïŧŀẏ ŀőřėɱ⟧"
+      },
+      "authority.refresh": {
+        "en": "Refresh authority",
+        "ja": "権限の状態を更新",
+        "qps-ploc": "⟦Řėƒřėşħ ȧůŧħőřïŧẏ ŀőřėɱ⟧"
+      },
+      "authority.pending": {
+        "en": "Waiting for the confirmed result…",
+        "ja": "確定した結果を確認中です…",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ŧħė ƈőñƒïřɱėḓ řėşůŀŧ… ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "authority.loading": {
+        "en": "Loading current authority…",
+        "ja": "現在の権限を読み込み中です…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ƈůřřėñŧ ȧůŧħőřïŧẏ… ŀőřėɱ ïṗ⟧"
+      },
+      "authority.unavailable": {
+        "en": "Authority unavailable. Check access and refresh.",
+        "ja": "権限を取得できません。アクセス権を確認して更新してください。",
+        "qps-ploc": "⟦Ȧůŧħőřïŧẏ ůñȧṽȧïŀȧƀŀė. Ƈħėƈķ ȧƈƈėşş ȧñḓ řėƒřėşħ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "authority.unconfirmed": {
+        "en": "Outcome unconfirmed. Refresh the request status before trying again.",
+        "ja": "結果を確認できません。再操作の前に要求の状態を更新してください。",
+        "qps-ploc": "⟦Őůŧƈőɱė ůñƈőñƒïřɱėḓ. Řėƒřėşħ ŧħė řėɋůėşŧ şŧȧŧůş ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "authority.accountable": {
+        "en": "Accountable person",
+        "ja": "責任者",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė ṗėřşőñ ŀőřėɱ⟧"
+      },
+      "authority.stopped": {
+        "en": "Authority stopped",
+        "ja": "権限は停止中です",
+        "qps-ploc": "⟦Ȧůŧħőřïŧẏ şŧőṗṗėḓ ŀőřėɱ⟧"
+      },
+      "authority.current": {
+        "en": "Current authority",
+        "ja": "現在の権限",
+        "qps-ploc": "⟦Ƈůřřėñŧ ȧůŧħőřïŧẏ ŀőřėɱ⟧"
+      },
+      "authority.revoke": {
+        "en": "Review revocation",
+        "ja": "権限の取消しを確認",
+        "qps-ploc": "⟦Řėṽïėẇ řėṽőƈȧŧïőñ ŀőřėɱ⟧"
+      },
+      "authority.none": {
+        "en": "No delegation is configured in this scope.",
+        "ja": "この範囲の委任は設定されていません。",
+        "qps-ploc": "⟦Ñő ḓėŀėɠȧŧïőñ ïş ƈőñƒïɠůřėḓ ïñ ŧħïş şƈőṗė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "authority.new": {
+        "en": "Review a new grant",
+        "ja": "新しい権限を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧ ñėẇ ɠřȧñŧ ŀőřėɱ⟧"
+      },
+      "authority.operation": {
+        "en": "Permitted operation",
+        "ja": "許可する操作",
+        "qps-ploc": "⟦Ṗėřɱïŧŧėḓ őṗėřȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "authority.pr": {
+        "en": "Create a pull request",
+        "ja": "プルリクエストを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ṗůŀŀ řėɋůėşŧ ŀőřėɱ ⟧"
+      },
+      "authority.goto": {
+        "en": "Navigate to an origin",
+        "ja": "指定オリジンを開く",
+        "qps-ploc": "⟦Ñȧṽïɠȧŧė ŧő ȧñ őřïɠïñ ŀőřėɱ ⟧"
+      },
+      "authority.tab": {
+        "en": "Open a tab at an origin",
+        "ja": "指定オリジンのタブを開く",
+        "qps-ploc": "⟦Őṗėñ ȧ ŧȧƀ ȧŧ ȧñ őřïɠïñ ŀőřėɱ ï⟧"
+      },
+      "authority.target": {
+        "en": "Exact HTTPS repository or origin",
+        "ja": "正確な HTTPS リポジトリまたはオリジン",
+        "qps-ploc": "⟦Ėẋȧƈŧ ĦŦŦṖŞ řėṗőşïŧőřẏ őř őřïɠïñ ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.expiry": {
+        "en": "Expiry (local time)",
+        "ja": "有効期限（現地時刻）",
+        "qps-ploc": "⟦Ėẋṗïřẏ (ŀőƈȧŀ ŧïɱė) ŀőřėɱ ⟧"
+      },
+      "authority.preview": {
+        "en": "Preview exact authority",
+        "ja": "正確な権限をプレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ėẋȧƈŧ ȧůŧħőřïŧẏ ŀőřėɱ ï⟧"
+      },
+      "authority.request": {
+        "en": "Ask this agent to request these permissions",
+        "ja": "このエージェントにこれらの権限を申請させる",
+        "qps-ploc": "⟦Ȧşķ ŧħïş ȧɠėñŧ ŧő řėɋůėşŧ ŧħėşė ṗėřɱïşşïőñş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "authority.review": {
+        "en": "Open signed approval review",
+        "ja": "署名付き承認の確認画面を開く",
+        "qps-ploc": "⟦Őṗėñ şïɠñėḓ ȧṗṗřőṽȧŀ řėṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "authority.status": {
+        "en": "Check request status",
+        "ja": "要求の状態を確認",
+        "qps-ploc": "⟦Ƈħėƈķ řėɋůėşŧ şŧȧŧůş ŀőřėɱ ⟧"
+      },
+      "authority.apply": {
+        "en": "Apply approved authority",
+        "ja": "承認済みの権限を適用",
+        "qps-ploc": "⟦Ȧṗṗŀẏ ȧṗṗřőṽėḓ ȧůŧħőřïŧẏ ŀőřėɱ ï⟧"
+      },
+      "authority.browser_connection": {
+        "en": "Browser authority does not import your login session. Connect an existing browser through the governed browser setup; credentials and authority remain separate.",
+        "ja": "ブラウザの権限設定でログイン状態は取り込みません。既存ブラウザは管理された設定手順で接続し、認証情報と操作権限を分けて扱います。",
+        "qps-ploc": "⟦Ƀřőẇşėř ȧůŧħőřïŧẏ ḓőėş ñőŧ ïɱṗőřŧ ẏőůř ŀőɠïñ şėşşïőñ. Ƈőññėƈŧ ȧñ ėẋïşŧïñɠ ƀřőẇşėř ŧħřőůɠħ ŧħė ɠőṽėřñėḓ ƀřőẇşėř şėŧůṗ; ƈřėḓėñŧïȧŀş ȧñḓ ȧůŧħőřïŧẏ řėɱȧïñ şėṗȧřȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
       "memory.review_in_chronos": {
         "en": "Review in Chronos",
         "ja": "Chronosで確認",

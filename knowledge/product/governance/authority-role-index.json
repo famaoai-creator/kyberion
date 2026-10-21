@@ -344,6 +344,18 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "person_charter_store": {
+      "description": "Internal installed-owner person charter IO mediator. Never held around worker actions. Requires verified installed owner/NHI context and exact registry-created path capability enforced by tier guard. Reads only selected charter/ledger or charter directory, appends only an existing owned charter ledger; no profile, charter acceptance, retirement or stop-clear authority. Also writes one canonical generated personal external-operation reservation under an exact-file capability; no general runtime write authority.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "knowledge/personal/charters/",
+        "active/shared/runtime/external-operations/personal/shared/",
+        "active/shared/tmp/personal/shared/vitest-external-operations/"
+      ],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal"]
+    },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
       "default_persona": "qa_lead",

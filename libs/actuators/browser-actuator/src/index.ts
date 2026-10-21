@@ -168,6 +168,23 @@ export const actuator = defineCatalogBackedActuator({
   id: 'browser-actuator',
   describeOps,
   handleAction,
+  actionInput: (op, params, context) => {
+    const navigation = op === 'goto' || op === 'navigate' || op === 'open_tab';
+    const isolated = navigation && params.onboarding_isolated_navigation === true;
+    const { onboarding_isolated_navigation: _configuration, ...operationParams } = params;
+    return {
+      action: 'pipeline',
+      steps: [
+        {
+          type: describeOps().find((description) => description.op === op)!.kind,
+          op,
+          params: navigation ? operationParams : params,
+        },
+      ],
+      context,
+      ...(isolated ? { options: { onboarding_isolated_navigation: true } } : {}),
+    };
+  },
 });
 
 function handleExtensionSessionPreflight(

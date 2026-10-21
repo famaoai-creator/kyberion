@@ -114,6 +114,8 @@ export interface ExternalOperationAuthority {
   invocationId: string;
   hasHuman?: boolean;
   charter?: ApprovalGateCharterInput;
+  /** Trusted stop scope survives a target mismatch or an ineligible operation. */
+  standingScope?: Charter['scope'];
   /** Trusted production pipeline binding, never copied from effect params. */
   pipelineContext?: ApprovalRequesterContext;
   /** Human-readable, trusted review material; never copy raw effect bodies here. */
@@ -263,6 +265,8 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
     );
   }
   const envelope = currentScopeEnvelope();
+  if (envelope?.policy?.external_egress === 'deny')
+    stopExternalGovernance('[EXTERNAL_EGRESS_DENIED] Scope envelope prohibits external egress');
   if (authority && envelope && authority.tenantSlug !== envelope.identity.tenant_slug) {
     stopExternalGovernance(
       '[EXTERNAL_SCOPE_MISMATCH] Authority must match the active scope envelope'
@@ -281,15 +285,22 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   // Standing tenant stops tighten every external mutation, including opaque
   // human-only operations that cannot obtain delegated authority.
   const trustedTenant = input.tenantSlug ?? authority?.tenantSlug;
-  if (trustedTenant) {
+  if (
+    authority?.standingScope &&
+    (authority.standingScope.kind === 'person'
+      ? Boolean(trustedTenant)
+      : authority.standingScope.tenant_slug !== trustedTenant)
+  )
+    stopExternalGovernance('[EXTERNAL_SCOPE_MISMATCH] Standing scope differs from boundary scope');
+  const standingScope = trustedTenant
+    ? { kind: 'organization' as const, tenant_slug: trustedTenant }
+    : (authority?.standingScope ??
+      (authority?.charter?.scope.kind === 'person' ? authority.charter.scope : undefined));
+  if (standingScope) {
     const pathOptions = authority?.charter?.pathOptions;
     let active: Charter | null;
     try {
-      active = findActiveCharter(
-        { kind: 'organization', tenant_slug: trustedTenant },
-        new Date(),
-        pathOptions
-      );
+      active = findActiveCharter(standingScope, new Date(), pathOptions);
     } catch {
       stopExternalGovernance(
         '[EXTERNAL_CHARTER_UNAVAILABLE] Cannot verify the tenant governance state'
@@ -315,9 +326,9 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   const charter = input.delegable ? authority?.charter : undefined;
   if (
     charter &&
-    (charter.scope.kind !== 'organization' ||
-      !authority?.tenantSlug ||
-      charter.scope.tenant_slug !== authority.tenantSlug)
+    (charter.scope.kind === 'person'
+      ? Boolean(trustedTenant)
+      : !authority?.tenantSlug || charter.scope.tenant_slug !== authority.tenantSlug)
   ) {
     stopExternalGovernance(
       '[EXTERNAL_SCOPE_MISMATCH] Charter must match the trusted tenant binding'

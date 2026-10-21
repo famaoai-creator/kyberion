@@ -1,5 +1,11 @@
 import { logger } from '@agent/core/core';
-import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeMkdir,
+  safeExistsSync,
+  safeRmSync,
+} from '@agent/core/secure-io';
+import { randomUUID } from 'node:crypto';
 import {
   runAdfActuatorPipeline,
   defineActuatorPipelineBase,
@@ -17,6 +23,11 @@ import { assertExternalOperationBatchResumable } from '@agent/core/governance/ex
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { countBrowserExternalEffects } from './browser-external-governance.js';
 import { runLocalSessionProbe } from './browser-local-session-probe.js';
+import {
+  forgetIsolatedNavigationConfinement,
+  registerIsolatedBrowserProfile,
+} from './browser-navigation-confinement.js';
+import { createScratchWorkspace, releaseWorkspace } from '@agent/core/workforce/workspace-ledger';
 import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
@@ -122,10 +133,35 @@ export async function executePipeline(
     return runLocalSessionProbe(steps[0].params || {}, initialCtx);
   }
   assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
+  const isolated = inputOptions?.onboarding_isolated_navigation === true;
+  if (
+    isolated &&
+    ((inputSessionId && inputSessionId !== 'default') ||
+      [
+        'connect_over_cdp',
+        'cdp_url',
+        'cdp_port',
+        'user_data_dir',
+        'profile',
+        'profile_name',
+        'profile_email',
+        'profile_directory',
+        'launch_args',
+        'browser_channel',
+        'record_trace',
+        'record_video',
+      ].some((key) => inputOptions[key]) ||
+      (inputOptions.browser_runtime && inputOptions.browser_runtime !== 'playwright-chromium'))
+  )
+    throw new Error(
+      '[BROWSER_ISOLATION_REQUIRED] Isolated public navigation requires a fresh builtin session without profile, CDP, launch or recording overrides'
+    );
   const { sessionId, options } = preflightAutomationRuntime(
     steps,
-    inputSessionId,
-    inputOptions ?? {}
+    isolated ? `onboarding-${randomUUID()}` : inputSessionId,
+    isolated
+      ? { ...inputOptions, browser_runtime: 'playwright-chromium', keep_alive: false }
+      : (inputOptions ?? {})
   );
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;
@@ -141,9 +177,15 @@ export async function executePipeline(
     }
   }
 
+  const isolatedWorkspace = isolated
+    ? createScratchWorkspace({ session_id: sessionId })
+    : undefined;
   const userDataDir = resolveBrowserRepositoryPath(
-    options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId)
+    isolated
+      ? isolatedWorkspace!.path
+      : options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId)
   );
+  if (isolated) registerIsolatedBrowserProfile(userDataDir);
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
   if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
   const sessionMetadataPath = assertSafeRepositoryPath(
@@ -163,13 +205,21 @@ export async function executePipeline(
     safeMkdir(resolvedVideoDir, { recursive: true });
 
   const hadExistingLease = browserRuntimeHelpers.hasBrowserRuntimeLease(sessionId);
-  const browserContext = await browserRuntimeHelpers.getOrCreateBrowserContext(
-    sessionId,
-    userDataDir,
-    sessionMetadataPath,
-    options,
-    resolvedVideoDir
-  );
+  const browserContext = await browserRuntimeHelpers
+    .getOrCreateBrowserContext(
+      sessionId,
+      userDataDir,
+      sessionMetadataPath,
+      options,
+      resolvedVideoDir
+    )
+    .catch((error) => {
+      if (isolated) {
+        safeRmSync(userDataDir, { recursive: true, force: true });
+        releaseWorkspace(isolatedWorkspace!.id);
+      }
+      throw error;
+    });
 
   // Start Tracing if requested
   if (options.record_trace) {
@@ -195,8 +245,17 @@ export async function executePipeline(
   const sessionScopeFingerprint =
     activeLease?.scopeFingerprint || browserRuntimeHelpers.getBrowserScopeFingerprint();
   if (runtime.tabs.size === 0) {
-    const page = await browserContext.newPage();
-    browserRuntimeHelpers.registerBrowserPage(runtime, page, 'tab-1');
+    try {
+      const page = await browserContext.newPage();
+      browserRuntimeHelpers.registerBrowserPage(runtime, page, 'tab-1');
+    } catch (error) {
+      if (isolated) {
+        await browserRuntimeHelpers.closeBrowserSession(sessionId);
+        safeRmSync(userDataDir, { recursive: true, force: true });
+        releaseWorkspace(isolatedWorkspace!.id);
+      }
+      throw error;
+    }
   }
 
   let ctx = {
@@ -385,7 +444,8 @@ export async function executePipeline(
     // Existing shared sessions remain owned by their original caller.
     const failedNewSession =
       !hadExistingLease && (Boolean(ctx.error) || engineResult?.status === 'failed');
-    const shouldClose = ctx.__close_browser_session === true || !keepAlive || failedNewSession;
+    const shouldClose =
+      isolated || ctx.__close_browser_session === true || !keepAlive || failedNewSession;
     const leaseExpiresAt = shouldClose
       ? undefined
       : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
@@ -443,12 +503,17 @@ export async function executePipeline(
         recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
         scope_fingerprint: sessionScopeFingerprint,
       } as any);
-      if (failedNewSession) {
+      if (failedNewSession || isolated) {
         // The acquired lease may be a new connection to an existing CDP
         // browser. Its release disconnects without destroying remote tabs.
         await browserRuntimeHelpers.closeBrowserSession(sessionId);
       } else {
         await browserContext.close();
+      }
+      if (isolated) {
+        forgetIsolatedNavigationConfinement(browserContext);
+        safeRmSync(userDataDir, { recursive: true, force: true });
+        releaseWorkspace(isolatedWorkspace!.id);
       }
     } else {
       ctx.recorded_videos = [];

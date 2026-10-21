@@ -2807,6 +2807,16 @@
       "native_help": true
     },
     {
+      "id": "script.onboarding.authority",
+      "module": "scripts/onboarding_authority.ts",
+      "command": "onboarding authority",
+      "noun": "onboarding",
+      "verb": "authority",
+      "audience": "operator",
+      "description": "cli_cmd_script_onboarding_authority",
+      "group": "start"
+    },
+    {
       "id": "script.onboarding.context",
       "script": "onboarding:context",
       "command": "onboarding context",

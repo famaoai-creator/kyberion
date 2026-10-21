@@ -52,6 +52,8 @@ export function generateOnboardingRunbookSkill(
     '1. Run `pnpm pipeline --input pipelines/baseline-check.json` and keep the result as the session health receipt. For `needs_attention`, fix the failed layer (L8 storage janitor, L10 chronos scheduler, L11 audit ledger are the usual first-run gaps) as described in Step 4 of `knowledge/product/governance/onboarding-flow.md`.',
     '2. Run `pnpm pipeline vital-check --format=json` and confirm identity, vision and onboarding summary.',
     '3. Review connection drafts under the active profile before enabling any external service.',
+    '   In Settings → Services, connect the account separately from authority. Review exact GitHub/browser targets, existing limits and expiry, then ask the installed agent to request owner delegation. Use a signed human decision and apply the exact plan; identity setup alone leaves a new NHI provisioned, never active. This is owner consent, not independent review.',
+    '   CLI alternative: `pnpm kyberion onboarding authority show --scope person --json`, then `preview` → `request` → signed human approval → `status` → `apply`. Retain the request id to resume; revoke selected grants through the same reviewed flow. Personal scope has no tenant.',
     '4. Personal-only use needs no tenant. Before any tenant-bound work, complete Steps 5-8 of the onboarding standard flow (tenant registry, context binding, tenant activation, first-work review).',
     '5. Classify the first real task with work-scope-policy.json and use the lowest suitable execution shape; create a mission when required. Do not turn the tutorial into work implicitly.',
     '6. Run `/ky-review` or the governed review phase after changing code, knowledge, or audit state.',

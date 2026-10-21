@@ -7,6 +7,7 @@ import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import { ensureAgentIdentityBestEffort } from '../agent/agent-identity.js';
 import { ownerAccountableHumanId } from '../organization/member-registry.js';
+import { onboardingAgentIdentityParameters } from '../organization/onboarding-runtime-identity.js';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
@@ -51,22 +52,6 @@ import {
   writeVoiceProfileRegistry,
   type VoiceProfileRegistry,
 } from '../voice/voice-profile-registry.js';
-
-/**
- * FD-10 item 2 / item 5: onboarding's `agent_id` predates NI-01 and keeps a
- * looser grammar (see `identitySchema` below) than an nhi_id slug segment
- * (`^[a-z][a-z0-9-]*$`). Derive a valid slug from it rather than tightening
- * the onboarding field itself — existing agent_id values (and the concierge
- * `/api/setup` route that also writes this file) are not re-validated.
- */
-function slugifyForNhi(agentId: string): string {
-  const normalized = agentId
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return /^[a-z]/.test(normalized) ? normalized : `agent-${normalized}`.replace(/-+$/, '');
-}
 
 const interactionStyles = ['Senior Partner', 'Concierge', 'Minimalist'] as const;
 const toolModes = ['trial_first', 'installed_first', 'installed_only'] as const;
@@ -326,13 +311,18 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         // but the persisted profile should still carry the deterministic link
         // so a later governed reconciliation can complete it.
         const ensuredAgent = ensureAgentIdentityBestEffort({
-          slug: slugifyForNhi(draft.identity.agent_id),
+          ...onboardingAgentIdentityParameters(draft.identity.agent_id, ownerAccountableHumanId()),
           displayName: draft.identity.name,
           accountableHumanId: ownerAccountableHumanId(),
           ...(draft.identity.tenant_slug
             ? { affiliation: { tenant_slug: draft.identity.tenant_slug } }
             : {}),
         });
+        if (
+          ensuredAgent.record &&
+          ensuredAgent.record.accountable_human_id !== ownerAccountableHumanId()
+        )
+          throw new Error('Installed agent accountability mismatch.');
         const agentPath = path.join(profileRoot(), 'agent-identity.json');
         writePersonalAgentIdentityAtPath(agentPath, {
           agent_id: draft.identity.agent_id,

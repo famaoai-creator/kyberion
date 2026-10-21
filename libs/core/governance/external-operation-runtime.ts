@@ -8,6 +8,21 @@ import { charterInputForDecision } from './charter-call-site.js';
 import { currentExternalOperationOccurrence } from './external-operation-occurrence.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import { redactSensitiveValue } from '../network.js';
+import { agentActor } from '../actor.js';
+import { inspectInstalledOnboardingRuntime } from '../organization/onboarding-runtime-identity.js';
+import { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
+export { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
+import { findActiveCharter } from './accountability-charter-registry.js';
+import type { CharterScope } from './accountability-charter.js';
+import {
+  parseExternalOperationGrant,
+  externalOperationGrantMatches,
+} from './external-operation-target.js';
+export {
+  parseExternalOperationGrant,
+  parseExternalOperationGrants,
+} from './external-operation-target.js';
+export type { ExternalOperationGrant } from './external-operation-target.js';
 import {
   hasExternalOperationAuthority,
   withExternalOperationAuthority,
@@ -19,6 +34,100 @@ export interface ExternalOperationRuntimeOptions {
   runId?: string;
   stepId: string;
   hasHuman?: boolean;
+}
+
+/** The onboarding facade proves profile ownership and installed agent identity.
+ * Caller action parameters cannot install this authority context. */
+export function createOnboardingExternalOperationAuthority(options: {
+  scope: CharterScope;
+  agentId: string;
+  ownerActor: string;
+  invocationId: string;
+  hasHuman?: false;
+}): ExternalOperationAuthorityResolver {
+  if (!options.invocationId.trim())
+    throw new Error('[EXTERNAL_IDENTITY_REQUIRED] Stable invocation required');
+  const scope = structuredClone(options.scope);
+  return (facts) => {
+    const authority = {
+      agentId: options.agentId,
+      invocationId: computeApprovalPayloadHash({
+        base: options.invocationId,
+        pipeline: externalOperationReplayKey('onboarding'),
+        occurrence: currentExternalOperationOccurrence(),
+      }),
+      hasHuman: false,
+      standingScope: scope,
+      ...(scope.kind === 'organization' ? { tenantSlug: scope.tenant_slug } : {}),
+    };
+    // A destination grant never declassifies source content. Only a trusted
+    // public execution scope may use these first, narrowly supported grants.
+    const envelope = currentScopeEnvelope();
+    const source = envelope?.identity ?? resolveScopeContext();
+    if (source.nhi_id && source.nhi_id !== options.agentId)
+      throw new Error(
+        '[EXTERNAL_AGENT_IDENTITY_MISMATCH] Installed NHI differs from actual execution actor'
+      );
+    if (
+      source.tier !== 'public' ||
+      envelope?.policy.external_egress === 'deny' ||
+      (envelope && !envelope.policy.read_tiers.includes('public'))
+    )
+      return authority;
+    const charter = findActiveCharter(scope, new Date());
+    if (!charter || !facts.delegable) return authority;
+    const effect = facts.effect as Record<string, unknown>;
+    let raw: unknown;
+    if (facts.operationId === 'vcs:pr_create') {
+      if (effect.body_source_tier !== 'public' && effect.body_source_tier !== 'inline')
+        return authority;
+      const repository = effect.repository as
+        { url?: unknown; host?: unknown; slug?: unknown } | undefined;
+      if (repository && typeof repository.url === 'string') {
+        const url = new URL(repository.url);
+        if (
+          url.host === repository.host &&
+          url.pathname.replace(/^\//, '').replace(/\/$/, '') === repository.slug
+        )
+          raw = {
+            operation_id: facts.operationId,
+            repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
+          };
+      }
+    } else if (facts.operationId === 'browser:goto' || facts.operationId === 'browser:open_tab') {
+      if (effect.navigation_confinement !== 'isolated-public-read-v1') return authority;
+      const params = effect.params as { url?: unknown } | undefined;
+      if (typeof params?.url === 'string') {
+        const url = new URL(params.url);
+        if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash)
+          raw = { operation_id: facts.operationId, origin: url.origin };
+      }
+    }
+    const target = parseExternalOperationGrant(raw);
+    if (
+      !target ||
+      !(charter.envelope.external_operations ?? []).some((grant) =>
+        externalOperationGrantMatches(grant, target)
+      )
+    )
+      return authority;
+    return {
+      ...authority,
+      charter: {
+        scope,
+        action: {
+          actor: agentActor(options.agentId, options.ownerActor),
+          action_class: 'target_scoped_external_operation',
+          external_operation: target,
+          reversible: false,
+          irreversible_action_name: target.operation_id,
+          estimated_loss: 0,
+          reputational_class: 'B' as const,
+          blast_radius: { systems: 1, recipients: 1 },
+        },
+      },
+    };
+  };
 }
 
 const runtimeIdentity = new AsyncLocalStorage<Readonly<ExternalOperationRuntimeOptions>>();
@@ -146,10 +255,46 @@ export function withRuntimeExternalOperationAuthority<T>(
   options: ExternalOperationRuntimeOptions,
   dispatch: () => T
 ): T {
-  const run = () =>
-    hasExternalOperationAuthority()
-      ? dispatch()
-      : withExternalOperationAuthority(createRuntimeExternalOperationAuthority(options), dispatch);
+  const run = () => {
+    if (hasExternalOperationAuthority()) return dispatch();
+    const identity = currentScopeEnvelope()?.identity ?? resolveScopeContext();
+    const scope: CharterScope = identity.tenant_slug
+      ? { kind: 'organization', tenant_slug: identity.tenant_slug }
+      : { kind: 'person' };
+    const installed = inspectInstalledOnboardingRuntime(scope);
+    const base = createRuntimeExternalOperationAuthority(options);
+    const onboard =
+      installed.ready && 'agentActive' in installed && installed.agentActive === true
+        ? createOnboardingExternalOperationAuthority({
+            scope,
+            agentId: installed.agentId,
+            ownerActor: installed.ownerId,
+            invocationId: options.runId || randomUUID(),
+          })
+        : undefined;
+    const execute = () =>
+      withExternalOperationAuthority((facts) => {
+        if (!onboard) return base(facts);
+        const target = onboard(facts);
+        if (
+          ['vcs:pr_create', 'browser:goto', 'browser:open_tab'].includes(facts.operationId) &&
+          target?.charter
+        )
+          return target;
+        // Preserve individual human approval and all existing Slack/meeting
+        // delegation while carrying the independent installed standing stop.
+        return { ...base(facts), standingScope: target?.standingScope };
+      }, dispatch);
+    return installed.ready &&
+      'agentActive' in installed &&
+      installed.agentActive === true &&
+      scope.kind === 'person'
+      ? withInstalledPersonCharterRuntime(
+          { ownerActor: installed.ownerId, agentId: installed.agentId },
+          execute
+        )
+      : execute();
+  };
   return runtimeIdentity.run(Object.freeze({ ...options }), () =>
     options.runId ? withExternalOperationPipelineRun(options.runId, run) : run()
   );

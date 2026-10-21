@@ -7,6 +7,11 @@ import type { BrowserRuntime } from './browser-pipeline-helpers.js';
 import type { Page } from '@playwright/test';
 import { assertBrowserSessionOwner } from './browser-session-scope.js';
 import { isRecord } from '@agent/core/foundation';
+import {
+  hasIsolatedNavigationConfinement,
+  permitIsolatedNavigation,
+  ISOLATED_NAVIGATION_CAPABILITY,
+} from './browser-navigation-confinement.js';
 
 const READ_APPLY = new Set(['wait', 'wait_ref', 'log', 'list_profiles']);
 const MUTATING_CONTROL = new Set([
@@ -97,10 +102,17 @@ export async function runBrowserMutation<T>(
           ? { ref_target: resolvedEffect(refTarget, (value: unknown) => value, true) }
           : {}),
         params: resolvedEffect(params, (value: unknown) => value, true),
+        ...(hasIsolatedNavigationConfinement(input.runtime.context)
+          ? { navigation_confinement: ISOLATED_NAVIGATION_CAPABILITY }
+          : {}),
       },
       requiresApproval: true,
-      // A generic click/script may commit money, authenticate, or disclose data.
-      delegable: false,
+      // Request-origin checks alone do not confine redirects, service workers
+      // or subresources. Existing browser contexts retain individual approval
+      // until a trusted context-wide network confinement capability is bound.
+      delegable:
+        ['goto', 'navigate', 'open_tab'].includes(input.op) &&
+        hasIsolatedNavigationConfinement(input.runtime.context),
     },
     async () => {
       if (input.runtime.activeTabId !== tabId || input.page.url() !== pageUrl) {
@@ -108,6 +120,8 @@ export async function runBrowserMutation<T>(
           '[BROWSER_TARGET_CHANGED] Revalidate the actual tab and URL before execution'
         );
       }
+      if (['goto', 'navigate', 'open_tab'].includes(input.op))
+        permitIsolatedNavigation(input.runtime.context, String(params.url));
       return execute(rawParams, resolveBound);
     },
     () => 'succeeded'
