@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/concept-consolidation-baseline.schema.json",
   "version": 1,
   "files": {
     "libs/actuators/android-actuator/src/android-runtime-helpers.ts": {
