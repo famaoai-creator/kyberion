@@ -51,11 +51,7 @@ const SHARE_GRANTS_HMAC_KEY_PATH = pathResolver.shared('runtime/share-grants/hma
 const SHARE_LINK_PREFIX = 'share-link:';
 
 const ROLE_RANK: Record<ShareGrantRole, number> = { view: 1, operate: 2 };
-const TAINT_RANK: Record<ShareGrantTaint, number> = {
-  public: 0,
-  confidential: 1,
-  personal: 2,
-};
+import { KNOWLEDGE_TIER_RANK as TAINT_RANK } from './foundation/knowledge-tier.js';
 
 export interface ShareEdge {
   edgeId: string;

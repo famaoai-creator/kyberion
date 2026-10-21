@@ -1,4 +1,5 @@
 import { isRecord, nowIso } from '@agent/core/foundation';
+import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 import type { AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { logger } from '@agent/core/core';
 import {
@@ -913,8 +914,10 @@ async function opApply(
 
         const originAgentId = pkg.metadata.origin_agent_id;
         const sourceTier = pkg.metadata.source_tier;
-        const tierRank = { public: 0, confidential: 1, personal: 2 } as const;
-        if (tierRank[targetTier] < tierRank[sourceTier] && !params.promotion_approval_id) {
+        if (
+          KNOWLEDGE_TIER_RANK[targetTier] < KNOWLEDGE_TIER_RANK[sourceTier] &&
+          !params.promotion_approval_id
+        ) {
           throw new Error(
             '[KNOWLEDGE_PROMOTION_APPROVAL_REQUIRED] promotion approval is required for public import'
           );

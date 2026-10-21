@@ -180,7 +180,7 @@ export interface RunVisualReviewInput {
   rubric?: VisualReviewRubric;
 }
 
-const TIER_ORDER = { public: 0, confidential: 1, personal: 2 } as const;
+import { KNOWLEDGE_TIER_RANK as TIER_ORDER } from './foundation/knowledge-tier.js';
 
 /** The most sensitive tier present decides how the payload must be treated. */
 function mostSensitiveTier(tiers: readonly string[]): 'public' | 'confidential' | 'personal' {

@@ -68,7 +68,7 @@ const ADOPTABLE_TASK_STATUSES = new Set([
   'rework',
   'review',
 ]);
-const TIER_WEIGHT = { public: 1, confidential: 3, personal: 4 } as const;
+import { KNOWLEDGE_TIER_RANK as TIER_WEIGHT } from '../foundation/knowledge-tier.js';
 export const MISSION_RECONCILIATION_APPROVAL_CHANNEL = 'mission-reconciliation';
 
 export interface MissionWorkReconciliationEvidence {

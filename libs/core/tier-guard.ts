@@ -50,11 +50,7 @@ import type {
 export { TierLevel, TierScope, TierWeightMap, TierValidation, MarkerScanResult };
 
 /** Numeric weight for each tier (higher = more sensitive). */
-export const TIERS: TierWeightMap = {
-  personal: 4,
-  confidential: 3,
-  public: 1,
-};
+export { KNOWLEDGE_TIER_RANK as TIERS } from './foundation/knowledge-tier.js';
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
 

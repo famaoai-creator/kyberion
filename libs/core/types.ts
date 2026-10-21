@@ -12,10 +12,8 @@ export * from './contracts/index.js';
 // ---------------------------------------------------------------------------
 
 /** Knowledge-tier hierarchy levels. */
-export type TierLevel = 'personal' | 'confidential' | 'public';
-
-/** Alias kept for backward compatibility with earlier type exports. */
-export type KnowledgeTier = TierLevel;
+import type { TierLevel, KnowledgeTier } from './foundation/knowledge-tier.js';
+export type { TierLevel, KnowledgeTier } from './foundation/knowledge-tier.js';
 
 /** Scoped tier with optional project isolation (multi-tenant). */
 export interface TierScope {

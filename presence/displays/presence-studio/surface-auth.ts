@@ -25,6 +25,8 @@ const SURFACE_LABEL = 'Presence Studio';
  * limiter for /api and /a2ui (`requirePresenceStudioRateLimit`) is unchanged.
  */
 export const presenceStudioAuthRateLimiter = rateLimit({
+  // Keep the Express adapter: it owns draft-8 RateLimit headers, client-IP
+  // normalization and this surface's established 429 JSON response contract.
   windowMs: 60_000,
   limit: 600,
   skip: (req) => isLoopbackAddress(getPresenceStudioClientAddress(req)),

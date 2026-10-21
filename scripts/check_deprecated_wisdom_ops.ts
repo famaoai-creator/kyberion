@@ -4,7 +4,8 @@ import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineCheck } from '@agent/core/check-harness';
+import { isDirectScript } from './lib/harness.js';
 
 const DEPRECATED = new Map(
   describeOps()
@@ -67,23 +68,14 @@ function collectFindings(): Finding[] {
   return findings;
 }
 
-export const runCheckDeprecatedWisdomOps = defineScript({
-  name: 'check:deprecated-wisdom-ops',
-  flags: [],
-  run(context) {
-    const findings = collectFindings();
-    if (findings.length === 0) {
-      context.print('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
-    } else {
-      for (const finding of findings) {
-        if (!context.json)
-          context.print(
-            `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
-          );
-      }
-      if (context.argv.includes('--fail')) throw new ScriptExitError(1);
-    }
-    return { findings };
+export const runCheckDeprecatedWisdomOps = defineCheck({
+  id: 'deprecated-wisdom-ops',
+  collect() {
+    return collectFindings().map((finding) => ({
+      code: finding.kind,
+      path: finding.file,
+      message: `wisdom:${finding.op} -> ${finding.canonical}`,
+    }));
   },
 });
 

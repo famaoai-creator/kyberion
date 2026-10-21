@@ -2,6 +2,7 @@
  * scripts/refactor/mission-state.ts
  * State management and prerequisite validation for missions.
  */
+import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 
 import * as path from 'node:path';
 import { compileSchema } from '../foundation/ajv.js';
@@ -197,18 +198,14 @@ export function calculateRequiredTier(
   injections: KnowledgeInjectionDeclaration[] = [],
   requestedTier?: string
 ): 'personal' | 'confidential' | 'public' {
-  const tierWeight: Record<string, number> = {
-    public: 1,
-    confidential: 3,
-    personal: 4,
-  };
+  const tierWeight: Readonly<Record<string, number>> = KNOWLEDGE_TIER_RANK;
 
-  let maxWeight = requestedTier ? tierWeight[requestedTier] || 1 : 1;
+  let maxWeight = requestedTier ? (tierWeight[requestedTier] ?? 0) : 0;
   let currentTier: 'personal' | 'confidential' | 'public' = (requestedTier as any) || 'public';
 
   for (const injection of injections) {
     const tier = injection.tier;
-    if (tierWeight[tier] > (maxWeight || 0)) {
+    if (tierWeight[tier] > maxWeight) {
       maxWeight = tierWeight[tier];
       currentTier = tier;
     }

@@ -10,7 +10,8 @@ import { signA2AContent, verifyA2AContent } from '@agent/core/mesh/a2a-envelope-
 import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
 import { createAjv } from '@agent/core/foundation';
 
-export type KnowledgeTier = 'personal' | 'confidential' | 'public';
+import type { KnowledgeTier } from '@agent/core/foundation/knowledge-tier';
+export type { KnowledgeTier } from '@agent/core/foundation/knowledge-tier';
 export type KnowledgePackageSignatureStatus = 'absent' | 'verified' | 'rejected';
 
 export interface KnowledgePackageOriginScope {

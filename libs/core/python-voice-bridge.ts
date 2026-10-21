@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeExistsSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -126,7 +127,7 @@ export function installPythonVoiceBridgeIfAvailable(
 
   const audioOutputDir =
     getRegisteredEnvText('KYBERION_VOICE_OUTPUT_DIR', { env }) ??
-    path.join(process.cwd(), 'active/shared/tmp/voice-out');
+    pathResolver.sharedTmp('voice-out');
   const blackholePath = getRegisteredEnvText('KYBERION_BLACKHOLE_SCRIPT', { env }) ?? null;
   const playThroughBlackhole =
     getRegisteredEnvText('KYBERION_VOICE_PLAY_BLACKHOLE', { env }) === '1';

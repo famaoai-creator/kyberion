@@ -270,6 +270,36 @@ describe('browser-actuator v3 contract', () => {
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
     vi.clearAllMocks();
+    // JSON helpers must use the same overlay as the secure-io double. Leaving
+    // its real registration installed writes marks to live session state while
+    // the resolver reads an empty virtual store.
+    const foundation = await import('@agent/core/foundation');
+    const actual =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+    foundation.registerFoundationIo({
+      loadJson: <T>(filePath: string, options?: { maxSizeMB?: number; label?: string }): T =>
+        mocks.fileStore.has(filePath)
+          ? (foundation.parseSafeJsonInput(mocks.fileStore.get(filePath)!, filePath) as T)
+          : actual.loadJson<T>(filePath, options),
+      loadJsonIfPresent: <T>(
+        filePath: string,
+        options?: { maxSizeMB?: number; label?: string }
+      ): T | null =>
+        mocks.fileStore.has(filePath)
+          ? (foundation.parseSafeJsonInput(mocks.fileStore.get(filePath)!, filePath) as T)
+          : actual.loadJsonIfPresent<T>(filePath, options),
+      exists: (filePath) => mocks.fileStore.has(filePath) || actual.safeExistsSync(filePath),
+      readFile: (filePath, options) =>
+        mocks.fileStore.get(filePath) ??
+        String(actual.safeReadFile(filePath, { ...options, encoding: 'utf8' })),
+      stat: (filePath) =>
+        mocks.fileStore.has(filePath)
+          ? { mtimeMs: 1, size: Buffer.byteLength(mocks.fileStore.get(filePath)!) }
+          : actual.safeStat(filePath),
+      appendFile: (filePath, content) =>
+        mocks.safeWriteFile(filePath, (mocks.fileStore.get(filePath) ?? '') + content),
+      writeFile: mocks.safeWriteFile,
+    });
   });
 
   it('creates an isolated onboarding browser with a preinstalled network fence and closes its scratch profile', async () => {
@@ -1961,6 +1991,7 @@ describe('browser-actuator v3 contract', () => {
           updated_at: new Date().toISOString(),
           lease_status: 'active',
           retained: true,
+          scope_fingerprint: 'public:shared',
           cdp_url: 'http://127.0.0.1:9334',
           cdp_port: 9334,
           action_trail_count: 1,

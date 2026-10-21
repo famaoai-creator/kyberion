@@ -9,7 +9,8 @@ import {
   loadTestInventoryAtPath,
 } from '@agent/core/software-quality';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { writeJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface SoftwareQualityReportInput {
@@ -25,12 +26,6 @@ export interface SoftwareQualityReportInput {
 
 export function resolveQualityArtifactPath(filePath: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(pathResolver.resolve(filePath), { allowMissingLeaf });
-}
-
-function writeJson(filePath: string, value: unknown): void {
-  const safePath = resolveQualityArtifactPath(filePath, true);
-  safeMkdir(path.dirname(safePath), { recursive: true });
-  safeWriteFile(safePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8' });
 }
 
 export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInput): {

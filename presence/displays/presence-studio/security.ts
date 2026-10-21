@@ -2,6 +2,8 @@ import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { logger } from '@agent/core/core';
+import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 import {
   extractSurfaceBearerToken,
   narrowSurfaceViewerTenant,
@@ -32,10 +34,7 @@ const LOCALHOST_NAMES = new Set([
   '::ffff:127.0.0.1',
   '::ffff:7f00:1',
 ]);
-const RATE_LIMIT_DEFAULT_WINDOW_MS = 60_000;
-const RATE_LIMIT_DEFAULT_GET = 180;
-const RATE_LIMIT_DEFAULT_MUTATION = 60;
-const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const booleanLike = z.union([z.boolean(), z.literal('true'), z.literal('false')]).optional();
 
 function normalizeHostname(hostname: string): string {
@@ -155,32 +154,32 @@ export function checkPresenceStudioRateLimit(
     return { ok: true, status: 200, reason: 'allowed' };
   }
 
+  const policy = loadRuntimeControlPolicy().presence_studio;
+  rateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+    expireAtBoundary: false,
+  });
   const windowMs =
     options?.windowMs ??
-    Number(
-      getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
-    );
+    Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || policy.window_ms);
   const method = String(req.method || 'UNKNOWN').toUpperCase();
   const limit =
     options?.limit ??
     (method === 'GET' || method === 'HEAD'
-      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || policy.read_limit)
       : Number(
-          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || RATE_LIMIT_DEFAULT_MUTATION
+          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || policy.mutation_limit
         ));
   const key = getPresenceStudioRateLimitKey(req);
   const now = Date.now();
-  const current = rateLimitStore.get(key);
-  const expired = !current || now - current.windowStart > windowMs;
-  const windowStart = expired ? now : current.windowStart;
-  const count = expired ? 1 : current.count + 1;
-  rateLimitStore.set(key, { count, windowStart });
-
-  if (count <= limit) {
+  const decision = rateLimiter.take(key, limit, now, windowMs);
+  if (decision.allowed === true) {
     return { ok: true, status: 200, reason: 'allowed' };
   }
 
-  const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - windowStart)) / 1000));
+  const retryAfterSeconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
   return {
     ok: false,
     status: 429,

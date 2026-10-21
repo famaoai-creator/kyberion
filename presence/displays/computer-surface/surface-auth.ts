@@ -15,6 +15,8 @@ import { isComputerSurfaceLoopbackRequest } from './auth.js';
  * skipped, like the API limiter), generous enough for page + asset loads.
  */
 export const computerSurfaceAuthRateLimiter = rateLimit({
+  // Retain Express's draft-8 headers/IP normalization and the existing 429
+  // JSON contract; the framework-neutral limiter has no HTTP header semantics.
   windowMs: 60_000,
   limit: 600,
   skip: (req) => isComputerSurfaceLoopbackRequest(req),

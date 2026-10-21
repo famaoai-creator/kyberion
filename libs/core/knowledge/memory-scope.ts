@@ -9,11 +9,7 @@ export interface MemoryScopeEnvelope extends ScopeContext {
   redacted?: boolean;
 }
 
-const TIER_RANK: Record<ScopeContext['tier'], number> = {
-  public: 0,
-  confidential: 1,
-  personal: 2,
-};
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 const principalFor = (context: ScopeContext): string[] =>
   [context.viewer_principal, context.nhi_id].filter(

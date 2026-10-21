@@ -1,7 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineCheck } from '@agent/core/check-harness';
+import { isDirectScript } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface CliEntrypoint {
@@ -587,16 +588,9 @@ export function checkCliManifest(
   return failures;
 }
 
-export const runCheckCliManifest = defineScript({
-  name: 'check:cli-manifest',
-  flags: [],
-  run(context): void {
-    const failures = checkCliManifest();
-    if (failures.length > 0) {
-      throw new ScriptExitError(1, failures.map((failure) => `- ${failure}`).join('\n'));
-    }
-    context.print('[check:cli-manifest] OK');
-  },
+export const runCheckCliManifest = defineCheck({
+  id: 'cli-manifest',
+  collect: () => checkCliManifest().map((message) => ({ code: 'CLI_MANIFEST', message })),
 });
 
 if (

@@ -216,6 +216,24 @@ describe('installPythonVoiceBridgeIfAvailable', () => {
     expect(bridge.name).toBe('python-tts');
   });
 
+  it('uses canonical scratch placement even when launched outside the checkout', () => {
+    const outputDir = pathResolver.sharedTmp('voice-out');
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue('/outside-checkout');
+    try {
+      expect(installPythonVoiceBridgeIfAvailable({ KYBERION_VOICE_PROFILE_ID: 'profile' })).toBe(
+        true
+      );
+      expect(getVoiceBridge()).toHaveProperty('audioOutputDir', outputDir);
+      installPythonVoiceBridgeIfAvailable({
+        KYBERION_VOICE_PROFILE_ID: 'profile',
+        KYBERION_VOICE_OUTPUT_DIR: '/explicit-output',
+      });
+      expect(getVoiceBridge()).toHaveProperty('audioOutputDir', '/explicit-output');
+    } finally {
+      cwd.mockRestore();
+    }
+  });
+
   it('respects KYBERION_VOICE_PLAY_BLACKHOLE env var', () => {
     mockExists.mockReturnValue(true);
     installPythonVoiceBridgeIfAvailable({

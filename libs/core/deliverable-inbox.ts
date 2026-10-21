@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { readJson, readJsonLines } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
@@ -8,11 +9,9 @@ import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
   assertSafeRepositoryPath,
-  safeCreateExclusiveFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 
@@ -84,7 +83,6 @@ export interface DeliverableInboxQuery {
 }
 
 const INBOX_PATH = pathResolver.shared(path.join('inbox', 'entries.jsonl'));
-const INBOX_LOCK_PATH = `${INBOX_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;
 const INBOX_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/deliverable-inbox-entry.schema.json'
@@ -92,10 +90,6 @@ const INBOX_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
 
 function inboxPath(): string {
   return assertSafeRepositoryPath(INBOX_PATH, { allowMissingLeaf: true });
-}
-
-function inboxLockPath(): string {
-  return assertSafeRepositoryPath(INBOX_LOCK_PATH, { allowMissingLeaf: true });
 }
 
 function ensureInboxDir(): void {
@@ -111,82 +105,9 @@ function inboxEntryCatalog(filePath: string): GovernedCatalog<DeliverableInboxEn
   });
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-export function normalizeInboxLockRecord(value: unknown): { pid: number } | undefined {
-  if (
-    !isRecord(value) ||
-    typeof value.pid !== 'number' ||
-    !Number.isInteger(value.pid) ||
-    value.pid <= 0
-  ) {
-    return undefined;
-  }
-  return { pid: value.pid };
-}
-
-export function isRegularInboxLockPath(filePath: string): boolean {
-  if (!safeExistsSync(filePath)) return false;
-  try {
-    return safeLstat(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function isStaleLock(lockPath: string): boolean {
-  if (!isRegularInboxLockPath(lockPath)) return false;
-  try {
-    const parsed = normalizeInboxLockRecord(readJson<unknown>(lockPath));
-    if (!parsed) return true;
-    process.kill(parsed.pid, 0);
-    return false;
-  } catch (error: any) {
-    if (error?.code === 'ESRCH') return true;
-    if (error?.code === 'EPERM') return false;
-    return true;
-  }
-}
-
 function withInboxLock<T>(fn: () => T): T {
-  ensureInboxDir();
-  const lockPath = inboxLockPath();
-  const startedAt = Date.now();
-  let ownsLock = false;
-
-  while (Date.now() - startedAt < LOCK_TIMEOUT_MS) {
-    try {
-      safeCreateExclusiveFileSync(
-        lockPath,
-        JSON.stringify({
-          pid: process.pid,
-          created_at: nowIso(),
-          resource: 'deliverable-inbox',
-        })
-      );
-      ownsLock = true;
-      break;
-    } catch (error: any) {
-      if (error?.code !== 'EEXIST') throw error;
-      if (isStaleLock(lockPath)) {
-        safeUnlinkSync(lockPath);
-        continue;
-      }
-      sleepSync(50 + Math.floor(Math.random() * 50));
-    }
-  }
-
-  if (!ownsLock) {
-    throw new Error(`[LOCK_TIMEOUT] Failed to acquire inbox lock within ${LOCK_TIMEOUT_MS}ms`);
-  }
-
-  try {
-    return fn();
-  } finally {
-    safeUnlinkSync(lockPath);
-  }
+  const resource = `deliverable-inbox-${createHash('sha256').update(inboxPath()).digest('hex')}`;
+  return withLockSync(resource, fn, LOCK_TIMEOUT_MS);
 }
 
 function normalizeEntry(value: unknown): DeliverableInboxEntry | null {
