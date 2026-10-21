@@ -1,3 +1,4 @@
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 /**
  * DL-09 — self-scheduled follow-ups and cron catch-up.
  *
@@ -41,7 +42,7 @@ export const DOT_CRON_CATCH_UP_DEFAULT_HOURS = 6;
 export const DOT_CRON_CATCH_UP_MAX_HOURS = 24;
 
 /** Mirror of dot-runtime's wake-ledger path (see module note; pinned by test). */
-export const DOT_FOLLOWUP_WAKE_LEDGER_PATH = 'active/shared/runtime/dot-wake-ledger.jsonl';
+export const DOT_FOLLOWUP_WAKE_LEDGER_PATH = runtimeStatePath('dot.wakeLedger').logicalPath;
 /** Mirror of dot-runtime's failed-key backoff (5 min doubling, capped at 6 h). */
 const BACKOFF_BASE_MS = 5 * 60 * 1000;
 const BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;

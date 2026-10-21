@@ -1,13 +1,38 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import {
   computeAuditEntryHash,
   computeLedgerEntryHash,
   verifyAuditEntryHash,
   verifyLedgerEntryHash,
+  registerChainIntegrityIo,
+  resolveAuditChainKey,
 } from './chain-integrity.js';
 
 describe('chain-integrity', () => {
+  it('resolves key storage through the canonical checkout root, independent of cwd', () => {
+    const canonical = pathResolver.shared('runtime/audit/chain-key');
+    const oldEnv = process.env.KYBERION_AUDIT_CHAIN_KEY;
+    delete process.env.KYBERION_AUDIT_CHAIN_KEY;
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue('/outside-checkout');
+    const read = vi.fn().mockReturnValue('test-key');
+    registerChainIntegrityIo({
+      exists: () => true,
+      read,
+      mkdir: vi.fn(),
+      createExclusive: vi.fn(),
+      chmod: vi.fn(),
+    });
+    try {
+      expect(resolveAuditChainKey()).toBe('test-key');
+      expect(read).toHaveBeenCalledWith(canonical);
+    } finally {
+      cwd.mockRestore();
+      if (oldEnv === undefined) delete process.env.KYBERION_AUDIT_CHAIN_KEY;
+      else process.env.KYBERION_AUDIT_CHAIN_KEY = oldEnv;
+    }
+  });
   it('preserves the legacy audit SHA-256 formula', () => {
     const entry = {
       id: 'AUD-1',

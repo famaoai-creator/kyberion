@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { isValidTenantSlug } from './scope.js';
+
 /**
  * Durable tier-partitioned state, distinct from append-only metrics ledgers.
  * State roots mirror knowledge-tier permissions for reads AND writes; they
@@ -13,3 +16,68 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   /** PG-03 standing grants (governance/grant-store.ts). */
   grants: 'active/shared/runtime/grants',
 } as const;
+
+/** Logical names preserve existing layouts; registration never grants access. */
+export const RUNTIME_STATE_PATHS = {
+  'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',
+  'dot.lifecycleAudit': 'active/shared/runtime/dot-lifecycle-audit.jsonl',
+  'memory.promotionQueue': 'active/shared/runtime/memory/promotion-queue.jsonl',
+  'memory.tenantRoot': 'active/shared/runtime/tenants',
+  'quota.tenantBuckets': 'active/shared/runtime/tenant-rate-limit-state.json',
+} as const;
+
+export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;
+export interface RuntimeStateScope {
+  tenant_slug?: string;
+  tier?: 'public' | 'confidential' | 'personal';
+  owner_nhi?: string;
+}
+
+/**
+ * Both paths are repository-relative so foreign-worktree readers can resolve
+ * the same layout against their own root. Physical placement is not authority.
+ * Global Dot ledgers remain global; only the memory queue has scoped layouts.
+ */
+export function runtimeStatePath(
+  key: RuntimeStateKey,
+  scope?: RuntimeStateScope
+): { logicalPath: string; physicalPath: string } {
+  if (!Object.hasOwn(RUNTIME_STATE_PATHS, key)) {
+    throw new Error(`[RUNTIME_STATE_KEY_INVALID] ${String(key)}`);
+  }
+  const logicalPath = RUNTIME_STATE_PATHS[key];
+  if (scope?.tier !== undefined && !['public', 'confidential', 'personal'].includes(scope.tier)) {
+    throw new Error('[RUNTIME_STATE_TIER_INVALID]');
+  }
+  if (scope?.tenant_slug !== undefined && !isValidTenantSlug(scope.tenant_slug)) {
+    throw new Error('[RUNTIME_STATE_TENANT_INVALID]');
+  }
+  if (scope?.tier === 'confidential' && !scope.tenant_slug) {
+    throw new Error('[RUNTIME_STATE_TENANT_REQUIRED]');
+  }
+  if (key !== 'memory.promotionQueue') {
+    if (scope && (scope.tenant_slug || scope.owner_nhi || scope.tier)) {
+      throw new Error(`[RUNTIME_STATE_SCOPE_UNSUPPORTED] ${key}`);
+    }
+    return { logicalPath, physicalPath: logicalPath };
+  }
+  if (scope?.tier === 'personal') {
+    if (typeof scope.owner_nhi !== 'string' || !scope.owner_nhi.trim()) {
+      throw new Error('[MEMORY_SCOPE_UNSUPPORTED] Personal queue requires an explicit owner_nhi');
+    }
+    const owner = createHash('sha256').update(scope.owner_nhi).digest('hex');
+    return {
+      logicalPath,
+      physicalPath: `active/personal/owners/${owner}/memory/promotion-queue.jsonl`,
+    };
+  }
+  // Non-personal candidates may name an owner for brokered promotion; that
+  // attribution never changes their tenant queue's physical ownership.
+  if (scope?.tenant_slug) {
+    return {
+      logicalPath,
+      physicalPath: `${RUNTIME_STATE_PATHS['memory.tenantRoot']}/${scope.tenant_slug}/memory/promotion-queue.jsonl`,
+    };
+  }
+  return { logicalPath, physicalPath: logicalPath };
+}

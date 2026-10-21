@@ -67,7 +67,7 @@ import { parseVtt } from './vtt-parser.js';
 
 export const FETCH_VIDEO_APPROVAL_OP = 'vision:fetch_video';
 
-const TIER_RANK: Record<VideoTier, number> = { public: 0, confidential: 1, personal: 2 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../../foundation/knowledge-tier.js';
 
 export interface VideoCachePlacement {
   scope: 'mission' | 'tenant' | 'shared';

@@ -7,7 +7,7 @@ import {
   loadTeamRoleIndex as loadGovernedTeamRoleIndex,
 } from '@agent/core/mission/mission-team-index';
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
-import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
+import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
@@ -402,11 +402,6 @@ function resetOrgCatalog(filePath: string): void {
   roleAuthorityMapCatalogs.get(filePath)?.reset();
   securityPolicyCatalogs.get(filePath)?.reset();
   roleWriteAccessCatalogs.get(filePath)?.reset();
-}
-
-function writeJson(filePath: string, payload: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function resolveDomainTemplate(domain: string) {

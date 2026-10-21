@@ -4,11 +4,7 @@ import type {
   ProvenanceTaint,
 } from './cloudflare-os-control-plane.js';
 
-const TIER_RANK: Record<OsKnowledgeTier, number> = {
-  public: 0,
-  confidential: 1,
-  personal: 2,
-};
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from './foundation/knowledge-tier.js';
 
 export interface ProvenanceShareCheck {
   provenance: ProvenanceTaint | null | undefined;

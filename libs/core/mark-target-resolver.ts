@@ -3,7 +3,8 @@ import path from 'node:path';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { dhashFile, hamming } from './media/image-dhash.js';
 import { assertVolatileId, findMissionPath, pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { writeJson } from './foundation/json.js';
 import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
 
 /**
@@ -221,11 +222,6 @@ export function saveMarks(input: SaveMarksInput): MarksRecord {
     writeJson(statePath, record);
   }
   return record;
-}
-
-function writeJson(filePath: string, value: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function readJson(filePath: string, label: string): unknown {

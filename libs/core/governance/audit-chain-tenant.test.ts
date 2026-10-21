@@ -18,6 +18,7 @@ vi.mock('../path-resolver.js', () => ({
   pathResolver: {
     rootDir: () => testRoot,
     rootResolve: (sub = '') => path.join(testRoot, sub),
+    shared: (sub = '') => path.join(testRoot, 'active', 'shared', sub),
   },
   rootDir: () => testRoot,
 }));

@@ -521,11 +521,7 @@ export function isSlackMissionRejection(text: string): boolean {
   ].some((pattern) => pattern.test(normalized));
 }
 
-const TIER_RANK: Record<'public' | 'confidential' | 'personal', number> = {
-  public: 1,
-  confidential: 2,
-  personal: 3,
-};
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 export interface MissionIssuanceParams {
   /** Originating surface ('slack' | 'chronos' | 'terminal' | 'telegram' | …). */

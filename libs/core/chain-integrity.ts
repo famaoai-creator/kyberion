@@ -46,21 +46,7 @@ export interface ChainVerifyResult {
 const KEY_FILE = 'runtime/audit/chain-key';
 
 function auditKeyPath(): string {
-  const resolver = pathResolver as {
-    shared?: (subPath?: string) => string;
-    rootDir?: () => string;
-    vitestLivePath?: (absolutePath: string) => string;
-  };
-  if (typeof resolver.shared === 'function') return resolver.shared(KEY_FILE);
-  // Partially mocked resolvers: still honour the Vitest live-state sandbox.
-  const sandboxed = (absolutePath: string): string =>
-    typeof resolver.vitestLivePath === 'function'
-      ? resolver.vitestLivePath(absolutePath)
-      : absolutePath;
-  if (typeof resolver.rootDir === 'function') {
-    return sandboxed(path.join(resolver.rootDir(), 'active', 'shared', KEY_FILE));
-  }
-  return sandboxed(path.join(process.cwd(), 'active', 'shared', KEY_FILE));
+  return pathResolver.shared(KEY_FILE);
 }
 
 export function resolveAuditChainKey(options: { createIfMissing?: boolean } = {}): string | null {

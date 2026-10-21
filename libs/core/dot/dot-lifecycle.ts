@@ -1,3 +1,4 @@
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 /**
  * Dot charter lifecycle — governed status transitions.
  *
@@ -52,7 +53,7 @@ import {
   type DotCharterStatus,
 } from './dot-charter.js';
 
-export const DOT_LIFECYCLE_AUDIT_PATH = 'active/shared/runtime/dot-lifecycle-audit.jsonl';
+export const DOT_LIFECYCLE_AUDIT_PATH = runtimeStatePath('dot.lifecycleAudit').logicalPath;
 
 /**
  * Charter files live at repo-root `dots/`; writes are made under a dedicated

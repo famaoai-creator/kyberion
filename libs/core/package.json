@@ -7819,6 +7819,42 @@
     "./knowledge/scoped-learning-approval-visibility": {
       "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
       "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
+    },
+    "./actor-context": {
+      "types": "./dist/actor-context.d.ts",
+      "default": "./dist/actor-context.js"
+    },
+    "./foundation/knowledge-tier": {
+      "types": "./dist/foundation/knowledge-tier.d.ts",
+      "default": "./dist/foundation/knowledge-tier.js"
+    },
+    "./foundation/json-state": {
+      "types": "./dist/foundation/json-state.d.ts",
+      "default": "./dist/foundation/json-state.js"
+    },
+    "./rate-limit": {
+      "types": "./dist/rate-limit.d.ts",
+      "default": "./dist/rate-limit.js"
+    },
+    "./failure-tracker": {
+      "types": "./dist/failure-tracker.d.ts",
+      "default": "./dist/failure-tracker.js"
+    },
+    "./check-harness": {
+      "types": "./dist/check-harness.d.ts",
+      "default": "./dist/check-harness.js"
+    },
+    "./command-harness": {
+      "types": "./dist/command-harness.d.ts",
+      "default": "./dist/command-harness.js"
+    },
+    "./cli-guard": {
+      "types": "./dist/cli-guard.d.ts",
+      "default": "./dist/cli-guard.js"
+    },
+    "./runtime-control-policy": {
+      "types": "./dist/runtime-control-policy.d.ts",
+      "default": "./dist/runtime-control-policy.js"
     }
   },
   "dependencies": {

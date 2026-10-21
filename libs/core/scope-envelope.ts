@@ -71,8 +71,10 @@ export interface ScopeNarrowRequest {
   policy?: Partial<ScopePolicy>;
 }
 
-const TIER_RANK: Record<TierLevel, number> = { public: 0, confidential: 1, personal: 2 };
-const TIERS_BY_RANK: TierLevel[] = ['public', 'confidential', 'personal'];
+import {
+  KNOWLEDGE_TIER_RANK as TIER_RANK,
+  KNOWLEDGE_TIERS as TIERS_BY_RANK,
+} from './foundation/knowledge-tier.js';
 
 /** Mint ledger: mint_ref → the envelope as issued. Module-local, runtime-owned. */
 const mintLedger = new Map<string, ScopeEnvelope>();

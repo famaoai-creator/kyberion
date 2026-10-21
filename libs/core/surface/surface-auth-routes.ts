@@ -9,6 +9,8 @@
  * the Host header) and `requestOrigin`.
  */
 
+import { fixedWindowLimiter } from '../rate-limit.js';
+import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
 import {
   completeOidcLogin,
   loginTransactionCookieName,
@@ -112,43 +114,24 @@ function html(
 // Rate limit (framework-neutral, in-memory, per process)
 // ---------------------------------------------------------------------------
 
-const RATE_WINDOW_MS = 60_000;
-const RATE_LIMIT_PER_CLIENT = 120;
-/** Whole-surface ceiling: a rotating caller-supplied key cannot exceed it. */
-const RATE_LIMIT_PER_SURFACE = 600;
-const DEFAULT_RATE_MAX_TRACKED_KEYS = 5_000;
-let rateMaxTrackedKeys = DEFAULT_RATE_MAX_TRACKED_KEYS;
-const rateBuckets = new Map<string, { windowStart: number; count: number }>();
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
+let maxTrackedKeysOverride: number | undefined;
 
 export function resetSurfaceAuthRateLimitForTests(maxTrackedKeys?: number): void {
-  rateBuckets.clear();
-  rateMaxTrackedKeys = maxTrackedKeys ?? DEFAULT_RATE_MAX_TRACKED_KEYS;
+  rateLimiter = undefined;
+  maxTrackedKeysOverride = maxTrackedKeys;
 }
 
 function takeRateToken(key: string, limit: number, now: number): boolean {
-  const bucket = rateBuckets.get(key);
-  if (bucket && now - bucket.windowStart < RATE_WINDOW_MS) {
-    // Re-insert so Map order tracks recency: eviction below drops the least
-    // recently used bucket, never a hot attacker's.
-    rateBuckets.delete(key);
-    rateBuckets.set(key, bucket);
+  if (!rateLimiter) {
+    const policy = loadRuntimeControlPolicy().surface_auth;
+    rateLimiter = fixedWindowLimiter({
+      windowMs: policy.window_ms,
+      maxKeys: maxTrackedKeysOverride ?? policy.max_keys,
+      eviction: 'lru',
+    });
   }
-  if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
-    if (rateBuckets.size >= rateMaxTrackedKeys) {
-      // Bound memory under key-rotation abuse: drop expired buckets, then the oldest.
-      for (const [k, v] of rateBuckets) {
-        if (now - v.windowStart >= RATE_WINDOW_MS) rateBuckets.delete(k);
-      }
-      if (rateBuckets.size >= rateMaxTrackedKeys) {
-        const oldest = rateBuckets.keys().next().value;
-        if (oldest !== undefined) rateBuckets.delete(oldest);
-      }
-    }
-    rateBuckets.set(key, { windowStart: now, count: 1 });
-    return true;
-  }
-  bucket.count += 1;
-  return bucket.count <= limit;
+  return rateLimiter.take(key, limit, now).allowed;
 }
 
 /** Client key the adapter returns when it cannot tell callers apart (no trusted peer IP). */
@@ -162,9 +145,10 @@ const SHARED_CLIENT_KEY = 'shared';
  */
 function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
   if (req.clientKey === undefined || req.loopback) return true;
-  const surfaceOk = takeRateToken(`s:${req.surfaceId}`, RATE_LIMIT_PER_SURFACE, now);
+  const policy = loadRuntimeControlPolicy().surface_auth;
+  const surfaceOk = takeRateToken(`s:${req.surfaceId}`, policy.surface_limit, now);
   if (req.clientKey === SHARED_CLIENT_KEY) return surfaceOk;
-  const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, RATE_LIMIT_PER_CLIENT, now);
+  const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, policy.client_limit, now);
   return surfaceOk && clientOk;
 }
 
@@ -291,7 +275,11 @@ export async function handleSurfaceAuthRoute(
 ): Promise<SurfaceAuthRouteResponse | null> {
   const method = req.method.toUpperCase();
   if (isSurfaceAuthPath(req.pathname) && !withinRateLimit(req, deps.now ?? Date.now())) {
-    return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], { 'Retry-After': '60' });
+    return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], {
+      'Retry-After': String(
+        Math.max(1, Math.ceil(loadRuntimeControlPolicy().surface_auth.window_ms / 1000))
+      ),
+    });
   }
   const next = sanitizeNextPath(req.searchParams.get('next'));
   const publicOrigin = publicOriginFor(req, deps);

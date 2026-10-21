@@ -240,7 +240,8 @@ function withCoSessionWrite<T>(fn: () => T): T {
   return withExecutionContext('infrastructure_sentinel', fn);
 }
 
-function writeJson(filePath: string, value: unknown): void {
+/** Preserve the infrastructure writer boundary around the shared serializer. */
+function writeCoSessionRecord(filePath: string, value: unknown): void {
   withCoSessionWrite(() => {
     foundationWriteJson(filePath, value);
   });
@@ -283,7 +284,7 @@ function readSession(sessionId: string): CoSessionRecord {
 function writeSession(record: CoSessionRecord): void {
   withCoSessionWrite(() => {
     safeMkdir(sessionDir(record.session_id), { recursive: true });
-    writeJson(sessionFile(record.session_id), record);
+    writeCoSessionRecord(sessionFile(record.session_id), record);
   });
 }
 
@@ -628,7 +629,7 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
       ) {
         return false;
       }
-      writeJson(leaseFile(lease.session_id, lease.path_hash), lease);
+      writeCoSessionRecord(leaseFile(lease.session_id, lease.path_hash), lease);
       return true;
     });
   } catch {
@@ -737,7 +738,7 @@ export function acquireCoSessionLease(input: {
     };
     withCoSessionWrite(() => {
       safeMkdir(leasesDir(session_id), { recursive: true });
-      writeJson(leaseFile(session_id, path_hash), next);
+      writeCoSessionRecord(leaseFile(session_id, path_hash), next);
     });
     // Post-write re-check: a close that flipped the session after our earlier
     // check enumerated leases before our write — self-delete so no active
@@ -794,7 +795,7 @@ export function releaseCoSessionLease(input: {
       status: 'released',
       released_at: nowIso(),
     };
-    writeJson(leaseFile(session_id, path_hash), next);
+    writeCoSessionRecord(leaseFile(session_id, path_hash), next);
     return next;
   });
   appendEvent(session_id, 'lease_released', provider, {
@@ -1031,7 +1032,7 @@ export function takeUnseenCoSessionHandoffs(
     for (const handoff of fresh) seen.add(handoff.handoff_id);
     if (fresh.length) {
       withCoSessionWrite(() => safeMkdir(path.dirname(file), { recursive: true }));
-      writeJson(
+      writeCoSessionRecord(
         file,
         pending.filter((h) => seen.has(h.handoff_id)).map((h) => h.handoff_id)
       );

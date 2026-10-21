@@ -59,12 +59,71 @@ describe('knowledge scope semantic checker', () => {
         [{ file: 'fixture.ts', source: 'safeWriteFile(path)' }],
         { max_direct_tenant_env_reads: 26, scoped_runtime_writer_files: ['fixture.ts'] }
       )
-    ).toContain('fixture.ts: scoped runtime writer must use physicalScopedPath');
+    ).toContain(
+      'fixture.ts: scoped runtime writer must use physicalScopedPath or scoped runtimeStatePath physicalPath'
+    );
     expect(
       findKnowledgeRuntimeWriterViolations(
-        [{ file: 'fixture.ts', source: 'physicalScopedPath(base, scope)' }],
+        [
+          {
+            file: 'fixture.ts',
+            source:
+              "import { physicalScopedPath } from '../physical-namespace.js'; physicalScopedPath(base, scope)",
+          },
+        ],
         { max_direct_tenant_env_reads: 26, scoped_runtime_writer_files: ['fixture.ts'] }
       )
     ).toEqual([]);
+  });
+
+  it('accepts scoped canonical registry placement, including an import alias', () => {
+    const config = { max_direct_tenant_env_reads: 26, scoped_runtime_writer_files: ['fixture.ts'] };
+    expect(
+      findKnowledgeRuntimeWriterViolations(
+        [
+          {
+            file: 'fixture.ts',
+            source: `
+      import { runtimeStatePath as placement } from '../foundation/runtime-state-roots.js';
+      const path = placement('memory.promotionQueue', scope).physicalPath;
+    `,
+          },
+        ],
+        config
+      )
+    ).toEqual([]);
+    for (const expression of [
+      "runtimeStatePath('memory.promotionQueue').physicalPath",
+      "runtimeStatePath('memory.promotionQueue', undefined).physicalPath",
+      "runtimeStatePath('memory.promotionQueue', scope).logicalPath",
+      "runtimeStatePath('dot.wakeLedger', scope).physicalPath",
+    ]) {
+      expect(
+        findKnowledgeRuntimeWriterViolations(
+          [
+            {
+              file: 'fixture.ts',
+              source: `
+        import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+        const path = ${expression};
+      `,
+            },
+          ],
+          config
+        )
+      ).toHaveLength(1);
+    }
+  });
+
+  it('does not accept dummy strings/comments, unrelated helpers or unused imports', () => {
+    const config = { max_direct_tenant_env_reads: 26, scoped_runtime_writer_files: ['fixture.ts'] };
+    for (const source of [
+      "// physicalScopedPath(base, scope)\nconst name = 'runtimeStatePath';",
+      "import { physicalScopedPath } from '../untrusted.js'; physicalScopedPath(base, scope)",
+      "import { runtimeStatePath } from '../foundation/runtime-state-roots.js'; safeWriteFile(path, data)",
+    ])
+      expect(
+        findKnowledgeRuntimeWriterViolations([{ file: 'fixture.ts', source }], config)
+      ).toHaveLength(1);
   });
 });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { currentActor, type ActorContext } from './actor-context.js';
 import {
   clearWorkCoordinationStore,
   claimWorkItem,
@@ -103,9 +104,11 @@ describe('CoordinatedAgentExecutionPort', () => {
       status: 'ready',
     });
     let envelopeInDelegate: ScopeEnvelope | undefined;
+    let actorInDelegate: ActorContext | undefined;
     const delegatePort: AgentExecutionPort = {
       delegate: vi.fn(async () => {
         envelopeInDelegate = currentScopeEnvelope();
+        actorInDelegate = currentActor();
         return {
           execution_kind: 'agent_delegation' as const,
           task_id: 'task-env',
@@ -115,7 +118,10 @@ describe('CoordinatedAgentExecutionPort', () => {
         };
       }),
     };
-    const port = new CoordinatedAgentExecutionPort(delegatePort);
+    const port = new CoordinatedAgentExecutionPort(
+      delegatePort,
+      'kyberion://agent/acme/dispatcher'
+    );
     const parent = mintScopeEnvelope({
       env: {
         KYBERION_TIER: 'confidential',
@@ -146,6 +152,10 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(envelopeInDelegate?.mint_ref).not.toBe(parent.mint_ref);
     expect(envelopeInDelegate?.policy.read_tiers).toEqual(['public']);
     expect(envelopeInDelegate?.identity.mission_id).toBe('MSN-COORDINATED-ENV');
+    expect(actorInDelegate?.actor.id).toBe('kyberion://agent/acme/dispatcher');
+    expect(actorInDelegate?.scope.mission_id).toBe('MSN-COORDINATED-ENV');
+    expect(actorInDelegate?.provenance).toBe('claim');
+    expect(currentActor()).toBeUndefined();
     expect(currentScopeEnvelope()).toBeUndefined();
   });
 

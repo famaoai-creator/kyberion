@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Concept consolidation adoption budgets",
+  "type": "object",
+  "required": ["version", "files", "exported_types"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "env_direct_read_budget": { "$ref": "#/definitions/count" },
+          "json_state_write_budget": { "$ref": "#/definitions/count" },
+          "runtime_path_literal_budget": { "$ref": "#/definitions/count" },
+          "rate_limiter_impl_budget": { "$ref": "#/definitions/count" },
+          "exported_type_name_duplication_budget": { "$ref": "#/definitions/count" },
+          "bespoke_cli_parser_budget": { "$ref": "#/definitions/count" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "exported_types": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true,
+        "minItems": 2
+      }
+    }
+  },
+  "definitions": { "count": { "type": "integer", "minimum": 0 } },
+  "additionalProperties": false
+}

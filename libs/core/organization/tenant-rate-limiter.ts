@@ -21,6 +21,7 @@
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { readJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { isRecord } from '../foundation/text.js';
@@ -41,7 +42,7 @@ import {
 import { getActiveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 const POLICY_PATH = 'knowledge/product/governance/tenant-rate-limit-policy.json';
-const STATE_PATH = 'active/shared/runtime/tenant-rate-limit-state.json';
+const STATE_PATH = runtimeStatePath('quota.tenantBuckets').physicalPath;
 const LOCK_PATH = `${STATE_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
