@@ -63,13 +63,7 @@ import { fixedWindowLimiter } from '@agent/core/rate-limit';
 import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 
 // Bounded in-memory windows; a new key cannot evict a live denied client.
-const chronosRatePolicy = loadRuntimeControlPolicy().chronos;
-const rateLimiter = fixedWindowLimiter({
-  windowMs: chronosRatePolicy.window_ms,
-  maxKeys: chronosRatePolicy.max_keys,
-  eviction: 'deny',
-  expireAtBoundary: false,
-});
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 
 function getClientIP(req: NextRequest): string {
   return (
@@ -100,7 +94,14 @@ export function isChronosLoopbackRequest(req: NextRequest): boolean {
 }
 
 function checkRateLimit(ip: string): boolean {
-  return rateLimiter.take(ip, chronosRatePolicy.limit).allowed;
+  const policy = loadRuntimeControlPolicy().chronos;
+  rateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+    expireAtBoundary: false,
+  });
+  return rateLimiter.take(ip, policy.limit).allowed;
 }
 
 /**

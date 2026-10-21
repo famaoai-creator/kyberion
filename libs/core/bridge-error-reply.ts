@@ -35,13 +35,18 @@ export function buildBridgeEmptyReplyText(opts: { locale?: string } = {}): strin
     .join('\n');
 }
 
-const bridgeRatePolicy = loadRuntimeControlPolicy().bridge_errors;
-const DEFAULT_ERROR_POST_INTERVAL_MS = bridgeRatePolicy.window_ms;
-const errorPostLimiter = fixedWindowLimiter({
-  windowMs: DEFAULT_ERROR_POST_INTERVAL_MS,
-  maxKeys: bridgeRatePolicy.max_keys,
-  eviction: 'deny',
-});
+let errorPostLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
+function bridgeErrorLimiter() {
+  if (!errorPostLimiter) {
+    const policy = loadRuntimeControlPolicy().bridge_errors;
+    errorPostLimiter = fixedWindowLimiter({
+      windowMs: policy.window_ms,
+      maxKeys: policy.max_keys,
+      eviction: 'deny',
+    });
+  }
+  return errorPostLimiter;
+}
 
 /**
  * Rate limit for error postings: at most one error message per conversation
@@ -51,13 +56,13 @@ const errorPostLimiter = fixedWindowLimiter({
 export function shouldPostBridgeError(
   conversationKey: string,
   nowMs: number = Date.now(),
-  intervalMs: number = DEFAULT_ERROR_POST_INTERVAL_MS
+  intervalMs: number = loadRuntimeControlPolicy().bridge_errors.window_ms
 ): boolean {
-  return errorPostLimiter.take(conversationKey, 1, nowMs, intervalMs).allowed;
+  return bridgeErrorLimiter().take(conversationKey, 1, nowMs, intervalMs).allowed;
 }
 
 export function resetBridgeErrorRateLimiter(): void {
-  errorPostLimiter.clear();
+  errorPostLimiter?.clear();
 }
 
 /**

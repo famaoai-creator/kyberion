@@ -36,6 +36,16 @@ const KEY = Symbol.for('kyberion.json-state.active.v1');
 const globals = globalThis as typeof globalThis & { [KEY]?: Set<string> };
 const active = (globals[KEY] ??= new Set<string>());
 
+/**
+ * One conservative identity for case/Unicode-normalization aliases on macOS
+ * and Windows. Keep the validated path unchanged for I/O. Case-equivalent
+ * files also share a mutex on case-sensitive volumes, and nested updates to
+ * either spelling are intentionally rejected rather than risking lost writes.
+ */
+function stateIdentity(file: string): string {
+  return file.normalize('NFC').toLowerCase().toUpperCase().normalize('NFC');
+}
+
 export function openJsonState<T>(options: JsonStateOptions<T>): JsonStateStore<T> {
   if (!options.schema) throw new Error('[JSON_STATE_SCHEMA_REQUIRED] Supply a state schema');
   const resolvePath = (): string => {
@@ -64,12 +74,13 @@ export function openJsonState<T>(options: JsonStateOptions<T>): JsonStateStore<T
   };
   const mutate = (fn: (file: string) => T): T => {
     const file = resolvePath();
-    if (active.has(file)) throw new Error(`[JSON_STATE_REENTRANT] ${file}`);
+    const identity = stateIdentity(file);
+    if (active.has(identity)) throw new Error(`[JSON_STATE_REENTRANT] ${file}`);
     const timeout = options.lock?.timeoutMs ?? 5000;
     if (!Number.isFinite(timeout) || timeout <= 0)
       throw new Error('[JSON_STATE_LOCK_TIMEOUT_INVALID]');
-    const resource = `json-state-${createHash('sha256').update(file).digest('hex')}`;
-    active.add(file);
+    const resource = `json-state-${createHash('sha256').update(identity).digest('hex')}`;
+    active.add(identity);
     try {
       return withLockSync(
         resource,
@@ -85,7 +96,7 @@ export function openJsonState<T>(options: JsonStateOptions<T>): JsonStateStore<T
         timeout
       );
     } finally {
-      active.delete(file);
+      active.delete(identity);
     }
   };
   const store: JsonStateStore<T> = {

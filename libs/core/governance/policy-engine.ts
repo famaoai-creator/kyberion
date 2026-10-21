@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import { fixedWindowLimiter } from '../rate-limit.js';
+import { fixedWindowLimiter } from '../foundation/rate-limit.js';
 import { createLogger } from '../logger.js';
 import { getFoundationIo } from '../foundation/io.js';
 import { isRecord } from '../foundation/text.js';

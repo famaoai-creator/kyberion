@@ -27,12 +27,20 @@ interface RuntimeControlPolicy {
   };
 }
 
-const catalog = defineCatalog<RuntimeControlPolicy>({
-  id: 'runtime-control-policy',
-  path: () => pathResolver.knowledge('product/governance/runtime-control-policy.json'),
-  schema: pathResolver.knowledge('product/schemas/runtime-control-policy.schema.json'),
-});
+let catalog: ReturnType<typeof defineCatalog<RuntimeControlPolicy>> | undefined;
+let catalogPath: string | undefined;
 
 export function loadRuntimeControlPolicy(): RuntimeControlPolicy {
+  // Loading core exports must never touch a runtime catalog. Resolve both paths
+  // at the actual operation boundary, including after a runtime-root change.
+  const currentPath = pathResolver.knowledge('product/governance/runtime-control-policy.json');
+  if (!catalog || catalogPath !== currentPath) {
+    catalog = defineCatalog<RuntimeControlPolicy>({
+      id: 'runtime-control-policy',
+      path: currentPath,
+      schema: pathResolver.knowledge('product/schemas/runtime-control-policy.schema.json'),
+    });
+    catalogPath = currentPath;
+  }
   return catalog.load();
 }

@@ -34,16 +34,7 @@ const LOCALHOST_NAMES = new Set([
   '::ffff:127.0.0.1',
   '::ffff:7f00:1',
 ]);
-const studioRatePolicy = loadRuntimeControlPolicy().presence_studio;
-const RATE_LIMIT_DEFAULT_WINDOW_MS = studioRatePolicy.window_ms;
-const RATE_LIMIT_DEFAULT_GET = studioRatePolicy.read_limit;
-const RATE_LIMIT_DEFAULT_MUTATION = studioRatePolicy.mutation_limit;
-const rateLimiter = fixedWindowLimiter({
-  windowMs: RATE_LIMIT_DEFAULT_WINDOW_MS,
-  maxKeys: studioRatePolicy.max_keys,
-  eviction: 'deny',
-  expireAtBoundary: false,
-});
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const booleanLike = z.union([z.boolean(), z.literal('true'), z.literal('false')]).optional();
 
 function normalizeHostname(hostname: string): string {
@@ -163,18 +154,23 @@ export function checkPresenceStudioRateLimit(
     return { ok: true, status: 200, reason: 'allowed' };
   }
 
+  const policy = loadRuntimeControlPolicy().presence_studio;
+  rateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+    expireAtBoundary: false,
+  });
   const windowMs =
     options?.windowMs ??
-    Number(
-      getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
-    );
+    Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS') || policy.window_ms);
   const method = String(req.method || 'UNKNOWN').toUpperCase();
   const limit =
     options?.limit ??
     (method === 'GET' || method === 'HEAD'
-      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      ? Number(getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_GET') || policy.read_limit)
       : Number(
-          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || RATE_LIMIT_DEFAULT_MUTATION
+          getRegisteredEnvText('PRESENCE_STUDIO_RATE_LIMIT_MUTATION') || policy.mutation_limit
         ));
   const key = getPresenceStudioRateLimitKey(req);
   const now = Date.now();

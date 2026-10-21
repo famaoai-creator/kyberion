@@ -1886,6 +1886,8 @@ tiers, parentless projects, binding removal, sibling operations and delayed scop
 
 ## Shared state, limits and check bootstrap
 
+Shared barrels and limiter adapters must not read policy catalogs on import. Load at first operation and propagate missing/invalid policy errors. Cover cold imports without a configured root. Keep dependency-free mechanisms in foundation rather than adding layer exceptions. Tests that virtualize secure-io must register the same FoundationIo fixture for shared JSON serializers; assert no live runtime files leak. JSON-state lock and reentry identities must agree for case and Unicode aliases, including on case-sensitive hosts.
+
 Use schema-backed `openJsonState` for new JSON state transactions and the shared fixed-window limiter for matching algorithms. Keep weighted token buckets, JSONL ledgers and HTTP adapter contracts explicit. Untrusted key churn must never evict an already-limited live quota; new bounded adapters reject new keys when full. Catalog reads must not run in `PolicyEngine` construction because secure-io installs its foundation bridge only after importing that engine. Verify actual source imports of secure-io and the core barrel in addition to isolated tests.
 
 When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from the CI manifest in the same change and run that exact gate command. Keep new concept budgets registered with changed-path inputs; test destructured env reads, serialization aliases and renamed duplicated export types. For inbox/provider-pin lock upgrades, stop old writers before restarting new binaries. See [shared-concept operations](./concept-consolidation-operations.md).

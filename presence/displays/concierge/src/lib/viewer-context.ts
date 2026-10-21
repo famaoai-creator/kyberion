@@ -29,15 +29,7 @@ import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-au
 import { toWireError } from '@agent/core/wire-error';
 import { conciergePeerAddress, isLoopbackPeer } from './loopback-peer';
 
-const conciergeRatePolicy = loadRuntimeControlPolicy().concierge;
-const CONCIERGE_RATE_LIMIT_WINDOW_MS = conciergeRatePolicy.window_ms;
-const CONCIERGE_RATE_LIMIT_GET = conciergeRatePolicy.read_limit;
-const CONCIERGE_RATE_LIMIT_MUTATION = conciergeRatePolicy.mutation_limit;
-const conciergeRateLimiter = fixedWindowLimiter({
-  windowMs: CONCIERGE_RATE_LIMIT_WINDOW_MS,
-  maxKeys: conciergeRatePolicy.max_keys,
-  eviction: 'deny',
-});
+let conciergeRateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const conciergeRateLimitedRequests = new WeakSet<object>();
 
 export interface ConciergeViewerContext {
@@ -121,13 +113,17 @@ export function checkConciergeRateLimit(
     key?: string;
   }
 ): { ok: boolean; retryAfterSeconds?: number } {
+  const policy = loadRuntimeControlPolicy().concierge;
+  conciergeRateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+  });
   const method = String(req.method || 'GET').toUpperCase();
   const limit =
     options?.limit ??
-    (method === 'GET' || method === 'HEAD'
-      ? CONCIERGE_RATE_LIMIT_GET
-      : CONCIERGE_RATE_LIMIT_MUTATION);
-  const windowMs = options?.windowMs ?? CONCIERGE_RATE_LIMIT_WINDOW_MS;
+    (method === 'GET' || method === 'HEAD' ? policy.read_limit : policy.mutation_limit);
+  const windowMs = options?.windowMs ?? policy.window_ms;
   const now = Date.now();
   const key = options?.key ? `${options.key}:${method}` : conciergeRateLimitKey(req);
   const decision = conciergeRateLimiter.take(key, limit, now, windowMs);

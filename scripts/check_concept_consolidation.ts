@@ -26,7 +26,7 @@ export interface ConceptBaseline {
 // Canonical implementations contain these concepts by design. No consumer exemption.
 const CANONICAL: Partial<Record<ConceptMetric, readonly string[]>> = {
   runtime_path_literal_budget: ['libs/core/foundation/runtime-state-roots.ts'],
-  rate_limiter_impl_budget: ['libs/core/rate-limit.ts', 'libs/core/failure-tracker.ts'],
+  rate_limiter_impl_budget: ['libs/core/foundation/rate-limit.ts', 'libs/core/failure-tracker.ts'],
   bespoke_cli_parser_budget: [
     'libs/core/cli-guard.ts',
     'libs/core/command-harness.ts',

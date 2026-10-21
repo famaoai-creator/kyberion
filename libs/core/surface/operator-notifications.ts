@@ -300,24 +300,32 @@ export function saveNotificationPreferences(prefs: NotificationPreferences): str
 
 // Rate limit per event×correlation so retry storms do not spam the operator
 // (same shape as UX-01's shouldPostBridgeError, event-scoped).
-const notificationRatePolicy = loadRuntimeControlPolicy().operator_notifications;
-const DEFAULT_NOTIFY_INTERVAL_MS = notificationRatePolicy.window_ms;
-const notificationLimiter = fixedWindowLimiter({
-  windowMs: DEFAULT_NOTIFY_INTERVAL_MS,
-  maxKeys: notificationRatePolicy.max_keys,
-  eviction: 'deny',
-});
+function notificationIntervalMs(): number {
+  return loadRuntimeControlPolicy().operator_notifications.window_ms;
+}
+let notificationLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
+function operatorNotificationLimiter() {
+  if (!notificationLimiter) {
+    const policy = loadRuntimeControlPolicy().operator_notifications;
+    notificationLimiter = fixedWindowLimiter({
+      windowMs: policy.window_ms,
+      maxKeys: policy.max_keys,
+      eviction: 'deny',
+    });
+  }
+  return notificationLimiter;
+}
 
 export function shouldNotifyOperator(
   dedupeKey: string,
   nowMs: number = Date.now(),
-  intervalMs: number = DEFAULT_NOTIFY_INTERVAL_MS
+  intervalMs: number = notificationIntervalMs()
 ): boolean {
-  return notificationLimiter.take(dedupeKey, 1, nowMs, intervalMs).allowed;
+  return operatorNotificationLimiter().take(dedupeKey, 1, nowMs, intervalMs).allowed;
 }
 
 export function resetOperatorNotificationRateLimiter(): void {
-  notificationLimiter.clear();
+  notificationLimiter?.clear();
 }
 
 const EVENT_LABEL_KEYS: Record<OperatorEvent, VocabularyKey | null> = {
@@ -651,7 +659,7 @@ export function notifyOperatorWithReceiptSync(
         return {
           status: 'retryable',
           reason: 'no_channel_configured',
-          retryAfterMs: DEFAULT_NOTIFY_INTERVAL_MS,
+          retryAfterMs: notificationIntervalMs(),
         };
       };
       return key ? stableNotificationAttempt(event, payload, null, key, pushOnly) : pushOnly();
@@ -667,14 +675,15 @@ export function notifyOperatorWithReceiptSync(
         return {
           status: 'retryable',
           reason: 'rate_limited',
-          retryAfterMs: notificationLimiter.retryAfterMs(rateKey) ?? DEFAULT_NOTIFY_INTERVAL_MS,
+          retryAfterMs:
+            operatorNotificationLimiter().retryAfterMs(rateKey) ?? notificationIntervalMs(),
         };
       }
       let delivery: string | undefined;
       try {
         delivery = getChannelAdapter(route.surface).operator_notification?.delivery;
         if (!delivery) {
-          notificationLimiter.forget(rateKey);
+          operatorNotificationLimiter().forget(rateKey);
           return { status: 'retryable', reason: 'no_delivery_adapter' };
         }
         deliver(
@@ -697,11 +706,11 @@ export function notifyOperatorWithReceiptSync(
         // This error is thrown before outbox creation; other transport/storage
         // errors may happen after an effect and are deliberately not retryable.
         if (delivery === 'surface-outbox' && detail.startsWith('surface_target_dead:')) {
-          notificationLimiter.forget(rateKey);
+          operatorNotificationLimiter().forget(rateKey);
           return {
             status: 'retryable',
             reason: 'surface_target_dead',
-            retryAfterMs: DEFAULT_NOTIFY_INTERVAL_MS,
+            retryAfterMs: notificationIntervalMs(),
           };
         }
         return { status: 'uncertain', reason: 'delivery_outcome_unknown' };

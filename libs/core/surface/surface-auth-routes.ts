@@ -114,27 +114,23 @@ function html(
 // Rate limit (framework-neutral, in-memory, per process)
 // ---------------------------------------------------------------------------
 
-const authRatePolicy = loadRuntimeControlPolicy().surface_auth;
-const RATE_WINDOW_MS = authRatePolicy.window_ms;
-const RATE_LIMIT_PER_CLIENT = authRatePolicy.client_limit;
-/** Whole-surface ceiling: a rotating caller-supplied key cannot exceed it. */
-const RATE_LIMIT_PER_SURFACE = authRatePolicy.surface_limit;
-const DEFAULT_RATE_MAX_TRACKED_KEYS = authRatePolicy.max_keys;
-let rateLimiter = fixedWindowLimiter({
-  windowMs: RATE_WINDOW_MS,
-  maxKeys: DEFAULT_RATE_MAX_TRACKED_KEYS,
-  eviction: 'lru',
-});
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
+let maxTrackedKeysOverride: number | undefined;
 
 export function resetSurfaceAuthRateLimitForTests(maxTrackedKeys?: number): void {
-  rateLimiter = fixedWindowLimiter({
-    windowMs: RATE_WINDOW_MS,
-    maxKeys: maxTrackedKeys ?? DEFAULT_RATE_MAX_TRACKED_KEYS,
-    eviction: 'lru',
-  });
+  rateLimiter = undefined;
+  maxTrackedKeysOverride = maxTrackedKeys;
 }
 
 function takeRateToken(key: string, limit: number, now: number): boolean {
+  if (!rateLimiter) {
+    const policy = loadRuntimeControlPolicy().surface_auth;
+    rateLimiter = fixedWindowLimiter({
+      windowMs: policy.window_ms,
+      maxKeys: maxTrackedKeysOverride ?? policy.max_keys,
+      eviction: 'lru',
+    });
+  }
   return rateLimiter.take(key, limit, now).allowed;
 }
 
@@ -149,9 +145,10 @@ const SHARED_CLIENT_KEY = 'shared';
  */
 function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
   if (req.clientKey === undefined || req.loopback) return true;
-  const surfaceOk = takeRateToken(`s:${req.surfaceId}`, RATE_LIMIT_PER_SURFACE, now);
+  const policy = loadRuntimeControlPolicy().surface_auth;
+  const surfaceOk = takeRateToken(`s:${req.surfaceId}`, policy.surface_limit, now);
   if (req.clientKey === SHARED_CLIENT_KEY) return surfaceOk;
-  const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, RATE_LIMIT_PER_CLIENT, now);
+  const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, policy.client_limit, now);
   return surfaceOk && clientOk;
 }
 
@@ -279,7 +276,9 @@ export async function handleSurfaceAuthRoute(
   const method = req.method.toUpperCase();
   if (isSurfaceAuthPath(req.pathname) && !withinRateLimit(req, deps.now ?? Date.now())) {
     return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], {
-      'Retry-After': String(Math.max(1, Math.ceil(RATE_WINDOW_MS / 1000))),
+      'Retry-After': String(
+        Math.max(1, Math.ceil(loadRuntimeControlPolicy().surface_auth.window_ms / 1000))
+      ),
     });
   }
   const next = sanitizeNextPath(req.searchParams.get('next'));

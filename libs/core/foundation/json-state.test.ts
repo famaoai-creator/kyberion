@@ -31,7 +31,7 @@ describe('locked JSON state', () => {
   });
 
   it('uses one file-derived mutex for every writer instance', () => {
-    const resource = `json-state-${createHash('sha256').update(file).digest('hex')}`;
+    const resource = `json-state-${createHash('sha256').update(file.normalize('NFC').toLowerCase().toUpperCase().normalize('NFC')).digest('hex')}`;
     withLockSync(resource, () => {
       expect(() => store(1).replace({ count: 3 })).toThrow('LOCK_TIMEOUT');
     });
@@ -74,6 +74,55 @@ describe('locked JSON state', () => {
     expect(() => state.update(() => store().replace({ count: 9 }))).toThrow('JSON_STATE_REENTRANT');
     expect(state.read()).toEqual({ count: 1 });
     expect(state.update((value) => ({ count: value.count + 1 }))).toEqual({ count: 2 });
+  });
+
+  it('rejects nested case aliases before they can overwrite one physical file', () => {
+    const state = store();
+    const alias = openJsonState({ path: `${root}/STATE.JSON`, schema, default: { count: 0 } });
+    state.replace({ count: 1 });
+    expect(() =>
+      state.update((current) => {
+        alias.update((value) => ({ count: value.count + 10 }));
+        return { count: current.count + 1 };
+      })
+    ).toThrow('JSON_STATE_REENTRANT');
+    expect(state.read()).toEqual({ count: 1 });
+    expect(state.update((value) => ({ count: value.count + 1 }))).toEqual({ count: 2 });
+  });
+
+  it('shares the mutex and reentrancy fence across Unicode normalization aliases', () => {
+    const composed = `${root}/caf\u00e9.json`;
+    const decomposed = `${root}/cafe\u0301.json`;
+    const state = openJsonState({ path: composed, schema, default: { count: 0 } });
+    const alias = openJsonState({
+      path: decomposed,
+      schema,
+      default: { count: 0 },
+      lock: { timeoutMs: 1 },
+    });
+    state.replace({ count: 1 });
+    expect(() => state.update(() => alias.replace({ count: 99 }))).toThrow('JSON_STATE_REENTRANT');
+    const resource = `json-state-${createHash('sha256').update(composed.normalize('NFC').toLowerCase().toUpperCase().normalize('NFC')).digest('hex')}`;
+    withLockSync(resource, () => {
+      expect(() => alias.replace({ count: 3 })).toThrow('LOCK_TIMEOUT');
+    });
+    expect(state.read()).toEqual({ count: 1 });
+  });
+
+  it('conservatively fences Unicode case aliases even on volumes that distinguish them', () => {
+    const state = openJsonState({
+      path: `${root}/stra\u00dfe.json`,
+      schema,
+      default: { count: 0 },
+    });
+    const alias = openJsonState({
+      path: `${root}/STRA\u1e9eE.JSON`,
+      schema,
+      default: { count: 0 },
+    });
+    state.replace({ count: 1 });
+    expect(() => state.update(() => alias.replace({ count: 99 }))).toThrow('JSON_STATE_REENTRANT');
+    expect(state.read()).toEqual({ count: 1 });
   });
 
   it('appends array records atomically and rejects append to an object', () => {

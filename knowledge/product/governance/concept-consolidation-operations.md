@@ -22,6 +22,8 @@ phase: [execution, review]
 
 inbox と provider pins の更新では mutex identity が変わる。**旧 writer を停止 → 更新 → 新 writer を再起動**の順とし、新旧プロセスを同時に動かさない。ファイル形式の変換や利用額の初期化は不要。旧 mutex を残すだけでは正準 lock と相互排他にならない。
 
+JSON state の lock と再入検出は Unicode 正規化と case folding を共有する。大文字小文字や合成文字だけが違うパスも同じ lock とし、同じ処理内の入れ子更新を拒否する。case-sensitive な filesystem でも保守的に共有するが、実際の I/O パスは変更しない。
+
 `runtimeStatePath` はキーごとの既存の論理・物理配置を返す。confidential は有効な tenant が必要で、予約済み partition 名を tenant に指定できない。global な Dot 状態を推測で tenant に分割しない。
 
 ## 制限と失敗追跡
@@ -29,6 +31,8 @@ inbox と provider pins の更新では mutex identity が変わる。**旧 writ
 固定窓には `fixedWindowLimiter` を使う。未検証 token など攻撃者が新規キーを作れる場所では、満杯時に既存の live bucket を捨てず、新規キーを拒否する。既存 OIDC の LRU eviction と Express の HTTP adapter は明示した既存契約を保持する。閾値は `runtime-control-policy.json`、policy engine の閾値・窓は従来の governance rule に置く。policy engine の constructor で catalog I/O を行うと secure-io の初期化循環になるため禁止する。
 
 失敗追跡では `createFailureTracker` に reset の意味と成功時リセットを指定する。機構は count と decision を返し、throw/open/demote/disable の実行は呼出側の既存ライフサイクルが担当する。重み付き token bucket の連続 refill と burst を固定窓に置き換えない。
+
+共通 barrel や limiter adapter の import 時にも catalog I/O を行わず、操作の初回利用時に読み込む。利用時の欠落・不正な policy はエラーとして伝え、既定値で隠さない。依存のない limiter 機構は foundation に置く。
 
 ## CLI とチェック
 
