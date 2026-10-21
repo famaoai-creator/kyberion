@@ -944,10 +944,6 @@
       "types": "./dist/contracts/docx-protocol.d.ts",
       "default": "./dist/contracts/docx-protocol.js"
     },
-    "./contracts/excel-protocol": {
-      "types": "./dist/contracts/excel-protocol.d.ts",
-      "default": "./dist/contracts/excel-protocol.js"
-    },
     "./contracts/generation-job": {
       "types": "./dist/contracts/generation-job.d.ts",
       "default": "./dist/contracts/generation-job.js"
