@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/runtime-control-policy.schema.json",
+  "title": "Runtime Control Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "surface_auth",
+    "concierge",
+    "presence_studio",
+    "chronos",
+    "bridge_errors",
+    "operator_notifications",
+    "schedule_failures"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "surface_auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_ms", "client_limit", "surface_limit", "max_keys"],
+      "properties": {
+        "window_ms": { "$ref": "#/$defs/positive" },
+        "client_limit": { "$ref": "#/$defs/positive" },
+        "surface_limit": { "$ref": "#/$defs/positive" },
+        "max_keys": { "$ref": "#/$defs/positive" }
+      }
+    },
+    "concierge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_ms", "read_limit", "mutation_limit", "max_keys"],
+      "properties": {
+        "window_ms": { "$ref": "#/$defs/positive" },
+        "read_limit": { "$ref": "#/$defs/positive" },
+        "mutation_limit": { "$ref": "#/$defs/positive" },
+        "max_keys": { "$ref": "#/$defs/positive" }
+      }
+    },
+    "presence_studio": { "$ref": "#/properties/concierge" },
+    "chronos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_ms", "limit", "max_keys"],
+      "properties": {
+        "window_ms": { "$ref": "#/$defs/positive" },
+        "limit": { "$ref": "#/$defs/positive" },
+        "max_keys": { "$ref": "#/$defs/positive" }
+      }
+    },
+    "bridge_errors": { "$ref": "#/$defs/cooldown" },
+    "operator_notifications": { "$ref": "#/$defs/cooldown" },
+    "schedule_failures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threshold", "reset", "reset_on_success", "action"],
+      "properties": {
+        "threshold": { "$ref": "#/$defs/positive" },
+        "reset": { "const": "never" },
+        "reset_on_success": { "const": true },
+        "action": { "const": "disable" }
+      }
+    }
+  },
+  "$defs": {
+    "positive": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "cooldown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_ms", "max_keys"],
+      "properties": {
+        "window_ms": { "$ref": "#/$defs/positive" },
+        "max_keys": { "$ref": "#/$defs/positive" }
+      }
+    }
+  }
+}

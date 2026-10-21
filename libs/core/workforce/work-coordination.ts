@@ -4,7 +4,7 @@ import {
 } from './work-coordination-pipeline-continuation.js';
 import { latestById, readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
 import { finalizeWorkItemAttempt } from './work-item-attempt.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { withLockSync } from '../foundation/lock-utils.js';
@@ -23,7 +23,6 @@ import {
   safeLstat,
   safeMkdir,
   safeRmSync,
-  safeWriteFile,
 } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -241,13 +240,11 @@ function appendJsonl(logicalPath: string, record: unknown): void {
   });
 }
 
-function writeJson(logicalPath: string, value: unknown): void {
+/** State publication keeps its governed writer role; serialization is shared. */
+function writeCoordinationState(logicalPath: string, value: unknown): void {
   withExecutionContext('infrastructure_sentinel', () => {
     ensureStore();
-    safeWriteFile(
-      assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }),
-      JSON.stringify(value, null, 2)
-    );
+    writeJson(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), value);
   });
 }
 
@@ -525,7 +522,7 @@ function materializeBoardCatalog(): WorkBoardCatalog {
 function writeBoardCatalog(catalog: WorkBoardCatalog): void {
   const filePath = assertSafeRepositoryPath(boardsPath(), { allowMissingLeaf: true });
   const validated = workBoardCatalogAtPath(filePath).validate(catalog, filePath);
-  writeJson(filePath, validated);
+  writeCoordinationState(filePath, validated);
 }
 
 export function clearWorkCoordinationStore(): void {

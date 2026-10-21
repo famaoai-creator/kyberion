@@ -15,7 +15,7 @@
 import * as path from 'node:path';
 import { safeExecResult, safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
-import { PHYSICAL_TENANT_NAMESPACE } from '../physical-namespace.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import type { GitRunner } from './memory-promotion-git.js';
 import { coreDistDirUrl, defaultGitRunner } from './memory-promotion-git.js';
@@ -189,14 +189,10 @@ export interface ResolveMissionRootInput {
   gitRunner?: GitRunner;
 }
 
-const GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
+const GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH = runtimeStatePath('memory.promotionQueue').physicalPath;
 const MISSIONS_RELATIVE_PATH = 'active/missions';
 const ARCHIVE_MISSIONS_RELATIVE_PATH = 'active/archive/missions';
-/** Mirrors `memory-promotion-queue.ts`'s own tenant queue layout (`physicalScopedPath('active/shared/runtime', {tenant_slug, scope_kind:'tenant'}, 'memory', 'promotion-queue.jsonl')` — see `physical-namespace.ts`). */
-const TENANT_RUNTIME_RELATIVE_PATH = path.posix.join(
-  'active/shared/runtime',
-  PHYSICAL_TENANT_NAMESPACE
-);
+const TENANT_RUNTIME_RELATIVE_PATH = runtimeStatePath('memory.tenantRoot').physicalPath;
 
 /** True when `root` itself already has mission/queue records (no need to look elsewhere). Only used when no Mission ID was parsed to check against. */
 function rootHasMissionRecords(root: string): boolean {
@@ -226,7 +222,15 @@ function listTenantPromotionQueuePaths(root: string): string[] {
   }
   const queuePaths: string[] = [];
   for (const slug of tenantSlugs) {
-    const queuePath = path.join(tenantsDir, slug, 'memory', 'promotion-queue.jsonl');
+    let queuePath: string;
+    try {
+      queuePath = path.join(
+        root,
+        runtimeStatePath('memory.promotionQueue', { tenant_slug: slug }).physicalPath
+      );
+    } catch {
+      continue;
+    }
     if (safeExistsSync(queuePath)) queuePaths.push(queuePath);
   }
   return queuePaths;

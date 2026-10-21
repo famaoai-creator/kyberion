@@ -1600,7 +1600,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#writeJson",
+      "site": "libs/core/workforce/work-coordination.ts#writeCoordinationState",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },

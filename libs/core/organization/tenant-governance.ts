@@ -35,6 +35,7 @@ import {
   loadProviderEgressPolicy,
 } from '../provider/provider-egress-gate.js';
 import { resolveIdentityContext } from '../authority.js';
+import { currentActor } from '../actor-context.js';
 import { pathResolver } from '../path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import {
@@ -141,7 +142,8 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
     const saved = writeTenantProfile(profile, options);
     if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
     auditChain.record({
-      agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+      agentId:
+        input.actor || currentActor()?.actor.id || resolveIdentityContext().persona || 'operator',
       action: `tenant.${input.verb}`,
       operation: `tenant:${profile.tenant_slug}`,
       result: 'completed',

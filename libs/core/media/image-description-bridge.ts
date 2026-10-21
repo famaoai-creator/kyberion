@@ -181,7 +181,7 @@ export interface ReasoningVisionOptions {
   resolveBackend?: ReasoningBackendResolver;
 }
 
-const TIER_RANK: Record<PayloadTier, number> = { public: 0, confidential: 1, personal: 2 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 /** Tier implied by where the image lives under the project root. */
 export function inferImagePayloadTier(absolutePath: string): PayloadTier {

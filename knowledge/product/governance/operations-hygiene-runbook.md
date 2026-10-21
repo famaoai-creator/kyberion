@@ -1884,6 +1884,12 @@ dot-work-binding, lifecycle, dispatch, admission recovery and executor tests, pl
 mounted workspace/ingest UI tests. Include public-only viewers, same-name owners in two
 tiers, parentless projects, binding removal, sibling operations and delayed scope changes.
 
+## Shared state, limits and check bootstrap
+
+Use schema-backed `openJsonState` for new JSON state transactions and the shared fixed-window limiter for matching algorithms. Keep weighted token buckets, JSONL ledgers and HTTP adapter contracts explicit. Untrusted key churn must never evict an already-limited live quota; new bounded adapters reject new keys when full. Catalog reads must not run in `PolicyEngine` construction because secure-io installs its foundation bridge only after importing that engine. Verify actual source imports of secure-io and the core barrel in addition to isolated tests.
+
+When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from the CI manifest in the same change and run that exact gate command. Keep new concept budgets registered with changed-path inputs; test destructured env reads, serialization aliases and renamed duplicated export types. For inbox/provider-pin lock upgrades, stop old writers before restarting new binaries. See [shared-concept operations](./concept-consolidation-operations.md).
+
 ## Dot authoring: ownership and confidentiality
 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.

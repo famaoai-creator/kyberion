@@ -22,7 +22,7 @@ import { normalizeMemoryFact } from './memory-notebook.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { scopeContextKey } from '../scope-context.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
   verifyScopedLearningApprovalRef,
   assertScopedLearningReviewUnchanged,
@@ -135,8 +135,7 @@ export interface MemoryCandidate {
 const SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/memory-candidate.schema.json'
 );
-const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
-const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
+const TENANT_RUNTIME_ROOT = runtimeStatePath('memory.tenantRoot').physicalPath;
 
 export function isPublicMemoryEvidencePath(ref: string): boolean {
   const normalized = String(ref || '')
@@ -151,18 +150,6 @@ export function isPublicMemoryEvidencePath(ref: string): boolean {
   );
 }
 
-function tenantQueueScope(scope: MemoryScopeEnvelope): {
-  tier: MemoryScopeEnvelope['tier'];
-  tenant_slug: string;
-  scope_kind: 'tenant';
-} {
-  if (!scope.tenant_slug) throw new Error('Tenant-scoped memory queue requires tenant_slug.');
-  // A promotion queue is owned by the tenant, even when the candidate was
-  // observed inside a project/mission. Do not let a deeper work scope create
-  // a separate queue or weaken the tenant boundary.
-  return { tier: scope.tier, tenant_slug: scope.tenant_slug, scope_kind: 'tenant' };
-}
-
 // Tests namespace the queue via KYBERION_MEMORY_QUEUE_PATH so parallel suites
 // never clobber their real queue file (resolved lazily per call). In
 // production, tenant-scoped candidates are physically isolated under the
@@ -171,28 +158,12 @@ function tenantQueueScope(scope: MemoryScopeEnvelope): {
 function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
   const override = getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim();
   const canonical = scope ? assertMemoryScope(scope) : undefined;
-  if (canonical?.tier === 'personal' && !canonical.owner_nhi)
-    throw new Error('[MEMORY_SCOPE_UNSUPPORTED] Personal queue requires an explicit owner_nhi');
-  const ownerKey =
+  // A personal owner queue is never redirected by the test/global override.
+  const candidate = pathResolver.rootResolve(
     canonical?.tier === 'personal'
-      ? createHash('sha256').update(canonical.owner_nhi!).digest('hex')
-      : undefined;
-  const candidate = ownerKey
-    ? pathResolver.rootResolve(
-        path.posix.join('active/personal/owners', ownerKey, 'memory', 'promotion-queue.jsonl')
-      )
-    : override
-      ? pathResolver.rootResolve(override)
-      : scope?.tenant_slug
-        ? pathResolver.rootResolve(
-            physicalScopedPath(
-              'active/shared/runtime',
-              tenantQueueScope(scope),
-              'memory',
-              'promotion-queue.jsonl'
-            )
-          )
-        : pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
+      ? runtimeStatePath('memory.promotionQueue', canonical).physicalPath
+      : override || runtimeStatePath('memory.promotionQueue', canonical).physicalPath
+  );
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
@@ -215,7 +186,9 @@ function queuePathsForAllScopes(): string[] {
       });
       if (!safeStat(tenantDir).isDirectory()) continue;
       const candidatePath = assertSafeRepositoryPath(
-        path.join(tenantDir, 'memory', 'promotion-queue.jsonl'),
+        pathResolver.rootResolve(
+          runtimeStatePath('memory.promotionQueue', { tenant_slug: tenantSlug }).physicalPath
+        ),
         { allowMissingLeaf: true }
       );
       if (safeExistsSync(candidatePath)) paths.push(candidatePath);

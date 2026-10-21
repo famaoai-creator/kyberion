@@ -256,6 +256,7 @@
 - [テスト用一時領域の後始末と削除境界](./product/governance/testing-scratch-cleanup.md) (public | Unknown)
 - [テナント追加手順 — 登録は1系統、検証は check:tenant-registry](./product/governance/tenant-onboarding-procedure.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
+- [共通概念の採用と安全な更新](./product/governance/concept-consolidation-operations.md) (public | Unknown)
 - [受信と実行権限を分離する自律ループ](./product/governance/delegated-autonomous-loop.md) (public | Unknown)
 - [外部入出力 actuator の統合と自律運用](./product/governance/external-actuator-governance.md) (public | Unknown)
 

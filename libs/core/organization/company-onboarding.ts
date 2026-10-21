@@ -4,6 +4,7 @@
  */
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
+import { writeJson } from '../foundation/json.js';
 import { withExecutionContext } from '../authority.js';
 import { ensureAgentIdentityBestEffort } from '../agent/agent-identity.js';
 import {
@@ -79,10 +80,10 @@ function validateInput(input: AiCompanyOnboardingInput): void {
   if (!input.firstWork.trim()) throw new Error('[company-onboard] firstWork is required');
 }
 
-function writeJson(filePath: string, value: unknown, rootDir: string): void {
+/** The caller-selected checkout root remains an explicit artifact boundary. */
+function writeCompanyArtifact(filePath: string, value: unknown, rootDir: string): void {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir });
-  safeMkdir(path.dirname(safePath), { recursive: true });
-  safeWriteFile(safePath, JSON.stringify(value, null, 2));
+  writeJson(safePath, value);
 }
 
 function requireRegularFile(filePath: string, rootDir: string, label: string): string {
@@ -272,7 +273,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       default_approval_holder: normalized.accountableHumanId,
       default_budget_posture: 'block',
     };
-    writeJson(profilePath, profile, rootDir);
+    writeCompanyArtifact(profilePath, profile, rootDir);
 
     const now = nowIso();
     const readiness = {
@@ -315,7 +316,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         review_before_execution: true,
       },
     };
-    writeJson(readinessPath, readiness, rootDir);
+    writeCompanyArtifact(readinessPath, readiness, rootDir);
     safeMkdir(path.dirname(firstWorkPath), { recursive: true });
     safeWriteFile(
       firstWorkPath,

@@ -1,4 +1,5 @@
 import * as yaml from 'js-yaml';
+import { fixedWindowLimiter } from '../rate-limit.js';
 import { createLogger } from '../logger.js';
 import { getFoundationIo } from '../foundation/io.js';
 import { isRecord } from '../foundation/text.js';
@@ -169,7 +170,15 @@ function normalizePolicy(value: unknown): Policy | null {
 class PolicyEngineImpl {
   private policies: Policy[] = [];
   private declaredPolicyCount = 0;
-  private rateLimitCounters: Map<string, { count: number; windowStart: number }> = new Map();
+  private rateLimiter = fixedWindowLimiter({
+    // Policy evaluation is part of secure-io bootstrap: loading a catalog here
+    // would recurse through that same boundary. Every actual decision receives
+    // its governed rule window below; this default is never used for decisions.
+    windowMs: 1,
+    maxKeys: 5_000,
+    eviction: 'deny',
+    expireAtBoundary: false,
+  });
 
   loadFromFile(filePath?: string): void {
     this.policies = [];
@@ -368,14 +377,7 @@ class PolicyEngineImpl {
     const now = Date.now();
     const windowMs = rule.rate_limit.window_seconds * 1000;
 
-    let counter = this.rateLimitCounters.get(key);
-    if (!counter || now - counter.windowStart > windowMs) {
-      counter = { count: 0, windowStart: now };
-    }
-    counter.count++;
-    this.rateLimitCounters.set(key, counter);
-
-    return counter.count > rule.rate_limit.max;
+    return !this.rateLimiter.take(key, rule.rate_limit.max, now, windowMs).allowed;
   }
 }
 

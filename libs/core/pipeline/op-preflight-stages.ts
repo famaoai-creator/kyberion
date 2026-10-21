@@ -97,7 +97,7 @@ export function opPreflightStageCounts(): Record<string, number> {
   return Object.fromEntries(stageModeCounts);
 }
 
-const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 /**
  * The tier an observation is recorded at: the resource's own tier when its

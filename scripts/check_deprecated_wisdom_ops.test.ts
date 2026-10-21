@@ -15,7 +15,7 @@ describe('deprecated Wisdom op checker output boundary', () => {
       safeReadFile(pathResolver.rootResolve('scripts/check_deprecated_wisdom_ops.ts'))
     );
 
-    expect(source).toContain('context.print');
+    expect(source).toContain('defineCheck');
     expect(source).not.toContain('console.warn');
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
     expect(source).not.toContain('safeReadFile(');

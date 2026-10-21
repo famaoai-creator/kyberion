@@ -2,11 +2,7 @@ import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 
-const TIER_SENSITIVITY: Record<TierLevel, number> = {
-  public: 1,
-  confidential: 3,
-  personal: 4,
-};
+import { KNOWLEDGE_TIER_RANK as TIER_SENSITIVITY } from './foundation/knowledge-tier.js';
 
 export interface ContextSecurityScope {
   /** Canonical tenant boundary. */

@@ -1,5 +1,6 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
+import ts from 'typescript';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge/knowledge-scope-check-policy';
@@ -119,9 +120,9 @@ export function scanKnowledgeScopeBoundaries(
 /**
  * Runtime writer ratchet for the knowledge loop. A listed writer may retain a
  * legacy/global fallback, but it must also contain the physical namespace
- * helper so a tenant-scoped write cannot silently fall back to one shared
- * file. The list is governed in knowledge-scope-check.json and reviewed with
- * the storage layout.
+ * helper or the scoped registry's physical result. This checks a real imported
+ * call, not a helper name in a comment/string. It is a mechanical adoption
+ * gate; storage scope correctness remains covered by domain boundary tests.
  */
 export function findKnowledgeRuntimeWriterViolations(
   fileSources: Array<{ file: string; source: string }>,
@@ -131,10 +132,71 @@ export function findKnowledgeRuntimeWriterViolations(
   return (config.scoped_runtime_writer_files || []).flatMap((file) => {
     const source = sources.get(file);
     if (source === undefined) return [`${file}: scoped runtime writer was not scanned`];
-    return source.includes('physicalScopedPath')
+    return usesScopedRuntimePlacement(source, file)
       ? []
-      : [`${file}: scoped runtime writer must use physicalScopedPath`];
+      : [
+          `${file}: scoped runtime writer must use physicalScopedPath or scoped runtimeStatePath physicalPath`,
+        ];
   });
+}
+
+function usesScopedRuntimePlacement(source: string, filename: string): boolean {
+  const ast = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+  const physicalImports = new Set<string>();
+  const registryImports = new Set<string>();
+  for (const statement of ast.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier))
+      continue;
+    const clause = statement.importClause;
+    if (
+      !clause ||
+      clause.isTypeOnly ||
+      !clause.namedBindings ||
+      !ts.isNamedImports(clause.namedBindings)
+    )
+      continue;
+    const module = statement.moduleSpecifier.text;
+    for (const binding of clause.namedBindings.elements) {
+      if (binding.isTypeOnly) continue;
+      const exported = binding.propertyName?.text ?? binding.name.text;
+      if (exported === 'physicalScopedPath' && /(?:^|\/)physical-namespace(?:\.js)?$/.test(module))
+        physicalImports.add(binding.name.text);
+      if (
+        exported === 'runtimeStatePath' &&
+        /(?:^|\/)foundation\/runtime-state-roots(?:\.js)?$/.test(module)
+      )
+        registryImports.add(binding.name.text);
+    }
+  }
+  const hasScope = (argument: ts.Expression | undefined): boolean =>
+    !!argument &&
+    argument.kind !== ts.SyntaxKind.NullKeyword &&
+    !(ts.isIdentifier(argument) && argument.text === 'undefined');
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      physicalImports.has(node.expression.text) &&
+      hasScope(node.arguments[1])
+    )
+      found = true;
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === 'physicalPath' &&
+      ts.isCallExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      registryImports.has(node.expression.expression.text) &&
+      hasScope(node.expression.arguments[1]) &&
+      node.expression.arguments[0] &&
+      ts.isStringLiteralLike(node.expression.arguments[0]) &&
+      node.expression.arguments[0].text === 'memory.promotionQueue'
+    )
+      found = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  return found;
 }
 
 function collectSources(): Array<{ file: string; source: string }> {

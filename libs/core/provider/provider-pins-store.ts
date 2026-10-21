@@ -8,20 +8,12 @@
  * an import cycle through the providers it discovers).
  */
 
-import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { openJsonState } from '../foundation/json-state.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
-import { withLockSync } from '../foundation/lock-utils.js';
 import type { HealthAwareResolution } from './provider-health-registry.js';
 
 export interface PinnedEntry {
@@ -94,49 +86,30 @@ function pinFilePath(): string {
   );
 }
 
-const providerPinsCatalog = defineCatalog<PinFile>({
-  id: 'provider-pins',
+const providerPinsState = openJsonState<PinFile>({
   path: pinFilePath,
   schema: PROVIDER_PINS_SCHEMA_PATH,
+  default: () => ({ version: PIN_FILE_VERSION, pins: {} }),
 });
 
 export function readPinFile(): PinFile {
   try {
     const filePath = pinFilePath();
     if (!safeLstat(filePath).isFile()) return { version: PIN_FILE_VERSION, pins: {} };
-    return providerPinsCatalog.load();
+    return providerPinsState.read();
   } catch {
     /* treat as empty */
   }
   return { version: PIN_FILE_VERSION, pins: {} };
 }
 
-function pinFileLockId(filePath: string): string {
-  return `provider-pins-${createHash('sha256').update(filePath, 'utf8').digest('hex')}`;
-}
-
-function writePinFileUnlocked(file: PinFile): void {
-  const filePath = pinFilePath();
-  const validated = providerPinsCatalog.validate(file, filePath);
-  const dir = path.dirname(filePath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`, { encoding: 'utf8' });
-  providerPinsCatalog.reset();
-}
-
 export function writePinFile(file: PinFile): void {
-  const filePath = pinFilePath();
-  withLockSync(pinFileLockId(filePath), () => writePinFileUnlocked(file));
+  providerPinsState.replace(file);
 }
 
 /** Atomically read, update and validate the complete pin file. */
 export function updatePinFile(mutator: (file: PinFile) => PinFile): PinFile {
-  const filePath = pinFilePath();
-  return withLockSync(pinFileLockId(filePath), () => {
-    const next = mutator(readPinFile());
-    writePinFileUnlocked(next);
-    return next;
-  });
+  return providerPinsState.update(mutator);
 }
 
 function seamPinKey(seam: string, decisionKey: string): string {
