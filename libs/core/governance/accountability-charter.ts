@@ -1,3 +1,10 @@
+import {
+  parseExternalOperationGrants,
+  parseExternalOperationGrant,
+  externalOperationGrantMatches,
+  type ExternalOperationGrant,
+} from './external-operation-target.js';
+export type { ExternalOperationGrant } from './external-operation-target.js';
 /**
  * Accountability charter — the pure decision core.
  *
@@ -97,6 +104,7 @@ export interface MoneyLimits {
 }
 
 export interface CharterEnvelope {
+  external_operations?: ExternalOperationGrant[];
   money: MoneyLimits;
   data_tier: {
     read: string[]; // 'public' | 'confidential:<tenant>' | 'personal'
@@ -143,6 +151,8 @@ export interface CharterAccountable {
 
 export interface Charter {
   charter_id: string;
+  /** Canonical immutable accounting predecessor, populated only by acceptCharter. */
+  replaces_charter_id?: string;
   scope: CharterScope;
   accountable: CharterAccountable;
   envelope: CharterEnvelope;
@@ -157,6 +167,7 @@ export interface CharterUsage {
 }
 
 export interface CharterAction {
+  external_operation?: ExternalOperationGrant;
   /** The executing actor. Agents must name the accountable human (or a deputy) in `on_behalf_of`. */
   actor: ActorRef;
   action_class: string;
@@ -396,6 +407,11 @@ export interface CharterValidationContext {
 export function validateCharter(charter: Charter, ctx: CharterValidationContext): string[] {
   const violations: string[] = [];
   const { accountable, envelope, appetite } = charter;
+  if (
+    envelope.external_operations !== undefined &&
+    !parseExternalOperationGrants(envelope.external_operations)
+  )
+    violations.push('external_operations must contain valid exact operation targets');
 
   if (!parseActorRef({ kind: 'human', id: accountable.actor })) {
     violations.push(`accountable.actor '${accountable.actor}' is not a valid human actor id`);
@@ -429,6 +445,15 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
     (accountable.authority_basis.kind === 'owner' ||
       accountable.authority_basis.kind === 'officer') &&
     Boolean(accountable.authority_basis.evidence_ref?.trim());
+  if (
+    envelope.external_operations?.length &&
+    !basisCanCarry &&
+    !(accountable.authority_basis.kind === 'delegated' && ctx.parent_envelope)
+  ) {
+    violations.push(
+      'external_operations require owner/officer evidence or a validated parent delegation'
+    );
+  }
   for (const cls of BASIS_GATED_EFFECTS) {
     if (effectPolicy(envelope, cls) !== 'forbid' && !basisCanCarry) {
       violations.push(
@@ -562,6 +587,14 @@ export function envelopeExceeds(child: CharterEnvelope, parent: CharterEnvelope)
       out.push(`delegated_decisions.${type} is more permissive than the parent envelope`);
     }
   }
+  for (const grant of child.external_operations ?? []) {
+    if (
+      !(parent.external_operations ?? []).some((value) =>
+        externalOperationGrantMatches(value, grant)
+      )
+    )
+      out.push('external_operations exceeds parent targets');
+  }
   if (child.information_flow) {
     const p = parent.information_flow;
     if (!p) out.push('information_flow is not granted by the parent envelope');
@@ -658,13 +691,27 @@ export function evaluateAgainstCharter(input: {
       action.reversible &&
       money === 0 &&
       loss === 0 &&
-      !(EXTERNAL_EFFECT_CLASSES as readonly string[]).includes(action.action_class);
+      !(EXTERNAL_EFFECT_CLASSES as readonly string[]).includes(action.action_class) &&
+      !action.external_operation &&
+      action.action_class !== 'target_scoped_external_operation';
     if (!safe)
       return deny([
         'safe_mode: no accountable human or deputy available; only reversible zero-cost internal actions',
       ]);
   }
 
+  // 4. Exact target delegation is separate from business-message delegation.
+  if (action.action_class === 'target_scoped_external_operation' || action.external_operation) {
+    const target = parseExternalOperationGrant(action.external_operation);
+    if (
+      action.action_class !== 'target_scoped_external_operation' ||
+      !target ||
+      !(envelope.external_operations ?? []).some((grant) =>
+        externalOperationGrantMatches(grant, target)
+      )
+    )
+      return deny(['external operation target not delegated']);
+  }
   // 4. Envelope.
   if (action.decision_type) {
     const policy = delegatedDecisionPolicy(envelope, action.decision_type);

@@ -11,6 +11,16 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resetCurrentScope } from '@agent/core/scope-context';
 import type { ComputerInteractionAction } from './browser-interaction-helpers.js';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+vi.mock('@agent/core/workforce/workspace-ledger', () => ({
+  createScratchWorkspace: () => ({
+    id: 'isolated-fixture',
+    path: path.join(
+      process.cwd(),
+      'active/shared/tmp/workspaces/onboarding-browser-00000000-0000-4000-8000-000000000000'
+    ),
+  }),
+  releaseWorkspace: vi.fn(),
+}));
 
 // Existing transport/ref/secret fixtures execute the actual handler callback.
 // Admission and outcome fencing are covered in browser-external-governance.test.ts.
@@ -128,6 +138,7 @@ const mocks = vi.hoisted(() => {
   const retry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
 
   const context = {
+    route: vi.fn(async () => undefined),
     pages: vi.fn(() => [page]),
     newPage: vi.fn(async () => page2),
     on: vi.fn(),
@@ -210,6 +221,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeExistsSync: (filePath: string) =>
       mocks.fileStore.has(filePath) || mocks.safeExistsSync(filePath),
     safeMkdir: mocks.safeMkdir,
+    safeReaddir: (filePath: string) =>
+      filePath.includes('/onboarding-browser-') ? [] : actual.safeReaddir(filePath),
     safeReadFile: (filePath: string, options?: { encoding?: BufferEncoding | null }) =>
       mocks.fileStore.has(filePath)
         ? mocks.fileStore.get(filePath)!
@@ -257,6 +270,71 @@ describe('browser-actuator v3 contract', () => {
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
     vi.clearAllMocks();
+  });
+
+  it('creates an isolated onboarding browser with a preinstalled network fence and closes its scratch profile', async () => {
+    const { handleAction } = await import('./index');
+    await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'goto', params: { url: 'https://example.com' } }],
+      options: { onboarding_isolated_navigation: true },
+    });
+    expect(mocks.launchPersistentContext).toHaveBeenCalledWith(
+      expect.stringMatching(/onboarding-browser-[a-f0-9-]+$/),
+      expect.objectContaining({
+        serviceWorkers: 'block',
+        javaScriptEnabled: false,
+        acceptDownloads: false,
+        args: [],
+      })
+    );
+    expect(mocks.context.route).toHaveBeenCalledWith('**/*', expect.any(Function));
+    expect(mocks.context.route.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.page.goto.mock.invocationCallOrder[0]!
+    );
+    expect(vi.mocked(runExternalOperation).mock.calls.at(-1)?.[0]).toMatchObject({
+      delegable: true,
+      effect: expect.objectContaining({ navigation_confinement: 'isolated-public-read-v1' }),
+    });
+    expect(mocks.close).toHaveBeenCalled();
+    expect(mocks.safeRmSync).toHaveBeenCalledWith(expect.stringContaining('/onboarding-browser-'), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it.each([
+    { connect_over_cdp: true },
+    { profile: 'registered-user' },
+    { user_data_dir: 'active/shared/user-profile' },
+    { launch_args: ['--disable-web-security'] },
+  ])('rejects unconfined onboarding overrides before allocation: %j', async (override) => {
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        steps: [],
+        options: { onboarding_isolated_navigation: true, ...override },
+      })
+    ).rejects.toThrow('BROWSER_ISOLATION_REQUIRED');
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+    expect(mocks.connectOverCDP).not.toHaveBeenCalled();
+  });
+
+  it('forwards the documented navigation parameter through the production catalog handler', async () => {
+    const { actuator } = await import('./index');
+    await actuator.ops.goto.handler(
+      { url: 'https://example.com', onboarding_isolated_navigation: true },
+      {}
+    );
+    expect(mocks.launchPersistentContext).toHaveBeenCalledWith(
+      expect.stringContaining('/onboarding-browser-'),
+      expect.objectContaining({ serviceWorkers: 'block' })
+    );
+    expect(vi.mocked(runExternalOperation).mock.calls.at(-1)?.[0]).toMatchObject({
+      delegable: true,
+      effect: expect.objectContaining({ navigation_confinement: 'isolated-public-read-v1' }),
+    });
   });
 
   it('rejects a browser profile path outside the repository before launching', async () => {

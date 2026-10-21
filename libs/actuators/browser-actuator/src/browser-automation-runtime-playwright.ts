@@ -30,6 +30,9 @@ export function registerPlaywrightBrowserAutomationRuntime(): void {
           locale: options.locale,
           recordVideo: options.recordVideo,
           args: options.args,
+          serviceWorkers: options.serviceWorkers === 'block' ? 'block' : undefined,
+          javaScriptEnabled: options.javaScriptEnabled === false ? false : undefined,
+          acceptDownloads: options.acceptDownloads === false ? false : undefined,
         });
       },
     },

@@ -34,6 +34,10 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
+import {
+  installIsolatedNavigationConfinement,
+  claimIsolatedBrowserProfile,
+} from './browser-navigation-confinement.js';
 import './browser-automation-runtime-playwright.js';
 import './browser-automation-runtime-lightpanda.js';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
@@ -1144,6 +1148,10 @@ export const browserRuntimeHelpers = {
     cleanupExpiredBrowserRuntimeLeases();
     const scopeFingerprint = browserScopeFingerprint();
     const existing = browserRuntimeLeases.get(sessionId);
+    if (options.onboarding_isolated_navigation && existing)
+      throw new Error(
+        '[BROWSER_ISOLATION_REQUIRED] Isolated onboarding cannot reuse a browser session'
+      );
     if (existing) {
       assertBrowserSessionOwner(existing.scopeFingerprint, scopeFingerprint);
       logger.info(`♻️ [BROWSER] Reusing leased session: ${sessionId}`);
@@ -1151,7 +1159,26 @@ export const browserRuntimeHelpers = {
     }
 
     const automationRuntime = resolveValidatedBrowserRuntime(options.browser_runtime);
-    const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
+    if (
+      options.onboarding_isolated_navigation &&
+      (automationRuntime.bridge_id !== 'playwright-chromium' ||
+        options.connect_over_cdp ||
+        options.cdp_url ||
+        options.cdp_port ||
+        options.profile_directory ||
+        options.launch_args?.length)
+    )
+      throw new Error(
+        '[BROWSER_ISOLATION_REQUIRED] Fresh builtin Chromium without profile, CDP or launch overrides required'
+      );
+    if (
+      options.onboarding_isolated_navigation &&
+      (!claimIsolatedBrowserProfile(userDataDir) || safeReaddir(userDataDir).length > 0)
+    )
+      throw new Error('[BROWSER_ISOLATION_REQUIRED] Fresh empty scratch profile required');
+    const persistedMetadata = options.onboarding_isolated_navigation
+      ? undefined
+      : loadBrowserSessionMetadata(sessionMetadataPath);
     assertPersistedBrowserSessionOwner(
       persistedMetadata,
       scopeFingerprint,
@@ -1239,19 +1266,31 @@ export const browserRuntimeHelpers = {
       viewport: options.viewport || { width: 1280, height: 720 },
       locale: options.locale || localeToBcp47(resolveLocale()),
       recordVideo: options.record_video ? { dir: videoDir } : undefined,
+      ...(options.onboarding_isolated_navigation
+        ? { serviceWorkers: 'block', javaScriptEnabled: false, acceptDownloads: false }
+        : {}),
       args: [
         ...(Array.isArray(options.launch_args) ? options.launch_args : []),
         ...(options.profile_directory ? [`--profile-directory=${options.profile_directory}`] : []),
-        '--remote-debugging-port=0',
+        ...(options.onboarding_isolated_navigation ? [] : ['--remote-debugging-port=0']),
       ],
     })) as BrowserContext;
+    if (options.onboarding_isolated_navigation) {
+      try {
+        await installIsolatedNavigationConfinement(context);
+      } catch (error) {
+        await context.close();
+        throw error;
+      }
+    }
 
     // Only Chrome profiles publish DevToolsActivePort; other providers own
     // their endpoint and are not reattached across processes.
-    const cdpEndpoint = getBrowserAutomationRuntimeCapabilities(automationRuntime)
-      .persistent_profile
-      ? await waitForCdpEndpoint(userDataDir)
-      : null;
+    const cdpEndpoint =
+      !options.onboarding_isolated_navigation &&
+      getBrowserAutomationRuntimeCapabilities(automationRuntime).persistent_profile
+        ? await waitForCdpEndpoint(userDataDir)
+        : null;
     browserRuntimeLeases.set(sessionId, {
       runtime: createBrowserRuntime(context, options.navigation_policy),
       userDataDir,

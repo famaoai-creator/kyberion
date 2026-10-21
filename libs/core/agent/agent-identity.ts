@@ -218,7 +218,11 @@ const identityProvisionedPayloadSchema = z
   .strict();
 
 const identityActivatedPayloadSchema = z
-  .object({ nhi_id: z.string(), activated_at: z.string() })
+  .object({
+    nhi_id: z.string(),
+    activated_at: z.string(),
+    only_provisioned: z.literal(true).optional(),
+  })
   .strict();
 
 const identitySuspendedPayloadSchema = z
@@ -281,6 +285,9 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityActivated, {
     if (!existing || existing.lifecycle_status === 'active') return state;
     // Retired is terminal: replay never resurrects a retired identity.
     if (existing.lifecycle_status === 'retired') return state;
+    // Initial owner consent must never undo a concurrent suspension, even
+    // when that suspension arrived after the caller's lifecycle precheck.
+    if (payload.only_provisioned && existing.lifecycle_status !== 'provisioned') return state;
     const activated: AgentIdentityRecord = { ...existing, lifecycle_status: 'active' };
     return { identities: { ...state.identities, [payload.nhi_id]: activated } };
   },
@@ -755,6 +762,27 @@ export function activateAgentIdentity(nhiId: string): AgentIdentityRecord {
     activated_at: nowIso(),
   });
   return requireIdentity(nhiId);
+}
+
+/** Initial activation only. Unlike operational reactivation this cannot lift a suspension. */
+export function activateProvisionedAgentIdentity(nhiId: string): AgentIdentityRecord {
+  assertAgentIdentityGovernedContext('activateProvisionedAgentIdentity');
+  const existing = requireIdentity(nhiId);
+  if (existing.lifecycle_status === 'active') return existing;
+  if (existing.lifecycle_status !== 'provisioned')
+    throw new AgentIdentityLifecycleError(
+      nhiId,
+      'initial activation requires a provisioned identity'
+    );
+  appendGoverned(AGENT_IDENTITY_OPS.identityActivated, {
+    nhi_id: nhiId,
+    activated_at: nowIso(),
+    only_provisioned: true,
+  });
+  const result = requireIdentity(nhiId);
+  if (result.lifecycle_status !== 'active')
+    throw new AgentIdentityLifecycleError(nhiId, 'identity stopped during initial activation');
+  return result;
 }
 
 /** Governed. provisioned/active -> suspended. Idempotent when already suspended. Retired is terminal. */

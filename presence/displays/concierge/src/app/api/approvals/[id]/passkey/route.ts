@@ -1,4 +1,5 @@
 import { scopedLearningApprovalVisibleToViewer } from '../../../../../lib/scoped-learning-approval-visibility';
+import { onboardingApprovalMember } from '../../../../../lib/onboarding-authority-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
@@ -80,9 +81,14 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (!scopedLearningApprovalVisibleToViewer(record, resolved.context))
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     const resourceTenant = approvalResourceTenant(record);
-    const decisionDenied = conciergeDecisionDenied(resolved.context, resourceTenant);
+    const onboardingMember = onboardingApprovalMember(resolved.context, record);
+    if (onboardingMember === null)
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
+    const decisionDenied = onboardingMember
+      ? null
+      : conciergeDecisionDenied(resolved.context, resourceTenant);
     if (decisionDenied) return decisionDenied;
-    const member = conciergePasskeyMember(resolved.context, resourceTenant);
+    const member = onboardingMember ?? conciergePasskeyMember(resolved.context, resourceTenant);
     if (!member) return passkeyUnavailable('member_required');
     const rp = conciergeRelyingParty(req);
     if (!rp) return passkeyUnavailable('origin_not_configured');

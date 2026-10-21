@@ -4100,6 +4100,22 @@
       "types": "./dist/organization/onboarding-context.d.ts",
       "default": "./dist/organization/onboarding-context.js"
     },
+    "./organization/onboarding-authority": {
+      "types": "./dist/organization/onboarding-authority.d.ts",
+      "default": "./dist/organization/onboarding-authority.js"
+    },
+    "./organization/onboarding-authority-runtime": {
+      "types": "./dist/organization/onboarding-authority-runtime.d.ts",
+      "default": "./dist/organization/onboarding-authority-runtime.js"
+    },
+    "./organization/onboarding-runtime-identity": {
+      "types": "./dist/organization/onboarding-runtime-identity.d.ts",
+      "default": "./dist/organization/onboarding-runtime-identity.js"
+    },
+    "./personal-identity-state": {
+      "types": "./dist/personal-identity-state.d.ts",
+      "default": "./dist/personal-identity-state.js"
+    },
     "./organization/onboarding-flow-policy": {
       "types": "./dist/organization/onboarding-flow-policy.d.ts",
       "default": "./dist/organization/onboarding-flow-policy.js"

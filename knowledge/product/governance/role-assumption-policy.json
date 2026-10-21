@@ -15,6 +15,7 @@
       "peer_catalog_reader",
       "peer_responder_reader",
       "peer_task_artifact_writer",
+      "person_charter_store",
       "scope_locale_reader",
       "slack_bridge",
       "surface_runtime",

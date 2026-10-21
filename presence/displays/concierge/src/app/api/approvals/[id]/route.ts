@@ -1,4 +1,5 @@
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
+import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   decideApprovalRequest,
@@ -75,9 +76,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       requesterContext?.tenant_slug ||
       requesterContext?.tenantSlug ||
       loopContext?.tenant_slug;
-    const decisionDenied = conciergeDecisionDenied(resolved.context, resourceTenant);
+    const onboardingMember = onboardingApprovalMember(resolved.context, record);
+    if (onboardingMember === null)
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
+    const decisionDenied = onboardingMember
+      ? null
+      : conciergeDecisionDenied(resolved.context, resourceTenant);
     if (decisionDenied) return decisionDenied;
-    const decidedBy = resolveConciergeDecidedBy(resolved.context, resourceTenant);
+    const decidedBy =
+      onboardingMember ?? resolveConciergeDecidedBy(resolved.context, resourceTenant);
     const updated = decideApprovalRequest('sovereign_concierge', {
       channel,
       storageChannel,

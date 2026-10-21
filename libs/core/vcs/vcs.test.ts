@@ -1,15 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { safeMkdir, safeWriteFile, safeRmSync } from '../secure-io.js';
+import { resolveStorageFloor } from '../storage-layout.js';
+const bodyPath = resolveStorageFloor(
+  'scratch',
+  { kind: 'tier', tier: 'public' },
+  'vcs-test',
+  randomUUID(),
+  'body.md'
+);
+beforeAll(() => {
+  safeMkdir(path.dirname(bodyPath), { recursive: true });
+  safeWriteFile(bodyPath, 'captured review body');
+});
+afterAll(() => safeRmSync(path.dirname(bodyPath), { recursive: true, force: true }));
 vi.mock('./external-vcs.js', () => ({
   governVcsCommand: (_operation: string, _effect: object, execute: () => unknown) => execute(),
 }));
-vi.mock('../secure-io.js', async (original) => {
-  const actual = await original<typeof import('../secure-io.js')>();
-  return {
-    ...actual,
-    safeReadFile: (file: string, options?: Parameters<typeof actual.safeReadFile>[1]) =>
-      file === '/tmp/b.md' ? 'captured review body' : actual.safeReadFile(file, options),
-  };
-});
 import {
   ghPrChecks,
   ghPrChecksWait,
@@ -213,7 +221,7 @@ describe('libs/core/vcs', () => {
       {
         title: 'T',
         body: 'ignored',
-        bodyFile: '/tmp/b.md',
+        bodyFile: bodyPath,
         base: 'main',
         head: 'f/x',
         draft: true,
