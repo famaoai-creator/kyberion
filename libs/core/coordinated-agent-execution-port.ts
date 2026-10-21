@@ -15,6 +15,8 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { parseActorRef } from './actor.js';
+import { withActorContext } from './actor-context.js';
 import {
   clampPolicyToRuntimeTier,
   currentScopeEnvelope,
@@ -153,9 +155,20 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
     const attemptId = claimed.item.current_attempt_id;
     let receipt: AgentExecutionReceipt;
     try {
+      const delegate = () => this.delegatePort.delegate(request);
+      // Only a canonical claim holder is attributed. A legacy peer label is
+      // never promoted to a human or to the requested child's identity.
+      const actor = parseActorRef({
+        kind: this.actorPeerId.startsWith('user:') ? 'human' : 'agent',
+        id: this.actorPeerId,
+      });
       receipt = envelope
-        ? await withScopeEnvelope(envelope, () => this.delegatePort.delegate(request))
-        : await this.delegatePort.delegate(request);
+        ? await withScopeEnvelope(envelope, () =>
+            actor
+              ? withActorContext({ actor, scope: envelope.identity, provenance: 'claim' }, delegate)
+              : delegate()
+          )
+        : await delegate();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(

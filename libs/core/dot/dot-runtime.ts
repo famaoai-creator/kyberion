@@ -1,3 +1,4 @@
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
   assertEventContinuationOutput,
   claimEventContinuation,
@@ -103,7 +104,7 @@ import {
 
 const logger = createLogger('dot-runtime');
 
-export const DOT_WAKE_LEDGER_PATH = 'active/shared/runtime/dot-wake-ledger.jsonl';
+export const DOT_WAKE_LEDGER_PATH = runtimeStatePath('dot.wakeLedger').logicalPath;
 export const DOT_TOKEN_USAGE_PATH = 'active/shared/runtime/dot-token-usage.jsonl';
 export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json';
 export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';

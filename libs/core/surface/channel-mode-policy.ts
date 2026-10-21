@@ -86,7 +86,7 @@ export interface ChannelModePolicy {
 }
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const TIER_RANK: Record<TierLevel, number> = { public: 1, confidential: 2, personal: 3 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 function isSafeRecord(value: unknown): value is Record<string, unknown> {
   return (

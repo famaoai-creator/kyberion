@@ -227,6 +227,8 @@ const RATE_LIMIT_DEFAULT_GET = 180;
 const RATE_LIMIT_DEFAULT_MUTATION = 60;
 
 const computerSurfaceRateLimiter = rateLimit({
+  // Retain Express's draft-8 headers/IP normalization and this API's established
+  // 429 response; framework-neutral windows do not implement that adapter contract.
   windowMs: Number(
     getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
   ),

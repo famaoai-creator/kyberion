@@ -139,6 +139,8 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     for (const rel of [
       'knowledge/product/governance/surface-provider-manifests.json',
       'knowledge/product/schemas/surface-provider-manifests.schema.json',
+      'knowledge/product/governance/runtime-control-policy.json',
+      'knowledge/product/schemas/runtime-control-policy.schema.json',
     ]) {
       fs.mkdirSync(path.dirname(path.join(tmpRoot, rel)), { recursive: true });
       fs.copyFileSync(path.join(REPO_ROOT, rel), path.join(tmpRoot, rel));

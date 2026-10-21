@@ -4,6 +4,8 @@
  * Implements the closed-loop between Phase 4 (Execution) and Phase 5 (Review/Distillation).
  */
 import { logger } from '../core.js';
+import { createFailureTracker } from '../failure-tracker.js';
+import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import {
@@ -174,7 +176,7 @@ export function loadFeedbackHintsAtPath(filePath: string): KnowledgeHint[] {
  */
 export function checkScheduleHealth(
   scheduleId: string,
-  maxConsecutiveFailures: number = 3,
+  maxConsecutiveFailures: number = loadRuntimeControlPolicy().schedule_failures.threshold,
   registryOptions: PipelineSchedulerOptions = {}
 ): {
   healthy: boolean;
@@ -189,7 +191,13 @@ export function checkScheduleHealth(
 
     const failCount = schedule.consecutiveFailures || 0;
 
-    if (failCount >= maxConsecutiveFailures) {
+    if (
+      createFailureTracker({
+        threshold: maxConsecutiveFailures,
+        reset: 'never',
+        action: 'disable',
+      }).decision({ count: failCount }).exceeded
+    ) {
       // Auto-disable
       schedule.enabled = false;
       schedule.disabledReason = `Auto-disabled after ${failCount} consecutive failures`;
@@ -317,11 +325,19 @@ export function recordPipelineResult(
     schedule.lastRun = nowIso();
     schedule.lastStatus = status;
 
-    if (status === 'failed') {
-      schedule.consecutiveFailures = (schedule.consecutiveFailures || 0) + 1;
-    } else {
-      schedule.consecutiveFailures = 0;
-    }
+    const failurePolicy = loadRuntimeControlPolicy().schedule_failures;
+    schedule.consecutiveFailures = createFailureTracker({
+      threshold: failurePolicy.threshold,
+      reset: failurePolicy.reset,
+      action: failurePolicy.action,
+      resetOnSuccess: failurePolicy.reset_on_success,
+    }).transition(
+      { count: schedule.consecutiveFailures || 0 },
+      {
+        kind: status === 'failed' ? 'failure' : 'success',
+        now: Date.now(),
+      }
+    ).count;
 
     saveScheduleRegistry(registry, registryOptions);
 
@@ -334,7 +350,7 @@ export function recordPipelineResult(
     }
 
     // Check health after recording
-    checkScheduleHealth(scheduleId, 3, registryOptions);
+    checkScheduleHealth(scheduleId, failurePolicy.threshold, registryOptions);
   } catch (e: any) {
     logger.error(`[FEEDBACK] Failed to record result: ${e.message}`);
   }

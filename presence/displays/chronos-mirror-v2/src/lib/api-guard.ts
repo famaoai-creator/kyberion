@@ -59,10 +59,11 @@ export function resolveChronosTokenRegistration(token: string): ChronosTokenRegi
   return findChronosTokenRegistration(token, loadChronosTokenRegistrations());
 }
 
-// In-memory rate limit store
-const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT_MAX = 3000; // requests
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
+import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
+
+// Bounded in-memory windows; a new key cannot evict a live denied client.
+let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 
 function getClientIP(req: NextRequest): string {
   return (
@@ -93,14 +94,14 @@ export function isChronosLoopbackRequest(req: NextRequest): boolean {
 }
 
 function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  let entry = rateLimitStore.get(ip);
-  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
-    entry = { count: 0, windowStart: now };
-  }
-  entry.count++;
-  rateLimitStore.set(ip, entry);
-  return entry.count <= RATE_LIMIT_MAX;
+  const policy = loadRuntimeControlPolicy().chronos;
+  rateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+    expireAtBoundary: false,
+  });
+  return rateLimiter.take(ip, policy.limit).allowed;
 }
 
 /**

@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 import { currentScope } from '@agent/core/scope-context';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
@@ -27,10 +29,7 @@ import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-au
 import { toWireError } from '@agent/core/wire-error';
 import { conciergePeerAddress, isLoopbackPeer } from './loopback-peer';
 
-const CONCIERGE_RATE_LIMIT_WINDOW_MS = 60_000;
-const CONCIERGE_RATE_LIMIT_GET = 180;
-const CONCIERGE_RATE_LIMIT_MUTATION = 60;
-const conciergeRateLimitStore = new Map<string, { count: number; windowStart: number }>();
+let conciergeRateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const conciergeRateLimitedRequests = new WeakSet<object>();
 
 export interface ConciergeViewerContext {
@@ -114,24 +113,24 @@ export function checkConciergeRateLimit(
     key?: string;
   }
 ): { ok: boolean; retryAfterSeconds?: number } {
+  const policy = loadRuntimeControlPolicy().concierge;
+  conciergeRateLimiter ??= fixedWindowLimiter({
+    windowMs: policy.window_ms,
+    maxKeys: policy.max_keys,
+    eviction: 'deny',
+  });
   const method = String(req.method || 'GET').toUpperCase();
   const limit =
     options?.limit ??
-    (method === 'GET' || method === 'HEAD'
-      ? CONCIERGE_RATE_LIMIT_GET
-      : CONCIERGE_RATE_LIMIT_MUTATION);
-  const windowMs = options?.windowMs ?? CONCIERGE_RATE_LIMIT_WINDOW_MS;
+    (method === 'GET' || method === 'HEAD' ? policy.read_limit : policy.mutation_limit);
+  const windowMs = options?.windowMs ?? policy.window_ms;
   const now = Date.now();
   const key = options?.key ? `${options.key}:${method}` : conciergeRateLimitKey(req);
-  const current = conciergeRateLimitStore.get(key);
-  const expired = !current || now - current.windowStart >= windowMs;
-  const windowStart = expired ? now : current.windowStart;
-  const count = expired ? 1 : current.count + 1;
-  conciergeRateLimitStore.set(key, { count, windowStart });
-  if (count <= limit) return { ok: true };
+  const decision = conciergeRateLimiter.take(key, limit, now, windowMs);
+  if (decision.allowed === true) return { ok: true };
   return {
     ok: false,
-    retryAfterSeconds: Math.max(1, Math.ceil((windowMs - (now - windowStart)) / 1000)),
+    retryAfterSeconds: Math.max(1, Math.ceil(decision.retryAfterMs / 1000)),
   };
 }
 

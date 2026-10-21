@@ -42,7 +42,7 @@ interface ChannelMemoryFile {
 
 export const CHANNEL_MEMORY_LIMITS = Object.freeze({ maxEntries: 30, maxTextLength: 500 });
 
-const TIER_RANK: Record<TierLevel, number> = { public: 1, confidential: 2, personal: 3 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '../foundation/knowledge-tier.js';
 
 function safeSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]/g, '_');

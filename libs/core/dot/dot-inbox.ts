@@ -1,3 +1,4 @@
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 /**
  * dot-inbox producer — the write side of the durable wake lane.
  *
@@ -294,7 +295,7 @@ export const DOT_INBOX_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
 /** Orphaned rows (match no current charter) tombstone only past this age. */
 export const DOT_INBOX_ORPHAN_TOMBSTONE_MS = 30 * 24 * 60 * 60 * 1000;
 const DOT_INBOX_TOMBSTONE = '{"tombstone":true}';
-export const DOT_WAKE_LEDGER_REL = 'active/shared/runtime/dot-wake-ledger.jsonl';
+export const DOT_WAKE_LEDGER_REL = runtimeStatePath('dot.wakeLedger').logicalPath;
 
 export interface DotInboxCompactResult {
   tombstoned: number;

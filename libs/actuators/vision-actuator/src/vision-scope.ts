@@ -15,7 +15,7 @@ import { tenantOfPath } from '@agent/core/video/ingest';
  * everything derived from the image stays inside that mission's directory.
  */
 
-const TIER_RANK: Record<PayloadTier, number> = { public: 0, confidential: 1, personal: 2 };
+import { KNOWLEDGE_TIER_RANK as TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 
 export type MissionPathResolver = (missionId: string) => string | null;
 

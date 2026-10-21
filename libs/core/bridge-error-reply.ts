@@ -1,6 +1,8 @@
 import { buildUserFacingError } from './error-classifier.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { logger } from './core.js';
+import { fixedWindowLimiter } from './rate-limit.js';
+import { loadRuntimeControlPolicy } from './runtime-control-policy.js';
 
 /**
  * Shared error/empty-reply presentation for text bridges (UX-01 Task 3).
@@ -33,8 +35,18 @@ export function buildBridgeEmptyReplyText(opts: { locale?: string } = {}): strin
     .join('\n');
 }
 
-const DEFAULT_ERROR_POST_INTERVAL_MS = 60_000;
-const lastErrorPostAtByConversation = new Map<string, number>();
+let errorPostLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
+function bridgeErrorLimiter() {
+  if (!errorPostLimiter) {
+    const policy = loadRuntimeControlPolicy().bridge_errors;
+    errorPostLimiter = fixedWindowLimiter({
+      windowMs: policy.window_ms,
+      maxKeys: policy.max_keys,
+      eviction: 'deny',
+    });
+  }
+  return errorPostLimiter;
+}
 
 /**
  * Rate limit for error postings: at most one error message per conversation
@@ -44,21 +56,13 @@ const lastErrorPostAtByConversation = new Map<string, number>();
 export function shouldPostBridgeError(
   conversationKey: string,
   nowMs: number = Date.now(),
-  intervalMs: number = DEFAULT_ERROR_POST_INTERVAL_MS
+  intervalMs: number = loadRuntimeControlPolicy().bridge_errors.window_ms
 ): boolean {
-  const last = lastErrorPostAtByConversation.get(conversationKey);
-  if (last !== undefined && nowMs - last < intervalMs) return false;
-  lastErrorPostAtByConversation.set(conversationKey, nowMs);
-  // Bounded memory: drop oldest entries past a sane cap.
-  if (lastErrorPostAtByConversation.size > 1000) {
-    const oldestKey = lastErrorPostAtByConversation.keys().next().value;
-    if (oldestKey !== undefined) lastErrorPostAtByConversation.delete(oldestKey);
-  }
-  return true;
+  return bridgeErrorLimiter().take(conversationKey, 1, nowMs, intervalMs).allowed;
 }
 
 export function resetBridgeErrorRateLimiter(): void {
-  lastErrorPostAtByConversation.clear();
+  errorPostLimiter?.clear();
 }
 
 /**

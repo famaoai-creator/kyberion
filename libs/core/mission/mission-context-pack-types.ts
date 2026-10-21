@@ -10,15 +10,8 @@ import type { TaskSession } from '../task/task-session.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
 
 export type MissionTier = 'personal' | 'confidential' | 'public';
-export type MissionStatus =
-  | 'planned'
-  | 'active'
-  | 'validating'
-  | 'distilling'
-  | 'completed'
-  | 'paused'
-  | 'failed'
-  | 'archived';
+import type { MissionStatus } from './mission-status.js';
+export type { MissionStatus } from './mission-status.js';
 export type MissionContextRecipientKind =
   'agent' | 'subagent' | 'reviewer' | 'operator' | 'planner' | 'tester';
 export type MissionContextDeliveryMode = 'prompt' | 'artifact';

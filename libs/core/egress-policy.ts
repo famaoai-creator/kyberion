@@ -66,11 +66,7 @@ let cachedPolicy: EgressPolicyFile | null = null;
 let cachedAllowedDomains: string[] | null = null;
 const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
-const EGRESS_TIER_ORDER: Record<'public' | 'confidential' | 'personal', number> = {
-  public: 0,
-  confidential: 1,
-  personal: 2,
-};
+import { KNOWLEDGE_TIER_RANK as EGRESS_TIER_ORDER } from './foundation/knowledge-tier.js';
 
 const policyCatalog = defineCatalog<EgressPolicyFile>({
   id: 'egress-policy',
@@ -522,11 +518,7 @@ export function evaluateEgressPolicy(
   const tier = context?.tier;
   const provenance = context?.provenance;
   if (provenance) {
-    const provenanceRank: Record<'public' | 'confidential' | 'personal', number> = {
-      public: 0,
-      confidential: 1,
-      personal: 2,
-    };
+    const provenanceRank = EGRESS_TIER_ORDER;
     const requestedTier = tier || provenance.highestTier;
     const wrongTenant = Boolean(
       provenance.tenants.length > 0 &&

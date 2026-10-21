@@ -1,0 +1,26 @@
+{
+  "$schema": "../schemas/runtime-control-policy.schema.json",
+  "version": 1,
+  "surface_auth": {
+    "window_ms": 60000,
+    "client_limit": 120,
+    "surface_limit": 600,
+    "max_keys": 5000
+  },
+  "concierge": { "window_ms": 60000, "read_limit": 180, "mutation_limit": 60, "max_keys": 5000 },
+  "presence_studio": {
+    "window_ms": 60000,
+    "read_limit": 180,
+    "mutation_limit": 60,
+    "max_keys": 5000
+  },
+  "chronos": { "window_ms": 60000, "limit": 3000, "max_keys": 5000 },
+  "bridge_errors": { "window_ms": 60000, "max_keys": 1000 },
+  "operator_notifications": { "window_ms": 600000, "max_keys": 1000 },
+  "schedule_failures": {
+    "threshold": 3,
+    "reset": "never",
+    "reset_on_success": true,
+    "action": "disable"
+  }
+}
