@@ -2,7 +2,9 @@ import { parseExecutionFeedbackText } from '@agent/core/execution-feedback';
 import { currentScope } from '@agent/core/scope-context';
 import { nowIso } from '@agent/core/foundation';
 import type { SupportedLocale } from '@agent/core/locale';
+import { t } from '@agent/core/t';
 import { normalizeEventScope } from '@agent/core/event-scope';
+import { ingestAskIntake, type AskIntakeResult } from '@agent/core/dot/dot-event-intake';
 import type { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 
 /** Scope options must never be silently ignored in favor of ambient selection. */
@@ -40,6 +42,37 @@ export function assertAskScopeOptionsSupported(args: string[]): void {
       '[SURFACE_CLI_SCOPE_FLAGS_UNSUPPORTED] ask uses the selected scope; select it with pnpm scope use before asking instead of passing scope flags.'
     );
   }
+}
+
+/**
+ * Scoped non-feedback ask → one intake event for the selected organization's
+ * active dot. Tenant/organization come from the selected scope only. Returns
+ * null when no charter accepts it, so the caller keeps refusing the ask.
+ */
+export function ingestScopedAskIntake(
+  text: string
+): Exclude<AskIntakeResult, { status: 'no_intake' }> | null {
+  const selected = currentScope();
+  if (!selected.tenant_slug || !selected.organization_id) return null;
+  if (parseExecutionFeedbackText(text)) return null;
+  const receipt = ingestAskIntake({ text, scope: normalizeEventScope(selected) });
+  return receipt.status === 'no_intake' ? null : receipt;
+}
+
+/** The printed receipt for a scoped ask taken as a dot intake event, or null. */
+export function scopedAskIntakeReceipt(
+  text: string,
+  json: boolean,
+  locale: SupportedLocale
+): string | null {
+  const intake = ingestScopedAskIntake(text);
+  if (!intake) return null;
+  if (json) return JSON.stringify({ dotIntake: intake }, null, 2);
+  return t(
+    intake.status === 'duplicate' ? 'dot_ask:intake_duplicate' : 'dot_ask:intake_accepted',
+    { dot_id: intake.dot_id, event_id: intake.event_id },
+    locale
+  );
 }
 
 /** Bind feedback to the selected scope, never to yargs' default public tier. */

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { assertWorkClaimsAllowed } from '@agent/core/workforce/work-coordination-error';
 import {
   findDotCharter,
@@ -38,6 +39,8 @@ import {
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
   DotExecutorPreEffectError,
+  DotExecutorStaleAttemptError,
+  isDotExecutorPreEffectError,
   DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   runDotExecutorSweep,
   type DotExecutorDeps,
@@ -60,6 +63,10 @@ import { runGoalDrivenLoop } from '@agent/core/workforce/worker-goal-driver';
 import type { DotSupervisorStep } from './dot_supervisor_extensions.js';
 
 const logger = createLogger('dot-executor-step');
+
+const DOT_PIPELINE_ATTEMPT_STALE = 'dot pipeline attempt is no longer current';
+/** Message of assertWorkClaimsAllowed while operations are halted. */
+const DOT_CLAIMS_HALTED = 'operations are halted';
 
 export interface DotExecutorStepDeps extends DotExecutorDeps {
   /** Process backend (test seam); defaults to getReasoningBackend(). */
@@ -143,7 +150,8 @@ async function defaultExecutePipeline(
   deps: DotExecutorStepDeps = {},
   assertExecutionCurrent?: () => void
 ): ReturnType<DotExecutorPorts['runPipeline']> {
-  const { executePipelineFile } = await import('./pipeline-execution-part-results.js');
+  const { executePipelineFile, isPipelineNotStartedError } =
+    await import('./pipeline-execution-part-results.js');
   try {
     // Preflight: a missing or invalid pipeline fails before any step runs.
     const { readValidatedWorkflowAdf } = await import('./refactor/adf-input.js');
@@ -168,6 +176,22 @@ async function defaultExecutePipeline(
       throw new DotExecutorPreEffectError('front-desk pipeline input binding changed');
   }
   const diagnostic = isFrontDeskDiagnosticDot(charter);
+  if (!diagnostic) {
+    // The delegated run journal is its first durable write; refuse before any hook or step.
+    const { assertPipelineRunJournalCreatable } =
+      await import('@agent/core/pipeline/pipeline-run-journal');
+    try {
+      assertPipelineRunJournalCreatable(`preflight-${randomUUID()}`, {
+        tier: charter.scope.tier,
+        tenantSlug: charter.scope.tenant_slug,
+      });
+    } catch (error) {
+      throw new DotExecutorPreEffectError(
+        `pipeline '${ref}' refused before start: ${error instanceof Error ? error.message : String(error)}`,
+        { retryable: false }
+      );
+    }
+  }
   const result = await executePipelineFile(ref, {
     assertExecutionCurrent,
     ...(diagnostic
@@ -212,6 +236,18 @@ async function defaultExecutePipeline(
       ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
       purpose: `dot ${charter.dot_id} pipeline ${ref}`,
     },
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    // The executor lost its claim: it must not record anything for this item.
+    if (message.includes(DOT_PIPELINE_ATTEMPT_STALE))
+      throw new DotExecutorStaleAttemptError(`pipeline '${ref}' stopped: ${message}`);
+    // Failed before any lifecycle hook or step ran: no effect is possible. A
+    // claims halt is an operator decision, so it ends the item instead of retrying.
+    if (isPipelineNotStartedError(error) && !isDotExecutorPreEffectError(error))
+      throw new DotExecutorPreEffectError(`pipeline '${ref}' did not start: ${message}`, {
+        retryable: !message.includes(DOT_CLAIMS_HALTED),
+      });
+    throw error;
   });
   if (result.status === 'suspended')
     return {
@@ -354,7 +390,7 @@ export function buildDotExecutorPorts(
           item.lease_id !== ctx.lease_id ||
           item.status !== 'in_progress'
         )
-          throw new Error('dot pipeline attempt is no longer current');
+          throw new Error(DOT_PIPELINE_ATTEMPT_STALE);
         assertWorkClaimsAllowed(id);
       };
       if (diagnostic && ref !== FRONT_DESK_RECEIPT_PIPELINE)

@@ -140,6 +140,12 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
   return missionPath;
 }
 
+// Seeds a micro-repo, runs implement + review dispatches, and shells out to git
+// for the diff — measured 9.5-13.5s locally against the 10s default, so it fails
+// or passes on machine load alone. Declared per test so the cost stays visible
+// where it is paid rather than by loosening the global bound.
+const CODE_CHANGE_E2E_TIMEOUT_MS = 60_000;
+
 describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, () => {
   // The worker stack is imported once per file, here, and every later
   // `await import` hits the module cache. Re-importing the secure-io /
@@ -198,7 +204,6 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
 
   it(
     'publishes diff.patch + PR.md on implement completion and injects the diff into review',
-    { timeout: 60_000 },
     async () => {
       const missionPath = await seedMission({ withReviewTask: true });
       const { safeWriteFile, safeReadFile, safeExistsSync, safeExec } =
@@ -250,7 +255,8 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
       expect(firstPrompt).toContain('## Mission goal');
       expect(firstPrompt).toContain('Ship the login change safely');
       expect(firstPrompt).toContain('review approves the change');
-    }
+    },
+    CODE_CHANGE_E2E_TIMEOUT_MS
   );
 
   it('blocks a code_change plan without a review task as a planner contract violation', async () => {

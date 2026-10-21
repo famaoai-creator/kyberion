@@ -93,10 +93,6 @@
       "reason": "OW-05 example pipeline: the runnable caller of browser:action_trail / export_failure_bundle (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
     {
-      "id": "pipelines/ceo-strategic-report.json",
-      "reason": "Scenario pipeline documented in docs/SCENARIOS.md and the ADF pipeline strategy/validation reports; run by hand, nothing schedules or invokes it."
-    },
-    {
       "id": "pipelines/chaos-actuator-down.json",
       "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (actuator failure \u2192 fallback); intentionally not scheduled."
     },
@@ -117,14 +113,6 @@
       "reason": "OW-05 example pipeline: the runnable caller of modeling:asset_inventory_to_ledger (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
     {
-      "id": "pipelines/generate-design-system-demo.json",
-      "reason": "Diagnostic deck exercising every slide-layout preset (pipelines/README.md); run by hand when the design system changes."
-    },
-    {
-      "id": "pipelines/generate-masterclass-pptx.json",
-      "reason": "Layout sample deck from pipelines/fragments/masterclass_design_protocol.json (pipelines/README.md); run by hand."
-    },
-    {
       "id": "pipelines/incident-review.json",
       "reason": "OW-05 example pipeline: the runnable caller of system:list_incidents / sre_analyze (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
@@ -135,14 +123,6 @@
     {
       "id": "pipelines/kyberion-autonomous-onboarding.json",
       "reason": "LLM-drafted organization profile and interview questions (pipelines/README.md 'Onboarding & Provisioning' row); run by hand. `pnpm onboard` runs scripts/onboarding.ts and never loads this pipeline (README corrected 2026-10-01)."
-    },
-    {
-      "id": "pipelines/kyberion-product-intro.json",
-      "reason": "Local narrated product-intro video (pipelines/README.md); scripts/kyberion_product_intro_render.ts renders the same flow directly, the pipeline is the ADF form run by hand."
-    },
-    {
-      "id": "pipelines/media-produce-and-review.json",
-      "reason": "MP-01..07 deck flow (brief \u2192 protocol \u2192 preflight \u2192 render \u2192 review \u2192 delivery gate) run by hand per pipelines/README.md with --context overrides."
     },
     {
       "id": "pipelines/media-review-fix-validation.json",
@@ -207,10 +187,6 @@
     {
       "id": "pipelines/test-inventory-device-pipeline.json",
       "reason": "OW-05 example pipeline: the runnable caller of modeling:test_inventory_to_device_pipeline (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
-    },
-    {
-      "id": "pipelines/trial-narrated-report.json",
-      "reason": "Trial narrated report quickstart (docs/user/USE_CASE_QUICKSTARTS.md and the ADF simplification proposals); run by hand."
     }
   ],
   "actuator_ops": [
@@ -241,6 +217,10 @@
     {
       "id": "browser:scroll_ref",
       "reason": "Browser v3 surface op listed in browser-automation-pipeline.schema.json: the step handler is in browser-pipeline-helpers.ts and browser-interaction-helpers.ts records a scroll on a ref target as `scroll_ref`. It needs a snapshot ref, so no static example ADF can call it; tests only list it in the catalog (browser-phase3.test.ts)."
+    },
+    {
+      "id": "code:discover_capabilities",
+      "reason": "Discovery helper whose only ADF callers were retired with the governance pipelines on this branch; kept registered so capability discovery stays reachable from ad-hoc ADFs."
     },
     {
       "id": "code:regex_replace",
@@ -275,6 +255,10 @@
       "reason": "Generic pipeline step `set` (also registered by android, ios and secret) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
+      "id": "modeling:ajv_validate",
+      "reason": "Only ADF caller was modeling-validate.json, retired to retired/governance-pipelines/ in this branch's retirement wave; the op stays registered for schema checks invoked from ad-hoc ADFs."
+    },
+    {
       "id": "modeling:glob_files",
       "reason": "Generic pipeline step `glob_files` (also registered by code, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
@@ -283,8 +267,24 @@
       "reason": "Generic pipeline step `if` (also registered by browser, code, file, network, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
+      "id": "modeling:json_query",
+      "reason": "Only ADF caller was modeling-graph.json, retired to retired/governance-pipelines/ in this branch's retirement wave; the op stays registered in the modeling actuator catalog for ad-hoc ADFs."
+    },
+    {
+      "id": "modeling:mermaid_gen",
+      "reason": "Only ADF caller was modeling-graph.json, retired to retired/governance-pipelines/ in this branch's retirement wave; the op stays registered in the modeling actuator catalog for ad-hoc ADFs."
+    },
+    {
       "id": "modeling:read_file",
       "reason": "Generic pipeline step `read_file` (also registered by code, file, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "modeling:write_artifact",
+      "reason": "Lost its last ADF caller in this branch's governance-pipeline retirement wave; kept registered as the modeling actuator's artifact sink."
+    },
+    {
+      "id": "modeling:write_file",
+      "reason": "Lost its last ADF caller in this branch's governance-pipeline retirement wave; kept registered as the modeling actuator's file sink."
     },
     {
       "id": "network:llm_decide",
@@ -384,7 +384,11 @@
     },
     {
       "id": "wisdom:write_artifact",
-      "reason": "Forwarding alias wisdom \u2192 file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom → file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:write_file",
+      "reason": "Lost its last ADF caller in this branch's governance-pipeline retirement wave; kept registered as the wisdom actuator's file sink."
     }
   ]
 }

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A2UI Host</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="pane pane-sources">
+        <header class="pane-head">
+          <h1 class="app-title" id="app-title"></h1>
+          <p class="app-subtitle" id="app-subtitle"></p>
+          <label class="field">
+            <span class="field-label" id="tenant-label"></span>
+            <input type="text" id="tenant" class="input" autocomplete="off" spellcheck="false" />
+          </label>
+        </header>
+
+        <section class="block">
+          <h2 class="block-title" id="sources-title"></h2>
+          <div id="providers" class="providers"></div>
+        </section>
+
+        <section class="block">
+          <h2 class="block-title" id="path-title"></h2>
+          <form id="path-form" class="path-form">
+            <select id="path-provider" class="input"></select>
+            <input
+              type="text"
+              id="path-input"
+              class="input"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="submit" id="path-load" class="button button-primary"></button>
+          </form>
+          <label class="check">
+            <input type="checkbox" id="auto-refresh" />
+            <span id="auto-refresh-label"></span>
+          </label>
+        </section>
+
+        <section class="block">
+          <h2 class="block-title" id="paste-title"></h2>
+          <textarea id="paste-input" class="input textarea" rows="6" spellcheck="false"></textarea>
+          <div class="row">
+            <button type="button" id="paste-apply" class="button"></button>
+            <button type="button" id="clear-all" class="button button-ghost"></button>
+          </div>
+          <p id="paste-error" class="note note-error" role="alert" hidden></p>
+        </section>
+      </aside>
+
+      <main class="pane pane-stage">
+        <header class="stage-head">
+          <div id="tabs" class="tabs" role="tablist"></div>
+          <p id="status" class="status" role="status"></p>
+        </header>
+        <div id="canvas" class="canvas"></div>
+        <form id="input-form" class="input-form" hidden>
+          <input type="text" id="input-text" class="input" autocomplete="off" />
+          <button type="submit" id="input-send" class="button button-primary"></button>
+        </form>
+      </main>
+
+      <aside class="pane pane-inspector">
+        <h2 class="block-title" id="inspector-title"></h2>
+        <section class="block">
+          <h3 class="block-sub" id="report-title"></h3>
+          <div id="report"></div>
+        </section>
+        <section class="block">
+          <h3 class="block-sub" id="actions-title"></h3>
+          <div id="actions" class="chips"></div>
+        </section>
+        <section class="block">
+          <h3 class="block-sub" id="data-title"></h3>
+          <div id="data"></div>
+        </section>
+        <section class="block">
+          <h3 class="block-sub" id="tree-title"></h3>
+          <ul id="tree" class="tree"></ul>
+        </section>
+        <section class="block">
+          <h3 class="block-sub" id="history-title"></h3>
+          <ol id="history" class="hist"></ol>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/js/app/main.js"></script>
+  </body>
+</html>

@@ -31,6 +31,7 @@ import {
   dotWakeBackoffMs,
   evaluateDotWakeCircuit,
   normalizeDotWakeReason,
+  classifyDotWakeReason,
   recordDotWakeOutcome,
   compactDotWakeLedger,
   DOT_WAKE_CIRCUIT_THRESHOLD,
@@ -174,6 +175,38 @@ describe('evaluateDotTriggersDue', () => {
   });
 });
 
+describe('classified wake failure reasons', () => {
+  it.each([
+    ['delegated wake exceeded wall_clock budget 900000ms', 'wall_clock_exceeded'],
+    [
+      '[reasoning-backend:failover] delegateTask failed across 2 candidate(s): codex-cli: x',
+      'provider_failover_exhausted',
+    ],
+    [
+      '[GOAL_DRIVER] backend lacks generateWithTools — a goal loop needs a tool-use backend',
+      'no_tool_backend',
+    ],
+    ['backend unavailable', 'backend_unavailable'],
+    ['charter unreadable', 'charter'],
+    ['something else broke', 'wake'],
+  ])('classifies %s', (reason, code) => {
+    expect(classifyDotWakeReason(reason)).toBe(code);
+  });
+
+  it('writes reason_code on a failed wake and keeps the reason text', () => {
+    const deps = { rootDir: TEST_ROOT, now: () => new Date(Date.UTC(2026, 9, 21, 6)) };
+    const reason = 'delegated wake exceeded wall_clock budget 900000ms';
+    recordDotWakeOutcome(
+      CHARTER,
+      { key: 'cron:reason-code@1', trigger: { kind: 'cron' } } as never,
+      'failed',
+      { ...deps, reason }
+    );
+    const row = readDotWakeLedger(deps).find((entry) => entry.trigger_key === 'cron:reason-code@1');
+    expect(row).toMatchObject({ outcome: 'failed', reason, reason_code: 'wall_clock_exceeded' });
+  });
+});
+
 describe('runDotWake', () => {
   it('skips when the charter is no longer active (status race)', async () => {
     writeCharter({ ...CHARTER, status: 'paused' });
@@ -183,6 +216,57 @@ describe('runDotWake', () => {
     );
     expect(receipt.outcome).toBe('skipped');
     expect(receipt.reason).toContain('paused');
+  });
+
+  it('records a wake whose only backend turn outran the wall clock as failed, not delivered', async () => {
+    writeCharter(CHARTER);
+    const trigger = { trigger: CHARTER.attention.triggers[0], key: 'cron:wall-clock@1' };
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        trigger,
+        // The goal driver's wall-clock race: the turn is cancelled, the goal blocked.
+        runLoop: async () => ({
+          finalState: 'blocked',
+          turnsRun: 1,
+          goal: {
+            budgetStats: { tokensUsed: 0 },
+            terminalReason: 'goal budget reached: wall-clock budget 60000ms',
+          },
+        }),
+      }
+    );
+    expect(receipt.outcome).toBe('failed');
+    const row = readDotWakeLedger({ rootDir: TEST_ROOT }).find(
+      (entry) => entry.trigger_key === trigger.key
+    );
+    expect(row).toMatchObject({ outcome: 'failed', reason_code: 'wall_clock_exceeded' });
+    expect(row?.turns_run).toBeUndefined();
+  });
+
+  it('keeps a wall-clock-blocked wake that collected proposals as delivered', async () => {
+    writeCharter(CHARTER);
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async (options) => {
+          options.executeTool!({
+            name: 'dot_propose_action',
+            input: { title: 'Rerun CI', objective: 'Re-run the job.', work_shape: 'task_session' },
+          });
+          return {
+            finalState: 'blocked',
+            turnsRun: 2,
+            goal: { terminalReason: 'goal budget reached: wall-clock budget 60000ms' },
+          };
+        },
+      }
+    );
+    expect(receipt.outcome).toBe('delivered');
   });
 
   it('enforces token_cap_per_day across wakes', async () => {

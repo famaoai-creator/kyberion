@@ -7,6 +7,15 @@ import { governedReasoningProviderEntries } from '../reasoning/__tests__/governe
 primeReasoningProviderRegistryForTests(governedReasoningProviderEntries());
 
 const files = new Map<string, string>();
+const mtimes = new Map<string, number>();
+let writeClock = 0;
+
+/** Every write advances the fake mtime, the way a real filesystem would. */
+function setFile(filePath: string, content: string): void {
+  files.set(filePath, content);
+  mtimes.set(filePath, ++writeClock);
+}
+
 const SCHEMA_PATH = '/repo/knowledge/product/schemas/provider-capabilities.schema.json';
 
 const SCHEMA = {
@@ -58,17 +67,18 @@ vi.mock('../path-resolver.js', async (importOriginal) => {
 vi.mock('../secure-io.js', () => ({
   assertSafeRepositoryPath: (p: string) => p,
   safeExistsSync: (p: string) => files.has(p),
-  safeLstat: () => ({ isFile: () => true, isSymbolicLink: () => false }),
+  safeLstat: (p: string) => ({ isFile: () => files.has(p), isSymbolicLink: () => false }),
   safeReadFile: (p: string) => {
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;
   },
   safeWriteFile: (p: string, data: string) => {
-    files.set(p, data);
+    setFile(p, data);
   },
   safeMkdir: () => undefined,
   safeUnlinkSync: (p: string) => {
     files.delete(p);
+    mtimes.delete(p);
   },
 }));
 
@@ -96,8 +106,14 @@ vi.mock('../foundation/io.js', () => ({
       if (raw === undefined) throw new Error('ENOENT');
       return raw;
     },
-    stat: (filePath: string) => ({ mtimeMs: 0, size: files.get(filePath)?.length || 0 }),
-    writeFile: (filePath: string, content: string) => files.set(filePath, content),
+    // A real filesystem bumps mtime on every write; the governed catalog keys
+    // its in-memory cache on `${mtimeMs}:${size}`, so a frozen mtime would let
+    // one test's cached catalog leak into the next.
+    stat: (filePath: string) => ({
+      mtimeMs: mtimes.get(filePath) ?? 0,
+      size: files.get(filePath)?.length || 0,
+    }),
+    writeFile: (filePath: string, content: string) => setFile(filePath, content),
   }),
   registerFoundationIo: vi.fn(),
 }));
@@ -107,6 +123,7 @@ const CATALOG = '/repo/knowledge/product/orchestration/provider-capabilities.jso
 describe('mergeProbedCapabilitiesIntoCatalog (probe -> knowledge loop)', () => {
   beforeEach(async () => {
     files.clear();
+    mtimes.clear();
     const { clearProviderDiscoveryCache } = await import('./provider-discovery.js');
     clearProviderDiscoveryCache();
   });
@@ -123,7 +140,7 @@ describe('mergeProbedCapabilitiesIntoCatalog (probe -> knowledge loop)', () => {
   });
 
   it('union-merges without destroying manually-curated capabilities', async () => {
-    files.set(
+    setFile(
       CATALOG,
       JSON.stringify({
         version: '1.0',
@@ -160,7 +177,7 @@ describe('mergeProbedCapabilitiesIntoCatalog (probe -> knowledge loop)', () => {
   });
 
   it('replace mode overwrites a provider entry', async () => {
-    files.set(
+    setFile(
       CATALOG,
       JSON.stringify({
         version: '1.0',

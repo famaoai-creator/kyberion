@@ -4,6 +4,7 @@
 // (timeout path, via fake timers).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { t as catalogT } from '@agent/core/t';
+import type { ResolvedCreativeDesign } from '@agent/core/creative-design-resolver';
 import {
   registerReasoningBackend,
   resetReasoningBackend,
@@ -89,7 +90,9 @@ describe('buildHearingCanvasPrompt', () => {
         warning: '#ff0000',
       },
       fonts: { sans: 'sans', mono: 'mono', heading: 'Heading Font', body: 'Body Font' },
-    } as any;
+      // Only the fields designTokenCssVars() reads; the rest of the resolved
+      // design is irrelevant to this assertion.
+    } as unknown as ResolvedCreativeDesign;
 
     const prompt = buildHearingCanvasPrompt(brief, tokens);
 

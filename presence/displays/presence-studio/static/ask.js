@@ -75,8 +75,20 @@
     return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
   }
 
+  // FD-01: the rail stores the chosen tenant; every same-origin API call carries
+  // it as `?tenant=` so the server narrows to the tenant being viewed.
+  function withTenant(url) {
+    try {
+      var slug = window.localStorage.getItem('front-desk.tenant');
+      if (!slug || url.indexOf('/api/') !== 0 || url.indexOf('tenant=') !== -1) return url;
+      return url + (url.indexOf('?') === -1 ? '?' : '&') + 'tenant=' + encodeURIComponent(slug);
+    } catch (err) {
+      return url;
+    }
+  }
+
   function fetchJson(url, options) {
-    return fetch(url, options).then(function (response) {
+    return fetch(withTenant(url), options).then(function (response) {
       return response.json().then(function (body) {
         return { ok: response.ok, status: response.status, body: body };
       });
@@ -174,6 +186,10 @@
     // instead of always defaulting to `web_app_build`.
     hearingScenarioId: 'web_app_build',
     hearingRecord: null,
+    // Server-issued canvas URL (versioned so the iframe reloads when a new canvas exists).
+    hearingCanvasUrl: null,
+    // Phase-structured sheet: the current phase (server-resolved title + counts).
+    hearingPhase: null,
     // HT-02: bounded retry while the record's canvas is still `pending`.
     hearingCanvasPollTries: 0,
     // HT-03 (2nd half): local hand-off UI state — `null` before the operator
@@ -213,7 +229,15 @@
     saveDraft: saveDraft,
     onHistoryReady: applyUrlPrefill,
     onConversationRestored: function () {
-      if (hearingRecovery) hearingRecovery.load();
+      if (!hearingRecovery) return;
+      hearingRecovery.load().then(function (accepted) {
+        // A hearing opens with the companion's first question, so the person
+        // knows what to answer instead of facing an empty box.
+        if (accepted && state.turns.length === 0 && state.hearingPrompt) {
+          pushTurn({ role: 'companion', text: state.hearingPrompt });
+          render();
+        }
+      });
     },
     retireSend: retireSend,
     retireStartup: retireStartup,
@@ -360,6 +384,7 @@
       { key: 'minutes', textKey: 'front_desk:chip_minutes', icon: 'notes' },
       { key: 'browser', textKey: 'front_desk:chip_browser', icon: 'globe' },
       { key: 'webapp', textKey: 'front_desk:chip_webapp', icon: 'list' },
+      { key: 'process', textKey: 'front_desk:chip_process', icon: 'list' },
     ];
     chipDefs.forEach(function (def) {
       var button = document.querySelector('.ask-chip[data-chip="' + def.key + '"]');
@@ -655,6 +680,7 @@
     var generation = record && record.canvas_generation;
     if (generation === 'pending') return 'front_desk:hearing_canvas_updating';
     if (generation === 'generated') return 'front_desk:hearing_canvas_generated';
+    if (generation === 'projected') return 'front_desk:hearing_canvas_projected';
     return 'front_desk:hearing_canvas_template';
   }
 
@@ -670,6 +696,12 @@
   function isWorkInventoryScenario(record) {
     if (record && record.scenario) return record.scenario === 'work_inventory';
     return state.hearingScenarioId === 'work_inventory';
+  }
+
+  // The server marks a decision-ledger hearing on the record (`is_ledger`); the
+  // client never re-derives that from the scenario id grammar.
+  function isLedgerHearing() {
+    return Boolean(state.hearingRecord && state.hearingRecord.is_ledger);
   }
 
   function renderHearingHandoff(record, ready) {
@@ -705,15 +737,31 @@
         }).length;
         var total = record.requirements.length;
         ready = done === total && total > 0 && Boolean(record.decided_at);
-        coverage.textContent = formatTemplate(vt(state.vocab, 'front_desk:hearing_coverage'), {
+        var overall = formatTemplate(vt(state.vocab, 'front_desk:hearing_coverage'), {
           done: done,
           total: total,
         });
-        if (decide) decide.classList.toggle('hidden', done !== total || Boolean(record.decided_at));
+        var phase = state.hearingPhase;
+        coverage.textContent = phase
+          ? formatTemplate(vt(state.vocab, 'front_desk:hearing_phase_progress'), {
+              phase: phase.title,
+              done: phase.complete,
+              total: phase.total,
+              index: phase.index,
+              count: phase.count,
+            }) +
+            ' / ' +
+            overall
+          : overall;
+        // A decision-ledger hearing may record part of its agenda; a greenfield
+        // hearing still needs every requirement answered before "decide".
+        var canDecide = isLedgerHearing() ? done > 0 : done === total;
+        if (decide) decide.classList.toggle('hidden', !canDecide || Boolean(record.decided_at));
       }
     }
-    if (canvas && record && record.canvas_url && canvas.getAttribute('src') !== record.canvas_url) {
-      canvas.setAttribute('src', record.canvas_url);
+    var canvasUrl = state.hearingCanvasUrl;
+    if (canvas && record && canvasUrl && canvas.getAttribute('src') !== canvasUrl) {
+      canvas.setAttribute('src', canvasUrl);
     }
     renderHearingCanvasStatus(record);
     renderHearingHandoff(record, ready);
@@ -996,6 +1044,38 @@
     state.errorKey = null;
     saveDraft();
     render();
+
+    var input = document.getElementById('ask-input');
+    if (input) input.value = '';
+
+    // A hearing is a question → answer sequence: the answer lands on the
+    // requirement the companion asked about, and the companion's next turn is
+    // the next open requirement (or "everything is filled in"). The generic
+    // conversation path is not consulted here — its intent routing is for
+    // requests, not for answers to the companion's own questions.
+    if (state.hearingMode) {
+      if (!hearingRecovery) {
+        state.sending = false;
+        render();
+        return;
+      }
+      hearingRecovery
+        .submit(trimmed, null)
+        .then(function (accepted) {
+          if (!accepted) throw new Error('hearing answer failed');
+          pushTurn({ role: 'companion', text: state.hearingPrompt || '' });
+          speakReply(state.hearingPrompt || '');
+        })
+        .catch(function () {
+          pushTurn({ role: 'companion', text: vt(state.vocab, 'front_desk:ask_send_failed') });
+        })
+        .finally(function () {
+          state.sending = false;
+          render();
+        });
+      return;
+    }
+
     var tenant =
       window.KyberionPrefs && window.KyberionPrefs.tenant ? window.KyberionPrefs.tenant() : null;
     var selectedScope = new URL(window.location.href).searchParams;
@@ -1253,11 +1333,19 @@
     document.querySelectorAll('.ask-chip').forEach(function (button) {
       button.addEventListener('click', function () {
         var key = button.getAttribute('data-chip');
+        // Hearing sheets are not text templates: they open the phase-structured
+        // hearing for that sheet (hearing-scenarios catalog).
+        var hearingScenario = { webapp: 'web_app_build', process: 'process_improvement' }[key];
+        if (hearingScenario) {
+          window.location.assign(
+            '/ask?mode=hearing&scenario=' + encodeURIComponent(hearingScenario)
+          );
+          return;
+        }
         var textKey = {
           email: 'chip_email',
           minutes: 'chip_minutes',
           browser: 'chip_browser',
-          webapp: 'chip_webapp',
         }[key];
         var template = textKey ? vt(state.vocab, 'front_desk:' + textKey) : '';
         proposeDraft(template);
@@ -1342,14 +1430,20 @@
   function mount() {
     state.locale = normalizeLocale();
     try {
-      var hearingParams = new URLSearchParams(window.location.search);
-      state.hearingMode = hearingParams.get('mode') === 'hearing';
-      // WI-08: `?scenario=` picks the hearing scenario (`work_inventory`,
-      // ...); defaults to `web_app_build` when absent/unrecognized-empty.
-      var scenarioParam = hearingParams.get('scenario');
+      var mountParams = new URLSearchParams(window.location.search);
+      state.hearingMode = mountParams.get('mode') === 'hearing';
+      // `?scenario=` names either a catalog sheet (WI-08: `work_inventory`,
+      // `process_improvement`, …; `web_app_build` when absent) or, SD-02, a
+      // `decisions-<case>-<actor>` ledger hearing whose items the server
+      // resolves from the tenant ledger.
+      var scenarioParam = mountParams.get('scenario') || '';
+      // The ledger id is also the persisted `record.scenario`, which accepted
+      // hearing responses are validated against.
+      if (/^decisions-/.test(scenarioParam)) state.hearingScenarioRef = scenarioParam;
       if (scenarioParam) state.hearingScenarioId = scenarioParam;
     } catch (err) {
       state.hearingMode = false;
+      state.hearingScenarioRef = '';
     }
     if (hearingRecovery) hearingRecovery.mount();
     if (hearingCompletion) hearingCompletion.mount();

@@ -64,6 +64,12 @@ export interface DaemonRenderContext {
    * outside the write roots and are only reachable through governed exec).
    */
   stagingDir: string;
+  /**
+   * Absolute PATH entries of the installing shell (see daemonUserPath), so a
+   * daemon finds the same CLIs the operator does — nvm, volta, asdf, homebrew
+   * or ~/.local alike — instead of a hard-coded list that fits one machine.
+   */
+  userPath?: string[];
   /** Extra daemon environment (allowlist-checked by the caller). */
   env?: Record<string, string>;
 }
@@ -122,4 +128,23 @@ export function resolveDaemonManager(
   if (platform === 'linux') return systemdUserManager;
   if (platform === 'win32') return windowsTaskSchedulerManager;
   return null;
+}
+
+/**
+ * The installing shell's PATH reduced to entries safe to bake into a unit:
+ * absolute, existing-as-written, never a project-local `node_modules/.bin`
+ * (it would shadow real CLIs with pnpm shims), deduplicated in order.
+ */
+export function daemonUserPath(rawPath: string | undefined, delimiter = ':'): string[] {
+  const seen = new Set<string>();
+  const entries: string[] = [];
+  for (const raw of (rawPath ?? '').split(delimiter)) {
+    const entry = raw.trim().replace(/\/+$/, '');
+    if (!entry.startsWith('/') || entry.includes('\0')) continue;
+    if (entry.endsWith('/node_modules/.bin')) continue;
+    if (seen.has(entry)) continue;
+    seen.add(entry);
+    entries.push(entry);
+  }
+  return entries;
 }

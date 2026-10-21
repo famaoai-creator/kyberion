@@ -3431,6 +3431,17 @@
       "group": "inspect"
     },
     {
+      "id": "script.scratch.promote",
+      "script": "scratch:promote",
+      "command": "scratch promote",
+      "noun": "scratch",
+      "verb": "promote",
+      "audience": "operator",
+      "description": "cli_cmd_script_scratch_promote",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.screenshot-annotate.server",
       "module": "scripts/screenshot-annotate/server.ts",
       "command": "screenshot-annotate server",
@@ -4136,6 +4147,46 @@
       "args": ["list"],
       "description": "cli_cmd_script_workspace_list",
       "group": "inspect"
+    },
+    {
+      "id": "script.pipeline.accept",
+      "script": "pipeline:accept",
+      "command": "pipeline accept",
+      "noun": "pipeline",
+      "verb": "accept",
+      "audience": "operator",
+      "description": "cli_cmd_script_pipeline_accept",
+      "group": "operate"
+    },
+    {
+      "id": "script.mission.residue",
+      "script": "mission:residue",
+      "command": "mission residue",
+      "noun": "mission",
+      "verb": "residue",
+      "audience": "operator",
+      "description": "cli_cmd_script_mission_residue",
+      "group": "operate"
+    },
+    {
+      "id": "script.reasoning.compare",
+      "script": "reasoning:compare",
+      "command": "reasoning compare",
+      "noun": "reasoning",
+      "verb": "compare",
+      "audience": "operator",
+      "description": "cli_cmd_script_reasoning_compare",
+      "group": "inspect"
+    },
+    {
+      "id": "script.decisions",
+      "script": "decisions",
+      "command": "decisions default",
+      "noun": "decisions",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_decisions",
+      "group": "operate"
     },
     {
       "id": "script.worktree.create",

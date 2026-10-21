@@ -20,6 +20,7 @@ import {
   refuseHumanOnlyDecisionOnAgentPath,
   type ApprovalJustification,
   type ApprovalRequesterContext,
+  type ApprovalAccountability,
   type ApprovalRequestDraft,
   type ApprovalRiskProfile,
   type ApprovalTargetDescriptor,
@@ -77,6 +78,12 @@ export interface ApprovalAction {
     justification?: ApprovalJustification;
     risk?: ApprovalRiskProfile;
     workflow?: ApprovalWorkflowState;
+    /**
+     * Binds the request to the exact payload it admits, so an approval cannot
+     * later be reused against a different effect. Declared at creation because
+     * the decider must be shown what they are binding to.
+     */
+    accountability?: ApprovalAccountability;
     idempotency_key?: string;
   };
 }
@@ -172,6 +179,7 @@ export async function handleApprovalAction(input: ApprovalAction) {
           justification: params.justification,
           risk: params.risk,
           workflow: params.workflow,
+          accountability: params.accountability,
         }),
       };
     case 'load':

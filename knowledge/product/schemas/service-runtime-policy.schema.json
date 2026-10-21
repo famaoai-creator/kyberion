@@ -19,8 +19,14 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "local_service": { "type": "string", "enum": ["trial_first", "installed_first", "installed_only"] },
-        "remote_service": { "type": "string", "enum": ["trial_first", "installed_first", "installed_only"] }
+        "local_service": {
+          "type": "string",
+          "enum": ["trial_first", "installed_first", "installed_only"]
+        },
+        "remote_service": {
+          "type": "string",
+          "enum": ["trial_first", "installed_first", "installed_only"]
+        }
       },
       "required": ["local_service", "remote_service"]
     },

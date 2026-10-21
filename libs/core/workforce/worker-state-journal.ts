@@ -105,6 +105,8 @@ export interface AppendValidatedJournalEventOptions<TEnvelope> {
   readonly seq: number;
   readonly now?: () => string;
   readonly buildEnvelope: (context: JournalAppendContext) => TEnvelope;
+  /** Narrow store IO scope for the lease and append; the lock stays with the caller. */
+  readonly storeAccess?: <R>(run: () => R) => R;
 }
 
 /**
@@ -131,6 +133,7 @@ export function appendValidatedJournalEvent<TEnvelope>(
     resourceId: writerLeaseResourceId(leasePath),
     ownerId: `process:${process.pid}`,
     leasePath,
+    ...(options.storeAccess ? { withinLock: options.storeAccess } : {}),
     fn: () => {
       const currentJournalPath = assertSafeRepositoryPath(journalPath, {
         allowMissingLeaf: true,

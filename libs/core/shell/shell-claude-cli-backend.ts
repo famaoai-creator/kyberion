@@ -47,12 +47,13 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isClaudeCliAuthenticated } from '../provider/claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
-  isClaudeCliPlaceholderFailure,
+  isClaudeCliFallbackEligible,
   resolveClaudeCliFallbackCandidates,
 } from '../provider/claude-cli-resolution.js';
 export {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
   type ClaudeCliFallbackCandidateOptions,
+  isClaudeCliFallbackEligible,
   isClaudeCliPlaceholderFailure,
   resolveClaudeCliFallbackCandidates,
 } from '../provider/claude-cli-resolution.js';
@@ -83,7 +84,14 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  GenerateWithToolsResult,
+  ToolDefinition,
 } from '../reasoning/reasoning-backend.js';
+import { isPromptedToolCallingEnabled } from '../reasoning/reasoning-backend-policy.js';
+import {
+  parsePromptedToolResponse,
+  renderPromptedToolProtocol,
+} from '../reasoning/prompted-tool-protocol.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -122,6 +130,12 @@ export interface ShellClaudeCliBackendOptions {
   nativeSubagent?: boolean;
   /** Test seam and runtime injection for the shared native CLI session. */
   harnessSession?: ClaudeHarnessSession;
+  /**
+   * Expose `generateWithTools` through the prompted tool-calling protocol.
+   * Defaults to the governed `prompted_tool_calling["claude-cli"]` policy
+   * value (on); an explicit value wins.
+   */
+  promptedToolCalling?: boolean;
 }
 
 /**
@@ -191,6 +205,13 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       (options.harnessSession !== undefined ||
         getRegisteredEnvText('KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1');
     if (options.harnessSession) this.injectedHarnessSession = options.harnessSession;
+    // Assigned only when opted in, so capability probes that test for
+    // `generateWithTools` presence (failover chain, dot wake resolution)
+    // answer truthfully when the policy switches it off.
+    if (options.promptedToolCalling ?? isPromptedToolCallingEnabled('claude-cli')) {
+      this.generateWithTools = (prompt, tools, callOptions) =>
+        this.generateWithPromptedTools(prompt, tools, callOptions);
+    }
     this.nativeSubagentAdopter = {
       id: 'claude-cli',
       dispatch: (instruction, context, callOptions) =>
@@ -505,6 +526,58 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
 
   async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /**
+   * Single-turn tool use over the prompted tool-calling protocol. Present only
+   * when opted in (see {@link ShellClaudeCliBackendOptions.promptedToolCalling}).
+   */
+  generateWithTools?: (
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ) => Promise<GenerateWithToolsResult>;
+
+  /**
+   * The CLI only proposes calls: its own built-in tools are removed
+   * (`--tools ''`) and the read-only planner permission profile still
+   * applies, so nothing runs inside the CLI. Kyberion's goal driver executes
+   * the parsed calls. The argv is closed — custom extras are not appended.
+   */
+  private async generateWithPromptedTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult> {
+    assertReasoningEgressAllowed(this.name);
+    const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);
+    const args = [
+      '-p',
+      '--tools',
+      '',
+      '--model',
+      model,
+      ...(options?.effort ? ['--effort', options.effort] : []),
+      ...this.resolvePermissionArgs('planner'),
+    ];
+    const stdout = await this.spawnCli(
+      args,
+      renderPromptedToolProtocol(prompt, tools),
+      options?.signal,
+      resolveEffectiveProviderPermissionProfile('claude', 'planner')
+    );
+    const outcome = parsePromptedToolResponse(stdout, tools);
+    for (const refusal of outcome.rejected) {
+      logger.warn(
+        `[shell-claude-cli] refused prompted tool call "${refusal.name}" — ${refusal.reason} | next: the model sees the refusal in this turn's text | evidence: ${tools.length} tool(s) offered`
+      );
+    }
+    if (outcome.malformed) {
+      logger.warn(
+        '[shell-claude-cli] prompted tool-call block was not valid JSON — returned as text with no tool calls | next: the goal loop treats the turn as prose | evidence: tool_calls block present'
+      );
+    }
+    return outcome.result;
   }
 
   /**
@@ -1011,9 +1084,9 @@ export function probeShellClaudeCliAvailability(
   }
 
   // LC-03 fallback: only when no binary was explicitly requested and the
-  // failure carries the pnpm placeholder signature — never second-guess an
-  // operator-pinned KYBERION_CLAUDE_CLI_BIN.
-  if (!explicitBin && isClaudeCliPlaceholderFailure(primary.reason)) {
+  // default `claude` is the pnpm placeholder or absent from PATH — never
+  // second-guess an operator-pinned KYBERION_CLAUDE_CLI_BIN.
+  if (!explicitBin && isClaudeCliFallbackEligible(primary.reason)) {
     for (const candidate of resolveClaudeCliFallbackCandidates({
       env: { ...process.env, ...env },
     })) {

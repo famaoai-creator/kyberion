@@ -80,7 +80,7 @@ will not speak.
 Use a dry run when you want to verify the workflow contract without a live call.
 
 ```bash
-pnpm kyberion preview pipelines/meeting-proxy-workflow.json
+pnpm kyberion preview knowledge/product/pipeline-templates/meeting-proxy-workflow.json
 pnpm test -- --suite meeting-dry-run
 ```
 

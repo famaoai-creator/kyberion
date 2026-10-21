@@ -27,6 +27,19 @@ const APPROVAL_PROPERTIES = {
   authenticated: { type: 'boolean' },
   payloadHash: { type: 'string' },
   effectBinding: { type: 'string' },
+  // Mirrors ApprovalAccountability in libs/core/approval-store.ts. The store
+  // enforces finalDecision === 'human_only' and cross-checks the two bindings
+  // against the request's own payloadHash, so the param has to reach it.
+  accountability: {
+    type: 'object',
+    required: ['finalDecision'],
+    additionalProperties: false,
+    properties: {
+      finalDecision: { const: 'human_only' },
+      payloadHash: { type: 'string' },
+      effectBinding: { type: 'string' },
+    },
+  },
   note: { type: 'string' },
   reasonCategory: { type: 'string' },
   requestKind: { enum: ['channel-approval', 'secret_mutation', 'mission_gate'] },

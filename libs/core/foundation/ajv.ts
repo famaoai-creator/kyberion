@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from './json.js';
+import { getFoundationIo } from './io.js';
 
 // ajv and ajv-formats are CommonJS and together ~90 modules. They load on the
 // first compile instead of at import, so an entry point that reads no governed
@@ -127,27 +128,45 @@ function registerSchema(
   return schema;
 }
 
-// One shared validator instance for callers that do not pass their own. Schema
-// registration is keyed by file:// URI, so compiling N catalogs from the same
-// schema costs one compile total instead of N Ajv instances each recompiling.
-let sharedDefaultValidator: AjvLike | null = null;
-function defaultValidator(): AjvLike {
-  if (!sharedDefaultValidator) sharedDefaultValidator = createAjv();
-  return sharedDefaultValidator;
+/**
+ * Compiled validators, keyed by schema path + the schema file's mtime. Every
+ * record loader in the repo (`defineCatalog(...).load()` per task session,
+ * artifact record, approval, member …) used to build a fresh Ajv instance and
+ * recompile the same schema on each call — ~100 ms per record, which is what
+ * made `/api/home`, `/api/progress` and `/api/me` take 3 s each. A schema that
+ * changes on disk (tests writing fixtures) gets a new key, so the cache is
+ * never stale. Callers that pass their own `validator` bypass the cache.
+ */
+const compiledSchemaCache = new Map<string, ValidateFunction<unknown>>();
+
+function schemaCacheKey(normalized: string): string {
+  try {
+    const stat = getFoundationIo().stat(normalized);
+    return `${normalized}:${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return normalized;
+  }
 }
 
 export function compileSchema<T = unknown>(
   schemaPath: string,
-  validator: AjvLike = defaultValidator()
+  validator?: AjvLike
 ): ValidateFunction<T> {
   const normalized = path.resolve(schemaPath);
-  const schemaId = pathToFileURL(normalized).href;
-  const schema = registerSchema(validator, normalized, new Set<string>());
-  const byPath = validator.getSchema<T>(schemaId);
-  if (byPath) return byPath;
-  if (typeof schema.$id === 'string' && schema.$id) {
-    const bySchemaId = validator.getSchema<T>(schema.$id);
-    if (bySchemaId) return bySchemaId;
+  const useCache = validator === undefined;
+  const cacheKey = useCache ? schemaCacheKey(normalized) : '';
+  if (useCache) {
+    const hit = compiledSchemaCache.get(cacheKey);
+    if (hit) return hit as ValidateFunction<T>;
   }
-  return validator.compile<T>(schema);
+  const ajv: AjvLike = validator ?? createAjv();
+  const schemaId = pathToFileURL(normalized).href;
+  const schema = registerSchema(ajv, normalized, new Set<string>());
+  let compiled = ajv.getSchema<T>(schemaId);
+  if (!compiled && typeof schema.$id === 'string' && schema.$id) {
+    compiled = ajv.getSchema<T>(schema.$id);
+  }
+  if (!compiled) compiled = ajv.compile<T>(schema);
+  if (useCache) compiledSchemaCache.set(cacheKey, compiled as ValidateFunction<unknown>);
+  return compiled;
 }

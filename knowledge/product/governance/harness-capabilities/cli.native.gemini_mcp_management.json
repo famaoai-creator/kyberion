@@ -23,7 +23,7 @@
       },
       "fallback_path": {
         "mode": "kyberion_local_pipeline",
-        "target": "pipelines/a2a-task-contract.json"
+        "target": "knowledge/product/schemas/a2a-task-contract.schema.json"
       },
       "status": "active",
       "notes": "Gemini MCP server management changes the tool surface and should remain governed."

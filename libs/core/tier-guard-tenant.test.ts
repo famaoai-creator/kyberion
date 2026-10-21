@@ -933,12 +933,33 @@ describe('tier-guard brokered missions (C8)', () => {
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
     // Best-effort cleanup; do not fail test if tier-guard rejects (e.g. in CI sandboxes).
+    // The raw removal runs first: the persona/tenant env has already been
+    // restored above, so a guarded remove would be denied here.
     const fs = await import('node:fs');
     const path = await import('node:path');
     const ROOT = pathResolver.rootDir();
-    const dir = path.join(ROOT, 'active/missions/public', FIX_MISSION);
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(path.join(ROOT, 'active/missions/public', FIX_MISSION), {
+        recursive: true,
+        force: true,
+      });
+    } catch {
+      /* ignore */
+    }
+    // `vi.importActual` is required here: this file mocks './secure-io.js' with a
+    // partial surface that has no safeRmSync, and the fixture helper builds on
+    // the real one. It reclaims any tenant-slug parent the fixtures created.
+    try {
+      const { removeMissionFixtures } = await vi.importActual<
+        typeof import('./testing/mission-fixture.js')
+      >('./testing/mission-fixture.js');
+      removeMissionFixtures([
+        { missionId: FIX_MISSION, tier: 'public' },
+        // Defensive: the cross-tenant denial cases name missions under
+        // `other-tenant/`; if a guard ever lets one through, the tenant-slug
+        // directory is reclaimed here rather than left as an empty shell.
+        { missionId: 'MSN-FOO', tier: 'confidential', tenantSlug: 'other-tenant' },
+      ]);
     } catch {
       /* ignore */
     }

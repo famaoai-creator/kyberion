@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -71,7 +72,32 @@ export function loadContextualIntentMemory(scope?: ScopeContext): ContextualInte
   }
 }
 
+/** Authorization refusals from secure-io / tier-guard — the one class of error a best-effort memory write may swallow. */
+function isAuthorizationRefusal(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /ROLE_VIOLATION|POLICY_VIOLATION|not authorized|Sovereign Sanctuary/i.test(error.message)
+  );
+}
+
 export function saveContextualIntentMemory(
+  memory: ContextualIntentMemory,
+  scope?: ScopeContext
+): void {
+  try {
+    saveContextualIntentMemoryStrict(memory, scope);
+  } catch (error) {
+    // Preference memory lives in the personal tier. A surface role that may
+    // not write it (presence-studio as a worker) must still answer the
+    // request — remembering is an optimization, never a precondition.
+    if (!isAuthorizationRefusal(error)) throw error;
+    logger.warn(
+      `[contextual-intent-memory] preference not saved for this role: ${(error as Error).message.slice(0, 160)}`
+    );
+  }
+}
+
+function saveContextualIntentMemoryStrict(
   memory: ContextualIntentMemory,
   scope?: ScopeContext
 ): void {

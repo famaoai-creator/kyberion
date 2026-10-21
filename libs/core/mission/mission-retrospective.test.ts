@@ -39,6 +39,9 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.appendFileSync(filePath, data, 'utf8');
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  // The performance-index projections require the leaf to be a regular file
+  // before they load it; without this export the check throws into a silent
+  // catch and the index reads back empty.
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeStat: (filePath: string) => fs.statSync(filePath),
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
@@ -749,6 +752,8 @@ describe('mission retrospective loop', () => {
     fs.writeFileSync(
       path.join(missionDir, 'evidence', 'workitem-dispatch-manifest.json'),
       JSON.stringify({
+        // The manifest is validated against its schema now, which requires
+        // mission_id — without it the retrospective records no outcomes.
         mission_id: MISSION,
         records: Array.from({ length: 6 }, (_, index) => ({
           item_id: `witem-${index}`,

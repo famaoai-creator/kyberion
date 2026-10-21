@@ -286,6 +286,9 @@
         if (!clearConfirmed(attempt)) return false;
       }
       state.hearingRecord = record;
+      if (typeof body.canvas_url === 'string') state.hearingCanvasUrl = body.canvas_url;
+      state.hearingPhase = body.current_phase || null;
+      state.hearingPrompt = typeof body.prompt === 'string' ? body.prompt : null;
       // Only an accepted current GET/answer may replace the completion read model.
       state.hearingCompletion = body.completion == null ? null : body.completion;
       if (!state.hearingHandoff || !state.hearingHandoff.pending) state.hearingHandoff = null;
@@ -378,7 +381,8 @@
             request_id: pending.requestId,
             intent_resolution: intentResolution,
             locale: state.locale,
-            scenario_id: state.hearingScenarioId,
+            scenario_id: state.hearingScenarioRef ? undefined : state.hearingScenarioId,
+            scenario_ref: state.hearingScenarioRef || undefined,
           }),
           signal: controller ? controller.signal : undefined,
         };

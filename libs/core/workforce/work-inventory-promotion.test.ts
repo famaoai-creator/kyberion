@@ -327,8 +327,15 @@ describe('planWorkInventoryPromotion', () => {
         'active/shared/tmp/sales-run.json',
         '--name',
         'weekly-sales-report',
+        '--tenant',
+        '<tenant-slug>',
       ],
     });
+    const tenantScoped = { ...adhoc, scope: { ...adhoc.scope, tenant_slug: 'acme' } };
+    expect(
+      planWorkInventoryPromotion(tenantScoped, { kind: 'pipeline', decided_by: HUMAN, now: NOW })
+        .args
+    ).toEqual(expect.arrayContaining(['--tenant', 'acme']));
 
     const bound = baseEntry();
     bound.steps[0] = { ...bound.steps[0], binding: { pipeline_id: 'sales-export' } };

@@ -1,8 +1,69 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { decideApprovalRequest, loadApprovalRequest } from './governance/approval-store.js';
+import {
+  installPluginManaged,
+  refreshManagedPluginActivation,
+  type ManagedPluginRecord,
+} from './plugin/plugin-managed-install.js';
 import { registerPluginFacet, resolveFacets, validateFacetPurity } from './facet-registry.js';
+
+const FIXTURE_ROOT = pathResolver.sharedTmp('facet-registry-test');
+const cleanupPaths: string[] = [];
+
+function tracked(target: string): string {
+  cleanupPaths.push(target);
+  return target;
+}
+
+afterEach(() => {
+  // Managed-plugin paths are only writable under the authority role the
+  // installer itself uses; test cleanup needs the same wrapper.
+  withExecutionContext('mission_controller', () => {
+    while (cleanupPaths.length > 0) {
+      safeRmSync(cleanupPaths.pop() as string);
+    }
+  });
+});
+
+// Leave nothing behind under active/shared/tmp, not even the empty parent.
+afterAll(() => withExecutionContext('mission_controller', () => safeRmSync(FIXTURE_ROOT)));
+
+/**
+ * Install a pack the way the managed installer does and take it through a real
+ * human approval, because provenance verification now refuses to honour a
+ * hand-written `trust: official` record that does not come from `plugins/`.
+ */
+function installApprovedPack(params: {
+  pluginId: string;
+  sourcePath: string;
+  managedRoot: string;
+}): ManagedPluginRecord {
+  const record = installPluginManaged({ ...params, requestedBy: 'facet-registry-test' });
+  const pending = loadApprovalRequest(
+    record.approvalChannel as string,
+    record.approvalRequestId as string
+  );
+  decideApprovalRequest('mission_controller', {
+    channel: record.approvalChannel as string,
+    requestId: record.approvalRequestId as string,
+    decision: 'approved',
+    decidedBy: 'human:operator',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: pending?.accountability?.payloadHash,
+    effectBinding: pending?.accountability?.effectBinding,
+  });
+  const refreshed = refreshManagedPluginActivation(params.pluginId, params.managedRoot);
+  if (!refreshed || refreshed.activationStatus !== 'activatable') {
+    throw new Error(`test pack did not become activatable: ${refreshed?.activationStatus}`);
+  }
+  return refreshed;
+}
 
 describe('facet-registry', () => {
   it('keeps legacy role procedures resolvable as product persona facets', () => {
@@ -28,92 +89,75 @@ describe('facet-registry', () => {
   });
 
   it('resolves only declared facets from an approved managed pack', () => {
-    const root = pathResolver.rootResolve(`active/shared/tmp/facet-pack-test-${Date.now()}`);
-    const pluginRoot = path.join(root, 'pack-one');
-    try {
-      safeMkdir(path.join(pluginRoot, 'facets', 'personas'), { recursive: true });
-      safeWriteFile(
-        path.join(pluginRoot, 'plugin.json'),
-        JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['pack-persona'] } })
-      );
-      safeWriteFile(
-        path.join(pluginRoot, '.kyberion-managed-plugin.json'),
-        JSON.stringify({
-          pluginId: 'pack-one',
-          trust: 'official',
-          trustReason: 'test',
-          // KD-06: trust is re-derived from resolvedSourcePath on every read, so
-          // this must resolve inside the repo's own plugins/ tree to stay 'official'.
-          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
-          managedPath: pluginRoot,
-          manifest: {
-            pluginId: 'pack-one',
-            raw: { plugin_id: 'pack-one', facets: { persona: ['pack-persona'] } },
-          },
-          diagnostics: [],
-          activationStatus: 'activatable',
-          installedAt: new Date().toISOString(),
-        })
-      );
-      safeWriteFile(
-        path.join(pluginRoot, 'facets', 'personas', 'pack-persona.md'),
-        'Managed pack persona content.'
-      );
-      const resolved = resolveFacets(
-        { persona: 'pack-persona' },
-        { tier: 'public', managedRoot: root }
-      );
-      expect(resolved.persona?.source).toBe('managed');
-      expect(resolved.persona?.content).toContain('Managed pack');
+    const id = randomUUID();
+    const sourcePath = tracked(path.join(FIXTURE_ROOT, `pack-source-${id}`));
+    const managedRoot = tracked(path.join(FIXTURE_ROOT, `pack-managed-${id}`));
 
-      const managedFacetPath = path.join(pluginRoot, 'facets', 'personas', 'pack-persona.md');
-      safeRmSync(managedFacetPath, { force: true });
+    safeMkdir(path.join(sourcePath, 'facets', 'personas'), { recursive: true });
+    safeWriteFile(
+      path.join(sourcePath, 'plugin.json'),
+      JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['pack-persona'] } })
+    );
+    safeWriteFile(
+      path.join(sourcePath, 'facets', 'personas', 'pack-persona.md'),
+      'Managed pack persona content.'
+    );
+    const installed = installApprovedPack({
+      pluginId: `facet-pack-${id}`,
+      sourcePath,
+      managedRoot,
+    });
+
+    const resolved = resolveFacets({ persona: 'pack-persona' }, { tier: 'public', managedRoot });
+    expect(resolved.persona?.source).toBe('managed');
+    expect(resolved.persona?.content).toContain('Managed pack');
+
+    // A directory standing where the facet file belongs must be refused by the
+    // read boundary rather than read as an empty facet.
+    const managedFacetPath = path.join(
+      installed.managedPath,
+      'facets',
+      'personas',
+      'pack-persona.md'
+    );
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(managedFacetPath);
       safeMkdir(managedFacetPath, { recursive: true });
-      expect(() =>
-        resolveFacets({ persona: 'pack-persona' }, { tier: 'public', managedRoot: root })
-      ).toThrow('[FACET_RESOURCE] facet must be a regular file');
-    } finally {
-      safeRmSync(root);
-    }
+    });
+    expect(() =>
+      resolveFacets({ persona: 'pack-persona' }, { tier: 'public', managedRoot })
+    ).toThrow('[FACET_RESOURCE] facet must be a regular file');
   });
 
   it('rejects a managed facet that resolves through a symlink', () => {
-    const root = pathResolver.rootResolve(`active/shared/tmp/facet-symlink-test-${Date.now()}`);
-    const pluginRoot = path.join(root, 'pack-one');
-    const targetPath = path.join(root, 'outside.md');
-    const linkPath = path.join(pluginRoot, 'facets', 'personas', 'linked-persona.md');
-    try {
-      safeMkdir(path.dirname(linkPath), { recursive: true });
-      safeWriteFile(targetPath, 'Outside managed facet content.');
-      safeWriteFile(
-        path.join(pluginRoot, 'plugin.json'),
-        JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['linked-persona'] } })
-      );
-      safeWriteFile(
-        path.join(pluginRoot, '.kyberion-managed-plugin.json'),
-        JSON.stringify({
-          pluginId: 'pack-one',
-          trust: 'official',
-          trustReason: 'test',
-          resolvedSourcePath: path.join(pathResolver.rootDir(), 'plugins', 'pack-one'),
-          managedPath: pluginRoot,
-          manifest: {
-            pluginId: 'pack-one',
-            raw: { plugin_id: 'pack-one', facets: { persona: ['linked-persona'] } },
-          },
-          diagnostics: [],
-          activationStatus: 'activatable',
-          installedAt: new Date().toISOString(),
-        })
-      );
-      safeSymlinkSync(targetPath, linkPath);
+    const id = randomUUID();
+    const sourcePath = tracked(path.join(FIXTURE_ROOT, `link-source-${id}`));
+    const managedRoot = tracked(path.join(FIXTURE_ROOT, `link-managed-${id}`));
+    const outsidePath = tracked(path.join(FIXTURE_ROOT, `outside-${id}.md`));
 
-      expect(() =>
-        resolveFacets({ persona: 'linked-persona' }, { tier: 'public', managedRoot: root })
-      ).toThrow(/RESOURCE_PATH_SYMLINK|symlink/i);
-    } finally {
-      safeRmSync(root);
-    }
+    safeMkdir(path.join(sourcePath, 'facets', 'personas'), { recursive: true });
+    safeWriteFile(
+      path.join(sourcePath, 'plugin.json'),
+      JSON.stringify({ plugin_id: 'pack-one', facets: { persona: ['linked-persona'] } })
+    );
+    safeWriteFile(outsidePath, 'Outside managed facet content.');
+    const installed = installApprovedPack({
+      pluginId: `facet-link-${id}`,
+      sourcePath,
+      managedRoot,
+    });
+
+    // The declared facet only ever appears in the managed tree as a link, so
+    // the read boundary — not the installer — is what has to refuse it.
+    const linkPath = path.join(installed.managedPath, 'facets', 'personas', 'linked-persona.md');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(path.dirname(linkPath), { recursive: true });
+      safeSymlinkSync(outsidePath, linkPath);
+    });
+
+    expect(() =>
+      resolveFacets({ persona: 'linked-persona' }, { tier: 'public', managedRoot })
+    ).toThrow(/RESOURCE_PATH_SYMLINK|symlink/i);
   });
 
   it('detects impurity by facet kind', () => {

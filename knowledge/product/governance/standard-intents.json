@@ -276,7 +276,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/speak-with-my-voice.json"
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/speak-with-my-voice.json"
           }
         }
       ],
@@ -317,7 +317,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/kyberion-howto-narrated-demo.json"
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json"
           }
         }
       ],
@@ -437,7 +437,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/live-voice-smoke.json"
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/live-voice-smoke.json"
           }
         }
       ],
@@ -1353,7 +1353,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/setup-messaging-bridge-smoke.json --context '{\"platform_id\":\"{{platform_id}}\"}'"
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/setup-messaging-bridge.json --context '{\"platform_id\":\"{{platform_id}}\"}'"
           }
         }
       ],
@@ -1440,7 +1440,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/clone-my-voice.json"
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/clone-my-voice.json"
           }
         }
       ],
@@ -4268,7 +4268,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/hypothesis-tree.json",
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/hypothesis-tree.json",
             "export_as": "hypothesis_tree_result"
           }
         }
@@ -4530,7 +4530,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/stakeholder-consensus-orchestrator.json",
+            "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator.json",
             "export_as": "consensus_result"
           }
         }

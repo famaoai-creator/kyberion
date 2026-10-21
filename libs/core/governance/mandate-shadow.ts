@@ -7,6 +7,10 @@ import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 import { matchHighRiskPaths } from './autonomous-ops-gate.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import {
+  readTenantGovernanceOverlays,
+  type TenantGovernanceOverlay,
+} from '../organization/tenant-governance-overlay.js';
 
 const logger = createLogger('mandate-shadow');
 
@@ -185,13 +189,93 @@ export interface MandateEvaluation {
 }
 
 const CATALOG_REL = 'product/governance/standing-mandates.json';
+/** Tenant-owned mandates: `knowledge/confidential/<slug>/governance/<this file>`. */
+export const TENANT_MANDATE_OVERLAY_FILE = 'standing-mandates.json';
 
-export function loadMandateCatalog(): MandateCatalog {
+function mandateCatalog() {
   return defineCatalog<MandateCatalog>({
     id: 'standing-mandates',
     path: pathResolver.knowledge(CATALOG_REL),
     schema: pathResolver.knowledge('product/schemas/standing-mandates.schema.json'),
-  }).load();
+  });
+}
+
+/**
+ * Merge tenant overlay files (`{version, mandates}`; `external_effect_patterns`
+ * stays product-owned) into `catalog`. Every overlay mandate must carry an
+ * `authority` bound to its directory tenant, and its id may not reuse a
+ * product mandate id or an id another overlay entry also declares (every
+ * claimant is dropped). An invalid file drops that tenant's overlay only.
+ */
+export function mergeTenantMandateOverlays(
+  catalog: MandateCatalog,
+  overlays: readonly TenantGovernanceOverlay[]
+): MandateCatalog {
+  const validator = mandateCatalog();
+  const productIds = new Set(catalog.mandates.map((mandate) => mandate.id));
+  const candidates: Array<{ slug: string; mandate: StandingMandate }> = [];
+  for (const overlay of overlays) {
+    let mandates: StandingMandate[];
+    try {
+      if (overlay.error) throw new Error(overlay.error);
+      const value = overlay.value;
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw new Error('overlay must be a JSON object');
+      if ('external_effect_patterns' in value)
+        throw new Error('external_effect_patterns is product-owned; remove it from the overlay');
+      mandates = validator.validate(
+        { ...value, external_effect_patterns: [] },
+        overlay.path
+      ).mandates;
+    } catch (error) {
+      logger.warn(
+        `tenant ${overlay.tenant_slug} standing mandate overlay ignored — invalid file | next: fix ${overlay.path} | evidence: ${error instanceof Error ? error.message : String(error)}`
+      );
+      continue;
+    }
+    for (const mandate of mandates) {
+      if (mandate.authority?.tenant_slug !== overlay.tenant_slug) {
+        logger.warn(
+          `tenant ${overlay.tenant_slug} mandate '${mandate.id}' dropped — its authority is not bound to this tenant | next: set authority.tenant_slug to '${overlay.tenant_slug}' in ${overlay.path} | evidence: authority.tenant_slug=${mandate.authority?.tenant_slug ?? 'missing'}`
+        );
+        continue;
+      }
+      if (productIds.has(mandate.id)) {
+        logger.warn(
+          `tenant ${overlay.tenant_slug} mandate '${mandate.id}' dropped — the id is a product mandate | next: rename it in ${overlay.path} | evidence: knowledge/${CATALOG_REL}`
+        );
+        continue;
+      }
+      candidates.push({ slug: overlay.tenant_slug, mandate });
+    }
+  }
+  const merged = [...catalog.mandates];
+  for (const candidate of candidates) {
+    const claimants = candidates.filter((other) => other.mandate.id === candidate.mandate.id);
+    if (claimants.length > 1) {
+      logger.warn(
+        `tenant ${candidate.slug} mandate '${candidate.mandate.id}' dropped — the id is declared more than once | next: give each tenant mandate a distinct id | evidence: ${claimants.map((other) => other.slug).join(', ')}`
+      );
+      continue;
+    }
+    merged.push(candidate.mandate);
+  }
+  return { ...catalog, mandates: merged };
+}
+
+/**
+ * Product catalog plus, unless `tenantOverlays` is false, every registered
+ * tenant's overlay mandates ({@link mergeTenantMandateOverlays}).
+ */
+export function loadMandateCatalog(
+  options: { tenantOverlays?: boolean; rootDir?: string } = {}
+): MandateCatalog {
+  const catalog = mandateCatalog().load();
+  if (options.tenantOverlays === false) return catalog;
+  return mergeTenantMandateOverlays(
+    catalog,
+    readTenantGovernanceOverlays(TENANT_MANDATE_OVERLAY_FILE, { rootDir: options.rootDir })
+  );
 }
 
 function riskLevelOf(brief: MandateBriefInput): number {
@@ -228,7 +312,8 @@ export function evaluateBriefAgainstMandates(
   brief: MandateBriefInput,
   options: { catalog?: MandateCatalog; now?: Date } = {}
 ): MandateEvaluation {
-  const catalog = options.catalog ?? loadMandateCatalog();
+  // Shadow briefs carry no tenant, so tenant overlay mandates never cover them.
+  const catalog = options.catalog ?? loadMandateCatalog({ tenantOverlays: false });
   const now = (options.now ?? new Date()).getTime();
   const text = textOf(brief);
   const reasons: string[] = [];

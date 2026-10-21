@@ -4,6 +4,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+// Records which files the scratch grace sniffed (safeReadFile).
+const readLog = vi.hoisted(() => ({ paths: [] as string[] }));
+
 // Stub secure-io to use real temp fs so we can test file operations
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -15,7 +18,10 @@ vi.mock('./secure-io.js', async () => {
     safeRmdirSync: (p: string) => actual.rmdirSync(p),
     safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
     safeExistsSync: (p: string) => actual.existsSync(p),
-    safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
+    safeReadFile: (p: string, opts: any) => {
+      readLog.paths.push(p);
+      return actual.readFileSync(p, opts);
+    },
     loadJson: (p: string) => JSON.parse(actual.readFileSync(p, 'utf8')),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
     safeWriteFile: (p: string, data: string) => {
@@ -137,6 +143,7 @@ import {
   sweepWorkspaces,
   sweepEmptyMissionDirs,
   sweepTrash,
+  softDeleteToTrash,
   sweepAppendOnlyStores,
   restoreFromTrash,
   listReviewRequiredDirs,
@@ -165,6 +172,11 @@ import {
   STORAGE_RETENTION_AUDIT_FILENAME,
   loadRetentionCatalog,
 } from './storage-retention-catalog.js';
+import {
+  scratchCandidateId,
+  scratchPromotionCandidatesWarning,
+} from './scratch-promotion-grace.js';
+import { createHash } from 'node:crypto';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -364,6 +376,281 @@ describe('storage-janitor', () => {
       expect(result.deleted).not.toContain(dir);
       expect(fs.existsSync(dir)).toBe(true);
       expect(fs.existsSync(path.join(dir, 'fresh.txt'))).toBe(true);
+    });
+
+    describe('scratch promotion code grace', () => {
+      const candidatesFile = () =>
+        path.join(path.dirname(tmpDir), 'runtime', 'system', 'scratch-promotion-candidates.json');
+      const readCandidates = () => JSON.parse(fs.readFileSync(candidatesFile(), 'utf8'));
+      const saltFile = () =>
+        path.join(path.dirname(tmpDir), 'runtime', 'system', 'scratch-promotion-salt.json');
+      const readSalt = (): string => JSON.parse(fs.readFileSync(saltFile(), 'utf8')).salt;
+      const FIXED_SALT = 'a'.repeat(64);
+      const pastTtl = DEFAULT_TMP_TTL_MS + 60 * 60 * 1000;
+
+      it('defers an unpromoted code-bearing job dir past the TTL and records it', async () => {
+        const { logger } = await import('./core.js');
+        const builder = path.join(tmpDir, 'deck-job', 'work', 'build.ts');
+        const output = path.join(tmpDir, 'deck-job', 'work', 'out.pptx');
+        writeFile(builder, 'export {};');
+        writeFile(output);
+        setMtime(builder, pastTtl);
+        setMtime(output, pastTtl);
+
+        const result = scanTmp({ dryRun: false });
+
+        expect(fs.existsSync(builder)).toBe(true);
+        expect(fs.existsSync(output)).toBe(true);
+        expect(result.expired).not.toContain(builder);
+        expect(result.codeGrace?.map((c) => c.dir)).toEqual(['active/shared/tmp/deck-job']);
+        expect(result.codeGrace?.[0].id).toBe(
+          scratchCandidateId('active/shared/tmp/deck-job', readSalt())
+        );
+        // Salted: not the bare path hash an outsider could recompute.
+        expect(result.codeGrace?.[0].id).not.toBe(
+          createHash('sha256').update('active/shared/tmp/deck-job').digest('hex').slice(0, 16)
+        );
+        const file = readCandidates();
+        expect(file.code_grace_days).toBe(2);
+        expect(file.candidates).toHaveLength(1);
+        const [candidate] = file.candidates;
+        expect(candidate.dir).toBe('active/shared/tmp/deck-job');
+        // Legacy (unpartitioned) scratch: tier unknown, so file names are withheld.
+        expect(candidate.files).toEqual([]);
+        expect(candidate.files_redacted).toBe(true);
+        expect(candidate.file_count).toBe(2);
+        expect(typeof candidate.first_seen).toBe('string');
+        const deleteAfter = Date.parse(candidate.delete_after);
+        expect(deleteAfter).toBeGreaterThan(Date.now());
+        expect(deleteAfter).toBeLessThanOrEqual(Date.now() + 2 * RETENTION_DAY_MS);
+        expect(candidate.command).toBe(
+          'pnpm scratch:promote --from active/shared/tmp/deck-job --name deck-job --tenant <slug>'
+        );
+        const warned = vi
+          .mocked(logger.warn)
+          .mock.calls.map(([line]) => String(line))
+          .find((line) => line.includes('active/shared/tmp/deck-job'));
+        expect(warned).toMatch(/ — .* \| promote it now: pnpm scratch:promote .* \| evidence: /);
+      });
+
+      it('treats an ADF json (top-level steps array) as authored code', () => {
+        const adf = path.join(tmpDir, 'adf-job', 'flow.json');
+        writeFile(adf, JSON.stringify({ name: 'x', steps: [] }));
+        setMtime(adf, pastTtl);
+        const plain = path.join(tmpDir, 'data-job', 'data.json');
+        writeFile(plain, JSON.stringify({ rows: [] }));
+        setMtime(plain, pastTtl);
+
+        scanTmp({ dryRun: false });
+
+        expect(fs.existsSync(adf)).toBe(true);
+        expect(fs.existsSync(plain)).toBe(false);
+      });
+
+      it('deletes a non-code job dir on the plain TTL', () => {
+        const report = path.join(tmpDir, 'report-job', 'report.md');
+        writeFile(report);
+        setMtime(report, pastTtl);
+
+        const result = scanTmp({ dryRun: false });
+
+        expect(result.deleted).toContain(report);
+        expect(result.codeGrace).toEqual([]);
+        expect(fs.existsSync(candidatesFile())).toBe(false);
+      });
+
+      it('deletes after the grace expires and drops the dir from the candidates file', () => {
+        const builder = path.join(tmpDir, 'old-job', 'build.py');
+        writeFile(builder, 'print(1)');
+        setMtime(builder, DEFAULT_TMP_TTL_MS + 2 * RETENTION_DAY_MS + 60 * 60 * 1000);
+        writeFile(
+          candidatesFile(),
+          JSON.stringify({
+            generated_at: '2026-10-18T00:00:00.000Z',
+            code_grace_days: 2,
+            candidates: [
+              {
+                dir: 'active/shared/tmp/old-job',
+                files: ['build.py'],
+                file_count: 1,
+                first_seen: '2026-10-18T00:00:00.000Z',
+                delete_after: '2026-10-20T00:00:00.000Z',
+                command: 'x',
+              },
+            ],
+          })
+        );
+
+        const result = scanTmp({ dryRun: false });
+
+        expect(result.deleted).toContain(builder);
+        expect(fs.existsSync(builder)).toBe(false);
+        expect(readCandidates().candidates).toEqual([]);
+      });
+
+      it('keeps first_seen across runs while the grace runs', () => {
+        writeFile(saltFile(), JSON.stringify({ salt: FIXED_SALT }));
+        const builder = path.join(tmpDir, 'kept-job', 'run.sh');
+        writeFile(builder, 'echo');
+        setMtime(builder, pastTtl);
+        writeFile(
+          candidatesFile(),
+          JSON.stringify({
+            generated_at: '2026-10-19T00:00:00.000Z',
+            code_grace_days: 2,
+            candidates: [
+              {
+                id: scratchCandidateId('active/shared/tmp/kept-job', FIXED_SALT),
+                dir: 'active/shared/tmp/kept-job',
+                files: ['run.sh'],
+                file_count: 1,
+                first_seen: '2026-10-19T00:00:00.000Z',
+                delete_after: '2026-10-21T00:00:00.000Z',
+                command: 'x',
+              },
+            ],
+          })
+        );
+
+        scanTmp({ dryRun: false });
+
+        expect(readCandidates().candidates[0].first_seen).toBe('2026-10-19T00:00:00.000Z');
+      });
+
+      it('applies the plain TTL once the job carries a promotion record', () => {
+        const builder = path.join(tmpDir, 'done-job', 'build.mjs');
+        const marker = path.join(tmpDir, 'done-job', '.scratch-promoted.json');
+        writeFile(builder, 'export {};');
+        writeFile(marker, '{}');
+        setMtime(builder, pastTtl);
+
+        const result = scanTmp({ dryRun: false });
+
+        expect(result.deleted).toContain(builder);
+        expect(result.codeGrace).toEqual([]);
+      });
+
+      it('records a tier-partitioned job only as an opaque id + tier', async () => {
+        const { logger } = await import('./core.js');
+        const builder = path.join(tmpDir, 'confidential', 'acme', 'media', 'job1', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+
+        scanTmp({ dryRun: false });
+
+        const [candidate] = readCandidates().candidates;
+        expect(candidate.id).toBe(
+          scratchCandidateId('active/shared/tmp/confidential/acme/media/job1', readSalt())
+        );
+        expect(candidate.tier).toBe('confidential');
+        expect(candidate.command).toBe(
+          `pnpm scratch:promote --candidate ${candidate.id} --tenant <slug> --name <tool>`
+        );
+        expect(candidate.dir).toBeUndefined();
+        expect(candidate.files).toEqual([]);
+        expect(candidate.files_redacted).toBe(true);
+        expect(fs.readFileSync(candidatesFile(), 'utf8')).not.toMatch(/acme|job1|build\.ts/u);
+        const warned = vi
+          .mocked(logger.warn)
+          .mock.calls.map(([line]) => String(line))
+          .filter((line) => line.includes(candidate.id));
+        expect(warned).toHaveLength(1);
+        expect(warned[0]).not.toMatch(/acme|job1/u);
+      });
+
+      it('creates the salt once and reuses it across runs', () => {
+        const builder = path.join(tmpDir, 'salt-job', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+        expect(fs.existsSync(saltFile())).toBe(false);
+
+        const first = scanTmp({ dryRun: false });
+        const salt = readSalt();
+        const second = scanTmp({ dryRun: false });
+
+        expect(salt).toMatch(/^[0-9a-f]{64}$/u);
+        expect(readSalt()).toBe(salt);
+        expect(second.codeGrace?.[0].id).toBe(first.codeGrace?.[0].id);
+      });
+
+      it('summarises held dirs for the session baseline (warn-only)', () => {
+        expect(scratchPromotionCandidatesWarning()).toBeNull();
+        const builder = path.join(tmpDir, 'confidential', 'acme', 'media', 'job9', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+
+        scanTmp({ dryRun: false });
+
+        const warning = scratchPromotionCandidatesWarning();
+        expect(warning).toMatch(/^1 scratch dir\(s\) hold unpromoted code .*earliest /u);
+        expect(warning).toContain('scratch-promotion-candidates.json');
+        expect(warning).not.toMatch(/acme|job9/u);
+      });
+
+      it('lists file names for system-partition jobs', () => {
+        const builder = path.join(tmpDir, 'system', 'media', 'job2', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+
+        scanTmp({ dryRun: false });
+
+        const [candidate] = readCandidates().candidates;
+        expect(candidate.dir).toBe('active/shared/tmp/system/media/job2');
+        expect(candidate.files).toEqual(['build.ts']);
+      });
+
+      it('classifies only jobs with an expired file and checks code before sniffing JSON', () => {
+        const fresh = path.join(tmpDir, 'fresh-job', 'flow.json');
+        writeFile(fresh, JSON.stringify({ steps: [] }));
+        const coded = path.join(tmpDir, 'coded-job', 'build.ts');
+        const codedJson = path.join(tmpDir, 'coded-job', 'flow.json');
+        writeFile(coded, 'export {};');
+        writeFile(codedJson, JSON.stringify({ steps: [] }));
+        setMtime(coded, pastTtl);
+        setMtime(codedJson, pastTtl);
+        readLog.paths.length = 0;
+
+        const result = scanTmp({ dryRun: true });
+
+        expect(readLog.paths.filter((p) => p.endsWith('.json') && p.startsWith(tmpDir))).toEqual(
+          []
+        );
+        expect(result.codeGrace?.map((c) => c.dir)).toEqual(['active/shared/tmp/coded-job']);
+      });
+
+      it('does not write the candidates file in a dry run', () => {
+        const builder = path.join(tmpDir, 'dry-job', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+
+        const result = scanTmp({ dryRun: true });
+
+        expect(result.codeGrace).toHaveLength(1);
+        expect(result.expired).not.toContain(builder);
+        expect(fs.existsSync(candidatesFile())).toBe(false);
+      });
+
+      it('honours code_grace_days from the catalog (0 disables the grace)', () => {
+        writeCatalogFile({
+          version: '1.11.0',
+          entries: [
+            {
+              path: 'active/shared/tmp',
+              artifact_class: 'tmp',
+              ttl_days: 1,
+              code_grace_days: 0,
+              action: 'delete',
+            },
+          ],
+        });
+        const builder = path.join(tmpDir, 'nograce-job', 'build.ts');
+        writeFile(builder, 'export {};');
+        setMtime(builder, pastTtl);
+
+        const result = scanTmp({ dryRun: false });
+
+        expect(result.deleted).toContain(builder);
+      });
     });
   });
 
@@ -1503,6 +1790,40 @@ describe('storage-janitor', () => {
       writeFile(path.join(path.dirname(tmpDir), 'runtime', 'locks', 'a.lock'));
       const declared = listReviewRequiredDirs();
       expect(declared).toEqual(['active/shared/runtime/locks']);
+    });
+  });
+
+  describe('trash grace for directory soft-deletes', () => {
+    it('measures the grace of a file from its trashed ancestor, not its mtime', () => {
+      const missionDir = path.join(testRootDir(), 'active', 'missions', 'public', 'MSN-OLD');
+      const evidence = path.join(missionDir, 'evidence', 'note.txt');
+      writeFile(evidence);
+      // A fixture written months ago: its mtime is already far past any grace.
+      setMtime(evidence, 120 * 24 * 60 * 60 * 1000);
+
+      softDeleteToTrash(missionDir);
+
+      const trashedFile = path.join(
+        testRootDir(),
+        'active/archive/.trash/active/missions/public/MSN-OLD/evidence/note.txt'
+      );
+      expect(fs.existsSync(trashedFile)).toBe(true);
+
+      const result = sweepTrash({ dryRun: false });
+      expect(result.purged).not.toContain(trashedFile);
+      expect(fs.existsSync(trashedFile)).toBe(true);
+    });
+
+    it('still falls back to mtime for a hand-moved file the index does not cover', () => {
+      const orphan = path.join(
+        testRootDir(),
+        'active/archive/.trash/active/shared/tmp/hand-moved.txt'
+      );
+      writeFile(orphan);
+      setMtime(orphan, (DEFAULT_TRASH_GRACE_DAYS + 5) * 24 * 60 * 60 * 1000);
+
+      const result = sweepTrash({ dryRun: false });
+      expect(result.purged).toContain(orphan);
     });
   });
 

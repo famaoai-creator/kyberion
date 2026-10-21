@@ -2,7 +2,15 @@
   "$id": "https://kyberion.local/schemas/provider-cli-capability-report-policy.schema.json",
   "title": "Provider CLI Capability Report Policy",
   "type": "object",
-  "required": ["version", "title", "summary_title", "capability_inventory_title", "provider_title_prefix", "missing_adapter_title", "missing_adapter_message"],
+  "required": [
+    "version",
+    "title",
+    "summary_title",
+    "capability_inventory_title",
+    "provider_title_prefix",
+    "missing_adapter_title",
+    "missing_adapter_message"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "string" },

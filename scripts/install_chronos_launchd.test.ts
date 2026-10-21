@@ -54,7 +54,7 @@ describe('install_chronos_launchd plist generation', () => {
   it('extends PATH so scheduled pipelines can shell out to node/pnpm', () => {
     expect(plist).toContain('<key>EnvironmentVariables</key>');
     expect(plist).toContain(
-      '<string>/usr/local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>'
+      '<string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>'
     );
   });
 

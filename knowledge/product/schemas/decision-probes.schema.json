@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "decision-probes.schema.json",
+  "title": "Decision Ledger Probes",
+  "description": "Declarative observation probes (SD-06): what to read in an implementation, per decision key, expressed as data so no tenant-specific observer code enters the product.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "case_id", "repo", "probes"],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "repo": { "type": "string", "minLength": 1 },
+    "quote_max_chars": { "type": "integer", "minimum": 1 },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "file", "pattern"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+          "file": { "type": "string", "minLength": 1 },
+          "pattern": { "type": "string" },
+          "flags": { "type": "string", "pattern": "^[imsu]*$" },
+          "capture": {
+            "type": "string",
+            "enum": ["string", "number", "boolean", "json", "list", "count", "exists"]
+          },
+          "group": { "type": "integer", "minimum": 0 },
+          "stale_if": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern"],
+            "properties": {
+              "pattern": { "type": "string" },
+              "flags": { "type": "string", "pattern": "^[imsu]*$" }
+            }
+          },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

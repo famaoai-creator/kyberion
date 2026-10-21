@@ -119,6 +119,12 @@ import {
   type WorkerEventSource,
   type WorkerEventStream,
 } from './worker-event-stream.js';
+import {
+  buildGoalToolCallAuditEntry,
+  recordGoalToolCallToAuditChain,
+  type GoalToolCallAuditSink,
+  type GoalToolCallStatus,
+} from './goal-tool-audit.js';
 
 // ---------------------------------------------------------------------------
 // KD-02: wall-clock scheduler seam (injectable so deadline tests are hermetic
@@ -301,6 +307,13 @@ export interface RunGoalDrivenLoopOptions {
   };
   /** Backend override; defaults to the real getReasoningBackend(). */
   backend?: Pick<ReasoningBackend, 'generateWithTools'>;
+  /**
+   * Accountable actor named on every tool-call audit record (e.g. `dot:<id>`).
+   * Defaults to the manual-drive agent id, else `goal-driver`.
+   */
+  actorId?: string;
+  /** Tool-call audit sink; defaults to the process audit chain (test seam). */
+  auditToolCall?: GoalToolCallAuditSink;
   /** Event stream override; defaults to the process-wide worker event stream. */
   stream?: WorkerEventStream;
   /** Injection registry override; defaults to mission-scoped or the global one. */
@@ -481,6 +494,9 @@ export async function runGoalDrivenLoop(
     );
   }
   const now = options.now;
+  const auditToolCall = options.auditToolCall ?? recordGoalToolCallToAuditChain;
+  const auditActorId = options.actorId ?? options.manualDrive?.agentId ?? 'goal-driver';
+  const backendLabel = (backend as { name?: unknown }).name;
   const source: WorkerEventSource | undefined = options.missionId
     ? { mission_id: options.missionId }
     : undefined;
@@ -640,6 +656,21 @@ export async function runGoalDrivenLoop(
           'status_update',
           { goal_event: 'grace_tool_rejected', goal_id: goal.goalId, tool: call.name },
           source
+        );
+        auditToolCall(
+          buildGoalToolCallAuditEntry({
+            actorId: auditActorId,
+            goalId: goal.goalId,
+            ...(options.missionId ? { missionId: options.missionId } : {}),
+            turn: graceTurnNumber,
+            toolName: call.name,
+            input: call.input,
+            status: 'refused',
+            backend:
+              graceResult.servedBy ??
+              (typeof backendLabel === 'string' && backendLabel ? backendLabel : 'unknown'),
+            reason: 'grace_step_rejected',
+          })
         );
       }
       report = graceResult.text?.trim() || report;
@@ -865,6 +896,26 @@ export async function runGoalDrivenLoop(
         goal = accrueGoalBudgetUsage(goal, { tokens, turns: 1, wallClockMs: elapsedMs });
       }
 
+      // Every tool call handled below leaves exactly one audit record (the
+      // condition tool loops were approved on). Recording failures propagate:
+      // an unauditable loop must not keep running tools.
+      const servedBy =
+        result.servedBy ??
+        (typeof backendLabel === 'string' && backendLabel ? backendLabel : 'unknown');
+      const recordToolCall = (call: ToolCall, status: GoalToolCallStatus, reason?: string) =>
+        auditToolCall(
+          buildGoalToolCallAuditEntry({
+            actorId: auditActorId,
+            goalId: goal.goalId,
+            ...(options.missionId ? { missionId: options.missionId } : {}),
+            turn: turnNumber,
+            toolName: call.name,
+            input: call.input,
+            status,
+            backend: servedBy,
+            ...(reason ? { reason } : {}),
+          })
+        );
       for (const [toolIndex, call] of (result.toolCalls ?? []).entries()) {
         const decision = advanceToolCallRepeatGovernor(
           govState,
@@ -875,54 +926,74 @@ export async function runGoalDrivenLoop(
         govState = decision.state;
         if (decision.should_force_stop) {
           forceStopTool = call.name;
+          recordToolCall(call, 'refused', 'repeat_governor_force_stop');
           break;
         }
-        if (call.name === GOAL_UPDATE_TOOL_NAME) {
-          const parsed = parseGoalUpdateSignal(call.input);
-          if (parsed) signal = parsed; // last structured signal wins
-        } else if (call.name === CONTEXT_REWIND_TOOL_NAME) {
-          const checkpoint = String((call.input as Record<string, unknown>).checkpoint_id ?? '');
-          const lesson = String((call.input as Record<string, unknown>).lesson ?? '');
-          // Existing guards (one-per-turn, external-effect, lesson length)
-          // stay intact; the module emits its own context_rewind event.
-          rewindContext.rewindTo(checkpoint, lesson);
-        } else if (call.name === TOOL_SEARCH_TOOL_NAME && options.toolSearch) {
-          const input = call.input as Record<string, unknown>;
-          const query = String(input.query ?? '').trim();
-          if (!query) throw new Error('[TOOL_SEARCH_INPUT] query is required.');
-          const discovered = await options.toolSearch(query, {
-            goal,
-            turnNumber,
-            checkpointId,
-          });
-          const added = addDiscoveredTools(tools, discovered, options.toolRole);
-          toolSearchAnnouncement = renderToolSearchResults(added);
-        } else if (options.executeTool) {
-          const exec = manualDriveController
-            ? await manualDriveController.requestAction({
-                action_id: `${goal.goalId}:turn:${turnNumber}:tool:${toolIndex}:${call.name}`,
-                kind: 'execute_tool',
-                title: `Execute ${call.name}`,
-                operation_id: call.name,
-                requires_approval: true,
-                approval_payload: call.input,
-                execute: () =>
-                  options.executeTool!(call, {
-                    goal,
-                    turnNumber,
-                    checkpointId,
-                  }),
-              })
-            : await options.executeTool(call, { goal, turnNumber, checkpointId });
-          if (manualDriveAdmissionBlocked(exec)) {
-            manualDriveStopReason = `manual drive ${exec.status} before tool ${call.name}`;
-            break;
+        let status: GoalToolCallStatus = 'ok';
+        let reason: string | undefined;
+        try {
+          if (call.name === GOAL_UPDATE_TOOL_NAME) {
+            const parsed = parseGoalUpdateSignal(call.input);
+            if (parsed)
+              signal = parsed; // last structured signal wins
+            else [status, reason] = ['refused', 'invalid_goal_update'];
+          } else if (call.name === CONTEXT_REWIND_TOOL_NAME) {
+            const checkpoint = String((call.input as Record<string, unknown>).checkpoint_id ?? '');
+            const lesson = String((call.input as Record<string, unknown>).lesson ?? '');
+            // Existing guards (one-per-turn, external-effect, lesson length)
+            // stay intact; the module emits its own context_rewind event.
+            const rewind = rewindContext.rewindTo(checkpoint, lesson);
+            if (!rewind.rewound) [status, reason] = ['refused', rewind.refusal ?? 'rewind_refused'];
+          } else if (call.name === TOOL_SEARCH_TOOL_NAME && options.toolSearch) {
+            const input = call.input as Record<string, unknown>;
+            const query = String(input.query ?? '').trim();
+            if (!query) throw new Error('[TOOL_SEARCH_INPUT] query is required.');
+            const discovered = await options.toolSearch(query, {
+              goal,
+              turnNumber,
+              checkpointId,
+            });
+            const added = addDiscoveredTools(tools, discovered, options.toolRole);
+            toolSearchAnnouncement = renderToolSearchResults(added);
+          } else if (options.executeTool) {
+            const exec = manualDriveController
+              ? await manualDriveController.requestAction({
+                  action_id: `${goal.goalId}:turn:${turnNumber}:tool:${toolIndex}:${call.name}`,
+                  kind: 'execute_tool',
+                  title: `Execute ${call.name}`,
+                  operation_id: call.name,
+                  requires_approval: true,
+                  approval_payload: call.input,
+                  execute: () =>
+                    options.executeTool!(call, {
+                      goal,
+                      turnNumber,
+                      checkpointId,
+                    }),
+                })
+              : await options.executeTool(call, { goal, turnNumber, checkpointId });
+            if (manualDriveAdmissionBlocked(exec)) {
+              manualDriveStopReason = `manual drive ${exec.status} before tool ${call.name}`;
+              recordToolCall(call, 'refused', `manual_drive_${exec.status}`);
+              break;
+            }
+            const toolExecution = exec as GoalToolExecution;
+            if (toolExecution.externalEffect) {
+              rewindContext.recordExternalEffect(toolExecution.effectDescription);
+            }
+          } else {
+            [status, reason] = ['refused', 'no_executor'];
           }
-          const toolExecution = exec as GoalToolExecution;
-          if (toolExecution.externalEffect) {
-            rewindContext.recordExternalEffect(toolExecution.effectDescription);
-          }
+        } catch (error) {
+          // Only the error code is recorded: messages may echo tool input.
+          const message = error instanceof Error ? error.message : String(error);
+          const code =
+            /^\[([A-Z0-9_]+)\]/.exec(message)?.[1] ??
+            (error instanceof Error ? error.name : 'Error');
+          recordToolCall(call, 'error', code);
+          throw error;
         }
+        recordToolCall(call, status, reason);
       }
 
       if (manualDriveStopReason) {

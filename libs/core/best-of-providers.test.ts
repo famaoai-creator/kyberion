@@ -256,6 +256,67 @@ describe('runBestOfProviders', () => {
     expect(delegationSlotCalls).toHaveLength(3);
     expect(delegationSlotCalls.map((c) => c.provider).sort()).toEqual(['agy', 'claude', 'codex']);
   });
+
+  it('compares backend/model/effort candidates and isolates candidates sharing one backend', async () => {
+    const calls: Array<{
+      provider: string;
+      model?: string;
+      effort?: string;
+      event: 'reset' | 'delegate';
+    }> = [];
+    const backend = (provider: string): BestOfProviderBackend => ({
+      async resetSession() {
+        calls.push({ provider, event: 'reset' });
+      },
+      async delegateTask(_instruction, _context, options) {
+        calls.push({
+          provider,
+          model: options?.model,
+          effort: options?.effort,
+          event: 'delegate',
+        });
+        return `${provider}:${options?.model}:${options?.effort}`;
+      },
+    });
+    const backends = {
+      claude: backend('claude'),
+      cursor: backend('cursor'),
+    };
+
+    const result = await runBestOfProviders({
+      instruction: 'compare routing candidates',
+      dataTier: 'public',
+      candidates: [
+        { provider: 'claude', model: 'opus', effort: 'medium' },
+        { provider: 'cursor', model: 'auto' },
+        { provider: 'cursor', model: 'claude-opus-5-thinking-high', effort: 'high' },
+      ],
+      seams: {
+        getBackend: (provider) => backends[provider as keyof typeof backends],
+        verdictLogPath: VERDICT_LOG_PATH,
+      },
+    });
+
+    expect(result.candidates.map((candidate) => candidate.candidate_id)).toEqual([
+      'claude:opus@medium',
+      'cursor:auto',
+      'cursor:claude-opus-5-thinking-high@high',
+    ]);
+    expect(calls.filter((call) => call.provider === 'cursor')).toEqual([
+      { provider: 'cursor', event: 'reset' },
+      { provider: 'cursor', model: 'auto', effort: undefined, event: 'delegate' },
+      { provider: 'cursor', event: 'reset' },
+      {
+        provider: 'cursor',
+        model: 'claude-opus-5-thinking-high',
+        effort: 'high',
+        event: 'delegate',
+      },
+    ]);
+    expect(result.verdictRecord.candidate_specs).toHaveLength(3);
+    expect(result.verdictRecord.participants).toContain('cursor:auto');
+    expect(peekBestOfProvidersVerdictLog(VERDICT_LOG_PATH)[0].candidate_specs).toHaveLength(3);
+  });
 });
 
 describe('default seams.getBackend (KYBERION_BEST_OF_PROVIDERS_LIVE opt-in)', () => {

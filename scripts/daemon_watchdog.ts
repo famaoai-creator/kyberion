@@ -44,6 +44,10 @@ import {
   resolveDotMissionAdmissionScope,
 } from '@agent/core/mission/mission-admission';
 import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
+import {
+  applyApprovedMissionAdmissionConfirmation,
+  openMissionAdmissionConfirmation,
+} from './mission_admission_confirmation.js';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 
@@ -503,7 +507,8 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
         });
       };
       // Metadata is a request, never authority. Legacy shadow catalogs hold.
-      if (!admission().covered) continue;
+      const mandate = admission();
+      if (!mandate.covered) continue;
       const verdict = evaluateAutonomousOpsAction({
         actionId: 'mission_start_mandate',
         ...(item.context?.tenant_slug ? { tenantSlug: item.context.tenant_slug } : {}),
@@ -522,6 +527,14 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
               ' | next: reconcile original admission | evidence: ' +
               item.item_id
           );
+        continue;
+      }
+      // R5: shadow holds autonomous start but may ask a human, once per item version,
+      // whether to begin the existing admission. Accepting is not mandate learning.
+      if (verdict.shadow) {
+        const mandateId = mandate.mandate_id ?? 'unknown';
+        const applied = await applyApprovedMissionAdmissionConfirmation(item, mandateId, deps);
+        if (!applied) openMissionAdmissionConfirmation(item, mandateId, deps);
         continue;
       }
       if (verdict.allowed && verdict.decision === 'auto') {

@@ -32,6 +32,7 @@ import {
   type PipelineJournalScope,
 } from '@agent/core/pipeline/pipeline-run-journal';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
+import { safeReadFile } from '@agent/core/secure-io';
 
 import * as nodePath from 'node:path';
 import {
@@ -201,6 +202,19 @@ export interface ExecutePipelineFileOptions {
 }
 
 /**
+ * True when a library pipeline run failed before any lifecycle hook or step
+ * could run (and, for delegated runs, before its run journal was created), so
+ * the failure provably had no effect. Duck-typed so src and dist agree.
+ */
+export function isPipelineNotStartedError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as { pipelineNotStarted?: unknown }).pipelineNotStarted === true
+  );
+}
+
+/**
  * Library entry for callers that already run inside the Kyberion process.
  *
  * Delegated library calls own protected durable journals just like the CLI.
@@ -211,6 +225,23 @@ export interface ExecutePipelineFileOptions {
 export async function executePipelineFile(
   inputPath: string,
   options: ExecutePipelineFileOptions = {}
+) {
+  const progress = { started: false };
+  try {
+    return await executePipelineFileOnce(inputPath, options, progress);
+  } catch (error) {
+    const tagged = error instanceof Error ? error : new Error(String(error));
+    // A nested run's not-started tag must never describe this (started) run.
+    if (progress.started) delete (tagged as { pipelineNotStarted?: boolean }).pipelineNotStarted;
+    else Object.assign(tagged, { pipelineNotStarted: true });
+    throw tagged;
+  }
+}
+
+async function executePipelineFileOnce(
+  inputPath: string,
+  options: ExecutePipelineFileOptions,
+  progress: { started: boolean }
 ) {
   if (
     options.executionMode &&
@@ -267,6 +298,7 @@ export async function executePipelineFile(
     node_options: getRegisteredEnvText('NODE_OPTIONS') || '',
     run_utc_now: nowIso(),
     __pipeline_options: pipeline.options || {},
+    ...(pipeline.session_id ? { __pipeline_session_id: pipeline.session_id } : {}),
     trust_resolved: effectiveTrustResolved,
     ...(options.projectTrustApprovalId
       ? { project_trust_approval_id: options.projectTrustApprovalId }
@@ -307,6 +339,8 @@ export async function executePipelineFile(
   }));
   if (!options.executionMode) await installReasoningBackendsForSteps(steps);
   assertPipelineExecutionCurrent(options);
+  // Nothing above has an effect; lifecycle hooks (extensible) and steps may.
+  progress.started = true;
   const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,
@@ -804,6 +838,11 @@ export async function main(args?: string[], print: Print = () => undefined) {
       default: false,
       describe: 'Suppress step-by-step progress output',
     })
+    .option('fail-on-suspend', {
+      type: 'boolean',
+      default: false,
+      describe: 'Exit non-zero when an approval gate suspends the pipeline',
+    })
     .option('trust-project', {
       type: 'boolean',
       default: false,
@@ -963,6 +1002,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
   autoContext.node_options = getRegisteredEnvText('NODE_OPTIONS') || '';
   autoContext.run_utc_now = nowIso();
   autoContext.__pipeline_options = pipeline.options || {};
+  // The authored `session_id` is what keeps a multi-step browser scenario on
+  // ONE session; `browser_session_id` above is only a display/default hint.
+  if (pipeline.session_id) autoContext.__pipeline_session_id = pipeline.session_id;
 
   // Propagate pipeline knowledge_scope so wisdom:query uses the right tier/customer index.
   // Falls back to public-only scope when not declared.
@@ -1027,6 +1069,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
           {
             pipeline_id: pipelineId,
             input_path: String(argv.input),
+            pipeline_sha256: createHash('sha256')
+              .update(safeReadFile(pathResolver.rootResolve(String(argv.input))) as Buffer)
+              .digest('hex'),
             ...(missionId ? { mission_id: missionId } : {}),
             step_ids: stepsToRun.map((step, index) => step.id || `__step_${index}`),
           },
@@ -1223,11 +1268,11 @@ export async function main(args?: string[], print: Print = () => undefined) {
         const successCount = recordAdhocPipelineRun(inputRelative);
         if (successCount >= PROMOTION_CANDIDATE_MIN_RUNS) {
           logger.warn(
-            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative}`
+            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative} --tenant <slug>`
           );
         } else {
           logger.info(
-            `   [PIPELINE] Reusable? Promote this run into the catalog: pnpm pipeline:promote --input ${inputRelative}`
+            `   [PIPELINE] Reusable? Promote this run into the tenant catalog: pnpm pipeline:promote --input ${inputRelative} --tenant <slug>`
           );
         }
       }
@@ -1299,6 +1344,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
       logger.warn(
         `⏸️ [PIPELINE] Awaiting decision ${err.suspension.approval_request_id}. Resume with --resume ${runJournal?.runId || 'the run id'}.`
       );
+      if (argv.failOnSuspend) throw new ScriptExitError(3, '', true);
       return;
     }
     const failure = formatPipelineFailure(err);

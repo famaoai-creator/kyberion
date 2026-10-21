@@ -17,6 +17,7 @@ import {
   safePublishExclusiveFileSync,
   safeRmSync,
 } from './secure-io.js';
+import { reportScratchCodeGrace, selectExpiredTmpFiles } from './scratch-promotion-grace.js';
 import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
 import { listUncoveredRuntimeDirs, listUncoveredRuntimeFiles } from './storage-runtime-coverage.js';
 export {
@@ -70,6 +71,9 @@ import {
   SUPERVISOR_EVENTS_FILE_PATTERN,
   SUPERVISOR_EVENTS_LEGACY_FILE,
 } from './agent/agent-runtime-events.js';
+import { trashedAtFor } from './storage-trash-grace.js';
+
+export { trashedAtFor };
 
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
@@ -126,6 +130,7 @@ export interface ScanTmpResult {
   softDeleted: string[];
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
+  codeGrace?: ReturnType<typeof reportScratchCodeGrace>; // dirs held by code_grace_days
 }
 
 export interface RotateLogsOptions {
@@ -553,16 +558,12 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const expired: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
-  const files = collectFiles(dir);
-  for (const filePath of files) {
+  const selection = selectExpiredTmpFiles(collectFiles(dir), ttlMs, now, entry?.code_grace_days);
+  for (const filePath of selection.expired) {
+    expired.push(filePath);
+    if (opts.dryRun) continue;
     try {
-      const stat = safeStat(filePath);
-      if (now - stat.mtimeMs > ttlMs) {
-        expired.push(filePath);
-        if (!opts.dryRun) {
-          expireFilePerPolicy(filePath, entry, outcome);
-        }
-      }
+      expireFilePerPolicy(filePath, entry, outcome);
     } catch {
       // skip
     }
@@ -613,6 +614,7 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    codeGrace: reportScratchCodeGrace(selection.grace, now, opts.dryRun),
   };
 }
 
@@ -1362,7 +1364,7 @@ export function sweepTrash(opts: {
       if (originalRepoRel === TRASH_INDEX_FILENAME) continue;
       const entry = retentionEntryForPath(catalog, originalRepoRel);
       const graceDays = entry?.soft_delete_days ?? DEFAULT_TRASH_GRACE_DAYS;
-      const graceStartMs = trashedAt.get(originalRepoRel) ?? safeStat(filePath).mtimeMs;
+      const graceStartMs = trashedAtFor(originalRepoRel, trashedAt) ?? safeStat(filePath).mtimeMs;
       if (now - graceStartMs > graceDays * RETENTION_DAY_MS) {
         expired.push(filePath);
         if (!opts.dryRun) {

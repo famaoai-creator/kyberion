@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const FOLLOWUP_MISSION_ID = vi.hoisted(() => `MSN-FOLLOWUP-${process.pid}`);
 

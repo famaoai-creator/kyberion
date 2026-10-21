@@ -224,6 +224,7 @@
 - [Audio Route Resource Lifecycle and Configuration Abstraction](./product/governance/audio-route-resource-lifecycle.md) (public | ecosystem_architect)
 - [Audit ledger recovery and canonical location](./product/governance/audit-ledger-recovery.md) (public | Unknown)
 - [Authority, Role & Persona Model (v3.0)](./product/governance/AUTHORITY_MODEL.md) (public | Unknown)
+- [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
 - [Dependency Placement Policy](./product/governance/dependency-placement-policy.md) (public | Unknown)
 - [Dual-Key Policy](./product/governance/dual-key-policy.md) (public | Unknown)
@@ -254,11 +255,14 @@
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
 - [オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work](./product/governance/onboarding-flow.md) (public | Unknown)
 - [テスト用一時領域の後始末と削除境界](./product/governance/testing-scratch-cleanup.md) (public | Unknown)
+- [テナントslugの改称手順（商号変更への追従）](./product/governance/tenant-rename-procedure.md) (public | Unknown)
 - [テナント追加手順 — 登録は1系統、検証は check:tenant-registry](./product/governance/tenant-onboarding-procedure.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
+- [人が読む報告資料の書き方](./product/governance/human-report-writing-practices.md) (public | Unknown)
 - [共通概念の採用と安全な更新](./product/governance/concept-consolidation-operations.md) (public | Unknown)
 - [受信と実行権限を分離する自律ループ](./product/governance/delegated-autonomous-loop.md) (public | Unknown)
 - [外部入出力 actuator の統合と自律運用](./product/governance/external-actuator-governance.md) (public | Unknown)
+- [文脈の経済 — 長いセッションでトークンを無駄にしない](./product/governance/agent-context-economy.md) (public | Unknown)
 
 ## 📁 product/governance/authority-roles
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)
@@ -402,6 +406,7 @@
 - [Generative Video Production Playbook](./product/orchestration/generative-video-production-playbook.md) (public | ecosystem_architect)
 - [Guided Coordination Protocol](./product/orchestration/guided-coordination-protocol.md) (public | Codex)
 - [HITL Decision Loop — when a human is asked, and how](./product/orchestration/hitl-decision-loop.md) (public | Ecosystem Architect)
+- [HTML Output Playbook — pages a person will read, present, or print](./product/orchestration/html-output-playbook.md) (public | Unknown)
 - [Human Intervention Census — measuring where a human is still needed](./product/orchestration/human-intervention-census.md) (public | Ecosystem Architect)
 - [Hypothesis Tree Protocol](./product/orchestration/hypothesis-tree-protocol.md) (public | Ecosystem Architect)
 - [Intuition Capture Protocol](./product/orchestration/intuition-capture-protocol.md) (public | Ecosystem Architect)
@@ -447,6 +452,7 @@
 - [Same-Tenant Peer Quickstart](./product/orchestration/same-tenant-peer-quickstart.ja.md) (public | Unknown)
 - [Schedule Coordination Playbook](./product/orchestration/schedule-coordination-playbook.md) (public | Unknown)
 - [Schedule Delivery Protocol](./product/orchestration/schedule-delivery-protocol.md) (public | Ecosystem Architect)
+- [Scratch Tool Promotion](./product/orchestration/scratch-tool-promotion-playbook.md) (public | ecosystem_architect)
 - [Scratch-to-Pipeline Video Promotion](./product/orchestration/scratch-to-pipeline-video-promotion.md) (public | ecosystem_architect)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./product/orchestration/self-refinement-protocol.md) (public | Ecosystem Architect)
 - [Service Integration and Connection Guide](./product/orchestration/service-integration-guide.md) (public | Unknown)
@@ -560,7 +566,7 @@
 - [prompts/](./product/prompts/README.md) (public | Unknown)
 
 ## 📁 product/roles
-- [Roles Directory — Assigned Persona Reference](./product/roles/README.md) (public | Ecosystem Architect)
+- [Roles Directory — Org Role Reference](./product/roles/README.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/business_owner
 - [Business Owner (事業責任者) ミッション声明](./product/roles/business_owner/mission.md) (public | Ecosystem Architect)
@@ -715,6 +721,7 @@
 - [Web App Profile](./product/schemas/README-web-app-profile.md) (public | Unknown)
 - [Web Theme Pack Schema](./product/schemas/README-web-theme-pack.md) (public | Unknown)
 - [WebView Session Handoff](./product/schemas/README-webview-session-handoff.md) (public | Unknown)
+- [決定台帳(decision ledger)のスキーマ](./product/schemas/README-decision-ledger.md) (public | Unknown)
 
 ## 📁 product/voice
 - [Realtime voice conversation operations](./product/voice/realtime-voice-conversation-operations.md) (public | Unknown)

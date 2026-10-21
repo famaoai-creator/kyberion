@@ -105,6 +105,68 @@ describe('runtime-scope', () => {
     });
   });
 
+  it('drops a legacy project reference that has no resolvable organization', async () => {
+    // Mission state written before the containment chain existed: a project
+    // relationship with neither an organization on the mission nor a registry
+    // record to resolve one from. Contributing the bare project_id produced a
+    // scope that failed containment validation, which blocked every CLI verb
+    // that resolves the process scope during bootstrap — including repair.
+    mocks.findMissionPath.mockReturnValue('/repo/active/missions/MSN-LEGACY-CHAIN');
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.loadJson.mockReturnValue({
+      mission_id: 'MSN-LEGACY-CHAIN',
+      tier: 'confidential',
+      tenant_slug: 'tenant-a',
+      relationships: { project: { project_id: 'PRJ-UNREGISTERED' } },
+    });
+    mocks.loadProjectRecord.mockReturnValue(null);
+
+    const { resolveRuntimeScope } = await import('./runtime-scope.js');
+    const scope = resolveRuntimeScope({ missionId: 'MSN-LEGACY-CHAIN' });
+    expect(scope.tenant_slug).toBe('tenant-a');
+    expect(scope.organization_id).toBeUndefined();
+    expect(scope.project_id).toBeUndefined();
+  });
+
+  it('drops an organization that has no tenant above it', async () => {
+    // A public-tier mission may legitimately have no tenant. An organization
+    // recorded without one still cannot be honoured: organizations live inside
+    // tenants, so the id has nothing to scope against.
+    mocks.findMissionPath.mockReturnValue('/repo/active/missions/MSN-ORPHAN-ORG');
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.loadJson.mockReturnValue({
+      mission_id: 'MSN-ORPHAN-ORG',
+      tier: 'public',
+      organization_id: 'org-a',
+      relationships: { project: { project_id: 'PRJ-ORPHAN' } },
+    });
+    mocks.loadProjectRecord.mockReturnValue(null);
+
+    const { resolveRuntimeScope } = await import('./runtime-scope.js');
+    const scope = resolveRuntimeScope({ missionId: 'MSN-ORPHAN-ORG' });
+    expect(scope.tenant_slug).toBeUndefined();
+    expect(scope.organization_id).toBeUndefined();
+    expect(scope.project_id).toBeUndefined();
+  });
+
+  it('still fails closed for a confidential mission with no tenant', async () => {
+    // Gating the chain must not soften the tenant invariant: confidential work
+    // without a tenant has no isolation boundary and must not resolve.
+    mocks.findMissionPath.mockReturnValue('/repo/active/missions/MSN-NO-TENANT');
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.loadJson.mockReturnValue({
+      mission_id: 'MSN-NO-TENANT',
+      tier: 'confidential',
+      relationships: { project: { project_id: 'PRJ-ORPHAN' } },
+    });
+    mocks.loadProjectRecord.mockReturnValue(null);
+
+    const { resolveRuntimeScope } = await import('./runtime-scope.js');
+    expect(() => resolveRuntimeScope({ missionId: 'MSN-NO-TENANT' })).toThrow(
+      '[SCOPE_CONTEXT_INVALID]'
+    );
+  });
+
   it('rejects a supplied scope that changes the authoritative mission', async () => {
     const { resolveRuntimeScope } = await import('./runtime-scope.js');
     expect(() =>

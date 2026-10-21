@@ -49,7 +49,12 @@
       "produces": { "channel": "expansion_trigger", "type": "AnalysisResult" },
       "params": {
         "instruction": "以下の既存顧客チェックインコール記録を分析し、アップセル・拡張機会を特定してください。\n\n## 分析項目\n1. 既存契約スコープ（参照: {{existing_contract_ref}}）\n2. チェックインで浮上した新たな課題・ニーズ（具体的に）\n3. 既存スコープとの差分（なぜ既存契約で対応できないか）\n4. 拡張機会の規模感（概算）\n5. 顧客のレディネス（即決/要検討/長期）\n6. 競合リスク（他社に取られる可能性）\n\n## 出力形式（Markdown）\n### 拡張トリガー\n### 新たな課題・ニーズ\n### 既存スコープとの差分\n### 拡張機会の評価\n| 項目 | 評価 |\n|---|---|\n| 規模感 | |\n| 顧客レディネス | |\n| 競合リスク | |\n### 推奨アクション",
-        "context": ["{{mission_id}}", "{{account_org}}", "{{account_name}}", "{{existing_contract_ref}}"]
+        "context": [
+          "{{mission_id}}",
+          "{{account_org}}",
+          "{{account_name}}",
+          "{{existing_contract_ref}}"
+        ]
       }
     },
     {
@@ -132,7 +137,7 @@
           "trigger_mission": "{{mission_id}}",
           "suggested_track": "product_discovery",
           "suggested_title": "{{project_name}}: 拡張フェーズ — 詳細ヒアリング・要件定義",
-          "suggested_pipeline": "pipelines/customer-discovery-workflow.json",
+          "suggested_pipeline": "knowledge/product/pipeline-templates/customer-discovery-workflow.json",
           "account": "{{account_org}} / {{account_name}}",
           "existing_contract": "{{existing_contract_ref}}",
           "instructions": "このブリーフを参照して mission_controller create を実行し、後継ミッションを起票してください。顧客のサインオフ確認後に実施を推奨。",

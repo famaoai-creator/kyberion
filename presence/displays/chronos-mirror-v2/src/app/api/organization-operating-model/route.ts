@@ -48,9 +48,15 @@ export async function GET(req: NextRequest) {
     const selectedTenant =
       requestedTenant ||
       (tenantSlugs !== 'all' && tenantSlugs.length === 1 ? tenantSlugs[0] : undefined);
-    const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
-    if (selectedTenant && !registeredTenants.includes(selectedTenant)) {
-      throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
+    // Only a selected tenant needs the registry, and the registry is personal
+    // tier: listing it unconditionally denied the whole projection to every
+    // viewer without personal-tier access, including the all-tenant operator
+    // view that names no tenant at all.
+    if (selectedTenant) {
+      const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
+      if (!registeredTenants.includes(selectedTenant)) {
+        throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
+      }
     }
     const company = resolveCompany(selectedTenant);
     const requestedOrganization = readChronosOptionalStringParam(

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import * as path from 'node:path';
 import {
   rootDir,
@@ -12,13 +12,27 @@ import {
   safeRmSync,
 } from '@agent/core';
 import { detectTier } from '@agent/core/governance';
+import { removeMissionFixtures } from '@agent/core/testing/mission-fixture';
 
 describe('Tiered Mission Architecture', () => {
-  const TEST_MISSION_ID = 'TEST-MSN-TIER-999';
+  const TEST_MISSION_ID = `TEST-MSN-TIER-${process.pid}`;
+  const LEDGER_MISSION_ID = `LEDGER-TEST-${process.pid}`;
   const PROJECT_ROOT = rootDir();
 
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
+  });
+
+  afterAll(() => {
+    // The suite resolves the mission id in every tier and creates at least the
+    // personal one; sweep all three so no tier keeps a state-less shell (the
+    // confidential/public directories of this id were exactly that residue).
+    removeMissionFixtures([
+      { missionId: TEST_MISSION_ID, tier: 'personal' },
+      { missionId: TEST_MISSION_ID, tier: 'confidential' },
+      { missionId: TEST_MISSION_ID, tier: 'public' },
+      { missionId: LEDGER_MISSION_ID, tier: 'confidential' },
+    ]);
   });
 
   it('should detect tiers correctly based on paths', () => {
@@ -60,7 +74,7 @@ describe('Tiered Mission Architecture', () => {
   });
 
   it('should record hybrid ledger entries correctly', () => {
-    const missionId = 'LEDGER-TEST-001';
+    const missionId = LEDGER_MISSION_ID;
     const missionPath = missionDir(missionId, 'confidential');
     const missionLedgerPath = path.join(missionPath, 'evidence/ledger.jsonl');
     const globalLedgerPath = path.join(PROJECT_ROOT, 'active/audit/system-ledger.jsonl');

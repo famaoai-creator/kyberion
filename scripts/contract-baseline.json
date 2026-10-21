@@ -148,10 +148,10 @@
     },
     {
       "actuator_id": "media-actuator",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "ops": ["pipeline"],
       "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
-      "contract_schema_sha256": "40f17639125da43e054b1e9fd11a5d6e72e142419e71b22d3d1c72534fe0b356"
+      "contract_schema_sha256": "8a8d5feb7e1fedce344dfd27739caec21ebd1109f3e21e707ef3a67ea3285c53"
     },
     {
       "actuator_id": "media-generation-actuator",

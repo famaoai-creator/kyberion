@@ -527,6 +527,24 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   return result;
 }
 
+/**
+ * Startup variant for long-lived services: install the backend chain before
+ * any route registers, but never fail startup — an install error is logged
+ * and the stubs stay in place.
+ */
+export function installReasoningBackendsForService(service: string): boolean {
+  try {
+    const nonStub = installReasoningBackends();
+    logger.info(`[${service}] reasoning backend ${nonStub ? 'installed' : 'stub'}`);
+    return nonStub;
+  } catch (error) {
+    logger.warn(
+      `[${service}] installReasoningBackends failed, continuing with stub: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return false;
+  }
+}
+
 /** Re-resolve provider availability and rebuild the reasoning chain in a long-lived process. */
 export function reselectReasoningBackends(
   options: Omit<InstallReasoningOptions, 'refreshProviders'> = {}

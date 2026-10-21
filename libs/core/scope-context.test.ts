@@ -105,6 +105,38 @@ describe('scope-context', () => {
     expect(resolution.knowledge_roots).not.toContain('confidential');
   });
 
+  it('ignores a legacy mission project reference that has no organization', () => {
+    // Mission state is an inference source. Legacy state predates the chain and
+    // records a project with no organization above it; contributing that id
+    // makes currentScope() throw, and because reasoning-backend selection
+    // resolves the process scope at bootstrap, one stale mission then blocked
+    // unrelated CLI verbs — including the repair verb meant to fix it.
+    const missionDir = pathResolver.shared('tmp/scope-context-legacy-chain-test');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
+      JSON.stringify({
+        tier: 'confidential',
+        relationships: { project: { project_id: 'PRJ-UNREGISTERED' } },
+      })
+    );
+    const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
+    try {
+      const resolution = resolveScopeResolution(
+        { mission_id: 'legacy-chain-test' },
+        {},
+        { includePersisted: false, inferFromCwd: false }
+      );
+      expect(resolution.scope.project_id).toBeUndefined();
+      expect(resolution.scope.organization_id).toBeUndefined();
+      expect(() => currentScope({ mission_id: 'legacy-chain-test' }, {})).not.toThrow();
+    } finally {
+      findMissionPath.mockRestore();
+      resetCurrentScope();
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
   it('uses the mission tier before the public default', () => {
     const missionDir = pathResolver.shared('tmp/scope-context-mission-tier-test');
     safeMkdir(missionDir, { recursive: true });

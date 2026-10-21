@@ -168,9 +168,12 @@ export type DotGoalMode = 'tool' | 'delegated' | { unavailable: string };
  */
 export class DotExecutorPreEffectError extends Error {
   readonly preEffect = true;
-  constructor(message: string) {
+  /** False for a deterministic refusal that a retry cannot change. */
+  readonly retryable: boolean;
+  constructor(message: string, options: { retryable?: boolean } = {}) {
     super(message);
     this.name = 'DotExecutorPreEffectError';
+    this.retryable = options.retryable ?? true;
   }
 }
 
@@ -178,6 +181,38 @@ export class DotExecutorPreEffectError extends Error {
 export function isDotExecutorPreEffectError(error: unknown): boolean {
   return Boolean(
     error && typeof error === 'object' && (error as { preEffect?: unknown }).preEffect === true
+  );
+}
+
+/** Policy, capability and journal-creation refusals repeat identically on every attempt. */
+const DETERMINISTIC_PRE_EFFECT =
+  /\[POLICY_VIOLATION\]|\[RESOURCE_SCOPE_[A-Z_]+\]|\[PIPELINE_JOURNAL\] run journal cannot be created/u;
+
+/** A pre-effect failure that must escalate on its first attempt instead of retrying. */
+export function isDotExecutorPreEffectNonRetryable(error: unknown): boolean {
+  if (!isDotExecutorPreEffectError(error)) return false;
+  if ((error as { retryable?: unknown }).retryable === false) return true;
+  return DETERMINISTIC_PRE_EFFECT.test(error instanceof Error ? error.message : String(error));
+}
+
+/**
+ * Thrown when the executor's own attempt lost its claim (lease or attempt no
+ * longer current). The executor no longer owns the item, so it writes no
+ * result, receipt or release; the current owner and lease recovery decide.
+ */
+export class DotExecutorStaleAttemptError extends Error {
+  readonly staleAttempt = true;
+  constructor(message: string) {
+    super(message);
+    this.name = 'DotExecutorStaleAttemptError';
+  }
+}
+
+export function isDotExecutorStaleAttemptError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as { staleAttempt?: unknown }).staleAttempt === true
   );
 }
 
@@ -279,6 +314,10 @@ interface Outcome {
   summary: string;
   tokens?: number;
   reason_code?: DotWorkResultRow['reason_code'];
+  /** Deterministic pre-effect refusal: escalate without retrying. */
+  nonRetryable?: boolean;
+  /** This executor no longer owns the attempt: persist nothing. */
+  stale?: boolean;
 }
 
 async function routeItem(
@@ -712,6 +751,8 @@ export async function executeDotWorkItem(
         ...(isDotExecutorPreEffectError(error)
           ? { reason_code: 'pre_effect_failure' as const }
           : {}),
+        ...(isDotExecutorPreEffectNonRetryable(error) ? { nonRetryable: true } : {}),
+        ...(isDotExecutorStaleAttemptError(error) ? { stale: true } : {}),
       })),
       deadline,
     ]);
@@ -720,10 +761,22 @@ export async function executeDotWorkItem(
     clearInterval(renewTimer);
   }
 
+  if (outcome.stale) {
+    // Another owner (or lease recovery) holds this item now: a result row,
+    // receipt or release from this executor would contradict it.
+    logger.warn(
+      `executor attempt for ${item.item_id} is no longer current — ${outcome.summary} | next: nothing is recorded by this executor; the current owner or lease recovery settles the item | evidence: ${lease.lease_id}`
+    );
+    return skippedRow(c, item, startedAt, `stale attempt: ${outcome.summary}`, deps);
+  }
   const preEffect = outcome.status === 'failed' && outcome.reason_code === 'pre_effect_failure';
   // A pre-effect failure goes back to `ready` until the attempt bound; then it
-  // ends as an escalated failure — never as an uncertain quarantine.
-  const retryable = preEffect && attemptsSinceRelease(claimed.item) < DOT_EXECUTOR_MAX_ATTEMPTS;
+  // ends as an escalated failure — never as an uncertain quarantine. A
+  // deterministic refusal escalates at once: a retry would only repeat it.
+  const retryable =
+    preEffect &&
+    !outcome.nonRetryable &&
+    attemptsSinceRelease(claimed.item) < DOT_EXECUTOR_MAX_ATTEMPTS;
   if (preEffect && !retryable) {
     outcome = {
       ...outcome,
@@ -785,7 +838,9 @@ export async function executeDotWorkItem(
   // Advisory model completions are never receipts of an executed effect.
   // Pipeline ports report concrete runner outcomes; retries use the same
   // attempt identity and the tenant learner deduplicates their receipts.
+  // A pre-effect failure executed nothing, so it is no evidence for learning.
   if (
+    !preEffect &&
     outcome.mode === 'pipeline' &&
     !outcome.awaitingApproval &&
     claimed.item.current_attempt_id &&

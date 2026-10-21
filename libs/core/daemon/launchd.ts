@@ -21,6 +21,12 @@ export interface LaunchdPlistOptions {
    * Standard*Path targets live on an external volume it cannot open (TCC).
    */
   logDir: string;
+  /**
+   * PATH entries carried over from the installing shell (DaemonRenderContext
+   * userPath), placed after the node dir so CLI backends a daemon selects are
+   * reachable under launchd's minimal environment on any machine layout.
+   */
+  extraPath?: string[];
   label?: string;
   /** Daemon entrypoint relative to repoRoot. */
   daemonScript?: string;
@@ -56,13 +62,16 @@ export function buildLaunchdPlist(
   // pipelines shell out to node/pnpm, so extend PATH with the node bin dir
   // and the standard package-manager locations.
   const pathEnv = [
-    path.posix.dirname(options.nodePath),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin',
-    '/usr/sbin',
-    '/sbin',
+    ...new Set([
+      path.posix.dirname(options.nodePath),
+      ...(options.extraPath ?? []),
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+    ]),
   ].join(':');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -143,6 +152,7 @@ export const launchdManager: DaemonManager = {
         nodePath: ctx.nodePath,
         repoRoot: ctx.repoRoot,
         logDir,
+        extraPath: ctx.userPath,
         label: spec.label,
         daemonScript: spec.daemonScript,
         daemonArgs: spec.daemonArgs,

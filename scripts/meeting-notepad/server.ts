@@ -9,8 +9,8 @@
  *     [--out <dir>] [--instruction <text>] [--title <text>] [port]
  */
 import http from 'node:http';
-import { randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
@@ -20,6 +20,7 @@ import {
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
+import { scopedArtifactDir } from '@agent/core/workforce/artifact-store';
 import { t as catalogT } from '@agent/core/t';
 import { getSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import {
@@ -87,8 +88,33 @@ export function validateMeetingNotepadContentLength(
   return bytes;
 }
 
-export function defaultMeetingNotepadOutputDir(): string {
-  return pathResolver.sharedTmp('meeting-notepad');
+/**
+ * Where a notepad's pads land when `--out` is not given.
+ *
+ * Pads are captured evidence of a meeting, not a consumable intermediate, so
+ * they belong to the scope that owns them. They used to default onto the
+ * shared tmp floor unconditionally, where the 24h TTL hard-deletes them with
+ * no trash grace: leave a pad alone for a day and the notes, the transcript
+ * and the handoff are gone.
+ *
+ * With a scope (a tenant, project or mission) the pads go to that scope's
+ * evidence directory. Without one there is nothing to own them, so the tmp
+ * floor remains the only honest answer.
+ */
+export function defaultMeetingNotepadOutputDir(scope?: {
+  tenant_slug?: string;
+  project_id?: string;
+  mission_id?: string;
+  tier?: 'personal' | 'confidential' | 'public';
+}): string {
+  const scoped = {
+    ...(scope?.tenant_slug ? { tenant: scope.tenant_slug } : {}),
+    ...(scope?.project_id ? { project: scope.project_id } : {}),
+    ...(scope?.mission_id ? { mission: scope.mission_id } : {}),
+  };
+  if (Object.keys(scoped).length === 0) return pathResolver.sharedTmp('meeting-notepad');
+  const { dir } = scopedArtifactDir(scoped, 'evidence', scope?.tier ?? 'confidential');
+  return path.join(dir, 'meeting-notepad');
 }
 
 function option(args: string[], flag: string): string | undefined {
@@ -234,7 +260,6 @@ export async function main(
 ): Promise<MeetingNotepadServerResult | undefined> {
   const positionals = positionalArgs(args);
   const port = Number(positionals[0] || MEETING_NOTEPAD_DEFAULT_PORT);
-  const out = option(args, '--out') || defaultMeetingNotepadOutputDir();
   const defaultInstruction = option(args, '--instruction') || '';
   const defaultTitle = option(args, '--title') || '';
   assertProtocolServiceRegistered('meeting-notepad');
@@ -260,6 +285,14 @@ export async function main(
     // CLI hint is an input selector, never the tenant authority itself.
     resolveTenant(requestedTenant.trim());
   }
+  const out =
+    option(args, '--out') ||
+    defaultMeetingNotepadOutputDir({
+      tenant_slug: requestedTenant,
+      project_id: option(args, '--project-id'),
+      mission_id: option(args, '--mission-id'),
+      tier,
+    });
   const notepadContext = createMeetingNotepadContext({
     artifact_ref: option(args, '--artifact-ref') || out,
     viewer_principal:

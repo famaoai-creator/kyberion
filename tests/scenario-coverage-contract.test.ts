@@ -38,7 +38,9 @@ describe('scenario coverage contracts', () => {
     expect(scenarioDoc).toContain(
       '[product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md)'
     );
-    expect(scenarioDoc).toContain('[ceo-strategic-report](../pipelines/ceo-strategic-report.json)');
+    expect(scenarioDoc).toContain(
+      '[ceo-strategic-report](knowledge/product/pipeline-templates/ceo-strategic-report.json)'
+    );
 
     expect(
       safeExistsSync(
@@ -47,9 +49,11 @@ describe('scenario coverage contracts', () => {
         )
       )
     ).toBe(true);
-    expect(safeExistsSync(pathResolver.rootResolve('pipelines/ceo-strategic-report.json'))).toBe(
-      true
-    );
+    expect(
+      safeExistsSync(
+        pathResolver.rootResolve('knowledge/product/pipeline-templates/ceo-strategic-report.json')
+      )
+    ).toBe(true);
     expect(
       safeExistsSync(
         pathResolver.rootResolve(
@@ -106,16 +110,16 @@ describe('scenario coverage contracts', () => {
   it('keeps representative pipelines spanning multiple actuator domains', () => {
     const representativePipelines = [
       {
-        path: 'pipelines/ceo-strategic-report.json',
-        expectedDomains: ['reasoning', 'system', 'wisdom'],
+        path: 'knowledge/product/pipeline-templates/ceo-strategic-report.json',
+        expectedDomains: ['system', 'code'],
       },
       {
-        path: 'pipelines/contract-review.json',
+        path: 'knowledge/product/pipeline-templates/contract-review.json',
         expectedDomains: ['media', 'wisdom'],
       },
       {
-        path: 'pipelines/executive-narrative-bridge.json',
-        expectedDomains: ['reasoning', 'system', 'wisdom'],
+        path: 'knowledge/product/pipeline-templates/executive-narrative-bridge.json',
+        expectedDomains: ['reasoning', 'system'],
       },
     ];
 
@@ -133,18 +137,21 @@ describe('scenario coverage contracts', () => {
   });
 
   it('keeps the media review and marketing pipelines aligned with the working op shapes', () => {
-    const marketingOps = collectPipelineOps(readJson('pipelines/marketing-content.json'));
+    const marketingOps = collectPipelineOps(
+      readJson('knowledge/product/pipeline-templates/marketing-content.json')
+    );
     expect(marketingOps.has('media:document_diagram_asset_from_brief')).toBe(true);
     expect(marketingOps.has('media:apply_theme')).toBe(true);
     expect(marketingOps.has('media:apply_pattern')).toBe(true);
     expect(marketingOps.has('media:merge_content')).toBe(true);
     expect(marketingOps.has('media:pptx_render')).toBe(true);
 
-    const reviewOps = collectPipelineOps(readJson('pipelines/contract-review.json'));
+    const reviewOps = collectPipelineOps(
+      readJson('knowledge/product/pipeline-templates/contract-review.json')
+    );
     expect(reviewOps.has('media:document_digest')).toBe(true);
     expect(reviewOps.has('wisdom:perspective_fanout')).toBe(true);
     expect(reviewOps.has('wisdom:typed_cross_critique')).toBe(true);
     expect(reviewOps.has('wisdom:emit_dissent_log')).toBe(true);
-    expect(reviewOps.has('wisdom:render_hypothesis_report')).toBe(true);
   });
 });

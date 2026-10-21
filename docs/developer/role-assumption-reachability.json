@@ -55,6 +55,26 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/accepted-pipeline-bindings.ts#requestPipelineBindingApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -961,6 +981,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/tenant-governance-overlay.ts#readTenantGovernanceOverlays",
+      "roles": ["chronos_tenant_runner"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -978,6 +1003,11 @@
     {
       "site": "libs/core/organization/tenant-registry-consistency.ts#collectTenantSystems",
       "roles": ["check_tenant_registry_consistency"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess",
+      "roles": ["pipeline_journal_store"],
       "unresolved": []
     },
     {
@@ -1556,6 +1586,11 @@
     },
     {
       "site": "libs/core/task/task-scoped-grants.ts#revokeGrantsForTenantBestEffort",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/testing/mission-fixture.ts#removeMissionFixture",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2184,6 +2219,21 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/hearing-ledger-routes.ts#registerHearingLedgerRoutes",
+      "roles": ["decision_ledger", "ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/hearing-ledger-routes.ts#renderLedgerCanvasForRecord",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/hearing-ledger-routes.ts#resolveLedgerScenarioRef",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/hearing-mission-routes.ts#missionChildEnv [delegated child role]",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2476,6 +2526,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/chronos_daemon.ts#tickAsLeader",
+      "roles": ["chronos_gateway"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/clean.ts#main",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2530,6 +2585,11 @@
     {
       "site": "scripts/daemon_watchdog.ts#sweepMissionStartCandidates",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/decisions.ts#asLedgerWriter",
+      "roles": ["decision_ledger"],
       "unresolved": []
     },
     {
@@ -2701,6 +2761,46 @@
     {
       "site": "scripts/mission-alignment-gate/alignment-approval.ts#openAlignmentApproval (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
@@ -2921,8 +3021,18 @@
       "unresolved": []
     },
     {
+      "site": "scripts/pipeline_promote.ts#appendTenantCatalogRow",
+      "roles": ["asset_promoter"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/pipeline_promote.ts#main",
-      "roles": ["ecosystem_architect"],
+      "roles": ["asset_promoter", "ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/purge_mission_residue.ts#<module>",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -2968,6 +3078,16 @@
     {
       "site": "scripts/scan_dependency_vulns.ts#scanDependencyVulnerabilitiesFromInputs",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/scratch_promote.ts#main",
+      "roles": ["asset_promoter", "public_tool_promoter"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/scratch_promote.ts#resolveCandidateSource",
+      "roles": ["asset_promoter"],
       "unresolved": []
     },
     {
@@ -3096,7 +3216,7 @@
     "libs/core/mesh/acp-mediator.ts#<module>": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/mic-capture.ts#detectMacPhysicalAudioDevice": [
+    "libs/core/mic-capture.ts#detectMacAudioListing": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/mic-capture.ts#probeMicCapture": [
@@ -3716,6 +3836,20 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -4104,6 +4238,34 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {
@@ -4708,6 +4870,20 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "presence/displays/concierge/src/lib/front-desk-nav.ts#buildFrontDeskNavPayload",
@@ -5028,6 +5204,29 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -5165,9 +5364,16 @@
         "audit_mirror_writer": {
           "example_path": [
             "scripts/event_intake_surface.ts#<module>",
-            "scripts/lib/harness.ts#<module>",
-            "libs/core/script-harness.ts#<module>",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/organization/tenant-governance-overlay.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "scripts/event_intake_surface.ts#<module>",
+            "libs/core/dot/dot-event-intake.ts#loadEventIntakePolicy",
+            "libs/core/organization/tenant-governance-overlay.ts#readTenantGovernanceOverlays"
           ]
         },
         "infrastructure_sentinel": {
@@ -5186,7 +5392,6 @@
       "policy_roles_not_reachable": [
         "autonomy_learning_store",
         "chronos_gateway",
-        "chronos_tenant_runner",
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
@@ -5194,12 +5399,480 @@
         "peer_responder_reader",
         "peer_task_artifact_writer",
         "person_charter_store",
+        "pipeline_journal_store",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
+    },
+    "generation_schedule": {
+      "entries": ["scripts/run_generation_schedule_daemon.ts"],
+      "reviewed_infeasible": [],
+      "child_process_entries": [
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+          "targets": ["scripts/agent_runtime_supervisor_daemon.ts"]
+        },
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+          "targets": ["scripts/run_agent_runtime_supervisor.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+          "targets": ["scripts/run_mission_orchestration_event_worker.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+          "targets": ["scripts/surface_runtime.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+          "targets": ["scripts/mission_controller.ts"]
+        },
+        {
+          "site": "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+          "targets": ["scripts/run_pipeline.ts"]
+        },
+        {
+          "site": "scripts/run_baseline_check.ts#maybeSubmitJanitorMaintenanceJob",
+          "targets": ["scripts/run_pipeline.ts"]
+        },
+        {
+          "site": "scripts/run_checks.ts#executeCheckGate",
+          "targets": ["scripts/knowledge.ts"]
+        },
+        {
+          "site": "scripts/run_generation_schedule_daemon.ts#runTick",
+          "targets": ["scripts/run_generation_schedule.ts"]
+        },
+        {
+          "site": "scripts/setup_oauth.ts#main",
+          "targets": ["scripts/oauth_callback_surface.ts"]
+        },
+        {
+          "site": "scripts/soak_restart_e2e.ts#spawnWorker",
+          "targets": ["scripts/soak_restart_e2e.ts"]
+        }
+      ],
+      "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
+        "autonomy_learning_store": {
+          "example_path": [
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/governance/autonomy-action-state.ts#recordAutonomyExecution",
+            "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore"
+          ]
+        },
+        "chronos_gateway": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "ecosystem_architect": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
+            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "generation_scheduler": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction"
+          ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "knowledge_steward": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "metrics_cap_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#reconcileGenerationSchedule",
+            "libs/core/generation-cost-settlement.ts#settleGenerationProviderCost",
+            "libs/core/metrics.ts#aggregateMetricsForEnforcement"
+          ]
+        },
+        "mission_controller": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
+            "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "nhi_accountability_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/index.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#<module>",
+            "libs/actuators/system-actuator/src/index.ts#<module>",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
+          ]
+        },
+        "operational_learning_writer": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/index.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#<module>",
+            "libs/actuators/system-actuator/src/index.ts#<module>",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
+          ]
+        },
+        "organization_operator": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#<module>",
+            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
+            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "reconcile_config_fallbacks": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/index.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#<module>",
+            "libs/actuators/system-actuator/src/index.ts#<module>",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "libs/core/reconcile-ops.ts#reconcileConfigFallbacks",
+            "libs/core/reconcile-ops.ts#handleFileMissing"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign_concierge": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#handleCaptureAction",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleSystemAction",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleComputerInteraction"
+          ]
+        },
+        "surface_runtime": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "workspace_tenant_registry_reader": {
+          "example_path": [
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-lifecycle.ts#assertOperationBinding",
+            "libs/core/dot/dot-lifecycle.ts#readWorkspaceTenant"
+          ]
+        }
+      },
+      "unresolved_sites": [
+        "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+        "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
+        "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
+        "libs/core/agent/agent-adapter.ts#runCliProcess",
+        "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
+        "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
+        "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
+        "libs/core/environment-capability.ts#runCommandProbe",
+        "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
+        "libs/core/media/native-tts.ts#probeNativeTts",
+        "libs/core/media/native-tts.ts#speak",
+        "libs/core/mesh/acp-mediator.ts#<module>",
+        "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
+        "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
+        "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
+        "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
+        "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
+        "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
+        "libs/core/provider/cursor-cli-reasoning-backend.ts#CursorCliReasoningBackend",
+        "libs/core/provider/devin-cli-reasoning-backend.ts#DevinCliReasoningBackend",
+        "libs/core/provider/gemini-cli-backend.ts#GeminiCliBackend",
+        "libs/core/provider/gemini-cli-backend.ts#runGeminiCliQuery",
+        "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
+        "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
+        "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/shell/pty-engine.ts#PtyRegistry",
+        "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
+        "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/video/video-frame-archive.ts#readVideoFramesFromMp4",
+        "libs/core/video/video-frame-archive.ts#writeVideoFramesToMp4",
+        "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
+        "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
+        "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
+        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
+        "scripts/backup.ts#runRequired",
+        "scripts/check_doc_examples.ts#runBashCheck",
+        "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/continuous_owner_process.ts#runContinuousOwnerProcess",
+        "scripts/dot_supervisor_extensions.ts#reconcileDotEventRunnerDuplicate",
+        "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+        "scripts/refactor/adf-input.ts#readWorkflowModuleInput",
+        "scripts/run_checks.ts#executeCheckGate"
+      ],
+      "policy_roles_not_reachable": []
     },
     "imessage_bridge": {
       "entries": ["satellites/imessage-bridge/src/index.ts"],
@@ -5435,6 +6108,31 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {
@@ -5799,6 +6497,19 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {
@@ -6276,6 +6987,30 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -6508,6 +7243,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "pipeline_journal_store",
         "scope_locale_reader",
         "slack_bridge",
         "workspace_tenant_registry_index_reader",
@@ -6764,6 +7500,26 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "reasoning_settings_writer": {
@@ -7159,6 +7915,34 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "scripts/personal-pads/server.ts#createPersonalPadsServer",
@@ -7400,9 +8184,16 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "decision_ledger": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-ledger-routes.ts#registerHearingLedgerRoutes"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackendsForService",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -7492,6 +8283,19 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -7566,7 +8370,7 @@
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
-        "libs/core/mic-capture.ts#detectMacPhysicalAudioDevice",
+        "libs/core/mic-capture.ts#detectMacAudioListing",
         "libs/core/mic-capture.ts#probeMicCapture",
         "libs/core/mic-capture.ts#startMicCapture",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7830,6 +8634,30 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -8035,6 +8863,7 @@
         "peer_responder_reader",
         "peer_task_artifact_writer",
         "person_charter_store",
+        "pipeline_journal_store",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
@@ -8216,6 +9045,15 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {
@@ -8540,6 +9378,29 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {
@@ -8899,6 +9760,26 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pipeline_journal_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -9126,13 +10007,8 @@
         },
         "ecosystem_architect": {
           "example_path": [
-            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
-            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/agent_runtime_supervisor_daemon.ts#main",
+            "satellites/voice-hub/server.ts#<module>",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackendsForService",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -9228,6 +10104,26 @@
             "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
             "libs/core/governance/accountability-charter-registry.ts#readCharter",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/pipeline/pipeline-run-journal.ts#openPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#appendPipelineJournalEvent",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "scope_locale_reader": {

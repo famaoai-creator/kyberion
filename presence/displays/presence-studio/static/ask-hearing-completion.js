@@ -682,6 +682,40 @@
       if (window.FrontDeskRail && window.FrontDeskRail.subscribe)
         window.FrontDeskRail.subscribe(retire);
     }
+    // SD-02: a decision-ledger hearing records its answered items through the
+    // governed ledger facade; the tenant ledger, not a hearing receipt, is the
+    // durable proof, so this path has no exact-receipt recovery.
+    var ledgerPending = false;
+    function recordLedgerDecisions() {
+      if (ledgerPending) return;
+      ledgerPending = true;
+      renderHearing();
+      Promise.resolve()
+        .then(function () {
+          return fetchJson(
+            scopedUrl(
+              '/api/hearing/' +
+                encodeURIComponent(state.sessionId) +
+                '/record-decisions?locale=' +
+                encodeURIComponent(state.locale)
+            ),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}',
+            }
+          );
+        })
+        .catch(function () {
+          /* the record remains available for retry */
+        })
+        .finally(function () {
+          ledgerPending = false;
+          // Refresh through the validated read gate instead of trusting the raw payload.
+          if (hearingRecovery) hearingRecovery.load();
+          else renderHearing();
+        });
+    }
     function decideHearing() {
       if (
         !state.hearingMode ||
@@ -697,6 +731,10 @@
         !state.conversationId
       )
         return;
+      if (state.hearingRecord.is_ledger) {
+        recordLedgerDecisions();
+        return;
+      }
       var local = decisionState();
       var action = hearingActionContext();
       action.generation = decisionGeneration;

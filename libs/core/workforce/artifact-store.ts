@@ -557,6 +557,28 @@ function serializeScopedContent(content: unknown, format?: ScopedArtifactFormat)
  * lifecycle GC (AL-03/AL-04) can classify artifacts by class without walking.
  * Fail-closed: the resolved path must satisfy `isScopedArtifactPath`.
  */
+/**
+ * Directory a scoped artifact of `artifactClass` lands in, without writing
+ * anything. Long-lived capture surfaces (a meeting notepad, a recorder) hold a
+ * directory open and append to it over a session, so they cannot express their
+ * placement as a single `writeScopedArtifact` call. Giving them the same
+ * resolved directory keeps their output inside the scope that owns it instead
+ * of on the shared tmp floor, where a 24h TTL deletes it outright.
+ */
+export function scopedArtifactDir(
+  scope: ScopedArtifactScope,
+  artifactClass: RetentionArtifactClass,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+): { dir: string; scope_kind: ScopedArtifactScopeKind } {
+  const { artifactsRoot, kind } = resolveScopeArtifactsRoot(scope, tier);
+  const dir =
+    kind === 'task'
+      ? path.join(artifactsRoot, artifactClass, scopedTaskArtifactDirName(scope.task as string))
+      : path.join(artifactsRoot, artifactClass);
+  assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  return { dir, scope_kind: kind };
+}
+
 export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScopedArtifactResult {
   if (!RETENTION_ARTIFACT_CLASSES.includes(input.artifact_class)) {
     throw new Error(

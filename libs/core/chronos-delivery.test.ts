@@ -7,18 +7,26 @@ import {
   validateChronosDeliveryTarget,
 } from './chronos-delivery.js';
 import { validatePipelineAdf } from './pipeline/pipeline-contract.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   clearSurfaceOutboxMessage,
   listSurfaceOutboxMessages,
 } from './surface/surface-coordination-store.js';
 
 const createdMessageIds: string[] = [];
+const createdChronosMessageIds: string[] = [];
 
 afterEach(() => {
   vi.unstubAllEnvs();
   withExecutionContext('slack_bridge', () => {
     for (const messageId of createdMessageIds.splice(0)) {
       clearSurfaceOutboxMessage('slack', messageId);
+    }
+  });
+  withExecutionContext('chronos_gateway', () => {
+    for (const messageId of createdChronosMessageIds.splice(0)) {
+      clearSurfaceOutboxMessage('chronos', messageId);
     }
   });
 });
@@ -37,6 +45,42 @@ describe('chronos-delivery', () => {
       surface: 'slack',
       channel: '#ops',
     });
+  });
+
+  it('validates the shipped digest schedule that delivers to Chronos', () => {
+    // Schema and the runtime allowlist must agree, or chronos silently skips the file.
+    const adf = JSON.parse(
+      safeReadFile(pathResolver.rootResolve('pipelines/organization-daily-digest.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(validatePipelineAdf(adf).schedule?.deliver_to).toMatchObject({ surface: 'chronos' });
+    // The cross-tenant text must never land in the system-namespace outbox:
+    // only counts are delivered; the text lives in per-organization artifacts.
+    const template = String(adf.schedule.deliver_to.template);
+    expect(template).not.toMatch(/organization_digest\.(text|tenants|organizations)\b/);
+    expect(template).toContain('organization_digest.totals.');
+    const rendered = renderChronosDeliveryMessage({
+      scheduleId: 'organization-daily-digest',
+      pipelineName: 'Organization daily digest',
+      status: 'succeeded',
+      context: {
+        organization_digest: {
+          status: 'attention',
+          organization_count: 5,
+          totals: {
+            due_operations: 3,
+            deadlines: 1,
+            pending_decisions: 2,
+            open_incidents: 1,
+            expiring_services: 0,
+          },
+        },
+      },
+      template,
+    });
+    expect(rendered).not.toContain('{{');
+    expect(rendered).toContain('5');
   });
 
   it('renders a bounded schedule template from pipeline context', () => {
@@ -82,6 +126,29 @@ describe('chronos-delivery', () => {
       source: 'system',
       deduplication_key: 'chronos:daily-report:run-1',
     });
+  });
+
+  it('delivers to the local Chronos outbox without an external chat bridge', () => {
+    const messagePath = withExecutionContext('chronos_gateway', () =>
+      enqueueChronosDelivery({
+        scheduleId: 'organization-daily-digest',
+        pipelineName: 'Organization daily digest',
+        runId: 'run-chronos-1',
+        status: 'succeeded',
+        context: { organization_digest: { text: 'digest body' } },
+        target: {
+          surface: 'chronos',
+          channel: 'chronos',
+          template: '{{context.organization_digest.text}}',
+        },
+      })
+    );
+    const message = listSurfaceOutboxMessages('chronos').find(
+      (entry) => entry.correlation_id === 'chronos:organization-daily-digest:run-chronos-1'
+    );
+    if (message) createdChronosMessageIds.push(message.message_id);
+    expect(messagePath.replaceAll('\\', '/')).toContain('/coordination/channels/chronos/outbox/');
+    expect(message).toMatchObject({ channel: 'chronos', text: 'digest body', source: 'system' });
   });
 
   it('rejects unsupported surfaces and empty targets before writing', () => {

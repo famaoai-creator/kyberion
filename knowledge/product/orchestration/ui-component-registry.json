@@ -1,0 +1,64 @@
+{
+  "$schema": "../schemas/ui-component-registry.schema.json",
+  "version": "1.0.0",
+  "components": [
+    {
+      "id": "hearing",
+      "kind": "flow",
+      "status": "a2ui",
+      "title_key": "front_desk:component_hearing_title",
+      "summary_key": "front_desk:component_hearing_sub",
+      "host": "presence-studio",
+      "entry": {
+        "a2ui_path": "/api/headless/a2ui/hearing",
+        "input": {
+          "operation_id": "presence.hearing.answer",
+          "placeholder_key": "front_desk:flow_input_placeholder"
+        }
+      },
+      "menu": { "group": "ask", "order": 10 },
+      "required_role": "viewer",
+      "operations": [
+        "presence.hearing.view.a2ui",
+        "presence.hearing.answer",
+        "presence.hearing.decide",
+        "presence.hearing.handoff"
+      ]
+    },
+    {
+      "id": "decision-ledger",
+      "kind": "view",
+      "status": "planned",
+      "title_key": "front_desk:component_decisions_title",
+      "summary_key": "front_desk:component_decisions_sub",
+      "host": "presence-studio",
+      "menu": { "group": "decide", "order": 20 },
+      "required_role": "viewer",
+      "operations": []
+    },
+    {
+      "id": "approvals",
+      "kind": "view",
+      "status": "page",
+      "title_key": "front_desk:component_approvals_title",
+      "summary_key": "front_desk:component_approvals_sub",
+      "host": "concierge",
+      "entry": { "page_path": "/", "page_surface": "concierge" },
+      "menu": { "group": "decide", "order": 10 },
+      "required_role": "viewer",
+      "operations": []
+    },
+    {
+      "id": "progress",
+      "kind": "view",
+      "status": "page",
+      "title_key": "front_desk:component_progress_title",
+      "summary_key": "front_desk:component_progress_sub",
+      "host": "presence-studio",
+      "entry": { "page_path": "/progress", "page_surface": "presence-studio" },
+      "menu": { "group": "progress", "order": 10 },
+      "required_role": "viewer",
+      "operations": []
+    }
+  ]
+}

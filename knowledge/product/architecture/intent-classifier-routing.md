@@ -260,3 +260,26 @@ intent -> slot -> plan -> execution -> outcome
 ```
 
 This keeps the system debuggable without forcing the user to understand raw ADF or actuator internals.
+
+## Palettes and comparison runs
+
+Work-shape routing (this document) chooses machinery. Cognitive palettes choose how expensive the remaining LLM turn may be:
+
+- `cost` — keep more turns on `fast_llm`; comparison fan-out only when the operator asks
+- `balance` — default; same thresholds as the original cognitive router; comparison when uncertainty is high or the operator asks
+- `intelligence` — upgrade more turns to `heavy_reasoning`; comparison for heavy turns or when asked
+
+Set `KYBERION_ROUTING_OPTIMIZE_FOR`. Capture a request on the memory pad (`memory.propose-compare`); run it with `pnpm reasoning:compare --instruction "..." --explicit`. Live provider fan-out also needs `KYBERION_BEST_OF_PROVIDERS_LIVE=1`. The comparison path is read-only and does not write the repository.
+
+Provider-only comparison remains available through `--providers`. To isolate
+backend, model, and effort as separate experimental variables, pass an explicit
+candidate matrix:
+
+```bash
+pnpm reasoning:compare --instruction "..." --explicit --live \
+  --candidates '[{"backend":"claude","model":"opus","effort":"medium"},{"backend":"cursor","model":"auto"},{"backend":"cursor","model":"claude-opus-5-thinking-high"}]'
+```
+
+Candidates on different backends run concurrently. Candidates sharing one
+backend run sequentially with the resumable session reset between them, so one
+model's context cannot contaminate the next model's result.

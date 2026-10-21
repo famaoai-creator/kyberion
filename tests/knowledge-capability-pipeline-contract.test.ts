@@ -4,30 +4,30 @@ import { safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
 
+function readJson(relativePath: string): unknown {
+  return JSON.parse(safeReadFile(path.join(rootDir, relativePath), { encoding: 'utf8' }) as string);
+}
+
 describe('Knowledge capability pipeline contract', () => {
-  it('uses capability discovery in the code audit pipeline', () => {
-    const pipeline = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/product/governance/pipelines/code-skill-audit.json'), { encoding: 'utf8' }) as string,
-    ) as {
-      steps: Array<{ op: string; params?: { export_as?: string } }>;
+  it('lists capabilities from the governed intent catalog', () => {
+    const pipeline = readJson('pipelines/list-capabilities.json') as {
+      steps: Array<{ op: string; params?: { path?: string } }>;
     };
 
-    expect(pipeline.steps[0]?.op).toBe('discover_capabilities');
-    expect(pipeline.steps[0]?.params?.export_as).toBe('all_capabilities');
+    expect(pipeline.steps[0]?.op).toBe('system:read_json');
+    expect(pipeline.steps[0]?.params?.path).toBe(
+      'knowledge/product/governance/standard-intents.json'
+    );
   });
 
-  it('synchronizes markdown knowledge cards instead of legacy instruction assets', () => {
-    const pipeline = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/product/governance/pipelines/wisdom-sync-dates.json'), { encoding: 'utf8' }) as string,
-    ) as {
-      strategies: Array<{
-        for_each?: { params?: { dir?: string; ext?: string; export_as?: string } };
-      }>;
+  it('curates markdown knowledge cards through the weekly report pipeline', () => {
+    const pipeline = readJson('pipelines/knowledge-curation-weekly.json') as {
+      steps: Array<{ op: string }>;
     };
 
-    const forEach = pipeline.strategies[0]?.for_each?.params;
-    expect(forEach?.dir).toBe('knowledge/public');
-    expect(forEach?.ext).toBe('.md');
-    expect(forEach?.export_as).toBe('knowledge_cards_to_sync');
+    expect(pipeline.steps.some((step) => step.op === 'wisdom:curation_report')).toBe(true);
+    expect(pipeline.steps.some((step) => step.op === 'wisdom:knowledge_validation_sweep')).toBe(
+      true
+    );
   });
 });

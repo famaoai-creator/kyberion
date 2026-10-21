@@ -838,7 +838,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       if (options?.advisory && (attempt.result.toolCalls?.length ?? 0) > 0) {
         throw new AdvisoryPolicyViolation();
       }
-      return attempt.result;
+      return attempt.result.servedBy
+        ? attempt.result
+        : { ...attempt.result, servedBy: candidateLabel(candidate) };
     }
 
     throw new Error(

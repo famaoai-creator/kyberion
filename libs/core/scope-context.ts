@@ -4,7 +4,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
+import { loadMissionStateForInference } from './mission/mission-state-reader.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
@@ -119,13 +119,24 @@ function readMissionScope(missionId: string): ScopeContextInput {
     const statePath = assertSafeRepositoryPath(
       pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`)
     );
-    const state = loadMissionStateAtPath(statePath);
+    const state = loadMissionStateForInference(statePath);
     if (!state) return {};
+    const tenantSlug = state.tenant_slug || state.tenant_id;
+    const organizationId = state.organization_id;
+    // Mission state is an inference source, not an authority, and legacy state
+    // predates the containment chain — a project relationship recorded before
+    // organizations existed carries no parent. Contributing such an id would
+    // make every subsequent `currentScope()` throw, which is how a stale
+    // mission blocked unrelated CLI verbs (reasoning-backend selection
+    // resolves the process scope during bootstrap). Each level is contributed
+    // only when its parent is present.
     return {
       tier: state.tier,
-      tenant_slug: state.tenant_slug || state.tenant_id,
-      organization_id: state.organization_id,
-      project_id: state.relationships?.project?.project_id,
+      tenant_slug: tenantSlug,
+      ...(tenantSlug ? { organization_id: organizationId } : {}),
+      ...(tenantSlug && organizationId
+        ? { project_id: state.relationships?.project?.project_id }
+        : {}),
     };
   } catch {
     return {};

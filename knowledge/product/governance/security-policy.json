@@ -377,6 +377,7 @@
         "active/shared/observability/review-service/",
         "active/shared/observability/mission-control/",
         "active/shared/observability/retrospectives/",
+        "active/shared/observability/protocol-services/report-review/",
         "presence/bridge/runtime/",
         "active/audit/"
       ],
@@ -399,6 +400,7 @@
         "active/shared/observability/review-service/",
         "active/shared/observability/mission-control/",
         "active/shared/observability/retrospectives/",
+        "active/shared/observability/protocol-services/report-review/",
         "presence/bridge/runtime/",
         "active/audit/",
         "evidence/browser/"
@@ -712,6 +714,37 @@
     "ingest_commit": {
       "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
     },
+    "asset_promoter": {
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "knowledge/confidential/${KYBERION_TENANT}/pipelines/",
+        "knowledge/confidential/${KYBERION_TENANT}/tools/",
+        "active/shared/tmp/",
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+        "active/shared/staging/",
+        "active/shared/staging/confidential/${KYBERION_TENANT}/",
+        "active/missions/",
+        "active/missions/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "knowledge/confidential/${KYBERION_TENANT}/pipelines/",
+        "knowledge/confidential/${KYBERION_TENANT}/tools/",
+        "knowledge/confidential/${KYBERION_TENANT}/_ledger/",
+        "active/shared/tmp/",
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+        "active/shared/staging/",
+        "active/shared/staging/confidential/${KYBERION_TENANT}/"
+      ]
+    },
+    "public_tool_promoter": {
+      "allow_read": [
+        "knowledge/public/tools/",
+        "active/shared/tmp/",
+        "active/shared/staging/",
+        "active/missions/"
+      ],
+      "allow_write": ["knowledge/public/tools/", "active/shared/tmp/", "active/shared/staging/"]
+    },
     "reconcile_config_fallbacks": {
       "allow_write": ["knowledge/public/", "active/shared/tmp/"]
     },
@@ -809,6 +842,16 @@
         "active/shared/observability/"
       ]
     },
+    "decision_ledger": {
+      "allow_read": [
+        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+        "knowledge/confidential/${KYBERION_TENANT}/customers/"
+      ],
+      "allow_write": [
+        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+        "knowledge/confidential/${KYBERION_TENANT}/customers/"
+      ]
+    },
     "daemon_watchdog": {
       "allow_read": [
         "active/shared/coordination/autonomy/",
@@ -885,6 +928,20 @@
         "knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
         "active/shared/runtime/autonomy-learning",
         "active/shared/runtime/autonomy-learning/confidential",
+        "knowledge/confidential/${KYBERION_TENANT}"
+      ]
+    },
+    "pipeline_journal_store": {
+      "allow_read": [
+        "active/shared/runtime/pipeline-library-runs",
+        "active/shared/runtime/pipeline-library-runs/confidential",
+        "active/shared/runtime/pipeline-library-runs/confidential/${KYBERION_TENANT}",
+        "knowledge/confidential/${KYBERION_TENANT}"
+      ],
+      "allow_write": [
+        "active/shared/runtime/pipeline-library-runs",
+        "active/shared/runtime/pipeline-library-runs/confidential",
+        "active/shared/runtime/pipeline-library-runs/confidential/${KYBERION_TENANT}",
         "knowledge/confidential/${KYBERION_TENANT}"
       ]
     },

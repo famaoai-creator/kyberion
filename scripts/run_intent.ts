@@ -1,4 +1,6 @@
+// Task types executeApprovedClaudeTaskSession can run; others stop at session creation.
 import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
+import { resolveAcceptedPipelineBinding } from '@agent/core/accepted-pipeline-bindings';
 import { createAssistantCompilerRequest } from '@agent/core/assistant-compiler-request';
 import { createAssistantDelegationRequest } from '@agent/core/mission/delegation-request';
 import {
@@ -11,6 +13,8 @@ import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { executeApprovedClaudeTaskSession } from '@agent/core/provider/claude-task-session-executor';
 import { formatClarificationPacket } from '@agent/core/intent/intent-clarification-format';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
+import { buildOrganizationWorkLoopSummary } from '@agent/core/workforce/work-design';
+import { resolveScopeContext } from '@agent/core/scope-context';
 import { safeExistsSync } from '@agent/core/secure-io';
 import {
   chooseExecutionIntent,
@@ -23,14 +27,51 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-
-// Task types executeApprovedClaudeTaskSession can run; others stop at session creation.
+import { executePipelineFile } from './run_pipeline.js';
+import { PipelineSuspendedError } from './pipeline-execution-part-bootstrap.js';
 const CLAUDE_TASK_SESSION_TYPES = new Set(['browser', 'report_document', 'document_generation']);
 
 export const RUN_INTENT_USAGE =
   'Usage: pnpm intent:run -- <intent_id> [--input <context.json>] [--scenario-only]';
 
 type IntentGatewayResult = Record<string, unknown>;
+
+export async function executeAcceptedPipelineRoute(input: {
+  pipelineRef: string;
+  context: Record<string, unknown>;
+  execute?: typeof executePipelineFile;
+}): Promise<IntentGatewayResult> {
+  try {
+    const result = await (input.execute || executePipelineFile)(input.pipelineRef, {
+      context: input.context,
+      trustResolved: true,
+      quiet: true,
+    });
+    const failed = result.results.some((entry) => entry.status === 'failed');
+    return {
+      status: failed ? 'failed' : 'completed',
+      route: 'accepted_pipeline_binding',
+      pipeline_ref: input.pipelineRef,
+      results: result.results,
+      trace_path: result.persistedPath,
+    };
+  } catch (error) {
+    if (error instanceof PipelineSuspendedError) {
+      return {
+        status: 'suspended',
+        route: 'accepted_pipeline_binding',
+        pipeline_ref: input.pipelineRef,
+        approval_request_id: error.suspension.approval_request_id,
+      };
+    }
+    return {
+      status: 'failed',
+      route: 'accepted_pipeline_binding',
+      pipeline_ref: input.pipelineRef,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
 
 /**
  * Dispatch a catalog intent whose resolution shape is `task_session` to the
@@ -188,6 +229,33 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
     // the canonical resolver has selected an intent ID.
     source_text: intent,
   };
+  const contextText = (key: string): string | undefined => {
+    const value = (context as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value : undefined;
+  };
+  const fastPathWorkScope = buildOrganizationWorkLoopSummary({
+    intentId: packet.selected_intent_id,
+    shape: packet.selected_resolution?.shape,
+    utterance: intent,
+    tier,
+    projectId: contextText('project_id'),
+  });
+
+  const acceptedBinding = resolveAcceptedPipelineBinding({
+    packet,
+    scope: resolveScopeContext({
+      tier: tier || 'public',
+      tenant_slug: typeof tenantId === 'string' ? tenantId : undefined,
+      organization_id: contextText('organization_id'),
+      project_id: contextText('project_id'),
+    }),
+    governance: {
+      execution_shape: fastPathWorkScope.work_scope_decision?.execution_shape,
+      requires_approval: fastPathWorkScope.authority.requires_approval,
+      active_mission: Boolean(contextText('mission_id')),
+      viewer_scope_authorized: true,
+    },
+  });
 
   const compilerOptions = {
     provider: argv.compilerProvider as 'codex' | 'gemini' | 'claude' | undefined,
@@ -200,7 +268,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
       {
         text: intent,
         locale: String((context as any)?.locale || ''),
-        projectId: (context as any)?.project_id,
+        projectId: contextText('project_id'),
         projectName: (context as any)?.project_name,
         trackId: (context as any)?.track_id,
         trackName: (context as any)?.track_name,
@@ -234,7 +302,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
       source: { origin: 'cli', channel: 'run_intent' },
       sourceText: intent,
       locale: String((context as any)?.locale || ''),
-      projectId: (context as any)?.project_id,
+      projectId: contextText('project_id'),
       projectName: (context as any)?.project_name,
       trackId: (context as any)?.track_id,
       trackName: (context as any)?.track_name,
@@ -266,7 +334,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
       workLoop: compiled.workLoop,
       clarificationPacket: compiled.clarificationPacket,
       locale: String((context as any)?.locale || ''),
-      projectId: (context as any)?.project_id,
+      projectId: contextText('project_id'),
       projectName: (context as any)?.project_name,
       trackId: (context as any)?.track_id,
       trackName: (context as any)?.track_name,
@@ -292,6 +360,18 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
       ...(compiled.clarificationPacket
         ? { clarification_text: formatClarificationPacket(compiled.clarificationPacket) }
         : {}),
+    };
+  }
+
+  if (acceptedBinding) {
+    const execution = await executeAcceptedPipelineRoute({
+      pipelineRef: acceptedBinding.pipeline_ref,
+      context: runtimeContext,
+    });
+    return {
+      ...execution,
+      intent_id: packet.selected_intent_id,
+      binding_id: acceptedBinding.binding_id,
     };
   }
 

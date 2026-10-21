@@ -69,13 +69,22 @@ function readMissionScope(missionId: string): EventScope | null {
   const resolvedOrganizationId =
     registryOrganizationId || organizationId || normalizedRelationOrganizationId;
 
+  // The chain is only meaningful downward: an id whose parent is absent cannot
+  // narrow anything, and emitting it yields a scope that fails containment
+  // validation. Legacy mission state predates the chain and often carries a
+  // project reference with no organization — surfacing that as scope made even
+  // `mission repair` unreachable, because the guard fired before the verb that
+  // exists to fix it could run. Each level is therefore gated on its parent.
+  const scopedOrganizationId = tenantSlug ? resolvedOrganizationId : undefined;
+  const scopedProjectId = scopedOrganizationId ? projectId : undefined;
+
   return normalizeEventScope({
     scope_kind: 'mission',
     tier,
     mission_id: missionId,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-    ...(resolvedOrganizationId ? { organization_id: resolvedOrganizationId } : {}),
-    ...(projectId ? { project_id: projectId } : {}),
+    ...(scopedOrganizationId ? { organization_id: scopedOrganizationId } : {}),
+    ...(scopedProjectId ? { project_id: scopedProjectId } : {}),
   });
 }
 

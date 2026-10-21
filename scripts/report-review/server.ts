@@ -29,6 +29,7 @@ import { t as catalogT } from '@agent/core/t';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import {
   reviewLayerMarkup,
+  injectReviewLayer,
   RV_LAYER_OPEN,
   RV_LAYER_CLOSE,
   RV_SAVE_CONFIG_CLOSE,
@@ -142,10 +143,7 @@ export function createReportReviewRequestHandler(
         assets: 'served',
         reportId: reviewContext.artifact_ref,
       });
-      // Replacer function: the layer carries script sources whose `$` must not be read as patterns.
-      html = html.includes('</body>')
-        ? html.replace('</body>', () => `${layer}\n</body>`)
-        : html + layer;
+      html = injectReviewLayer(html, layer);
     }
     return html;
   }

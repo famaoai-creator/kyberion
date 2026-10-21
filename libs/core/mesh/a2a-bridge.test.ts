@@ -665,6 +665,46 @@ describe('a2a-bridge', () => {
     expect(responses).toHaveLength(1);
   });
 
+  it('routes a bare surface handoff without holding it to the mission-task contract', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    mocks.getAgentManifest.mockImplementation((agentId: string) =>
+      agentId === 'codex-nerve'
+        ? { provider: 'codex', modelId: 'gpt-5', systemPrompt: 'You are nerve', capabilities: [] }
+        : undefined
+    );
+    const handle = { ask: vi.fn(async (prompt: string) => `echo:${prompt}`) };
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+      agentId === 'codex-nerve' ? handle : null
+    );
+    mocks.askAgentRuntime.mockImplementation(
+      async (_agentId: string, prompt: string) => `echo:${prompt}`
+    );
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.get.mockImplementation((agentId: string) =>
+      agentId === 'sender-x' || agentId === 'codex-nerve' ? { status: 'ready' } : undefined
+    );
+
+    await expect(
+      a2aBridge.route({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-HANDOFF',
+          sender: 'sender-x',
+          receiver: 'kyberion:nerve:codex',
+          conversation_id: 'CONV-HANDOFF',
+          performative: 'request' as const,
+        },
+        payload: { intent: 'surface_handoff', text: 'hand over' },
+      })
+    ).resolves.toBeDefined();
+    expect(mocks.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'a2a_task_contract_invalid' })
+    );
+    expect(mocks.askAgentRuntime).toHaveBeenCalled();
+  });
+
   it('includes intent and context when routing structured payloads', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
     const handle = { ask: vi.fn(async () => 'ok') };

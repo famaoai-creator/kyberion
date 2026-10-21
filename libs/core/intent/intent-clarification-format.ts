@@ -24,6 +24,13 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
   return lines.join('\n');
 }
 
+/** Missing-input ids are internal (`goal_or_target`, `scope-definition`); people see plain words. */
+export function humanizeInputId(id: string): string {
+  return String(id || '')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+}
+
 export function formatClarificationPacketConcise(
   packet: OperatorInteractionPacket,
   options: ClarificationFormatOptions = {}

@@ -461,14 +461,29 @@ function escapeHtml(value: unknown): string {
 export function renderHearingCanvas(record: HearingRecord, locale: SupportedLocale = 'en'): string {
   const complete = record.requirements.filter((item) => item.answer?.trim()).length;
   const unanswered = catalogT('front_desk:hearing_canvas_unanswered', undefined, locale);
-  const cards = record.requirements
-    .map(
-      (item) => `<article class="requirement ${item.answer ? 'answered' : 'open'}">
-        <h2>${escapeHtml(catalogT(item.label_key as VocabularyKey, undefined, locale))}</h2>
+  const card = (
+    item: HearingRecord['requirements'][number]
+  ) => `<article class="requirement ${item.answer ? 'answered' : 'open'}">
+        <h2>${escapeHtml(
+          item.label_source === 'tenant' && item.label_text
+            ? item.label_text
+            : catalogT(item.label_key as VocabularyKey, undefined, locale)
+        )}</h2>
         <p>${escapeHtml(item.answer || unanswered)}</p>
-      </article>`
-    )
-    .join('\n');
+      </article>`;
+  // Phase-structured sheets are drawn phase by phase (heading + its cards);
+  // flat scenarios keep the single list.
+  const cards = record.phases?.length
+    ? record.phases
+        .map((phase) => {
+          const own = record.requirements.filter((item) => item.phase_id === phase.id);
+          const done = own.filter((item) => item.answer?.trim()).length;
+          return `<section class="phase"><h2 class="phase-title">${escapeHtml(
+            catalogT(phase.title_key as VocabularyKey, undefined, locale)
+          )} <small>${done}/${own.length}</small></h2><div class="grid">${own.map(card).join('\n')}</div></section>`;
+        })
+        .join('\n')
+    : record.requirements.map(card).join('\n');
   const pageTitle = catalogT('front_desk:hearing_canvas_page_title', undefined, locale);
   const heading = catalogT('front_desk:hearing_canvas_heading', undefined, locale);
   const coverage = catalogT(
@@ -476,7 +491,7 @@ export function renderHearingCanvas(record: HearingRecord, locale: SupportedLoca
     { complete, total: record.requirements.length },
     locale
   );
-  return `<!doctype html><html lang="${escapeHtml(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(pageTitle)}</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#faf9f6;color:#26231d}h1{font-size:22px;margin:0 0 8px}.meta{color:#706b60;font-size:13px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.requirement{padding:14px;border:1px solid #e3ddd1;border-radius:12px;background:#fff}.requirement h2{font-size:14px;margin:0 0 8px}.requirement p{font-size:13px;line-height:1.5;margin:0;color:#706b60}.answered{border-color:#a98a54}.answered p{color:#26231d}</style></head><body><h1>${escapeHtml(heading)}</h1><p class="meta">${escapeHtml(coverage)}</p><main class="grid">${cards}</main></body></html>`;
+  return `<!doctype html><html lang="${escapeHtml(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(pageTitle)}</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#faf9f6;color:#26231d}h1{font-size:22px;margin:0 0 8px}.meta{color:#706b60;font-size:13px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.requirement{padding:14px;border:1px solid #e3ddd1;border-radius:12px;background:#fff}.requirement h2{font-size:14px;margin:0 0 8px}.requirement p{font-size:13px;line-height:1.5;margin:0;color:#706b60}.answered{border-color:#a98a54}.answered p{color:#26231d}.phase-title{font-size:15px;margin:18px 0 8px}.phase-title small{color:#706b60;font-weight:400}</style></head><body><h1>${escapeHtml(heading)}</h1><p class="meta">${escapeHtml(coverage)}</p><main${record.phases?.length ? '' : ' class="grid"'}>${cards}</main></body></html>`;
 }
 
 /** Versioned wire contract. Empty legacy bodies never create or backfill receipt proof. */

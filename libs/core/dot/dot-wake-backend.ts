@@ -98,7 +98,14 @@ export async function runDelegatedWake(
   prompt: string,
   timeoutMs: number
 ): Promise<string> {
-  const options = { advisory: true, profile: 'planner' } as const;
+  // Route on the charter's authority role, the same role resolveDotWakeBackend
+  // checked for a live candidate. Without it the call fell to the `default`
+  // role chain, which can differ from the chain that passed the check.
+  const options = {
+    advisory: true,
+    profile: 'planner',
+    role: charter.authority.authority_role,
+  } as const;
   // Unnamed injected ports are explicit hosts/test seams. Every production
   // backend has a governed identity, rechecked per candidate by failover.
   if (backend.name) assertAdvisoryBackendPermission(backend.name, options);

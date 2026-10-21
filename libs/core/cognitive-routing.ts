@@ -4,6 +4,10 @@ import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import {
+  resolveCognitiveRoutingPaletteMode,
+  type RoutingOptimizeMode,
+} from './cognitive-routing-palette.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/cognitive-routing-decision.schema.json'
@@ -30,6 +34,7 @@ export interface CognitiveRouteCandidate {
   prompt?: string;
   context_pack_id?: string;
   context_pack_path?: string;
+  optimize_for?: RoutingOptimizeMode | string;
 }
 
 export interface CognitiveRouteDecision {
@@ -44,6 +49,7 @@ export interface CognitiveRouteDecision {
   team_role?: string;
   recipient_kind?: string;
   prompt_length?: number;
+  optimize_for?: RoutingOptimizeMode;
 }
 
 export interface FormatCognitiveRouteDecisionOptions {
@@ -306,6 +312,7 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
   const riskSignals = resolveRiskScore(text);
   const fastPathSignals = scoreMarkers(text, FAST_PATH_MARKERS);
   const heavySignals = scoreMarkers(text, HIGH_RISK_MARKERS);
+  const { mode, palette } = resolveCognitiveRoutingPaletteMode(input.optimize_for);
 
   if (deterministicEligible) {
     const decision: Record<string, unknown> = {
@@ -316,6 +323,7 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
       uncertainty: Math.min(20, riskSignals.uncertainty),
       reason: 'deterministic pipeline or ADF reference detected',
       mission_id: input.mission_id,
+      optimize_for: mode,
     };
     if (input.item_id) decision.item_id = input.item_id;
     if (input.team_role) decision.team_role = input.team_role;
@@ -325,7 +333,9 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
   }
 
   const preferHeavy =
-    heavySignals.score >= 2 || riskSignals.risk >= 36 || riskSignals.uncertainty >= 34;
+    heavySignals.score >= palette.heavy_marker_min ||
+    riskSignals.risk >= palette.heavy_risk_threshold ||
+    riskSignals.uncertainty >= palette.heavy_uncertainty_threshold;
 
   const decision: Record<string, unknown> = {
     tier: preferHeavy ? 'heavy_reasoning' : 'fast_llm',
@@ -339,6 +349,7 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
         ? `fast-path task markers: ${fastPathSignals.matches.slice(0, 3).join(', ')}`
         : 'routine task suitable for minimal reasoning',
     mission_id: input.mission_id,
+    optimize_for: mode,
   };
   if (input.item_id) decision.item_id = input.item_id;
   if (input.team_role) decision.team_role = input.team_role;
@@ -381,7 +392,8 @@ export function formatCognitiveRouteDecision(
     `deterministic=${decision.deterministic_eligible ? 'yes' : 'no'}`,
     `risk=${decision.risk}`,
     `uncertainty=${decision.uncertainty}`,
-  ];
+    decision.optimize_for ? `optimize_for=${decision.optimize_for}` : '',
+  ].filter(Boolean);
   if (!options.compact && decision.reason) {
     parts.push(`reason=${decision.reason}`);
   }

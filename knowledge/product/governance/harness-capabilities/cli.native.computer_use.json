@@ -22,8 +22,8 @@
         "intents": ["browser-step", "inspect-service"]
       },
       "fallback_path": {
-        "mode": "kyberion_local_pipeline",
-        "target": "pipelines/browser-session-simulation.json"
+        "mode": "kyberion_local_actuator",
+        "target": "browser-actuator"
       },
       "status": "experimental",
       "notes": "Use with approval-aware boundaries for high-risk UI actions. Action trails and receipt traces must remain visible."

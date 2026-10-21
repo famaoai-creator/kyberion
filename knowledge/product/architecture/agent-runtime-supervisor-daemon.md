@@ -66,7 +66,7 @@ Provider children still speak ACP or provider-specific protocols. They remain ch
 
 Communication is local-only over a Unix domain socket.
 
-- socket path: `active/shared/runtime/agent-supervisor/agent-runtime-supervisor.sock`
+- socket path: `active/shared/runtime/agent-supervisor/sup.sock` (kept short: macOS caps unix socket paths near 104 bytes)
 
 This keeps the control plane off public ports and matches the intended local-only deployment model.
 

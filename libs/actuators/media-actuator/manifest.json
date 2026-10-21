@@ -1,6 +1,6 @@
 {
   "actuator_id": "media-actuator",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows.",
   "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -22,6 +22,14 @@
         "document_digest": {
           "effect": "read",
           "resource_ref_from": "path"
+        },
+        "pptx_package_check": {
+          "effect": "read",
+          "resource_ref_from": "path"
+        },
+        "pptx_package_diff": {
+          "effect": "read",
+          "resource_ref_from": "after"
         }
       }
     }
@@ -68,6 +76,14 @@
       {
         "op": "json_read",
         "note": "Read a JSON file into context."
+      },
+      {
+        "op": "pptx_package_check",
+        "note": "Inspect the PPTX at path for the structural defects that make PowerPoint demand a repair: EMPTY_TXBODY, BROKEN_REL, DANGLING_RID, MISSING_CONTENT_TYPE, DUPLICATE_SLDID (errors) and ORPHAN_PART (any part unreachable from the package root), CHANGES_INFO_PRESENT, BROKEN_REL on NULL / #anchor placeholder targets (warnings). params.fail_on = error (default) | warn | never; the report { path, ok, issues[] } lands in export_as (default pptx_package_check)."
+      },
+      {
+        "op": "pptx_package_diff",
+        "note": "Compare params.before and params.after (two .pptx paths) part by part: only_in_before / only_in_after, changed[] ordered by relevance (package structure, then slides/layouts/masters, then the rest) with LCS-aligned tag diffs, and summary { counts, significant_parts }. noise_only marks attribute-order, xmlns / mc:Ignorable, docProps/* and embedded font subset changes; params.parts filters by glob. Repair triage: diff your output against the PowerPoint-repaired copy; ignore noise_only parts; the first significant_parts (usually a slide or a .rels) show what the repair changed — fix that writer, then confirm with pptx_package_check."
       }
     ],
     "transform": [
@@ -116,6 +132,14 @@
         "note": "Convert Kyberion report HTML (hero/h2/h3/p/.callout/table/.chip|.sev/ul/.kpis/.grpttl) into an editable last_pptx_design protocol, inheriting the HTML's :root design tokens. Source via params.html, params.path, or ctx channel (params.from). Pair with pptx_render."
       },
       {
+        "op": "deck_measurement_script",
+        "note": "Emit the in-page measurement script for browser:evaluate. Paired with deck_from_geometry (same geometry schema); params: aspect|canvas, viewport_px, font, deck_css."
+      },
+      {
+        "op": "deck_from_geometry",
+        "note": "Transcribe browser-measured layout geometry (from browser:evaluate) into an editable last_pptx_design protocol. Uses real wrap positions instead of estimating, so column widths match the report HTML. Pair with pptx_render."
+      },
+      {
         "op": "pptx_layout_preflight",
         "note": "Validate compiled PPTX layout diagnostics before any render; overflow requires explicit review-only opt-in."
       },
@@ -139,15 +163,23 @@
       },
       {
         "op": "pptx_render",
-        "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements."
+        "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements. For a rawParts protocol the original package is the baseline, so only new defects block. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
       },
       {
         "op": "pptx_filter_slides",
-        "note": "Write a subset of slides from an existing PPTX by index."
+        "note": "Write a subset of slides from an existing PPTX by index (slideN.xml numbers, emitted in the given order); notes of kept slides are re-pointed, notes of dropped slides removed. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
       },
       {
         "op": "pptx_patch",
-        "note": "Text-replacement patch on an existing PPTX (simple find-replace)."
+        "note": "Text-replacement patch on an existing PPTX (simple find-replace). Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
+      },
+      {
+        "op": "pptx_patch_paragraphs",
+        "note": "Replace whole paragraphs (exact or contains match on the paragraph's combined run text); the new text lands in the first run. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
+      },
+      {
+        "op": "pptx_replace_slides",
+        "note": "Replace slide replace_index (1-based) of an existing deck (path) with slides[] generated from semantic blocks (lead, kpi_band, labeled_rows, stage_columns, card_row, trend_chart, bullets, columns) and write to out. The template slide's head shapes and layout are reused, subtitle_shape receives slides[i].subtitle, colours/fonts come from theme (object, theme JSON path or media theme id). The package is rewritten: fresh slide/relationship ids, notes on the first slide only, template comments not copied, changesInfo removed, and every part only the replaced slide used (media, charts and embedded workbooks, SmartArt, comments, ...) removed. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
       },
       {
         "op": "xlsx_render",

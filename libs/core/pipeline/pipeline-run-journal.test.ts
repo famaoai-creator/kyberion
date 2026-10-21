@@ -19,6 +19,23 @@ describe('pipeline run journal', () => {
     );
     expect(pipelineRunJournalPath('isolated-run', undefined, scope)).toContain('vitest-live');
   });
+  it('rejects a duplicate run_started instead of replacing the original run identity', () => {
+    const runId = `test-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'original',
+      input_path: 'pipelines/example.json',
+      step_ids: ['source'],
+    });
+    journal.append('run_started', {
+      pipeline_id: 'forged',
+      input_path: 'pipelines/other.json',
+      step_ids: ['source'],
+    });
+    expect(() => loadPipelineRunJournal(runId)).toThrow(
+      'run_started must be the single first event'
+    );
+  });
+
   it('records declared channel snapshots and restores completed nodes', () => {
     const runId = `test-${newPipelineRunId()}`;
     const journal = createPipelineRunJournal(runId, {

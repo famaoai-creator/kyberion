@@ -48,39 +48,6 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-// defineCatalog (foundation/governed-catalog.ts) reads presence/content
-// through FoundationIo, which secure-io.ts registers with a direct reference
-// to its own real internal functions at module-evaluation time — overriding
-// the exported `safeExistsSync` etc. above does not reach that already
-// -registered object, so route FoundationIo through the same test doubles.
-vi.mock('./foundation/io.js', async () => {
-  const realSecureIo = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
-  return {
-    getFoundationIo: () => ({
-      loadJson: <T>(filePath: string): T =>
-        filePath.endsWith('.schema.json')
-          ? (realSecureIo.loadJson(filePath) as T)
-          : (JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T),
-      loadJsonIfPresent: <T>(filePath: string): T | null => {
-        if (filePath.endsWith('.schema.json')) {
-          return realSecureIo.loadJsonIfPresent(filePath) as T | null;
-        }
-        try {
-          return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
-        } catch {
-          return null;
-        }
-      },
-      appendFile: () => undefined,
-      exists: (filePath: string) => mocks.safeExistsSync(filePath),
-      readFile: (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' })),
-      stat: () => ({ mtimeMs: Date.now(), size: 1 }),
-      writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
-    }),
-    registerFoundationIo: vi.fn(),
-  };
-});
-
 vi.mock('./foundation/json.js', async () => {
   const actual =
     await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
@@ -103,6 +70,58 @@ vi.mock('./foundation/json.js', async () => {
     loadJsonIfPresent: readIfPresent,
     readJson: read,
     readJsonIfPresent: readIfPresent,
+  };
+});
+
+// Persisted OAuth sessions are now read through the governed catalog, which
+// goes to FoundationIo rather than secure-io directly. Without this the
+// catalog consults the real filesystem, finds nothing, and every callback
+// looks like an expired state.
+vi.mock('./foundation/io.js', async () => {
+  const actual = await vi.importActual<typeof import('./foundation/io.js')>('./foundation/io.js');
+  const realSecureIo = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  // Schemas are real repo assets, not fixtures in the virtual store the mocks
+  // above serve — the catalog compiles them through this same boundary.
+  const isSchema = (filePath: string) => filePath.endsWith('.schema.json');
+  const readText = (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' }));
+  // Content-addressed so the catalog's `${mtimeMs}:${size}` cache invalidates
+  // whenever a test swaps the content behind a path.
+  const contentStamp = (raw: string) => {
+    let hash = 0;
+    for (let index = 0; index < raw.length; index += 1) {
+      hash = (hash * 31 + raw.charCodeAt(index)) | 0;
+    }
+    return hash;
+  };
+  return {
+    ...actual,
+    getFoundationIo: () => ({
+      loadJson: <T>(filePath: string): T =>
+        isSchema(filePath)
+          ? (realSecureIo.loadJson(filePath) as T)
+          : (JSON.parse(readText(filePath)) as T),
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        if (isSchema(filePath)) return realSecureIo.loadJsonIfPresent(filePath) as T | null;
+        try {
+          return JSON.parse(readText(filePath)) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
+      exists: (filePath: string) =>
+        isSchema(filePath)
+          ? actual.getFoundationIo().exists(filePath)
+          : Boolean(mocks.safeExistsSync(filePath)),
+      readFile: (filePath: string) =>
+        isSchema(filePath) ? actual.getFoundationIo().readFile(filePath) : readText(filePath),
+      stat: (filePath: string) => {
+        if (isSchema(filePath)) return actual.getFoundationIo().stat(filePath);
+        const raw = readText(filePath);
+        return { mtimeMs: contentStamp(raw), size: raw.length };
+      },
+      writeFile: (filePath: string, content: string) => mocks.safeWriteFile(filePath, content),
+    }),
   };
 });
 

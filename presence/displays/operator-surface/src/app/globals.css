@@ -6,7 +6,8 @@
   --kb-primary: #0f172a;
   --kb-secondary: #334155;
   --kb-accent: #0066cc;
-  --kb-warning: #eab308;
+  --kb-accent-on: #ffffff;
+  --kb-warning: #854d0e;
   --kb-text-primary: #0f172a;
   --kb-text-secondary: rgba(15, 23, 42, 0.62);
   --kb-accent-text: #005a9c;
@@ -30,6 +31,7 @@
     --kb-primary: #0A192F;
     --kb-secondary: #31415B;
     --kb-accent: #00F2FF;
+    --kb-accent-on: #02121a;
     --kb-warning: #f59e0b;
     --kb-text-primary: #F8FAFC;
     --kb-text-secondary: rgba(248, 250, 252, 0.62);
@@ -51,7 +53,8 @@
   --kb-primary: #0f172a;
   --kb-secondary: #334155;
   --kb-accent: #0066cc;
-  --kb-warning: #eab308;
+  --kb-accent-on: #ffffff;
+  --kb-warning: #854d0e;
   --kb-text-primary: #0f172a;
   --kb-text-secondary: rgba(15, 23, 42, 0.62);
   --kb-accent-text: #005a9c;
@@ -71,6 +74,7 @@
   --kb-primary: #0A192F;
   --kb-secondary: #31415B;
   --kb-accent: #00F2FF;
+  --kb-accent-on: #02121a;
   --kb-warning: #f59e0b;
   --kb-text-primary: #F8FAFC;
   --kb-text-secondary: rgba(248, 250, 252, 0.62);

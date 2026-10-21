@@ -4,8 +4,9 @@ import {
   maybeCompactDispatchSections,
 } from './mission-orchestration-worker.js';
 import { resetReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { removeMissionFixture } from '../testing/mission-fixture.js';
 
-const MISSION_ID = 'OH1-DISPATCH-FIXTURE';
+const MISSION_ID = `OH1-DISPATCH-FIXTURE-${process.pid}`;
 
 function makeTasks() {
   const allTasks = [
@@ -37,6 +38,10 @@ describe('mission-orchestration-worker dispatch compaction (OH-01)', () => {
     delete process.env.KYBERION_CONTEXT_RESERVE_TOKENS;
     delete process.env.KYBERION_CONTEXT_BUFFER_TOKENS;
     resetReasoningBackend();
+    // The dispatch path persists carryover under the governed mission tree;
+    // leaving it behind was how OH1-DISPATCH-FIXTURE became permanent residue.
+    removeMissionFixture({ missionId: MISSION_ID, tier: 'confidential' });
+    removeMissionFixture({ missionId: MISSION_ID, tier: 'public' });
   });
 
   it('builds carryover from mission goal and settled tasks', () => {

@@ -3,6 +3,10 @@ import {
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
+import {
+  isPipelineJournalCapability,
+  PIPELINE_JOURNAL_STORE_ROLE,
+} from './foundation/pipeline-journal-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -67,6 +71,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
   autonomy_learning_store: 'worker',
+  pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
@@ -682,6 +687,7 @@ interface PreparedExecutionContext {
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
   DISCUSSION_REQUEST_STORAGE_ROLE,
+  PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -738,6 +744,14 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability'
+    );
+  if (
+    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
+    (!isPipelineJournalCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
     );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();

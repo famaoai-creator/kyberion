@@ -19,6 +19,7 @@
 
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
+import { readConfiguredActorIdentity } from '@agent/core/identity-context-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
@@ -31,6 +32,8 @@ import {
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
+  listOperatorExcludedSchedules,
+  listScheduledPipelines,
 } from '@agent/core/pipeline-scheduler';
 import {
   enqueueChronosDelivery,
@@ -66,6 +69,22 @@ const TICK_INTERVAL_MS = 60_000;
 /** Bound on waiting for an in-flight tick during SIGTERM/SIGINT shutdown. */
 const SHUTDOWN_GRACE_MS = 30_000;
 const triggerRunner = createTriggerRunner();
+
+/**
+ * Schedules whose ops are sovereign-only (cross-tenant aggregation). The
+ * chronos_gateway role binds persona `worker` into the execution scope, which
+ * outranks the process env, so these run under an explicit sovereign scope —
+ * but only when the operator started the daemon with KYBERION_PERSONA=sovereign.
+ * Adding an id here is a privilege decision; keep the list minimal.
+ */
+const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set(['organization-daily-digest']);
+
+function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
+  return SOVEREIGN_SCHEDULE_IDS.has(scheduleId) &&
+    readConfiguredActorIdentity().persona === 'sovereign'
+    ? 'sovereign'
+    : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // ADF scan → registry sync
@@ -487,6 +506,15 @@ export function readScheduledPipelineAdf(fullPath: string): {
   };
 }
 
+/** Make a restrictive KYBERION_CHRONOS_SCHEDULES visible instead of silently idling jobs. */
+function warnOperatorExcludedSchedules(): void {
+  const excluded = listOperatorExcludedSchedules(listScheduledPipelines());
+  if (excluded.length === 0) return;
+  logger.warn(
+    `[CHRONOS] ${excluded.length} enabled schedule(s) will never run on this host — KYBERION_CHRONOS_SCHEDULES lists plain ids, which restricts the host to those ids | next: prefix opt-in ids with + (e.g. +organization-daily-digest) to keep every enabled schedule running | evidence: ${excluded.slice(0, 10).join(', ')}${excluded.length > 10 ? ', …' : ''}`
+  );
+}
+
 function syncSchedulesFromAdf(): void {
   const root = pathResolver.rootDir();
   const pipelinesDir = path.join(root, 'pipelines');
@@ -668,24 +696,29 @@ async function tickAsLeader(): Promise<void> {
           // process-env flip: ticks fire from an un-awaited setInterval, so
           // runs of different schedules can overlap in this process, and
           // secure-io child processes never inherit non-allowlisted env.
-          const result = await runSteps(
-            adf.steps,
-            {
-              ...(scheduled.context ?? {}),
-              ...(adf.context ?? {}),
-              cron_runtime_context: {
-                trigger_id: deliveryId,
-                fired_at: now.toISOString(),
-                fresh_thread: true,
-                persisted_between_fires: [
-                  'pipeline-schedules.json',
-                  'active/shared/runtime/trigger-deliveries.jsonl',
-                  'pipeline trace and run journal artifacts',
-                ],
+          const runScheduledSteps = () =>
+            runSteps(
+              adf.steps,
+              {
+                ...(scheduled.context ?? {}),
+                ...(adf.context ?? {}),
+                cron_runtime_context: {
+                  trigger_id: deliveryId,
+                  fired_at: now.toISOString(),
+                  fresh_thread: true,
+                  persisted_between_fires: [
+                    'pipeline-schedules.json',
+                    'active/shared/runtime/trigger-deliveries.jsonl',
+                    'pipeline trace and run journal artifacts',
+                  ],
+                },
               },
-            },
-            { pipelinePath: resolvedPipelinePath, runId: deliveryId }
-          );
+              { pipelinePath: resolvedPipelinePath, runId: deliveryId }
+            );
+          const sovereign = sovereignPersonaFor(scheduled.id);
+          const result = sovereign
+            ? await withExecutionContextAsync('chronos_gateway', runScheduledSteps, sovereign)
+            : await runScheduledSteps();
 
           let deliverySucceeded = true;
           if (result.status === 'succeeded' && scheduled.deliver_to) {
@@ -758,9 +791,12 @@ async function tickAsLeader(): Promise<void> {
 }
 
 async function tick(): Promise<void> {
-  const result = await withTriggerLeaderLease('chronos-daemon', () =>
-    withExecutionContextAsync('chronos_gateway', tickAsLeader)
-  );
+  // tickAsLeader resolves to void, so the lease result cannot signal "lost the
+  // lease" by itself — that logged a false "another leader" line on every tick.
+  const result = await withTriggerLeaderLease('chronos-daemon', async () => {
+    await withExecutionContextAsync('chronos_gateway', tickAsLeader);
+    return 'led' as const;
+  });
   if (result === undefined) {
     logger.info('[CHRONOS] Another scheduler leader owns this tick; skipping.');
   }
@@ -817,6 +853,7 @@ async function main(_args: string[] = []): Promise<void> {
   });
 
   syncSchedulesFromAdf();
+  warnOperatorExcludedSchedules();
 
   // G09: a self-rescheduling loop with an in-flight guard — the next tick is
   // armed only after the previous one settles, so a slow tick is never raced

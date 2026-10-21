@@ -226,11 +226,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'mouse_move':
       performMouseOperation({ type: 'move', x: Number(params.x || 0), y: Number(params.y || 0) });
       break;
-    case 'wait':
+    case 'wait': {
+      // The published op contract (op-input-contracts.ts) names this `ms`, and
+      // every authored pipeline uses that spelling; reading only `duration_ms`
+      // silently collapsed every declared wait to the 1s default — a scenario
+      // asking for 8s between page transitions got 1s and raced the navigation.
+      const waitMs = Number(params.ms ?? params.duration_ms ?? 1000);
       await new Promise((resolveDelay) =>
-        setTimeout(resolveDelay, Number(params.duration_ms || 1000))
+        setTimeout(resolveDelay, Number.isFinite(waitMs) && waitMs >= 0 ? waitMs : 1000)
       );
       break;
+    }
     case 'voice':
       const { say } = await import('@agent/core/voice/voice-synth');
       await say(resolve(params.text || '{{last_capture}}'));

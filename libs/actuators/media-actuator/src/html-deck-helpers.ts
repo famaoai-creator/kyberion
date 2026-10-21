@@ -412,9 +412,10 @@ function buildDeck(root: HNode): Deck {
 
 // ───────────────────────── layout → PptxDesignProtocol ─────────────────────────
 const FONT = 'Yu Gothic';
-const W = 13.333,
-  H = 7.5,
-  M = 0.6;
+/** 既定は 16:9（13.333in × 7.5in）。4:3 の既存デッキへ差し込む場合は 10 × 7.5 を渡す。 */
+export const DECK_CANVAS_16_9 = { w: 13.333, h: 7.5 } as const;
+export const DECK_CANVAS_4_3 = { w: 10, h: 7.5 } as const;
+const M = 0.6;
 type El = Record<string, unknown>;
 
 function charsPerLine(w: number, fs: number): number {
@@ -441,7 +442,77 @@ function hardWrap(text: string, w: number, fs: number): string {
   return out.join('\n');
 }
 
-function layout(deck: Deck, C: PaletteResolved) {
+/**
+ * スライド1枚ぶんの収まりを実測する（deck_from_html 経路の layoutFit）。
+ *
+ * この経路は charsPerLine による推定＋hardWrap の一発勝負で、実測へのフィードバックが
+ * 無かった。結果として枠外へ出たチップ・折返しで潰れた表セルが、生成時に検出されず
+ * pptx_layout_preflight も常に pass を返していた（layoutFit を誰も書いていなかったため）。
+ * ここで幾何を突き合わせ、preflight が読む形に落とす。
+ */
+function measureSlideFit(
+  elements: Array<Record<string, unknown>>,
+  W: number,
+  H: number
+): {
+  status: 'pass' | 'shrunk' | 'overflow';
+  shrinkCount: number;
+  overflowCount: number;
+  shrunkZones: Array<{ zone: string; fontSize: number; designedFontSize: number }>;
+  overflows: Array<{ zone: string; fillRatio: number; overflowAtParagraph?: number }>;
+} {
+  const EPS = 0.02; // in。丸め誤差でのフラグ乱発を避ける
+  const overflows: Array<{ zone: string; fillRatio: number; overflowAtParagraph?: number }> = [];
+  const shrunkZones: Array<{ zone: string; fontSize: number; designedFontSize: number }> = [];
+
+  elements.forEach((el, i) => {
+    const pos = (el as { pos?: { x: number; y: number; w: number; h: number } }).pos;
+    if (!pos) return;
+    const style = ((el as { style?: Record<string, unknown> }).style ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const kind = String((el as { type?: string }).type ?? 'el');
+    const zone = `${kind}#${i}`;
+
+    // 枠外（右／下）。チップが右へ突き抜ける事故はここで捕まる
+    const right = pos.x + pos.w;
+    const bottom = pos.y + pos.h;
+    if (right > W + EPS)
+      overflows.push({ zone: `${zone}:right`, fillRatio: Number((right / W).toFixed(3)) });
+    if (bottom > H + EPS)
+      overflows.push({ zone: `${zone}:bottom`, fillRatio: Number((bottom / H).toFixed(3)) });
+
+    // テキストが自分の箱に収まるか（推定行数 × 行高 vs 箱の高さ）
+    const raw = String((el as { text?: string }).text ?? '');
+    if (kind === 'text' && raw.trim() && pos.h > 0) {
+      const fs = Number(style.fontSize ?? 12);
+      const lines = estLines(raw, pos.w, fs);
+      const needed = (lines * fs * 1.25) / 72; // pt → in
+      const ratio = needed / pos.h;
+      if (ratio > 1 + 0.08) {
+        const over = raw.split('\n').findIndex((_, n) => ((n + 1) * fs * 1.25) / 72 > pos.h);
+        overflows.push({
+          zone: `${zone}:text`,
+          fillRatio: Number(ratio.toFixed(3)),
+          ...(over >= 0 ? { overflowAtParagraph: over } : {}),
+        });
+      } else if (ratio > 1) {
+        shrunkZones.push({ zone: `${zone}:text`, fontSize: fs, designedFontSize: fs });
+      }
+    }
+  });
+
+  return {
+    status: overflows.length > 0 ? 'overflow' : shrunkZones.length > 0 ? 'shrunk' : 'pass',
+    shrinkCount: shrunkZones.length,
+    overflowCount: overflows.length,
+    shrunkZones,
+    overflows,
+  };
+}
+
+function layout(deck: Deck, C: PaletteResolved, W: number, H: number) {
   const SEV: Record<string, [string, string]> = {
     crit: [C.crit, C.critBg],
     high: [C.high, C.highBg],
@@ -613,7 +684,12 @@ function layout(deck: Deck, C: PaletteResolved) {
     chrome(e, s.title);
     let y = START_Y;
     const flush = (cont: boolean): void => {
-      slidesOut.push({ id: `slide${slidesOut.length + 1}.xml`, backgroundFill: C.bg, elements: e });
+      slidesOut.push({
+        id: `slide${slidesOut.length + 1}.xml`,
+        backgroundFill: C.bg,
+        elements: e,
+        metadata: { layoutFit: measureSlideFit(e as Array<Record<string, unknown>>, W, H) },
+      });
       e = [];
       chrome(e, s.title + (cont ? '…' : ''));
       y = START_Y;
@@ -780,8 +856,39 @@ function layout(deck: Deck, C: PaletteResolved) {
     e.push(
       text(M, H - 0.34, W - 2 * M, 0.26, '分類 Confidential', { fontSize: 9.5, color: C.muted })
     );
-    slidesOut.push({ id: `slide${slidesOut.length + 1}.xml`, backgroundFill: C.bg, elements: e });
+    slidesOut.push({
+      id: `slide${slidesOut.length + 1}.xml`,
+      backgroundFill: C.bg,
+      elements: e,
+      metadata: { layoutFit: measureSlideFit(e as Array<Record<string, unknown>>, W, H) },
+    });
   }
+
+  // デッキ全体の診断。pptx_layout_preflight が protocol.metadata.layoutDiagnostics を読む
+  const overflowSlides: Array<{
+    slideIndex: number;
+    slideId: string | undefined;
+    overflows: unknown[];
+  }> = slidesOut.flatMap((s, i) => {
+    const fit = (s as { metadata?: { layoutFit?: { overflows?: unknown[] } } }).metadata?.layoutFit;
+    return fit?.overflows?.length
+      ? [{ slideIndex: i + 1, slideId: (s as { id?: string }).id, overflows: fit.overflows }]
+      : [];
+  });
+  // `slidesOut` is unknown[]: reduce then resolves to its unknown-accumulator
+  // overload (methods are bivariant, so annotating the callback parameter is
+  // not enough) and the tallies come back as unknown. The explicit type
+  // argument selects the numeric overload.
+  const shrinkCount = slidesOut.reduce<number>(
+    (n, s) =>
+      n +
+      Number(
+        (s as { metadata?: { layoutFit?: { shrinkCount?: number } } }).metadata?.layoutFit
+          ?.shrinkCount ?? 0
+      ),
+    0
+  );
+  const overflowCount = overflowSlides.reduce<number>((n, s) => n + s.overflows.length, 0);
 
   return {
     version: '3.0.0',
@@ -803,12 +910,26 @@ function layout(deck: Deck, C: PaletteResolved) {
     },
     master: { elements: [] },
     slides: slidesOut,
-    metadata: { source: 'deck_from_html', slideCount: slidesOut.length },
+    metadata: {
+      source: 'deck_from_html',
+      slideCount: slidesOut.length,
+      layoutDiagnostics: {
+        status: overflowCount > 0 ? 'overflow' : shrinkCount > 0 ? 'shrunk' : 'pass',
+        measurementModel: 'deterministic-width-table',
+        slideCount: slidesOut.length,
+        shrinkCount,
+        overflowCount,
+        overflowSlides,
+      },
+    },
   };
 }
 
 /** Convert report HTML into an editable PptxDesignProtocol (pure). */
-export function htmlToDeckProtocol(html: string): {
+export function htmlToDeckProtocol(
+  html: string,
+  canvas?: { w?: number; h?: number }
+): {
   protocol: ReturnType<typeof layout>;
   slideCount: number;
 } {
@@ -817,6 +938,8 @@ export function htmlToDeckProtocol(html: string): {
     throw new Error(`deck_from_html: HTML input exceeds ${MAX_HTML_DECK_INPUT_CHARS} characters`);
   }
   const root = parseHtml(html);
-  const protocol = layout(buildDeck(root), palette(extractTokens(root)));
+  const w = Number(canvas?.w) > 0 ? Number(canvas?.w) : DECK_CANVAS_16_9.w;
+  const h = Number(canvas?.h) > 0 ? Number(canvas?.h) : DECK_CANVAS_16_9.h;
+  const protocol = layout(buildDeck(root), palette(extractTokens(root)), w, h);
   return { protocol, slideCount: protocol.slides.length };
 }

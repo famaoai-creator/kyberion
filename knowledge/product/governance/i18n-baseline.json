@@ -63,7 +63,10 @@
     "presence/bridge/terminal",
     "presence/sensors/voice-hub"
   ],
-  "files": {},
+  "files": {
+    "satellites/voice-hub/reply-text.ts": 1,
+    "presence/displays/a2ui-host/src/app/strings.ts": 35
+  },
   "locale_tokens": {
     "intent_regex": {
       "libs/core/contextual-intent-frame.ts": 1,
@@ -82,7 +85,8 @@
       "libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts": 1,
       "libs/actuators/orchestrator-actuator/src/orchestrator-execution-brief-helpers.ts": 1,
       "satellites/voice-hub/server.ts": 3,
-      "presence/displays/presence-studio/hearing-work-inventory.ts": 4
+      "presence/displays/presence-studio/hearing-work-inventory.ts": 4,
+      "satellites/voice-hub/reply-text.ts": 1
     },
     "locale_compare": {
       "libs/core/apple-intelligence-bridge.ts": 1,
@@ -91,8 +95,9 @@
       "libs/core/surface/surface-login-pages.ts": 2,
       "scripts/capture_surface_screenshots.ts": 2,
       "scripts/check_plugin_views_e2e.ts": 1,
-      "satellites/voice-hub/server.ts": 1,
-      "satellites/voice-hub/speech-synthesis.ts": 2
+      "satellites/voice-hub/reply-text.ts": 3,
+      "satellites/voice-hub/speech-synthesis.ts": 2,
+      "presence/displays/a2ui-host/src/app/strings.ts": 1
     },
     "locale_literal": {
       "libs/core/apple-intelligence-bridge.ts": 2,
@@ -116,6 +121,7 @@
       "libs/core/video/video-composition-rendering.ts": 5,
       "libs/core/video/video-content-brief-contract.ts": 1,
       "libs/core/video/video-visual-direction.ts": 6,
+      "libs/actuators/media-actuator/src/deck-geometry-helpers.ts": 3,
       "libs/actuators/media-actuator/src/media-action-transform.ts": 6,
       "libs/actuators/media-actuator/src/media-design-protocol.ts": 16,
       "libs/actuators/media-actuator/src/media-diagram-helpers.ts": 13,

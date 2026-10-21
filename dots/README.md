@@ -100,6 +100,25 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
    through public ingress: `pnpm kyberion ingress up --surface event-intake`
    (approval-gated; Tailscale Funnel by default) — see
    [expose-surface-public-ingress](../knowledge/public/procedures/expose-surface-public-ingress.md).
+
+   **Tenant-owned sources and mandates.** The product files above are public
+   tier, so never write a real tenant slug into them. A registered tenant
+   declares its own entries in its confidential root instead:
+   - `knowledge/confidential/<slug>/governance/event-intake-sources.json` —
+     `{version, sources}`, each source in the same shape as the product
+     policy. Sources are bound to `<slug>` (a different `tenant_slug` drops
+     the source) and are **local-only**: `dot event ingest` and scoped
+     `kyberion ask` accept them, the HTTP webhook always refuses them.
+   - `knowledge/confidential/<slug>/governance/standing-mandates.json` —
+     `{version, mandates}` (no `external_effect_patterns`; that list stays
+     product-owned). Every mandate needs `authority.tenant_slug: "<slug>"`
+     and admits missions only for that tenant (reference it from the
+     charter's `authority.mission_mandate_refs`).
+
+   A source name or mandate id that reuses a product entry or another
+   tenant's entry is dropped with a warning; an invalid file drops only
+   that tenant's overlay.
+
 2. **Cadence pipelines (opt-in)**: `organization-operation-tick`,
    `organization-standup` and `organization-retro` ship `enabled: false`.
    Enable per host with

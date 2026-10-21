@@ -55,9 +55,10 @@
     "escalate_channel": "slack"
   },
   "notification": {
+    "delivery_mode": "inbox",
     "deliver_to": {
-      "surface": "slack",
-      "channel": "kyberion-ops"
+      "surface": "surface",
+      "channel": "inbox"
     },
     "digest_cron": "0 9,18 * * *",
     "quiet_hours": {
