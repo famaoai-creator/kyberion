@@ -139,6 +139,65 @@ describe('external operation common admission', () => {
     vi.mocked(findActiveCharter).mockReturnValue(null);
   });
 
+  it('admits a trusted person charter without a fabricated tenant and preserves its standing stop', () => {
+    const person = { ...charter, scope: { kind: 'person' as const } };
+    const input = operation({
+      authority: {
+        agentId: 'installed-worker',
+        invocationId: 'person-command',
+        hasHuman: false,
+        charter: person,
+      },
+    });
+    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'Exact person grant' });
+    expect(admitExternalOperation(input).allowed).toBe(true);
+    expect(reserveExternalOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantSlug: undefined })
+    );
+    vi.mocked(findActiveCharter).mockReturnValue({
+      scope: { kind: 'person' },
+      appetite: { tripwires: ['manual-stop'] },
+    } as Charter);
+    vi.mocked(loadCharterUsage).mockReturnValue({
+      spent_today: 0,
+      spent_this_month: 0,
+      tripwires_hit: ['manual-stop'],
+    });
+    for (const operationId of ['vcs:pr_create', 'browser:evaluate', 'browser:goto']) {
+      expect(() =>
+        admitExternalOperation({
+          ...input,
+          operationId,
+          authority: {
+            ...input.authority!,
+            charter: undefined,
+            standingScope: { kind: 'person' },
+            invocationId: 'new-command',
+          },
+        })
+      ).toThrow('CHARTER_STOP');
+    }
+    expect(findActiveCharter).toHaveBeenLastCalledWith(
+      { kind: 'person' },
+      expect.any(Date),
+      undefined
+    );
+  });
+
+  it('does not let a person charter authorize a tenant-bound effect', () => {
+    const input = operation({
+      tenantSlug: 'acme',
+      authority: {
+        agentId: 'installed-worker',
+        invocationId: 'person-command',
+        hasHuman: false,
+        charter: { ...charter, scope: { kind: 'person' } },
+      },
+    });
+    expect(() => admitExternalOperation(input)).toThrow('EXTERNAL_SCOPE_MISMATCH');
+    expect(runCharterGate).not.toHaveBeenCalled();
+  });
+
   it('creates an exact mission gate binding for trusted pipeline resumption', () => {
     const input = operation();
     input.authority = {

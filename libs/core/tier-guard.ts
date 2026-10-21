@@ -1,3 +1,4 @@
+import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
@@ -969,6 +970,17 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  if (
+    normalizedRole === 'person_charter_store' &&
+    !denyCandidatePaths(relativePath).every((target) =>
+      personCharterResourceAccessAllowed(target, operation)
+    )
+  )
+    return {
+      allowed: false,
+      reason:
+        '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
+    };
   if (
     normalizedRole === 'autonomy_learning_store' &&
     !isAutonomyLearningCapability(currentResourceAccessScope())

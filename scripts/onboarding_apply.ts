@@ -2,6 +2,13 @@ import * as path from 'node:path';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { ensureAgentIdentityProvisioned } from '@agent/core/agent/agent-identity';
+import {
+  ensureOwnerMember,
+  ownerAccountableHumanId,
+  writeMemberProfile,
+} from '@agent/core/organization/member-registry';
+import { onboardingAgentIdentityParameters } from '@agent/core/organization/onboarding-runtime-identity';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
@@ -52,6 +59,14 @@ type ApplyInput = OnboardingApplyInput;
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function assertInstalledAgentHandle(agentId: unknown): void {
+  const validate = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/personal-agent-identity.schema.json')
+  );
+  if (!validate({ agent_id: agentId }))
+    throw new Error('Reviewed agent_id does not match the installed identity schema.');
 }
 
 function profileRoot(): string {
@@ -166,6 +181,7 @@ export function validateInput(input: unknown): asserts input is ApplyInput {
       `interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`
     );
   }
+  assertInstalledAgentHandle(agent_id);
   if (persona !== undefined) {
     const normalizedPersona = isNonEmptyString(persona)
       ? persona.trim().toLowerCase().replace(/\s+/g, '_')
@@ -238,10 +254,33 @@ export async function writeText(filePath: string, content: string, lockName: str
 
 export async function applyIdentity(input: ApplyInput, now: string) {
   const profileDir = profileRoot();
+  const id = input.identity;
+  assertInstalledAgentHandle(id.agent_id);
+  // Identity setup provisions a reviewed identity; only its separate signed
+  // authority plan may activate it. Resolve before overwriting any profile.
+  const agent = withExecutionContext('sovereign_concierge', () => {
+    const owner = ensureOwnerMember();
+    if (owner.status !== 'active') throw new Error('Active accountable owner required.');
+    const parameters = onboardingAgentIdentityParameters(id.agent_id, ownerAccountableHumanId());
+    return withExecutionContext('mission_controller', () => {
+      const record = ensureAgentIdentityProvisioned({
+        ...parameters,
+        displayName: id.name,
+        accountableHumanId: ownerAccountableHumanId(),
+      });
+      if (
+        record.accountable_human_id !== ownerAccountableHumanId() ||
+        ['suspended', 'retired'].includes(record.lifecycle_status)
+      )
+        throw new Error(
+          'Installed agent is suspended, retired or has a different accountable human.'
+        );
+      return record;
+    });
+  });
   ensureDir(profileDir);
   ensureDir(onboardingRoot());
 
-  const id = input.identity;
   const persona = resolveInputPersona(input);
 
   await writeJson(
@@ -269,6 +308,7 @@ export async function applyIdentity(input: ApplyInput, now: string) {
     path.join(profileDir, 'agent-identity.json'),
     {
       agent_id: id.agent_id,
+      nhi_id: agent.nhi_id,
       version: '1.0.0',
       role: 'Ecosystem Architect / Senior Partner',
       owner: id.name,
@@ -279,6 +319,12 @@ export async function applyIdentity(input: ApplyInput, now: string) {
     },
     'onboarding-agent-identity'
   );
+  withExecutionContext('sovereign_concierge', () => {
+    const owner = ensureOwnerMember();
+    if (owner.status !== 'active') throw new Error('Active accountable owner required.');
+    if (owner.display_name !== id.name)
+      writeMemberProfile({ ...owner, display_name: id.name, updated_at: now });
+  });
 }
 
 export async function applyTenants(
@@ -408,6 +454,8 @@ export function buildSummary(
     `- Summary: ${tutorial.summary}`,
     '',
     `## ${summaryPolicy.sections.next_steps}`,
+    '- Connection authentication is separate from authority: open Settings → Services to connect accounts, review exact GitHub/browser targets and limits, ask the installed agent to request delegation, then approve and apply the reviewed plan. The new agent stays provisioned until its signed activation plan is applied.',
+    '- CLI: run `pnpm kyberion onboarding authority show --scope person --json`, then use `preview`, `request`, `status`, and `apply` with the exact reviewed plan. Personal use needs no tenant; organization scope requires an explicitly selected tenant owner.',
     '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',

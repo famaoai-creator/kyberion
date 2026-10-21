@@ -1,3 +1,7 @@
+import {
+  parseExternalOperationGrants,
+  type ExternalOperationGrant,
+} from './external-operation-target.js';
 /**
  * Charter service — what a surface needs to let an accountable human create,
  * read and stop a charter without knowing the registry's shape:
@@ -55,6 +59,8 @@ const MAX_DEPUTIES = 5;
 const LIST_SEPARATOR: Record<'ja' | 'en', string> = { ja: '、', en: ', ' };
 
 export interface CharterForm {
+  scope_kind?: 'person' | 'organization';
+  external_operations?: ExternalOperationGrant[];
   tenant_slug: string;
   per_action: number;
   per_day: number;
@@ -106,7 +112,13 @@ export function parseCharterForm(
   }
   const r = raw as Record<string, unknown>;
   const tenant = typeof r.tenant_slug === 'string' ? r.tenant_slug.trim() : '';
-  if (!isValidTenantSlug(tenant)) return { ok: false, error: 'tenant_slug is invalid' };
+  const scopeKind = r.scope_kind ?? 'organization';
+  if (scopeKind !== 'person' && scopeKind !== 'organization')
+    return { ok: false, error: 'scope_kind is invalid' };
+  if (scopeKind === 'person' ? tenant !== '' : !isValidTenantSlug(tenant))
+    return { ok: false, error: 'tenant_slug is invalid' };
+  const externalOperations = parseExternalOperationGrants(r.external_operations ?? []);
+  if (!externalOperations) return { ok: false, error: 'external_operations is invalid' };
   const nums: Record<string, number> = {};
   for (const key of ['per_action', 'per_day', 'per_month', 'max_loss_per_incident']) {
     const v = amount(r[key], key);
@@ -242,6 +254,8 @@ export function parseCharterForm(
     ok: true,
     form: {
       tenant_slug: tenant,
+      scope_kind: scopeKind,
+      external_operations: externalOperations,
       per_action: nums.per_action,
       per_day: nums.per_day,
       per_month: nums.per_month,
@@ -311,7 +325,11 @@ export function renderAcceptanceStatement(input: {
     const say = (key: string, params?: Record<string, string>) =>
       t(`decision:charter_statement_${key}` as Parameters<typeof t>[0], params, locale);
     return [
-      say('intro', { name: displayName, id: accountableId, tenant: form.tenant_slug }),
+      say('intro', {
+        name: displayName,
+        id: accountableId,
+        tenant: form.scope_kind === 'person' ? 'personal profile' : form.tenant_slug,
+      }),
       say('limits', {
         per_action: yen(form.per_action),
         per_day: yen(form.per_day),
@@ -324,6 +342,10 @@ export function renderAcceptanceStatement(input: {
         ? 'Unattended delivery is limited to a routine greeting for a bound customer. Attachments, personal or sensitive data, and all other content require human approval.'
         : 'Customer outbound automation is disabled.',
       recipientLine,
+      ...(form.external_operations ?? []).map(
+        (grant) =>
+          `External operation: ${grant.operation_id}; target: ${'repository' in grant ? grant.repository : grant.origin}; accountable owner: ${accountableId}; expires: ${expires}. Public execution context and public content only; protected or unknown source data requires individual approval. Browser URL queries, fragments, form submission and scripts are not delegated.`
+      ),
       `Approved inference processors: ${form.approved_processors.length ? form.approved_processors.join(', ') : 'none'}. Purposes: ${form.processing_purposes.join(', ') || 'none'}. Categories: ${form.processing_categories.join(', ') || 'none'}. Training and retention remain governed by separate provider evidence.`,
       form.delegated_decisions.length > 0
         ? say('decisions_on', { decisions: decisionLabels(locale) })
@@ -368,6 +390,7 @@ export function envelopeFromForm(
     ...(form.allow_customer_outbound ? { send_message_external: 'allow' as const } : {}),
   };
   const namedIrreversible = [
+    ...(form.external_operations ?? []).map((grant) => grant.operation_id),
     ...(form.allow_named_spend ? ['operational_spend'] : []),
     ...(form.allow_customer_outbound ? ['customer_outbound'] : []),
   ];
@@ -384,6 +407,7 @@ export function envelopeFromForm(
     if (!entry.reversible) namedIrreversible.push(type);
   }
   return {
+    ...(form.external_operations?.length ? { external_operations: form.external_operations } : {}),
     money: {
       currency: CURRENCY,
       per_action: form.per_action,
@@ -454,13 +478,23 @@ export function acceptCharterFromForm(
   return acceptCharter(
     {
       draft: {
-        charter_id: `chr-${form.tenant_slug}-${stamp}-${nonce || 'x'}`.slice(0, 64),
-        scope: { kind: 'organization', tenant_slug: form.tenant_slug },
+        charter_id:
+          `chr-${form.scope_kind === 'person' ? 'person' : form.tenant_slug}-${stamp}-${nonce || 'x'}`.slice(
+            0,
+            64
+          ),
+        scope:
+          form.scope_kind === 'person'
+            ? { kind: 'person' }
+            : { kind: 'organization', tenant_slug: form.tenant_slug },
         accountable: {
           actor: input.acceptedBy.id,
           authority_basis: {
             kind: 'owner',
-            evidence_ref: `member-registry:${memberId}:owner@${form.tenant_slug}`,
+            evidence_ref:
+              form.scope_kind === 'person'
+                ? `personal-profile-owner:${memberId}`
+                : `member-registry:${memberId}:owner@${form.tenant_slug}`,
           },
           expires_at: new Date(now.getTime() + form.expires_in_days * 86_400_000).toISOString(),
           deputies: form.deputies,
@@ -484,6 +518,8 @@ export function acceptCharterFromForm(
 }
 
 export interface CharterView {
+  scope_kind?: 'person' | 'organization';
+  external_operations?: ExternalOperationGrant[];
   reputational_class_max: ReputationalClass;
   charter_id: string;
   tenant_slug: string;
@@ -521,6 +557,8 @@ export function viewCharter(
   });
   return {
     charter_id: charter.charter_id,
+    scope_kind: charter.scope.kind,
+    external_operations: structuredClone(charter.envelope.external_operations ?? []),
     tenant_slug: charter.scope.kind === 'organization' ? charter.scope.tenant_slug : '',
     responsible: charter.accountable.actor,
     deputies: charter.accountable.deputies,

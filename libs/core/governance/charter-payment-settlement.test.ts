@@ -209,7 +209,8 @@ describe('governed payment execution and settlement', () => {
     expect(a.execute).toHaveBeenCalledTimes(2);
     expect((await executeCharterPayment(input(a, 'invoice-first'))).status).toBe('succeeded');
     expect(a.execute).toHaveBeenCalledTimes(2);
-    expect(usage()).toBe(60);
+    // An amendment retains settled predecessor spend; idempotent reads add none.
+    expect(usage()).toBe(120);
   });
 
   it('preserves unknown spend on transport failure and never retries execution', async () => {

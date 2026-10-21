@@ -8,6 +8,7 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
 import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
+import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
 /** Service selections are metadata. Token registration and authentication are separate actions. */
@@ -22,9 +23,12 @@ export type ServicesSectionProps = {
   hasUnsavedChanges?: boolean;
   oauthBusyId: string | null;
   oauthMessage: string | null;
+  oauthError?: boolean;
   onConnectOAuth: (serviceId: string, serviceLabel: string) => void;
   onSaveConnections: () => void;
   sectionRef: (element: HTMLElement | null) => void;
+  authorityTenants?: { tenant_slug: string; display_name: string }[];
+  selectedTenant?: string;
 };
 
 export function ServicesSection({
@@ -36,6 +40,12 @@ export function ServicesSection({
   busy,
   saveFeedback,
   hasUnsavedChanges,
+  oauthBusyId,
+  oauthMessage,
+  oauthError = false,
+  onConnectOAuth,
+  authorityTenants = [],
+  selectedTenant,
   onSaveConnections,
   sectionRef,
 }: ServicesSectionProps) {
@@ -90,10 +100,21 @@ export function ServicesSection({
                     value={services.includes(service.id)}
                     disabled={busy}
                   />
+                  {service.id !== 'browser' && service.id !== 'voice-hub' ? (
+                    <Button
+                      label={t('setup.connect_oauth', { service: service.label })}
+                      disabled={busy || oauthBusyId !== null}
+                      onClick={() => onConnectOAuth(service.id, service.label)}
+                    />
+                  ) : null}
                 </div>
               );
             })}
           </div>
+          {oauthBusyId ? <p role="status">{t('authority.connecting')}</p> : null}
+          {oauthMessage ? <p role={oauthError ? 'alert' : 'status'}>{oauthMessage}</p> : null}
+          <p>{t('authority.browser_connection')}</p>
+          <p>{t('authority.github_transport')}</p>
           {(setup.connections ?? []).length > 0 ? <ConnectionsByOwner t={t} setup={setup} /> : null}
           <SettingsSaveFeedback
             feedback={saveFeedback}
@@ -111,6 +132,11 @@ export function ServicesSection({
         </SettingsGroup>
       </FormScope>
       <OperatorServiceRegistrationPanel t={t} />
+      <OnboardingAuthorityPanel
+        locale={locale}
+        tenants={authorityTenants}
+        selectedTenant={selectedTenant}
+      />
     </div>
   );
 }

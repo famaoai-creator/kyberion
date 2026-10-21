@@ -479,6 +479,7 @@
 - [作業完了から再利用候補への自動接続](./product/orchestration/workflow-reuse-playbook.md) (public | Unknown)
 - [動画素材からの字幕付き短縮編集](./product/orchestration/video-recut-production-playbook.md) (public | Unknown)
 - [同一ディレクトリ複数CLI共存プレイブック](./product/orchestration/same-checkout-coexecution-playbook.ja.md) (public | Unknown)
+- [外部操作の接続と権限委任オンボーディング](./product/orchestration/onboarding-action-authority.md) (public | Unknown)
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)

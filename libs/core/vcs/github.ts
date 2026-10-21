@@ -1,4 +1,12 @@
-import { safeExec, safeExecResult, safeReadFile, type SafeExecOptions } from '../secure-io.js';
+import {
+  safeExec,
+  safeExecResult,
+  safeReadFile,
+  assertSafeRepositoryPath,
+  type SafeExecOptions,
+} from '../secure-io.js';
+import { toRepoRelative } from '../path-resolver.js';
+import { storageFloorTier } from '../storage-layout.js';
 import { governVcsCommand } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -544,6 +552,14 @@ export function ghPrCreate(
   const body = params.bodyFile
     ? String(safeReadFile(params.bodyFile, { encoding: 'utf8' }))
     : params.body?.trim() || '';
+  const bodyPath = params.bodyFile
+    ? toRepoRelative(assertSafeRepositoryPath(params.bodyFile))
+    : undefined;
+  const bodySourceTier = bodyPath
+    ? bodyPath.startsWith('knowledge/public/') || storageFloorTier(bodyPath) === 'public'
+      ? 'public'
+      : 'protected_or_unknown'
+    : 'inline';
   const snapshot = () => ({
     head,
     base,
@@ -595,7 +611,14 @@ export function ghPrCreate(
   if (params.draft) args.push('--draft');
   return governVcsCommand(
     'vcs:pr_create',
-    { repository, ...bound, title: params.title.trim(), body, draft: params.draft === true },
+    {
+      repository,
+      ...bound,
+      title: params.title.trim(),
+      body,
+      body_source_tier: bodySourceTier,
+      draft: params.draft === true,
+    },
     () => {
       if (
         computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound) ||

@@ -14,6 +14,8 @@ import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
 import { ghMust, ghPrCreate } from '@agent/core/vcs';
+import { withInstalledOnboardingAuthority } from '@agent/core/organization/onboarding-authority-runtime';
+import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
 import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
@@ -287,14 +289,25 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   const args = buildGhArgs(options);
   // Keep the established title/ref resolution and explicit body-file contract,
   // but route publication through the typed, snapshot-bound approval boundary.
-  const result = ghPrCreate({
+  const publication = {
     ...ghOpts(),
     title: args[args.indexOf('--title') + 1],
     base: args[args.indexOf('--base') + 1],
     head: args[args.indexOf('--head') + 1],
     bodyFile: options.bodyFile,
     draft: options.draft,
+  };
+  // The typed VCS boundary still verifies exact remote refs and content. This
+  // identity is stable across resumption; changing text cannot reuse a receipt.
+  const invocationId = computeApprovalPayloadHash({
+    operation: 'vcs:pr_create',
+    head: publication.head,
+    base: publication.base,
+    source: safeExec('git', ['rev-parse', '--verify', `${publication.head}^{commit}`], {
+      cwd: pathResolver.rootDir(),
+    }).trim(),
   });
+  const result = withInstalledOnboardingAuthority(invocationId, () => ghPrCreate(publication));
   if (result.error || result.status !== 0) {
     throw new Error(result.stderr?.trim() || result.error?.message || 'GitHub PR creation failed');
   }

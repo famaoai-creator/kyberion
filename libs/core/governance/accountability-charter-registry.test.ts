@@ -23,6 +23,7 @@ import {
   recordTripwire,
   recordCharterExecutionOutcome,
   recordCharterExecutionStarted,
+  releaseCharterPaymentReservation,
   type AcceptCharterInput,
 } from './accountability-charter-registry.js';
 
@@ -86,6 +87,179 @@ describe('accountability-charter-registry', () => {
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (root) safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('amendments retain exhausted budgets and old in-flight reservations, including later releases', () => {
+    const options = { rootDir: path.join(root, 'accounting-lineage') };
+    const create = (id: string, replaces?: string) =>
+      acceptCharter(
+        {
+          draft: {
+            ...draft(id),
+            envelope: {
+              ...draft(id).envelope,
+              money: { ...draft(id).envelope.money, per_month: 200_000 },
+            },
+            replaces_charter_id: 'forged-predecessor',
+          },
+          statement: 'Accountable amendment',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: NOW,
+          ...(replaces ? { replaces } : {}),
+        },
+        options
+      );
+    const old = create('chr-accounting-old');
+    expect(old.replaces_charter_id).toBeUndefined();
+    const action = {
+      actor: agentActor(NHI, 'user:owner'),
+      action_class: 'payment',
+      reversible: true,
+      amount: 100_000,
+      currency: 'JPY',
+      estimated_loss: 0,
+    };
+    for (const correlation of ['pending-one', 'pending-two']) {
+      const evaluation = evaluateUnderCharter(SCOPE, action, HERE, options, NOW)!;
+      expect(evaluation.decision.decision).toMatch(/^allow/);
+      recordCharterConsumption(old, action, evaluation.decision, options, NOW, correlation);
+    }
+    const amended = create('chr-accounting-new', old.charter_id);
+    expect(amended.replaces_charter_id).toBe(old.charter_id);
+    expect(loadCharterUsage(amended, NOW, options)).toMatchObject({
+      spent_today: 200_000,
+      spent_this_month: 200_000,
+    });
+    expect(
+      evaluateUnderCharter(SCOPE, { ...action, amount: 1 }, HERE, options, NOW)?.decision.decision
+    ).toBe('deny');
+    expect(
+      evaluateUnderCharter(
+        SCOPE,
+        { ...action, amount: 1 },
+        HERE,
+        options,
+        new Date('2026-10-02T09:00:00Z')
+      )?.decision.decision
+    ).toBe('deny');
+    expect(
+      releaseCharterPaymentReservation(
+        old,
+        'pending-one',
+        { resolution: 'not_executed', evidence_ref: 'provider:verified-not-executed' },
+        options,
+        new Date(NOW.getTime() + 1000)
+      )
+    ).toBe(true);
+    expect(loadCharterUsage(amended, NOW, options)).toMatchObject({
+      spent_today: 100_000,
+      spent_this_month: 100_000,
+    });
+    const third = create('chr-accounting-third', amended.charter_id);
+    expect(loadCharterUsage(third, NOW, options).spent_today).toBe(100_000);
+    // A provider settling work against the original stream must remain visible
+    // after subsequent amendments; no copied snapshot may hide that settlement.
+    const lateAction = { ...action, amount: 50_000 };
+    const late = evaluateUnderCharter(SCOPE, lateAction, HERE, options, NOW)!;
+    recordCharterConsumption(
+      old,
+      lateAction,
+      late.decision,
+      options,
+      NOW,
+      'late-provider-settlement'
+    );
+    expect(loadCharterUsage(third, NOW, options)).toMatchObject({
+      spent_today: 150_000,
+      spent_this_month: 150_000,
+    });
+    expect(() =>
+      loadCharterUsage({ ...third, replaces_charter_id: 'chr-missing' }, NOW, options)
+    ).toThrow('CHARTER_ACCOUNTING_LINEAGE');
+    expect(() =>
+      loadCharterUsage({ ...third, replaces_charter_id: third.charter_id }, NOW, options)
+    ).toThrow('CHARTER_ACCOUNTING_LINEAGE');
+  });
+
+  it('does not clear inherited stops by amendment and observes later ancestor tripwires', () => {
+    const options = { rootDir: path.join(root, 'tripwire-lineage') };
+    const create = (id: string, replaces?: string) =>
+      acceptCharter(
+        {
+          draft: draft(id),
+          statement: 'Accountable amendment',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: NOW,
+          ...(replaces ? { replaces } : {}),
+        },
+        options
+      );
+    const old = create('chr-stop-old');
+    const current = create('chr-stop-new', old.charter_id);
+    recordTripwire(
+      old,
+      'audit-chain-gap',
+      'old in-flight operation failed',
+      options,
+      new Date(NOW.getTime() + 2000)
+    );
+    expect(
+      loadCharterUsage(current, new Date(NOW.getTime() + 3000), options).tripwires_hit
+    ).toEqual(['audit-chain-gap']);
+    const dropping = draft('chr-stop-drop');
+    dropping.appetite.tripwires = [];
+    expect(() =>
+      acceptCharter(
+        {
+          draft: dropping,
+          statement: 'Remove stop',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: new Date(NOW.getTime() + 4000),
+          replaces: current.charter_id,
+        },
+        options
+      )
+    ).toThrow('Predecessor tripwires');
+    clearTripwire(
+      current,
+      'audit-chain-gap',
+      humanActor('owner'),
+      options,
+      new Date(NOW.getTime() + 5000)
+    );
+    expect(
+      loadCharterUsage(current, new Date(NOW.getTime() + 6000), options).tripwires_hit
+    ).toEqual([]);
+    retireCharter(
+      current,
+      humanActor('owner'),
+      'manual stop',
+      options,
+      new Date(NOW.getTime() + 7000)
+    );
+    expect(() => create('chr-stop-fresh')).toThrow('pass replaces');
+    expect(() =>
+      acceptCharter(
+        {
+          draft: draft('chr-stale-approved-amendment'),
+          statement: 'Stale live amendment approval',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: NOW,
+          replaces: current.charter_id,
+          expected_lifecycle: 'active',
+        },
+        options
+      )
+    ).toThrow('CHARTER_LIFECYCLE_CHANGED');
+    const renewed = create('chr-stop-renewed', current.charter_id);
+    expect(renewed.replaces_charter_id).toBe(current.charter_id);
+    expect(
+      loadCharterUsage(renewed, new Date(NOW.getTime() + 8000), options).tripwires_hit
+    ).toEqual([]);
   });
 
   it('only the named accountable human can accept; agents and others cannot', () => {

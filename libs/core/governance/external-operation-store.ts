@@ -9,6 +9,11 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
 } from '../storage-layout.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
+import { withExecutionContext } from '../authority.js';
+import {
+  currentInstalledPersonCharterRuntime,
+  withPersonExternalReservationAccess,
+} from './person-charter-runtime.js';
 
 export interface ExternalOperationReservation {
   tenantSlug?: string;
@@ -58,18 +63,25 @@ export function reserveExternalOperation(input: ExternalOperationReservation): v
   if (!input.operationId.trim() || !input.invocationId.trim())
     throw new Error('[EXTERNAL_IDENTITY_REQUIRED] Reservation needs operation and invocation');
   try {
-    safeWriteFile(
-      rootResolve(externalOperationReservationRelativePath(input)),
-      JSON.stringify({
-        version: 1,
-        state: 'started',
-        started_at: new Date().toISOString(),
-        operation_hash: digest(input.operationId),
-        invocation_hash: digest(input.invocationId),
-        effect_hash: input.effectHash,
-      }),
-      { createOnly: true, mode: 0o600 }
-    );
+    const relative = externalOperationReservationRelativePath(input);
+    const write = () =>
+      safeWriteFile(
+        rootResolve(relative),
+        JSON.stringify({
+          version: 1,
+          state: 'started',
+          started_at: new Date().toISOString(),
+          operation_hash: digest(input.operationId),
+          invocation_hash: digest(input.invocationId),
+          effect_hash: input.effectHash,
+        }),
+        { createOnly: true, mode: 0o600 }
+      );
+    if (!input.tenantSlug && currentInstalledPersonCharterRuntime())
+      withPersonExternalReservationAccess(relative, () =>
+        withExecutionContext('person_charter_store', write, 'worker')
+      );
+    else write();
   } catch (error) {
     if ((error as { code?: string }).code === 'EEXIST') {
       throw new Error(

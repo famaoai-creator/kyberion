@@ -311,6 +311,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
+      "roles": ["person_charter_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/accountability-digest.ts#runAccountabilityDigest",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -363,6 +368,11 @@
     {
       "site": "libs/core/governance/autonomy-action-state.ts#withTenantAutonomyStore",
       "roles": ["autonomy_learning_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/external-operation-store.ts#reserveExternalOperation",
+      "roles": ["person_charter_store"],
       "unresolved": []
     },
     {
@@ -897,6 +907,31 @@
       "unresolved": [
         "role argument `charter.authority.authority_role` could not be resolved at libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner"
       ]
+    },
+    {
+      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/onboarding-authority.ts#requestOnboardingAuthority (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/onboarding-runtime-identity.ts#inspectInstalledOnboardingRuntime",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
     },
     {
       "site": "libs/core/organization/organization-standup.ts#persistOrganizationCadenceReport (via libs/core/workforce/artifact-store.ts#withRole)",
@@ -2039,6 +2074,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/onboarding-authority-server.ts#asOnboardingOwner",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/outcome-files.ts#metadata",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2704,6 +2744,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/onboarding_apply.ts#applyIdentity",
+      "roles": ["mission_controller", "sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/onboarding_apply.ts#ensureDir",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2715,6 +2760,11 @@
     },
     {
       "site": "scripts/onboarding_apply.ts#writeText",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_authority.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3656,6 +3706,16 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -4029,6 +4089,23 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-worker.ts#<module>",
@@ -4217,6 +4294,7 @@
         "presence/displays/concierge/src/app/api/message/route.ts",
         "presence/displays/concierge/src/app/api/notification-preferences/route.ts",
         "presence/displays/concierge/src/app/api/oauth/begin/route.ts",
+        "presence/displays/concierge/src/app/api/onboarding-authority/route.ts",
         "presence/displays/concierge/src/app/api/org-readiness/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/files/[fileId]/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/files/route.ts",
@@ -4288,6 +4366,7 @@
         "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/OnboardingAuthorityPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OperatorServiceRegistrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PasskeyPane.tsx",
@@ -4348,6 +4427,7 @@
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
         "presence/displays/concierge/src/lib/observation-review.ts",
+        "presence/displays/concierge/src/lib/onboarding-authority-server.ts",
         "presence/displays/concierge/src/lib/operator-service-access.ts",
         "presence/displays/concierge/src/lib/org-readiness-server.ts",
         "presence/displays/concierge/src/lib/org-readiness-view.ts",
@@ -4590,11 +4670,9 @@
         },
         "mission_controller": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/setup/route.ts#POST",
-            "libs/core/browser/browser-onboarding.ts#applyBrowserOnboarding",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityBestEffort",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityProvisioned",
-            "libs/core/agent/agent-identity.ts#issueAgentIdentity",
+            "presence/displays/concierge/src/app/api/onboarding-authority/route.ts#POST",
+            "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority",
+            "libs/core/agent/agent-identity.ts#activateProvisionedAgentIdentity",
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
@@ -4620,6 +4698,14 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "presence/displays/concierge/src/lib/charter-server.ts#readCharterOverview",
+            "libs/core/governance/accountability-charter-registry.ts#findActiveCharter",
+            "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -4929,6 +5015,19 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -5094,6 +5193,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "person_charter_store",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
@@ -5320,6 +5420,21 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -5667,6 +5782,23 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -6127,6 +6259,23 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -6311,6 +6460,19 @@
             "scripts/oauth_callback_surface.ts#<module>",
             "libs/core/governance.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/delegated-execution.ts#verifyDelegatedExecution",
+            "libs/core/governance/delegated-execution.ts#previous",
+            "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "sovereign_concierge": {
@@ -6585,6 +6747,23 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "reasoning_settings_writer": {
@@ -6963,6 +7142,23 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "scripts/personal-pads/server.ts#createPersonalPadsServer",
@@ -7283,6 +7479,17 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -7609,6 +7816,20 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -7813,6 +8034,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "person_charter_store",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
@@ -7977,6 +8199,23 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -8288,6 +8527,19 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -8630,6 +8882,23 @@
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
           ]
         },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -8942,6 +9211,23 @@
             "scripts/dot_continuous_operations_step.ts#<module>",
             "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
             "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+          ]
+        },
+        "person_charter_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
