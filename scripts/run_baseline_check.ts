@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { inspectInstalledIdentity } from './lib/installed-identity.js';
 import {
   getRegisteredEnvText,
   isVitestProcess,
@@ -440,10 +440,6 @@ export function parseConnectionReadinessConfig(
       configDegraded: true,
     };
   }
-}
-
-function profileRoot(): string {
-  return resolveActiveProfileRoot();
 }
 
 function checkServiceConnectionReadiness(
@@ -1036,10 +1032,12 @@ export async function runBaselineCheck() {
     { countFailure: false }
   );
 
+  // Same-repository worktrees share installed identity; never copy personal state.
+  let identityReadiness: ReturnType<typeof inspectInstalledIdentity> | null = null;
   // L3: Identity Layer (Soul)
   sentinel.registerLayer('L3', async () => {
-    const identityPath = path.join(profileRoot(), 'my-identity.json');
-    return safeExistsSync(identityPath);
+    identityReadiness = inspectInstalledIdentity();
+    return identityReadiness.ready;
   });
 
   // L4: Surface Layer (Background Daemons)
@@ -1105,7 +1103,12 @@ export async function runBaselineCheck() {
   const reasoningFailover = readReasoningFailover();
 
   // Determine High-Level Status
-  const status = deriveBaselineStatus(result, janitorMaintenance, reasoningDegraded !== null);
+  const status =
+    result.failedLayer === 'L3' &&
+    (identityReadiness as ReturnType<typeof inspectInstalledIdentity> | null)?.source ===
+      'unavailable'
+      ? 'needs_attention'
+      : deriveBaselineStatus(result, janitorMaintenance, reasoningDegraded !== null);
 
   // Format Output
   const report = {
@@ -1114,6 +1117,7 @@ export async function runBaselineCheck() {
     failed_layer: result.failedLayer || null,
     details: state.layers,
     build_readiness: buildReadiness,
+    identity_readiness: identityReadiness,
     config_degraded: baselineConfigDegraded,
     reasoning_degraded: reasoningDegraded,
     warnings: {

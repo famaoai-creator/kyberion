@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-10-19
+last_updated: 2026-10-22
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -38,6 +38,8 @@ git fetch origin
 git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
 #    worktree ごとにゼロから用意する（main checkout の node_modules を symlink しない）
 (cd ../kyberion-<topic> && CI=true pnpm install --frozen-lockfile && pnpm build)
+#    以降の script 実行では依存関係を暗黙に再インストールしない。
+#    依存を変更した場合は frozen install を明示的に再実行する。
 
 # 1〜4. 実装・commit のあと、PR 前確認（下の「エージェント必須手順」）
 git diff --name-only origin/main...HEAD
@@ -98,6 +100,54 @@ gh pr checks <number> --watch
   コード側の workaround を書かない。失敗が外部起因だと確認できたら、その旨を PR にコメントして
   追跡しやすくする。
 - **レビュー修正は同じ worktree・同じ branch で行う**。マージ後は `git worktree remove` で片付ける。
+
+### worktree と人間承認の継続
+
+`pr create` の readiness / Knowledge 検査は作業中の worktree で実行する。
+単独 CLI からの公開では、Git の common directory が同じであることを確認し、元 checkout の
+approval-store・本人情報・charter・利用台帳を正本として使う。表示される
+`Approval and charter authority: <path>` が承認を操作する場所である。
+これらの状態を worktree にコピーしたり、`active/` や `knowledge/personal/` を symlink したりしない。
+別の tenant や保存済み scope が混入しないよう、作業元の scope は明示的に引き継ぐ。
+
+baseline の L3 も同じ Git common directory の正本 checkout に本人設定があるかを参照し、
+`identity_readiness.governance_root` に参照先を表示する。参照できない場合は
+`needs_attention` として復旧先を表示するので、本人設定の不存在と区別する。
+`pnpm onboarding authority` は正本 checkout で操作する。worktree から実行した場合は
+scope を保った実行コマンドを表示する。`--file` / `--out` は元の絶対パスに固定されるため、
+正本外のファイルを別ファイルとして読み替えない。正本の active personal profile 内に計画を置き、
+`preview --file <plan> --out <profile>/onboarding/activation-reviewed.json` で保存した
+同じ envelope を `request --file <reviewed-file>` に渡す。既存の reviewed file は上書きしない。
+
+mission の本人設定・ライフサイクルは引き続き owner checkout が管理する。
+新しい worktree で `Sovereign profile incomplete` が出た場合、同じ人の onboarding / charter を
+worktree ごとに作り直さない。作業 worktree にビルド済み runtime を用意したうえで、
+既存の owner checkout を明示してライフサイクルを実行する:
+
+```bash
+# 作業 worktree から、既存の本人設定と mission 正本を使う
+KYBERION_ROOT=<owner-checkout> pnpm mission kickoff <ID> --tier public \
+  --goal "<goal>" --success-condition "<observable conditions>"
+KYBERION_ROOT=<owner-checkout> pnpm mission record-evidence <ID> <task-id> \
+  "<worktree path, source commit, result>" --actor-id <agent-id>
+```
+
+コード編集・ビルド・テストでは通常の worktree を使う。`KYBERION_ROOT` を shell 全体に export せず、
+owner のライフサイクル操作にだけ付ける。mission evidence に作業 worktree と source commit を記録し、
+学びは既存の `memory-promote --target-root <worktree>` で同じ PR に入れる。
+
+承認が必要な場合、ヘッドレス実行でも依頼を保存し、依頼 ID と完全な公開内容の確認先を表示する。
+人間がその確認先で repository / head・base の SHA / title / body を確認し、表示された正本 checkout の
+人間用ターミナルで `pnpm kyberion approvals --approve <id>` を実行する。その後、作業 worktree で
+**同じ `pr create` コマンドを再実行する**。同じ公開内容の依頼は再利用され、コミット・本文・公開先が
+変わった場合は別の依頼になる。承認拒否・失効・取り消し・charter の停止条件は引き続き適用される。
+人間の TTY 確認をエージェントから代行しない。
+
+有効な charter の repository grant が使える場合も、本文の情報区分は別に判定する。
+区分不明の scratch ファイルは、元 checkout に転送しただけでは public にならない。
+公開が意図された本文を public の storage floor に置く場合も、その分類は作業元で確定する。
+実行結果が不明な場合や既に実行予約がある場合は、GitHub 上の PR の有無を確認してから復旧する。
+承認 ID を変えたり worktree を作り直したりして二重実行しない。
 
 ### メモリ制約のある環境での同時実行数
 

@@ -18,6 +18,9 @@ export * from './governance/external-operation.js';
 export * from './governance/external-operation-occurrence.js';
 export * from './governance/external-operation-runtime.js';
 export * from './governance/external-operation-store.js';
+export * from './governance/pr-publication-runtime.js';
+export * from './vcs/publication-host.js';
+export * from './vcs/governance-host.js';
 export * from './meeting/calendar-external-effect.js';
 
 // Preserve the original explicit export precedence for names also surfaced by

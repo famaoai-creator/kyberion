@@ -6973,6 +6973,11 @@
       }
     },
     "cli": {
+      "cli_cmd_script_dot_capacity": {
+        "en": "Preview or configure a paused Dot delegation capacity; inherit the installation default with --inherit",
+        "ja": "停止中の Dot の委任枠を確認・設定します。--inherit でインストール既定値を使います",
+        "qps-ploc": "⟦Ṗřėṽïėẇ őř ƈőñƒïɠůřė ȧ ṗȧůşėḓ Ḓőŧ ḓėŀėɠȧŧïőñ ƈȧṗȧƈïŧẏ; ïñħėřïŧ ŧħė ïñşŧȧŀŀȧŧïőñ ḓėƒȧůŀŧ ẇïŧħ --ïñħėřïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
       "cli_cmd_script_dot_create": {
         "en": "Preview or apply a reviewed Dot draft; activate separately",
         "ja": "レビュー済みの Dot 草案をプレビューまたは作成します。有効化は別操作です。",
@@ -7877,6 +7882,31 @@
         "en": "Check and set up voice readiness",
         "ja": "音声機能の準備状況を確認・設定",
         "qps-ploc": "⟦Ƈħėƈķ ȧñḓ şėŧ ůṗ ṽőïƈė řėȧḓïñėşş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_organization_role_migrate_publication_store": {
+        "en": "Review and install publication role catalog updates",
+        "ja": "公開操作に必要なロール定義の更新を確認・適用",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ïñşŧȧŀŀ ṗůƀŀïƈȧŧïőñ řőŀė ƈȧŧȧŀőɠ ůṗḓȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_organization_member": {
+        "en": "Manage human members and tenant access",
+        "ja": "人間のメンバーとテナント権限を管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ħůɱȧñ ɱėɱƀėřş ȧñḓ ŧėñȧñŧ ȧƈƈėşş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_organization_participant": {
+        "en": "Manage organization memberships and responsibilities",
+        "ja": "組織への所属と担当ロールを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė őřɠȧñïẑȧŧïőñ ɱėɱƀėřşħïṗş ȧñḓ řėşṗőñşïƀïŀïŧïėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_organization_agent": {
+        "en": "Manage accountable agent identities and lifecycle",
+        "ja": "エージェントの責任者とライフサイクルを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ȧƈƈőůñŧȧƀŀė ȧɠėñŧ ïḓėñŧïŧïėş ȧñḓ ŀïƒėƈẏƈŀė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_organization_identity": {
+        "en": "Inspect humans, agents and the local owner",
+        "ja": "人間・エージェント・本人の対応を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ħůɱȧñş, ȧɠėñŧş ȧñḓ ŧħė ŀőƈȧŀ őẇñėř ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_organization_model_default": {
         "en": "Manage the organization operating model and roles",
@@ -11636,6 +11666,241 @@
       }
     },
     "concierge": {
+      "people.member_reload": {
+        "en": "Reload the people list to confirm the current owner and access scope before saving.",
+        "ja": "人の一覧を再取得して、現在の所有者と操作できる範囲を確認してから保存してください。",
+        "qps-ploc": "⟦Řėŀőȧḓ ŧħė ṗėőṗŀė ŀïşŧ ŧő ƈőñƒïřɱ ŧħė ƈůřřėñŧ őẇñėř ȧñḓ ȧƈƈėşş şƈőṗė ƀėƒőřė şȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "people.title": {
+        "en": "People and responsibilities",
+        "ja": "人とエージェントの担当",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ řėşṗőñşïƀïŀïŧïėş ŀőřėɱ ïṗ⟧"
+      },
+      "people.description": {
+        "en": "Assign people and agents to this organization, including several responsibilities and work in other organizations.",
+        "ja": "この組織の担当者を登録します。一人・一体が複数の役割や組織を兼務できます。",
+        "qps-ploc": "⟦Ȧşşïɠñ ṗėőṗŀė ȧñḓ ȧɠėñŧş ŧő ŧħïş őřɠȧñïẑȧŧïőñ, ïñƈŀůḓïñɠ şėṽėřȧŀ řėşṗőñşïƀïŀïŧïėş ȧñḓ ẇőřķ ïñ őŧħėř őřɠȧñïẑȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "people.selected_scope": {
+        "en": "Company: {tenant} · Organization: {organization}",
+        "ja": "会社: {tenant} · 組織: {organization}",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ: {tenant} · Őřɠȧñïẑȧŧïőñ: {organization} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "people.roles_boundary": {
+        "en": "Responsibilities record who does the work. Sign-in access and agent tool authority are managed separately.",
+        "ja": "担当する役割の記録です。ログインの権限やエージェントのツール権限は、別に管理します。",
+        "qps-ploc": "⟦Řėşṗőñşïƀïŀïŧïėş řėƈőřḓ ẇħő ḓőėş ŧħė ẇőřķ. Şïɠñ-ïñ ȧƈƈėşş ȧñḓ ȧɠėñŧ ŧőőŀ ȧůŧħőřïŧẏ ȧřė ɱȧñȧɠėḓ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "people.human": {
+        "en": "Person",
+        "ja": "人",
+        "qps-ploc": "⟦Ṗėřşőñ ŀőř⟧"
+      },
+      "people.agent": {
+        "en": "Agent",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧ ŀőř⟧"
+      },
+      "people.service": {
+        "en": "Service",
+        "ja": "サービス",
+        "qps-ploc": "⟦Şėřṽïƈė ŀőř⟧"
+      },
+      "people.local_operator": {
+        "en": "Kyberion operator",
+        "ja": "この Kyberion の利用者",
+        "qps-ploc": "⟦Ķẏƀėřïőñ őṗėřȧŧőř ŀőřėɱ⟧"
+      },
+      "people.you": {
+        "en": "You",
+        "ja": "あなた",
+        "qps-ploc": "⟦Ẏőů ŀőř⟧"
+      },
+      "people.member_access": {
+        "en": "Manage people and sign-in access",
+        "ja": "人の登録とログイン権限を管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ṗėőṗŀė ȧñḓ şïɠñ-ïñ ȧƈƈėşş ŀőřėɱ ïṗşů⟧"
+      },
+      "people.manage_organization": {
+        "en": "Manage organization responsibilities and agents",
+        "ja": "組織の担当・兼務・エージェントを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė őřɠȧñïẑȧŧïőñ řėşṗőñşïƀïŀïŧïėş ȧñḓ ȧɠėñŧş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "people.empty": {
+        "en": "No responsibilities assigned yet. Choose a registered person or agent below.",
+        "ja": "担当者はまだ登録されていません。下から登録済みの人・エージェントを選べます。",
+        "qps-ploc": "⟦Ñő řėşṗőñşïƀïŀïŧïėş ȧşşïɠñėḓ ẏėŧ. Ƈħőőşė ȧ řėɠïşŧėřėḓ ṗėřşőñ őř ȧɠėñŧ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "people.no_roles": {
+        "en": "No responsibility roles",
+        "ja": "担当する役割の指定なし",
+        "qps-ploc": "⟦Ñő řėşṗőñşïƀïŀïŧẏ řőŀėş ŀőřėɱ ï⟧"
+      },
+      "people.active": {
+        "en": "Active",
+        "ja": "有効",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "people.provisioned": {
+        "en": "Awaiting activation",
+        "ja": "有効化待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ȧƈŧïṽȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "people.suspended": {
+        "en": "Suspended",
+        "ja": "停止中",
+        "qps-ploc": "⟦Şůşṗėñḓėḓ ŀőř⟧"
+      },
+      "people.retired": {
+        "en": "Retired",
+        "ja": "廃止済み",
+        "qps-ploc": "⟦Řėŧïřėḓ ŀőř⟧"
+      },
+      "people.edit_roles": {
+        "en": "Edit responsibilities",
+        "ja": "担当する役割を変更",
+        "qps-ploc": "⟦Ėḓïŧ řėşṗőñşïƀïŀïŧïėş ŀőřėɱ ⟧"
+      },
+      "people.remove_assignment": {
+        "en": "Remove from this organization",
+        "ja": "この組織の担当から外す",
+        "qps-ploc": "⟦Řėɱőṽė ƒřőɱ ŧħïş őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "people.assign_title": {
+        "en": "Assign or change responsibilities",
+        "ja": "担当者の追加・役割の変更",
+        "qps-ploc": "⟦Ȧşşïɠñ őř ƈħȧñɠė řėşṗőñşïƀïŀïŧïėş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "people.choose_identity": {
+        "en": "Choose a person or agent",
+        "ja": "人・エージェントを選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗėřşőñ őř ȧɠėñŧ ŀőřėɱ ï⟧"
+      },
+      "people.roles": {
+        "en": "Responsibilities (select several)",
+        "ja": "担当する役割（複数選択可）",
+        "qps-ploc": "⟦Řėşṗőñşïƀïŀïŧïėş (şėŀėƈŧ şėṽėřȧŀ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "people.agents_title": {
+        "en": "Agents managed by this organization",
+        "ja": "この組織で管理するエージェント",
+        "qps-ploc": "⟦Ȧɠėñŧş ɱȧñȧɠėḓ ƀẏ ŧħïş őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "people.agent_scope": {
+        "en": "Lifecycle and accountable-person changes apply to this agent in every organization it works for. Existing tool and approval rules continue to apply.",
+        "ja": "状態・責任者の変更は、このエージェントの全ての兼務先に反映されます。ツールや承認の権限は既存の設定に従います。",
+        "qps-ploc": "⟦Ŀïƒėƈẏƈŀė ȧñḓ ȧƈƈőůñŧȧƀŀė-ṗėřşőñ ƈħȧñɠėş ȧṗṗŀẏ ŧő ŧħïş ȧɠėñŧ ïñ ėṽėřẏ őřɠȧñïẑȧŧïőñ ïŧ ẇőřķş ƒőř. Ėẋïşŧïñɠ ŧőőŀ ȧñḓ ȧṗṗřőṽȧŀ řůŀėş ƈőñŧïñůė ŧő ȧṗṗŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "people.agents_empty": {
+        "en": "No agents managed here yet. Register one below, or assign an existing agent above.",
+        "ja": "ここで管理するエージェントはまだいません。下から登録するか、上で既存のエージェントを担当に追加できます。",
+        "qps-ploc": "⟦Ñő ȧɠėñŧş ɱȧñȧɠėḓ ħėřė ẏėŧ. Řėɠïşŧėř őñė ƀėŀőẇ, őř ȧşşïɠñ ȧñ ėẋïşŧïñɠ ȧɠėñŧ ȧƀőṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "people.accountable_summary": {
+        "en": "Accountable person: {name}",
+        "ja": "責任を持つ人: {name}",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė ṗėřşőñ: {name} ŀőřėɱ ïṗ⟧"
+      },
+      "people.accountable": {
+        "en": "Accountable person",
+        "ja": "責任を持つ人",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė ṗėřşőñ ŀőřėɱ⟧"
+      },
+      "people.choose_accountable": {
+        "en": "Choose an active person",
+        "ja": "有効な人を選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ ȧƈŧïṽė ṗėřşőñ ŀőřėɱ ï⟧"
+      },
+      "people.change_reason": {
+        "en": "Reason for change",
+        "ja": "変更の理由",
+        "qps-ploc": "⟦Řėȧşőñ ƒőř ƈħȧñɠė ŀőřėɱ⟧"
+      },
+      "people.activate_agent": {
+        "en": "Activate",
+        "ja": "有効化する",
+        "qps-ploc": "⟦Ȧƈŧïṽȧŧė ŀőř⟧"
+      },
+      "people.suspend_agent": {
+        "en": "Suspend",
+        "ja": "停止する",
+        "qps-ploc": "⟦Şůşṗėñḓ ŀőř⟧"
+      },
+      "people.retire_agent": {
+        "en": "Retire permanently",
+        "ja": "廃止する（元に戻せません）",
+        "qps-ploc": "⟦Řėŧïřė ṗėřɱȧñėñŧŀẏ ŀőřėɱ⟧"
+      },
+      "people.change_accountable": {
+        "en": "Change accountable person",
+        "ja": "責任者を変更する",
+        "qps-ploc": "⟦Ƈħȧñɠė ȧƈƈőůñŧȧƀŀė ṗėřşőñ ŀőřėɱ ïṗ⟧"
+      },
+      "people.issue_agent": {
+        "en": "Register an agent",
+        "ja": "エージェントを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧñ ȧɠėñŧ ŀőřėɱ⟧"
+      },
+      "people.provisioned_hint": {
+        "en": "Registration creates an identity awaiting activation. Review and activate it separately before use.",
+        "ja": "登録直後は有効化待ちです。内容を確認してから、別の操作で有効化します。",
+        "qps-ploc": "⟦Řėɠïşŧřȧŧïőñ ƈřėȧŧėş ȧñ ïḓėñŧïŧẏ ȧẇȧïŧïñɠ ȧƈŧïṽȧŧïőñ. Řėṽïėẇ ȧñḓ ȧƈŧïṽȧŧė ïŧ şėṗȧřȧŧėŀẏ ƀėƒőřė ůşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "people.agent_name": {
+        "en": "Agent display name",
+        "ja": "エージェントの表示名",
+        "qps-ploc": "⟦Ȧɠėñŧ ḓïşṗŀȧẏ ñȧɱė ŀőřėɱ⟧"
+      },
+      "people.agent_slug": {
+        "en": "Permanent identifier (lowercase letters, digits and hyphens)",
+        "ja": "変更しない識別名（英小文字・数字・ハイフン）",
+        "qps-ploc": "⟦Ṗėřɱȧñėñŧ ïḓėñŧïƒïėř (ŀőẇėřƈȧşė ŀėŧŧėřş, ḓïɠïŧş ȧñḓ ħẏṗħėñş) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "people.member_admin_title": {
+        "en": "People and company access",
+        "ja": "人と会社ごとのログイン権限",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ƈőɱṗȧñẏ ȧƈƈėşş ŀőřėɱ ïṗ⟧"
+      },
+      "people.member_access_hint": {
+        "en": "One person can access several companies. Responsibilities and organization assignments are managed on the organization page. The last owner and your own sign-in cannot be removed.",
+        "ja": "一人が複数の会社に参加できます。組織の担当や兼務は組織の管理画面で設定します。最後の所有者や自分自身のログインは外せません。",
+        "qps-ploc": "⟦Őñė ṗėřşőñ ƈȧñ ȧƈƈėşş şėṽėřȧŀ ƈőɱṗȧñïėş. Řėşṗőñşïƀïŀïŧïėş ȧñḓ őřɠȧñïẑȧŧïőñ ȧşşïɠñɱėñŧş ȧřė ɱȧñȧɠėḓ őñ ŧħė őřɠȧñïẑȧŧïőñ ṗȧɠė. Ŧħė ŀȧşŧ őẇñėř ȧñḓ ẏőůř őẇñ şïɠñ-ïñ ƈȧññőŧ ƀė řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "people.choose_human": {
+        "en": "Choose a person",
+        "ja": "人を選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗėřşőñ ŀőřė⟧"
+      },
+      "people.no_access_memberships": {
+        "en": "No company access assigned",
+        "ja": "参加する会社の指定なし",
+        "qps-ploc": "⟦Ñő ƈőɱṗȧñẏ ȧƈƈėşş ȧşşïɠñėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "people.human_name": {
+        "en": "Person's display name",
+        "ja": "人の表示名",
+        "qps-ploc": "⟦Ṗėřşőñ'ş ḓïşṗŀȧẏ ñȧɱė ŀőřėɱ ⟧"
+      },
+      "people.rename_human": {
+        "en": "Review name change",
+        "ja": "表示名の変更を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ñȧɱė ƈħȧñɠė ŀőřėɱ⟧"
+      },
+      "people.access_role": {
+        "en": "Company sign-in role",
+        "ja": "会社へのログイン権限",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ şïɠñ-ïñ řőŀė ŀőřėɱ ⟧"
+      },
+      "people.set_access": {
+        "en": "Review access change",
+        "ja": "参加・権限の変更を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧƈƈėşş ƈħȧñɠė ŀőřėɱ ⟧"
+      },
+      "people.remove_access": {
+        "en": "Remove company access",
+        "ja": "この会社のログイン権限を外す",
+        "qps-ploc": "⟦Řėɱőṽė ƈőɱṗȧñẏ ȧƈƈėşş ŀőřėɱ ⟧"
+      },
       "authority.github_transport": {
         "en": "GitHub account OAuth and pull-request execution are separate connections. Pull requests use the runtime's gh CLI, which must already be authenticated. Account connection and an approved grant do not prove that transport is ready.",
         "ja": "GitHub アカウントの OAuth 接続と、プルリクエストの実行経路は別です。プルリクエストには実行環境で認証済みの gh CLI が必要です。アカウント接続と権限の承認だけでは、実行経路の準備完了を意味しません。",

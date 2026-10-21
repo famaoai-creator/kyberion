@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: mocks.authorizeSurfaceMutation,
+  surfaceMutationRequestUrl: (req: { url: string }) => req.url,
 }));
 
 vi.mock('./viewer-context', async () => {

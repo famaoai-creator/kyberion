@@ -138,6 +138,17 @@
       "allowed_actuators": ["process-actuator"],
       "tier_access": ["public"]
     },
+    "decision_ledger": {
+      "description": "Decision-ledger write authority: appends and promotes decisions under the active tenant's knowledge/confidential/{tenant}/decisions/ and customers/ only.",
+      "default_persona": "analyst",
+      "write_scopes": [
+        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+        "knowledge/confidential/${KYBERION_TENANT}/customers/"
+      ],
+      "scope_classes": ["knowledge_core"],
+      "allowed_actuators": ["artifact-actuator"],
+      "tier_access": ["confidential"]
+    },
     "designer": {
       "description": "Visual identity and UX authority for interaction design and design-system stewardship.",
       "default_persona": "designer",
@@ -290,6 +301,14 @@
       "allowed_actuators": [],
       "tier_access": ["personal"]
     },
+    "notification_preferences_reader": {
+      "description": "Shared operator delivery reader for the single knowledge/personal/notification-preferences.json routing file. Reads validated notification preferences only; no other personal files, writes, or decision authority.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal"]
+    },
     "operational_learning_writer": {
       "description": "Narrow internal store-writer for machine-generated organization learning proposals, bound to one organization and tenant execution scope.",
       "default_persona": "worker",
@@ -355,6 +374,18 @@
       "scope_classes": [],
       "allowed_actuators": [],
       "tier_access": ["personal"]
+    },
+    "pr_publication_store": {
+      "description": "Internal VCS host IO only: exact standing charter reads, accepted organization charter consumption ledger appends, protected publication review artifact and index, and one canonical vcs:pr_create, vcs:push, or vcs:pr_merge reservation. Requires publication runtime and exact resource ceiling; never held during caller execution or approval decisions. No charter acceptance or stop-clear surface is exposed by the VCS host.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "knowledge/confidential/${KYBERION_TENANT}/charters/",
+        "active/shared/artifacts/",
+        "active/shared/runtime/external-operations/"
+      ],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal", "confidential"]
     },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
@@ -464,16 +495,13 @@
       "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
     },
-    "decision_ledger": {
-      "description": "Decision-ledger write authority: appends and promotes decisions under the active tenant's knowledge/confidential/{tenant}/decisions/ and customers/ only.",
-      "default_persona": "analyst",
-      "write_scopes": [
-        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
-        "knowledge/confidential/${KYBERION_TENANT}/customers/"
-      ],
-      "scope_classes": ["knowledge_core"],
-      "allowed_actuators": ["artifact-actuator"],
-      "tier_access": ["confidential"]
+    "tool_runtime_policy_reader": {
+      "description": "Shared tool availability policy reader for the canonical product policy and exact operator or configured customer onboarding policy. Explicit custom paths retain the caller's own permissions. No installation, pinning, writes, or decision authority.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["public", "personal", "confidential"]
     },
     "workspace_tenant_registry_index_reader": {
       "description": "Shared core read-only workspace tenant selector index reader. Used only for authenticated viewers whose tenant grants are all. Enumerates registry filenames only; descendant file reads are explicitly denied. Each valid slug is subsequently checked by the exact tenant-bound registry reader; no personal profile fields or write authority are exposed.",

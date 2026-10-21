@@ -7,6 +7,9 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { ScopeContext } from '../scope-context-validation.js';
+import { resolveScopeContext } from '../scope-context.js';
+import { currentScopeEnvelope, type ScopePolicy } from '../scope-envelope.js';
+import { capturePipelineResumePolicyEnvironment } from './pipeline-resume-policy-env.js';
 import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
@@ -64,6 +67,19 @@ export interface PipelineRunStartedPayload {
   pipeline_sha256?: string;
   mission_id?: string;
   step_ids: string[];
+  /** Captured by the journal writer, never accepted from a pipeline payload. */
+  execution_authority?: {
+    system_role: string;
+    mission_role: string;
+    persona: string;
+    scope: ScopeContext;
+    nhi_id: string;
+    agent_id: string;
+    task_grants_path: string;
+    scope_policy?: ScopePolicy;
+    policy_env: Record<string, string>;
+    unsupported_policy_env: string[];
+  };
   library_execution?: {
     source_sha256: string;
     initial_context: Record<string, unknown>;
@@ -243,6 +259,40 @@ const pipelineStartedSchema = z.object({
     .optional(),
   mission_id: z.string().optional(),
   step_ids: z.array(z.string()),
+  execution_authority: z
+    .object({
+      system_role: z.string(),
+      mission_role: z.string(),
+      persona: z.string(),
+      scope: z.object({
+        tier: z.enum(['public', 'confidential', 'personal']),
+        tenant_slug: z.string().optional(),
+        organization_id: z.string().optional(),
+        project_id: z.string().optional(),
+        mission_id: z.string().optional(),
+        task_id: z.string().optional(),
+        session_id: z.string().optional(),
+        work_shape: z.string().optional(),
+        customer_stance: z.string().optional(),
+        viewer_principal: z.string().optional(),
+        nhi_id: z.string().optional(),
+      }),
+      nhi_id: z.string(),
+      agent_id: z.string(),
+      task_grants_path: z.string(),
+      scope_policy: z
+        .object({
+          read_tiers: z.array(z.enum(['public', 'confidential', 'personal'])),
+          write_tier: z.enum(['public', 'confidential', 'personal']),
+          purpose: z.string(),
+          external_egress: z.enum(['allow', 'deny']).optional(),
+          allowed_reasoning_backends: z.array(z.string()).optional(),
+        })
+        .optional(),
+      policy_env: z.record(z.string(), z.string()),
+      unsupported_policy_env: z.array(z.string()),
+    })
+    .optional(),
   library_execution: z
     .object({
       source_sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -701,8 +751,22 @@ export function createPipelineRunJournal(
     sequence = envelope.sequence;
     return envelope;
   };
+  const identity = resolveIdentityContext();
   append('run_started', {
     ...started,
+    execution_authority: {
+      system_role: getRegisteredEnvText('SYSTEM_ROLE') || '',
+      mission_role: identity.role === 'unknown' ? '' : identity.role,
+      persona: identity.persona === 'unknown' ? '' : identity.persona || '',
+      scope: currentScopeEnvelope()?.identity ?? resolveScopeContext(),
+      nhi_id: getRegisteredEnvText('KYBERION_NHI_ID') || '',
+      agent_id: getRegisteredEnvText('KYBERION_AGENT_ID') || '',
+      task_grants_path: getRegisteredEnvText('KYBERION_TASK_GRANTS_PATH') || '',
+      ...(currentScopeEnvelope()
+        ? { scope_policy: structuredClone(currentScopeEnvelope()!.policy) }
+        : {}),
+      ...capturePipelineResumePolicyEnvironment(),
+    },
     input_path: path.relative(rootDir(), started.input_path) || started.input_path,
   });
   return {

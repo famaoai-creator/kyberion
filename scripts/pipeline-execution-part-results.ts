@@ -5,6 +5,7 @@ import {
   currentScopeEnvelope,
   runtimeScopeIdentity,
   mintScopeEnvelope,
+  narrowScopeEnvelope,
   withScopeEnvelope,
 } from '@agent/core/scope-envelope';
 import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
@@ -593,15 +594,37 @@ export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJou
   }
   if (!snapshot.scope_identity)
     throw new Error('[PIPELINE_RESUME_DENIED] Original scope identity is missing');
-  const envelope = mintScopeEnvelope({
-    identity: snapshot.scope_identity,
-    env: {},
-    policy: {
-      read_tiers: [scope.tier],
-      write_tier: scope.tier,
-      purpose: snapshot.payload_scope.purpose ?? 'original pipeline continuation',
-    },
-  });
+  const continuationPolicy = {
+    read_tiers: [scope.tier],
+    write_tier: scope.tier,
+    purpose: snapshot.payload_scope.purpose ?? 'original pipeline continuation',
+  };
+  const originalPolicy = state.started?.execution_authority?.scope_policy;
+  const originalEnvelope = originalPolicy
+    ? mintScopeEnvelope({
+        identity: snapshot.scope_identity,
+        env: {},
+        policy: originalPolicy,
+      })
+    : undefined;
+  const originalContinuation = originalEnvelope
+    ? narrowScopeEnvelope(originalEnvelope, {
+        identity: snapshot.scope_identity,
+        policy: continuationPolicy,
+      })
+    : undefined;
+  const parentEnvelope = currentScopeEnvelope();
+  const envelope = parentEnvelope
+    ? narrowScopeEnvelope(parentEnvelope, {
+        identity: snapshot.scope_identity,
+        policy: originalContinuation?.policy ?? continuationPolicy,
+      })
+    : (originalContinuation ??
+      mintScopeEnvelope({
+        identity: snapshot.scope_identity,
+        env: {},
+        policy: continuationPolicy,
+      }));
   return withScopeEnvelope(envelope, () =>
     withExecutionContextAsync(
       snapshot.identity.role,

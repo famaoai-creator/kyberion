@@ -889,6 +889,56 @@
       "group": "operate"
     },
     {
+      "id": "organization-model.role-migrate-publication-store",
+      "command": "organization role migrate-publication-store",
+      "noun": "organization",
+      "verb": "role migrate-publication-store",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_role_migrate_publication_store",
+      "group": "operate"
+    },
+    {
+      "id": "organization-model.member",
+      "command": "organization member",
+      "noun": "organization",
+      "verb": "member",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_member",
+      "group": "operate"
+    },
+    {
+      "id": "organization-model.participant",
+      "command": "organization participant",
+      "noun": "organization",
+      "verb": "participant",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_participant",
+      "group": "operate"
+    },
+    {
+      "id": "organization-model.agent",
+      "command": "organization agent",
+      "noun": "organization",
+      "verb": "agent",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_agent",
+      "group": "operate"
+    },
+    {
+      "id": "organization-model.identity",
+      "command": "organization identity",
+      "noun": "organization",
+      "verb": "identity",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_identity",
+      "group": "inspect"
+    },
+    {
       "id": "project-controller.default",
       "command": "project",
       "noun": "project",
@@ -989,7 +1039,14 @@
     {
       "id": "organization-model",
       "module": "scripts/organization.ts",
-      "commands": ["organization"]
+      "commands": [
+        "organization",
+        "organization role migrate-publication-store",
+        "organization member",
+        "organization participant",
+        "organization agent",
+        "organization identity"
+      ]
     },
     {
       "id": "project-controller",
@@ -1779,6 +1836,17 @@
       "group": "start",
       "native_help": true,
       "same_target_as": "operator-home.doctor"
+    },
+    {
+      "id": "script.dot.capacity",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot capacity",
+      "args": ["capacity"],
+      "noun": "dot",
+      "verb": "capacity",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_capacity",
+      "group": "operate"
     },
     {
       "id": "script.dot.create",

@@ -153,6 +153,23 @@ export class UnitIndex {
           exported: hasExportModifier(statement),
           roots: [statement],
         });
+        // Construction evaluates constructors and fields, not dormant methods.
+        // Method references resolve to these units through the checker.
+        for (const member of statement.members) {
+          if (
+            ts.isMethodDeclaration(member) ||
+            ts.isGetAccessorDeclaration(member) ||
+            ts.isSetAccessorDeclaration(member)
+          ) {
+            this.add({
+              id: unitId(`${name}.${member.name.getText(sourceFile)}`),
+              file: rel,
+              lazy: true,
+              exported: hasExportModifier(statement),
+              roots: [member],
+            });
+          }
+        }
         continue;
       }
       if (ts.isVariableStatement(statement)) {

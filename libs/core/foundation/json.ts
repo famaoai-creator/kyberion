@@ -34,8 +34,15 @@ export function readJsonIfPresent<T>(filePath: string, options?: FoundationReadO
   return loadJsonIfPresent<T>(filePath, options);
 }
 
-export function writeJson<T>(filePath: string, value: T): void {
-  getFoundationIo().writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+export function writeJson<T>(filePath: string, value: T, options?: { createOnly?: boolean }): void {
+  const io = getFoundationIo();
+  const content = `${JSON.stringify(value, null, 2)}\n`;
+  if (options?.createOnly) {
+    if (!io.createExclusiveFile) throw new Error('secure_foundation_exclusive_io_not_registered');
+    io.createExclusiveFile(filePath, content);
+  } else {
+    io.writeFile(filePath, content);
+  }
 }
 
 export interface AppendJsonLineOptions {

@@ -84,7 +84,9 @@ export async function runFrontDeskExecutionIntake(
         const prior = currentDotActions(charter.dot_id, deps).find((row) =>
           frontDeskBindingsEqual(entry.binding, row.front_desk_execution)
         );
-        if (prior) return; // Existing approval/denial/report is reconciled by its owner.
+        // Capacity waiting owns no approval or executable reservation. Only
+        // this original, revalidated outbox may retry it when a slot is free.
+        if (prior && prior.status !== 'waiting_capacity') return;
         const shape = resolveWorkScopeDecision({ catalogMinimumShape: 'pipeline' });
         if (shape.execution_shape !== 'pipeline') return;
         dispatchDotProposals(charter, [frontDeskExecutionProposal(entry.binding)], deps);

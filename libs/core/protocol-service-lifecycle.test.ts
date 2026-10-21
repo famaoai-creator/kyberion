@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './index.js';
 import {
@@ -24,6 +24,23 @@ beforeEach(cleanReceiptRoot);
 afterEach(cleanReceiptRoot);
 
 describe('protocol service lifecycle receipts', () => {
+  it('records attributed lifecycle events without assuming the attributed actor role', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
+    try {
+      const receipt = withExecutionContext('generation_scheduler', () =>
+        recordProtocolServiceLifecycle({
+          serviceId: 'peer-messaging',
+          action: 'reconnect',
+          status: 'reconnected',
+          scope,
+          actorRole: 'sovereign_concierge',
+        })
+      );
+      expect(receipt.actor_role).toBe('sovereign_concierge');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('records and reads a tenant-scoped receipt under the canonical namespace', () => {
     const receipt = recordProtocolServiceLifecycle({
       serviceId: 'peer-messaging',

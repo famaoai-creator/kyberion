@@ -40,6 +40,16 @@ vi.mock('./app_preflight.js', () => ({
   formatAppPreflightReport: mocks.formatAppPreflightReport,
 }));
 
+// Doctor formatting tests must not probe the host's Apple model bridge or
+// desktop sessions. Those probes have their own capability integration tests.
+vi.mock('@agent/core/apple-intelligence-bridge', () => ({
+  probeAppleIntelligence: vi.fn(async () => ({ available: false, reason: 'test fixture' })),
+}));
+
+vi.mock('@agent/core/virtual/desktop-observation-readiness', () => ({
+  probeDesktopObservationReadiness: vi.fn(async () => []),
+}));
+
 describe('run_doctor', () => {
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

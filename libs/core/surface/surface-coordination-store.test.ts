@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as coordinationRoleMap from './surface-coordination-role-map.js';
 
 import { withExecutionContext } from '../authority.js';
 import {
@@ -107,6 +108,34 @@ afterEach(() => {
 });
 
 describe('surface coordination outbox recovery', () => {
+  it('enqueues and preserves source attribution without assuming configured channel actor roles', () => {
+    const roleOverride = vi
+      .spyOn(coordinationRoleMap, 'getSurfaceCoordinationRole')
+      .mockReturnValue('sovereign_concierge');
+    vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
+    try {
+      const messagePath = withExecutionContext('generation_scheduler', () =>
+        enqueueSurfaceOutboxMessage({
+          surface: testSurface,
+          correlationId: `${testPrefix}-narrow-writer`,
+          channel: 'channel-1',
+          threadTs: '',
+          text: 'scheduler notification',
+          source: 'system',
+        })
+      );
+      createdOutboxFiles.push(messagePath);
+      expect(loadSurfaceOutboxMessageAtPath(messagePath, testSurface)).toMatchObject({
+        surface: testSurface,
+        source: 'system',
+        text: 'scheduler notification',
+      });
+      expect(roleOverride).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      roleOverride.mockRestore();
+    }
+  });
   it('quarantines malformed records and keeps valid messages readable', () => {
     const malformedPath = path.join(outboxDir, `${testPrefix}-MALFORMED.json`);
     withExecutionContext('surface_runtime', () => {

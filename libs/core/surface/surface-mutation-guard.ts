@@ -39,6 +39,20 @@ export interface SurfaceMutationDecision {
   reason: string;
 }
 
+/** Preserve the server's original Request URL when a framework normalizes its public getter. */
+export function surfaceMutationRequestUrl(request: { readonly url: string }): string {
+  const nativeUrl = Object.getOwnPropertyDescriptor(Request.prototype, 'url')?.get;
+  if (nativeUrl) {
+    try {
+      const value: unknown = nativeUrl.call(request);
+      if (typeof value === 'string') return value;
+    } catch {
+      // Framework-neutral adapters need not be native Request instances.
+    }
+  }
+  return request.url;
+}
+
 /** Extract a bearer credential without deciding whether it is authorized. */
 export function extractSurfaceBearerToken(authorization: string | null | undefined): string {
   return typeof authorization === 'string' && authorization.startsWith('Bearer ')

@@ -38,6 +38,7 @@ export function composeDotDigestText(
   );
   const count = (status: DotActionStatus) => recent.filter((row) => row.status === status).length;
   const waiting = actions.filter((row) => row.status === 'parked');
+  const capacityWaiting = actions.filter((row) => row.status === 'waiting_capacity');
   const signals = dotSignalStatusLines(charter, { rootDir: deps.rootDir });
   return [
     `${charter.title}${dotGoalRefLabel(charter) ? ` — ${dotGoalRefLabel(charter)}` : ''}`,
@@ -50,6 +51,9 @@ export function composeDotDigestText(
           `- ${evidence.get(row.action_ref)?.status ?? 'queued'}: ${row.title}${row.work_item_id ? ` (${row.work_item_id})` : ''}`
       ),
     ...waiting.slice(0, 5).map((row) => `- waiting on you: ${row.title}`),
+    ...capacityWaiting
+      .slice(0, 5)
+      .map((row) => `- waiting for delegation capacity: ${row.title}; ${row.reason}`),
     ...(signals.length ? ['Signals:', ...signals] : []),
     ...sectionLines,
   ].join('\n');

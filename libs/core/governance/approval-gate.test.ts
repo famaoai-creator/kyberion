@@ -122,6 +122,32 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it('enqueues an explicitly requested human decision without claiming human presence', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([]);
+    mockCreateRequest.mockReturnValue({
+      id: 'req-headless',
+      status: 'pending',
+    } as ApprovalRequestRecord);
+    const requestScope = { tier: 'confidential' as const, tenant_slug: 'acme' };
+    const result = enforceApprovalGate({
+      ...baseParams,
+      hasHuman: false,
+      enqueueRequest: true,
+      requestScope,
+    });
+    expect(result).toMatchObject({ allowed: false, status: 'pending', requestStatus: 'created' });
+    expect(mockCreateRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        scope: requestScope,
+        accountability: expect.objectContaining({ finalDecision: 'human_only' }),
+      })
+    );
+  });
+
   it('allows when an existing approved request matches correlationId', () => {
     mockResolvePolicy.mockReturnValue({
       requiresApproval: true,
@@ -277,7 +303,7 @@ describe('enforceApprovalGate', () => {
         requestStatus: 'created',
       });
       expect(mockCreateRequest).toHaveBeenCalledWith(
-        'mission_controller',
+        'infrastructure_sentinel',
         expect.objectContaining({ correlationId: 'corr-123', expiresAt })
       );
     });
@@ -329,7 +355,7 @@ describe('enforceApprovalGate', () => {
         mockListRequests.mockReturnValue([]);
         enforceApprovalGate({ ...baseParams, expiresAt: '2099-01-01T00:00:00.000Z' });
         expect(mockCreateRequest).toHaveBeenCalledWith(
-          'mission_controller',
+          'infrastructure_sentinel',
           expect.objectContaining({
             expiresAt: new Date(Date.now() + MAX_APPROVAL_TTL_MS).toISOString(),
           })
@@ -364,7 +390,7 @@ describe('enforceApprovalGate', () => {
         'req-stale',
         'req-bad',
       ]);
-      expect(mockExpireRequest).toHaveBeenCalledWith('mission_controller', {
+      expect(mockExpireRequest).toHaveBeenCalledWith('infrastructure_sentinel', {
         channel: 'terminal',
         storageChannel: 'terminal',
         requestId: 'req-stale',
@@ -436,7 +462,7 @@ describe('enforceApprovalGate', () => {
     expect(result.requestStatus).toBe('created');
     expect(mockCreateRequest).toHaveBeenCalledTimes(1);
     expect(mockCreateRequest).toHaveBeenCalledWith(
-      'mission_controller',
+      'infrastructure_sentinel',
       expect.objectContaining({
         accountability: expect.objectContaining({
           finalDecision: 'human_only',
@@ -470,7 +496,7 @@ describe('enforceApprovalGate', () => {
     enforceApprovalGate(baseParams);
 
     expect(mockCreateRequest).toHaveBeenCalledWith(
-      'mission_controller',
+      'infrastructure_sentinel',
       expect.objectContaining({
         accountability: expect.objectContaining({ min_assurance: 'A3' }),
       })
@@ -517,7 +543,7 @@ describe('enforceApprovalGate', () => {
     });
 
     expect(mockCreateRequest).toHaveBeenCalledWith(
-      'mission_controller',
+      'infrastructure_sentinel',
       expect.objectContaining({
         draft: { title: 'Custom', summary: 'Custom summary', severity: 'high' },
       })
@@ -546,7 +572,7 @@ describe('enforceApprovalGate', () => {
     });
 
     expect(mockCreateRequest).toHaveBeenCalledWith(
-      'mission_controller',
+      'infrastructure_sentinel',
       expect.objectContaining({
         draft: expect.objectContaining({
           title: 'Approval required: secret:set',
@@ -761,7 +787,7 @@ describe('enforceApprovalGate', () => {
         })
       );
       expect(mockRecordSessionCacheAutoApproval).toHaveBeenCalledWith(
-        'mission_controller',
+        'infrastructure_sentinel',
         expect.objectContaining({
           entry: cacheEntry,
           operationId: 'secret:set',
@@ -864,7 +890,7 @@ describe('enforceApprovalGate', () => {
       enforceApprovalGate({ ...baseParams, source: { missionId: 'm1', taskId: 't1' } });
 
       expect(mockCreateRequest).toHaveBeenCalledWith(
-        'mission_controller',
+        'infrastructure_sentinel',
         expect.objectContaining({ source: { missionId: 'm1', taskId: 't1' } })
       );
     });

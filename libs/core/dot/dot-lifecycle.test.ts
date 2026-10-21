@@ -12,6 +12,7 @@ import {
   checkDotActivationReadiness,
   isDotStatusTerminal,
   transitionDotCharterStatus,
+  configureDotDelegationCapacity,
 } from './dot-lifecycle.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-lifecycle-tests';
@@ -72,6 +73,44 @@ function writeTenantCharter(slug: string, charter: DotCharter, name = 'dot.json'
 
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
+});
+
+describe('configureDotDelegationCapacity', () => {
+  it('previews and changes only capacity on a paused charter, then supports inheritance', () => {
+    const file = writeCharter({ ...DRAFT, status: 'paused' });
+    const preview = configureDotDelegationCapacity(DRAFT.dot_id, 100, { ...deps, dryRun: true });
+    expect(preview).toMatchObject({ applied: false, effective_limit: 100 });
+    expect(loadDotCharter(file).authority.max_concurrent_delegations).toBeUndefined();
+    const applied = configureDotDelegationCapacity(DRAFT.dot_id, 100, deps);
+    expect(applied.charter).toEqual({
+      ...DRAFT,
+      status: 'paused',
+      authority: {
+        ...DRAFT.authority,
+        max_concurrent_delegations: 100,
+      },
+    });
+    expect(loadDotCharter(file).authority.max_concurrent_delegations).toBe(100);
+    configureDotDelegationCapacity(DRAFT.dot_id, undefined, deps);
+    expect(loadDotCharter(file).authority.max_concurrent_delegations).toBeUndefined();
+    expect(safeExistsSync(`${TEST_ROOT}/${DOT_LIFECYCLE_AUDIT_PATH}`)).toBe(true);
+  });
+  it('refuses active/retired changes and invalid limits without modifying the charter', () => {
+    for (const status of ['active', 'retired'] as const) {
+      const file = writeCharter({ ...DRAFT, status });
+      expect(() => configureDotDelegationCapacity(DRAFT.dot_id, 100, deps)).toThrow(
+        'pause the dot'
+      );
+      expect(loadDotCharter(file).status).toBe(status);
+      expect(loadDotCharter(file).authority.max_concurrent_delegations).toBeUndefined();
+    }
+    writeCharter(DRAFT);
+    for (const limit of [0, -1, 3.5, 257, Infinity, NaN]) {
+      expect(() => configureDotDelegationCapacity(DRAFT.dot_id, limit, deps)).toThrow(
+        'DOT_CAPACITY_INVALID'
+      );
+    }
+  });
 });
 
 describe('transitionDotCharterStatus', () => {

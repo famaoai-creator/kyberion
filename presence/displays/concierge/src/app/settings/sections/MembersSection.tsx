@@ -18,6 +18,7 @@ import type { ConciergeLocale, FrontDeskMessageKey } from '../../../lib/i18n';
 import type {
   Setup,
   SettingsMember,
+  SettingsMemberPatch,
   SettingsRole,
   SettingsTenantView,
   TrainingAssignments,
@@ -27,6 +28,7 @@ import type {
 import { CharterPane } from './CharterPane';
 import { InvitesPane } from './InvitesPane';
 import { OrgReadinessPane } from './OrgReadinessPane';
+import { MemberAdministrationPanel } from './MemberAdministrationPanel';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 /** FD-06/FD-07/HT-05 組織とメンバー pane (`#settings-members`) — tenants list,
@@ -71,20 +73,15 @@ export type MembersSectionProps = {
   meTenants: SettingsTenantView[];
   meViewing: SettingsTenantView | null;
   members: SettingsMember[];
+  memberContextId?: string;
+  onRefreshMembers?: () => void;
   memberForm: MemberFormState;
   setMemberForm: React.Dispatch<React.SetStateAction<MemberFormState>>;
   memberBusy: boolean;
   issuedToken: string | null;
   setIssuedToken: (token: string | null) => void;
   onAddMember: () => void;
-  onPatchMember: (
-    memberId: string,
-    patch:
-      | { tenant_slug: string; role: SettingsRole }
-      | { status: 'active' | 'suspended' }
-      | { external_identity: { issuer: string; subject: string } }
-      | { external_identity_remove: { issuer: string; subject: string } }
-  ) => void;
+  onPatchMember: (memberId: string, patch: SettingsMemberPatch) => void;
   trainingTracks: TrainingTrack[];
   trainingAssignments: TrainingAssignments[];
   trainingProgress: TrainingProgressSummary[];
@@ -109,6 +106,8 @@ export function MembersSection({
   meTenants,
   meViewing,
   members,
+  memberContextId,
+  onRefreshMembers,
   memberForm,
   setMemberForm,
   memberBusy,
@@ -133,7 +132,8 @@ export function MembersSection({
       ...current,
       [memberId]: { ...(current[memberId] ?? { issuer: '', subject: '' }), [field]: value },
     }));
-  const activeTenantSlug = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
+  const activeTenantSlug =
+    meViewing?.tenant_slug ?? (meTenants.length === 1 ? meTenants[0]?.tenant_slug : undefined);
   const roleOptions = ROLES.map((role) => ({
     value: role,
     label: frontDeskText(ROLE_LABEL_KEYS[role], locale),
@@ -242,15 +242,17 @@ export function MembersSection({
                   description={`${signIn} · ${status}`}
                 >
                   <div className="settings-inline-actions">
-                    <Select
-                      id={`member-role-${member.member_id}`}
-                      name={`member.role.${member.member_id}`}
-                      label={frontDeskText('settings_member_role_change', locale)}
-                      hide_label
-                      value={membership?.role ?? 'viewer'}
-                      disabled={memberBusy}
-                      options={roleOptions}
-                    />
+                    {activeTenantSlug ? (
+                      <Select
+                        id={`member-role-${member.member_id}`}
+                        name={`member.role.${member.member_id}`}
+                        label={frontDeskText('settings_member_role_change', locale)}
+                        hide_label
+                        value={membership?.role ?? 'viewer'}
+                        disabled={memberBusy}
+                        options={roleOptions}
+                      />
+                    ) : null}
                     <Button
                       label={frontDeskText(
                         member.status === 'suspended'
@@ -272,6 +274,27 @@ export function MembersSection({
             })
           )}
         </SettingsGroup>
+
+        <div className="settings-row-block">
+          <Button
+            label={t('people.manage_organization')}
+            href={
+              activeTenantSlug
+                ? '/management?tenant=' + encodeURIComponent(activeTenantSlug)
+                : '/management'
+            }
+          />
+        </div>
+        <MemberAdministrationPanel
+          members={members}
+          tenants={meTenants}
+          busy={memberBusy}
+          locale={locale}
+          t={t}
+          onPatch={onPatchMember}
+          contextId={memberContextId}
+          onRefresh={onRefreshMembers}
+        />
 
         {/* FD-07 SSO: bind / unbind IdP identities (issuer + subject) per
             member. Server enforces owner-only + uniqueness (409). */}

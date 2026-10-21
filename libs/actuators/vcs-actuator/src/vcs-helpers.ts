@@ -15,21 +15,25 @@ import {
   gitStatus,
   ghPrChecks,
   ghPrChecksWait,
-  ghPrCreate,
   ghPrList,
-  ghPrMerge,
   ghPrView,
   ghRepoDefaultBranch,
   ghVersion,
   gitCheckout,
   gitFetch,
   gitPull,
-  gitPush,
   gitWorktree,
 } from '@agent/core/vcs';
 import type { ValidateFunction } from 'ajv';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { runVcsMutationWithWorktreeGovernance } from '@agent/core/vcs/governance-host';
+import {
+  runVcsMutationWithApproval,
+  vcsHostInvocationId,
+  type VcsHostMutation,
+} from '@agent/core/vcs/publication-host';
+import type { VcsCommandResult } from '@agent/core/vcs/git';
 
 export type VcsOp =
   | 'status'
@@ -63,6 +67,7 @@ export type VcsParams = {
   add?: boolean;
   title?: string;
   body?: string;
+  body_file?: string;
   base?: string;
   remote?: string;
   set_upstream?: boolean;
@@ -188,7 +193,17 @@ function asActionableError(error: unknown, bin: string, installStep: string): Er
   return error instanceof Error ? error : new Error(message);
 }
 
-export async function handleAction(action: VcsAction): Promise<unknown> {
+export async function handleAction(
+  action: VcsAction,
+  publicationHost: (mutation: VcsHostMutation) => VcsCommandResult = (mutation) =>
+    runVcsMutationWithApproval(
+      mutation,
+      vcsHostInvocationId(mutation),
+      (line) => logger.info(String(line)),
+      runGhResult,
+      { authority: 'existing_only' }
+    )
+): Promise<unknown> {
   const input = validateAction(action);
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
@@ -235,17 +250,16 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'pr_create': {
-      const result = ghPrCreate(
-        {
-          title: (params.title as string).trim(),
-          body: params.body,
-          base: params.base,
-          head: params.head,
-          draft: params.draft,
-          cwd,
-        },
-        runGhResult
-      );
+      const publication = {
+        title: (params.title as string).trim(),
+        body: params.body,
+        bodyFile: params.body_file,
+        base: params.base,
+        head: params.head,
+        draft: params.draft,
+        cwd,
+      };
+      const result = publicationHost({ operation: 'pr_create', params: publication });
       if (result.error || result.status !== 0) {
         throw asActionableError(
           new Error(result.stderr || `exit ${result.status}`),
@@ -256,11 +270,13 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'push': {
-      const result = gitPush(cwd, {
+      const publication = {
+        cwd,
         remote: params.remote,
         ref: params.ref,
         setUpstream: params.set_upstream,
-      });
+      };
+      const result = publicationHost({ operation: 'push', params: publication });
       assertOk(result, 'git push');
       return { op: valid.op, cwd, output: result.stdout };
     }
@@ -313,10 +329,13 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, result };
     }
     case 'pr_merge': {
-      const result = ghPrMerge(
-        { ref: params.ref, method: params.method, deleteBranch: params.delete_branch, cwd },
-        runGhResult
-      );
+      const publication = {
+        ref: params.ref!,
+        method: params.method,
+        deleteBranch: params.delete_branch,
+        cwd,
+      };
+      const result = publicationHost({ operation: 'pr_merge', params: publication });
       assertOk(result, 'gh pr merge');
       return { op: valid.op, cwd, output: result.stdout };
     }
@@ -348,4 +367,21 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       throw new Error(`Unsupported operation: ${String(_exhaustive)}`);
     }
   }
+}
+
+/** Explicit direct CLI host. Embedded/pipeline/serve dispatch retains its own authority. */
+export function handleStandaloneAction(
+  action: VcsAction,
+  print: (value: unknown) => void = (value) => logger.info(String(value))
+): Promise<unknown> {
+  return handleAction(action, (mutation) =>
+    runVcsMutationWithWorktreeGovernance(
+      mutation,
+      vcsHostInvocationId(mutation),
+      print,
+      mutation.operation === 'pr_create' && !mutation.params.bodyFile
+        ? { bodySourceTier: 'protected_or_unknown' }
+        : {}
+    )
+  );
 }

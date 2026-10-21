@@ -19,6 +19,7 @@ import * as pathResolver from './path-resolver.js';
 import { missionPathOrNull } from './mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { resolveProjectScope } from './foundation/project-scope-env.js';
+import { isScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
@@ -1021,7 +1022,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   // 1. Resolve Persona (and tenantSlug / brokeredTenants) from Mission State.
   // Try the legacy no-tier path first, then fall back to tier-aware lookup
   // (covers active/missions/{personal,confidential,public}/{id}/...).
-  if (missionId) {
+  if (missionId && !isScopeEnvOnly()) {
     const candidates: string[] = [pathResolver.active(`missions/${missionId}/mission-state.json`)];
     // An id that is ambiguous across tenants or not visible to this process
     // contributes no mission identity (the persona stays 'unknown'), so

@@ -212,6 +212,7 @@ export function purposePath(
 }
 
 export type OrganizationRecordKind =
+  | 'participants'
   | 'domains'
   | 'capabilities'
   | 'services'

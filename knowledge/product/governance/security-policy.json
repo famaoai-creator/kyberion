@@ -945,6 +945,18 @@
         "knowledge/confidential/${KYBERION_TENANT}"
       ]
     },
+    "notification_preferences_reader": {
+      "allow_read": ["knowledge/personal/notification-preferences.json"],
+      "allow_write": []
+    },
+    "tool_runtime_policy_reader": {
+      "allow_read": [
+        "knowledge/product/governance/tool-runtime-policy.json",
+        "knowledge/personal/onboarding/tool-runtime-policy.json",
+        "customer/${KYBERION_CUSTOMER}/onboarding/tool-runtime-policy.json"
+      ],
+      "allow_write": []
+    },
     "workspace_tenant_registry_reader": {
       "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
       "allow_write": []
@@ -953,6 +965,22 @@
       "allow_read": ["knowledge/personal/tenants/"],
       "deny_read_descendants": ["knowledge/personal/tenants/"],
       "allow_write": []
+    },
+    "pr_publication_store": {
+      "allow_read": [
+        "knowledge/personal/charters/",
+        "knowledge/confidential/${KYBERION_TENANT}/charters/",
+        "active/shared/artifacts/personal/shared/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/external-operations/",
+        "active/shared/tmp/"
+      ],
+      "allow_write": [
+        "knowledge/confidential/${KYBERION_TENANT}/charters/",
+        "active/shared/artifacts/",
+        "active/shared/runtime/external-operations/",
+        "active/shared/tmp/"
+      ]
     },
     "person_charter_store": {
       "allow_read": [

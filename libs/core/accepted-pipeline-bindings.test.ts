@@ -165,7 +165,9 @@ describe('accepted pipeline bindings', () => {
   it('accepts only canonical successful exact-path run journal state', () => {
     const state = {
       run_id: 'run-1',
-      path: pathResolver.rootResolve('active/shared/runtime/pipeline-runs/run-1.jsonl'),
+      // Pure validator fixture: rootResolve maps live runtime stores to Vitest's
+      // sandbox, while this contract validates the canonical persisted path.
+      path: `${pathResolver.rootDir()}/active/shared/runtime/pipeline-runs/run-1.jsonl`,
       events: [
         {
           version: 3,

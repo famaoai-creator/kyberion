@@ -194,6 +194,19 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
 
 ### Stage 7: Soul infusion (identity)
 
+同じ repository の worktree では、本人設定を作り直さない。単独の operator 診断では、baseline L3 は Git common
+directory で正本 checkout を検証し、`identity_readiness.governance_root` に参照先を表示する。
+明示した tenant / customer stance は維持する。参照に失敗した場合は `needs_attention` として
+復旧先を表示する。本人設定や charter をコピーせず、正本 checkout の runtime とアクセスを確認する。
+pipeline / worker などの scope 内では、正本への参照を広げない。手元に本人設定がない、または読めない場合は
+`identity_readiness.source: unavailable` / `needs_attention` とする。`governance_root` はその診断対象を示す。
+`identity_readiness.next` に従って、同じ tenant / customer stance の単独 operator セッションで正本を診断する。
+scope 内の未確認を本人設定の欠落と判断して onboarding をやり直さない。scope 内で手元の設定を確認できた場合は引き続き利用できる。
+本人設定・activation の変更は正本で実施する。`pnpm onboarding authority` の worktree 実行時は
+正本で使うコマンドが表示される。計画と reviewed envelope は正本の active personal profile 内に置き、
+`preview --out <profile>/onboarding/activation-reviewed.json` で保存した同じファイルを
+`request --file <reviewed-file>` に渡す。
+
 - **Command**: `pnpm onboarding` (needs `dist/`)
 - **Purpose**: make the system remember the sovereign's name, language, interaction style, specialty, and vision.
 - **To do it in the GUI**: open the concierge `/settings` (the old Concierge `/setup` and the Presence Studio `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.

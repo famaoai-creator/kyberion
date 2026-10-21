@@ -14,9 +14,44 @@ import {
   clearScopeEnv,
   pushScopeEnv,
   popScopeEnv,
+  withScopeEnvOnly,
 } from './scope-context.js';
 
 describe('scope-context', () => {
+  it('keeps transported runtime scope independent of a destination persisted scope', () => {
+    const dir = pathResolver.sharedTmp(`scope-host-${process.pid}`);
+    const file = `${dir}/scope.env`;
+    const env = { KYBERION_SCOPE_ENV_PATH: file, KYBERION_TIER: 'public' };
+    safeMkdir(dir, { recursive: true });
+    try {
+      safeWriteFile(
+        file,
+        'KYBERION_TIER=confidential\nKYBERION_TENANT=destination-tenant\nKYBERION_ORGANIZATION_ID=destination-org\nMISSION_ID=MSN-DESTINATION\n'
+      );
+      const source = withScopeEnvOnly(() => resolveScopeContext({}, env));
+      expect(source).toEqual({ tier: 'public' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeContext({}, env), {
+          session_id: 'source-session',
+          work_shape: 'task_session',
+        })
+      ).toEqual({ tier: 'public', session_id: 'source-session', work_shape: 'task_session' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeResolution({}, env, { includePersisted: true })).scope
+      ).toEqual({ tier: 'public' });
+      expect(resolveScopeContext({}, env).tenant_slug).toBe('destination-tenant');
+      expect(
+        withScopeEnvOnly(() =>
+          resolveScopeContext(
+            {},
+            { ...env, KYBERION_TENANT: 'source-tenant', KYBERION_ORGANIZATION_ID: 'source-org' }
+          )
+        )
+      ).toEqual({ tier: 'public', tenant_slug: 'source-tenant', organization_id: 'source-org' });
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
   it('keeps customer stance separate from tenant scope', () => {
     const context = resolveScopeContext(
       { tier: 'confidential', customer_stance: 'kyberion-development-team' },

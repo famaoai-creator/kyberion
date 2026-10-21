@@ -2,6 +2,10 @@
 export * from './authority-role-registry.js';
 export * from './member-id-grammar.js';
 export * from './member-identity-link.js';
+export * from './member-management.js';
+export * from './organization-people-access.js';
+export * from './organization-participants.js';
+export * from './organization-agent-management.js';
 export type {
   MemberRole,
   MemberStatus,

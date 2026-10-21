@@ -12,8 +12,8 @@
   gap: var(--kb-ui-space-2);
 }
 .management-page select,
-.management-editor input,
-.management-editor textarea {
+.management-page input,
+.management-page textarea {
   color: var(--kb-ui-text);
   background: var(--kb-ui-surface);
   border: 1px solid var(--kb-ui-border);
@@ -27,4 +27,20 @@
 .management-description {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.management-role-picker {
+  max-height: 20rem;
+  overflow: auto;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  padding: var(--kb-ui-space-3);
+}
+.management-editor .management-role-option {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding-block: var(--kb-ui-space-2);
+}
+.management-role-option input {
+  width: auto;
 }

@@ -20,6 +20,8 @@
 import * as path from 'node:path';
 import { rootDir } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
   appendRetentionAudit,
   repoRelativePosix,
@@ -116,10 +118,24 @@ export function collectResidue(dir: string): string[] {
   return [dir];
 }
 
-export function findMissionResidue(): string[] {
-  const root = missionsRoot();
+export function findMissionResidue(root = missionsRoot()): string[] {
   if (!safeExistsSync(root)) return [];
-  return subdirectories(root).flatMap(collectResidue);
+  return subdirectories(root).flatMap((child) =>
+    STORAGE_DATA_TIERS.some((tier) => tier === path.basename(child))
+      ? subdirectories(child).flatMap((partition) => {
+          const name = path.basename(partition);
+          // Tenant/shared containers remain scaffolding when they hold only
+          // directories. A slug-shaped fixture with loose files stays visible
+          // as residue rather than becoming an accidental namespace.
+          if (name === 'shared' || isValidTenantSlug(name)) {
+            const entries = safeReaddir(partition);
+            const children = subdirectories(partition);
+            if (entries.length === children.length) return children.flatMap(collectResidue);
+          }
+          return collectResidue(partition);
+        })
+      : collectResidue(child)
+  );
 }
 
 function countFiles(dir: string): number {

@@ -176,7 +176,13 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/members/[id]/route.ts'),
       'utf8'
     );
-    expect(membersPatch).toContain('conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug)');
+    expect(membersPatch).toContain('updateManagedMember(principal,');
+    expect(membersPatch).toContain('assertMemberManagementContext');
+    const memberManagement = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/organization/member-management.ts'))
+    );
+    expect(memberManagement).toContain('requireOwner');
+    expect(memberManagement).toContain('An owner membership is required on every tenant affected');
     const trainingAssign = fs.readFileSync(
       path.join(appDir, 'src/app/api/training/assignments/route.ts'),
       'utf8'
@@ -696,17 +702,15 @@ describe('concierge surface contract', () => {
     expect(listRoute).toContain("status === 'queued'");
     expect(listRoute).not.toContain('mission_controller');
 
-    // Decisions go exclusively through scripts/mission_controller.ts (repo
-    // invariant), with the controller role and honest exit handling.
+    // Decisions share the controller's exact review and atomic queue facade.
     expect(decisionRoute).toContain('requireConciergeMutationAccess');
-    expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
-    expect(decisionRoute).toContain('memory-approve');
-    expect(decisionRoute).toContain('memory-reject');
-    expect(decisionRoute).toContain("buildExecutionEnv(process.env, 'mission_controller')");
-    expect(decisionRoute).toContain('safeExecResult');
+    expect(decisionRoute).toContain('reviewMemoryPromotionCandidate');
+    expect(decisionRoute).toContain('assertMemoryPromotionReviewReady');
+    expect(decisionRoute).toContain('updateMemoryPromotionCandidateStatus');
+    expect(decisionRoute).toContain('expectedStatus: candidate.status');
     // The candidate must exist and still be pending before anything runs, and
     // exit code 0 alone is not success — the transition is verified on disk.
-    expect(decisionRoute).toContain('loadMemoryPromotionCandidate');
+    expect(decisionRoute).toContain('listMemoryPromotionCandidates');
     expect(decisionRoute).toContain("candidate.status !== 'queued'");
     expect(decisionRoute).toContain('after?.status !== expected');
     expect(decisionRoute).not.toMatch(/setInterval\(|setTimeout\(/);

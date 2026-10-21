@@ -27,6 +27,12 @@ describe('tool runtime policy', () => {
     expect(resolveToolRuntimeCacheRoot(policy)).toContain('active/shared/tmp/tool-runtime-cache');
   });
 
+  it('lets a scheduler read tool policy without assuming concierge authority', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
+    _resetToolRuntimePolicyCacheForTests();
+    expect(getToolRuntimePolicy().approval.install_requires_approval).toBe(true);
+  });
+
   it('respects env overrides', () => {
     vi.stubEnv(
       'KYBERION_TOOL_RUNTIME_POLICY_PATH',
@@ -35,6 +41,37 @@ describe('tool runtime policy', () => {
     _resetToolRuntimePolicyCacheForTests();
     const policy = getToolRuntimePolicy();
     expect(policy.version).toBe('1.0.0');
+  });
+
+  it('rechecks explicit protected policy access after a privileged cache fill', () => {
+    const policy = getToolRuntimePolicy();
+    const protectedPath = pathResolver.shared(
+      `artifacts/personal/shared/evidence/tool-policy-${process.pid}.json`
+    );
+    try {
+      withExecutionContext(
+        'mission_controller',
+        () => safeWriteFile(protectedPath, JSON.stringify(policy), { mkdir: true }),
+        'ecosystem_architect'
+      );
+      vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', protectedPath);
+      expect(
+        withExecutionContext(
+          'mission_controller',
+          () => getToolRuntimePolicy(),
+          'ecosystem_architect'
+        )
+      ).toEqual(policy);
+      expect(() =>
+        withExecutionContext('generation_scheduler', () => getToolRuntimePolicy(), 'worker')
+      ).toThrow();
+    } finally {
+      withExecutionContext(
+        'mission_controller',
+        () => safeRmSync(protectedPath, { force: true }),
+        'ecosystem_architect'
+      );
+    }
   });
 
   it('fails closed when an override fails schema validation', () => {

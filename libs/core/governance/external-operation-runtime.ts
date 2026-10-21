@@ -44,6 +44,8 @@ export function createOnboardingExternalOperationAuthority(options: {
   ownerActor: string;
   invocationId: string;
   hasHuman?: false;
+  /** Standalone typed VCS hosts bind reservations to the resolved exact effect. */
+  bindEffectIdentity?: boolean;
 }): ExternalOperationAuthorityResolver {
   if (!options.invocationId.trim())
     throw new Error('[EXTERNAL_IDENTITY_REQUIRED] Stable invocation required');
@@ -55,6 +57,9 @@ export function createOnboardingExternalOperationAuthority(options: {
         base: options.invocationId,
         pipeline: externalOperationReplayKey('onboarding'),
         occurrence: currentExternalOperationOccurrence(),
+        ...(options.bindEffectIdentity
+          ? { operation: facts.operationId, effect: computeApprovalPayloadHash(facts.effect) }
+          : {}),
       }),
       hasHuman: false,
       standingScope: scope,

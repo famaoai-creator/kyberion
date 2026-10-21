@@ -125,7 +125,7 @@ export class CloudflareOsReadOnlySurface {
     missionId: string | undefined,
     access: CloudflareOsSurfaceAccess
   ): CloudflareOsSurfaceSnapshot {
-    return this.#surface.snapshot(missionId, access);
+    return this.#surface.snapshot(missionId, access, { readOnly: true });
   }
 }
 

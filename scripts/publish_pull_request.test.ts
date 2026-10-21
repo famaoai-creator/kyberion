@@ -6,10 +6,27 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   checkPrKnowledgeReadiness: vi.fn(),
   ghPrCreate: vi.fn(),
+  explicitRequest: vi.fn(),
+  writeScopedArtifact: vi.fn(),
 }));
 
-vi.mock('@agent/core/vcs', async (original) => ({
-  ...(await original<typeof import('@agent/core/vcs')>()),
+vi.mock('@agent/core/governance/external-operation', async (original) => {
+  const actual = await original<typeof import('@agent/core/governance/external-operation')>();
+  return {
+    ...actual,
+    withExplicitExternalApprovalRequest: mocks.explicitRequest.mockImplementation(
+      actual.withExplicitExternalApprovalRequest
+    ),
+  };
+});
+
+vi.mock('@agent/core/workforce/artifact-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/workforce/artifact-store')>()),
+  writeScopedArtifact: mocks.writeScopedArtifact,
+}));
+
+vi.mock('@agent/core/vcs/github', async (original) => ({
+  ...(await original<typeof import('@agent/core/vcs/github')>()),
   ghPrCreate: mocks.ghPrCreate,
 }));
 
@@ -36,9 +53,11 @@ import {
   runKnowledgeReadinessGate,
   runPrePrReadiness,
 } from './publish_pull_request.js';
+import { ExternalOperationApprovalRequired } from '@agent/core/governance/external-operation';
 
 /** Default `safeExec` stub covering every gh/git call `main()` makes before `gh pr create`. */
 function stubGhAndGit(): void {
+  mocks.explicitRequest.mockImplementation((_request, body) => body());
   mocks.ghPrCreate.mockReturnValue({
     status: 0,
     stdout: 'https://github.com/acme/repo/pull/1\n',
@@ -58,6 +77,7 @@ function stubGhAndGit(): void {
 describe('publish_pull_request', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.explicitRequest.mockImplementation((_request, body) => body());
   });
 
   it('parses explicit publish flags', () => {
@@ -369,6 +389,47 @@ describe('main() wiring (KL-03)', () => {
     expect(
       mocks.safeExec.mock.calls.some(([command, args]) => command === 'gh' && args[0] === 'pr')
     ).toBe(false);
+  });
+
+  it('gives the human the exact publication review and an actionable approval resume path', async () => {
+    stubGhAndGit();
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+    mocks.writeScopedArtifact.mockReturnValue({
+      absolute_path: '/protected/review.json',
+      repo_relative_path: 'active/review.json',
+    });
+    const effect = {
+      repository: { url: 'https://github.com/acme/repo' },
+      title: 'fix(pr): request decision',
+      body: 'full reviewed text',
+      headSha: 'a'.repeat(40),
+    };
+    mocks.ghPrCreate.mockImplementation(() => {
+      const request = mocks.explicitRequest.mock.calls.at(-1)![0];
+      expect(request.operationId).toBe('vcs:pr_create');
+      expect(request.reviewArtifacts(effect)).toEqual(['active/review.json']);
+      throw new ExternalOperationApprovalRequired({
+        allowed: false,
+        status: 'pending',
+        requestId: 'apr-human',
+      });
+    });
+    const print = vi.fn();
+    await expect(
+      main(
+        ['--title', 'fix(pr): request decision', '--body-file', 'body.md', '--skip-readiness'],
+        print
+      )
+    ).rejects.toThrow(ExternalOperationApprovalRequired);
+    expect(mocks.writeScopedArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({ content: effect, tier: 'personal' })
+    );
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('/protected/review.json'));
+    expect(print).toHaveBeenCalledWith(
+      expect.stringContaining('pnpm kyberion approvals --approve apr-human')
+    );
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('rerun the same pr create command'));
   });
 
   it('reports typed transport failure instead of printing a successful publication', async () => {
