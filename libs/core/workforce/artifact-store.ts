@@ -146,6 +146,7 @@ export interface ScopedArtifactScope {
    * another scope ref.
    */
   system?: true;
+  /** Registered tenant; `shared` is an untenanted partition sentinel only with personal tier. */
   tenant?: string;
   /**
    * Organization-owned artifact (digests, org-wide reports). Lands under the
@@ -501,7 +502,13 @@ function resolveScopeArtifactsRoot(
   if (scope.tenant !== undefined) {
     let segments: string[];
     try {
-      segments = storagePartitionSegments({ kind: 'tier', tier, tenant: scope.tenant });
+      // Personal operator evidence has no tenant. Preserve the existing shared
+      // owner sentinel without treating it as a registered/confidential tenant.
+      segments = storagePartitionSegments({
+        kind: 'tier',
+        tier,
+        ...(tier === 'personal' && scope.tenant === SHARED_TENANT ? {} : { tenant: scope.tenant }),
+      });
     } catch {
       throw new Error(
         `writeScopedArtifact: invalid tenant reference: ${JSON.stringify(scope.tenant)}`

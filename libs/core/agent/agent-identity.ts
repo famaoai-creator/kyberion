@@ -44,6 +44,8 @@
  */
 
 import { z } from 'zod';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import * as path from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { isVitestProcess } from '../foundation/env.js';
@@ -199,6 +201,7 @@ export const AGENT_IDENTITY_OPS = {
   identityActivated: 'identity_activated',
   identitySuspended: 'identity_suspended',
   identityRetired: 'identity_retired',
+  accountabilityReassigned: 'accountability_reassigned',
   instanceBound: 'instance_bound',
   instanceReleased: 'instance_released',
 } as const;
@@ -222,6 +225,16 @@ const identityActivatedPayloadSchema = z
     nhi_id: z.string(),
     activated_at: z.string(),
     only_provisioned: z.literal(true).optional(),
+  })
+  .strict();
+
+const accountabilityReassignedPayloadSchema = z
+  .object({
+    nhi_id: z.string().regex(NHI_ID_PATTERN),
+    previous_accountable_human_id: z.string().min(1),
+    accountable_human_id: z.string().min(1),
+    reason: z.string().min(1),
+    reassigned_at: z.string(),
   })
   .strict();
 
@@ -290,6 +303,29 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityActivated, {
     if (payload.only_provisioned && existing.lifecycle_status !== 'provisioned') return state;
     const activated: AgentIdentityRecord = { ...existing, lifecycle_status: 'active' };
     return { identities: { ...state.identities, [payload.nhi_id]: activated } };
+  },
+});
+
+agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.accountabilityReassigned, {
+  model: agentIdentityModel,
+  schema: accountabilityReassignedPayloadSchema,
+  apply: (state, payload) => {
+    const existing = state.identities[payload.nhi_id];
+    if (
+      !existing ||
+      existing.lifecycle_status === 'retired' ||
+      existing.accountable_human_id !== payload.previous_accountable_human_id
+    )
+      return state;
+    return {
+      identities: {
+        ...state.identities,
+        [payload.nhi_id]: {
+          ...existing,
+          accountable_human_id: payload.accountable_human_id,
+        },
+      },
+    };
   },
 });
 
@@ -385,6 +421,17 @@ export interface AgentIdentityJournalOptions {
   now?: () => string;
 }
 
+type AgentIdentityStoreAccess = <R>(
+  resources: { reads: string[]; writes?: string[] },
+  run: () => R
+) => R;
+const agentIdentityStoreAccess = new AsyncLocalStorage<AgentIdentityStoreAccess>();
+
+/** Applies exact content IO grants while keeping writer locks in their host context. */
+export function withAgentIdentityStoreAccess<T>(access: AgentIdentityStoreAccess, run: () => T): T {
+  return agentIdentityStoreAccess.run(access, run);
+}
+
 interface AgentIdentityReadResult {
   events: JournalEventEnvelope[];
   maxSeq: number;
@@ -393,6 +440,9 @@ interface AgentIdentityReadResult {
 export class AgentIdentityJournal {
   private readonly kernel = agentIdentityKernel;
   private readonly journalPath: string;
+  get resourcePath(): string {
+    return this.journalPath;
+  }
   private readonly now: () => string;
   private seqLoaded = false;
   private seq = 0;
@@ -414,6 +464,22 @@ export class AgentIdentityJournal {
       journalPath: this.journalPath,
       seq: this.seq,
       now: this.now,
+      ...(agentIdentityStoreAccess.getStore()
+        ? {
+            storeAccess: <R>(run: () => R): R =>
+              agentIdentityStoreAccess.getStore()!(
+                {
+                  reads: [this.journalPath],
+                  writes: [
+                    this.journalPath,
+                    path.join(path.dirname(this.journalPath), 'writer-lease.json'),
+                    path.join(path.dirname(this.journalPath), 'writer-lease-metrics.json'),
+                  ],
+                },
+                run
+              ),
+          }
+        : {}),
       buildEnvelope: ({ seq, ts, payload: validated }) =>
         journalEventEnvelopeSchema.parse({
           v: AGENT_IDENTITY_JOURNAL_VERSION,
@@ -438,6 +504,14 @@ export class AgentIdentityJournal {
     });
   }
 
+  /** Stable per-identity change fence, including lifecycle/accountability ABA changes. */
+  revision(nhiId: string): number {
+    return this.readJournal().events.reduce((revision, event) => {
+      const payload = event.payload as { nhi_id?: unknown };
+      return payload?.nhi_id === nhiId ? Math.max(revision, event.seq) : revision;
+    }, -1);
+  }
+
   private ensureSeqLoaded(): void {
     if (this.seqLoaded) return;
     this.seq = this.readJournal().maxSeq + 1;
@@ -445,6 +519,13 @@ export class AgentIdentityJournal {
   }
 
   private readJournal(): AgentIdentityReadResult {
+    const access = agentIdentityStoreAccess.getStore();
+    return access
+      ? access({ reads: [this.journalPath] }, () => this.readJournalContent())
+      : this.readJournalContent();
+  }
+
+  private readJournalContent(): AgentIdentityReadResult {
     if (!safeExistsSync(this.journalPath)) return { events: [], maxSeq: -1 };
     if (!safeLstat(this.journalPath).isFile()) {
       throw new Error(
@@ -710,6 +791,50 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
 /** Read-only, ungated: the identity for `nhiId`, or `null`. */
 export function getAgentIdentity(nhiId: string): AgentIdentityRecord | null {
   return ensureState().identities[nhiId] ?? null;
+}
+
+export function getAgentIdentityRevision(nhiId: string): number {
+  return getDefaultJournal().revision(nhiId);
+}
+
+export function agentIdentityJournalResourcePath(): string {
+  return getDefaultJournal().resourcePath;
+}
+
+/** Governed metadata transfer: immutable NHI identity and home affiliation are retained. */
+export function reassignAgentIdentityAccountability(input: {
+  nhiId: string;
+  accountableHumanId: string;
+  expectedAccountableHumanId: string;
+  reason: string;
+}): AgentIdentityRecord {
+  assertAgentIdentityGovernedContext('reassignAgentIdentityAccountability');
+  const current = getAgentIdentity(input.nhiId);
+  if (!current) throw new AgentIdentityNotFoundError(input.nhiId);
+  if (current.lifecycle_status === 'retired')
+    throw new AgentIdentityLifecycleError(input.nhiId, 'retired identity is terminal');
+  if (!input.accountableHumanId.trim() || !input.reason.trim())
+    throw new AgentIdentityAccountabilityError(input.nhiId, current.kind);
+  if (current.accountable_human_id !== input.expectedAccountableHumanId)
+    throw new AgentIdentityConflictError(
+      input.nhiId,
+      'accountability changed; refresh before retrying'
+    );
+  if (current.accountable_human_id === input.accountableHumanId) return current;
+  appendGoverned(AGENT_IDENTITY_OPS.accountabilityReassigned, {
+    nhi_id: input.nhiId,
+    previous_accountable_human_id: current.accountable_human_id,
+    accountable_human_id: input.accountableHumanId,
+    reason: input.reason.trim(),
+    reassigned_at: nowIso(),
+  });
+  const next = getAgentIdentity(input.nhiId)!;
+  if (next.accountable_human_id !== input.accountableHumanId)
+    throw new AgentIdentityConflictError(
+      input.nhiId,
+      'accountability changed concurrently; refresh before retrying'
+    );
+  return next;
 }
 
 export interface ListAgentIdentitiesFilter {

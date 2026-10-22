@@ -11,15 +11,18 @@
       "infrastructure_sentinel",
       "knowledge_steward",
       "metrics_cap_reader",
+      "notification_preferences_reader",
       "organization_operator",
       "peer_catalog_reader",
       "peer_responder_reader",
       "peer_task_artifact_writer",
       "person_charter_store",
+      "pr_publication_store",
       "pipeline_journal_store",
       "scope_locale_reader",
       "slack_bridge",
       "surface_runtime",
+      "tool_runtime_policy_reader",
       "workspace_tenant_registry_index_reader",
       "workspace_tenant_registry_reader"
     ],
@@ -71,8 +74,8 @@
       "rationale": "scripts/event_intake_surface.ts (loopback-only inbound event intake, operator-launched through surface_runtime with SYSTEM_ROLE=event_intake_surface). Assumes no role: ingestInboundEvent only appends normalized events to the dot events ledgers under active/shared/runtime/dot/, so no broad role (ecosystem_architect, mission_controller, sovereign_concierge) is granted."
     },
     "generation_schedule": {
-      "may_assume": ["generation_scheduler", "sovereign_concierge"],
-      "rationale": "Recurring generation-schedule tick service (surfaces/generation-schedule.json, launched by surface_runtime with SYSTEM_ROLE=generation_schedule, entry dist/scripts/run_generation_schedule_daemon.js). Each tick runs under the generation_scheduler authority via GENERATION_SCHEDULER_AUTHORITY (scripts/run_generation_schedule.ts, libs/core/generation-scheduler.ts), so the daemon assumes no broad role for its work (ecosystem_architect, mission_controller). sovereign_concierge: reachable only through libs/core/ops-alert.ts sendOpsAlert -> operator-notifications loadNotificationPreferences, the single personal routing-preferences read every alerting daemon performs; replace it with a dedicated reader role once one ships with its installation migration. Child processes spawned mid-tick follow the scheduler scope through buildExecutionEnv (DR-01), so they stay on generation_scheduler."
+      "may_assume": ["generation_scheduler"],
+      "rationale": "Recurring generation-schedule tick service (surfaces/generation-schedule.json, launched by surface_runtime with SYSTEM_ROLE=generation_schedule, entry dist/scripts/run_generation_schedule_daemon.js). Each tick runs under the generation_scheduler authority via GENERATION_SCHEDULER_AUTHORITY (scripts/run_generation_schedule.ts, libs/core/generation-scheduler.ts), so the daemon assumes only that role and no broad role (ecosystem_architect, mission_controller, sovereign_concierge). Child processes spawned mid-tick follow the scheduler scope through buildExecutionEnv (DR-01), so they stay on generation_scheduler."
     },
     "imessage_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],

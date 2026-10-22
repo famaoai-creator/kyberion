@@ -205,7 +205,6 @@ export function gitPush(
   const branch = source.replace(/^refs\/heads\//, '');
   const destination = `refs/heads/${branch}`;
   const snapshot = () => ({
-    cwd,
     remote,
     url: read(['remote', 'get-url', '--push', remote]),
     source,

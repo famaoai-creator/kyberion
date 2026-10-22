@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentScopeEnvelope } from '../scope-envelope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
@@ -33,6 +34,30 @@ export type ExternalOperationAuthorityResolver = (
   facts: ExternalOperationFacts
 ) => ExternalOperationAuthority | undefined;
 const authorityContext = new AsyncLocalStorage<ExternalOperationAuthorityResolver>();
+const explicitRequestContext = new AsyncLocalStorage<{
+  operationId: string;
+  reviewArtifacts: (effect: Record<string, unknown>) => string[];
+  requestScope?: EventScopeInput;
+}>();
+
+/** Host-only opt-in to enqueue a decision even without an interactive human.
+ * Action data cannot enable this, and other operations retain headless behavior. */
+export function withExplicitExternalApprovalRequest<T>(
+  request: {
+    operationId: string;
+    reviewArtifacts: (effect: Record<string, unknown>) => string[];
+    requestScope?: EventScopeInput;
+  },
+  body: () => T
+): T {
+  return explicitRequestContext.run(
+    {
+      ...request,
+      ...(request.requestScope ? { requestScope: normalizeEventScope(request.requestScope) } : {}),
+    },
+    body
+  );
+}
 const pipelineRunContext = new AsyncLocalStorage<string>();
 
 /** Trusted outer checkpoint boundary; never supplied by an action envelope. */
@@ -336,15 +361,21 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   }
   // Invocation identity prevents one approval becoming a standing grant for
   // identical messages; the effect hash prevents edits while awaiting approval.
+  const request = explicitRequestContext.getStore();
+  const enqueueRequest = request?.operationId === input.operationId;
   const correlationId = createHash('sha256')
     .update(
       JSON.stringify([
         input.operationId,
         authority?.tenantSlug ?? '',
         authority?.invocationId?.trim() || randomUUID(),
+        ...(enqueueRequest ? [effectHash, request?.requestScope ?? null] : []),
       ])
     )
     .digest('hex');
+  const artifactRefs = enqueueRequest
+    ? request!.reviewArtifacts(structuredClone(input.effect))
+    : authority?.review?.artifactRefs;
   const approval: ApprovalGateResult = serviceProof
     ? {
         allowed: true,
@@ -360,6 +391,8 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
         requireApproval: true,
         // An unbound CLI call never opens prompts or obtains standing delegation.
         hasHuman: authority?.hasHuman ?? false,
+        ...(enqueueRequest ? { enqueueRequest: true } : {}),
+        ...(enqueueRequest && request?.requestScope ? { requestScope: request.requestScope } : {}),
         ...(charter ? { charter } : {}),
         ...(authority?.pipelineContext
           ? { requestedByContext: authority.pipelineContext, kind: 'mission_gate' as const }
@@ -370,9 +403,7 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
           rationale:
             authority?.review?.summary ||
             `Review external operation ${input.operationId}${authority?.tenantSlug ? ` for tenant ${authority.tenantSlug}` : ''}`,
-          ...(authority?.review?.artifactRefs
-            ? { artifact_refs: authority.review.artifactRefs }
-            : {}),
+          ...(artifactRefs ? { artifact_refs: artifactRefs } : {}),
           ...(authority?.tenantSlug ? { tenant_slug: authority.tenantSlug } : {}),
           ...(charter?.action.decision_type ? { decision_type: charter.action.decision_type } : {}),
         },

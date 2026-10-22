@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: mocks.authorizeSurfaceMutation,
+  surfaceMutationRequestUrl: (req: { url: string }) => req.url,
   extractSurfaceBearerToken: (authorization: string | null) =>
     authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '',
 }));

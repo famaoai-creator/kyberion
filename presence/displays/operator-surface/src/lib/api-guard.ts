@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   authorizeSurfaceMutation,
+  surfaceMutationRequestUrl,
   type SurfaceMutationDecision,
 } from '@agent/core/surface/surface-mutation-guard';
 import { isLoopbackRequest } from './peer';
@@ -10,7 +11,7 @@ export function authorizeOperatorSurfaceMutation(
   req: Pick<NextRequest, 'headers' | 'url'>
 ): SurfaceMutationDecision {
   return authorizeSurfaceMutation({
-    url: req.url,
+    url: surfaceMutationRequestUrl(req),
     getHeader: (name) => req.headers.get(name),
   });
 }

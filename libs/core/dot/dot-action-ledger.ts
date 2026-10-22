@@ -26,7 +26,7 @@ export interface DotActionLedgerDeps {
 }
 
 export type DotActionStatus =
-  'admitted' | 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
+  'admitted' | 'dispatched' | 'parked' | 'waiting_capacity' | 'refused' | 'shadow' | 'declined';
 
 export interface DotActionRecord {
   /** Trusted admission class; external effect authority is never inherited. */
@@ -132,9 +132,15 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
       ].every((key) => typeof value[key] === 'string' && (value[key] as string).trim()) ||
       !Number.isFinite(Date.parse(value.at as string)) ||
       !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(String(value.work_shape)) ||
-      !['admitted', 'dispatched', 'parked', 'refused', 'shadow', 'declined'].includes(
-        String(value.status)
-      ) ||
+      ![
+        'admitted',
+        'dispatched',
+        'parked',
+        'waiting_capacity',
+        'refused',
+        'shadow',
+        'declined',
+      ].includes(String(value.status)) ||
       !['decision', 'gate_decision', 'floor'].every(
         (key) =>
           value[key] === undefined || ['auto', 'notify', 'approve'].includes(String(value[key]))

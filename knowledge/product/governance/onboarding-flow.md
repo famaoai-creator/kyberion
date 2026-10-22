@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-10-18
+last_updated: 2026-10-22
 kind: governance
 scope: repository
 authority: standard
@@ -758,3 +758,17 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 ## 外部操作の接続と権限委任
 
 GitHub の認証やブラウザへの接続だけでは、自律実行の権限は付かない。identity と接続設定の後、[外部操作のオンボーディング](../orchestration/onboarding-action-authority.md)で操作・対象・期限を確認し、本人承認してから適用する。Concierge の設定画面でも同じ申請・承認・適用・取消しを行う。個人利用では person scope を使い、架空の tenant は作らない。
+
+### 常設の外部権限を渡さずに始める
+
+個人の初期設定では、実行用 identity の有効化と外部操作の委任を別々に選べる。
+`onboarding apply` が表示する `activation-input.json` は `mode: activate`、`grants: []` の
+有効化専用プランである。期限と対象 identity を確認してから、表示された `preview` → `request` を進める。
+人間が依頼を承認し、その同じ依頼 ID に `apply` すると provisioned identity が active になる。
+これだけでは GitHub やブラウザへの常設送信権限は付かない。
+
+初回の PR 作成などは、送信先・コミット・本文を固定した個別の承認依頼として進められる。
+ヘッドレスなエージェント実行でも依頼 ID と完全な内容の確認先が表示されるため、
+人間が確認して承認した後、同じコマンドを再実行する。内容が変われば再確認が必要になる。
+繰り返す公開データの操作だけを委任したい場合は、対象を限定した別の `grant` プランを確認する。
+既存 charter の失効・停止・取消しを、有効化専用プランで解除することはできない。

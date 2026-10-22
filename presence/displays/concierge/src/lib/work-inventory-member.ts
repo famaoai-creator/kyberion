@@ -6,7 +6,10 @@ import {
 } from '@agent/core/organization/member-registry';
 import type { WorkInventoryScope } from '@agent/core/workforce/work-inventory';
 import { WorkInventoryConsentError } from '@agent/core/workforce/work-inventory-consent';
-import { authorizeSurfaceMutation } from '@agent/core/surface/surface-mutation-guard';
+import {
+  authorizeSurfaceMutation,
+  surfaceMutationRequestUrl,
+} from '@agent/core/surface/surface-mutation-guard';
 import {
   conciergeErrorResponse,
   guardConciergeRequest,
@@ -81,7 +84,7 @@ export function requireConciergeSelfServiceAccess(req: NextRequest): NextRespons
   const rateLimitResponse = guardConciergeRequest(req);
   if (rateLimitResponse) return rateLimitResponse;
   const decision = authorizeSurfaceMutation({
-    url: req.url,
+    url: surfaceMutationRequestUrl(req),
     getHeader: (name) => req.headers.get(name),
   });
   if (!decision.ok) {

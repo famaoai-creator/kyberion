@@ -1,5 +1,10 @@
 import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
+  prPublicationResourceAllowed,
+  PR_PUBLICATION_STORE_ROLE,
+  currentPrPublicationScope,
+} from './governance/pr-publication-runtime.js';
+import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
@@ -627,6 +632,18 @@ function isScopedStructuralMkdir(
   access: { kind: 'read' | 'write' | 'mkdir'; role?: string }
 ): boolean {
   if (access.kind !== 'mkdir') return false;
+  if (access.role === PR_PUBLICATION_STORE_ROLE) {
+    const publication = currentPrPublicationScope();
+    return (
+      publication?.kind === 'organization' &&
+      publication.tenant_slug === tenantSlug &&
+      [
+        `${STORAGE_FLOOR_ROOTS.artifact}/confidential`,
+        `${PARTITIONED_RUNTIME_STATE_ROOTS.external_operations}/confidential`,
+      ].includes(relativePath) &&
+      prPublicationResourceAllowed(relativePath, 'mkdir')
+    );
+  }
   if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
     if (
       !isDiscussionRequestCapability(currentResourceAccessScope()) ||
@@ -978,6 +995,16 @@ function requestResourceDenial(
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
   if (
+    normalizedRole === PR_PUBLICATION_STORE_ROLE &&
+    !denyCandidatePaths(relativePath).every((target) =>
+      prPublicationResourceAllowed(target, operation)
+    )
+  )
+    return {
+      allowed: false,
+      reason: '[PR_PUBLICATION_SCOPE] Publication store requires exact host resource capability',
+    };
+  if (
     normalizedRole === 'person_charter_store' &&
     !denyCandidatePaths(relativePath).every((target) =>
       personCharterResourceAccessAllowed(target, operation)
@@ -1102,11 +1129,14 @@ export function validateWritePermission(
     stateKnowledgePath &&
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
-    // This dedicated role grants only its real receipt paths, never knowledge-tier writes.
+    // Dedicated receipt/publication roles grant only their bound real paths,
+    // never knowledge-tier writes.
     // The exact request ceiling was checked before all ambient/default policy grants.
     if (
-      currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-      isDiscussionRequestCapability(currentResourceAccessScope())
+      (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
+        isDiscussionRequestCapability(currentResourceAccessScope())) ||
+      (currentRole === PR_PUBLICATION_STORE_ROLE &&
+        prPublicationResourceAllowed(relativePath, operation))
     )
       return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
@@ -1267,8 +1297,10 @@ export function validateReadPermission(
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (
-          identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
-          isDiscussionRequestCapability(currentResourceAccessScope()) &&
+          ((identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
+            isDiscussionRequestCapability(currentResourceAccessScope())) ||
+            (identity.role === PR_PUBLICATION_STORE_ROLE &&
+              prPublicationResourceAllowed(relativePath, operation))) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
             (pattern: string) => {
               const expanded = expandPolicyPath(

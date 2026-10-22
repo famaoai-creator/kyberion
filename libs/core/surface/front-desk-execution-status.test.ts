@@ -36,6 +36,7 @@ const state = vi.hoisted(() => ({
   pipeline: '',
   items: new Map<string, WorkFixture>(),
   results: [] as ResultFixture[],
+  actions: [] as Array<{ status: string; front_desk_execution: FrontDeskExecutionBinding }>,
   charters: [] as CharterFixture[],
   files: new Map<string, string>(),
   nonFiles: new Set<string>(),
@@ -61,7 +62,7 @@ vi.mock('../dot/dot-charter.js', () => ({
 vi.mock('../dot/dot-executor-reports.js', () => ({
   readDotWorkResults: state.readDotWorkResults,
 }));
-vi.mock('../dot/dot-dispatch.js', () => ({ currentDotActions: () => [] }));
+vi.mock('../dot/dot-dispatch.js', () => ({ currentDotActions: () => state.actions }));
 vi.mock('../foundation/governed-catalog.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../foundation/governed-catalog.js')>();
   return {
@@ -244,6 +245,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.items.clear();
   state.results = [];
+  state.actions = [];
   state.files.clear();
   state.nonFiles.clear();
   state.deniedPaths.clear();
@@ -291,6 +293,11 @@ beforeEach(() => {
 });
 
 describe('verified receipt body projection', () => {
+  it('shows capacity waiting as queued rather than claiming a human approval exists', () => {
+    const binding = makeBinding();
+    state.actions = [{ status: 'waiting_capacity', front_desk_execution: binding }];
+    expect(projectFrontDeskExecution(viewer, binding)).toMatchObject({ status: 'queued' });
+  });
   it('keeps verified metadata-only projections body-free by default and explicit opt-out', () => {
     const receipt = registerReceipt();
     for (const options of [{ locale: 'en' as const }, { includeArtifactBody: false }]) {

@@ -1,0 +1,9 @@
+{
+  "role": "tool_runtime_policy_reader",
+  "description": "Shared tool availability policy reader for the canonical product policy and exact operator or configured customer onboarding policy. Explicit custom paths retain the caller's own permissions. No installation, pinning, writes, or decision authority.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["public", "personal", "confidential"]
+}

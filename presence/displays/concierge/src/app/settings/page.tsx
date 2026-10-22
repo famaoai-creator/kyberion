@@ -39,6 +39,7 @@ import {
   type Notice,
   type PluginEntry,
   type SettingsMember,
+  type SettingsMemberPatch,
   type SettingsRole,
   type SettingsTenantView,
 } from '../../lib/settings-types';
@@ -209,6 +210,8 @@ export default function SettingsPage() {
   const [meTenants, setMeTenants] = React.useState<SettingsTenantView[]>([]);
   const [meViewing, setMeViewing] = React.useState<SettingsTenantView | null>(null);
   const [members, setMembers] = React.useState<SettingsMember[]>([]);
+  const [memberContextId, setMemberContextId] = React.useState<string | undefined>();
+  const memberPending = React.useRef(false);
   const [memberForm, setMemberForm] = React.useState<MemberFormState>({
     display_name: '',
     member_id: '',
@@ -261,6 +264,19 @@ export default function SettingsPage() {
     setNotice(null);
     setBusy(false);
     setSaveFeedback(null);
+    setMembers([]);
+    setMemberContextId(undefined);
+    setIssuedToken(null);
+    setMemberBusy(false);
+    setMeTenants([]);
+    setMeViewing(null);
+    setMemberForm({
+      display_name: '',
+      member_id: '',
+      tenant_slug: '',
+      role: 'viewer',
+      issue_token: false,
+    });
     setError('context-changed');
   });
 
@@ -410,28 +426,47 @@ export default function SettingsPage() {
   // viewer simply sees nothing here (the section stays visible, matching
   // every other degrade-gracefully pane on this page).
   const refreshMembers = React.useCallback(async () => {
+    const current = draftSession.startRead('members');
     try {
+      if (!(await draftSession.check()) || !current()) return false;
       const response = await fetch('/api/members', { cache: 'no-store' });
-      const parsed = parseMembersResponse(await response.json().catch(() => null));
+      if (!current() || !draftSession.inspect(response)) return false;
+      const payload = await response.json().catch(() => null);
+      const parsed = parseMembersResponse(payload);
       if (!response.ok || !parsed) throw new Error('Invalid members response');
+      if (!(await draftSession.check()) || !current()) return false;
       setMembers(parsed);
+      setMemberContextId(typeof payload.context_id === 'string' ? payload.context_id : undefined);
+      return true;
     } catch {
-      // Members pane shows an empty list rather than blocking the page.
+      if (current()) {
+        setMembers([]);
+        setMemberContextId(undefined);
+      }
+      return false;
     }
-  }, []);
+  }, [draftSession]);
 
   // FD-07 「メンバーを追加」: fires only from the explicit form submit — no
   // auto-creation, no default role. The new access token (when requested)
   // is shown exactly once via `issuedToken` and never re-fetchable.
   const addMember = React.useCallback(async () => {
+    const epoch = draftSession.epoch();
+    if (memberPending.current || !draftSession.current(epoch)) return;
+    memberPending.current = true;
     setMemberBusy(true);
     try {
+      if (!memberContextId) throw new Error(t('management.changed'));
+      if (!(await draftSession.check(epoch))) return;
+      draftSession.advance('members');
       const response = await fetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(memberForm),
+        body: JSON.stringify({ ...memberForm, expected_context_id: memberContextId }),
       });
+      if (!draftSession.current(epoch) || !draftSession.inspect(response)) return;
       const parsed = parseAddMemberResponse(await response.json().catch(() => null));
+      if (!draftSession.current(epoch)) return;
       if (!response.ok || !parsed) {
         const failure = await response
           .clone()
@@ -442,49 +477,73 @@ export default function SettingsPage() {
             'Member creation failed'
         );
       }
-      setNotice({ text: frontDeskText('settings_member_added', locale) });
+      if (!(await draftSession.check(epoch))) return;
       setIssuedToken(parsed.token);
       setMemberForm((current) => ({ ...current, display_name: '', member_id: '' }));
-      await refreshMembers();
+      if (!(await refreshMembers()) || !draftSession.current(epoch)) {
+        if (draftSession.current(epoch))
+          setNotice({ text: t('management.uncertain'), error: true });
+        return;
+      }
+      setNotice({ text: frontDeskText('settings_member_added', locale) });
     } catch (err) {
-      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+      if (draftSession.current(epoch))
+        setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
     } finally {
-      setMemberBusy(false);
+      memberPending.current = false;
+      if (draftSession.current(epoch)) setMemberBusy(false);
     }
-  }, [memberForm, locale, refreshMembers]);
+  }, [memberForm, locale, refreshMembers, memberContextId, draftSession, t]);
 
   // FD-07 role change / suspend / reactivate — owner-only PATCH, no delete.
   const patchMember = React.useCallback(
-    async (
-      memberId: string,
-      patch:
-        | { tenant_slug: string; role: SettingsRole }
-        | { status: 'active' | 'suspended' }
-        | { external_identity: { issuer: string; subject: string } }
-        | { external_identity_remove: { issuer: string; subject: string } }
-    ) => {
+    async (memberId: string, patch: SettingsMemberPatch) => {
+      const epoch = draftSession.epoch();
+      if (memberPending.current || !draftSession.current(epoch)) return;
+      memberPending.current = true;
       setMemberBusy(true);
       try {
+        const expectedVersion =
+          patch.expected_version ??
+          members.find((member) => member.member_id === memberId)?.version;
+        const contextId = patch.expected_context_id ?? memberContextId;
+        if (!contextId || contextId !== memberContextId || !expectedVersion)
+          throw new Error(t('management.changed'));
+        if (!(await draftSession.check(epoch))) return;
+        draftSession.advance('members');
         const response = await fetch(`/api/members/${encodeURIComponent(memberId)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
+          body: JSON.stringify({
+            ...patch,
+            expected_version: expectedVersion,
+            expected_context_id: contextId,
+          }),
         });
+        if (!draftSession.current(epoch) || !draftSession.inspect(response)) return;
         const parsed = await response.json().catch(() => null);
+        if (!draftSession.current(epoch)) return;
         if (!response.ok || !parsed?.ok) {
           throw new Error(
             (parsed && typeof parsed.error === 'string' && parsed.error) || 'Member update failed'
           );
         }
+        if (!(await draftSession.check(epoch))) return;
+        if (!(await refreshMembers()) || !draftSession.current(epoch)) {
+          if (draftSession.current(epoch))
+            setNotice({ text: t('management.uncertain'), error: true });
+          return;
+        }
         setNotice({ text: frontDeskText('settings_member_updated', locale) });
-        await refreshMembers();
       } catch (err) {
-        setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+        if (draftSession.current(epoch))
+          setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
       } finally {
-        setMemberBusy(false);
+        memberPending.current = false;
+        if (draftSession.current(epoch)) setMemberBusy(false);
       }
     },
-    [locale, refreshMembers]
+    [locale, refreshMembers, memberContextId, members, draftSession, t]
   );
 
   // FD-06 詳細設定: the 管制塔 (chronos-mirror-v2) link's port is resolved
@@ -1128,6 +1187,8 @@ export default function SettingsPage() {
             meTenants={meTenants}
             meViewing={meViewing}
             members={members}
+            memberContextId={memberContextId}
+            onRefreshMembers={() => void refreshMembers()}
             memberForm={memberForm}
             setMemberForm={setMemberForm}
             memberBusy={memberBusy}

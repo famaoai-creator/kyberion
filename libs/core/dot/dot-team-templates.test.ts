@@ -94,7 +94,7 @@ describe('inactive three-role dot team starter', () => {
     for (const charter of templates()) {
       expect(charter.authority.allowed_work_shapes).toEqual(['direct_reply']);
       expect(charter.authority.allowed_pipelines).toEqual([]);
-      expect(charter.authority.max_concurrent_delegations).toBe(1);
+      expect(charter.authority.max_concurrent_delegations).toBeUndefined();
       expect(charter.decisions).toEqual({
         default_decision: 'approve',
         decision_expiry_minutes: 60,

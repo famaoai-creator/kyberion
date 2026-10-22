@@ -1,0 +1,13 @@
+{
+  "role": "pr_publication_store",
+  "description": "Internal VCS host IO only: exact standing charter reads, accepted organization charter consumption ledger appends, protected publication review artifact and index, and one canonical vcs:pr_create, vcs:push, or vcs:pr_merge reservation. Requires publication runtime and exact resource ceiling; never held during caller execution or approval decisions. No charter acceptance or stop-clear surface is exposed by the VCS host.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "knowledge/confidential/${KYBERION_TENANT}/charters/",
+    "active/shared/artifacts/",
+    "active/shared/runtime/external-operations/"
+  ],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential"]
+}

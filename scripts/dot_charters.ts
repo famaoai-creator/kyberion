@@ -50,19 +50,21 @@ import {
   createDraftDotCharter,
   enableDotEventContinuation,
   transitionDotCharterStatus,
+  configureDotDelegationCapacity,
 } from '@agent/core/dot/dot-lifecycle';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
 import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
-import { currentDotActions } from '@agent/core/dot/dot-dispatch';
+import { currentDotActions, dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
 const SUBCOMMANDS = [
+  'capacity',
   'create',
   'list',
   'validate',
@@ -301,6 +303,14 @@ function reportStatus(argv: string[]) {
             }
           : null,
         actions: actionCounts,
+        delegation_capacity: asCharter(entry.charter, () => dotDelegationCapacity(entry.charter)),
+        waiting_for_capacity: actions
+          .filter((action) => action.status === 'waiting_capacity')
+          .map((action) => ({
+            action_ref: action.action_ref,
+            title: action.title,
+            reason: action.reason,
+          })),
         waiting_on_operator: actions
           .filter((action) => action.status === 'parked')
           .map((action) => ({ title: action.title, request_id: action.request_id })),
@@ -441,6 +451,36 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
     : 'list';
   const args = subcommand === sub ? rest : argv;
   switch (subcommand) {
+    case 'capacity': {
+      const [dotId, ...options] = stripSharedScriptFlags(args);
+      const limitIndex = options.indexOf('--limit');
+      const inherit = options.includes('--inherit');
+      if (
+        !dotId ||
+        dotId.startsWith('--') ||
+        limitIndex < 0 === !inherit ||
+        options.some(
+          (option, index) =>
+            !['--limit', '--inherit', '--apply'].includes(option) &&
+            !(limitIndex >= 0 && index === limitIndex + 1)
+        )
+      )
+        throw new Error(
+          'usage: pnpm kyberion dot capacity <dot_id> (--limit <1..256> | --inherit) [--apply]'
+        );
+      const limit = inherit ? undefined : Number(options[limitIndex + 1]);
+      const result = configureDotDelegationCapacity(dotId, limit, {
+        dryRun: !options.includes('--apply'),
+      });
+      return {
+        ok: true,
+        dot_id: dotId,
+        ...result,
+        next: result.applied
+          ? 'Capacity saved. Review dot status, then activate separately.'
+          : 'Review this capacity and rerun with --apply. The dot remains draft/paused.',
+      };
+    }
     case 'create':
       return reportCreate(args);
     case 'validate':
@@ -501,6 +541,13 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
       }
       for (const waiting of (dot.waiting_on_operator ?? []) as Array<Record<string, unknown>>) {
         print(`    waiting on you: ${waiting.title} (${waiting.request_id ?? 'no request'})`);
+      }
+      if (dot.delegation_capacity)
+        print('    delegation capacity: ' + compact(dot.delegation_capacity));
+      for (const waiting of (dot.waiting_for_capacity ?? []) as Array<Record<string, unknown>>) {
+        print(
+          `    waiting for capacity: ${waiting.title} (${waiting.action_ref}); ${waiting.reason}`
+        );
       }
       for (const signal of (dot.signals ?? []) as Array<Record<string, unknown>>) {
         const mark = signal.healthy === null ? '??' : signal.healthy ? 'OK' : 'NG';
@@ -591,7 +638,7 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
     print(JSON.stringify(report.ingested));
   } else if (report.release_requested) {
     print(JSON.stringify(report.release_requested));
-  } else if (report.status || report.outcome) {
+  } else if (report.status || report.outcome || report.effective_limit !== undefined) {
     print(JSON.stringify(report));
   }
 }

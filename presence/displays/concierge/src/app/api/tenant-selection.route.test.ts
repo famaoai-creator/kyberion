@@ -117,6 +117,7 @@ vi.mock('@agent/core/ceo-surface-summary', () => ({
   },
 }));
 vi.mock('@agent/core/knowledge/memory-promotion-queue', () => ({
+  memoryPromotionCandidateKey: (candidate: { candidate_id: string }) => candidate.candidate_id,
   listMemoryPromotionCandidates: () => [
     {
       candidate_id: 'm-beta-personal-source',

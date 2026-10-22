@@ -31,7 +31,22 @@ import { createLogger } from '../logger.js';
 import type { KeyResultSpec, ObjectiveRef } from '../key-result-spec.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { parseInflightLimit } from '../foundation/inflight-limit.js';
 import type { ValidateFunction } from 'ajv';
+
+/** Per-dot admission slots, independent of provider/LLM process concurrency. */
+export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 100;
+export function resolveDotDelegationLimit(explicit?: number): number {
+  if (explicit !== undefined) return explicit;
+  const raw = getRegisteredEnvText('KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS');
+  const parsed = parseInflightLimit(raw, DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS);
+  if (parsed.invalid)
+    logger.warn(
+      '[DOT_CAPACITY_CONFIG_INVALID] invalid default capacity — using 100 | next: set KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS to an integer from 1 to 256 | evidence: env-registry.json'
+    );
+  return parsed.value;
+}
 
 export const DOT_CHARTER_SCHEMA_PATH = 'knowledge/product/schemas/dot-charter.schema.json';
 export const DOT_CHARTER_DIR = 'dots';

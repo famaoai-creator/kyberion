@@ -46,6 +46,14 @@ export type Setup = SetupPayload;
 export type Notice = { text: string; error?: boolean } | null;
 
 export type SettingsRole = 'owner' | 'approver' | 'operator' | 'viewer';
+export type SettingsMemberPatch = (
+  | { tenant_slug: string; role: SettingsRole }
+  | { status: 'active' | 'suspended' }
+  | { display_name: string }
+  | { membership_remove: string }
+  | { external_identity: { issuer: string; subject: string } }
+  | { external_identity_remove: { issuer: string; subject: string } }
+) & { expected_version?: string; expected_context_id?: string };
 export type SettingsTenantView = {
   tenant_slug: string;
   display_name: string;
@@ -62,6 +70,8 @@ export type SettingsMember = {
   memberships: Array<{ tenant_slug: string; role: SettingsRole }>;
   /** SSO identities bound to this member (issuer + subject). Older payloads omit it; the parser defaults to []. */
   external_identities: Array<{ issuer: string; subject: string }>;
+  version?: string;
+  is_local_owner?: boolean;
 };
 
 export function isSettingsRole(value: unknown): value is SettingsRole {
@@ -103,6 +113,11 @@ function isExternalIdentity(value: unknown): value is { issuer: string; subject:
 function isSettingsMemberWire(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
+  if (
+    (record.version !== undefined && (typeof record.version !== 'string' || !record.version)) ||
+    (record.is_local_owner !== undefined && typeof record.is_local_owner !== 'boolean')
+  )
+    return false;
   if (
     record.external_identities !== undefined &&
     !(

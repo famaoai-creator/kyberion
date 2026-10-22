@@ -57,6 +57,7 @@ import {
   runExternalOperation,
   runExternalOperationSync,
   withExternalOperationApprovalObserver,
+  withExplicitExternalApprovalRequest,
 } from './external-operation.js';
 
 const charter: ApprovalGateCharterInput = {
@@ -83,6 +84,97 @@ const operation = (overrides: Partial<ExternalOperation> = {}): ExternalOperatio
 });
 
 describe('external operation common admission', () => {
+  it('enqueues only the explicitly selected headless operation and binds its protected review', () => {
+    const review = vi.fn(() => ['active/review/private.json']);
+    const input = operation({
+      operationId: 'vcs:pr_create',
+      authority: { agentId: 'pr-cli', invocationId: 'stable-pr', hasHuman: false },
+    });
+    const enqueue = () =>
+      withExplicitExternalApprovalRequest(
+        { operationId: 'vcs:pr_create', reviewArtifacts: review },
+        () => admitExternalOperation(input)
+      );
+    expect(enqueue).toThrow(ExternalOperationApprovalRequired);
+    expect(review).toHaveBeenCalledWith(input.effect);
+    expect(createApprovalRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        accountability: expect.objectContaining({ finalDecision: 'human_only' }),
+        draft: expect.objectContaining({
+          details: expect.stringContaining('active/review/private.json'),
+        }),
+      })
+    );
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+    const first = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+    vi.mocked(createApprovalRequest).mockClear();
+    expect(enqueue).toThrow(ExternalOperationApprovalRequired);
+    expect(vi.mocked(createApprovalRequest).mock.calls[0]![1].correlationId).toBe(
+      first.correlationId
+    );
+    vi.mocked(listApprovalRequests).mockReturnValue([
+      { ...first, id: 'apr-1', status: 'pending' } as never,
+    ]);
+    vi.mocked(createApprovalRequest).mockClear();
+    expect(enqueue).toThrow(ExternalOperationApprovalRequired);
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+    vi.mocked(listApprovalRequests).mockReturnValue([
+      { ...first, id: 'apr-1', status: 'approved' } as never,
+    ]);
+    expect(enqueue().allowed).toBe(true);
+    expect(reserveExternalOperation).toHaveBeenCalledTimes(1);
+    expect(() =>
+      withExplicitExternalApprovalRequest(
+        { operationId: 'vcs:pr_create', reviewArtifacts: review },
+        () => admitExternalOperation({ ...input, effect: { body: 'edited' } })
+      )
+    ).toThrow(ExternalOperationApprovalRequired);
+    expect(vi.mocked(createApprovalRequest).mock.calls[0]![1].correlationId).not.toBe(
+      first.correlationId
+    );
+    vi.mocked(createApprovalRequest).mockClear();
+    expect(() =>
+      withExplicitExternalApprovalRequest(
+        {
+          operationId: 'vcs:pr_create',
+          reviewArtifacts: review,
+          requestScope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'org-a' },
+        },
+        () => admitExternalOperation(input)
+      )
+    ).toThrow(ExternalOperationApprovalRequired);
+    const scoped = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+    expect(scoped.scope).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      organization_id: 'org-a',
+    });
+    expect(scoped.correlationId).not.toBe(first.correlationId);
+    vi.mocked(createApprovalRequest).mockClear();
+    expect(() =>
+      withExplicitExternalApprovalRequest(
+        {
+          operationId: 'vcs:pr_create',
+          reviewArtifacts: review,
+          requestScope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'org-b' },
+        },
+        () => admitExternalOperation(input)
+      )
+    ).toThrow(ExternalOperationApprovalRequired);
+    expect(vi.mocked(createApprovalRequest).mock.calls[0]![1].correlationId).not.toBe(
+      scoped.correlationId
+    );
+    vi.mocked(listApprovalRequests).mockReturnValue([]);
+    vi.mocked(createApprovalRequest).mockClear();
+    withExplicitExternalApprovalRequest(
+      { operationId: 'vcs:pr_create', reviewArtifacts: review },
+      () =>
+        expect(() => admitExternalOperation(operation())).toThrow(ExternalOperationApprovalRequired)
+    );
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+  });
+
   it('protects synchronous transports before execution and preserves their receipt', () => {
     const execute = vi.fn(() => ({ status: 0 }));
     expect(() =>

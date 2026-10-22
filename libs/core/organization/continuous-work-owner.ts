@@ -7,7 +7,7 @@ import { withLock } from '../foundation/lock-utils.js';
 import { isOperationsHalted } from '../governance/operations-halt.js';
 import { dotBudgetHardThrottled } from '../dot/dot-budget.js';
 import { dotDailyTokenCapReached } from '../dot/dot-runtime.js';
-import { findDotCharter, type DotCharter } from '../dot/dot-charter.js';
+import { findDotCharter, resolveDotDelegationLimit, type DotCharter } from '../dot/dot-charter.js';
 import { withExecutionContext } from '../authority.js';
 import {
   getWorkItem,
@@ -91,7 +91,10 @@ export async function runContinuousWorkOwner(
   const lock = deps.lock ?? withLock;
   const cap = Math.max(
     0,
-    Math.min(options.limit ?? 1, charter.authority.max_concurrent_delegations ?? 3)
+    Math.min(
+      options.limit ?? 1,
+      resolveDotDelegationLimit(charter.authority.max_concurrent_delegations)
+    )
   );
   const items = (
     deps.list ?? (() => listWorkItems({ status: ['ready', 'in_progress'] }, { rootDir }))

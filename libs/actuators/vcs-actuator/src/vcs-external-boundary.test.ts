@@ -12,6 +12,12 @@ vi.mock('@agent/core/governance/external-operation-store', () => ({
 vi.mock('@agent/core/pipeline/op-preflight-defaults', () => ({
   ensureDefaultOpPreflight: vi.fn(),
 }));
+vi.mock('@agent/core/workforce/artifact-store', () => ({
+  writeScopedArtifact: vi.fn(() => ({
+    repo_relative_path: 'active/shared/tmp/fixture-vcs-review.json',
+    absolute_path: '/fixture/active/shared/tmp/fixture-vcs-review.json',
+  })),
+}));
 import { registerOpPreflightListener, resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { withExternalOperationAuthority } from '@agent/core/governance/external-operation';
 import { actuator, handleAction } from './index.js';
@@ -49,7 +55,12 @@ describe('VCS actuator public boundary', () => {
       () => handleAction({ op: 'push', params: { cwd: '/fixture', ref: 'feature' } })
     );
     expect(mocks.gate).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: 'trusted-owner', operationId: 'vcs:push' })
+      expect.objectContaining({
+        agentId: 'trusted-owner',
+        operationId: 'vcs:push',
+        enqueueRequest: true,
+        hasHuman: false,
+      })
     );
     expect(mocks.run.mock.calls.filter(([, args]) => args[0] === 'push')).toHaveLength(1);
   });
