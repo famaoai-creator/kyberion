@@ -10,6 +10,7 @@ import { groupConnections, type ConnectionViewItem } from '../../../lib/connecti
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
 import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
 import { ProviderAttestationSection } from './ProviderAttestationSection';
+import { GovernanceSection } from './GovernanceSection';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
 /** Service selections are metadata. Token registration and authentication are separate actions. */
@@ -144,6 +145,7 @@ export function ServicesSection({
         tenants={authorityTenants}
         selectedTenant={selectedTenant}
       />
+      <GovernanceSection />
     </div>
   );
 }

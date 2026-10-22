@@ -226,6 +226,14 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     `# probe prints the activate command citing its evidence; run it with --owner-id ${normalized.accountableHumanId}`,
     `pnpm onboarding:context first-work --customer-slug ${normalized.slug} --intent "${normalized.firstWork}" --dry-run --json`,
     '# after human review: apply first-work, then create and start a governed mission when the work shape requires it',
+    // Browser path: local dev IdP + member link makes /login work without an
+    // external OIDC provider, then attestation/approvals are operable in
+    // concierge Settings (loopback-only; not for production).
+    '# browser setup (local dev IdP):',
+    'node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts setup',
+    'pnpm surfaces enable --surface dev-idp',
+    `pnpm organization member link-identity <member-id> --issuer http://localhost:9099 --subject dev-user`,
+    '# open http://localhost:3050/login -> Dev IdP; concierge Settings > Services shows attestation, approvals, charters',
   ];
 
   if (normalized.dryRun) {
