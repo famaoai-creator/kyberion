@@ -33,8 +33,7 @@
   "authority": {
     "authority_role": "knowledge_steward",
     "allowed_work_shapes": ["direct_reply"],
-    "allowed_pipelines": [],
-    "max_concurrent_delegations": 1
+    "allowed_pipelines": []
   },
   "decisions": {
     "default_decision": "approve",

@@ -36,6 +36,11 @@ vi.mock('@agent/core/dot/dot-lifecycle', async (importOriginal) => {
       input: unknown,
       deps: Parameters<typeof actual.createDraftDotCharter>[1]
     ) => actual.createDraftDotCharter(input, { ...deps, rootDir: mocks.rootDir }),
+    configureDotDelegationCapacity: (
+      dotId: string,
+      limit: number | undefined,
+      deps: Parameters<typeof actual.configureDotDelegationCapacity>[2]
+    ) => actual.configureDotDelegationCapacity(dotId, limit, { ...deps, rootDir: mocks.rootDir }),
     enableDotEventContinuation: (
       dotId: string,
       deps: Parameters<typeof actual.enableDotEventContinuation>[1]
@@ -114,6 +119,39 @@ afterEach(() => {
 });
 
 describe('dot charter CLI identity resolution', () => {
+  it('previews a paused dot capacity and applies or inherits only on explicit request', async () => {
+    writeCharter({ ...CHARTER, status: 'paused' }, 'capacity');
+    const preview = await runDotCharters([
+      'capacity',
+      CHARTER.dot_id,
+      '--limit',
+      '100',
+      '--json',
+      '--quiet',
+    ]);
+    expect(preview).toMatchObject({ ok: true, applied: false, effective_limit: 100 });
+    expect(
+      await runDotCharters([
+        'capacity',
+        CHARTER.dot_id,
+        '--limit',
+        '100',
+        '--apply',
+        '--json',
+        '--quiet',
+      ])
+    ).toMatchObject({ ok: true, applied: true, effective_limit: 100 });
+    expect(
+      await runDotCharters([
+        'capacity',
+        CHARTER.dot_id,
+        '--inherit',
+        '--apply',
+        '--json',
+        '--quiet',
+      ])
+    ).toMatchObject({ ok: true, applied: true });
+  });
   it('previews a reviewed draft without writing, then creates only on explicit apply', async () => {
     const file = `${TEST_ROOT}/reviewed.json`;
     safeMkdir(TEST_ROOT, { recursive: true });

@@ -12,6 +12,16 @@ import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
 import { redactActiveSecretsForHostLog } from '../secret/secret-guard.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+export type PrBodySourceTier = 'public' | 'protected_or_unknown' | 'inline';
+const publicationBodySource = new AsyncLocalStorage<PrBodySourceTier>();
+
+/** Trusted worktree host preserves the provenance of a frozen inline body.
+ * Moving bytes over stdin must never turn a protected file into public text. */
+export function withPrPublicationBodySource<T>(tier: PrBodySourceTier, action: () => T): T {
+  return publicationBodySource.run(tier, action);
+}
 
 export interface GhDiagnostic {
   status:
@@ -551,7 +561,9 @@ export function ghPrCreate(
   assertNotFlagLike(base, 'base');
   const body = params.bodyFile
     ? String(safeReadFile(params.bodyFile, { encoding: 'utf8' }))
-    : params.body?.trim() || '';
+    : publicationBodySource.getStore()
+      ? (params.body ?? '')
+      : params.body?.trim() || '';
   const bodyPath = params.bodyFile
     ? toRepoRelative(assertSafeRepositoryPath(params.bodyFile))
     : undefined;
@@ -559,7 +571,7 @@ export function ghPrCreate(
     ? bodyPath.startsWith('knowledge/public/') || storageFloorTier(bodyPath) === 'public'
       ? 'public'
       : 'protected_or_unknown'
-    : 'inline';
+    : (publicationBodySource.getStore() ?? 'inline');
   const snapshot = () => ({
     head,
     base,

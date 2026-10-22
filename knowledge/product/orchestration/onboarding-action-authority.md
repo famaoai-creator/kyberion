@@ -1,7 +1,7 @@
 ---
 title: 外部操作の接続と権限委任オンボーディング
 tags: [onboarding, approval, delegation, github, browser]
-last_updated: 2026-10-21
+last_updated: 2026-10-22
 kind: runbook
 scope: repository
 authority: reference
@@ -25,9 +25,10 @@ phase: [onboarding, execution]
 
 ```bash
 pnpm onboarding authority show --scope person --json
-pnpm onboarding authority preview --file <repository-local-input.json> --json
-# preview の input / digest / base_hash をそのまま reviewed ファイルへ保存する
-pnpm onboarding authority request --file <reviewed-preview.json> --json
+pnpm onboarding authority preview --file <repository-local-input.json> \
+  --out knowledge/personal/onboarding/reviewed-preview.json --json
+# 保存された input / digest / base_hash と statement を確認する
+pnpm onboarding authority request --file knowledge/personal/onboarding/reviewed-preview.json --json
 pnpm onboarding authority status --scope person --request-id <id> --json
 # 本人がブラウザで内容を確認して承認した後
 pnpm onboarding authority apply --scope person --request-id <id> --json
@@ -47,6 +48,27 @@ pnpm onboarding authority apply --scope person --request-id <id> --json
 ```
 
 組織の場合は `scope_kind=organization` と実在する `tenant_slug` を指定し、show/status/apply にも `--scope organization --tenant <slug>` を渡す。個人利用のために架空の tenant を作らない。接続済みであっても本人の承認をエージェントが代行してはならない。
+
+### 最初は identity の有効化だけを承認する
+
+新規の個人設定で外部操作を常設委任しない場合は、`onboarding apply` が作る
+`onboarding/activation-input.json` を使う。同じ preview → request → 人間承認 → apply の手順で進める。
+再実行でも既存の入力と確認済みファイルは上書きしない。`show` で依頼を探し、pending / approved の
+依頼があれば同じ ID を再開する。有効化済みの identity には新しい有効化依頼を作らない。
+入力は次の形で、外部操作の grant を一つでも含めた場合は拒否する。
+
+```json
+{
+  "scope_kind": "person",
+  "mode": "activate",
+  "expires_at": "2026-11-01T00:00:00.000Z",
+  "grants": []
+}
+```
+
+有効化対象は登録済みの provisioned identity に固定する。既存 charter の置き換えや更新、
+suspended / retired identity の復活には使えない。個別の外部送信は依然として人間の承認が必要である。
+期限が過ぎた入力を再利用せず、希望する未来の日時へ更新してから preview を取り直す。
 
 期限切れ・廃止済み Charter がある場合は、`renew_existing: true` を明示し、表示された全ての既存権限・金額・データ・リスク制限を確認して更新する。ブラウザでは更新確認欄を選ぶ。通常の変更申請では復活させず、過去の利用額や停止条件もリセットしない。承認後に Charter の有効状態が変わった場合は再確認が必要になる。
 

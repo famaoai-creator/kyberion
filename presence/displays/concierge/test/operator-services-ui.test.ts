@@ -165,16 +165,16 @@ const sectionProps = (): ServicesSectionProps => ({
 });
 
 describe('operator service registration rendered interactions', () => {
-  it('separates metadata selections from credentials and removes unsupported OAuth actions', async () => {
+  it('separates metadata selections from credentials and offers supported account connections', async () => {
     const props = sectionProps();
     const html = renderToStaticMarkup(kit(createElement(ServicesSection, props)));
     expect(html).toContain(t('settings.operator_metadata_configured'));
     expect(html).toContain(t('settings.operator_selections_description'));
     expect(html).toContain(t('settings.operator_unsupported_providers'));
     expect(html).not.toContain('data-state="connected"');
-    expect(html).not.toContain('legacy-oauth-message');
+    expect(html).toContain('legacy-oauth-message');
     expect(html).not.toContain('secret-introduce');
-    expect(html).not.toContain('>' + t('setup.connect_oauth') + '</button>');
+    expect(html).toContain('>' + t('setup.connect_oauth') + '</button>');
     const api = mockApi();
     const m = mount(createElement(ServicesSection, props));
     await flush();

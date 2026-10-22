@@ -32,6 +32,33 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: mocks.guard }));
 vi.mock('../../../lib/viewer-context', () => ({ resolveConciergeViewer: mocks.resolve }));
+// The workspace selector validates the registry chain as well as the viewer grants.
+vi.mock('@agent/core/organization/tenant-registry', async (original) => ({
+  ...(await original<typeof import('@agent/core/organization/tenant-registry')>()),
+  readTenantProfile: (slug: string) =>
+    ['acme', 'globex'].includes(slug) ? { tenant_slug: slug } : null,
+}));
+vi.mock('@agent/core/organization/organization-operating-model-persistence', async (original) => ({
+  ...(await original<
+    typeof import('@agent/core/organization/organization-operating-model-persistence')
+  >()),
+  loadOrganizationOperationalState: (id: string, query: { tier: string; tenantSlug: string }) =>
+    ['org-a', 'org-b'].includes(id) && query.tenantSlug === 'acme'
+      ? { organization_id: id, tier: query.tier, tenant_slug: 'acme' }
+      : null,
+}));
+vi.mock('@agent/core/project/project-registry', async (original) => ({
+  ...(await original<typeof import('@agent/core/project/project-registry')>()),
+  loadProjectRecord: (id: string) =>
+    id === 'project-a' || id === 'project-b'
+      ? {
+          project_id: id,
+          tier: 'confidential',
+          tenant_slug: 'acme',
+          organization_id: id === 'project-a' ? 'org-a' : 'org-b',
+        }
+      : null,
+}));
 vi.mock('@agent/core/surface/front-desk-conversation-store', async () => {
   const actual = await vi.importActual<
     typeof import('@agent/core/surface/front-desk-conversation-store')

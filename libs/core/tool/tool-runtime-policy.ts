@@ -3,7 +3,12 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
 import { withExecutionContext } from '../authority.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from '../secure-io.js';
 
 export type ToolRuntimeMode = 'trial' | 'approved_install' | 'installed' | 'pinned';
 export type ToolRuntimeEcosystem = 'python' | 'node' | 'system';
@@ -52,13 +57,17 @@ export function _resetToolRuntimePolicyCacheForTests(): void {
 
 export function getToolRuntimePolicy(): ToolRuntimePolicy {
   const policyPath = getPolicyPath();
+  // Cached content must never bypass the current caller's permissions on an
+  // explicit path populated by a more privileged request in this process.
+  const explicitPath = getRegisteredEnvText('KYBERION_TOOL_RUNTIME_POLICY_PATH')?.trim();
+  if (explicitPath) safeReadFile(policyPath, { encoding: 'utf8' });
   if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
 
-  cachedPolicy = withExecutionContext(
-    'sovereign_concierge',
-    () => policyCatalog.load(),
-    'ecosystem_architect'
-  );
+  // Explicit paths retain the caller's permissions. The shared reader only
+  // opens the canonical policy and the configured operator/customer overlay.
+  cachedPolicy = explicitPath
+    ? policyCatalog.load()
+    : withExecutionContext('tool_runtime_policy_reader', () => policyCatalog.load());
   cachedPolicyPath = policyPath;
   return cachedPolicy;
 }

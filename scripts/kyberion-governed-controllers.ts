@@ -8,7 +8,7 @@ export async function runGovernedController(
 ): Promise<void | undefined> {
   switch (entrypointId) {
     case 'organization-model':
-      await organizationMain(args);
+      await organizationMain(args, print);
       return;
     case 'project-controller':
       await projectControllerMain(args, print);

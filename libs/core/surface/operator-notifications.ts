@@ -270,11 +270,8 @@ function notificationPreferencesCatalogAtPath(filePath: string) {
 
 export function loadNotificationPreferences(): NotificationPreferences {
   try {
-    // The preferences file lives in the personal tier; reading it is the
-    // concierge role's job (routing delivery, not personal data access). Any
-    // caller — baseline check, pipeline worker, CLI — needs this elevation or
-    // every configured channel silently reads as "unconfigured".
-    return withExecutionContext('sovereign_concierge', () => {
+    // Shared delivery callers only need this one routing-preferences file.
+    return withExecutionContext('notification_preferences_reader', () => {
       const filePath = notificationPreferencesPath();
       if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return {};
       return (

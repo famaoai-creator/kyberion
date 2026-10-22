@@ -1,4 +1,4 @@
-import { appendActionRecord } from './dot-action-ledger.js';
+import { appendActionRecord, readDotActionLedger } from './dot-action-ledger.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
@@ -36,6 +36,8 @@ import {
   dotBoundsPromptLines,
   effectiveDotWorkShapes,
   dotNotificationRoute,
+  dotDelegationCapacity,
+  settleDotCapacityActions,
   maybeSendDotDigest,
   runDotHousekeeping,
   settleDotParkedActions,
@@ -413,8 +415,81 @@ describe('dispatchDotProposals — charter bounds', () => {
     const first = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
     expect(first.records[0].status).toBe('parked');
     const second = dispatchDotProposals(CHARTER, [{ ...PROPOSAL, title: 'Another task' }], h.deps);
-    expect(second.records[0].status).toBe('refused');
+    expect(second.records[0].status).toBe('waiting_capacity');
     expect(second.records[0].reason).toMatch(/max_concurrent_delegations 2/);
+  });
+
+  it('defaults to 100 configurable slots while preserving explicit charter limits', () => {
+    const h = harness();
+    const inherited = { ...CHARTER, authority: { authority_role: 'organization_operator' } };
+    vi.stubEnv('KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS', '');
+    expect(dotDelegationCapacity(inherited, h.deps).cap).toBe(100);
+    vi.stubEnv('KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS', '7');
+    expect(dotDelegationCapacity(inherited, h.deps).cap).toBe(7);
+    expect(dotDelegationCapacity(CHARTER, h.deps).cap).toBe(2);
+    for (const invalid of ['0', '-1', 'Infinity', '3.5', '257', 'bad']) {
+      vi.stubEnv('KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS', invalid);
+      expect(dotDelegationCapacity(inherited, h.deps).cap).toBe(100);
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('waits at capacity without approval/effects and resumes the exact operation once', () => {
+    let open = 2;
+    const h = harness('auto', { operationKey: 'wake-capacity', countOpenWorkItems: () => open });
+    const waiting = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    expect(waiting.status).toBe('waiting_capacity');
+    expect(h.items).toHaveLength(0);
+    expect(h.routed).toHaveLength(0);
+    const writes = readDotActionLedger(h.deps).length;
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(readDotActionLedger(h.deps)).toHaveLength(writes);
+    expect(settleDotCapacityActions(CHARTER, h.deps)).toEqual([]);
+    expect(settleDotCapacityActions({ ...CHARTER, status: 'paused' }, h.deps)).toEqual([]);
+    expect(settleDotCapacityActions({ ...CHARTER, scope: { tier: 'public' } }, h.deps)).toEqual([]);
+    const conflict = dispatchDotProposals(CHARTER, [{ ...PROPOSAL, objective: 'changed' }], h.deps);
+    expect(conflict.records[0].reason).toContain('identity conflict');
+    open = 0;
+    expect(settleDotCapacityActions({ ...CHARTER, scope: { tier: 'public' } }, h.deps)).toEqual([]);
+    expect(
+      settleDotCapacityActions(
+        {
+          ...CHARTER,
+          authority: {
+            ...CHARTER.authority,
+            authority_role: 'other_role',
+          },
+        },
+        h.deps
+      )
+    ).toEqual([]);
+    const resumed = settleDotCapacityActions(CHARTER, h.deps);
+    expect(resumed[0]).toMatchObject({ status: 'dispatched', action_ref: waiting.action_ref });
+    expect(h.items).toHaveLength(1);
+    expect(settleDotCapacityActions(CHARTER, h.deps)).toEqual([]);
+    expect(dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).duplicates).toEqual([
+      waiting.action_ref,
+    ]);
+    expect(h.items).toHaveLength(1);
+  });
+
+  it('rechecks the current human gate after capacity opens instead of inheriting auto permission', () => {
+    let open = 2;
+    const h = harness('approve', {
+      operationKey: 'wake-capacity-human',
+      countOpenWorkItems: () => open,
+    });
+    const waiting = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    open = 0;
+    expect(settleDotCapacityActions(CHARTER, h.deps)[0]).toMatchObject({
+      action_ref: waiting.action_ref,
+      status: 'parked',
+      request_id: 'req-1',
+    });
+    expect(h.items).toHaveLength(0);
+    expect(h.routed).toHaveLength(1);
+    expect(settleDotCapacityActions(CHARTER, h.deps)).toEqual([]);
+    expect(h.routed).toHaveLength(1);
   });
 });
 

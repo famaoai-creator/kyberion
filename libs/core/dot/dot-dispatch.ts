@@ -1,4 +1,7 @@
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
+import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
+import { composeDotBoundsPrompt, sameDotHandoffScope } from './dot-bounds-prompt.js';
+export { dotDelegationCapacity } from './dot-admission-capacity.js';
 import {
   CONTINUOUS_MANAGED_WORK_PIPELINE,
   parseContinuousWorkPlan,
@@ -8,10 +11,7 @@ import { composeDotDigestText, dotCharterTimezone } from './dot-digest-compositi
 import { dotWorkItemInput } from './dot-work-item.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
-import {
-  dotMissionAdmissionPrompt,
-  dotMissionAdmissionRefusal,
-} from './dot-mission-admission-bounds.js';
+import { dotMissionAdmissionRefusal } from './dot-mission-admission-bounds.js';
 import { sendDueDotDigest } from './dot-digest-delivery.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
@@ -152,7 +152,7 @@ const logger = createLogger('dot-dispatch');
  */
 export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['direct_reply'];
 /** Concurrency cap when a charter declares no `max_concurrent_delegations`. */
-export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 3;
+export { DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS } from './dot-charter.js';
 /** The same proposal is not re-dispatched or re-asked within this window. */
 export const DOT_PROPOSAL_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** How long a proposal may wait on the operator when the charter sets no decision_expiry_minutes. */
@@ -161,7 +161,6 @@ export const DEFAULT_DOT_DECISION_EXPIRY_MINUTES = 24 * 60;
 const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
 
 const DECISION_RANK: Record<DotDecisionLevel, number> = { auto: 0, notify: 1, approve: 2 };
-const OPEN_WORK_ITEM_STATUSES = ['backlog', 'ready', 'in_progress', 'blocked', 'review'] as const;
 
 export interface DotDispatchDeps {
   /** Stable identity of the originating wake; reuse on retries, change for intentional new work. */
@@ -262,71 +261,12 @@ export function dotQuietHours(charter: DotCharter): NotificationQuietHours | und
   };
 }
 
-function defaultCountOpenWorkItems(dotId: string, rootDir?: string): number {
-  return listWorkItems({ status: [...OPEN_WORK_ITEM_STATUSES] }, rootDir ? { rootDir } : {}).filter(
-    (item) => item.metadata?.dot_id === dotId
-  ).length;
-}
-
-function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
-  const parked = currentDotActions(charter.dot_id, deps).filter(
-    (row) => row.status === 'parked' || row.status === 'admitted'
-  ).length;
-  const count =
-    deps.countOpenWorkItems ?? ((dotId: string) => defaultCountOpenWorkItems(dotId, deps.rootDir));
-  return count(charter.dot_id) + parked;
-}
-/** Current admission capacity, shared by preflight and the enforced dispatch bound. */
-export function dotDelegationCapacity(
-  charter: DotCharter,
-  deps: DotDispatchDeps = {}
-): { cap: number; open: number; free: number } {
-  const cap =
-    charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
-  const open = openDelegations(charter, deps);
-  return { cap, open, free: Math.max(0, cap - open) };
-}
-
 /**
  * The charter bounds, phrased for the wake prompt, so the dot proposes inside
  * them instead of spending proposals on refusals. Same sources as enforcement.
  */
 export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
-  const shapes = effectiveDotWorkShapes(charter, deps);
-  const pipelines = charter.authority.allowed_pipelines ?? [];
-  const { cap, free } = dotDelegationCapacity(charter, deps);
-  const partners = (deps.listCharters?.() ?? defaultListCharters(deps))
-    .filter(
-      (other) =>
-        other.dot_id !== charter.dot_id &&
-        other.status === 'active' &&
-        sameDotHandoffScope(charter, other) &&
-        (other.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)
-    )
-    .map((other) => other.dot_id);
-  return [
-    ...dotMissionAdmissionPrompt(charter, shapes, deps.now?.() ?? new Date()),
-    shapes.length
-      ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
-      : 'No work_shape is available to you now; propose nothing and report status instead.',
-    ...(shapes.includes('pipeline')
-      ? [
-          pipelines.length
-            ? `Allowed pipeline_ref values: ${pipelines.join(', ')}.`
-            : 'No pipeline is allowed by your charter; do not propose pipeline work.',
-        ]
-      : []),
-    ...(!shapes.includes('task_session') &&
-    (charter.authority.allowed_work_shapes ?? []).includes('task_session')
-      ? [DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE]
-      : []),
-    free > 0
-      ? `Delegation slots free: ${free} of ${cap}. Propose at most ${free}, most important first; extra proposals are refused.`
-      : `Delegation slots free: 0 of ${cap} (open work or decisions waiting on the operator). Propose nothing new; report status instead.`,
-    partners.length
-      ? `Dots that accept your handoffs (handoff_to): ${partners.join(', ')}.`
-      : 'No dot accepts handoffs from you; do not use handoff_to.',
-  ];
+  return composeDotBoundsPrompt(charter, effectiveDotWorkShapes(charter, deps), deps);
 }
 
 function defaultFindWorkItemByActionRef(
@@ -371,18 +311,7 @@ function recordAudit(
   }
 }
 
-export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string };
-
-/**
- * A handoff never crosses a tenant: same tenant_slug (both untenanted counts
- * as the same), and the same organization_id when both declare one.
- */
-function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
-  if ((from.scope.tenant_slug ?? '') !== (to.scope.tenant_slug ?? '')) return false;
-  const fromOrg = from.scope.organization_id;
-  const toOrg = to.scope.organization_id;
-  return !fromOrg || !toOrg || fromOrg === toOrg;
-}
+export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string; capacity?: true };
 
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
@@ -498,6 +427,7 @@ export function checkDotProposalBounds(
   if (open >= cap) {
     return {
       ok: false,
+      capacity: true,
       reason: `max_concurrent_delegations ${cap} reached (${open} open or awaiting a decision)`,
     };
   }
@@ -1006,8 +936,15 @@ export function dispatchDotProposals(
           const prior = currentDotActions(charter.dot_id, deps).find(
             (row) => row.action_ref === 'frontdesk-' + proposal.front_desk_execution!.work_item_id
           );
-          if (prior) {
+          if (prior && prior.status !== 'waiting_capacity') {
             result.duplicates.push(prior.action_ref);
+            return;
+          }
+          if (
+            prior?.status === 'waiting_capacity' &&
+            dotDelegationCapacity(charter, deps).free === 0
+          ) {
+            result.records.push(prior);
             return;
           }
         }
@@ -1027,7 +964,8 @@ function dispatchDotProposalsUnlocked(
   charter: DotCharter,
   proposals: readonly DotProposal[],
   deps: DotDispatchDeps = {},
-  ordinalOffset = 0
+  ordinalOffset = 0,
+  retryIdentity?: Pick<DotActionRecord, 'action_ref' | 'admission'>
 ): DotDispatchResult {
   const records: DotActionRecord[] = [];
   const duplicates: string[] = [];
@@ -1037,9 +975,10 @@ function dispatchDotProposalsUnlocked(
     const hash = dotProposalHash(charter.dot_id, proposal);
     const identity = proposal.front_desk_execution
       ? undefined
-      : genericDotActionIdentity(charter, proposal, ordinalOffset + index, deps.operationKey);
+      : (retryIdentity ??
+        genericDotActionIdentity(charter, proposal, ordinalOffset + index, deps.operationKey));
     const priorOperation =
-      identity && deps.operationKey
+      identity && (deps.operationKey || retryIdentity)
         ? currentDotActions(charter.dot_id, deps).find(
             (row) => row.action_ref === identity.action_ref
           )
@@ -1052,14 +991,33 @@ function dispatchDotProposalsUnlocked(
         });
       } else if (priorOperation.status === 'admitted') {
         records.push(reconcileDotAdmission(charter, priorOperation, deps));
-      } else duplicates.push(priorOperation.action_ref);
-      continue;
+      } else if (priorOperation.status !== 'waiting_capacity') {
+        duplicates.push(priorOperation.action_ref);
+      } else {
+        // Capacity waiting has no executable reservation. Retry the same
+        // immutable operation through every current gate when a slot opens.
+        if (priorOperation.admission?.authority_role !== charter.authority.authority_role) {
+          duplicates.push(priorOperation.action_ref);
+          continue;
+        }
+      }
+      if (
+        priorOperation.status !== 'waiting_capacity' ||
+        priorOperation.admission?.semantic_hash !== identity?.admission?.semantic_hash
+      )
+        continue;
     }
     const recent = currentDotActions(charter.dot_id, deps).find(
       (row) =>
         row.proposal_hash === hash &&
         (!row.admission || row.admission.scope_hash === dotAdmissionScopeHash(charter)) &&
-        (row.status === 'admitted' ||
+        row.action_ref !==
+          (priorOperation?.action_ref ??
+            (proposal.front_desk_execution
+              ? 'frontdesk-' + proposal.front_desk_execution.work_item_id
+              : undefined)) &&
+        (row.status === 'waiting_capacity' ||
+          row.status === 'admitted' ||
           (row.status === 'dispatched' &&
             dotDigestActionEvidence(charter, row, deps).status !== 'done') ||
           ((row.status === 'parked' ||
@@ -1115,6 +1073,19 @@ function dispatchDotProposalsUnlocked(
         throw new Error('front-desk request requires explicit human approval');
       const bounds = checkDotProposalBounds(charter, proposal, deps);
       if (bounds.ok === false) {
+        if (bounds.capacity) {
+          // Repeated sweeps while full do not append errors or ask humans
+          // again. No WorkItem, approval or effect is created in this state.
+          records.push(
+            priorOperation?.status === 'waiting_capacity'
+              ? priorOperation
+              : appendActionRecord(
+                  { ...base, status: 'waiting_capacity', reason: bounds.reason },
+                  deps
+                )
+          );
+          continue;
+        }
         recordAudit(charter, proposal.action_id, 'denied', { reason: bounds.reason }, deps);
         records.push(appendActionRecord({ ...base, reason: bounds.reason }, deps));
         continue;
@@ -1453,6 +1424,23 @@ function supersedeDotParkedActionUnlocked(
   );
 }
 
+/** Resume capacity waits only when slots are free; original identities remain pinned. */
+export function settleDotCapacityActions(
+  charter: DotCharter,
+  deps: DotDispatchDeps = {}
+): DotActionRecord[] {
+  return resumeDotCapacityActions(charter, deps, (row) => {
+    const admission = row.admission!;
+    return dispatchDotProposalsUnlocked(
+      charter,
+      [admission.proposal],
+      { ...deps, operationKey: admission.operation_key },
+      admission.ordinal,
+      row
+    ).records;
+  });
+}
+
 /**
  * Advance this dot's parked actions: approved → execute (after re-checking
  * the charter scope, which may have narrowed while it waited), anything else
@@ -1606,6 +1594,7 @@ export async function runDotHousekeeping(
     result.settled = [
       ...reconcileDotAdmissions(charter, deps),
       ...settleDotParkedActions(charter, deps),
+      ...settleDotCapacityActions(charter, deps),
     ];
   } catch (error) {
     fail('settle', error);

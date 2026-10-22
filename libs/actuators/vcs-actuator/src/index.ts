@@ -1,5 +1,5 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { handleAction } from './vcs-helpers.js';
+import { handleAction, handleStandaloneAction } from './vcs-helpers.js';
 import {
   currentProcessArgv,
   runActuatorCli,
@@ -16,10 +16,13 @@ export const actuator = defineCatalogBackedActuator({
 });
 
 const main = async () => {
+  const args = currentProcessArgv();
   await runActuatorCli({
     name: 'vcs-actuator',
-    args: currentProcessArgv(),
-    handleAction,
+    args,
+    handleAction: args.some((arg) => arg === '--serve' || arg === '--serve=true')
+      ? handleAction
+      : handleStandaloneAction,
   });
 };
 
@@ -27,5 +30,5 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/vcs-actuator/src/index.ts')) 
   void runActuatorCliEntryPoint(main, 'vcs-actuator');
 }
 
-export { handleAction } from './vcs-helpers.js';
+export { handleAction, handleStandaloneAction } from './vcs-helpers.js';
 export type { VcsAction, VcsOp, VcsParams } from './vcs-helpers.js';

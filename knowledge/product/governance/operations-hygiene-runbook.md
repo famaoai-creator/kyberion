@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-21
+last_updated: 2026-10-22
 ---
 
 # Operations Hygiene Runbook
@@ -194,6 +194,55 @@ A gate that times out on busy runs:
    case the pruning reasons about.
 
 ## §2 Runtime stores and retention
+
+### VCS publication across Git worktrees
+
+PR readiness and Knowledge checks use the source worktree. Standalone publication
+uses the primary checkout's current approval store, installed identity, charters
+and consumption ledger only after checking Git common-directory equality. Keep
+these stores authoritative: copying trust records duplicates budgets and loses
+revocations; sharing all runtime directories loses worktree isolation.
+
+The trusted publication child receives frozen PR text on stdin and preserves its
+original information tier. It resolves only the source process scope; an absent
+tenant/mission must never be filled from the destination's persisted scope. An
+existing envelope, execution proof or resource ceiling stays in its owner process.
+Limit host IO mediation to exact standing-stop reads, publication review artifacts
+and one reservation; never run a caller callback with a broad store-writer role.
+
+Headless request creation and human presence are separate facts. Explicit PR,
+push and merge publication may queue an exact human decision, expose its protected full review,
+and resume with the same invocation and effect. It cannot approve itself. Keep
+assurance, separation of duties, revocation, charter stops and exclusive execution
+reservations in force. Test missing onboarding, destination scope contamination,
+protected-body provenance, exact approval resumption and ambiguous transport results.
+Exercise the real child program across two actual Git worktrees with `VITEST`
+unset in the child. The durable reservation floor must pass the same exact
+host resource ceiling as the test scratch floor; a broad knowledge-tier grant
+must never be added to make durable reservations writable. Replay must remain
+blocked after the child exits. The enforcing integration is
+`scripts/vcs-worktree-approval.integration.test.ts`.
+Approval-store persistence defaults to the coordination writer, not mission lifecycle
+authority. See `libs/core/vcs/governance-host.ts`, `libs/core/vcs/publication-host.ts`
+and the PR readiness checklist for the operator flow.
+
+When approval requirements change, update the real decision fixtures with the
+recognized human authentication method; do not weaken production proof checks.
+Approval-backed managed packs reject post-approval mutations at provenance
+validation, before feature-specific lookup. Clear only the fixture's isolated
+channel via `approvalStoreRoots()`. Retired pipeline contract tests follow the
+archived canonical source, and surface-registry equality compares stable IDs
+rather than filesystem enumeration order. Mission residue scans treat tier roots
+as namespaces while still detecting orphan descendants and legacy mission roots.
+
+Keep dependency installation explicit. pnpm 11 defaults to reinstalling before a
+script when workspace state changes, including export-map edits. In headless
+worktrees that can abort on a modules-purge prompt, or modify dependencies while
+another test process is using them. `pnpm-workspace.yaml` keeps
+`verifyDepsBeforeRun: warn`: script execution reports stale dependency state and
+does not install. Recover actual dependency changes with
+`pnpm install --frozen-lockfile`; release-age and build-approval policies still
+apply to that explicit install. CI retains its separate frozen install step.
 
 **Rule.** Every path directly under `active/shared/runtime/` must have an entry in
 `knowledge/product/governance/storage-retention-catalog.json` in the same PR that adds its writer.
@@ -1884,7 +1933,70 @@ dot-work-binding, lifecycle, dispatch, admission recovery and executor tests, pl
 mounted workspace/ingest UI tests. Include public-only viewers, same-name owners in two
 tiers, parentless projects, binding removal, sibling operations and delayed scope changes.
 
+## Approval continuation authority and scheduled media boundaries
+
+An approval runtime must resume a pipeline under the original execution authority
+captured by `createPipelineRunJournal`, never its own `SYSTEM_ROLE`, delegated role,
+or persona. Keep that snapshot outside pipeline inputs and overwrite caller-supplied
+claims when writing `run_started`. Journals without this provenance require manual
+continuation from the original runtime. Verify changes with
+`libs/core/pipeline/pipeline-approval-resume.test.ts` and
+`libs/core/pipeline/pipeline-run-journal.test.ts`.
+
+Continuation preserves the source scope's egress and reasoning-backend ceilings,
+including library dispatch after journal restoration. Restore the original
+nonsecret policy selectors and task identity; clear every approver override first.
+Never serialize or replay temporary SUDO flags or keys. Unknown original policy
+controls require the explicit original-runtime resume path. A protected explicit
+tool-policy cache hit must recheck the current caller's read permission. The
+read-only surface wrapper must pass `readOnly: true` itself; a real durable approved
+link must stay pending during snapshots, even for a viewer of another tenant.
+
+Generation schedules load the generation implementation without desktop capture;
+the public media actuator wires capture through its typed dependency. Do not import
+the entire system actuator into the scheduled generation path or add broad role
+grants to compensate. After changing imports or child environments, regenerate
+`docs/developer/role-assumption-reachability.json` and run both
+`scripts/analyze_role_assumptions.test.ts` and
+`scripts/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
+shorthand environment properties to their value declarations before deciding
+whether the child inherits its parent's system role.
+
+Projection refreshes used by observation writers must not reconcile or enact
+unrelated approval decisions. Keep reconciliation on explicit approval-owner
+operations; `libs/core/cloudflare-os-held-reconcile.test.ts` must prove that
+refresh alone retains a pending held action and explicit reconciliation recovers
+the decision. Service lifecycle receipt attribution must remain data: write
+through the shared `infrastructure_sentinel` store authority instead of assuming
+the receipt's actor role (`libs/core/protocol-service-lifecycle.test.ts`).
+
+Shared readers must use purpose-scoped read grants: provider egress policy reads
+the selected tenant profile through `workspace_tenant_registry_reader`, and
+operator delivery reads only `knowledge/personal/notification-preferences.json`
+through `notification_preferences_reader` (no writes). A scheduler should be able
+to consult both without assuming `mission_controller` or `sovereign_concierge`.
+Tool availability probes similarly read the canonical runtime policy or its exact
+operator/customer overlay through `tool_runtime_policy_reader`; an explicit
+policy-path override retains the caller's own read permissions. Surface outbox,
+dead-target and quarantine store IO uses `infrastructure_sentinel`, independently
+of configurable channel actor roles. Verify these boundaries with the provider
+egress, tool runtime policy, surface coordination store and notification suites.
+
 ## Shared state, limits and check bootstrap
+
+Installation upgrades must preserve canonical trust and deny absent internal
+roles until an explicit catalog migration is approved. Do not replace canonical
+policies with worktree policies or add a missing-role capability exemption.
+Use `pnpm organization role migrate-publication-store` for the exact publication
+dependency bundle, review the before/after hashes and digest, and obtain an
+authenticated human approval bound to that digest and each changed path. Stop
+other catalog writers during this maintenance operation; migration checks each
+before hash immediately before writing and preserves unrelated entries. Existing
+divergent definitions and explicit denies require a separate policy review.
+See [installation upgrade procedure](./publication-role-installation-upgrade.ja.md).
+The migration unit suite and real two-worktree PR publication integration must
+prove old catalogs still deny, preview changes nothing, explicit approved
+migration enables one authenticated approval and one effect, and replay denies.
 
 Shared barrels and limiter adapters must not read policy catalogs on import. Load at first operation and propagate missing/invalid policy errors. Cover cold imports without a configured root. Keep dependency-free mechanisms in foundation rather than adding layer exceptions. Tests that virtualize secure-io must register the same FoundationIo fixture for shared JSON serializers; assert no live runtime files leak. JSON-state lock and reentry identities must agree for case and Unicode aliases, including on case-sensitive hosts.
 
@@ -1897,3 +2009,15 @@ When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
 
 Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not `dot_lifecycle_writer`. Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+
+## People management: exact store grants
+
+Keep organization responsibilities separate from tenant access and immutable agent home affiliation. Journal append grants include the journal, its writer lease, and lease metrics inside the canonical fenced writer callback; infrastructure locks remain with the host controller. Member identity updates must read every stored profile needed for uniqueness validation through exact file grants. Never broaden a directory grant to make a failed operation pass.
+
+Run `scripts/organization_people.integration.test.ts` with real secure IO, authority, registry, leases, and journal projection against a product-policy-only synthetic root. Mocked transport or facade tests cannot establish the correctness of these store grants. The gate must cover member creation, duplicate external identity refusal, agent issue, lifecycle change, accountability transfer, and restricted-home visibility.
+
+After building Concierge, run `KYBERION_TEST_CONCIERGE_BROWSER=1 pnpm exec vitest run scripts/organization_people.integration.test.ts --maxWorkers 1` explicitly for the loopback browser probe. Its authenticated decisions belong only to the synthetic fixture and exercise the real approval store; the flag never changes runtime admission policy. Stop the owned server and browser in `finally`, remove the fixture state, and retain only a synthetic screenshot in scratch when needed for review.
+
+Next-based surface adapters pass `surfaceMutationRequestUrl(req)` to the shared mutation guard. Next normalizes numeric loopback hosts in its public URL getter; use the native branded Request URL to preserve the server-bound origin. Never repair this by accepting loopback aliases or trusting Host/forwarded headers. The actual NextRequest regression gate is `presence/displays/concierge/src/lib/native-request-origin.test.ts`, including IPv4/IPv6, cross-port, cross-origin, and spoofed-header refusals.
+
+Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding_authority.test.ts`, and `scripts/onboarding_apply.identity.integration.test.ts`.

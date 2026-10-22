@@ -37,7 +37,7 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { withExecutionContext } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
-import { appendJsonLine } from '../foundation/json.js';
+import { appendJsonLine, writeJson } from '../foundation/json.js';
 import { resolveWorkspaceScope } from '../surface/workspace-scope.js';
 import { readTenantProfile } from '../organization/tenant-registry.js';
 import { loadProjectRecord } from '../project/project-registry.js';
@@ -49,6 +49,7 @@ import {
   assertFrontDeskDiagnosticDotCharter,
   listDotCharters,
   validateDotCharter,
+  resolveDotDelegationLimit,
   type DotCharter,
   type DotCharterStatus,
 } from './dot-charter.js';
@@ -386,6 +387,68 @@ export function transitionDotCharterStatus(
       withLockSync('dot-charter-edit:' + path.resolve(source.path), () =>
         transitionDotCharterStatusUnlocked(dotId, target, deps)
       ),
+    undefined,
+    source.tenant_slug,
+    source.charter.scope.organization_id
+  );
+}
+
+/** Change only admission capacity; activation and all authority stay separate. */
+export function configureDotDelegationCapacity(
+  dotId: string,
+  limit: number | undefined,
+  deps: DotLifecycleDeps & { dryRun?: boolean } = {}
+): { charter: DotCharter; effective_limit: number; applied: boolean } {
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit > 256))
+    throw new Error('[DOT_CAPACITY_INVALID] limit must be an integer from 1 to 256');
+  const source = findDotCharter(dotId, deps.rootDir);
+  if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
+  return withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () =>
+      withLockSync('dot-charter-edit:' + path.resolve(source.path), () => {
+        const parsed = parseSafeJsonObjectInput(
+          String(safeReadFile(source.path, { encoding: 'utf8' })),
+          'dot capacity charter'
+        );
+        const current = validateDotCharter(parsed, source.path);
+        if (
+          current.dot_id !== dotId ||
+          !isDeepStrictEqual(current.scope, source.charter.scope) ||
+          (deps.expectedScope && !isDeepStrictEqual(current.scope, deps.expectedScope)) ||
+          (deps.expectedStatus && current.status !== deps.expectedStatus) ||
+          (deps.expectedAdmissionScopeHash &&
+            dotAdmissionScopeHash(current) !== deps.expectedAdmissionScopeHash)
+        )
+          throw new Error('[DOT_CAPACITY_CONFLICT] charter changed; refresh before configuring');
+        if (current.status !== 'draft' && current.status !== 'paused')
+          throw new Error(
+            '[DOT_CAPACITY_STATUS] pause the dot before configuring capacity; retired dots cannot change'
+          );
+        assertOperationBinding(current, deps);
+        const next = { ...parsed, authority: { ...current.authority } };
+        if (limit === undefined) delete next.authority.max_concurrent_delegations;
+        else next.authority.max_concurrent_delegations = limit;
+        const charter = validateDotCharter(next, source.path);
+        if (!deps.dryRun) {
+          writeJson(source.path, next);
+          auditTransition(
+            {
+              dot_id: dotId,
+              action: 'configure_delegation_capacity',
+              previous: current.authority.max_concurrent_delegations ?? 'inherit',
+              next: limit ?? 'inherit',
+              path: source.path,
+            },
+            deps
+          );
+        }
+        return {
+          charter,
+          effective_limit: resolveDotDelegationLimit(limit),
+          applied: !deps.dryRun,
+        };
+      }),
     undefined,
     source.tenant_slug,
     source.charter.scope.organization_id

@@ -25,7 +25,14 @@ vi.mock('../secure-io.js', async (original) => {
   };
 });
 import { gitRun, gitPush, gitFetch, gitStatus, type VcsCommandRunner } from './git.js';
-import { ghPrCreate, ghPrMerge, ghPrView, ghRun, ghMust } from './github.js';
+import {
+  ghPrCreate,
+  ghPrMerge,
+  ghPrView,
+  ghRun,
+  ghMust,
+  withPrPublicationBodySource,
+} from './github.js';
 import { withExternalOperationAuthority } from '../governance/external-operation.js';
 
 describe('canonical VCS external governance', () => {
@@ -128,6 +135,36 @@ describe('canonical VCS external governance', () => {
     expect(sent()[0].args).toContain('reviewed body');
     expect(sent()[0].args).toContain('https://github.com/owner/repo');
     expect(sent()[0].args).not.toContain('--body-file');
+  });
+  it('keeps frozen inline PR bytes and their protected worktree provenance', () => {
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'frozen-body' }));
+    const body = '\n  protected review text  \n';
+    withExternalOperationAuthority(resolver, () =>
+      withPrPublicationBodySource('protected_or_unknown', () =>
+        ghPrCreate({ title: 'review', head: 'feature', base: 'main', body }, run)
+      )
+    );
+    expect(resolver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        effect: expect.objectContaining({ body, body_source_tier: 'protected_or_unknown' }),
+      })
+    );
+    expect(sent()[0].args).toContain(body);
+  });
+  it('never lets a transport provenance context declassify a protected body file', () => {
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'file-body' }));
+    withExternalOperationAuthority(resolver, () =>
+      withPrPublicationBodySource('public', () =>
+        ghPrCreate({ title: 'review', head: 'feature', base: 'main', bodyFile: bodyPath }, run)
+      )
+    );
+    expect(resolver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        effect: expect.objectContaining({ body_source_tier: 'protected_or_unknown' }),
+      })
+    );
   });
   it('rejects edited PR review body after approval', () => {
     mocks.gate.mockImplementation(() => {

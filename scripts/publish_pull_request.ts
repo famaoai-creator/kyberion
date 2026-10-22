@@ -13,9 +13,9 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/founda
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
-import { ghMust, ghPrCreate } from '@agent/core/vcs';
-import { withInstalledOnboardingAuthority } from '@agent/core/organization/onboarding-authority-runtime';
+import { ghMust } from '@agent/core/vcs';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
+import { publishWithWorktreeGovernance } from './lib/pr-worktree-governance.js';
 import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
@@ -307,7 +307,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
       cwd: pathResolver.rootDir(),
     }).trim(),
   });
-  const result = withInstalledOnboardingAuthority(invocationId, () => ghPrCreate(publication));
+  const result = publishWithWorktreeGovernance(publication, invocationId, print);
   if (result.error || result.status !== 0) {
     throw new Error(result.stderr?.trim() || result.error?.message || 'GitHub PR creation failed');
   }

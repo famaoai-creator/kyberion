@@ -1017,3 +1017,101 @@ describe('section feedback interruption boundaries', () => {
     expect(posts()).toHaveLength(1);
   });
 });
+
+describe('member administration session and revision fence', () => {
+  const member = {
+    member_id: 'bob',
+    display_name: 'Synthetic Bob',
+    status: 'active',
+    sign_in: 'token',
+    memberships: [{ tenant_slug: 'alpha', role: 'viewer' }],
+    external_identities: [],
+    version: 'bob-v1',
+  };
+  const list = () => json({ ok: true, context_id: 'member-context-a', members: [member] });
+  it('binds member edits to the loaded context and exact member revision', async () => {
+    serve((url, init) =>
+      url === '/api/members'
+        ? list()
+        : url === '/api/members/bob' && init?.method === 'PATCH'
+          ? json({ ok: true })
+          : undefined
+    );
+    await mount();
+    expect(captured.members!.memberContextId).toBe('member-context-a');
+    await act(async () => captured.members!.onPatchMember('bob', { status: 'suspended' }));
+    const updates = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url, init]) => url === '/api/members/bob' && init?.method === 'PATCH');
+    expect(updates).toHaveLength(1);
+    expect(JSON.parse(String(updates[0][1]?.body))).toEqual({
+      status: 'suspended',
+      expected_version: 'bob-v1',
+      expected_context_id: 'member-context-a',
+    });
+  });
+  it('does not submit a reviewed member grant after the verified owner changes', async () => {
+    let changed = false;
+    serve((url) =>
+      url === '/api/members'
+        ? list()
+        : url === '/api/me' && changed
+          ? json({ ...me(), member: { ...me().member, member_id: 'other' } })
+          : undefined
+    );
+    const view = await mount();
+    changed = true;
+    await act(async () =>
+      captured.members!.onPatchMember('bob', { tenant_slug: 'alpha', role: 'owner' })
+    );
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(
+      0
+    );
+    expect(view.text()).toContain('setup.draft_context_changed');
+  });
+  it('rejects a stale reviewed context without rebinding it to the current owner', async () => {
+    serve((url) => (url === '/api/members' ? list() : undefined));
+    await mount();
+    await act(async () =>
+      captured.members!.onPatchMember('bob', {
+        status: 'suspended',
+        expected_version: 'bob-old',
+        expected_context_id: 'old-context',
+      })
+    );
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(
+      0
+    );
+  });
+  it('does not claim success when the post-write member snapshot fails', async () => {
+    let updated = false;
+    serve((url, init) => {
+      if (url === '/api/members') return updated ? json({ ok: false }, 503) : list();
+      if (url === '/api/members/bob' && init?.method === 'PATCH') {
+        updated = true;
+        return json({ ok: true });
+      }
+    });
+    const view = await mount();
+    await act(async () => captured.members!.onPatchMember('bob', { status: 'suspended' }));
+    expect(view.text()).toContain('management.uncertain');
+    expect(captured.members!.members).toEqual([]);
+    expect(captured.members!.memberContextId).toBeUndefined();
+  });
+  it('discards a late member result after identity invalidates the page', async () => {
+    const pending = deferred<Response>();
+    let changed = false;
+    serve((url, init) => {
+      if (url === '/api/members') return list();
+      if (url === '/api/members/bob' && init?.method === 'PATCH') return pending.promise;
+      if (url === '/api/me' && changed)
+        return json({ ...me(), member: { ...me().member, member_id: 'other' } });
+    });
+    const view = await mount();
+    await act(async () => captured.members!.onPatchMember('bob', { status: 'suspended' }));
+    changed = true;
+    await act(async () => pending.resolve(json({ ok: true })));
+    expect(view.text()).toContain('setup.draft_context_changed');
+    expect(view.text()).not.toContain('settings_member_updated');
+  });
+});

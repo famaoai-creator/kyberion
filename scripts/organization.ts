@@ -22,12 +22,23 @@ export async function main(
     return;
   }
   if (args[0] === 'role') {
+    if (args[1] === 'migrate-publication-store') {
+      const { runPublicationRoleMigration } =
+        await import('./organization_publication_role_migration.js');
+      runPublicationRoleMigration(args.slice(2), print);
+      return;
+    }
     await organizationRolesMain(args);
     return;
   }
   if (args[0] === 'member') {
     const { runOrganizationMember } = await import('./organization_member.js');
     await runOrganizationMember(args.slice(1));
+    return;
+  }
+  if (args[0] === 'participant' || args[0] === 'agent') {
+    const { runOrganizationPeople } = await import('./organization_people.js');
+    await runOrganizationPeople(args[0], args.slice(1), print);
     return;
   }
   if (args[0] === 'scim-token') {

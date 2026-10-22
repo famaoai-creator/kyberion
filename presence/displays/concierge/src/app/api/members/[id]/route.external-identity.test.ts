@@ -1,168 +1,118 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
-
-const mocks = vi.hoisted(() => ({
-  readMemberProfile: vi.fn(),
-  writeMemberProfile: vi.fn(),
-  roleForTenant: vi.fn(),
-  resolveRole: vi.fn(),
-}));
-
-vi.mock('../../../../lib/api-guard', () => ({
-  requireConciergeMutationAccess: vi.fn(() => null),
-}));
+import { SurfaceManagementError } from '@agent/core/surface/surface-management-mutations';
+const s = vi.hoisted(() => ({ update: vi.fn(), context: 'a'.repeat(64) }));
+vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: () => null }));
 vi.mock('../../../../lib/viewer-context', () => ({
-  resolveConciergeViewer: vi.fn(() => ({
-    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
-  })),
-  conciergeErrorResponse: vi.fn(
-    (error: unknown, status: number) =>
-      new Response(JSON.stringify({ ok: false, error: String(error) }), { status })
-  ),
+  resolveConciergeViewer: () => ({
+    context: { role: 'localadmin', source: 'loopback', tenantSlugs: ['acme'] },
+  }),
+  conciergeErrorResponse: (error: unknown, status: number) =>
+    new Response(JSON.stringify({ ok: false, error: String(error) }), { status }),
 }));
-vi.mock('../../../../lib/front-desk-member', () => ({
-  conciergeFrontDeskRoleForTenant: mocks.roleForTenant,
-  resolveConciergeFrontDeskRole: mocks.resolveRole,
+vi.mock('../../../../lib/member-management-server', async () => {
+  const { SurfaceManagementError } =
+    await import('@agent/core/surface/surface-management-mutations');
+  return {
+    memberManagementPrincipal: () => ({ memberId: 'owner', allowedTenantSlugs: ['acme'] }),
+    assertMemberManagementContext: (_viewer: unknown, expected: unknown) => {
+      if (expected !== undefined && expected !== s.context)
+        throw new SurfaceManagementError('context_changed', 403, 'Refresh identity');
+    },
+  };
+});
+vi.mock('@agent/core/organization/member-management', () => ({
+  updateManagedMember: s.update,
+  managedMemberVersion: () => 'v'.repeat(64),
 }));
-vi.mock('@agent/core/authority', () => ({
-  withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
-}));
-vi.mock('@agent/core/organization/member-registry', () => ({
-  isValidMemberId: (id: string) => /^[a-z][a-z0-9-]{1,30}$/.test(id),
-  readMemberProfile: mocks.readMemberProfile,
-  writeMemberProfile: mocks.writeMemberProfile,
-}));
-
 import { PATCH } from './route.js';
-
 function request(body: unknown): NextRequest {
   return {
-    headers: new Headers({ 'content-type': 'application/json', 'accept-language': 'en' }),
+    headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => body,
   } as unknown as NextRequest;
 }
 const params = { params: Promise.resolve({ id: 'carol' }) };
-const member = (over: Record<string, unknown> = {}) => ({
-  member_id: 'carol',
-  display_name: 'Carol',
-  status: 'active',
-  memberships: [{ tenant_slug: 'acme-corp', role: 'viewer' }],
-  access_registrations: [],
-  ...over,
-});
-const identity = { issuer: 'https://accounts.google.com/', subject: '1122334455' };
-
-describe('concierge member PATCH — SSO identity binding', () => {
+describe('member PATCH shared-service transport', () => {
   beforeEach(() => {
-    for (const mock of Object.values(mocks)) mock.mockReset();
-    mocks.readMemberProfile.mockReturnValue(member());
-    mocks.writeMemberProfile.mockImplementation((profile: unknown) => profile);
-    mocks.roleForTenant.mockReturnValue('owner');
-    mocks.resolveRole.mockReturnValue('owner');
-  });
-
-  it('binds an OIDC iss+sub (trailing slash trimmed) for an owner', async () => {
-    const response = await PATCH(request({ external_identity: identity }), params);
-    expect(response.status).toBe(200);
-    const written = mocks.writeMemberProfile.mock.calls[0]![0] as {
-      external_identities: unknown[];
-    };
-    expect(written.external_identities).toEqual([
-      { issuer: 'https://accounts.google.com', subject: '1122334455' },
-    ]);
-  });
-
-  it('is idempotent for an identity that is already bound', async () => {
-    mocks.readMemberProfile.mockReturnValue(
-      member({
-        external_identities: [{ issuer: 'https://accounts.google.com', subject: '1122334455' }],
-      })
-    );
-    await PATCH(request({ external_identity: identity }), params);
-    const written = mocks.writeMemberProfile.mock.calls[0]![0] as {
-      external_identities: unknown[];
-    };
-    expect(written.external_identities).toHaveLength(1);
-  });
-
-  it('takes over a SCIM-made binding the owner re-asserts (SCIM can no longer move it)', async () => {
-    mocks.readMemberProfile.mockReturnValue(
-      member({
-        external_identities: [
-          {
-            issuer: 'https://accounts.google.com/',
-            subject: '1122334455',
-            provisioned_by: 'scim:scim-0123456789abcdef',
-          },
-          {
-            issuer: 'https://slack.com',
-            subject: 'U1',
-            provisioned_by: 'scim:scim-0123456789abcdef',
-          },
-        ],
-      })
-    );
-    const response = await PATCH(request({ external_identity: identity }), params);
-    expect(response.status).toBe(200);
-    const written = mocks.writeMemberProfile.mock.calls[0]![0] as {
-      external_identities: unknown[];
-    };
-    expect(written.external_identities).toEqual([
-      { issuer: 'https://accounts.google.com/', subject: '1122334455' },
-      { issuer: 'https://slack.com', subject: 'U1', provisioned_by: 'scim:scim-0123456789abcdef' },
-    ]);
-  });
-
-  it('removes a bound identity', async () => {
-    mocks.readMemberProfile.mockReturnValue(
-      member({
-        external_identities: [{ issuer: 'https://accounts.google.com', subject: '1122334455' }],
-      })
-    );
-    const response = await PATCH(request({ external_identity_remove: identity }), params);
-    expect(response.status).toBe(200);
-    const written = mocks.writeMemberProfile.mock.calls[0]![0] as {
-      external_identities: unknown[];
-    };
-    expect(written.external_identities).toEqual([]);
-  });
-
-  it('requires owner on EVERY tenant the member belongs to (binding grants the whole scope)', async () => {
-    mocks.readMemberProfile.mockReturnValue(
-      member({
-        memberships: [
-          { tenant_slug: 'acme-corp', role: 'viewer' },
-          { tenant_slug: 'other', role: 'viewer' },
-        ],
-      })
-    );
-    mocks.roleForTenant.mockImplementation((_ctx: unknown, tenant: string) =>
-      tenant === 'acme-corp' ? 'owner' : 'viewer'
-    );
-    const response = await PATCH(request({ external_identity: identity }), params);
-    expect(response.status).toBe(403);
-    expect(mocks.writeMemberProfile).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [{ external_identity: { issuer: 'https://idp', subject: '' } }],
-    [{ external_identity: { issuer: 'has space', subject: 's' } }],
-    [{ external_identity: { issuer: 'https://idp', subject: 's', extra: 1 } }],
-    [{ external_identity: 'nope' }],
-    [{ external_identity: identity, external_identity_remove: identity }],
-    [{ external_identity: identity, status: 'suspended' }],
-    [{ external_identity: identity, tenant_slug: 'acme-corp', role: 'owner' }],
-  ])('rejects a malformed or combined request %#', async (body) => {
-    const response = await PATCH(request(body), params);
-    expect(response.status).toBe(400);
-    expect(mocks.writeMemberProfile).not.toHaveBeenCalled();
-  });
-
-  it('maps "already bound to another member" to 409', async () => {
-    mocks.writeMemberProfile.mockImplementation(() => {
-      throw new Error("external identity 'x#y' is already bound to member 'dave'");
+    s.update.mockReset();
+    s.update.mockResolvedValue({
+      member_id: 'carol',
+      display_name: 'Carol',
+      status: 'active',
+      memberships: [
+        { tenant_slug: 'acme', role: 'viewer' },
+        { tenant_slug: 'private', role: 'owner' },
+      ],
+      external_identities: [{ issuer: 'private', subject: 'secret', email: 'private@example.com' }],
     });
+  });
+  it('passes the authenticated principal and identity edit to the shared service', async () => {
+    const identity = { issuer: 'https://accounts.google.com/', subject: '1122334455' };
     const response = await PATCH(request({ external_identity: identity }), params);
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(200);
+    expect(s.update).toHaveBeenCalledWith(
+      { memberId: 'owner', allowedTenantSlugs: ['acme'] },
+      { memberId: 'carol', externalIdentity: identity }
+    );
+    // A tenant-only write never returns another tenant's membership or SSO metadata.
+    expect(await response.json()).toEqual({ ok: true, version: 'v'.repeat(64) });
+  });
+  it('passes removal, rename, membership revoke and version fields without inventing actor scope', async () => {
+    await PATCH(
+      request({ external_identity_remove: { issuer: 'https://id.example', subject: 'carol' } }),
+      params
+    );
+    expect(s.update).toHaveBeenLastCalledWith(expect.anything(), {
+      memberId: 'carol',
+      removeExternalIdentity: { issuer: 'https://id.example', subject: 'carol' },
+    });
+    await PATCH(request({ display_name: 'Carol human', expected_version: 'reviewed' }), params);
+    expect(s.update).toHaveBeenLastCalledWith(expect.anything(), {
+      memberId: 'carol',
+      displayName: 'Carol human',
+      expectedVersion: 'reviewed',
+    });
+    await PATCH(request({ membership_remove: 'acme' }), params);
+    expect(s.update).toHaveBeenLastCalledWith(expect.anything(), {
+      memberId: 'carol',
+      removeTenantSlug: 'acme',
+    });
+  });
+  it('rejects changed identity context before any core effect', async () => {
+    const response = await PATCH(
+      request({ display_name: 'Carol', expected_context_id: 'b'.repeat(64) }),
+      params
+    );
+    expect(response.status).toBe(403);
+    expect(s.update).not.toHaveBeenCalled();
+  });
+  it.each([
+    { external_identity: 'nope' },
+    { external_identity: { issuer: 'https://id', subject: 42 } },
+    { external_identity: { issuer: 'https://id', subject: 's', extra: 1 } },
+    { display_name: 4 },
+    { tenant_slug: [] },
+    { actor_id: 'user:other' },
+  ])('rejects malformed transport fields %#', async (body) => {
+    expect((await PATCH(request(body), params)).status).toBe(400);
+    expect(s.update).not.toHaveBeenCalled();
+  });
+  it('preserves domain owner/conflict/input status codes', async () => {
+    for (const status of [400, 403, 404, 409]) {
+      s.update.mockRejectedValueOnce(
+        new SurfaceManagementError('domain', status, 'Domain refused')
+      );
+      expect((await PATCH(request({ display_name: 'Carol' }), params)).status).toBe(status);
+    }
+  });
+  it('maps canonical external identity uniqueness failures to 409', async () => {
+    s.update.mockRejectedValueOnce(
+      new Error("external identity 'x#y' is already bound to member 'dave'")
+    );
+    expect(
+      (await PATCH(request({ external_identity: { issuer: 'https://id', subject: 's' } }), params))
+        .status
+    ).toBe(409);
   });
 });

@@ -12,7 +12,45 @@ import {
   parsePersistedPipelineStrategy,
   readJsonObjectRequest,
   readJsonLines,
+  writeJson,
 } from './json.js';
+import { safeReadFile, safeRmSync } from '../secure-io.js';
+
+describe('foundation exclusive JSON writer', () => {
+  const directory = 'active/shared/tmp/foundation-json-exclusive-tests';
+  afterEach(() => safeRmSync(directory, { recursive: true, force: true }));
+
+  it('creates pretty JSON with a final newline and preserves existing reviewed bytes', () => {
+    const file = `${directory}/reviewed.json`;
+    writeJson(file, { digest: 'reviewed' }, { createOnly: true });
+    const original = safeReadFile(file, { encoding: 'utf8' }).toString();
+    expect(original).toBe('{\n  "digest": "reviewed"\n}\n');
+    expect(() => writeJson(file, { digest: 'replacement' }, { createOnly: true })).toThrow();
+    expect(safeReadFile(file, { encoding: 'utf8' }).toString()).toBe(original);
+    writeJson(file, { digest: 'ordinary-update' });
+    expect(safeReadFile(file, { encoding: 'utf8' }).toString()).toContain('ordinary-update');
+  });
+
+  it('fails closed without an exclusive bridge instead of falling back to overwrite', () => {
+    const original = getFoundationIo();
+    let writes = 0;
+    registerFoundationIo({
+      ...original,
+      createExclusiveFile: undefined,
+      writeFile: () => {
+        writes++;
+      },
+    });
+    try {
+      expect(() => writeJson(`${directory}/reviewed.json`, {}, { createOnly: true })).toThrow(
+        'secure_foundation_exclusive_io_not_registered'
+      );
+      expect(writes).toBe(0);
+    } finally {
+      registerFoundationIo(original);
+    }
+  });
+});
 
 describe('foundation safe JSON parser', () => {
   it('accepts safe trees and rejects malformed or dangerous input', () => {

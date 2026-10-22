@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-participant.schema.json",
+  "title": "Organization participant responsibility assignment",
+  "description": "A scoped organizational responsibility. This record grants neither tenant access nor agent execution authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "assignment_id",
+    "organization_id",
+    "tenant_slug",
+    "tier",
+    "actor",
+    "role_ids",
+    "status",
+    "revision",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "assignment_id": { "type": "string", "pattern": "^participant-[a-f0-9]{32}$" },
+    "organization_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tier": { "const": "confidential" },
+    "actor": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "role_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 32,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" }
+    },
+    "status": { "enum": ["active", "removed"] },
+    "revision": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

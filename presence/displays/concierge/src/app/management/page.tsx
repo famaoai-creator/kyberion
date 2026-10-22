@@ -21,6 +21,7 @@ import {
 } from './management-client';
 import { ManagementOverview } from './ManagementOverview';
 import { ManagementEditor } from './ManagementEditor';
+import { OrganizationParticipantsPanel } from './OrganizationParticipantsPanel';
 import '../settings/settings.css';
 import './management.css';
 
@@ -452,6 +453,14 @@ export default function ManagementPage() {
         changeScope={changeScope}
         start={start}
       />
+      {data && scope.organizationId && !denied ? (
+        <OrganizationParticipantsPanel
+          key={data.contextId + ':' + scope.tenant + ':' + scope.organizationId}
+          scope={scope}
+          management={data}
+          disabled={busy || identityChecking || auditRetry !== null}
+        />
+      ) : null}
       {draft && data && !denied ? (
         <ManagementEditor
           verifying={identityChecking}

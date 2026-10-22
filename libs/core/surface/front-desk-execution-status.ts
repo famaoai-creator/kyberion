@@ -46,6 +46,8 @@ export function projectFrontDeskExecution(
         row.front_desk_execution?.work_item_id === binding.work_item_id &&
         row.front_desk_execution.config_digest === binding.config_digest
     );
+    if (action?.status === 'waiting_capacity')
+      return { status: 'queued', text: t('front_desk:execution_queued', {}, options.locale) };
     if (action && ['refused', 'declined', 'shadow'].includes(action.status))
       return {
         status: 'blocked',

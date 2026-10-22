@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authorizeSurfaceMutation } from '@agent/core/surface/surface-mutation-guard';
+import {
+  authorizeSurfaceMutation,
+  surfaceMutationRequestUrl,
+} from '@agent/core/surface/surface-mutation-guard';
 import { isSameOriginMutation } from '@agent/core/surface/surface-session-cookie';
 import {
   checkConciergeRateLimit,
@@ -35,7 +38,7 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
     );
   }
   const decision = authorizeSurfaceMutation({
-    url: req.url,
+    url: surfaceMutationRequestUrl(req),
     getHeader: (name) => req.headers.get(name),
   });
   if (!decision.ok) {

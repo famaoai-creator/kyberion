@@ -164,6 +164,20 @@
   border-radius: var(--kb-ui-radius-sm);
   overflow-wrap: anywhere;
 }
+.settings-member-admin label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+}
+.settings-member-admin select,
+.settings-member-admin input {
+  color: var(--kb-ui-text);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  padding: var(--kb-ui-space-2);
+  max-width: 100%;
+}
 
 @media (max-width: 720px) {
   .settings-row-block,

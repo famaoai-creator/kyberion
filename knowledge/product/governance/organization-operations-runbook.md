@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-07
+last_updated: 2026-10-22
 ---
 
 # Organization operations
@@ -72,6 +72,50 @@ pnpm organization objective kr record --organization-id ORG --tier confidential 
 ## Members and roles
 
 Link a chat or IdP identity to an existing member so team channels resolve the speaker: `pnpm organization member link-identity <member-id> --slack <user-id>` (or `--issuer <iss> --subject <sub>`; `unlink-identity` reverses it). Author roles with `pnpm organization role create --name <name> --domain <domain>` and grant authority with `role promote --role <role-id> --authority <authority-role-id>`.
+
+### People, responsibilities and identities
+
+The local sovereign is the existing `user:owner` human member. Its `is_local_owner` marker joins the people directory to the installation's owner; it does not create a second person. `my-identity.json` remains the personal onboarding profile. Human member display names are managed in the shared member facade.
+
+| Record                              | Meaning                                                                         | Governed operation                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Human member and tenant access role | One `owner`, `approver`, `operator` or `viewer` role per tenant                 | `organization member` and Settings → Organization and members                     |
+| Organization participant            | A human/NHI assigned to an organization, with zero or more responsibility roles | `organization participant` and the selected organization's Management page        |
+| Agent/service NHI                   | Stable identity, accountable human, immutable home organization and lifecycle   | `organization agent`; existing runtime staffing remains responsible for execution |
+
+An identity can participate in multiple organizations in its tenant. Assigning responsibility roles does not alter the member's tenant access or the agent's execution authority. Role identifiers come from `organization participant roles` (the existing team-role catalog). Tenant-scoped participant records live under the organization's existing `active/organizations/confidential/<tenant>/<organization>/participants/` floor. Removed assignments retain a tombstone and revision, so an old draft cannot overwrite a remove/reassign cycle. Cross-tenant assignments are refused.
+
+People management requires a fresh, active registered human owner for the affected tenant and the caller's verified scope. Global member edits (name, status, external identity) require owner access to every tenant the member belongs to. Tenant role edits and membership removal affect only the named tenant. Self suspension, removing one's own owner access, and removing the last active owner are refused. CLI commands do not accept an acting-member parameter.
+
+```bash
+# Human access operations use the same core service as the existing member HTTP routes.
+pnpm organization member list --tenant acme --json
+pnpm organization member create carol --name "Carol" --tenant acme --role viewer --apply
+pnpm organization member update carol --name "Carol Human" --tenant acme --expected-version <member-version> --apply
+pnpm organization member grant carol --tenant acme --role approver --apply
+pnpm organization member revoke carol --tenant acme --apply
+pnpm organization member suspend carol --tenant acme --apply
+pnpm organization member resume carol --tenant acme --apply
+
+# Responsibilities are plural and scoped to each organization.
+pnpm organization participant roles --json
+pnpm organization participant list --tenant acme --organization-id org-a --json
+pnpm organization participant assign --tenant acme --organization-id org-a --actor user:carol --role reviewer --role implementer --apply
+pnpm organization participant set-roles --tenant acme --organization-id org-a --actor user:carol --role reviewer --expected-version <assignment-version> --apply
+pnpm organization participant unassign --tenant acme --organization-id org-a --actor user:carol --expected-version <assignment-version> --apply
+
+# Issue before activation, then use the current version from list/show for every edit.
+pnpm organization agent issue --tenant acme --organization-id org-a --slug helper --accountable-human user:owner --apply
+pnpm organization agent list --tenant acme --organization-id org-a --json
+pnpm organization agent activate --tenant acme --organization-id org-a --nhi-id kyberion://agent/org-a/helper --expected-version <agent-version> --apply
+pnpm organization agent reassign-accountable --tenant acme --organization-id org-a --nhi-id kyberion://agent/org-a/helper --accountable-human user:carol --reason "Owner handover" --expected-version <agent-version> --apply
+pnpm organization agent suspend --tenant acme --organization-id org-a --nhi-id kyberion://agent/org-a/helper --reason "Paused" --expected-version <agent-version> --apply
+pnpm organization agent retire --tenant acme --organization-id org-a --nhi-id kyberion://agent/org-a/helper --reason "Offboarded" --expected-version <agent-version> --apply
+```
+
+New mutation commands show a dry-run unless `--apply` is supplied. For an existing assignment, always pass the exact version returned by `participant list`, including when reactivating a removed assignment. Agent lifecycle/accountability edits require the exact `agent list` / `show` version. Activation also checks the current accountable human and home organization. Suspension and retirement remain available for offboarding. Retirement is terminal; use a new identity slug for a replacement.
+
+When ownership, scope, context or version changes, refresh and review again. The member HTTP list returns a context hash bound to the full authenticated viewer and a version per member; the management UI binds drafts to both. A member PATCH returns only success/version, then the UI refreshes the scoped list. It never returns another tenant's membership data as a mutation receipt. A saved assignment is evidence of organizational responsibility; runtime startup and external action approval continue through their existing facades.
 
 ## Subsidiaries
 

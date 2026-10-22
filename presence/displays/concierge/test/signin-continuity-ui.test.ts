@@ -379,8 +379,8 @@ describe('first-run claim continuity', () => {
     expect(values.get(TOKEN_KEY)).toBe(ISSUED_TOKEN);
     expect(view.textContent).toContain(ISSUED_TOKEN);
     expect(view.querySelector('[data-testid="sso-settings"]')).not.toBeNull();
-    expect(element(view, 'a').getAttribute('href')).toBe('/');
-    expect(view.textContent).toContain('first_run_finish');
+    expect(element(view, 'a').getAttribute('href')).toBe('/setup/company?tenant=fixture-tenant');
+    expect(view.textContent).toContain('company_setup.entry');
     expect(assign).not.toHaveBeenCalled();
   });
 
@@ -423,7 +423,7 @@ describe('first-run claim continuity', () => {
       expect(values.get(TOKEN_KEY)).toBe(ISSUED_TOKEN);
       expect(view.textContent).not.toContain('signin_storage_error');
       expect(view.querySelector('[data-testid="sso-settings"]')).not.toBeNull();
-      expect(element(view, 'a').getAttribute('href')).toBe('/');
+      expect(element(view, 'a').getAttribute('href')).toBe('/setup/company?tenant=fixture-tenant');
     }
   );
 

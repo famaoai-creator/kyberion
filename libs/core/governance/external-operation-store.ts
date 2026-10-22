@@ -11,6 +11,12 @@ import {
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
 import {
+  currentPrPublicationScope,
+  withPrPublicationStoreAccess,
+  PR_PUBLICATION_STORE_ROLE,
+  currentVcsPublicationOperation,
+} from './pr-publication-runtime.js';
+import {
   currentInstalledPersonCharterRuntime,
   withPersonExternalReservationAccess,
 } from './person-charter-runtime.js';
@@ -77,7 +83,18 @@ export function reserveExternalOperation(input: ExternalOperationReservation): v
         }),
         { createOnly: true, mode: 0o600 }
       );
-    if (!input.tenantSlug && currentInstalledPersonCharterRuntime())
+    const publication = currentPrPublicationScope();
+    if (
+      publication &&
+      input.operationId === currentVcsPublicationOperation() &&
+      (publication.kind === 'person'
+        ? !input.tenantSlug
+        : publication.tenant_slug === input.tenantSlug)
+    )
+      withPrPublicationStoreAccess('reservation-write', [], [relative], () =>
+        withExecutionContext(PR_PUBLICATION_STORE_ROLE, write, 'worker', input.tenantSlug)
+      );
+    else if (!input.tenantSlug && currentInstalledPersonCharterRuntime())
       withPersonExternalReservationAccess(relative, () =>
         withExecutionContext('person_charter_store', write, 'worker')
       );

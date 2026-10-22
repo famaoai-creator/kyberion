@@ -1,6 +1,6 @@
 {
   "actuator_id": "vcs-actuator",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Governed VCS surface: git (status/diff/log/branch/commit/push/fetch/pull/checkout/worktree) plus GitHub PR ops via gh (pr_create/pr_view/pr_list/pr_checks watch/pr_merge/repo_view/gh_status)",
   "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
   "resilience_tier": "adaptive_retry",

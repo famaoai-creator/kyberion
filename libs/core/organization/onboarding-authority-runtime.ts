@@ -12,7 +12,11 @@ import {
 import type { CharterScope } from '../governance/accountability-charter.js';
 import { inspectInstalledOnboardingRuntime } from './onboarding-runtime-identity.js';
 
-export function withInstalledOnboardingAuthority<T>(invocationId: string, action: () => T): T {
+export function withInstalledOnboardingAuthority<T>(
+  invocationId: string,
+  action: () => T,
+  options: { bindEffectIdentity?: boolean } = {}
+): T {
   if (hasExternalOperationAuthority()) return action();
   const source = currentScopeEnvelope()?.identity ?? resolveScopeContext();
   const scope: CharterScope = source.tenant_slug
@@ -32,6 +36,7 @@ export function withInstalledOnboardingAuthority<T>(invocationId: string, action
         agentId: installed.agentId,
         ownerActor: installed.ownerId,
         invocationId,
+        bindEffectIdentity: options.bindEffectIdentity,
       }),
       action
     );
