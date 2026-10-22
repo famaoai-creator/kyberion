@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import { computeApprovalPresentedDigest } from '../governance/approval-presentation.js';
 
 type ApprovalFixture = {
   status: string;
@@ -23,6 +24,7 @@ const fixture = vi.hoisted(() => ({
   explicitScope: {} as Record<string, string>,
   claim: vi.fn(),
   complete: vi.fn(),
+  policyFloor: undefined as 'A3' | undefined,
 }));
 vi.mock('../path-resolver.js', () => ({ pathResolver: { rootDir: () => '/canonical' } }));
 vi.mock('../secure-io.js', () => ({
@@ -75,7 +77,13 @@ vi.mock('../governance/external-operation.js', () => ({
 }));
 vi.mock('../shell/sandbox-policy.js', () => ({ getPluginExecutionContext: () => undefined }));
 vi.mock('../workforce/artifact-store.js', () => ({ writeScopedArtifact: fixture.artifact }));
-vi.mock('../governance/approval-store.js', () => ({
+vi.mock('../organization/member-registry.js', () => ({
+  ownerAccountableHumanId: () => 'user:owner',
+}));
+vi.mock('../governance/approval-policy.js', () => ({
+  resolvePolicyAssuranceFloor: () => fixture.policyFloor,
+}));
+vi.mock('../governance/approval-store.js', async () => ({
   loadApprovalRequest: () => fixture.approval,
   assertApprovalUsable: fixture.usable,
   createApprovalRequest: fixture.createApproval,
@@ -84,6 +92,8 @@ vi.mock('../governance/approval-store.js', () => ({
   claimApprovalApply: fixture.claim,
   recordApprovalApplyResult: fixture.complete,
   computeApprovalPayloadHash: () => 'record-hash',
+  computeApprovalPresentedDigest: (await import('../governance/approval-presentation.js'))
+    .computeApprovalPresentedDigest,
 }));
 
 import {
@@ -111,11 +121,47 @@ function authorize(plan: ReturnType<typeof previewPublicationRoleMigration>): Ap
   fixture.approval = approval;
   return approval;
 }
+function legacyApproval(
+  plan: ReturnType<typeof previewPublicationRoleMigration>
+): ApprovalRequestRecord {
+  const record: ApprovalRequestRecord = {
+    id: 'legacy',
+    kind: 'channel-approval',
+    title: 'Reviewed migration',
+    summary: 'Exact catalog delta',
+    channel: 'terminal',
+    storageChannel: 'terminal',
+    threadTs: plan.digest,
+    correlationId: plan.requestedEffect,
+    requestedBy: 'agent:codex',
+    requestedAt: '2026-10-22T00:00:00.000Z',
+    status: 'approved',
+    decidedBy: 'user:owner',
+    decidedByType: 'human',
+    authenticated: true,
+    decidedAuthMethod: 'terminal_attested',
+    accountability: { finalDecision: 'human_only', min_assurance: 'A2' },
+    workflow: {
+      workflowId: 'installation-publication-role-migration',
+      mode: 'all_required',
+      requiredRoles: ['human'],
+      stages: [{ stageId: 'human', requiredRoles: ['human'] }],
+      approvals: [{ role: 'human', status: 'pending' }],
+    },
+    justification: {
+      reason: 'Reviewed exact migration',
+      requestedEffects: [plan.requestedEffect, ...plan.changes.map((entry) => entry.path)],
+    },
+  };
+  record.verifiedPresentedDigest = computeApprovalPresentedDigest(record);
+  return record;
+}
 beforeEach(() => {
   fixture.files.clear();
   fixture.source = {};
   fixture.approval = undefined;
   fixture.requests = [];
+  fixture.policyFloor = undefined;
   fixture.bound = false;
   fixture.explicitScope = {};
   fixture.audit.mockReset();
@@ -178,6 +224,64 @@ beforeEach(() => {
   });
 });
 describe('explicit installation publication role migration', () => {
+  it('accepts only the exact legacy pending slot backed by the canonical owner presented decision, once', () => {
+    const plan = previewPublicationRoleMigration('/source');
+    fixture.approval = legacyApproval(plan) as ApprovalFixture;
+    applyPublicationRoleMigration('/source', { approvalId: 'legacy', expectedDigest: plan.digest });
+    expect(fixture.writes).toHaveBeenCalledTimes(7);
+    expect(fixture.claim).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    'missing_digest',
+    'tampered_digest',
+    'tampered_payload',
+    'extra_role',
+    'rejected_slot',
+    'extra_stage',
+    'nonhuman',
+    'unauthenticated',
+    'foreign_owner',
+    'wrong_auth',
+    'caller_supplied',
+    'assurance_shortfall',
+    'A3',
+    'policy_A3',
+  ])('refuses legacy compatibility with %s', (condition) => {
+    const plan = previewPublicationRoleMigration('/source');
+    const record = legacyApproval(plan);
+    if (condition === 'missing_digest') delete record.verifiedPresentedDigest;
+    if (condition === 'tampered_digest') record.verifiedPresentedDigest = '0'.repeat(64);
+    if (condition === 'tampered_payload') record.summary = 'changed after presentation';
+    if (condition === 'extra_role') record.workflow!.requiredRoles.push('reviewer');
+    if (condition === 'rejected_slot') record.workflow!.approvals[0].status = 'rejected';
+    if (condition === 'extra_stage')
+      record.workflow!.stages.push({ stageId: 'extra', requiredRoles: ['reviewer'] });
+    if (condition === 'nonhuman') record.decidedByType = 'ai_agent';
+    if (condition === 'unauthenticated') record.authenticated = false;
+    if (condition === 'foreign_owner') record.decidedBy = 'user:someone-else';
+    if (condition === 'wrong_auth') record.decidedAuthMethod = 'manual';
+    if (condition === 'caller_supplied') record.decidedByIdentitySource = 'caller_supplied';
+    if (condition === 'assurance_shortfall')
+      record.assuranceShortfall = {
+        required: 'A3',
+        provided: 'A2',
+        authMethod: 'terminal_attested',
+        mode: 'warn',
+      };
+    if (condition === 'A3') record.accountability!.min_assurance = 'A3';
+    if (condition === 'policy_A3') fixture.policyFloor = 'A3';
+    // A3 is deliberately not part of the historical presented digest; the
+    // assurance floor must still reject it independently of presentation.
+    fixture.approval = record as ApprovalFixture;
+    expect(() =>
+      applyPublicationRoleMigration('/source', {
+        approvalId: 'legacy',
+        expectedDigest: plan.digest,
+      })
+    ).toThrow('authenticated human');
+    expect(fixture.writes).not.toHaveBeenCalled();
+    expect(fixture.claim).not.toHaveBeenCalled();
+  });
   it('queues a concrete pending human decision without applying the reviewed plan', () => {
     const plan = previewPublicationRoleMigration('/source');
     const result = requestPublicationRoleMigrationApproval('/source', {
@@ -191,6 +295,11 @@ describe('explicit installation publication role migration', () => {
         storageChannel: 'terminal',
         requestedBy: 'agent:codex',
         accountability: { finalDecision: 'human_only' },
+        workflow: expect.objectContaining({
+          requiredRoles: ['sovereign'],
+          stages: [{ stageId: 'sovereign', requiredRoles: ['sovereign'] }],
+          approvals: [{ role: 'sovereign', status: 'pending' }],
+        }),
         justification: expect.objectContaining({
           requestedEffects: [plan.requestedEffect, ...plan.changes.map((entry) => entry.path)],
         }),
@@ -238,6 +347,22 @@ describe('explicit installation publication role migration', () => {
     record.workflow!.approvals = [
       { role: 'human', status: 'approved', decidedByType: 'human', authenticated: true },
     ];
+    expect(
+      requestPublicationRoleMigrationApproval('/source', {
+        expectedDigest: plan.digest,
+        requestedBy: 'agent:codex',
+      })
+    ).toMatchObject({ reused: true, status: 'ready_to_apply' });
+    const legacy = legacyApproval(plan);
+    Object.assign(record, {
+      kind: legacy.kind,
+      decidedBy: legacy.decidedBy,
+      decidedByType: legacy.decidedByType,
+      authenticated: legacy.authenticated,
+      decidedAuthMethod: legacy.decidedAuthMethod,
+      workflow: legacy.workflow,
+    });
+    record.verifiedPresentedDigest = computeApprovalPresentedDigest(record);
     expect(
       requestPublicationRoleMigrationApproval('/source', {
         expectedDigest: plan.digest,

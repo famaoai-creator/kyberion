@@ -40,6 +40,8 @@ Apply は最新 preview と digest を照合し、既存の異なる定義・明
 
 ## 運用上の確認
 
+新しい request の唯一の workflow role は CLI の決定 role と同じ `sovereign` とする。過去に作成した唯一の `human` pending slot に CLI が sovereign として承認した記録は変更・再承認しない。exact legacy workflow の場合に限り、top-level approved、canonical owner の authenticated human / terminal_attested、提示済み digest の完全一致、現在の assurance floor が A2 以下であることを再確認して利用する。追加・拒否済み role/stage、digest 不一致、A3 要求は拒否し、通常の SoD・revocation・exact effect・apply claim/replay 制約は維持する。
+
 Apply は catalog の変更前に canonical approval store へ一回限りの application claim を永続化し、成功・失敗の結果を保存する。途中失敗や receipt の記録失敗でも claim は解除しない。後で catalog を元の bytes に戻して同じ digest を再現しても、古い approval で権限を再付与できない。必要な再実行は実ファイルと claim/result を確認し、新しい human approval を取得する。
 
 Apply は installation catalog の保守作業として実施する。同時に `organization role create/promote`、role catalog の生成・同期、手動 policy 更新を行わない。migration 同士は lock で直列化し、各ファイルの書き込み直前にも before hash を照合するが、既存の全 catalog writer が共通 lock を使用しているわけではない。

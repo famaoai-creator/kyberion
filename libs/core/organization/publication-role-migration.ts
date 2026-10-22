@@ -11,12 +11,23 @@ import {
   assertApprovalUsable,
   claimApprovalApply,
   computeApprovalPayloadHash,
+  computeApprovalPresentedDigest,
   createApprovalRequest,
   isApprovalRequestExpired,
   listApprovalRequests,
   loadApprovalRequest,
   recordApprovalApplyResult,
+  type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
+import {
+  APPROVAL_CHANNEL_MIN_ASSURANCE,
+  assuranceMeets,
+  assuranceOfAuthMethod,
+  isApprovalAssuranceLevel,
+  strongerAssurance,
+} from '../governance/approval-assurance.js';
+import { resolvePolicyAssuranceFloor } from '../governance/approval-policy.js';
+import { ownerAccountableHumanId } from './member-registry.js';
 import { nowIso } from '../foundation/time.js';
 import { resolvePromotionTargetRoot } from '../knowledge/memory-promotion-git.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
@@ -326,12 +337,7 @@ export function applyPublicationRoleMigration(
         !approval ||
         approval.status !== 'approved' ||
         approval.accountability?.finalDecision !== 'human_only' ||
-        !approval.workflow?.approvals?.some(
-          (entry) =>
-            entry.status === 'approved' &&
-            entry.decidedByType === 'human' &&
-            entry.authenticated === true
-        ) ||
+        !hasMigrationHumanDecision(approval) ||
         !effects.includes(plan.requestedEffect) ||
         !plan.changes.every((entry) => effects.includes(entry.path))
       )
@@ -432,6 +438,55 @@ export function applyPublicationRoleMigration(
   );
 }
 
+/** Recognize only the historical single pending-human slot left by the CLI's sovereign decision. */
+function hasMigrationHumanDecision(record: ApprovalRequestRecord): boolean {
+  if (
+    record.workflow?.approvals?.some(
+      (entry) =>
+        entry.status === 'approved' &&
+        entry.decidedByType === 'human' &&
+        entry.authenticated === true
+    )
+  )
+    return true;
+  const legacy = {
+    workflowId: 'installation-publication-role-migration',
+    mode: 'all_required',
+    requiredRoles: ['human'],
+    stages: [{ stageId: 'human', requiredRoles: ['human'] }],
+    approvals: [{ role: 'human', status: 'pending' }],
+  };
+  if (
+    record.status !== 'approved' ||
+    record.kind !== 'channel-approval' ||
+    record.channel !== 'terminal' ||
+    record.storageChannel !== 'terminal' ||
+    stable(record.workflow) !== stable(legacy) ||
+    record.decidedByType !== 'human' ||
+    record.authenticated !== true ||
+    record.decidedBy !== ownerAccountableHumanId() ||
+    (record.decidedByIdentitySource !== undefined &&
+      record.decidedByIdentitySource !== 'server_resolved') ||
+    record.assuranceShortfall ||
+    record.decidedAuthMethod !== 'terminal_attested' ||
+    !record.verifiedPresentedDigest ||
+    record.verifiedPresentedDigest !== computeApprovalPresentedDigest(record)
+  )
+    return false;
+  const minimum = record.accountability?.min_assurance ?? 'A2';
+  if (!isApprovalAssuranceLevel(minimum)) return false;
+  let required = strongerAssurance(minimum, 'A2');
+  const channelFloor = APPROVAL_CHANNEL_MIN_ASSURANCE[record.channel];
+  if (channelFloor) required = strongerAssurance(required, channelFloor);
+  const policyFloor = resolvePolicyAssuranceFloor({
+    ruleId: record.accountability?.policy_rule_id,
+    effectBinding: record.accountability?.effectBinding,
+  });
+  if (policyFloor) required = strongerAssurance(required, policyFloor);
+  const provided = assuranceOfAuthMethod(record.decidedAuthMethod);
+  return provided !== undefined && assuranceMeets(provided, required);
+}
+
 /** Open a human decision; this does not apply the catalog migration. */
 export function requestPublicationRoleMigrationApproval(
   sourceRoot: string,
@@ -505,15 +560,7 @@ export function requestPublicationRoleMigrationApproval(
         )
           continue;
         if (candidate.status === 'approved') {
-          if (
-            !candidate.workflow.approvals.some(
-              (entry) =>
-                entry.status === 'approved' &&
-                entry.decidedByType === 'human' &&
-                entry.authenticated === true
-            )
-          )
-            continue;
+          if (!hasMigrationHumanDecision(candidate)) continue;
           try {
             assertApprovalUsable(candidate, {
               consumer: 'installation_publication_role_migration',
@@ -564,9 +611,9 @@ export function requestPublicationRoleMigrationApproval(
         workflow: {
           workflowId: 'installation-publication-role-migration',
           mode: 'all_required',
-          requiredRoles: ['human'],
-          stages: [{ stageId: 'human', requiredRoles: ['human'] }],
-          approvals: [{ role: 'human', status: 'pending' }],
+          requiredRoles: ['sovereign'],
+          stages: [{ stageId: 'sovereign', requiredRoles: ['sovereign'] }],
+          approvals: [{ role: 'sovereign', status: 'pending' }],
         },
       });
       return {

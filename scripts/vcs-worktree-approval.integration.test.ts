@@ -27,13 +27,18 @@ if (input.action === 'migrate') {
   const { withExecutionContext } = await mod('authority');
   const { safeReadFile, safeExistsSync, safeWriteFile, safeRmSync } = await mod('secure-io');
   const { withScopeEnvOnly } = await mod('scope-context');
-  const { loadApprovalRequest } = await mod('governance/approval-store');
+  const { loadApprovalRequest, approvalRequestLogicalPath } = await mod('governance/approval-store');
+  const { writeGovernedArtifactJson } = await mod('workforce/artifact-store');
   const { previewPublicationRoleMigration, applyPublicationRoleMigration, requestPublicationRoleMigrationApproval } = await mod('organization/publication-role-migration');
   output = withExecutionContext('ecosystem_architect', () => {
     const plan = previewPublicationRoleMigration(input.sourceRoot);
     const previewUnchanged = plan.changes.every((change) => change.before === (safeExistsSync(input.canonical + '/' + change.path) ? safeReadFile(input.canonical + '/' + change.path, 'utf8') : null));
     const request = requestPublicationRoleMigrationApproval(input.sourceRoot, {expectedDigest: plan.digest, requestedBy: 'fixture-role-migration'});
-    const approval = loadApprovalRequest('terminal', request.approvalId);
+    let approval = loadApprovalRequest('terminal', request.approvalId);
+    // Reproduce the already-issued historical workflow, rather than changing
+    // or re-deciding any live request. New helper requests use sovereign slots.
+    approval.workflow = { workflowId: 'installation-publication-role-migration', mode: 'all_required', requiredRoles: ['human'], stages: [{ stageId: 'human', requiredRoles: ['human'] }], approvals: [{ role: 'human', status: 'pending' }] };
+    withScopeEnvOnly(() => writeGovernedArtifactJson('infrastructure_sentinel', approvalRequestLogicalPath('terminal', approval.id), approval));
     if (!approval || approval.accountability.finalDecision !== 'human_only') throw new Error('Migration did not create a canonical human-only decision');
     if (!request.reviewPath.includes('/active/shared/artifacts/personal/shared/')) throw new Error('Full migration review is not in the protected personal artifact floor');
     const protectedReview = withScopeEnvOnly(() => JSON.parse(safeReadFile(request.reviewPath, 'utf8')));
@@ -43,7 +48,11 @@ if (input.action === 'migrate') {
     try { applyPublicationRoleMigration(input.sourceRoot, {approvalId: approval.id, expectedDigest: plan.digest}); }
     catch (error) { pendingBlocked = error.message.includes('authenticated human approval'); }
     if (!pendingBlocked) throw new Error('Migration admitted a pending nonhuman decision');
-    decideApprovalRequest('mission_controller', { channel: approval.channel, storageChannel: approval.storageChannel, requestId: approval.id, decision: 'approved', decidedBy: 'user:owner', decidedByType: 'human', authenticated: true, authMethod: 'terminal_attested', deciderIdentitySource: 'server_resolved', presentedDigest: computeApprovalPresentedDigest(approval), payloadHash: approval.accountability.payloadHash, effectBinding: approval.accountability.effectBinding });
+    decideApprovalRequest('mission_controller', { channel: approval.channel, storageChannel: approval.storageChannel, requestId: approval.id, decision: 'approved', decidedBy: 'user:owner', decidedByRole: 'sovereign', decidedByType: 'human', authenticated: true, authMethod: 'terminal_attested', presentedDigest: computeApprovalPresentedDigest(approval), payloadHash: approval.accountability.payloadHash, effectBinding: approval.accountability.effectBinding });
+    approval = loadApprovalRequest('terminal', approval.id);
+    if (approval.status !== 'approved' || approval.workflow.approvals.length !== 1 || approval.workflow.approvals[0].status !== 'pending' || approval.decidedByIdentitySource) throw new Error('Fixture failed to reproduce the actual legacy human-pending sovereign decision');
+    const reusable = requestPublicationRoleMigrationApproval(input.sourceRoot, {expectedDigest: plan.digest, requestedBy: 'fixture-role-migration'});
+    if (!reusable.reused || reusable.status !== 'ready_to_apply' || reusable.approvalId !== approval.id) throw new Error('Existing presented human decision was not reused');
     const applied = applyPublicationRoleMigration(input.sourceRoot, { approvalId: approval.id, expectedDigest: plan.digest });
     // A deliberate installation rollback must not resurrect the old human
     // authorization. This fixture restores bytes only inside its isolated root.
