@@ -86,6 +86,19 @@ describe('member-registry', () => {
   });
 
   describe('write / read / list', () => {
+    it('rejects multiple tenant access roles while organizational responsibilities remain separate', () => {
+      expect(() =>
+        writeMemberProfile(
+          makeMember({
+            memberships: [
+              { tenant_slug: 'acme-corp', role: 'owner' },
+              { tenant_slug: 'acme-corp', role: 'viewer' },
+            ],
+          }),
+          { rootDir: fixtureRoot }
+        )
+      ).toThrow(/one access role per tenant/);
+    });
     it('round-trips a member profile', () => {
       const written = writeMemberProfile(makeMember(), { rootDir: fixtureRoot });
       const read = readMemberProfile('alice', { rootDir: fixtureRoot });

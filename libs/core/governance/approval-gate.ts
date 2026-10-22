@@ -36,6 +36,7 @@ import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
+import type { EventScopeInput } from '../event-scope.js';
 import {
   isCharterEligiblePolicy,
   runCharterGate,
@@ -85,6 +86,10 @@ export interface ApprovalGateParams {
    * intentionally treated as unknown for backwards compatibility.
    */
   hasHuman?: boolean;
+  /** Trusted host explicitly requests a durable decision; this does not attest human presence. */
+  enqueueRequest?: boolean;
+  /** Trusted viewer/entity scope for the durable request, separate from payload.scope policy labels. */
+  requestScope?: EventScopeInput;
   /** Optional UI capability signal used by callers that model a surface separately. */
   hasUI?: boolean;
   /** Explicit non-interactive mode signal; stronger than an inferred TTY. */
@@ -676,7 +681,7 @@ export function enforceApprovalGate(
   const draft =
     params.draft ?? buildApprovalDraft({ operationId, agentId, correlationId, payload, intentId });
 
-  if (hasHuman(params) === false) {
+  if (hasHuman(params) === false && params.enqueueRequest !== true) {
     const reason =
       'Human approval is required, but this execution boundary has no interactive human present.';
     auditChain.record({
@@ -713,6 +718,7 @@ export function enforceApprovalGate(
     ...(params.kind ? { kind: params.kind } : {}),
     ...(params.requestedByContext ? { requestedByContext: params.requestedByContext } : {}),
     draft,
+    ...(params.requestScope ? { scope: params.requestScope } : {}),
     source: params.source,
     accountability: {
       finalDecision: 'human_only',

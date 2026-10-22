@@ -54,7 +54,7 @@ export interface OnboardingAuthorityInput {
   tenant_slug?: string;
   grants: ExternalOperationGrant[];
   expires_at: string;
-  mode: 'grant' | 'revoke';
+  mode: 'grant' | 'revoke' | 'activate';
   renew_existing?: boolean;
 }
 interface Plan {
@@ -112,7 +112,10 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
   const allowed = ['scope_kind', 'tenant_slug', 'grants', 'expires_at', 'mode', 'renew_existing'];
   if (Object.keys(value).some((k) => !allowed.includes(k))) return deny('unknown plan field');
   const grants = parseExternalOperationGrants(value.grants);
-  if (!grants?.length) return deny('choose at least one exact operation and target');
+  if (!grants || (value.mode !== 'activate' && !grants.length))
+    return deny('choose at least one exact operation and target');
+  if (value.mode === 'activate' && grants.length)
+    return deny('activation-only consent must not include external grants');
   const expires = typeof value.expires_at === 'string' ? Date.parse(value.expires_at) : NaN;
   if (
     !Number.isFinite(expires) ||
@@ -120,8 +123,8 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
     expires > now.getTime() + 365 * 86_400_000
   )
     return deny('expiry must be in the next 365 days');
-  if (value.mode !== 'grant' && value.mode !== 'revoke')
-    return deny('mode must be grant or revoke');
+  if (value.mode !== 'grant' && value.mode !== 'revoke' && value.mode !== 'activate')
+    return deny('mode must be grant, revoke or activate');
   if (value.renew_existing !== undefined && typeof value.renew_existing !== 'boolean')
     return deny('renew_existing must be boolean');
   return {
@@ -147,6 +150,10 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
       : undefined;
   const live = findActiveCharter(scope, now, options);
   const active = live ?? findLatestCharterForRenewal(scope, options);
+  if (input.mode === 'activate' && (!runtime?.activate || active || input.renew_existing))
+    return deny(
+      'activation-only consent requires a provisioned identity without an existing charter'
+    );
   if (active && !live && !input.renew_existing)
     return deny(
       'expired or retired charter requires explicit renew_existing consent and full limits review'
@@ -170,7 +177,8 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
         money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
         data_tier: { read: ['public'], write: [] },
         external_effects: {},
-        irreversible: 'named_actions_only' as const,
+        irreversible:
+          input.mode === 'activate' ? ('forbid' as const) : ('named_actions_only' as const),
       };
   envelope.external_operations = grants;
   if (input.mode === 'grant' && envelope.irreversible !== 'allow') {
@@ -216,11 +224,16 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
         },
   };
   const statement = [
-    `Receiving execution agent requests this delegation: ${runtime?.agent_id ?? 'not installed'}`,
+    `Receiving execution agent requests this ${input.mode === 'activate' ? 'activation' : 'delegation'}: ${runtime?.agent_id ?? 'not installed'}`,
     `Initiated by: ${principal.requesterId}; this is owner consent, not independent substantive review.`,
     `Accountable human: ${accountable.display_name} (${accountable.id})`,
     `Scope: ${scope.kind === 'person' ? 'person (no tenant)' : scope.tenant_slug}`,
     `Change: ${input.mode}`,
+    ...(input.mode === 'activate'
+      ? [
+          'Activate the reviewed execution identity only. No standing external operation is granted; outbound effects still require individual approval. Risk ceiling B does not grant an operation or target.',
+        ]
+      : []),
     ...input.grants.map((g) => JSON.stringify(g)),
     `Expires: ${expires_at}`,
     ...(active && !live
@@ -237,7 +250,11 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
         ]
       : []),
     'Standing execution is restricted to verified public-data work. Connection authentication is separate.',
-    'Target-scoped operations have reputational class B. URL queries and fragments require individual approval.',
+    ...(input.mode === 'activate'
+      ? []
+      : [
+          'Target-scoped operations have reputational class B. URL queries and fragments require individual approval.',
+        ]),
     'Arbitrary browser click/evaluate/submit and GitHub merge are not delegated.',
     'Existing unrelated grants, limits and restrictions are retained; replacement follows the canonical charter lifecycle.',
     `Replaces: ${active?.charter_id ?? 'none'}; existing charter fingerprint: ${base_hash}`,
@@ -308,7 +325,10 @@ export function requestOnboardingAuthority(
     },
     draft: {
       title: 'Onboarding action authority',
-      summary: `${plan.input.mode}: ${plan.input.grants.map((g) => g.operation_id).join(', ')}`,
+      summary:
+        plan.input.mode === 'activate'
+          ? 'Activate the installed execution identity without standing external grants'
+          : `${plan.input.mode}: ${plan.input.grants.map((g) => g.operation_id).join(', ')}`,
       details: plan.statement,
       severity: 'high',
     },

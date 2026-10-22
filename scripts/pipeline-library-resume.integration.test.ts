@@ -5,6 +5,12 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import {
+  currentScopeEnvelope,
+  mintScopeEnvelope,
+  withScopeEnvelope,
+} from '@agent/core/scope-envelope';
+import { withScopeEnvOnly } from '@agent/core/scope-context';
+import {
   cancelApprovalRequest,
   decideApprovalRequest,
   expireApprovalRequest,
@@ -82,10 +88,15 @@ describe('protected library execution approval continuation', () => {
               op: 'core:transform',
               params: { input: 21, script: 'return Number(input) * 2;', export_as: 'answer' },
             },
+            { id: 'after', role: 'sink', op: 'system:log', params: { message: `after-${id}` } },
           ],
         })
       );
-      const log = vi.spyOn(logger, 'info');
+      const observedPolicies: unknown[] = [];
+      const log = vi.spyOn(logger, 'info').mockImplementation((...args) => {
+        if (String(args[0]).includes(`after-${id}`))
+          observedPolicies.push(currentScopeEnvelope()?.policy);
+      });
       setWorkCoordinationNamespace(`library-resume-${id}`);
       await withExecutionContextAsync(
         'mission_controller',
@@ -109,18 +120,39 @@ describe('protected library execution approval continuation', () => {
             agentId: 'library-worker',
             attemptId: claimed.item.current_attempt_id!,
           };
-          const pending = await executePipelineFile(file, {
-            delegatedExecution: 'require',
-            delegatedWorkItem: owner,
-            payloadScope: {
-              tier: 'confidential',
-              tenant_slug: tenant,
-              purpose: 'library continuation integration',
-            },
-            trustResolved: true,
-            hasHuman: false,
-            quiet: true,
-          });
+          const sourcePolicy = {
+            read_tiers: ['public', 'confidential'] as const,
+            write_tier: 'confidential' as const,
+            purpose: 'original restricted continuation',
+            external_egress: 'deny' as const,
+            allowed_reasoning_backends: ['local-model'],
+          };
+          const sourceEnvelope = withScopeEnvOnly(() =>
+            mintScopeEnvelope({
+              identity: {
+                tier: 'confidential',
+                tenant_slug: tenant,
+                session_id: `source:${id}`,
+                work_shape: 'pipeline',
+              },
+              env: {},
+              policy: sourcePolicy,
+            })
+          );
+          const pending = await withScopeEnvelope(sourceEnvelope, () =>
+            executePipelineFile(file, {
+              delegatedExecution: 'require',
+              delegatedWorkItem: owner,
+              payloadScope: {
+                tier: 'confidential',
+                tenant_slug: tenant,
+                purpose: 'library continuation integration',
+              },
+              trustResolved: true,
+              hasHuman: false,
+              quiet: true,
+            })
+          );
           expect(pending.status).toBe('suspended');
           if (pending.status !== 'suspended') throw new Error('expected approval suspension');
           const journal = loadPipelineRunJournal(pending.runId, undefined, {
@@ -133,8 +165,9 @@ describe('protected library execution approval continuation', () => {
           expect(journal.started?.library_execution?.scope_identity).toMatchObject({
             tenant_slug: tenant,
             tier: 'confidential',
-            session_id: `pipeline:${pending.runId}`,
+            session_id: `source:${id}`,
           });
+          expect(journal.started?.execution_authority?.scope_policy).toEqual(sourcePolicy);
           releaseWorkItem({
             itemId: id,
             leaseId: claimed.lease.lease_id,
@@ -187,6 +220,13 @@ describe('protected library execution approval continuation', () => {
           });
           expect(completed.status).toBe(decision === 'approved' ? 'succeeded' : 'aborted');
           expect(completed.context.answer).toBe(decision === 'approved' ? 42 : undefined);
+          if (decision === 'approved')
+            expect(observedPolicies).toEqual([
+              expect.objectContaining({
+                external_egress: 'deny',
+                allowed_reasoning_backends: ['local-model'],
+              }),
+            ]);
           expect(
             log.mock.calls.filter((args) => String(args[0]).includes(`before-${id}`))
           ).toHaveLength(1);

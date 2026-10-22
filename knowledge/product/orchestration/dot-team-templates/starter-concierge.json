@@ -33,8 +33,7 @@
   "authority": {
     "authority_role": "infrastructure_sentinel",
     "allowed_work_shapes": ["direct_reply"],
-    "allowed_pipelines": [],
-    "max_concurrent_delegations": 1
+    "allowed_pipelines": []
   },
   "decisions": {
     "default_decision": "approve",

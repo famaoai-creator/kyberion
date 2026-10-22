@@ -20,6 +20,8 @@ import {
   ensureAgentIdentityBestEffort,
   ensureAgentIdentityProvisioned,
   getAgentIdentity,
+  getAgentIdentityRevision,
+  reassignAgentIdentityAccountability,
   issueAgentIdentity,
   listAgentIdentities,
   parseNhiId,
@@ -218,6 +220,50 @@ describe('agent-identity — fail-closed execution-context gate', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — accountable ownership and uniqueness', () => {
+  it('journals accountable transfers without changing identity/home and fences stale and retired transfers', () => {
+    const original = issueTestIdentity('accountable-transfer', {
+      accountableHumanId: 'user:owner',
+      affiliation: { tenant_slug: 'acme' },
+    });
+    const before = getAgentIdentityRevision(original.nhi_id);
+    const next = withExecutionContext('mission_controller', () =>
+      reassignAgentIdentityAccountability({
+        nhiId: original.nhi_id,
+        accountableHumanId: 'user:alice',
+        expectedAccountableHumanId: 'user:owner',
+        reason: 'Owner handover',
+      })
+    );
+    expect(next.nhi_id).toBe(original.nhi_id);
+    expect(next.affiliation).toEqual(original.affiliation);
+    expect(next.accountable_human_id).toBe('user:alice');
+    expect(getAgentIdentityRevision(original.nhi_id)).toBeGreaterThan(before);
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        reassignAgentIdentityAccountability({
+          nhiId: original.nhi_id,
+          accountableHumanId: 'user:carol',
+          expectedAccountableHumanId: 'user:owner',
+          reason: 'Stale',
+        })
+      )
+    ).toThrow(AgentIdentityConflictError);
+    resetAgentIdentityServiceForTests(currentJournalPath);
+    expect(getAgentIdentity(original.nhi_id)?.accountable_human_id).toBe('user:alice');
+    withExecutionContext('mission_controller', () =>
+      retireAgentIdentity(original.nhi_id, 'Offboard')
+    );
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        reassignAgentIdentityAccountability({
+          nhiId: original.nhi_id,
+          accountableHumanId: 'user:owner',
+          expectedAccountableHumanId: 'user:alice',
+          reason: 'Too late',
+        })
+      )
+    ).toThrow(AgentIdentityLifecycleError);
+  });
   it('agent issuance without accountable_human_id fails closed', () => {
     expect(() =>
       withExecutionContext('mission_controller', () =>

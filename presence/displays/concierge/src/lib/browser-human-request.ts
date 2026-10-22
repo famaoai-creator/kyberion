@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { workspaceConversationViewer } from './workspace-conversation';
 import {
   authorizeSurfaceMutation,
+  surfaceMutationRequestUrl,
   extractSurfaceBearerToken,
   SurfaceViewerScopeError,
 } from '@agent/core/surface/surface-mutation-guard';
@@ -80,7 +81,7 @@ export function prepareConciergeHumanRequest(req: NextRequest, mutation: boolean
     )
       return { response: denied() };
     const transport = authorizeSurfaceMutation({
-      url: req.url,
+      url: surfaceMutationRequestUrl(req),
       getHeader: (name) => req.headers.get(name),
     });
     if (!transport.ok)

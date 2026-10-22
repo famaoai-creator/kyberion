@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { writeJson as writeGovernedJson } from '@agent/core/foundation/json';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
@@ -8,7 +9,15 @@ import {
   ownerAccountableHumanId,
   writeMemberProfile,
 } from '@agent/core/organization/member-registry';
-import { onboardingAgentIdentityParameters } from '@agent/core/organization/onboarding-runtime-identity';
+import {
+  onboardingAgentIdentityParameters,
+  inspectInstalledOnboardingRuntime,
+} from '@agent/core/organization/onboarding-runtime-identity';
+import {
+  findActiveCharter,
+  findLatestCharterForRenewal,
+} from '@agent/core/governance/accountability-charter-registry';
+import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
@@ -109,6 +118,53 @@ function statePath(): string {
 
 function summaryPath(): string {
   return path.join(onboardingRoot(), 'onboarding-summary.md');
+}
+
+export function buildActivationInput(now: Date) {
+  return {
+    scope_kind: 'person' as const,
+    mode: 'activate' as const,
+    grants: [],
+    expires_at: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+  };
+}
+
+function activationInputPath(): string {
+  return path.join(onboardingRoot(), 'activation-input.json');
+}
+
+export interface ActivationSetup {
+  status: 'activation_available' | 'identity_active' | 'existing_authority' | 'unavailable';
+  input_path?: string;
+}
+
+export async function prepareActivationSetup(now: Date): Promise<ActivationSetup> {
+  const runtime = inspectInstalledOnboardingRuntime({ kind: 'person' });
+  if (!runtime.ready) return { status: 'unavailable' };
+  if (runtime.agentActive) return { status: 'identity_active' };
+  const existing = withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      findActiveCharter({ kind: 'person' }, now) ?? findLatestCharterForRenewal({ kind: 'person' })
+  );
+  if (existing) return { status: 'existing_authority' };
+  await withLock('onboarding-activation-input', async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      const file = activationInputPath();
+      // Rerunning onboarding must not change an already reviewed expiry/digest.
+      if (safeExistsSync(file)) return;
+      ensureDir(path.dirname(file));
+      writeGovernedJson(file, buildActivationInput(now), { createOnly: true });
+    });
+  });
+  return { status: 'activation_available', input_path: activationInputPath() };
+}
+
+function activationNextStep(setup?: ActivationSetup): string {
+  if (setup?.status !== 'activation_available' || !setup.input_path)
+    return 'Inspect existing activation, pending requests and charter limits with `pnpm kyberion onboarding authority show --scope person --json`; resume the listed request with status/apply. Already active identities need no new activation consent.';
+  const reviewed = path.join(path.dirname(setup.input_path), 'activation-reviewed.json');
+  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. Otherwise review the expiry in ${setup.input_path}, then run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\`, inspect the saved preview, and request it with \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(reviewed)} --json\`. After human approval, apply the displayed request ID. This grants no standing outbound operations. Existing reviewed files are retained; choose a new output name when changing the plan.`;
 }
 
 export function ensureDir(p: string) {
@@ -421,7 +477,8 @@ export function buildSummary(
   input: ApplyInput,
   tenantEntries: Array<Record<string, unknown>>,
   tutorial: { mode: string; summary: string },
-  reasoning?: OnboardingReasoningState
+  reasoning?: OnboardingReasoningState,
+  activation?: ActivationSetup
 ) {
   const id = input.identity;
   const persona = resolveInputPersona(input);
@@ -456,6 +513,7 @@ export function buildSummary(
     `## ${summaryPolicy.sections.next_steps}`,
     '- Connection authentication is separate from authority: open Settings → Services to connect accounts, review exact GitHub/browser targets and limits, ask the installed agent to request delegation, then approve and apply the reviewed plan. The new agent stays provisioned until its signed activation plan is applied.',
     '- CLI: run `pnpm kyberion onboarding authority show --scope person --json`, then use `preview`, `request`, `status`, and `apply` with the exact reviewed plan. Personal use needs no tenant; organization scope requires an explicitly selected tenant owner.',
+    `- ${activationNextStep(activation)}`,
     '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',
@@ -471,7 +529,7 @@ export function buildApplySummary(
   tenantEntries: Array<Record<string, unknown>>,
   tutorial: { mode: string; summary: string },
   reasoning: OnboardingReasoningState,
-  paths: { statePath: string; summaryPath: string }
+  paths: { statePath: string; summaryPath: string; activation?: ActivationSetup }
 ): string {
   const lines = [
     'Onboarding profile applied successfully. Execution and human approval are separate setup steps.',
@@ -485,9 +543,10 @@ export function buildApplySummary(
     '',
     'Next steps:',
     `1. Export the persona in your shell: \`export KYBERION_PERSONA=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
-    '2. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
-    '3. Open Presence Studio Home and inspect First Job readiness at /first-job.',
-    '4. For an explicit public diagnostic setup, preview pnpm onboarding first-job --tenant <new-test-tenant> --json. See docs/developer/FIRST_JOB_DIAGNOSTIC_OPERATIONS.ja.md.',
+    `2. ${activationNextStep(paths.activation)}`,
+    '3. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
+    '4. Open Presence Studio Home and inspect First Job readiness at /first-job.',
+    '5. For an explicit public diagnostic setup, preview pnpm onboarding first-job --tenant <new-test-tenant> --json. See docs/developer/FIRST_JOB_DIAGNOSTIC_OPERATIONS.ja.md.',
   ];
   return lines.join('\n');
 }
@@ -529,9 +588,10 @@ export async function applyOnboardingInput(input: ApplyInput, print: Print = () 
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
   await writeJson(statePath(), state, 'onboarding-state');
+  const activation = await prepareActivationSetup(new Date(now));
   await writeText(
     summaryPath(),
-    buildSummary(validatedInput, tenantEntries, tutorial, reasoning),
+    buildSummary(validatedInput, tenantEntries, tutorial, reasoning, activation),
     'onboarding-summary'
   );
   return {
@@ -542,6 +602,7 @@ export async function applyOnboardingInput(input: ApplyInput, print: Print = () 
     reasoning,
     state_path: statePath(),
     summary_path: summaryPath(),
+    activation_setup: activation,
     runbook_skill_path: runbookSkill.skillPath,
     tutorial,
   };
@@ -587,6 +648,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
       {
         statePath: statePath(),
         summaryPath: summaryPath(),
+        activation: result.activation_setup,
       }
     )
   );

@@ -185,6 +185,13 @@ function assertMemberProfileShape(profile: unknown): asserts profile is MemberPr
     isRecord(profile) && typeof profile.member_id === 'string' ? profile.member_id : 'unknown';
   try {
     validateMemberProfile(profile, `member profile '${id}'`);
+    const memberships = (profile as MemberProfile).memberships;
+    if (
+      new Set(memberships.map((membership) => membership.tenant_slug)).size !== memberships.length
+    )
+      throw new Error(
+        'A member must have one access role per tenant; organizational responsibilities are separate.'
+      );
   } catch (error) {
     throw new Error(`[member-registry] invalid member profile '${id}': ${error}`);
   }

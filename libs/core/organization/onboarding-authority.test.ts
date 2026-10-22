@@ -6,6 +6,73 @@ import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding
 const f = useOnboardingAuthorityFixture();
 const person = { kind: 'person' } as const;
 describe('actual-store onboarding authority', () => {
+  it('activates a fresh installed identity after signed consent without standing outbound grants', () =>
+    f.run(() => {
+      const installed = f.installAgent(false, 'activation-only');
+      const raw = { ...f.input(), mode: 'activate' as const, grants: [] };
+      const preview = f.api.previewOnboardingAuthority(f.principal, raw);
+      expect(preview.statement).toContain('No standing external operation is granted');
+      const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      expect(() =>
+        f.api.applyOnboardingAuthority(f.principal, person, request.request_id)
+      ).toThrow();
+      expect(f.identities.getAgentIdentity(installed.nhi_id)?.lifecycle_status).toBe('provisioned');
+      f.approve(request.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, request.request_id);
+      expect(f.identities.getAgentIdentity(installed.nhi_id)?.lifecycle_status).toBe('active');
+      const charter = f.charters.findActiveCharter(person, new Date())!;
+      expect(charter.envelope.external_operations).toEqual([]);
+      expect(charter.envelope.irreversible).toBe('forbid');
+      expect(charter.envelope.money.per_action).toBe(0);
+      expect(() => f.api.previewOnboardingAuthority(f.principal, raw)).toThrow('activation-only');
+      const grantInput = f.input();
+      const next = f.api.requestOnboardingAuthority(
+        f.principal,
+        grantInput,
+        f.api.previewOnboardingAuthority(f.principal, grantInput)
+      );
+      expect(
+        f.charters.findActiveCharter(person, new Date())?.envelope.external_operations
+      ).toEqual([]);
+      expect(() => f.api.applyOnboardingAuthority(f.principal, person, next.request_id)).toThrow();
+      f.approve(next.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, next.request_id);
+      expect(
+        f.charters.findActiveCharter(person, new Date())?.envelope.external_operations
+      ).toEqual(grantInput.grants);
+    }));
+  it('rejects activation-only consent mixed with grants, renewal, or an active identity', () =>
+    f.run(() => {
+      f.installAgent(false, 'activation-only-invalid');
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, { ...f.input(), mode: 'activate' })
+      ).toThrow('must not include external grants');
+      const raw = { ...f.input(), mode: 'activate', grants: [] };
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, { ...raw, renew_existing: true })
+      ).toThrow('activation-only');
+      f.installAgent(true, 'already-active');
+      expect(() => f.api.previewOnboardingAuthority(f.principal, raw)).toThrow('activation-only');
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, { ...f.input(), grants: [] })
+      ).toThrow('choose at least one');
+    }));
+  it('cannot use activation-only consent to replace an existing charter', () =>
+    f.run(() => {
+      const first = f.request();
+      f.approve(first.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, first.request_id);
+      const original = f.charters.findActiveCharter(person, new Date());
+      f.installAgent(false, 'replacement-provisioned');
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, {
+          ...f.input(),
+          mode: 'activate',
+          grants: [],
+        })
+      ).toThrow('without an existing charter');
+      expect(f.charters.findActiveCharter(person, new Date())).toEqual(original);
+    }));
   it('requires fresh explicit renewal after an approved live amendment is overtaken by retirement', () =>
     f.run(() => {
       const first = f.request();

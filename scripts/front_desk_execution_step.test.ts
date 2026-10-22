@@ -339,6 +339,26 @@ async function resumeInFreshProcess(): Promise<Array<{ status: string }>> {
 }
 
 describe('durable diagnostic intake vertical slice', () => {
+  it('retries capacity waiting through the original validated outbox without duplicate approval', async () => {
+    reserveConversationTurn(viewer(), FRONT_DESK_RECEIPT_COMMAND, requestId);
+    let open = 2;
+    const options = { ...deps(), countOpenWorkItems: () => open };
+    await runFrontDeskExecutionIntake(fixture.charters, options);
+    const waiting = currentDotActions(charter.dot_id, deps()).at(-1)!;
+    expect(waiting).toMatchObject({ status: 'waiting_capacity' });
+    expect(waiting.request_id).toBeUndefined();
+    expect(listWorkItems()).toHaveLength(0);
+    await runFrontDeskExecutionIntake(fixture.charters, options);
+    expect(currentDotActions(charter.dot_id, deps()).at(-1)).toEqual(waiting);
+    open = 0;
+    await runFrontDeskExecutionIntake(fixture.charters, options);
+    const parked = currentDotActions(charter.dot_id, deps()).at(-1)!;
+    expect(parked).toMatchObject({ status: 'parked', action_ref: waiting.action_ref });
+    expect(parked.request_id).toBeTruthy();
+    expect(listWorkItems()).toHaveLength(0);
+    await runFrontDeskExecutionIntake(fixture.charters, options);
+    expect(currentDotActions(charter.dot_id, deps()).at(-1)?.request_id).toBe(parked.request_id);
+  });
   it.each(['inactive', 'tenant', 'organization', 'project', 'unbound'] as const)(
     'filters %s mapping before any transcript read',
     async (change) => {

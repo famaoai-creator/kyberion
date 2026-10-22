@@ -436,6 +436,28 @@ describe('writeScopedArtifact (AL-02)', () => {
     }
   });
 
+  it('personal evidence supports the untenanted shared partition without a shared tenant', () => {
+    const result = store.writeScopedArtifact({
+      scope: { tenant: 'shared' },
+      tier: 'personal',
+      artifact_class: 'evidence',
+      name: 'personal-review.json',
+      content: { review: 'operator only' },
+    });
+    expect(result.repo_relative_path).toBe(
+      'active/shared/artifacts/personal/shared/evidence/personal-review.json'
+    );
+    expect(() =>
+      store.writeScopedArtifact({
+        scope: { tenant: 'shared' },
+        tier: 'confidential',
+        artifact_class: 'evidence',
+        name: 'confidential-review.json',
+        content: 'must stay tenant-bound',
+      })
+    ).toThrow(/invalid tenant reference/);
+  });
+
   it('system scope: places platform-wide artifacts under the system partition', () => {
     const result = store.writeScopedArtifact({
       scope: { system: true },

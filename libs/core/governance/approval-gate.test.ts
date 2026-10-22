@@ -122,6 +122,32 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it('enqueues an explicitly requested human decision without claiming human presence', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([]);
+    mockCreateRequest.mockReturnValue({
+      id: 'req-headless',
+      status: 'pending',
+    } as ApprovalRequestRecord);
+    const requestScope = { tier: 'confidential' as const, tenant_slug: 'acme' };
+    const result = enforceApprovalGate({
+      ...baseParams,
+      hasHuman: false,
+      enqueueRequest: true,
+      requestScope,
+    });
+    expect(result).toMatchObject({ allowed: false, status: 'pending', requestStatus: 'created' });
+    expect(mockCreateRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        scope: requestScope,
+        accountability: expect.objectContaining({ finalDecision: 'human_only' }),
+      })
+    );
+  });
+
   it('allows when an existing approved request matches correlationId', () => {
     mockResolvePolicy.mockReturnValue({
       requiresApproval: true,

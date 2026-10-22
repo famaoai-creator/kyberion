@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
-import { nowIso } from '@agent/core/foundation';
+import { type FrontDeskHumanRole } from '@agent/core/front-desk-roles';
 import {
-  issueChronosAccessToken,
-  type ChronosAccessRole,
-} from '@agent/core/chronos-access-registry';
-import { frontDeskRoleAuthority, type FrontDeskHumanRole } from '@agent/core/front-desk-roles';
+  createManagedMember,
+  managedMemberVersion,
+} from '@agent/core/organization/member-management';
+import { SurfaceManagementError } from '@agent/core/surface/surface-management-mutations';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
   isValidMemberId,
   listMemberIds,
   readMemberProfile,
-  writeMemberProfile,
   type MemberProfile,
 } from '@agent/core/organization/member-registry';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
-import { requireKnownRequestKeys, requireRequestObject } from '../../../lib/request-input';
+import {
+  RequestInputError,
+  requireKnownRequestKeys,
+  requireRequestObject,
+} from '../../../lib/request-input';
 import {
   conciergeErrorResponse,
   resolveConciergeViewer,
@@ -24,6 +27,11 @@ import {
 import { resolveConciergeSelectedViewer, scopeMembershipList } from '../../../lib/selected-tenant';
 import { conciergeFrontDeskRoleForTenant } from '../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../lib/i18n';
+import {
+  memberManagementPrincipal,
+  memberManagementContextId,
+  assertMemberManagementContext,
+} from '../../../lib/member-management-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +50,8 @@ interface MemberListItem {
   memberships: MemberProfile['memberships'];
   /** Bound IdP identities (issuer + subject only — never the email). Always an array. */
   external_identities: { issuer: string; subject: string }[];
+  version: string;
+  is_local_owner: boolean;
 }
 
 function toListItem(profile: MemberProfile): MemberListItem {
@@ -55,6 +65,8 @@ function toListItem(profile: MemberProfile): MemberListItem {
       issuer,
       subject,
     })),
+    version: managedMemberVersion(profile),
+    is_local_owner: profile.member_id === 'owner',
   };
 }
 
@@ -80,8 +92,16 @@ export function GET(req: NextRequest) {
         resolved.context
       )
     );
-    return NextResponse.json({ ok: true, members }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { ok: true, members, context_id: memberManagementContextId(resolved.viewer) },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
+    if (error instanceof SurfaceManagementError)
+      return NextResponse.json(
+        { ok: false, error: error.message, code: error.code },
+        { status: error.status }
+      );
     return conciergeErrorResponse(error, 500);
   }
 }
@@ -108,6 +128,7 @@ export async function POST(req: NextRequest) {
       'tenant_slug',
       'role',
       'issue_token',
+      'expected_context_id',
     ]);
 
     const memberId = typeof body.member_id === 'string' ? body.member_id.trim() : '';
@@ -115,6 +136,8 @@ export async function POST(req: NextRequest) {
     const tenantSlug = typeof body.tenant_slug === 'string' ? body.tenant_slug.trim() : '';
     const role = body.role;
     const issueToken = body.issue_token === true;
+    const principal = memberManagementPrincipal(viewer.context);
+    assertMemberManagementContext(viewer.context, body.expected_context_id, principal);
 
     if (
       !isValidMemberId(memberId) ||
@@ -138,43 +161,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = withExecutionContext('sovereign_concierge', () => {
-      const existing = readMemberProfile(memberId);
-      if (existing) throw new Error(`ALREADY_EXISTS:${memberId}`);
-
-      const now = nowIso();
-      let profile: MemberProfile = {
-        member_id: memberId,
-        display_name: displayName,
-        status: 'active',
-        memberships: [{ tenant_slug: tenantSlug, role }],
-        access_registrations: [],
-        created_at: now,
-        updated_at: now,
-      };
-
-      let token: string | undefined;
-      if (issueToken) {
-        const serverRole: ChronosAccessRole = frontDeskRoleAuthority(role).serverRole;
-        const issued = issueChronosAccessToken({
-          role: serverRole,
-          tenantSlugs: [tenantSlug],
-          label: `${memberId}-token`,
-          memberId,
-        });
-        token = issued.token;
-        profile = {
-          ...profile,
-          access_registrations: [{ label: issued.registration.label! }],
-        };
-      }
-
-      const written = writeMemberProfile(profile);
-      return { member: toListItem(written), token };
+    const result = await createManagedMember(principal, {
+      memberId,
+      displayName,
+      tenantSlug,
+      role,
+      issueToken,
     });
-
-    return NextResponse.json({ ok: true, member: result.member, token: result.token ?? null });
+    return NextResponse.json({
+      ok: true,
+      member: toListItem(result.member),
+      token: result.token ?? null,
+    });
   } catch (error) {
+    if (error instanceof RequestInputError)
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    if (error instanceof SurfaceManagementError)
+      return NextResponse.json(
+        { ok: false, error: error.message, code: error.code },
+        { status: error.status }
+      );
     if (error instanceof Error && error.message.startsWith('ALREADY_EXISTS:')) {
       return NextResponse.json(
         {

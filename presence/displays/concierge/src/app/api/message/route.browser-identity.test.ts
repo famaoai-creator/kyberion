@@ -17,6 +17,11 @@ const state = vi.hoisted(() => ({
 vi.mock('@agent/core/secret/secret-guard', () => ({
   secretGuard: { loadConnectionDocument: () => undefined },
 }));
+vi.mock('@agent/core/organization/tenant-registry', async (original) => ({
+  ...(await original<typeof import('@agent/core/organization/tenant-registry')>()),
+  readTenantProfile: (slug: string) =>
+    ['alpha', 'beta'].includes(slug) ? { tenant_slug: slug } : null,
+}));
 vi.mock('@agent/core/organization/member-registry', async (original) => ({
   ...(await original<typeof import('@agent/core/organization/member-registry')>()),
   findMemberByExternalIdentity: (issuer: string, subject: string) =>

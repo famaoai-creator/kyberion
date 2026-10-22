@@ -9,6 +9,10 @@ packages:
 # settings are kept in this workspace file so CI and local installs agree.
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
+# Running a check must not implicitly reinstall/purge dependencies after a
+# workspace manifest edit. Keep the diagnostic; installs remain explicit and
+# lockfile/supply-chain governed (CI installs before running any scripts).
+verifyDepsBeforeRun: warn
 allowBuilds:
   '@anthropic-ai/claude-code': true
   '@scarf/scarf': false

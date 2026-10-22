@@ -12,6 +12,7 @@ vi.mock('@agent/core/deliverable-inbox', () => ({
 
 vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: () => ({ ok: true }),
+  surfaceMutationRequestUrl: (req: { url: string }) => req.url,
 }));
 
 vi.mock('../../../lib/viewer-context', () => ({

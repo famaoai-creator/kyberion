@@ -1588,6 +1588,10 @@
       "types": "./dist/foundation/scope.d.ts",
       "default": "./dist/foundation/scope.js"
     },
+    "./foundation/scope-resolution-mode": {
+      "types": "./dist/foundation/scope-resolution-mode.d.ts",
+      "default": "./dist/foundation/scope-resolution-mode.js"
+    },
     "./foundation/text": {
       "types": "./dist/foundation/text.d.ts",
       "default": "./dist/foundation/text.js"
@@ -1855,6 +1859,10 @@
     "./governance/policy-engine": {
       "types": "./dist/governance/policy-engine.d.ts",
       "default": "./dist/governance/policy-engine.js"
+    },
+    "./governance/pr-publication-runtime": {
+      "types": "./dist/governance/pr-publication-runtime.d.ts",
+      "default": "./dist/governance/pr-publication-runtime.js"
     },
     "./governance/pr-shadow": {
       "types": "./dist/governance/pr-shadow.d.ts",
@@ -4087,6 +4095,26 @@
     "./organization/member-registry": {
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
+    },
+    "./organization/member-management": {
+      "types": "./dist/organization/member-management.d.ts",
+      "default": "./dist/organization/member-management.js"
+    },
+    "./organization/publication-role-migration": {
+      "types": "./dist/organization/publication-role-migration.d.ts",
+      "default": "./dist/organization/publication-role-migration.js"
+    },
+    "./organization/organization-people-access": {
+      "types": "./dist/organization/organization-people-access.d.ts",
+      "default": "./dist/organization/organization-people-access.js"
+    },
+    "./organization/organization-participants": {
+      "types": "./dist/organization/organization-participants.d.ts",
+      "default": "./dist/organization/organization-participants.js"
+    },
+    "./organization/organization-agent-management": {
+      "types": "./dist/organization/organization-agent-management.d.ts",
+      "default": "./dist/organization/organization-agent-management.js"
     },
     "./organization/onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -6880,9 +6908,17 @@
       "types": "./dist/vcs/github.d.ts",
       "default": "./dist/vcs/github.js"
     },
+    "./vcs/governance-host": {
+      "types": "./dist/vcs/governance-host.d.ts",
+      "default": "./dist/vcs/governance-host.js"
+    },
     "./vcs/index": {
       "types": "./dist/vcs/index.d.ts",
       "default": "./dist/vcs/index.js"
+    },
+    "./vcs/publication-host": {
+      "types": "./dist/vcs/publication-host.d.ts",
+      "default": "./dist/vcs/publication-host.js"
     },
     "./video": {
       "types": "./dist/video/index.d.ts",

@@ -48,7 +48,7 @@
   "authority": {
     "authority_role": "organization_operator",
     "allowed_work_shapes": ["direct_reply", "pipeline", "mission", "task_session"],
-    "max_concurrent_delegations": 1,
+    "max_concurrent_delegations": 100,
     "allowed_pipelines": [
       "pipelines/ops-health-probe.json",
       "pipelines/knowledge-hygiene-probe.json",

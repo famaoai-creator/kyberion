@@ -1,0 +1,9 @@
+{
+  "role": "notification_preferences_reader",
+  "description": "Shared operator delivery reader for the single knowledge/personal/notification-preferences.json routing file. Reads validated notification preferences only; no other personal files, writes, or decision authority.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal"]
+}

@@ -67,6 +67,10 @@
         "body": {
           "type": "string"
         },
+        "body_file": {
+          "type": "string",
+          "minLength": 1
+        },
         "base": {
           "type": "string"
         },

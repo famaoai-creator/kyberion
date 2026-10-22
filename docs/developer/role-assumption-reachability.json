@@ -301,6 +301,11 @@
       ]
     },
     {
+      "site": "libs/core/dot/dot-lifecycle.ts#configureDotDelegationCapacity",
+      "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#createDraftDotCharter",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
@@ -332,7 +337,7 @@
     },
     {
       "site": "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo",
-      "roles": ["person_charter_store"],
+      "roles": ["person_charter_store", "pr_publication_store"],
       "unresolved": []
     },
     {
@@ -392,7 +397,7 @@
     },
     {
       "site": "libs/core/governance/external-operation-store.ts#reserveExternalOperation",
-      "roles": ["person_charter_store"],
+      "roles": ["person_charter_store", "pr_publication_store"],
       "unresolved": []
     },
     {
@@ -1028,6 +1033,36 @@
       ]
     },
     {
+      "site": "libs/core/organization/member-management.ts#createManagedMember",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/member-management.ts#createManagedMember (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/member-management.ts#profileIds (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/member-management.ts#registry (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/member-management.ts#updateManagedMember",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/member-management.ts#updateManagedMember (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1053,6 +1088,28 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/organization-agent-management.ts#inJournal",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/organization-agent-management.ts#inJournal (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
+      "roles": [],
+      "unresolved": [
+        "spread options object at libs/core/organization/organization-agent-management.ts#inJournal"
+      ]
+    },
+    {
+      "site": "libs/core/organization/organization-people-access.ts#recordPeopleManagementAudit",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/organization-people-access.ts#withPeopleResourcesSync",
+      "roles": ["concierge_management_reader", "concierge_management_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/organization-standup.ts#persistOrganizationCadenceReport (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -1062,6 +1119,21 @@
         "sovereign_concierge",
         "surface_runtime"
       ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/publication-role-migration.ts#requestPublicationRoleMigrationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
@@ -1306,7 +1378,7 @@
     },
     {
       "site": "libs/core/surface/operator-notifications.ts#loadNotificationPreferences",
-      "roles": ["sovereign_concierge"],
+      "roles": ["notification_preferences_reader"],
       "unresolved": []
     },
     {
@@ -1604,7 +1676,12 @@
     },
     {
       "site": "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy",
-      "roles": ["sovereign_concierge"],
+      "roles": ["tool_runtime_policy_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/vcs/publication-host.ts#runVcsMutationWithApproval",
+      "roles": ["pr_publication_store"],
       "unresolved": []
     },
     {
@@ -1877,17 +1954,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/members/[id]/route.ts#PATCH",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
       "site": "presence/displays/concierge/src/app/api/members/route.ts#GET",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/app/api/members/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2114,6 +2181,11 @@
     {
       "site": "presence/displays/concierge/src/lib/management-server.ts#readExact",
       "roles": ["concierge_management_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/member-management-server.ts#memberManagementPrincipal",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -2862,6 +2934,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/onboarding_apply.ts#prepareActivationSetup",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/onboarding_apply.ts#writeJson",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2999,6 +3076,16 @@
     {
       "site": "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked",
       "roles": ["organization_operator"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_people.ts#resolveOrganizationPeopleCliAuthorization",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_publication_role_migration.ts#runPublicationRoleMigration",
+      "roles": ["ecosystem_architect"],
       "unresolved": []
     },
     {
@@ -3227,6 +3314,9 @@
     "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner": [
       "role argument `charter.authority.authority_role` could not be resolved at libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner"
     ],
+    "libs/core/organization/organization-agent-management.ts#inJournal (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)": [
+      "spread options object at libs/core/organization/organization-agent-management.ts#inJournal"
+    ],
     "libs/core/plugin/plugin-lifecycle.ts#importTarget": [
       "dynamic import with a computed specifier at libs/core/plugin/plugin-lifecycle.ts#importTarget"
     ],
@@ -3285,6 +3375,9 @@
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.streamPromptFromCli": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/vcs/governance-host.ts#transport": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner": [
@@ -3774,6 +3867,15 @@
             "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
@@ -3804,6 +3906,16 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -3839,6 +3951,14 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#POST",
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#loadChronosCore",
+            "libs/core/tool/tool-runtime-registry.ts#getToolRuntimeModePreference",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_index_reader": {
@@ -4118,6 +4238,27 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -4174,6 +4315,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -4245,6 +4403,29 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -4350,6 +4531,7 @@
         "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
+        "presence/displays/concierge/src/app/api/management/participants/route.ts",
         "presence/displays/concierge/src/app/api/management/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/route.ts",
@@ -4410,10 +4592,14 @@
         "presence/displays/concierge/src/app/layout.tsx",
         "presence/displays/concierge/src/app/login/route.ts",
         "presence/displays/concierge/src/app/logout/route.ts",
+        "presence/displays/concierge/src/app/management/ManagedAgentsPanel.tsx",
         "presence/displays/concierge/src/app/management/ManagementEditor.tsx",
         "presence/displays/concierge/src/app/management/ManagementOverview.tsx",
+        "presence/displays/concierge/src/app/management/OrganizationParticipantsPanel.tsx",
         "presence/displays/concierge/src/app/management/management-client.ts",
         "presence/displays/concierge/src/app/management/page.tsx",
+        "presence/displays/concierge/src/app/management/participants-client.ts",
+        "presence/displays/concierge/src/app/management/use-organization-participants.ts",
         "presence/displays/concierge/src/app/manifest.ts",
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
@@ -4432,6 +4618,7 @@
         "presence/displays/concierge/src/app/settings/sections/DisplaySection.tsx",
         "presence/displays/concierge/src/app/settings/sections/IntroduceSecretPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
+        "presence/displays/concierge/src/app/settings/sections/MemberAdministrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/OnboardingAuthorityPanel.tsx",
@@ -4491,6 +4678,7 @@
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
         "presence/displays/concierge/src/lib/management-server.ts",
+        "presence/displays/concierge/src/lib/member-management-server.ts",
         "presence/displays/concierge/src/lib/memory-candidate-visibility.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
@@ -4661,16 +4849,18 @@
         },
         "concierge_management_reader": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/setup/company/route.ts#GET",
-            "libs/core/organization/company-setup-workflow.ts#executeCompanySetup",
-            "libs/core/surface/surface-management-mutations.ts#resolveSurfaceManagementAuthorization"
+            "presence/displays/concierge/src/app/api/management/participants/route.ts#GET",
+            "libs/core/organization/organization-participants.ts#listOrganizationParticipants",
+            "libs/core/organization/organization-people-access.ts#withPeopleResources",
+            "libs/core/organization/organization-people-access.ts#withPeopleResourcesSync"
           ]
         },
         "concierge_management_writer": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/management/route.ts#POST",
-            "libs/core/surface/surface-management-mutations.ts#executeSurfaceManagementMutation",
-            "libs/core/surface/surface-management-mutations.ts#scoped"
+            "presence/displays/concierge/src/app/api/management/participants/route.ts#GET",
+            "libs/core/organization/organization-participants.ts#listOrganizationParticipants",
+            "libs/core/organization/organization-people-access.ts#withPeopleResources",
+            "libs/core/organization/organization-people-access.ts#withPeopleResourcesSync"
           ]
         },
         "concierge_operator": {
@@ -4738,9 +4928,9 @@
         },
         "mission_controller": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/onboarding-authority/route.ts#POST",
-            "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority",
-            "libs/core/agent/agent-identity.ts#activateProvisionedAgentIdentity",
+            "presence/displays/concierge/src/app/api/management/participants/route.ts#POST",
+            "libs/core/organization/organization-agent-management.ts#issueManagedOrganizationAgent",
+            "libs/core/agent/agent-identity.ts#issueAgentIdentity",
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
@@ -4752,6 +4942,12 @@
             "libs/core/surface/operator-home-summary.ts#collectNhiLedgerSummary",
             "libs/core/nhi-lifecycle-governance.ts#buildNhiLedgerReport",
             "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
+          ]
+        },
+        "notification_preferences_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/setup/route.ts#GET",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
           ]
         },
         "organization_operator": {
@@ -4786,6 +4982,14 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "presence/displays/concierge/src/lib/charter-server.ts#readCharterOverview",
+            "libs/core/governance/accountability-charter-registry.ts#findActiveCharter",
+            "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -4830,6 +5034,13 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/me/route.ts#GET",
+            "libs/core/browser/browser-onboarding.ts#getBrowserOnboardingState",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
+          ]
+        },
         "workspace_tenant_registry_reader": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -4867,6 +5078,7 @@
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend.embedBatch",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend.spawnCli",
         "libs/core/organization/continuous-work-owner.ts#runContinuousWorkOwner",
+        "libs/core/organization/organization-agent-management.ts#inJournal (via libs/core/organization/organization-people-access.ts#withPeopleResourcesSync)",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend.spawnCli",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend.streamPromptFromCli",
         "libs/core/provider/codex-cli-query.ts#CodexCliQuery.spawnCli",
@@ -5080,6 +5292,22 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -5123,6 +5351,19 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -5181,6 +5422,24 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -5292,15 +5551,18 @@
         "chronos_gateway",
         "knowledge_steward",
         "metrics_cap_reader",
+        "notification_preferences_reader",
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
         "person_charter_store",
         "pipeline_journal_store",
+        "pr_publication_store",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
+        "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
@@ -5362,6 +5624,13 @@
             "libs/core/metrics.ts#aggregateMetricsForEnforcement"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#<module>",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "person_charter_store": {
           "example_path": [
             "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
@@ -5405,6 +5674,24 @@
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/delegated-execution.ts#verifyDelegatedExecution",
+            "libs/core/governance/delegated-execution.ts#previous",
+            "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "scripts/run_generation_schedule_daemon.ts#<module>",
@@ -5419,13 +5706,6 @@
             "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
-        "sovereign_concierge": {
-          "example_path": [
-            "scripts/run_generation_schedule_daemon.ts#<module>",
-            "libs/core/ops-alert.ts#sendOpsAlert",
-            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
-          ]
-        },
         "surface_runtime": {
           "example_path": [
             "scripts/run_generation_schedule_daemon.ts#<module>",
@@ -5433,6 +5713,24 @@
             "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
             "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
             "libs/core/surface/operator-notifications.ts#deliver"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handlePromptBasedGeneration",
+            "libs/core/media/image-generation-bridge.ts#LocalDiffusionImageGenerationProvider.isAvailable",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -5668,6 +5966,24 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#<module>",
@@ -5717,6 +6033,21 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -5782,6 +6113,26 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -6049,6 +6400,22 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "scripts/mcp_server.ts#<module>",
@@ -6095,6 +6462,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#loadPipelineRunJournal",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -6152,6 +6536,28 @@
             "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/core/cowork-surface.ts#deliverToCowork"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -6512,6 +6918,26 @@
             "libs/core/nhi-lifecycle-governance.ts#listOrphanNhiIdentities"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "operational_learning_writer": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -6592,6 +7018,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#loadPipelineRunJournal",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "reconcile_config_fallbacks": {
@@ -6676,6 +7119,26 @@
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
         },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/voice-actuator/src/index.ts#handleSingleAction [child process]",
+            "libs/actuators/voice-actuator/src/index.ts#executeSingleAction",
+            "libs/actuators/voice-actuator/src/index.ts#voiceHealth",
+            "libs/core/tool/tool-runtime-registry.ts#listToolRuntimeInventory",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
+          ]
+        },
         "workspace_tenant_registry_reader": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -6741,6 +7204,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend.streamPromptFromCli",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.spawnCli",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.streamPromptFromCli",
+        "libs/core/vcs/governance-host.ts#transport",
         "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner",
         "libs/core/video/video-frame-archive.ts#readVideoFramesFromMp4",
         "libs/core/video/video-frame-archive.ts#writeVideoFramesToMp4",
@@ -6785,6 +7249,19 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/delegated-execution.ts#verifyDelegatedExecution",
+            "libs/core/governance/delegated-execution.ts#previous",
+            "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "surface_runtime": {
           "example_path": ["scripts/oauth_callback_surface.ts#<module>"]
         }
@@ -6797,6 +7274,7 @@
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
+        "notification_preferences_reader",
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
@@ -6805,6 +7283,7 @@
         "scope_locale_reader",
         "slack_bridge",
         "sovereign_concierge",
+        "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
@@ -7025,6 +7504,19 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -7073,6 +7565,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "reasoning_settings_writer": {
@@ -7127,6 +7636,28 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -7423,6 +7954,27 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -7479,6 +8031,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -7538,6 +8107,29 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -7790,6 +8382,20 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -7828,6 +8434,17 @@
             "libs/core/pipeline/pipeline-run-journal.ts#loadPipelineRunJournal",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -7873,6 +8490,16 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/voice/voice-selection-preferences.ts#getVoiceSelectionSnapshot",
+            "libs/core/voice/voice-selection-preferences.ts#resolveSttAvailability",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -8134,6 +8761,23 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -8180,6 +8824,20 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -8242,6 +8900,25 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -8349,14 +9026,17 @@
         "knowledge_steward",
         "metrics_cap_reader",
         "mission_controller",
+        "notification_preferences_reader",
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
         "person_charter_store",
         "pipeline_journal_store",
+        "pr_publication_store",
         "slack_bridge",
         "sovereign_concierge",
+        "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ]
@@ -8513,6 +9193,18 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
@@ -8551,6 +9243,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#loadPipelineRunJournal",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -8604,6 +9313,25 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/reasoning/reasoning-bootstrap.ts#<module>",
+            "libs/core/reasoning/reasoning-cli-provider.ts#<module>",
+            "libs/core/provider/bundles/index.ts#<module>",
+            "libs/core/provider/bundles/codex-cli.ts#<module>",
+            "libs/core/provider/codex-cli-query.ts#buildCodexCliQueryOptionsFromEnv",
+            "libs/core/provider/provider-managed-env.ts#resolveManagedProviderCliBinary",
+            "libs/core/provider/provider-managed-env.ts#resolveManagedProviderCliEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#resolveToolRuntimeRoot",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -8848,6 +9576,22 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
@@ -8891,6 +9635,19 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -8949,6 +9706,24 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/embedding-bootstrap.ts#installEmbeddingBackendIfAvailable",
+            "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedToolPythonBin",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -9213,6 +9988,18 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -9260,6 +10047,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#assertPipelineRunJournalCreatable",
             "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
+          ]
+        },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
         "scope_locale_reader": {
@@ -9313,6 +10117,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/provider/provider-discovery.ts#discoverProviders",
+            "libs/core/provider/provider-discovery.ts#checkGemini",
+            "libs/core/provider/provider-managed-env.ts#resolveProviderCliCommand",
+            "libs/core/provider/provider-managed-env.ts#resolveManagedProviderCliBinary",
+            "libs/core/provider/provider-managed-env.ts#resolveManagedProviderCliEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#resolveToolRuntimeRoot",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {
@@ -9553,6 +10371,19 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "notification_preferences_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/ops-alert.ts#sendOpsAlert",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "organization_operator": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -9603,6 +10434,23 @@
             "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
+        "pr_publication_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "libs/core/workforce/work-coordination.ts#resumeSuspendedPipelineWorkItem",
+            "libs/core/workforce/work-coordination-pipeline-continuation.ts#continueSuspendedPipelineWorkItem",
+            "libs/core/governance/accountability-charter-registry.ts#readCharter",
+            "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/voice-hub/server.ts#<module>",
@@ -9650,6 +10498,15 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tool_runtime_policy_reader": {
+          "example_path": [
+            "satellites/voice-hub/server.ts#<module>",
+            "satellites/voice-hub/voice-stt-transcribe.ts#<module>",
+            "libs/core/tool/tool-runtime-registry.ts#probeToolRuntime",
+            "libs/core/tool/tool-runtime-registry.ts#resolveManagedEnvPath",
+            "libs/core/tool/tool-runtime-policy.ts#getToolRuntimePolicy"
           ]
         },
         "workspace_tenant_registry_reader": {

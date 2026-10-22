@@ -318,7 +318,8 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(membersSection).toContain("frontDeskText('settings_member_sso_bind', locale)");
     expect(membersSection).toContain("frontDeskText('settings_member_sso_unbind', locale)");
     expect(membersSection).toContain("frontDeskText('settings_member_sso_help', locale)");
-    expect(settingsPage).toContain('external_identity_remove');
+    expect(settingsPage).toContain('...patch,');
+    expect(settingsPage).toContain('expected_context_id');
   });
 
   it('HT-05 second pass: /api/training/progress is owner-only, the hook fetches it, and the section renders training_lessons_done', () => {

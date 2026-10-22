@@ -502,6 +502,21 @@ describe('the gate reads the tenant profile as its own policy input', () => {
     expect(allowed.allowed).toBe(true);
   });
 
+  it('consults tenant policy without requiring mission-controller authority from a scheduler', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
+    try {
+      const result = checkProviderEgress({
+        provider: 'clean',
+        dataTier: 'confidential',
+        tenant_slug: 'acme',
+        tenant_registry_root_dir: fixtureRoot,
+      });
+      expect(result.allowed).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('still denies a provider the same tenant attests is trained on', () => {
     const denied = checkProviderEgress({
       provider: 'dirty',

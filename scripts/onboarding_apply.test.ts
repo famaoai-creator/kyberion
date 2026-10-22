@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
   buildApplySummary,
+  buildActivationInput,
   buildState,
   buildSummary,
   parseApplyInput,
@@ -50,6 +51,14 @@ const FIXTURE_REASONING = {
 };
 
 describe('onboarding_apply', () => {
+  it('prepares reviewed activation-only consent without any standing external grant', () => {
+    expect(buildActivationInput(new Date('2026-10-22T00:00:00.000Z'))).toEqual({
+      scope_kind: 'person',
+      mode: 'activate',
+      grants: [],
+      expires_at: '2026-11-21T00:00:00.000Z',
+    });
+  });
   it('rejects invalid tenant slugs', () => {
     expect(() =>
       validateInput({
@@ -181,6 +190,10 @@ describe('onboarding_apply', () => {
       {
         statePath: 'customer/acme/onboarding/onboarding-state.json',
         summaryPath: 'customer/acme/onboarding/onboarding-summary.md',
+        activation: {
+          status: 'activation_available',
+          input_path: 'customer/acme/onboarding/activation-input.json',
+        },
       }
     );
 
@@ -191,6 +204,26 @@ describe('onboarding_apply', () => {
     expect(summary).toContain('Identity: Famao (agent-001)');
     expect(summary).toContain('Reasoning: real_backend_detected');
     expect(summary).toContain('Next steps:');
+    expect(summary).toContain('onboarding/activation-input.json');
+    expect(summary).toContain('onboarding authority preview --file');
+    expect(summary).toContain('human approval');
+  });
+
+  it('guides active setups to their existing authority rather than a new activation plan', () => {
+    const summary = buildApplySummary(
+      FIXTURE_INPUT,
+      [],
+      FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING,
+      {
+        statePath: 'profile/state.json',
+        summaryPath: 'profile/summary.md',
+        activation: { status: 'identity_active' },
+      }
+    );
+    expect(summary).toContain('onboarding authority show --scope person --json');
+    expect(summary).not.toContain('authority preview --file');
+    expect(summary).toContain('Already active identities need no new activation consent');
   });
 
   it('uses the active customer root for onboarding artifacts', () => {

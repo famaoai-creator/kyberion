@@ -2,6 +2,11 @@ import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
 import {
+  currentPrPublicationScope,
+  withPrPublicationStoreAccess,
+  PR_PUBLICATION_STORE_ROLE,
+} from './pr-publication-runtime.js';
+import {
   currentInstalledPersonCharterRuntime,
   withPersonCharterStoreAccess,
 } from './person-charter-runtime.js';
@@ -93,6 +98,41 @@ function scopedCharterIo<T>(
   action: () => T
 ): T {
   const identity = currentExecutionScope();
+  const publication = currentPrPublicationScope();
+  if (
+    publication?.kind === 'organization' &&
+    scope.kind === 'organization' &&
+    publication.tenant_slug === scope.tenant_slug &&
+    writes.length > 0
+  ) {
+    const relative = (file: string) =>
+      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    return withPrPublicationStoreAccess(
+      'charter-ledger-write',
+      files.map(relative),
+      writes.map(relative),
+      () => withExecutionContext(PR_PUBLICATION_STORE_ROLE, action, 'worker', scope.tenant_slug)
+    );
+  }
+  if (
+    publication &&
+    writes.length === 0 &&
+    publication.kind === scope.kind &&
+    (publication.kind === 'person' ||
+      (scope.kind === 'organization' && publication.tenant_slug === scope.tenant_slug))
+  ) {
+    const relative = files.map((file) =>
+      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/')
+    );
+    return withPrPublicationStoreAccess('charter-read', relative, [], () =>
+      withExecutionContext(
+        PR_PUBLICATION_STORE_ROLE,
+        action,
+        'worker',
+        scope.kind === 'organization' ? scope.tenant_slug : undefined
+      )
+    );
+  }
   if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
     const relative = (file: string) =>
       path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
@@ -491,6 +531,26 @@ function appendLedger(
   options: CharterPathOptions
 ): void {
   const file = ledgerPath(scope, charterId, options);
+  const publication = currentPrPublicationScope();
+  if (
+    scope.kind === 'organization' &&
+    publication?.kind === 'organization' &&
+    publication.tenant_slug === scope.tenant_slug &&
+    [
+      'consumption',
+      'delegated_execution',
+      'denied',
+      'execution_started',
+      'execution_outcome',
+      'tripwire',
+    ].includes(entry.kind)
+  ) {
+    if (!readCharter(scope, charterId, options))
+      throw new Error('[PR_PUBLICATION_SCOPE] Existing charter required');
+    return scopedCharterIo(scope, [file], [file], () =>
+      appendJsonLine(safePath(file, options), entry)
+    );
+  }
   if (
     scope.kind === 'person' &&
     currentInstalledPersonCharterRuntime() &&
