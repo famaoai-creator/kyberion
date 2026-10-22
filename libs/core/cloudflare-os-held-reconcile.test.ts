@@ -15,6 +15,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
+import { CloudflareOsReadOnlySurface, CloudflareOsSurface } from './cloudflare-os-surface.js';
 import { setControlPlaneRuntimeRootForTests } from './cloudflare-os-journal.js';
 import {
   cancelApprovalRequest,
@@ -115,7 +116,29 @@ describe('a held action whose approval was decided elsewhere', () => {
     // The bridge failed, so nothing told the plane — it is still pending.
     expect(new CloudflareOsControlPlane().getHeldAction(record.id)?.status).toBe('pending');
 
+    // A real durable approved link must not be enacted by a read, including
+    // one whose viewer cannot see the held action's tenant.
+    const decide = vi.spyOn(cp, 'decideHeldAction');
+    const readOnly = new CloudflareOsReadOnlySurface(new CloudflareOsSurface(cp));
+    expect(
+      readOnly.snapshot(undefined, {
+        principalId: 'human:other-tenant-reader',
+        tenantSlugs: ['tenant-b'],
+      }).heldActions
+    ).toEqual([]);
+    expect(
+      readOnly.snapshot(undefined, {
+        principalId: 'human:tenant-reader',
+        tenantSlugs: ['tenant-a'],
+      }).heldActions
+    ).toMatchObject([{ id: record.id, status: 'pending' }]);
+    expect(decide).not.toHaveBeenCalled();
+    expect(runs).toBe(0);
+    expect(cp.getHeldAction(record.id)?.status).toBe('pending');
+
     cp.refreshFromJournals();
+    expect(cp.getHeldAction(record.id)?.status).toBe('pending');
+    cp.reconcileLinkedApprovals();
     expect(cp.getHeldAction(record.id)?.status).toBe('approved');
     expect((await cp.applyHeldAction(record.id)).status).toBe('applied');
     expect(runs).toBe(1);

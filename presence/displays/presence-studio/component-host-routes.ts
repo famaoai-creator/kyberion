@@ -36,6 +36,7 @@ import { HEARING_SAFE_ID_PATTERN, nextHearingQuestion, type HearingRecord } from
 import { buildHearingA2UI } from './hearing-a2ui.js';
 import { defaultCatalogScenario } from './hearing-routes.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
+import { presenceStudioAuthRateLimiter } from './surface-auth.js';
 
 class ComponentHostRequestError extends Error {
   readonly status = 400 as const;
@@ -233,7 +234,7 @@ export function projectHearingFlow(
 }
 
 export function registerComponentHostRoutes(app: express.Express, staticDir: string): void {
-  app.get('/flow/:component', (req, res) => {
+  app.get('/flow/:component', presenceStudioAuthRateLimiter, (req, res) => {
     const id = String(req.params.component || '').trim();
     if (!COMPONENT_ID_PATTERN.test(id)) {
       res.status(404).end();
@@ -242,7 +243,7 @@ export function registerComponentHostRoutes(app: express.Express, staticDir: str
     res.sendFile(path.join(staticDir, 'flow.html'));
   });
 
-  app.get('/api/flow-vocabulary', (req, res) => {
+  app.get('/api/flow-vocabulary', presenceStudioAuthRateLimiter, (req, res) => {
     const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
     res.setHeader('Cache-Control', 'no-store');
     res.json({
@@ -254,7 +255,7 @@ export function registerComponentHostRoutes(app: express.Express, staticDir: str
     });
   });
 
-  app.get('/api/components', (req, res) => {
+  app.get('/api/components', presenceStudioAuthRateLimiter, (req, res) => {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       authorizePresenceOperation(viewer, 'presence.components.read');
@@ -270,7 +271,7 @@ export function registerComponentHostRoutes(app: express.Express, staticDir: str
     }
   });
 
-  app.get('/api/headless/a2ui/hearing', (req, res) => {
+  app.get('/api/headless/a2ui/hearing', presenceStudioAuthRateLimiter, (req, res) => {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       authorizePresenceOperation(viewer, 'presence.hearing.view.a2ui');

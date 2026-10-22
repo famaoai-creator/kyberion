@@ -49,7 +49,7 @@ export function formatClarificationPacketConcise(
   const more =
     remaining > 0 ? t('question:clarification_more_hint', { count: remaining }, locale) : '';
   const lines = [
-    t('question:clarification_next_required', { more, id: first.id }, locale),
+    t('question:clarification_next_required', { more, id: humanizeInputId(first.id) }, locale),
     first.question,
   ];
   if (first.reason) {

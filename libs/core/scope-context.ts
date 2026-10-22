@@ -1,5 +1,7 @@
 import type { TierLevel } from './types.js';
 import path from 'node:path';
+import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
+export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
@@ -289,6 +291,10 @@ export function resolveScopeResolution(
   env: NodeJS.ProcessEnv = process.env,
   options: ScopeResolutionOptions = {}
 ): ScopeResolution {
+  if (isScopeEnvOnly()) {
+    options = { includePersisted: false, inferFromMission: false, inferFromCwd: false };
+    input = { ...transportedScopeLineage(), ...input };
+  }
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({
     ...values,

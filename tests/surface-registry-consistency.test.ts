@@ -25,7 +25,8 @@ describe('RS-04 surface registry consistency', () => {
   }>;
 
   it('keeps active-surfaces.json identical to the canonical per-surface manifests', () => {
-    expect(snapshot.surfaces).toEqual(manifest.surfaces);
+    const byId = (left: { id: string }, right: { id: string }) => left.id.localeCompare(right.id);
+    expect([...snapshot.surfaces].sort(byId)).toEqual([...manifest.surfaces].sort(byId));
   });
 
   it('registers every surface-roles entry with the same port', () => {

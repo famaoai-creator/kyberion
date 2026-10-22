@@ -242,7 +242,12 @@ export function recordProtocolServiceLifecycle(
     ...(input.metadata ? { metadata: sanitizeLifecycleMetadata(input.metadata) } : {}),
   };
   const validated = validateReceipt(receipt, registryEntry.id, scope);
-  appendGovernedArtifactJsonl(actorRole, lifecycleLogicalPath(registryEntry.id, scope), validated);
+  // Attribution is receipt data, never the authority used by this shared store.
+  appendGovernedArtifactJsonl(
+    'infrastructure_sentinel',
+    lifecycleLogicalPath(registryEntry.id, scope),
+    validated
+  );
   return validated;
 }
 

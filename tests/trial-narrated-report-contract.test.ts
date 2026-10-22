@@ -31,7 +31,7 @@ function expandIncludes(pipeline: Pipeline): PipelineStep[] {
 
 describe('trial narrated report pipeline contract', () => {
   it('uses built actuator entrypoints and a runtime preflight with strict ADF compliance', () => {
-    const pipeline = readPipelineJson('pipelines/trial-narrated-report.json');
+    const pipeline = readPipelineJson('retired/pipelines/trial-narrated-report.json');
     const steps = expandIncludes(pipeline);
 
     const checkVoiceBuild = steps.find((step) => step.id === 'check_voice_actuator_build');

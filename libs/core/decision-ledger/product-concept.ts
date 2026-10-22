@@ -9,6 +9,7 @@
  * as `applyHearingTurn`).
  */
 import type { ActorRef } from '../actor.js';
+import { trimEndChars, trimStartChars } from '../foundation/text.js';
 import type { LedgerHearingAnswer } from './hearing-scenario.js';
 
 export const PRODUCT_CONCEPT_ID_PATTERN = /^PC-[a-z0-9][a-z0-9-]{0,80}$/u;
@@ -64,11 +65,10 @@ export const WEB_APP_CONCEPT_FIELDS = {
 } as const;
 
 export function conceptIdForSession(sessionId: string): string {
-  const slug = sessionId
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/gu, '-')
-    .replace(/^-+|-+$/gu, '')
-    .slice(0, 80);
+  const slug = trimStartChars(
+    trimEndChars(sessionId.toLowerCase().replace(/[^a-z0-9-]+/gu, '-'), '-'),
+    '-'
+  ).slice(0, 80);
   const id = `PC-${slug || 'hearing'}`;
   if (!PRODUCT_CONCEPT_ID_PATTERN.test(id)) throw new Error('[DECISION_LEDGER_CONCEPT_ID_INVALID]');
   return id;

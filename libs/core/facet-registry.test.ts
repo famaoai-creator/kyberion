@@ -4,7 +4,11 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
-import { decideApprovalRequest, loadApprovalRequest } from './governance/approval-store.js';
+import {
+  approvalStoreRoots,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from './governance/approval-store.js';
 import {
   installPluginManaged,
   refreshManagedPluginActivation,
@@ -26,6 +30,9 @@ afterEach(() => {
   withExecutionContext('mission_controller', () => {
     while (cleanupPaths.length > 0) {
       safeRmSync(cleanupPaths.pop() as string);
+    }
+    for (const root of Object.values(approvalStoreRoots())) {
+      safeRmSync(path.join(root, 'plugin-install'), { recursive: true, force: true });
     }
   });
 });
@@ -55,6 +62,7 @@ function installApprovedPack(params: {
     decidedBy: 'human:operator',
     decidedByType: 'human',
     authenticated: true,
+    authMethod: 'surface_session',
     payloadHash: pending?.accountability?.payloadHash,
     effectBinding: pending?.accountability?.effectBinding,
   });
@@ -112,8 +120,8 @@ describe('facet-registry', () => {
     expect(resolved.persona?.source).toBe('managed');
     expect(resolved.persona?.content).toContain('Managed pack');
 
-    // A directory standing where the facet file belongs must be refused by the
-    // read boundary rather than read as an empty facet.
+    // Mutating an approved pack invalidates its content provenance before the
+    // facet read boundary; it must no longer be selectable.
     const managedFacetPath = path.join(
       installed.managedPath,
       'facets',
@@ -126,7 +134,7 @@ describe('facet-registry', () => {
     });
     expect(() =>
       resolveFacets({ persona: 'pack-persona' }, { tier: 'public', managedRoot })
-    ).toThrow('[FACET_RESOURCE] facet must be a regular file');
+    ).toThrow('[FACET_NOT_FOUND]');
   });
 
   it('rejects a managed facet that resolves through a symlink', () => {
@@ -147,8 +155,8 @@ describe('facet-registry', () => {
       managedRoot,
     });
 
-    // The declared facet only ever appears in the managed tree as a link, so
-    // the read boundary — not the installer — is what has to refuse it.
+    // Adding the declared facet as a link after approval must fail provenance
+    // verification or the symlink read boundary before any content is read.
     const linkPath = path.join(installed.managedPath, 'facets', 'personas', 'linked-persona.md');
     withExecutionContext('mission_controller', () => {
       safeMkdir(path.dirname(linkPath), { recursive: true });
@@ -157,7 +165,7 @@ describe('facet-registry', () => {
 
     expect(() =>
       resolveFacets({ persona: 'linked-persona' }, { tier: 'public', managedRoot })
-    ).toThrow(/RESOURCE_PATH_SYMLINK|symlink/i);
+    ).toThrow(/FACET_NOT_FOUND|RESOURCE_PATH_SYMLINK|symlink/i);
   });
 
   it('detects impurity by facet kind', () => {
