@@ -28,6 +28,7 @@ import {
   type StorageDataTier,
 } from './storage-layout.js';
 import { isValidTenantSlug } from './foundation/scope.js';
+import { trimEndChars, trimStartChars } from './foundation/text.js';
 
 /** Extensions that mark a scratch file as authored code (a builder or script). */
 export const SCRATCH_CODE_EXTENSIONS: readonly string[] = [
@@ -231,11 +232,10 @@ export function classifyPromotionSourceScope(
 /** Tool name suggestion derived from a scratch directory's basename. */
 export function suggestScratchToolName(dir: string): string {
   const base = nodePath.basename(toPosix(dir));
-  const slug = base
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '')
-    .slice(0, 48);
+  const slug = trimStartChars(
+    trimEndChars(base.toLowerCase().replace(/[^a-z0-9]+/gu, '-'), '-'),
+    '-'
+  ).slice(0, 48);
   return slug || 'scratch-tool';
 }
 

@@ -59,7 +59,10 @@
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
       return window.crypto.randomUUID();
     }
-    return 'flow-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    // Request/session ids gate replay, so the fallback must stay unguessable.
+    var bytes = new Uint32Array(2);
+    window.crypto.getRandomValues(bytes);
+    return 'flow-' + Date.now().toString(36) + '-' + bytes[0].toString(36) + bytes[1].toString(36);
   }
 
   function sessionFor(componentId) {

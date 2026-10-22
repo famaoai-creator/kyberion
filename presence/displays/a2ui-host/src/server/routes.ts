@@ -9,6 +9,7 @@
  */
 import type express from 'express';
 import expressModule from 'express';
+import { rateLimit } from 'express-rate-limit';
 import * as path from 'node:path';
 import type { FetchLike } from '../framework/actions.js';
 import { findProvider, type A2UIProvider } from './providers.js';
@@ -92,6 +93,17 @@ export function securityHeaders(
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 }
+
+/** The shell page is read from disk per request; bound it like other surface pages. */
+const shellPageRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json(errorEnvelope(429, 'rate limit exceeded'));
+  },
+});
 
 export function registerA2UIHostRoutes(app: express.Express, options: A2UIHostRouteOptions): void {
   const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
@@ -278,7 +290,7 @@ export function registerA2UIHostRoutes(app: express.Express, options: A2UIHostRo
     res.status(upstream.status).json(upstream.body);
   });
 
-  app.get('/', (_req, res) => {
+  app.get('/', shellPageRateLimiter, (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(options.staticDir, 'index.html'));
   });

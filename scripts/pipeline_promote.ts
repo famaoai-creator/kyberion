@@ -176,7 +176,7 @@ export function buildTenantPipelineCatalog(
   tenant: string,
   row: { slug: string; command: string; description: string }
 ): string | null {
-  const line = `| \`${row.slug}\` | \`${row.command}\` | ${row.description.replace(/\|/g, '\\|')} |`;
+  const line = `| \`${row.slug}\` | \`${row.command}\` | ${row.description.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} |`;
   if (existing === null) {
     return [
       '---',

@@ -15,6 +15,7 @@
  * Windows uses Task Scheduler for per-user daemon tasks, alongside
  * launchd on macOS and systemd user units on Linux.
  */
+import { trimEndChars } from '../foundation/text.js';
 import { launchdManager } from './launchd.js';
 import { systemdUserManager } from './systemd-user.js';
 import { windowsTaskSchedulerManager } from './windows-task-scheduler.js';
@@ -139,7 +140,7 @@ export function daemonUserPath(rawPath: string | undefined, delimiter = ':'): st
   const seen = new Set<string>();
   const entries: string[] = [];
   for (const raw of (rawPath ?? '').split(delimiter)) {
-    const entry = raw.trim().replace(/\/+$/, '');
+    const entry = trimEndChars(raw.trim(), '/');
     if (!entry.startsWith('/') || entry.includes('\0')) continue;
     if (entry.endsWith('/node_modules/.bin')) continue;
     if (seen.has(entry)) continue;
