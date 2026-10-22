@@ -1,12 +1,12 @@
 # Core Concepts — the 5 you need first
 
-You can run Kyberion's first win without learning its whole vocabulary. These five ideas are enough to read the CLI output, the surfaces, and most of the docs. Each links to the [GLOSSARY](./GLOSSARY.md) for the precise definition; everything else in the glossary is **advanced** and can wait until you operate or extend the system.
+You can run Kyberion's first win without learning its whole vocabulary. These five ideas are the canonical first read: enough to read the CLI output, the surfaces, and most of the docs. Each links to the [GLOSSARY](./GLOSSARY.md) for the precise definition; everything else in the glossary is **advanced** and can wait until you operate or extend the system.
 
 The loop they all serve: **Intent → Plan → Result** (see [QUICKSTART](./QUICKSTART.md)).
 
 ## 1. Mission
 
-A bounded unit of work with a lifecycle (`planned → active → finished`), its own git history, state, and evidence. Missions are started, checkpointed, and finished only through the mission controller (`pnpm mission …`), so work is resumable and auditable. Lighter, conversational work is a **Task Session**; a mission is for work that needs evidence and rollback.
+A bounded unit of work with a lifecycle (`planned → active → validating → distilling → completed`, plus `paused` / `failed` / `archived`), its own git history, state, and evidence. Missions are started, checkpointed, and finished only through the mission controller (`pnpm mission …`), so work is resumable and auditable (`pnpm mission finish` moves it to `completed`). Lighter, conversational work is a **Task Session**; a mission is for work that needs evidence and rollback. How Mission, Task, Task Contract, Task Session and WorkItem relate: [Units of work](./GLOSSARY.md#units-of-work).
 
 - Glossary: [Mission](./GLOSSARY.md#mission) · [Task Session](./GLOSSARY.md#task-session) · [Artifact](./GLOSSARY.md#artifact)
 - Try: `pnpm mission hygiene` (lists stalled missions)
@@ -15,7 +15,7 @@ A bounded unit of work with a lifecycle (`planned → active → finished`), its
 
 A declarative, schema-validated description of steps (ADF — Agentic Data Format) that Kyberion runs under governance: trace, budgets, guardrails, replay. Repeatable work is captured as a pipeline instead of being re-improvised. Ready-made system pipelines live in [`pipelines/`](../pipelines/README.md); user-facing patterns are templates under `knowledge/product/pipeline-templates/`.
 
-- Glossary: [Pipeline](./GLOSSARY.md#contributor-vocabulary) · [ADF](./GLOSSARY.md#adf-agentic-data-format)
+- Glossary: [Pipeline](./GLOSSARY.md#contributor-vocabulary) · [ADF](./GLOSSARY.md#adf-agentic-data-format) · [Execution definitions](./GLOSSARY.md#execution-definitions) (pipeline vs template vs fragment)
 - Try: `pnpm pipeline --input pipelines/verify-session.json`
 
 ## 3. Actuator
@@ -40,4 +40,4 @@ A human-facing entrance, each with one role: **Concierge** (what do I decide?), 
 
 ---
 
-**Next:** [QUICKSTART](./QUICKSTART.md) for the five-minute first win, then [COMPONENT_MAP](./COMPONENT_MAP.md) for the repository layout. To check your setup at any time: `pnpm kyberion doctor`.
+**Reading order:** [QUICKSTART](./QUICKSTART.md) (first win) → this page → [AGENTS.md](../AGENTS.md) (binding rules) → [GLOSSARY](./GLOSSARY.md) (precise definitions). [COMPONENT_MAP](./COMPONENT_MAP.md) is the repository layout when you need it. To check your setup at any time: `pnpm kyberion doctor`.

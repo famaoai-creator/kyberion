@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records. G01/G02/G14 (ops-runtime-retention) declare the top-level ledgers and state files that sit directly in active/shared/runtime/ (dot-*.jsonl, mission_queue.jsonl, reasoning-failover-events.jsonl, …) and the remaining runtime subdirectories; listUncoveredRuntimeEntries now reports undeclared top-level files too (janitor report field uncoveredRuntimeFiles), and the runtime-store-retention check gate (scripts/check_runtime_store_retention.ts) fails when source references an active/shared/runtime/<name> store with no entry here. Top-level file entries carry no ttl_days: the janitor's mtime TTL walks directories and an append-only ledger's mtime never ages, so such files are either self-bounded (the note says how) or review_required.",
   "entries": [
     {
@@ -49,8 +49,15 @@
       "path": "active/shared/tmp",
       "artifact_class": "tmp",
       "ttl_days": 1,
+      "code_grace_days": 2,
       "action": "delete",
-      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json."
+      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json. code_grace_days: an unpromoted job directory (tmp/<job>/, tmp/system/<domain>/<job>/, tmp/<tier>/<tenant|shared>/<domain>/<job>/) holding authored code or ADF keeps its files that many days beyond the TTL; the janitor warns with the exact pnpm scratch:promote command and lists it in active/shared/runtime/system/scratch-promotion-candidates.json (libs/core/scratch-promotion.ts)."
+    },
+    {
+      "path": "active/shared/runtime/system",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Platform-wide (system partition) durable state that carries no tenant data. scratch-promotion-candidates.json is rewritten whole by every janitor tmp sweep (self-bounded: it lists only tmp job directories currently inside their code grace window, and names no files for personal/confidential partitions). Never auto-delete: removing it only loses first_seen times."
     },
     {
       "path": "active/shared/staging",
@@ -479,6 +486,13 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion."
+    },
+    {
+      "path": "active/shared/runtime/cognitive-routing",
+      "artifact_class": "log",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "Metadata-only comparison-run records (instruction digest, taxonomy labels, winner). Raw prompts are not stored."
     },
     {
       "path": "active/shared/runtime/workspaces",

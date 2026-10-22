@@ -7,7 +7,11 @@
  * This CLI just assembles the two-step pipeline and runs it, so command-line use
  * and pipeline use share one implementation.
  *
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts <input.html> [output.pptx]
+ *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts \\
+ *     <input.html> [output.pptx] [--aspect 4:3|16:9] [--strict]
+ *
+ * `--strict` は収まりの検査（pptx_layout_preflight）で溢れが出たら出力せず失敗させる。
+ * 既定は検査結果を表示するだけで出力する（既存の使い方を壊さないため）。
  *
  * Or use the ops directly in any pipeline:
  *   { "op": "media:deck_from_html", "params": { "path": "report.html" } }   // -> last_pptx_design
@@ -16,13 +20,20 @@
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { executePipelineFile } from '../run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { cliOptionValue, cliPositionals, hasCliFlag } from '../lib/cli-guard.js';
 
 type Print = (value: unknown) => void;
 
 async function main(argv: string[], print: Print = () => undefined): Promise<void> {
-  const [input, outArg] = argv;
+  const aspect = cliOptionValue(argv, '--aspect') ?? '';
+  const strict = hasCliFlag(argv, '--strict');
+  const positional = cliPositionals(argv, ['--aspect']);
+  const [input, outArg] = positional;
   if (!input) {
-    throw new ScriptExitError(1, 'usage: convert.ts <input.html> [output.pptx]');
+    throw new ScriptExitError(
+      1,
+      'usage: convert.ts <input.html> [output.pptx] [--aspect 4:3|16:9] [--strict]'
+    );
   }
   const out = outArg || input.replace(/\.html?$/i, '.pptx');
   const tmp = 'active/shared/tmp/html-to-pptx';
@@ -41,7 +52,16 @@ async function main(argv: string[], print: Print = () => undefined): Promise<voi
             role: 'transform',
             op: 'media:deck_from_html',
             produces: { channel: 'last_pptx_design', type: 'PptxDesignProtocol' },
-            params: { path: input },
+            params: { path: input, ...(aspect ? { aspect } : {}) },
+          },
+          {
+            // 収まりの実測。溢れたスライドを出力前に可視化する。
+            // --strict でない限り診断を出して先へ進む（既存の使い方を壊さない）。
+            id: 'preflight',
+            role: 'transform',
+            op: 'media:pptx_layout_preflight',
+            produces: { channel: 'media_layout_diagnostics', type: 'LayoutDiagnostics' },
+            params: { from: 'last_pptx_design', allow_layout_overflow: !strict },
           },
           {
             id: 'render',

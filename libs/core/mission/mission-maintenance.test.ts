@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExec,
@@ -19,6 +19,7 @@ import {
   shouldSkipResumeEntry,
   RESUME_IDEMPOTENCY_WINDOW_MS,
 } from './mission-maintenance.js';
+import { removeMissionFixture } from '../testing/mission-fixture.js';
 import { inferProviderFromActorId, recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 
 const mocks = vi.hoisted(() => ({ spawnManagedProcess: vi.fn() }));
@@ -47,7 +48,15 @@ vi.mock('../metrics.js', async (importOriginal) => {
   };
 });
 
+const RECORD_TASK_MISSION_ID = `MSN-MAINTENANCE-RECORD-TASK-${process.pid}`;
+
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
+  // The record-task case seeds a real mission-state.json, so without this the
+  // fixture stays visible to `pnpm mission list` as a live public mission.
+  afterAll(() => {
+    removeMissionFixture({ missionId: RECORD_TASK_MISSION_ID, tier: 'public' });
+  });
+
   const now = new Date('2026-05-07T12:00:00.000Z');
 
   it('returns false for empty history', () => {
@@ -128,7 +137,7 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
     const previousPersona = process.env.KYBERION_PERSONA;
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
-    const missionId = 'MSN-MAINTENANCE-RECORD-TASK';
+    const missionId = RECORD_TASK_MISSION_ID;
     const missionPath = pathResolver.missionDir(missionId, 'public');
     // The fixture mission lives in the live mission tree; leave nothing behind.
     ctx.onTestFinished(() => {

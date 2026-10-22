@@ -483,7 +483,18 @@ export function planWorkInventoryPromotion(
     name,
     source: source.source,
     command: 'pnpm',
-    args: ['pipeline:promote', '--input', source.input, '--name', name],
+    // Scratch sources are tier-unknown: pipeline:promote refuses a public
+    // target for them, so the plan always names the tenant catalog. A
+    // personal-scope entry has no tenant — the operator picks one (or keeps it).
+    args: [
+      'pipeline:promote',
+      '--input',
+      source.input,
+      '--name',
+      name,
+      '--tenant',
+      entry.scope.tenant_slug ?? '<tenant-slug>',
+    ],
   };
 }
 

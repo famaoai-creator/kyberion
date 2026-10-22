@@ -335,6 +335,23 @@ function extractDocxParagraphText(para: DocxParagraph, protocol?: DocxDesignProt
   return parts.join('');
 }
 
+/**
+ * Marker for an embedded picture: `_[image: media/image3.png]_`. Readers that
+ * OCR images (ingest --ocr) replace the marker with the recognized text; the
+ * image bytes themselves never enter the markdown.
+ */
+export const DOCX_IMAGE_MARKER = /_\[image: ([^\]]+)\]_/g;
+
+function docxDrawingMarker(
+  drawing: { imageRId?: string; name?: string },
+  protocol?: DocxDesignProtocol
+): string {
+  const target = drawing.imageRId
+    ? protocol?.relationships?.find((rel) => rel.id === drawing.imageRId)?.target
+    : undefined;
+  return `_[image: ${target || drawing.name || 'embedded'}]_`;
+}
+
 function extractDocxRunText(run: DocxRun, protocol?: DocxDesignProtocol): string {
   const parts: string[] = [];
   for (const c of run.content) {
@@ -346,14 +363,13 @@ function extractDocxRunText(run: DocxRun, protocol?: DocxDesignProtocol): string
         parts.push('\t');
         break;
       case 'break':
+        // <w:br/> without a type is an ordinary line break (textWrapping is
+        // the default per ECMA-376); page/column breaks carry no text.
         if (!c.breakType || c.breakType === 'textWrapping') parts.push('\n');
         break;
       case 'drawing':
         if (c.drawing?.imageRId || c.drawing?.imageData) {
-          const target = c.drawing.imageRId
-            ? protocol?.relationships?.find((rel) => rel.id === c.drawing.imageRId)?.target
-            : undefined;
-          parts.push(`_[image: ${target || c.drawing.name || 'embedded'}]_`);
+          parts.push(docxDrawingMarker(c.drawing, protocol));
         }
         break;
     }
@@ -382,6 +398,8 @@ function detectHeadingLevel(para: DocxParagraph, protocol: DocxDesignProtocol): 
       const jaMatch = styleDef.name.match(/見出し\s*(\d)/);
       if (jaMatch) return parseInt(jaMatch[1], 10);
     }
+    // Built-in style ids (Heading1…Heading6) also identify headings when the
+    // package carries no styles.xml definition for them.
     const idMatch = styleId.match(/^heading\s*(\d)$/i);
     if (idMatch) return parseInt(idMatch[1], 10);
   }
@@ -403,8 +421,6 @@ function findNumberingDef(
   const level = abstractNum.levels.find((l) => l.ilvl === ilvl);
   return level?.numFmt ?? null;
 }
-
-export const DOCX_IMAGE_MARKER = /_\[image: ([^\]]+)\]_/g;
 
 function renderDocxTable(table: DocxTable, lines: string[], protocol: DocxDesignProtocol) {
   if (!table.rows.length) return;
@@ -495,6 +511,8 @@ function resolveXlsxCellValue(
   if (cell.richText) {
     return cell.richText.map((r) => r.text).join('');
   }
+  // Numbers render as Excel displays them (percent, separators, dates …)
+  // rather than as the raw stored double.
   const isNumeric = cell.type === undefined || cell.type === 'n';
   const numeric = typeof cell.value === 'number' ? cell.value : Number(cell.value);
   if (isNumeric && cell.value !== '' && cell.value != null && Number.isFinite(numeric)) {

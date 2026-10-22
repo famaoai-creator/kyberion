@@ -14,8 +14,15 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
 import { checkMeetingParticipationConsent } from './meeting/meeting-participation-coordinator.js';
-import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from './mic-capture.js';
+import {
+  pcmRms,
+  startMicCapture,
+  type MicCaptureOptions,
+  type MicCaptureSession,
+} from './mic-capture.js';
+import { createWorkItemIfAbsent } from './workforce/work-coordination.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { nowIso } from './foundation/time.js';
 import { readTextFile } from './foundation/text.js';
 import { wavHeader } from './pcm-wav.js';
@@ -43,10 +50,29 @@ export interface InRoomMinutesOptions {
   /** Max seconds per segment even without a silence endpoint. */
   maxSegmentSeconds?: number;
   onTranscriptChunk?: (chunk: { segment: number; text: string; audioPath: string }) => void;
+  /**
+   * Canonical WorkItem the follow-up reasoning runs under. When unset, one is
+   * created for the mission on stop() (mission-scoped meeting reasoning
+   * requires it).
+   */
+  workItemId?: string;
+  /** Consecutive seconds below the silence floor before warning (default 60; 0 disables). */
+  silenceWarnSeconds?: number;
+  /**
+   * RMS (0..1) under which a chunk counts as silent (default 0.002, about
+   * -54 dBFS: above ADC noise of a muted bus, below a quiet room's voice).
+   * In `both` mode the mix includes the mic's noise floor, so a dead
+   * loopback bus alone is not detected.
+   */
+  silenceRmsFloor?: number;
+  /** Test seam: coordination store root for the auto-created WorkItem. */
+  workItemRootDir?: string;
+  onSilenceWarning?: (info: { seconds: number }) => void;
   /** Override for tests: how the minutes pipeline is invoked on stop(). */
   runMinutesPipeline?: (input: {
     missionId: string;
     transcriptPath: string;
+    workItemId: string;
   }) => Promise<{ minutesPath: string }>;
 }
 
@@ -65,9 +91,31 @@ function resolveMissionEvidenceDir(missionId: string): string {
   return assertSafeRepositoryPath(evidenceDir, { allowMissingLeaf: true });
 }
 
+/** The minutes WorkItem id for a mission; stable so a rerun finds the same item. */
+export function minutesWorkItemId(missionId: string): string {
+  return `WI-${missionId.toUpperCase().replace(/^MSN-/u, '')}-MINUTES`;
+}
+
+function ensureMinutesWorkItem(missionId: string, tenantSlug: string, rootDir?: string): string {
+  const itemId = minutesWorkItemId(missionId);
+  createWorkItemIfAbsent({
+    rootDir,
+    itemId,
+    title: t('minutes_record:work_item_title', { missionId }, 'ja'),
+    description: t('minutes_record:work_item_description', { missionId }, 'ja'),
+    context: {
+      tenant_slug: tenantSlug,
+      mission_id: missionId,
+      work_shape: 'governance_cadence',
+    },
+  });
+  return itemId;
+}
+
 function defaultRunMinutesPipeline(input: {
   missionId: string;
   transcriptPath: string;
+  workItemId: string;
 }): Promise<{ minutesPath: string }> {
   return new Promise((resolve, reject) => {
     const evidenceDir = resolveMissionEvidenceDir(input.missionId);
@@ -85,6 +133,7 @@ function defaultRunMinutesPipeline(input: {
         '--context',
         JSON.stringify({
           mission_id: input.missionId,
+          work_item_id: input.workItemId,
           transcript_path: input.transcriptPath,
           minutes_path: minutesPath,
         }),
@@ -103,11 +152,13 @@ export async function startInRoomMinutesSession(
   options: InRoomMinutesOptions
 ): Promise<InRoomMinutesSession> {
   const missionId = options.missionId.toUpperCase();
+  // One tenant for the consent gate and the WorkItem, resolved up front.
+  const tenantSlug = options.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug;
 
   // Fail-closed recording consent (same gate as meeting participation).
   const consent = checkMeetingParticipationConsent({
     mission_id: missionId,
-    tenant_slug: options.tenantSlug,
+    tenant_slug: tenantSlug,
     purpose: 'recording',
     ...(options.meeting ? { meeting: options.meeting } : {}),
   });
@@ -117,6 +168,26 @@ export async function startInRoomMinutesSession(
         `Grant it with: pnpm meeting:consent grant --mission ${missionId}` +
         (consent.remedy ? `, or ahead of time: ${consent.remedy}` : '')
     );
+  }
+
+  // The follow-up reasoning needs a WorkItem scoped to a tenant. Settle it
+  // before capture starts: failing after the meeting would lose the minutes.
+  let workItemId = options.workItemId;
+  if (!workItemId) {
+    if (!tenantSlug) {
+      throw new Error(
+        '[in-room-minutes] tenant required for the minutes WorkItem — set KYBERION_TENANT or pass --tenant (or pass --work-item)'
+      );
+    }
+    try {
+      workItemId = ensureMinutesWorkItem(missionId, tenantSlug, options.workItemRootDir);
+    } catch (error) {
+      throw new Error(
+        `[in-room-minutes] cannot prepare the minutes WorkItem ${minutesWorkItemId(missionId)} — ` +
+          `${error instanceof Error ? error.message : String(error)}. ` +
+          'If it exists under another tenant, pass --work-item <id> to use a different one.'
+      );
+    }
   }
 
   const evidenceDir = resolveMissionEvidenceDir(missionId);
@@ -150,6 +221,30 @@ export async function startInRoomMinutesSession(
   let segmentBuffers: Buffer[] = [];
   let segmentBytes = 0;
   let stopping = false;
+
+  const silenceWarnSeconds = options.silenceWarnSeconds ?? 60;
+  const silenceRmsFloor = options.silenceRmsFloor ?? 0.002;
+  let silentBytes = 0;
+  let silenceWarned = false;
+  const watchSilence = (chunk: AudioChunk) => {
+    if (pcmRms(chunk.payload) >= silenceRmsFloor) {
+      // Sound heard: end this silent run and re-arm the warning.
+      silentBytes = 0;
+      silenceWarned = false;
+      return;
+    }
+    silentBytes += chunk.payload.byteLength;
+    if (silenceWarnSeconds <= 0 || silenceWarned) return;
+    const seconds = silentBytes / (sampleRateHz * 2);
+    if (seconds >= silenceWarnSeconds) {
+      silenceWarned = true;
+      try {
+        options.onSilenceWarning?.({ seconds: Math.round(seconds) });
+      } catch {
+        // A faulty observer must not stop the recording.
+      }
+    }
+  };
 
   const appendTranscript = (text: string) => {
     if (!safeLstat(transcriptPath).isFile()) {
@@ -203,6 +298,7 @@ export async function startInRoomMinutesSession(
 
   const captureLoop = (async () => {
     for await (const chunk of mic.chunks() as AsyncIterable<AudioChunk>) {
+      watchSilence(chunk);
       segmentBuffers.push(Buffer.from(chunk.payload));
       segmentBytes += chunk.payload.byteLength;
       const state = vad.ingest(chunk);
@@ -224,7 +320,7 @@ export async function startInRoomMinutesSession(
       let minutesPath: string | null = null;
       if (segmentIndex > 0) {
         const run = options.runMinutesPipeline ?? defaultRunMinutesPipeline;
-        const result = await run({ missionId, transcriptPath });
+        const result = await run({ missionId, transcriptPath, workItemId: workItemId as string });
         minutesPath = result.minutesPath;
       }
       return { minutesPath, transcriptPath, segments: segmentIndex };

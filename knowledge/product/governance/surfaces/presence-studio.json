@@ -7,6 +7,9 @@
       "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
       "command": "node",
       "args": ["dist/presence/displays/presence-studio/server.js"],
+      "env": {
+        "KYBERION_TENANT": "default"
+      },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",

@@ -85,7 +85,9 @@
             "then": {
               "type": "object",
               "properties": {
-                "template_ref": { "const": "docs/operator/templates/production-evidence-30day-ops.md" },
+                "template_ref": {
+                  "const": "docs/operator/templates/production-evidence-30day-ops.md"
+                },
                 "ref_requirements": {
                   "type": "array",
                   "minItems": 3,
@@ -114,7 +116,11 @@
                         "properties": {
                           "id": { "const": "trace_bundle" },
                           "accepted_ref_patterns": {
-                            "const": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+                            "const": [
+                              "active/shared/logs/traces/",
+                              "active/shared/tmp/",
+                              "https://"
+                            ]
                           }
                         }
                       }
@@ -153,7 +159,9 @@
             "then": {
               "type": "object",
               "properties": {
-                "template_ref": { "const": "docs/operator/templates/production-evidence-external-contribution.md" },
+                "template_ref": {
+                  "const": "docs/operator/templates/production-evidence-external-contribution.md"
+                },
                 "ref_requirements": {
                   "type": "array",
                   "minItems": 3,
@@ -224,7 +232,9 @@
             "then": {
               "type": "object",
               "properties": {
-                "template_ref": { "const": "docs/operator/templates/production-evidence-fde-deployment.md" },
+                "template_ref": {
+                  "const": "docs/operator/templates/production-evidence-fde-deployment.md"
+                },
                 "ref_requirements": {
                   "type": "array",
                   "minItems": 4,
@@ -233,7 +243,12 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "enum": ["deployment_summary", "customer_overlay", "runtime_artifact", "no_fork_statement"]
+                        "enum": [
+                          "deployment_summary",
+                          "customer_overlay",
+                          "runtime_artifact",
+                          "no_fork_statement"
+                        ]
                       }
                     }
                   },
@@ -254,7 +269,9 @@
                         "required": ["id"],
                         "properties": {
                           "id": { "const": "customer_overlay" },
-                          "accepted_ref_patterns": { "const": ["customer/", "docs/operator/", "https://"] }
+                          "accepted_ref_patterns": {
+                            "const": ["customer/", "docs/operator/", "https://"]
+                          }
                         }
                       }
                     },
@@ -265,7 +282,11 @@
                         "properties": {
                           "id": { "const": "runtime_artifact" },
                           "accepted_ref_patterns": {
-                            "const": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+                            "const": [
+                              "active/shared/logs/traces/",
+                              "active/shared/tmp/",
+                              "https://"
+                            ]
                           }
                         }
                       }
@@ -276,7 +297,9 @@
                         "required": ["id"],
                         "properties": {
                           "id": { "const": "no_fork_statement" },
-                          "accepted_ref_patterns": { "const": ["docs/operator/", "migration/", "https://"] }
+                          "accepted_ref_patterns": {
+                            "const": ["docs/operator/", "migration/", "https://"]
+                          }
                         }
                       }
                     }

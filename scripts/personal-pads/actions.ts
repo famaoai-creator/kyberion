@@ -21,6 +21,7 @@ import { getSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isLinux, isMacOS } from '@agent/core/platform';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
+import { planRoutingCompare } from '@agent/core';
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import { readOsClipboardText } from '../clipboard-inbox/server.js';
 import { generateMeetingMinutes } from '../meeting-notepad/minutes.js';
@@ -639,6 +640,40 @@ export function getPadActionAvailability(
  * the adapter field renderer.  Adding an action extends this table and its
  * adapter declaration; the dispatcher below remains unchanged.
  */
+async function proposeCompare(input: PadActionInput): Promise<PadActionResult> {
+  const t = messages(input);
+  const instruction = [input.body, fieldText(input.fields, 'instruction')]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join('\n\n');
+  if (!instruction) {
+    return unavailable('memory.propose-compare', t('personal_pads:action_propose_compare_empty'));
+  }
+  const plan = planRoutingCompare({
+    instruction,
+    optimizeFor: fieldText(input.fields, 'optimize_for') || undefined,
+    explicit: true,
+  });
+  return {
+    action_id: 'memory.propose-compare',
+    status: 'succeeded',
+    message: t('personal_pads:action_propose_compare_done'),
+    draft_patch: {
+      fields: {
+        next_action: `pnpm reasoning:compare --instruction ${JSON.stringify(instruction.slice(0, 200))} --optimize-for ${plan.optimize_for} --explicit`,
+      },
+    },
+    result: {
+      kind: 'reasoning-compare-proposal',
+      optimize_for: plan.optimize_for,
+      labels: plan.labels,
+      instruction_digest: plan.instruction_digest,
+      cognitive_tier: plan.cognitive.tier,
+      live: false,
+    },
+  };
+}
+
 const ACTION_HANDLERS: Readonly<
   Record<string, (input: PadActionInput) => Promise<PadActionResult>>
 > = {
@@ -698,6 +733,7 @@ const ACTION_HANDLERS: Readonly<
   'workbench.calendar-reconcile': workbench,
   'workbench.ocr-extract': workbench,
   'workbench.knowledge-propose': workbench,
+  'memory.propose-compare': proposeCompare,
 };
 
 export async function executePadAction(input: PadActionInput): Promise<PadActionResult> {

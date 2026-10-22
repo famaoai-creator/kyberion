@@ -240,8 +240,14 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   app.get('/api/me', (req, res) => {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
-      const scope = toFrontDeskViewerScope(viewer);
-      const requestedTenant = readSurfaceStringParam(req.query.tenant);
+      // FD-01: the loopback owner's tenant list is their memberships (all
+      // tenants), with the request's effective tenant as the one being viewed.
+      const scope = toFrontDeskViewerScope(
+        viewer.source === 'loopback' ? { ...viewer, tenantSlugs: 'all' } : viewer
+      );
+      const requestedTenant =
+        readSurfaceStringParam(req.query.tenant) ??
+        (viewer.tenantSlugs !== 'all' ? viewer.tenantSlugs[0] : undefined);
       const me = withExecutionContext('ecosystem_architect', () =>
         readFrontDeskMe(scope, {
           requestedTenant,

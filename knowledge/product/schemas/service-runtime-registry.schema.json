@@ -26,7 +26,10 @@
           "supported_modes": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "enum": ["trial", "approved_install", "installed", "pinned"] }
+            "items": {
+              "type": "string",
+              "enum": ["trial", "approved_install", "installed", "pinned"]
+            }
           },
           "default_base_url": { "type": "string" },
           "trial_probe": {
@@ -67,7 +70,15 @@
           "service_preset_path": { "type": "string", "minLength": 1 },
           "notes": { "type": "string" }
         },
-        "required": ["service_id", "display_name", "kind", "status", "platforms", "supported_modes", "trial_probe"]
+        "required": [
+          "service_id",
+          "display_name",
+          "kind",
+          "status",
+          "platforms",
+          "supported_modes",
+          "trial_probe"
+        ]
       }
     }
   },

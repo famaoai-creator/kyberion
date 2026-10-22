@@ -2,7 +2,14 @@
   "$id": "https://kyberion.local/schemas/mission-journal-policy.schema.json",
   "title": "Mission Journal Policy",
   "type": "object",
-  "required": ["version", "title", "summary_title", "trust_scores_title", "empty_message", "relationship_labels"],
+  "required": [
+    "version",
+    "title",
+    "summary_title",
+    "trust_scores_title",
+    "empty_message",
+    "relationship_labels"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "string" },

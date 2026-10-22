@@ -1,15 +1,36 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
+import { removeMissionFixtures } from '../testing/mission-fixture.js';
 
 describe('mission-working-memory', () => {
+  /**
+   * `.write()` persists into the real confidential mission tree, so every id a
+   * test mints is recorded here and reclaimed afterwards.
+   */
+  const createdMissionIds: string[] = [];
+
+  function trackMission(missionId: string): string {
+    createdMissionIds.push(missionId);
+    return missionId;
+  }
+
+  afterEach(() => {
+    withExecutionContext('mission_controller', () =>
+      removeMissionFixtures(
+        createdMissionIds.map((missionId) => ({ missionId, tier: 'confidential' as const }))
+      )
+    );
+    createdMissionIds.length = 0;
+  });
+
   it('stores mission-scoped entries and produces a summary', () => {
     const memory = new MissionWorkingMemory();
-    const missionId = `MSN-1-${randomUUID()}`.toUpperCase();
+    const missionId = trackMission(`MSN-1-${randomUUID()}`.toUpperCase());
     memory.write({
       mission_id: missionId,
       scope: 'task',
@@ -33,7 +54,7 @@ describe('mission-working-memory', () => {
 
   it('keeps restricted working-memory entries tenant and mission scoped', () => {
     const memory = new MissionWorkingMemory();
-    const missionId = `MSN-SCOPE-${randomUUID()}`.toUpperCase();
+    const missionId = trackMission(`MSN-SCOPE-${randomUUID()}`.toUpperCase());
     memory.write({
       mission_id: missionId,
       key: 'secret',
@@ -73,7 +94,7 @@ describe('mission-working-memory', () => {
   });
 
   it('does not load schema-invalid persisted entries', () => {
-    const missionId = `MSN-MWM-INVALID-${randomUUID()}`.toUpperCase();
+    const missionId = trackMission(`MSN-MWM-INVALID-${randomUUID()}`.toUpperCase());
     const missionDir = pathResolver.active(path.join('missions', 'confidential', missionId));
     const entriesPath = path.join(missionDir, '.mwm-entries.json');
     withExecutionContext('mission_controller', () => {

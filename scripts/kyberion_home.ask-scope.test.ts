@@ -1,13 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScopeContext } from '@agent/core/scope-context';
 import * as path from 'node:path';
-import { safeRmSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import type { DotCharter } from '@agent/core/dot/dot-charter';
+import { readDotInboundEvents } from '@agent/core/dot/dot-event-intake';
 
 const mocks = vi.hoisted(() => ({
   scope: { tier: 'public' } as ScopeContext,
   conversation: vi.fn(),
   materialize: vi.fn(),
+  a2aRoute: vi.fn(),
+  charters: [] as unknown[],
 }));
+const ASK_ROOT = 'active/shared/tmp/kyberion-home-ask-intake-tests';
+const ASK_POLICY = {
+  version: '1.0.0',
+  sources: {
+    'synthetic-ask-intake': {
+      enabled: false,
+      signature_header: 'x-kyberion-signature',
+      prefix: 'sha256=',
+      secret_key: 'EVENT_INTAKE_SYNTHETIC_ASK_SECRET',
+      event_type_header: 'x-kyberion-event',
+      delivery_id_header: 'x-kyberion-delivery',
+      tenant_slug: 'synthetic-ask',
+      max_body_bytes: 4096,
+    },
+  },
+};
+vi.mock('@agent/core/dot/dot-event-intake', async (original) => {
+  const actual = await original<typeof import('@agent/core/dot/dot-event-intake')>();
+  return {
+    ...actual,
+    ingestAskIntake: (input: Parameters<typeof actual.ingestAskIntake>[0]) =>
+      actual.ingestAskIntake({
+        ...input,
+        charters: mocks.charters as DotCharter[],
+        policy: ASK_POLICY,
+        rootDir: ASK_ROOT,
+      }),
+  };
+});
+vi.mock('@agent/core/mesh/a2a-bridge', () => ({ a2aBridge: { route: mocks.a2aRoute } }));
 vi.mock('@agent/core/scope-context', async (original) => ({
   ...(await original<object>()),
   currentScope: () => mocks.scope,
@@ -33,10 +67,31 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   mocks.scope = { tier: 'public' };
+  mocks.charters = [];
   mocks.materialize.mockReturnValue({ candidate: null });
   mocks.conversation.mockResolvedValue({ text: 'Recorded.', executionFeedbackRecord: undefined });
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  if (safeExistsSync(ASK_ROOT)) safeRmSync(ASK_ROOT, { recursive: true, force: true });
+});
+
+function orgDot(organizationId: string): DotCharter {
+  return {
+    kind: 'dot-charter',
+    dot_id: `${organizationId}-intake`,
+    version: '1.0.0',
+    title: 'Org intake',
+    purpose: 'Take operator asks for the organization.',
+    status: 'active',
+    scope: { tier: 'confidential', tenant_slug: 'synthetic-ask', organization_id: organizationId },
+    goal: { statement: 'Handle operator asks.' },
+    attention: { triggers: [{ kind: 'event', sources: ['synthetic-ask-intake'] }] },
+    authority: { authority_role: 'infrastructure_sentinel' },
+    notification: { deliver_to: { surface: 'slack', channel: '#ops' } },
+    runtime: { heartbeat_id: `dot-${organizationId}-intake` },
+  };
+}
 
 describe('CLI ask scope and source correlation', () => {
   it('carries the selected complete scope without overriding its tier with the CLI default', async () => {
@@ -175,12 +230,46 @@ describe('CLI ask scope and source correlation', () => {
     expect(mocks.materialize).not.toHaveBeenCalled();
   });
 
+  it('hands a scoped ask to the organization dot as one intake event, with no conversation', async () => {
+    mocks.scope = organizationScope;
+    mocks.charters = [orgDot('org-a')];
+    const output: unknown[] = [];
+    await main(['ask', 'Implement the next mission task.', '--json'], (value) =>
+      output.push(value)
+    );
+    const { dotIntake } = JSON.parse(String(output[0]));
+    expect(dotIntake).toMatchObject({ status: 'accepted', dot_id: 'org-a-intake' });
+    const events = readDotInboundEvents('synthetic-ask', { rootDir: ASK_ROOT });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      event_id: dotIntake.event_id,
+      tenant_slug: 'synthetic-ask',
+      organization_id: 'org-a',
+    });
+    expect(mocks.conversation).not.toHaveBeenCalled();
+    expect(mocks.a2aRoute).not.toHaveBeenCalled();
+    expect(mocks.materialize).not.toHaveBeenCalled();
+  });
+
+  it('refuses a scoped ask when only another organization of the tenant has a dot', async () => {
+    mocks.scope = organizationScope;
+    mocks.charters = [orgDot('org-b')];
+    await expect(main(['ask', 'Implement the next mission task.'])).rejects.toThrow(
+      /SURFACE_CLI_SCOPE_UNSUPPORTED/
+    );
+    expect(readDotInboundEvents('synthetic-ask', { rootDir: ASK_ROOT })).toHaveLength(0);
+    expect(mocks.conversation).not.toHaveBeenCalled();
+    expect(mocks.a2aRoute).not.toHaveBeenCalled();
+  });
+
   it('keeps legacy unscoped conversations available', async () => {
+    mocks.charters = [orgDot('org-a')];
     await main(['ask', 'Hello', '--correlation-id', 'ordinary-turn']);
     expect(mocks.conversation).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'Hello', correlationId: 'ordinary-turn' })
     );
     expect(mocks.conversation.mock.calls[0][0]).not.toHaveProperty('scope');
+    expect(readDotInboundEvents('synthetic-ask', { rootDir: ASK_ROOT })).toHaveLength(0);
   });
 
   it('rejects incomplete selected organization scope instead of silently writing global feedback', async () => {

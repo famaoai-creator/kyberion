@@ -2,11 +2,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver, tenantMissionDir } from '@agent/core';
+import { removeMissionFixture } from '@agent/core/testing/mission-fixture';
 import { grantVoiceConsent, revokeVoiceConsent } from './voice_consent.js';
 
 const ROOT = pathResolver.rootDir();
-const FIX_MISSION = 'MSN-VOICE-CONSENT-FIXTURE-001';
-const MISSION_DIR = tenantMissionDir(FIX_MISSION, 'alpha-team', 'confidential');
+const FIX_MISSION = `MSN-VOICE-CONSENT-FIXTURE-${process.pid}`;
+const FIX_TENANT = 'alpha-team';
+const MISSION_DIR = tenantMissionDir(FIX_MISSION, FIX_TENANT, 'confidential');
 
 describe('voice_consent CLI helpers', () => {
   let savedMission: string | undefined;
@@ -36,6 +38,13 @@ describe('voice_consent CLI helpers', () => {
   });
 
   afterEach(() => {
+    // Remove the fixture while the tenant/persona env is still in place, and
+    // reclaim the `alpha-team/` tenant directory the mission brought with it.
+    removeMissionFixture({
+      missionId: FIX_MISSION,
+      tier: 'confidential',
+      tenantSlug: FIX_TENANT,
+    });
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -44,7 +53,6 @@ describe('voice_consent CLI helpers', () => {
     else process.env.MISSION_ROLE = savedRole;
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
-    fs.rmSync(MISSION_DIR, { recursive: true, force: true });
   });
 
   it('grants consent, records an audit event, and revokes idempotently', () => {

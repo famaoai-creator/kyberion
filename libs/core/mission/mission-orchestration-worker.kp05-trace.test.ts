@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // KP-05 acceptance-1 follow-up: mission task dispatch (single-shot via
 // dispatchPlannedMissionTaskCore) opens a `mission_task_dispatch` TraceContext
@@ -334,6 +334,21 @@ describe('mission-orchestration-worker KP-05 dispatch tracing', { timeout: 60_00
     }
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
+  });
+
+  // Mock-independent safety net: the per-test teardown resolves its paths
+  // through dynamically imported (and mockable) modules, so an aborted run can
+  // leave the fixture behind. `importActual` gives the fixture helper the real
+  // resolver regardless of what this file has mocked.
+  afterAll(async () => {
+    const { removeMissionFixture } = await vi.importActual<
+      typeof import('../testing/mission-fixture.js')
+    >('../testing/mission-fixture.js');
+    removeMissionFixture({ missionId: MISSION_ID, tier: 'public' });
+    // Dispatch also writes coordination state through the tenant-scoped
+    // resolver, which lands under the `default/` tenant when no tenant is
+    // bound; without this the tenant directory survives as a state-less shell.
+    removeMissionFixture({ missionId: MISSION_ID, tier: 'public', tenantSlug: 'default' });
   });
 
   async function readMissionTaskDispatchTraces(): Promise<

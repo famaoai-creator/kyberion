@@ -1,3 +1,6 @@
+import * as pathResolver from '@agent/core/path-resolver';
+import * as path from 'node:path';
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { installProcessGuards } from '@agent/core/process-guards';
 import {
@@ -16,7 +19,6 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 // C7: shared poll-loop + typing guards (behavior unchanged).
 import { startBridgePollLoop, startBridgeTypingIndicator } from '../../shared/bridge-poll-loop.js';
 import { logger } from '@agent/core/core';
-import * as pathResolver from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -56,9 +58,6 @@ import {
 import { evaluateSurfaceActorAccess } from '@agent/core/surface/surface-access-policy';
 import type { DecisionCardActionKind } from '@agent/core/surface/channel-surface';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
-import * as path from 'node:path';
-
-// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('telegram-bridge');
 
 export interface TelegramUser {

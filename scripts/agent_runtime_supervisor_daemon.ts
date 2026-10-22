@@ -171,7 +171,7 @@ function normalizeSupervisorRequest(value: unknown): SupervisorRequest {
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
-const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
+const SOCKET_PATH = `${SOCKET_DIR}/sup.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
 const GLOBAL_LIMIT = resolveInflightLimit(

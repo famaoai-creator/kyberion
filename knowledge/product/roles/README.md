@@ -1,10 +1,10 @@
 ---
-title: Roles Directory — Assigned Persona Reference
+title: Roles Directory — Org Role Reference
 category: Roles
 tags: [roles, persona, procedure, mission-lifecycle]
 importance: 6
 author: Ecosystem Architect
-last_updated: 2026-07-23
+last_updated: 2026-10-21
 kind: reference
 scope: global
 applies_to: [missions, roles]
@@ -12,13 +12,13 @@ owner: knowledge_steward
 status: active
 ---
 
-# Roles Directory — Assigned Persona Reference
+# Roles Directory — Org Role Reference
 
 Each subdirectory here (`business_owner/`, `qa_lead/`, `solution_architect/`, …) is one
-**org-chart persona** a mission can be assigned to at activation — not to be confused with
+**Org Role** (historically "assigned persona"; selected with `--persona`) a mission can be
+assigned to at activation — not the runtime `Persona` identity class, and not to be confused with
 a task's **team role** (`implementer`/`reviewer`/`qa`/`tester`/`planner`/`designer`/…, assigned
-per-task from `knowledge/product/orchestration/mission-team-templates.json`). See "Team Role vs.
-Assigned Persona" in [docs/GLOSSARY.md](../../../docs/GLOSSARY.md) for the full distinction.
+per-task from `knowledge/product/orchestration/mission-team-templates.json`). See [Role terms](../../../docs/GLOSSARY.md#role-terms) in the glossary for all four role words.
 
 Each persona directory holds:
 

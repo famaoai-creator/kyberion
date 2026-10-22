@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
   return { loadResolvedStandardIntentCatalog, resolveIntentResolutionPacket };
 });
 
+// intent-contract reads the catalog through the tier/tenant-resolved loader;
+// mocking the unresolved loader leaves the seam it actually calls undefined.
 vi.mock('./intent-resolution.js', () => ({
   loadResolvedStandardIntentCatalog: mocks.loadResolvedStandardIntentCatalog,
   resolveIntentResolutionPacket: mocks.resolveIntentResolutionPacket,

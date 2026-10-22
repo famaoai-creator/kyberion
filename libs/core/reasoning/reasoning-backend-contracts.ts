@@ -318,6 +318,11 @@ export interface GenerateWithToolsResult {
   toolCalls?: ToolCall[];
   /** PI-17: provider-native deferred tools returned as references. */
   deferredToolReferences?: string[];
+  /**
+   * Label of the candidate that actually served this turn (set by the
+   * failover chain), so tool-call audit records name the real provider.
+   */
+  servedBy?: string;
 }
 
 export interface ReasoningCallBudget {

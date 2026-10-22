@@ -7,6 +7,9 @@ const ALLOWED_DELIVERY_SURFACES = new Set<SurfaceAsyncChannel>([
   'telegram',
   'discord',
   'imessage',
+  // Local control tower: lands in the chronos outbox that Chronos lists, with
+  // no external egress — the default for operators without a chat bridge.
+  'chronos',
 ]);
 const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/gu;
 const ENV_CHANNEL_PREFIX = 'env:';

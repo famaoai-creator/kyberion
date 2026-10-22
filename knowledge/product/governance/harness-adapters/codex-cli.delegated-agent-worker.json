@@ -11,7 +11,7 @@
       "result_kind": "delegation_trace+artifact_ref",
       "approval_behavior": "none",
       "replayability": "partial",
-      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "fallback_contract": "knowledge/product/schemas/a2a-task-contract.schema.json",
       "enabled": true,
       "owner": "platform_architecture",
       "notes": "Bounded sidecar execution should still produce a delegation trace and evidence references."

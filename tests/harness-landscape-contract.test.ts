@@ -85,7 +85,7 @@ describe('harness landscape contract', () => {
       )
     ).toMatchObject({
       status: 'active',
-      fallback_path: { target: 'pipelines/a2a-task-contract.json' },
+      fallback_path: { target: 'knowledge/product/schemas/a2a-task-contract.schema.json' },
     });
 
     expect(adapterRegistry.profiles.map((item) => item.adapter_id)).toEqual(

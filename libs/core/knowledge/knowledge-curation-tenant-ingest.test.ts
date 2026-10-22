@@ -206,7 +206,14 @@ describe('computeTenantIngestCuration', () => {
   it('rejects an external tenant-ingest fixture root before ledger access', () => {
     const key = 'KYBERION_CURATION_TENANT_ROOTDIR';
     const previous = process.env[key];
-    process.env[key] = '/tmp/external-curation-root';
+    // This case is about the scope guard, so the root must genuinely be
+    // outside the repository — a sibling of the root, never created on disk
+    // (the old '/tmp' path only happened to qualify on this machine).
+    process.env[key] = path.join(
+      pathResolver.rootDir(),
+      '..',
+      `kyberion-external-curation-root-${randomUUID()}`
+    );
     try {
       expect(() =>
         computeTenantIngestCuration({ config: CONFIG, now: NOW, tenants: ['acme-corp'] })

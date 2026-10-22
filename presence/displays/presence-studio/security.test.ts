@@ -30,7 +30,21 @@ describe('Presence Studio OS viewer scope', () => {
       tenantSlugs: ['tenant-local'],
       source: 'loopback',
       principal: expect.objectContaining({ provider: 'loopback-local', role: 'localadmin' }),
+      loopbackDefaultTenant: 'tenant-local',
     });
+  });
+
+  it('FD-01: lets the loopback owner narrow to another tenant with ?tenant=, keeping the server tenant as the default', () => {
+    vi.stubEnv('KYBERION_TENANT', 'tenant-local');
+    const req = request('127.0.0.1') as unknown as { query?: Record<string, string> };
+    req.query = { tenant: 'tenant-other' };
+    expect(resolvePresenceStudioViewerContext(req as never)).toMatchObject({
+      tenantSlugs: ['tenant-other'],
+      source: 'loopback',
+      loopbackDefaultTenant: 'tenant-local',
+    });
+    req.query = { tenant: '../escape' };
+    expect(resolvePresenceStudioViewerContext(req as never).tenantSlugs).toEqual(['tenant-local']);
   });
 
   it('requires a bearer token and server tenant scope for remote access', () => {

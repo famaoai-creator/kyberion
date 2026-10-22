@@ -16,6 +16,8 @@ status: active
 - [フロントデスク再設計](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) — 秘書室と相棒の共有レール、テナント表示、メンバーとアクターの境界を再設計。
 - [ヒアリングとトレーニング](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md) — 依頼の要件化と、テナント単位の学習支援。
 - [Local Pads 統合](./LOCAL_PADS_UNIFICATION_PLAN_2026-09-14.ja.md) — 8つの作業場所を共通の保存・履歴・UIへ統合。
+- [決定台帳(SSOD)とヒアリングの統合](./SSOD_HEARING_INTEGRATION_PLAN_2026-09-14.ja.md) — 観測 → 提案 → 人の決定 → lock → 実装検査 → 投影を `libs/core/decision-ledger/` と `pnpm decisions` で本体化。
+- [A2UI 部品ホスト](./A2UI_COMPONENT_HOST_PLAN_2026-09-15.ja.md) — 業務フロー単位の A2UI 部品、部品レジストリ、`/flow/:component` ホスト。
 - [業務棚卸しと実データ学習ループ](./WORK_INVENTORY_PLAN_2026-09-22.ja.md) — 業務観測、候補順位付け、実績による校正を計画。
 - [サーフェス UI 統一](./SURFACE_UI_UNIFICATION_PLAN_2026-09-23.ja.md) — 基本 UI を A2UI `kyberion-base` カタログとして定義し、5 サーフェスを共通デザイン(deep blue、light/dark、en/ja)へ移行。
 - [ローカルパッドの A2UI 化と話すアバター](./PADS_A2UI_AND_AVATAR_PLAN_2026-09-23.ja.md) — パッド 10 種を `kyberion-base` へ移行し、ツールバー・描画パレット・音声入力(レベル表示)・ダイアログをコンポーネント化。PR 2 で口パクと写真アバター。

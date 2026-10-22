@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import { resolveProjectScope } from './project-scope-env.js';
+import { withScopeEnvOnly } from './scope-resolution-mode.js';
 
 const scopePath = pathResolver.sharedTmp('project-scope-env-test.env');
 const scopedKeys = [
@@ -66,5 +67,15 @@ describe('persisted project scope environment', () => {
       missionId: 'MSN-ENV',
       taskId: 'TASK-ENV',
     });
+  });
+  it('never fills absent transported identity fields from the destination scope', () => {
+    safeWriteFile(
+      scopePath,
+      'KYBERION_TENANT=destination\nKYBERION_PROJECT_ID=DESTINATION\nMISSION_ID=MSN-DESTINATION\nKYBERION_TASK_ID=DESTINATION-TASK\n'
+    );
+    expect(withScopeEnvOnly(() => resolveProjectScope())).toEqual({});
+    process.env.KYBERION_TENANT = 'source';
+    expect(withScopeEnvOnly(() => resolveProjectScope())).toEqual({ tenantSlug: 'source' });
+    expect(resolveProjectScope().projectId).toBe('DESTINATION');
   });
 });

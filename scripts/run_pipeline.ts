@@ -41,7 +41,7 @@ export {
 export const PIPELINE_PRESETS: Readonly<Record<string, string>> = Object.freeze({
   'vital-check': 'pipelines/vital-check.json',
   'system-diagnostics': 'pipelines/system-diagnostics.json',
-  'voice-health-check': 'pipelines/voice-health-check.json',
+  'voice-health-check': 'knowledge/product/pipeline-templates/voice-health-check.json',
   'speak-with-my-voice': 'knowledge/product/pipeline-templates/speak-with-my-voice.json',
   'create-my-avatar': 'knowledge/product/pipeline-templates/create-my-avatar.json',
   'clone-my-voice': 'knowledge/product/pipeline-templates/clone-my-voice.json',

@@ -14,7 +14,11 @@
     "defaults": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["max_missing_inputs_without_clarification", "min_confidence_to_skip", "always_ask_for"],
+      "required": [
+        "max_missing_inputs_without_clarification",
+        "min_confidence_to_skip",
+        "always_ask_for"
+      ],
       "properties": {
         "max_missing_inputs_without_clarification": {
           "type": "integer",

@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/cognitive-routing-palette.schema.json",
+  "title": "Cognitive Routing Palette",
+  "description": "Cost / Balance / Intelligence thresholds for cognitive-tier routing and comparison-run admission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "default_mode", "modes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "default_mode": {
+      "type": "string",
+      "enum": ["cost", "balance", "intelligence"]
+    },
+    "modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cost", "balance", "intelligence"],
+      "properties": {
+        "cost": { "$ref": "#/definitions/mode" },
+        "balance": { "$ref": "#/definitions/mode" },
+        "intelligence": { "$ref": "#/definitions/mode" }
+      }
+    }
+  },
+  "definitions": {
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heavy_marker_min",
+        "heavy_risk_threshold",
+        "heavy_uncertainty_threshold",
+        "fanout"
+      ],
+      "properties": {
+        "heavy_marker_min": { "type": "integer", "minimum": 1 },
+        "heavy_risk_threshold": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "heavy_uncertainty_threshold": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "fanout": {
+          "type": "string",
+          "enum": ["never", "explicit_only", "explicit_or_uncertain", "explicit_or_heavy"]
+        }
+      }
+    }
+  }
+}

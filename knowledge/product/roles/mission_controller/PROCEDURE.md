@@ -18,7 +18,7 @@ You are the EXCLUSIVE authority responsible for the ENTIRE physical lifecycle of
 
 ### A. Mission Initialization (The Start)
 
-- Receive aligned "Victory Conditions" and "Assigned Persona".
+- Receive aligned "Victory Conditions" and "Org Role" (`--persona`).
 - Execute `scripts/mission_controller.ts start <ID> <Persona>`.
 
 ### B. Progress Integrity (The Checkpoint)

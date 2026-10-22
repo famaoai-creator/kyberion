@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "product-concept.schema.json",
+  "title": "Product Concept",
+  "description": "What a product is, for whom, what it promises measurably, and what it does not do (SD-03). The root later decisions bind to.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "status",
+    "for_whom",
+    "promises",
+    "source",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^PC-[a-z0-9][a-z0-9-]{0,80}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["draft", "active", "superseded"] },
+    "problem": { "type": "string" },
+    "for_whom": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actor", "context"],
+        "properties": {
+          "actor": { "type": "string", "minLength": 1 },
+          "context": { "type": "string" },
+          "primary": { "type": "boolean" }
+        }
+      }
+    },
+    "promises": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["statement", "measured_by"],
+        "properties": {
+          "statement": { "type": "string", "minLength": 1 },
+          "measured_by": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["enacted", "proposed", "aspirational"] }
+        }
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["statement", "why"],
+        "properties": {
+          "statement": { "type": "string" },
+          "why": { "type": "string" },
+          "instead": { "type": "string" }
+        }
+      }
+    },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "core_flow": { "type": "string" },
+    "content": { "type": "string" },
+    "visual_direction": { "type": "string" },
+    "variability_axes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["axis", "kind"],
+        "properties": {
+          "axis": { "type": "string" },
+          "kind": { "type": "string", "enum": ["toggle", "value", "list", "label", "extend"] },
+          "options": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "session_id", "scenario"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["hearing"] },
+        "session_id": { "type": "string" },
+        "scenario": { "type": "string" }
+      }
+    },
+    "recorded_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["human", "agent", "service"] },
+        "id": { "type": "string" },
+        "display_name": { "type": "string" },
+        "on_behalf_of": { "type": "string" }
+      }
+    },
+    "recorded_at": { "type": "string" }
+  }
+}

@@ -43,6 +43,8 @@
  *     resolver deliberately does not call Grok's availability probe here;
  *     capability gating is handled by the cached registry just like the
  *     other providers.
+ *   - 'cursor' → `CursorCliReasoningBackend` with environment-derived options;
+ *     construction does not invoke Cursor's availability or login probes.
  *
  * Availability gate: before constructing, this module peeks the XP-01
  * provider capability registry (`peekProviderCapabilityRegistry` — cached
@@ -73,6 +75,10 @@ import {
   buildClaudeCliOptionsFromEnv,
 } from '../shell/shell-claude-cli-backend.js';
 import { CodexCliReasoningBackend } from './codex-cli-reasoning-backend.js';
+import {
+  CursorCliReasoningBackend,
+  buildCursorCliOptionsFromEnv,
+} from './cursor-cli-reasoning-backend.js';
 import type { CodexCliQueryOptions } from './codex-cli-query.js';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import {
@@ -146,6 +152,7 @@ const BUILTIN_CONSTRUCTORS: Readonly<Record<string, ProviderBackendConstructor>>
   codex: (env) => new CodexCliReasoningBackend(readCodexOptionsWithoutSpawn(env)),
   agy: (env) => buildAgyCliBackendFromEnv(env) as AgyCliBackend | null,
   grok: (env) => new ShellGrokCliBackend(buildGrokCliOptionsFromEnv(env)),
+  cursor: (env) => new CursorCliReasoningBackend(buildCursorCliOptionsFromEnv(env)),
 };
 
 /** Register a lazy delegate-capable backend constructor for one provider id. */

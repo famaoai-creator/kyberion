@@ -25,6 +25,10 @@ import { revokeApprovalRequest } from '@agent/core/governance/approval-revocatio
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
+import { sweepMissionStartCandidates } from './daemon_watchdog.js';
+import * as mandates from '@agent/core/governance/mandate-shadow';
+import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
+import * as operationsHalt from '@agent/core/governance/operations-halt';
 
 const h = vi.hoisted(() => ({
   state: undefined as undefined | Record<string, unknown>,
@@ -117,6 +121,8 @@ vi.mock('./mission-alignment-gate/alignment-approval.js', () => ({
     return { requestId: record.id };
   },
 }));
+// R5 watchdog sweeps reach the controller only through the governed continuation.
+vi.mock('./mission_controller.js', () => ({ main: (args: string[]) => run(args) }));
 // Human authentication is explicit; this test is not an agent pretending to be a decider.
 vi.mock('@agent/core/agent-execution-context', async (original) => ({
   ...(await original<typeof import('@agent/core/agent-execution-context')>()),
@@ -191,6 +197,8 @@ afterEach(() => {
     recursive: true,
     force: true,
   });
+  for (const root of [roots.coordination, roots.observability])
+    safeRmSync(pathResolver.resolve(root + '/autonomy'), { recursive: true, force: true });
   safeRmSync(h.dir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
@@ -376,5 +384,128 @@ describe('same-work human mission admission', () => {
     h.covered = false;
     await expect(tick()).rejects.toThrow('mandate revoked');
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('R5 shadow mission admission confirmation card', () => {
+  const cards = () =>
+    listApprovalRequests({ storageChannels: ['autonomy'] }).filter(
+      (r) => r.correlationId === 'mission-admission-confirm:' + itemId
+    );
+  const gates = () =>
+    listApprovalRequests({ storageChannels: ['brief'], kind: 'mission_gate' }).filter(
+      (r) => r.source?.missionId === missionId
+    );
+  const sweep = () => sweepMissionStartCandidates({});
+  function decideCard(id: string, decision: 'approved' | 'rejected') {
+    const record = loadApprovalRequest('autonomy', id)!;
+    return decideApprovalRequest('infrastructure_sentinel', {
+      channel: record.channel,
+      storageChannel: 'autonomy',
+      requestId: id,
+      decision,
+      decidedBy: 'user:test-owner',
+      decidedByType: 'human',
+      authenticated: true,
+      authMethod: 'surface_session',
+      deciderIdentitySource: 'server_resolved',
+      presentedDigest: computeApprovalPresentedDigest(record),
+      deciderPrincipal: {
+        actor: 'human',
+        source: 'session',
+        provider: 'test',
+        principalId: 'test-owner',
+      } as never,
+    });
+  }
+  beforeEach(() => {
+    vi.spyOn(mandates, 'evaluateMissionStartMandate').mockReturnValue({
+      covered: true,
+      mandate_id: 'docs',
+      reasons: [],
+    });
+    vi.spyOn(autonomyGate, 'evaluateAutonomousOpsAction').mockReturnValue({
+      actionId: 'mission_start_mandate',
+      decision: 'auto',
+      allowed: false,
+      shadow: true,
+    } as ReturnType<typeof autonomyGate.evaluateAutonomousOpsAction>);
+  });
+
+  it('opens exactly one pending card across repeated sweeps and prepares nothing', async () => {
+    await sweep();
+    await sweep();
+    await sweep();
+    expect(cards()).toHaveLength(1);
+    expect(cards()[0]).toMatchObject({
+      status: 'pending',
+      accountability: { finalDecision: 'human_only' },
+      source: { taskId: itemId },
+      scope: { tenant_slug: 'acme', organization_id: 'org-1', project_id: 'proj-1' },
+    });
+    expect(cards()[0].accountability?.effectBinding).toContain(`${itemId}@v`);
+    expect(cards()[0].details).toContain('A1');
+    expect(run).not.toHaveBeenCalled();
+    expect(gates()).toHaveLength(0);
+    expect(getWorkItem(itemId)?.metadata?.mission_alignment_preparation).toBeUndefined();
+  });
+
+  it('hands an approved card to the existing preparation once, opening the real mission gate', async () => {
+    await sweep();
+    decideCard(cards()[0].id, 'approved');
+    await sweep();
+    await sweep();
+    expect(run.mock.calls.map((c) => c[0][0])).toEqual(['create']);
+    expect(gates()).toHaveLength(1);
+    expect(gates()[0].status).toBe('pending');
+    expect(cards()).toHaveLength(1);
+    expect(cards()[0].applyResult?.result).toBe('success');
+  });
+
+  it('does nothing for a rejected card and never reopens it for the same version', async () => {
+    await sweep();
+    decideCard(cards()[0].id, 'rejected');
+    await sweep();
+    await sweep();
+    expect(run).not.toHaveBeenCalled();
+    expect(gates()).toHaveLength(0);
+    expect(cards()).toHaveLength(1);
+    expect(cards()[0].status).toBe('rejected');
+  });
+
+  it('keeps an approved card unconsumed while operations are halted', async () => {
+    await sweep();
+    decideCard(cards()[0].id, 'approved');
+    const halted = vi.spyOn(operationsHalt, 'isOperationsHalted').mockReturnValue(true);
+    await sweep();
+    expect(run).not.toHaveBeenCalled();
+    expect(cards()[0].applyClaim).toBeUndefined();
+    expect(cards()[0].applyResult).toBeUndefined();
+    halted.mockReturnValue(false);
+    await sweep();
+    expect(run.mock.calls.map((c) => c[0][0])).toEqual(['create']);
+    expect(cards()[0].applyResult?.result).toBe('success');
+  });
+
+  it('applies an approved card once when sweeps overlap', async () => {
+    await sweep();
+    decideCard(cards()[0].id, 'approved');
+    await Promise.allSettled([sweep(), sweep()]);
+    await sweep();
+    expect(run.mock.calls.map((c) => c[0][0])).toEqual(['create']);
+    expect(gates()).toHaveLength(1);
+    expect(cards()).toHaveLength(1);
+  });
+
+  it('opens no card when the verdict is not shadow', async () => {
+    vi.spyOn(autonomyGate, 'evaluateAutonomousOpsAction').mockReturnValue({
+      actionId: 'mission_start_mandate',
+      decision: 'approve',
+      allowed: false,
+      shadow: false,
+    } as ReturnType<typeof autonomyGate.evaluateAutonomousOpsAction>);
+    await sweep();
+    expect(cards()).toHaveLength(0);
+    expect(run).not.toHaveBeenCalled();
   });
 });

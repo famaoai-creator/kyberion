@@ -9,11 +9,13 @@ import {
   clearProviderHealth,
   reportProviderTemporarilyUnhealthy,
 } from '../provider/provider-health-registry.js';
+import { ShellClaudeCliBackend } from '../shell/shell-claude-cli-backend.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   dotBackendIsUnconfiguredStub,
   isDotToolBackendUnavailableError,
   resolveDotWakeBackend,
+  runDelegatedWake,
 } from './dot-wake-backend.js';
 
 const CHARTER: DotCharter = {
@@ -91,6 +93,23 @@ describe('resolveDotWakeBackend', () => {
       'fence'
     );
   });
+
+  it('chooses tool when the live candidate is the claude CLI with prompted tool calling', () => {
+    const claudeCli = new ShellClaudeCliBackend({ bin: 'claude' });
+    expect(resolveDotWakeBackend(CHARTER, claudeCli, { injected: true }).mode).toBe('tool');
+
+    // An API candidate demoted, the claude CLI still serves the tool loop.
+    const chain = buildFailoverReasoningBackend([
+      { backend: toolBackend, provider: 'anthropic' },
+      { backend: claudeCli, provider: 'claude-cli' },
+    ]);
+    reportProviderTemporarilyUnhealthy('anthropic', { retryAfterMs: 60_000 });
+    expect(resolveDotWakeBackend(CHARTER, chain).mode).toBe('tool');
+
+    // Opt-in off: the same CLI is advice-only again.
+    const offCli = new ShellClaudeCliBackend({ bin: 'claude', promptedToolCalling: false });
+    expect(resolveDotWakeBackend(CHARTER, offCli, { injected: true }).mode).toBe('fence');
+  });
 });
 
 describe('isDotToolBackendUnavailableError', () => {
@@ -107,6 +126,19 @@ describe('isDotToolBackendUnavailableError', () => {
     ).toBe(true);
     expect(isDotToolBackendUnavailableError('generateWithTools failed across 2 candidate(s)')).toBe(
       false
+    );
+  });
+});
+
+describe('runDelegatedWake', () => {
+  it("routes the delegated turn on the charter's authority role", async () => {
+    const delegateTask = vi.fn(async () => 'done');
+    // Unnamed port: an explicit test seam, so no provider permission profile applies.
+    await expect(runDelegatedWake(CHARTER, { delegateTask }, 'wake', 1_000)).resolves.toBe('done');
+    expect(delegateTask).toHaveBeenCalledWith(
+      'wake',
+      undefined,
+      expect.objectContaining({ role: 'infrastructure_sentinel', advisory: true })
     );
   });
 });

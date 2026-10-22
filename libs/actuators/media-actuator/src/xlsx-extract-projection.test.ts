@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { colLettersToNum, parseA1Range, projectXlsxDesign, unwrapCellValue } from './xlsx-extract-projection.js';
+import {
+  colLettersToNum,
+  parseA1Range,
+  projectXlsxDesign,
+  unwrapCellValue,
+} from './xlsx-extract-projection.js';
 
 const design = {
   version: '1.0.0',
@@ -7,9 +12,29 @@ const design = {
     {
       name: 'Sheet1',
       rows: [
-        { index: 1, cells: [{ ref: 'A1', value: 'hdr' }, { ref: 'C1', value: 60 }, { ref: 'AF1', value: 'total' }] },
-        { index: 5, cells: [{ ref: 'C5', value: 0 }, { ref: 'D5', value: 100 }, { ref: 'AF5', value: { formula: 'SUM', result: 100 } }] },
-        { index: 6, cells: [{ ref: 'C6', value: '' }, { ref: 'D6', value: null }] },
+        {
+          index: 1,
+          cells: [
+            { ref: 'A1', value: 'hdr' },
+            { ref: 'C1', value: 60 },
+            { ref: 'AF1', value: 'total' },
+          ],
+        },
+        {
+          index: 5,
+          cells: [
+            { ref: 'C5', value: 0 },
+            { ref: 'D5', value: 100 },
+            { ref: 'AF5', value: { formula: 'SUM', result: 100 } },
+          ],
+        },
+        {
+          index: 6,
+          cells: [
+            { ref: 'C6', value: '' },
+            { ref: 'D6', value: null },
+          ],
+        },
       ],
     },
     { name: '2410', rows: [{ index: 1, cells: [{ ref: 'A1', value: 'x' }] }] },
@@ -65,7 +90,17 @@ describe('projectXlsxDesign', () => {
   });
 
   it('records extraction metadata', () => {
-    const out = projectXlsxDesign(design, { sheet: 'Sheet1', range: '5:6', valuesOnly: true, skipZero: true });
-    expect(out.extracted).toEqual({ sheet: 'Sheet1', range: '5:6', values_only: true, skip_zero: true });
+    const out = projectXlsxDesign(design, {
+      sheet: 'Sheet1',
+      range: '5:6',
+      valuesOnly: true,
+      skipZero: true,
+    });
+    expect(out.extracted).toEqual({
+      sheet: 'Sheet1',
+      range: '5:6',
+      values_only: true,
+      skip_zero: true,
+    });
   });
 });

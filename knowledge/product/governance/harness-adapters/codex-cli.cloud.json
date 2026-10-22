@@ -11,7 +11,7 @@
       "result_kind": "task_ref+trace_ref",
       "approval_behavior": "pre_action",
       "replayability": "partial",
-      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "fallback_contract": "knowledge/product/schemas/a2a-task-contract.schema.json",
       "enabled": true,
       "owner": "platform_architecture",
       "notes": "Codex Cloud is useful when the provider-hosted task space is the most direct surface."

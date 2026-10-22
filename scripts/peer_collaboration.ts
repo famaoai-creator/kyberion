@@ -88,7 +88,7 @@ async function main(
       next_steps: [
         'Proposal acceptance is local authorization only — execution is not automatic.',
         `Track follow-up: pnpm work create-item --title "<proposal subject>" --tenant-slug ${tenantId} --assignee-peer-id ${peerId} --tier confidential`,
-        'Promote reusable runs: pnpm pipeline:promote --input active/shared/tmp/<run>.json --trace <traceId>',
+        `Promote reusable runs: pnpm pipeline:promote --input active/shared/tmp/<run>.json --trace <traceId> --tenant ${tenantId}`,
       ],
     };
   }

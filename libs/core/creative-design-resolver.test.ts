@@ -1,19 +1,32 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 
-const rootDirRef = vi.hoisted(() => ({ value: process.cwd() }));
-let rootDir = rootDirRef.value;
+// `import` statements are evaluated before any top-level `let`, and the modules
+// under test now read pathResolver.rootDir() while they initialize (governed
+// catalog -> lock-utils). The fixture root therefore has to exist before the
+// imports run, which is what vi.hoisted() is for. It stays inside the repo:
+// the real path guard rejects anything outside the repository root, and on
+// macOS os.tmpdir() sits behind a symlink.
+const fixture = vi.hoisted(() => {
+  const base = `${process.cwd()}/active/shared/tmp/creative-design-resolver-test`;
+  return { base, rootDir: base };
+});
 
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
-    knowledge: (sub = '') => path.join(rootDirRef.value, 'knowledge', sub),
+    // Schemas are repo assets, not fixture content, and several of them are
+    // resolved through knowledge() while the module initializes — so they have
+    // to point at the real tree the way rootResolve already does.
+    knowledge: (sub = '') =>
+      sub.startsWith('product/schemas/')
+        ? path.join(process.cwd(), 'knowledge', sub)
+        : path.join(fixture.rootDir, 'knowledge', sub),
     rootResolve: (sub = '') =>
       sub.startsWith('knowledge/product/schemas/')
         ? path.join(process.cwd(), sub)
-        : path.join(rootDirRef.value, sub),
-    rootDir: () => rootDirRef.value,
+        : path.join(fixture.rootDir, sub),
+    rootDir: () => fixture.rootDir,
   },
 }));
 
@@ -26,7 +39,7 @@ vi.mock('./secure-io.js', async () => {
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
   ): string => {
     const resolved = path.resolve(filePath);
-    const root = path.resolve(options.rootDir ?? rootDirRef.value);
+    const root = path.resolve(options.rootDir ?? fixture.rootDir);
     const relative = path.relative(root, resolved);
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       throw new Error('[RESOURCE_PATH_SCOPE]');
@@ -68,6 +81,10 @@ vi.mock('./secure-io.js', async () => {
     assertSafeRepositoryPath,
     safeLstat: (p: string) => actual.lstatSync(p),
     safeExistsSync: (p: string) => actual.existsSync(p),
+    // Tenant overlays are only loaded once the leaf proves to be a regular
+    // file; without this export the check throws into a silent catch and every
+    // tenant override degrades to brand defaults.
+    safeLstat: (p: string) => actual.lstatSync(p),
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
     loadJsonIfPresent: <T>(p: string): T | null => {
@@ -114,17 +131,27 @@ const BRAND_TOKENS = {
 };
 
 function write(rel: string, data: unknown): void {
-  const target = path.join(rootDir, rel);
+  const target = path.join(fixture.rootDir, rel);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, JSON.stringify(data, null, 2));
 }
 
 describe('creative-design-resolver', () => {
   beforeEach(() => {
-    rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-creative-design-'));
-    rootDirRef.value = rootDir;
+    fs.mkdirSync(fixture.base, { recursive: true });
+    fixture.rootDir = fs.mkdtempSync(path.join(fixture.base, 'run-'));
     write('knowledge/public/design-patterns/brand-tokens/kyberion.json', BRAND_TOKENS);
   });
+
+  // Each test gets its own run- directory and drops it again, so residue from
+  // an earlier run can never change a later one's result.
+  afterEach(() => {
+    if (fixture.rootDir !== fixture.base)
+      fs.rmSync(fixture.rootDir, { recursive: true, force: true });
+    fixture.rootDir = fixture.base;
+  });
+
+  afterAll(() => fs.rmSync(fixture.base, { recursive: true, force: true }));
 
   it('resolves brand defaults with light mode for pptx', () => {
     const resolved = resolveCreativeDesign({ surface: 'pptx' });
@@ -252,13 +279,13 @@ describe('creative-design-resolver', () => {
   });
 
   it('ignores a symlinked tenant design override', () => {
-    fs.mkdirSync(path.join(rootDir, 'knowledge/confidential/client-a/design'), {
+    fs.mkdirSync(path.join(fixture.rootDir, 'knowledge/confidential/client-a/design'), {
       recursive: true,
     });
     write('outside-theme.json', { brand_name: 'Outside brand' });
     fs.symlinkSync(
-      path.join(rootDir, 'outside-theme.json'),
-      path.join(rootDir, 'knowledge/confidential/client-a/design/tenant-override.json')
+      path.join(fixture.rootDir, 'outside-theme.json'),
+      path.join(fixture.rootDir, 'knowledge/confidential/client-a/design/tenant-override.json')
     );
 
     const resolved = resolveCreativeDesign({ surface: 'web', tenantSlug: 'client-a' });
@@ -294,7 +321,9 @@ describe('creative-design-resolver', () => {
   });
 
   it('survives a missing brand tokens file with fallback palette', () => {
-    fs.rmSync(path.join(rootDir, 'knowledge/public/design-patterns/brand-tokens/kyberion.json'));
+    fs.rmSync(
+      path.join(fixture.rootDir, 'knowledge/public/design-patterns/brand-tokens/kyberion.json')
+    );
     const resolved = resolveCreativeDesign({ surface: 'pptx' });
     expect(resolved.colors.accent).toBe('#0066cc');
   });

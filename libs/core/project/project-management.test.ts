@@ -33,6 +33,7 @@ import { withExecutionContextAsync } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
 import * as organizationOperatingModel from '../organization/organization-operating-model.js';
 import type { MissionState } from '../mission/mission-types.js';
+import { removeMissionFixture } from '../testing/mission-fixture.js';
 import {
   clearWorkCoordinationNamespace,
   clearWorkCoordinationStore,
@@ -111,8 +112,7 @@ function cleanup(): void {
     }
   }
   for (const tier of ['personal', 'confidential'] as const) {
-    const collisionPath = pathResolver.missionDir('MSN-PMC-TIER-COLLISION', tier);
-    if (safeExistsSync(collisionPath)) safeRmSync(collisionPath, { recursive: true, force: true });
+    removeMissionFixture({ missionId: 'MSN-PMC-TIER-COLLISION', tier });
   }
   const workspace = pathResolver.projectWorkspaceDir(
     BOOTSTRAP_PROJECT_ID,

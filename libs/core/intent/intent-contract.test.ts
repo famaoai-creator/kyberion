@@ -1245,7 +1245,7 @@ describe('formatClarificationPacketConcise', () => {
 
   it('shows only the first question in English', () => {
     const out = formatClarificationPacketConcise(packet, { locale: 'en' });
-    expect(out).toContain('meeting_url');
+    expect(out).toContain('meeting url');
     expect(out).toContain('What is the meeting URL?');
     expect(out).toContain('(+ 1 more)');
     expect(out).not.toContain('meeting_purpose');
@@ -1253,7 +1253,7 @@ describe('formatClarificationPacketConcise', () => {
 
   it('shows the first question in Japanese', () => {
     const out = formatClarificationPacketConcise(packet, { locale: 'ja' });
-    expect(out).toContain('meeting_url');
+    expect(out).toContain('meeting url');
     expect(out).toContain('次に必要な情報');
     expect(out).toContain('（他 1 件）');
     expect(out).not.toContain('meeting_purpose');
@@ -1271,7 +1271,7 @@ describe('formatClarificationPacketConcise', () => {
     const singlePacket = { ...packet, questions: [packet.questions[0]] };
     const out = formatClarificationPacketConcise(singlePacket, { locale: 'en' });
     expect(out).not.toContain('more');
-    expect(out).toContain('meeting_url');
+    expect(out).toContain('meeting url');
   });
 
   it('includes reason when present', () => {

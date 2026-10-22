@@ -14,9 +14,44 @@ import {
   clearScopeEnv,
   pushScopeEnv,
   popScopeEnv,
+  withScopeEnvOnly,
 } from './scope-context.js';
 
 describe('scope-context', () => {
+  it('keeps transported runtime scope independent of a destination persisted scope', () => {
+    const dir = pathResolver.sharedTmp(`scope-host-${process.pid}`);
+    const file = `${dir}/scope.env`;
+    const env = { KYBERION_SCOPE_ENV_PATH: file, KYBERION_TIER: 'public' };
+    safeMkdir(dir, { recursive: true });
+    try {
+      safeWriteFile(
+        file,
+        'KYBERION_TIER=confidential\nKYBERION_TENANT=destination-tenant\nKYBERION_ORGANIZATION_ID=destination-org\nMISSION_ID=MSN-DESTINATION\n'
+      );
+      const source = withScopeEnvOnly(() => resolveScopeContext({}, env));
+      expect(source).toEqual({ tier: 'public' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeContext({}, env), {
+          session_id: 'source-session',
+          work_shape: 'task_session',
+        })
+      ).toEqual({ tier: 'public', session_id: 'source-session', work_shape: 'task_session' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeResolution({}, env, { includePersisted: true })).scope
+      ).toEqual({ tier: 'public' });
+      expect(resolveScopeContext({}, env).tenant_slug).toBe('destination-tenant');
+      expect(
+        withScopeEnvOnly(() =>
+          resolveScopeContext(
+            {},
+            { ...env, KYBERION_TENANT: 'source-tenant', KYBERION_ORGANIZATION_ID: 'source-org' }
+          )
+        )
+      ).toEqual({ tier: 'public', tenant_slug: 'source-tenant', organization_id: 'source-org' });
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
   it('keeps customer stance separate from tenant scope', () => {
     const context = resolveScopeContext(
       { tier: 'confidential', customer_stance: 'kyberion-development-team' },
@@ -103,6 +138,38 @@ describe('scope-context', () => {
       'confidential/acme-corp/organizations/org-a/projects/project-a'
     );
     expect(resolution.knowledge_roots).not.toContain('confidential');
+  });
+
+  it('ignores a legacy mission project reference that has no organization', () => {
+    // Mission state is an inference source. Legacy state predates the chain and
+    // records a project with no organization above it; contributing that id
+    // makes currentScope() throw, and because reasoning-backend selection
+    // resolves the process scope at bootstrap, one stale mission then blocked
+    // unrelated CLI verbs — including the repair verb meant to fix it.
+    const missionDir = pathResolver.shared('tmp/scope-context-legacy-chain-test');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
+      JSON.stringify({
+        tier: 'confidential',
+        relationships: { project: { project_id: 'PRJ-UNREGISTERED' } },
+      })
+    );
+    const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
+    try {
+      const resolution = resolveScopeResolution(
+        { mission_id: 'legacy-chain-test' },
+        {},
+        { includePersisted: false, inferFromCwd: false }
+      );
+      expect(resolution.scope.project_id).toBeUndefined();
+      expect(resolution.scope.organization_id).toBeUndefined();
+      expect(() => currentScope({ mission_id: 'legacy-chain-test' }, {})).not.toThrow();
+    } finally {
+      findMissionPath.mockRestore();
+      resetCurrentScope();
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
   });
 
   it('uses the mission tier before the public default', () => {

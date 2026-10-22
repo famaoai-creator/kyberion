@@ -1,0 +1,12 @@
+{
+  "role": "decision_ledger",
+  "description": "Decision-ledger write authority: appends and promotes decisions under the active tenant's knowledge/confidential/{tenant}/decisions/ and customers/ only.",
+  "default_persona": "analyst",
+  "write_scopes": [
+    "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+    "knowledge/confidential/${KYBERION_TENANT}/customers/"
+  ],
+  "scope_classes": ["knowledge_core"],
+  "allowed_actuators": ["artifact-actuator"],
+  "tier_access": ["confidential"]
+}

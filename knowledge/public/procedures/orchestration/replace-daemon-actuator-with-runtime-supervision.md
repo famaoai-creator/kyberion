@@ -43,6 +43,6 @@ Use `process-actuator` when you need explicit runtime ownership for a process bu
 
 The old generation schedule daemon should now be expressed as a surface declaration:
 
-- [`generation-schedule-surface.json`](../../../product/governance/pipelines/generation-schedule-surface.json)
+- `generation-schedule-surface.json`（このブランチで廃止済み・リンク先なし）
 
 This keeps background process management inside the runtime supervisor instead of handing it off to OS-specific daemon files.

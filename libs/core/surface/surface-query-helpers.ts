@@ -302,7 +302,10 @@ async function readScheduleAgenda(
         confirmed: false,
       });
     }
-    return `Provider: ${scheduleSource}${calendarName ? ` / ${calendarName}` : ''}\n${t('surface:agenda_read_failed', { range: range.label, error: error?.message || String(error) })}`;
+    // The raw actuator error (often a multi-line script) stays in `notes` above
+    // for the operator log; the person gets one plain sentence and a way
+    // forward. Keep the i18n call so the wording stays translatable.
+    return t('surface:agenda_read_failed', { range: range.label });
   }
 }
 

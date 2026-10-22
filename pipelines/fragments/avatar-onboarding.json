@@ -10,7 +10,7 @@
     "required_inputs": "identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_style, consent_provider, consent_granted_by (capture_output_path / avatar_output_dir: empty = active profile root defaults)",
     "produced_channels": "capture_result, registration_result, generation_result",
     "failure_modes": "camera unavailable, host bridge hand-off (exit 100, rerun after the host saves the frames), missing per-run consent for a cloud or host-bridge provider, avatar generation failure, identity write failure",
-    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json",
+    "verification_command": "pnpm pipeline --input knowledge/product/pipeline-templates/create-my-avatar.json",
     "consent_note": "Cloud and host-bridge providers receive the photo only with a per-run consent: pass --context {\"consent_provider\":\"<provider id>\",\"consent_granted_by\":\"<who>\"}. Empty = local providers only.",
     "path_note": "Empty capture_output_path = <profileRoot>/tmp/avatar-capture.jpg (personal tier; moved to <profileRoot>/avatar.png by register_avatar and deleted on success and failure). Empty avatar_output_dir = <profileRoot>/avatar/draft (the generator default). The reference photo and the generated set stay separate; the stylised neutral frame never overwrites avatar.png.",
     "adoption_note": "The generated set waits in <profileRoot>/avatar/draft until adopted with concierge Settings > Voice > avatar > \"Use this avatar\" (setup action avatar_use), which promotes it to <profileRoot>/avatar and points identity avatar_profile at it."

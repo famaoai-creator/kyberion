@@ -1,0 +1,25 @@
+{
+  "$schema": "../schemas/cognitive-routing-palette.schema.json",
+  "version": "1.0.0",
+  "default_mode": "balance",
+  "modes": {
+    "cost": {
+      "heavy_marker_min": 4,
+      "heavy_risk_threshold": 72,
+      "heavy_uncertainty_threshold": 70,
+      "fanout": "explicit_only"
+    },
+    "balance": {
+      "heavy_marker_min": 2,
+      "heavy_risk_threshold": 36,
+      "heavy_uncertainty_threshold": 34,
+      "fanout": "explicit_or_uncertain"
+    },
+    "intelligence": {
+      "heavy_marker_min": 1,
+      "heavy_risk_threshold": 18,
+      "heavy_uncertainty_threshold": 16,
+      "fanout": "explicit_or_heavy"
+    }
+  }
+}

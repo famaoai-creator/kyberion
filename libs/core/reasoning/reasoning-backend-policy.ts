@@ -60,6 +60,8 @@ export interface ReasoningBackendPolicy {
   }>;
   default_mode: ReasoningBackendMode;
   openrouter?: ReasoningBackendOpenRouterPolicy;
+  /** Per CLI mode: expose `generateWithTools` via the prompted tool protocol. */
+  prompted_tool_calling?: Partial<Record<ReasoningBackendMode, boolean>>;
   tenant_overrides?: Record<
     string,
     Partial<Pick<ReasoningBackendPolicy, 'allowed_modes' | 'default_mode'>>
@@ -97,6 +99,23 @@ const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
   return policyCatalog.load();
+}
+
+/**
+ * Whether `mode` may expose `generateWithTools` through the prompted
+ * tool-calling protocol (`prompted_tool_calling` in the policy). An explicit
+ * policy value wins; when the policy omits the mode, only `claude-cli` is on.
+ * An unreadable policy keeps the same default rather than failing a backend's
+ * construction.
+ */
+export function isPromptedToolCallingEnabled(mode: ReasoningBackendMode): boolean {
+  const fallback = mode === 'claude-cli';
+  try {
+    const value = loadReasoningBackendPolicy().prompted_tool_calling?.[mode];
+    return typeof value === 'boolean' ? value : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {

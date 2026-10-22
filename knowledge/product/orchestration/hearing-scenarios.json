@@ -1,6 +1,7 @@
 {
   "$schema": "../schemas/hearing-scenarios.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "default_scenario": "web_app_build",
   "scenarios": [
     {
       "id": "web_app_build",
@@ -40,6 +41,23 @@
           "id": "success",
           "label_key": "front_desk:hearing_req_success",
           "aliases": ["acceptance"]
+        }
+      ],
+      "phases": [
+        {
+          "id": "purpose",
+          "title_key": "front_desk:hearing_phase_purpose",
+          "requirement_ids": ["audience", "problem"]
+        },
+        {
+          "id": "shape",
+          "title_key": "front_desk:hearing_phase_shape",
+          "requirement_ids": ["core_flow", "content", "visual_direction"]
+        },
+        {
+          "id": "limits",
+          "title_key": "front_desk:hearing_phase_limits",
+          "requirement_ids": ["constraints", "success"]
         }
       ],
       "canvas": "web_app_preview",
@@ -93,6 +111,72 @@
       ],
       "canvas": "work_inventory_table",
       "handoff": "work_inventory"
+    },
+    {
+      "id": "process_improvement",
+      "label_key": "front_desk:hearing_scenario_process",
+      "description_key": "front_desk:hearing_scenario_process_sub",
+      "requirements": [
+        {
+          "id": "who_does",
+          "label_key": "front_desk:hearing_req_who_does",
+          "aliases": ["who", "owner"]
+        },
+        {
+          "id": "what_happens",
+          "label_key": "front_desk:hearing_req_what_happens",
+          "aliases": ["process", "steps"]
+        },
+        {
+          "id": "frequency",
+          "label_key": "front_desk:hearing_req_frequency",
+          "aliases": ["how_often"]
+        },
+        {
+          "id": "pain_point",
+          "label_key": "front_desk:hearing_req_pain_point",
+          "aliases": ["problem", "issue"]
+        },
+        {
+          "id": "impact",
+          "label_key": "front_desk:hearing_req_impact",
+          "aliases": ["cost", "risk"]
+        },
+        {
+          "id": "desired_state",
+          "label_key": "front_desk:hearing_req_desired_state",
+          "aliases": ["goal", "to_be"]
+        },
+        {
+          "id": "success_measure",
+          "label_key": "front_desk:hearing_req_success_measure",
+          "aliases": ["kpi", "success"]
+        },
+        {
+          "id": "boundaries",
+          "label_key": "front_desk:hearing_req_boundaries",
+          "aliases": ["constraints", "limits"]
+        }
+      ],
+      "phases": [
+        {
+          "id": "current",
+          "title_key": "front_desk:hearing_phase_current",
+          "requirement_ids": ["who_does", "what_happens", "frequency"]
+        },
+        {
+          "id": "pain",
+          "title_key": "front_desk:hearing_phase_pain",
+          "requirement_ids": ["pain_point", "impact"]
+        },
+        {
+          "id": "target",
+          "title_key": "front_desk:hearing_phase_target",
+          "requirement_ids": ["desired_state", "success_measure", "boundaries"]
+        }
+      ],
+      "canvas": "web_app_preview",
+      "handoff": "mission"
     }
   ]
 }

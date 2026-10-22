@@ -8,9 +8,9 @@ import {
   mutateTenant,
   type TenantLifecycleVerb,
   listTenants,
-  renameTenant,
   deleteTenant,
 } from '@agent/core/organization/tenant-governance';
+import { renameTenantWithPlan } from '@agent/core/organization/tenant-rename';
 import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
@@ -61,6 +61,8 @@ type Args = {
   to?: string;
   purgeData?: boolean;
   displayName?: string;
+  keepOrganizationId?: boolean;
+  noScan?: boolean;
   assignedRole?: string;
   knowledgeRoot?: string;
   provider?: string;
@@ -111,6 +113,8 @@ function parseArgs(argv: string[]): Args {
     else if (arg === '--to') result.to = rest[++i];
     else if (arg === '--purge-data') result.purgeData = true;
     else if (arg === '--display-name') result.displayName = rest[++i];
+    else if (arg === '--keep-organization-id') result.keepOrganizationId = true;
+    else if (arg === '--no-scan') result.noScan = true;
     else if (arg === '--assigned-role') result.assignedRole = rest[++i];
     else if (arg === '--knowledge-root') result.knowledgeRoot = rest[++i];
     else if (arg === '--provider') result.provider = rest[++i];
@@ -127,7 +131,7 @@ function parseArgs(argv: string[]): Args {
 function usage(): string {
   return [
     'Usage: pnpm tenant <create|update|suspend|resume|archive|rename|delete|list|show|attest-provider> [slug] [options]',
-    '  rename <slug> --to <new-slug> --apply',
+    '  rename <slug> --to <new-slug> --apply [--display-name <text>] [--keep-organization-id] [--no-scan]',
     '      Renames the registry entry; the default knowledge/confidential/<slug>',
     '      directory moves with it (a custom --knowledge-root path is left as-is).',
     '  delete <slug> --apply --accept [--purge-data]',
@@ -170,7 +174,14 @@ export function main(
   if (args.command === 'rename') {
     const result = runUnbound(() =>
       withExecutionContext('sovereign_concierge', () =>
-        renameTenant({ slug: args.slug!, to: args.to ?? '', apply: args.apply })
+        renameTenantWithPlan({
+          fromSlug: args.slug!,
+          toSlug: args.to ?? '',
+          displayName: args.displayName,
+          renameOrganization: !args.keepOrganizationId,
+          scanResidual: !args.noScan,
+          apply: args.apply,
+        })
       )
     );
     print(JSON.stringify(result, null, 2));

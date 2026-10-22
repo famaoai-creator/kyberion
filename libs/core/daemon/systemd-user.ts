@@ -38,7 +38,7 @@ Description=Kyberion daemon: ${spec.id}
 [Service]
 Type=${spec.startIntervalSec ? 'oneshot' : 'simple'}
 WorkingDirectory=${ctx.repoRoot}
-Environment=PATH=${path.posix.dirname(ctx.nodePath)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+Environment=PATH=${[...new Set([path.posix.dirname(ctx.nodePath), ...(ctx.userPath ?? []), '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'])].join(':')}
 ${envLines ? `${envLines}\n` : ''}ExecStartPre=/bin/mkdir -p ${logDir(ctx)}
 ExecStart=${ctx.nodePath} ${daemonScript}${(spec.daemonArgs ?? []).map((arg) => ` ${arg}`).join('')}
 ${restart}StandardOutput=append:${path.posix.join(logDir(ctx), `${spec.logBaseName}.log`)}

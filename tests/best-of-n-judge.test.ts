@@ -125,6 +125,12 @@ async function seedMission(risk: string): Promise<void> {
   );
 }
 
+// Two candidate runs plus a judge pass, each seeding and reading a real mission
+// on disk — measured ~23s locally under a parallel suite run, against the 10s
+// default. Declared per test so the cost stays visible where it is paid rather
+// than by loosening the global bound (see vitest.config.mts).
+const BEST_OF_N_TIMEOUT_MS = 60_000;
+
 describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
   // The worker stack is imported once per file, here, and every later
   // `await import` hits the module cache. Re-importing the secure-io /
@@ -202,60 +208,64 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     }
   }, 60_000);
 
-  it('runs two candidates + judge for high-risk tasks and adopts the winner', async () => {
-    await seedMission('high');
-    mocks.route.mockImplementation(async (envelope: any) => {
-      const prompt = String(envelope?.payload?.text || '');
-      if (prompt.includes('independent judge')) {
-        return {
-          payload: {
-            text: JSON.stringify({
-              winner: 'B',
-              rationale: 'B handles edge cases',
-              merge_hints: ['keep A error message wording'],
-            }),
-          },
-        };
-      }
-      if (prompt.includes('best-of-N candidate A')) {
-        return { payload: { text: makeTaskResultText('Candidate A minimal implementation.') } };
-      }
-      if (prompt.includes('best-of-N candidate B')) {
-        return { payload: { text: makeTaskResultText('Candidate B robust implementation.') } };
-      }
-      return { payload: { text: makeTaskResultText('unexpected single-shot call') } };
-    });
+  it(
+    'runs two candidates + judge for high-risk tasks and adopts the winner',
+    async () => {
+      await seedMission('high');
+      mocks.route.mockImplementation(async (envelope: any) => {
+        const prompt = String(envelope?.payload?.text || '');
+        if (prompt.includes('independent judge')) {
+          return {
+            payload: {
+              text: JSON.stringify({
+                winner: 'B',
+                rationale: 'B handles edge cases',
+                merge_hints: ['keep A error message wording'],
+              }),
+            },
+          };
+        }
+        if (prompt.includes('best-of-N candidate A')) {
+          return { payload: { text: makeTaskResultText('Candidate A minimal implementation.') } };
+        }
+        if (prompt.includes('best-of-N candidate B')) {
+          return { payload: { text: makeTaskResultText('Candidate B robust implementation.') } };
+        }
+        return { payload: { text: makeTaskResultText('unexpected single-shot call') } };
+      });
 
-    const { missionDir } = await import('../libs/core/path-resolver.js');
-    const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
+      const { missionDir } = await import('../libs/core/path-resolver.js');
+      const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
 
-    await dispatch(MISSION);
+      await dispatch(MISSION);
 
-    expect(mocks.route).toHaveBeenCalledTimes(3);
-    expect(mocks.recordMissionContextTask).toHaveBeenCalledWith(
-      MISSION,
-      'Completed work item task-1',
-      expect.objectContaining({ task_id: 'task-1' })
-    );
-    const stored = JSON.parse(
-      safeReadFile(`${missionDir(MISSION, 'public')}/NEXT_TASKS.json`, {
-        encoding: 'utf8',
-      }) as string
-    );
-    expect(stored[0].last_result.summary).toContain('Candidate B robust implementation.');
+      expect(mocks.route).toHaveBeenCalledTimes(3);
+      expect(mocks.recordMissionContextTask).toHaveBeenCalledWith(
+        MISSION,
+        'Completed work item task-1',
+        expect.objectContaining({ task_id: 'task-1' })
+      );
+      const stored = JSON.parse(
+        safeReadFile(`${missionDir(MISSION, 'public')}/NEXT_TASKS.json`, {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(stored[0].last_result.summary).toContain('Candidate B robust implementation.');
 
-    const loserPath = `${missionDir(MISSION, 'public')}/evidence/alternatives/task-1-candidate-A.json`;
-    expect(safeExistsSync(loserPath)).toBe(true);
-    const loser = JSON.parse(safeReadFile(loserPath, { encoding: 'utf8' }) as string);
-    expect(loser.winner).toBe('B');
-    expect(loser.task_result.summary).toContain('Candidate A minimal implementation.');
+      const loserPath = `${missionDir(MISSION, 'public')}/evidence/alternatives/task-1-candidate-A.json`;
+      expect(safeExistsSync(loserPath)).toBe(true);
+      const loser = JSON.parse(safeReadFile(loserPath, { encoding: 'utf8' }) as string);
+      expect(loser.winner).toBe('B');
+      expect(loser.task_result.summary).toContain('Candidate A minimal implementation.');
 
-    const judgeEvents = mocks.emitMissionTaskEvent.mock.calls
-      .map((call) => call[0])
-      .filter((event: any) => event.decision === 'best_of_judged');
-    expect(judgeEvents).toHaveLength(1);
-    expect(judgeEvents[0].payload.winner).toBe('B');
-  });
+      const judgeEvents = mocks.emitMissionTaskEvent.mock.calls
+        .map((call) => call[0])
+        .filter((event: any) => event.decision === 'best_of_judged');
+      expect(judgeEvents).toHaveLength(1);
+      expect(judgeEvents[0].payload.winner).toBe('B');
+    },
+    BEST_OF_N_TIMEOUT_MS
+  );
 
   it('keeps normal-risk tasks single-shot', async () => {
     await seedMission('medium');

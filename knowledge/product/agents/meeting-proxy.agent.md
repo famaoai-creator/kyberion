@@ -77,7 +77,7 @@ operator's voice and identity are personal data.
 ## Reference
 
 - [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator/)
-- [`pipelines/meeting-proxy-workflow.json`](../../../pipelines/meeting-proxy-workflow.json)
+- [`knowledge/product/pipeline-templates/meeting-proxy-workflow.json`](../pipeline-templates/meeting-proxy-workflow.json)
 - [`knowledge/product/pipeline-templates/voice-recording-session.json`](../../../knowledge/product/pipeline-templates/voice-recording-session.json)
 - [`knowledge/product/pipeline-templates/voice-learning-setup.json`](../../../knowledge/product/pipeline-templates/voice-learning-setup.json)
 - [`knowledge/product/pipeline-templates/voice-instant-clone.json`](../../../knowledge/product/pipeline-templates/voice-instant-clone.json)

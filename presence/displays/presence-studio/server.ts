@@ -1,3 +1,12 @@
+import * as path from 'node:path';
+import * as presenceStudioData from './presence-studio-runtime-data.js';
+// Install the real reasoning/intent/voice backend chain before any route
+// registers — without this, `getReasoningBackend()` (the `/api/conversation`
+// orchestrator fallback, the voice-minutes path, and the hearing canvas)
+// always resolves to the stub even when `KYBERION_REASONING_BACKEND` selects
+// a real provider (mirrors `scripts/mission_controller.ts` / `scripts/cli.ts`,
+// the other two long-lived processes that call this at startup).
+// `installReasoningBackends()` itself honors `KYBERION_REASONING_BACKEND=stub`.
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { localeToBcp47, normalizeLocale } from '@agent/core/locale-normalize';
@@ -19,7 +28,7 @@ import {
 } from '@agent/core/browser/browser-conversation-session';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
-import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
+import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';
 import {
   listSurfaceAsyncRequestsAcrossChannels,
   listSurfaceNotificationsAcrossChannels,
@@ -43,7 +52,6 @@ import {
 } from '@agent/core/voice/voice-selection-preferences';
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
-import * as path from 'node:path';
 import {
   PresenceStudioViewerError,
   presenceStudioApprovalDecisionSchema,
@@ -78,35 +86,20 @@ import {
   listEmailAccountProviders,
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
 } from '@agent/core/integrations/email-workflow';
-import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { registerApprovalInboxRoutes } from './approval-inbox-routes.js';
 // C7: shared poll loop (fixed cadence preserved; see tail).
 import { startBridgePollLoop } from '../../../satellites/shared/bridge-poll-loop.js';
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';
 import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
+import { registerHearingLedgerRoutes } from './hearing-ledger-routes.js';
+import { registerComponentHostRoutes } from './component-host-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
 import { registerVoiceSynthesizeRoute } from './voice-synthesize-route.js';
 import { registerWorkInventoryRoutes } from './work-inventory-routes.js';
 import { registerAvatarRoutes } from './avatar-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
-
-// Install the real reasoning/intent/voice backend chain before any route
-// registers — without this, `getReasoningBackend()` (the `/api/conversation`
-// orchestrator fallback, the voice-minutes path, and the hearing canvas)
-// always resolves to the stub even when `KYBERION_REASONING_BACKEND` selects
-// a real provider (mirrors `scripts/mission_controller.ts` / `scripts/cli.ts`,
-// the other two long-lived processes that call this at startup).
-// `installReasoningBackends()` itself honors `KYBERION_REASONING_BACKEND=stub`;
-// this call must never fail startup, so any error is logged and swallowed.
-try {
-  const nonStub = installReasoningBackends();
-  logger.info(`[presence-studio] reasoning backend ${nonStub ? 'installed' : 'stub'}`);
-} catch (error) {
-  logger.warn(
-    `[presence-studio] installReasoningBackends failed, continuing with stub: ${error instanceof Error ? error.message : String(error)}`
-  );
-}
+installReasoningBackendsForService('presence-studio');
 
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
   const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
@@ -164,6 +157,13 @@ registerFrontDeskRoutes(presenceStudioData.app);
 // (same guard order) — see hearing-routes.ts / training-routes.ts module docs.
 registerHearingRoutes(presenceStudioData.app);
 registerHearingMissionRoutes(presenceStudioData.app);
+// SD-02〜04: the hearing surface as the entrance of the decision ledger (SSOD) —
+// `GET /api/hearing/decisions/agenda` and `POST /api/hearing/:session/record-decisions`,
+// see hearing-ledger-routes.ts.
+registerHearingLedgerRoutes(presenceStudioData.app);
+// AU-02/03: the component host — `/flow/:component`, `/api/components`,
+// `/api/flow-vocabulary`, `/api/headless/a2ui/hearing` (component-host-routes.ts).
+registerComponentHostRoutes(presenceStudioData.app, presenceStudioData.staticDir);
 registerTrainingRoutes(presenceStudioData.app);
 // WI-11: work-inventory automation-candidate panel for the progress page —
 // see work-inventory-routes.ts module doc.

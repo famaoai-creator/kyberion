@@ -6831,6 +6831,91 @@
         "ja": "進め方の手順",
         "qps-ploc": "⟦Ẇőřķƒŀőẇ şŧėṗş ŀőřė⟧"
       },
+      "chronos_status": {
+        "en": "status",
+        "ja": "状態",
+        "qps-ploc": "⟦şŧȧŧůş ŀőř⟧"
+      },
+      "chronos_kind": {
+        "en": "kind",
+        "ja": "種別",
+        "qps-ploc": "⟦ķïñḓ ŀőř⟧"
+      },
+      "chronos_tier": {
+        "en": "tier",
+        "ja": "tier",
+        "qps-ploc": "⟦ŧïėř ŀőř⟧"
+      },
+      "chronos_source": {
+        "en": "source",
+        "ja": "出所",
+        "qps-ploc": "⟦şőůřƈė ŀőř⟧"
+      },
+      "chronos_service": {
+        "en": "service",
+        "ja": "サービス",
+        "qps-ploc": "⟦şėřṽïƈė ŀőř⟧"
+      },
+      "chronos_specialist": {
+        "en": "specialist",
+        "ja": "スペシャリスト",
+        "qps-ploc": "⟦şṗėƈïȧŀïşŧ ŀőř⟧"
+      },
+      "chronos_archive": {
+        "en": "archive",
+        "ja": "アーカイブ",
+        "qps-ploc": "⟦ȧřƈħïṽė ŀőř⟧"
+      },
+      "chronos_promote": {
+        "en": "promote",
+        "ja": "昇格",
+        "qps-ploc": "⟦ṗřőɱőŧė ŀőř⟧"
+      },
+      "chronos_approvals": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "chronos_no_pending_approvals": {
+        "en": "No pending approvals.",
+        "ja": "保留中の承認はありません。",
+        "qps-ploc": "⟦Ñő ṗėñḓïñɠ ȧṗṗřőṽȧŀş. ŀőřėɱ ⟧"
+      },
+      "chronos_task": {
+        "en": "task",
+        "ja": "task",
+        "qps-ploc": "⟦ŧȧşķ ŀőř⟧"
+      },
+      "chronos_pipeline_role": {
+        "en": "Pipeline is a replayable execution procedure, not a parent container.",
+        "ja": "Pipeline は再実行できる実行手順であり、親コンテナではありません。",
+        "qps-ploc": "⟦Ṗïṗėŀïñė ïş ȧ řėṗŀȧẏȧƀŀė ėẋėƈůŧïőñ ṗřőƈėḓůřė, ñőŧ ȧ ṗȧřėñŧ ƈőñŧȧïñėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "chronos_project_hierarchy": {
+        "en": "Project → Track → Mission → Task / Task Session",
+        "ja": "Project → Track → Mission → Task / Task Session",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ → Ŧřȧƈķ → Ɱïşşïőñ → Ŧȧşķ / Ŧȧşķ Şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_lineage_counts": {
+        "en": "counts",
+        "ja": "件数",
+        "qps-ploc": "⟦ƈőůñŧş ŀőř⟧"
+      },
+      "chronos_distill_candidates": {
+        "en": "Distill Candidates",
+        "ja": "蒸留候補",
+        "qps-ploc": "⟦Ḓïşŧïŀŀ Ƈȧñḓïḓȧŧėş ŀőřėɱ⟧"
+      },
+      "chronos_no_distill_candidates": {
+        "en": "No distill candidates recorded yet.",
+        "ja": "蒸留候補はまだ記録されていません。",
+        "qps-ploc": "⟦Ñő ḓïşŧïŀŀ ƈȧñḓïḓȧŧėş řėƈőřḓėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_distill_candidates_description": {
+        "en": "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.",
+        "ja": "完了した仕事は再利用できる組織の記憶になります。このキューは、後からパターン・SOP・統制されたナレッジへ昇格できる、成果に裏付けられた候補を示します。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ŧħïş ɋůėůė ħïɠħŀïɠħŧş őůŧƈőɱė-ƀȧƈķėḓ ƈȧñḓïḓȧŧėş ŧħȧŧ ɱȧẏ ƀė ṗřőɱőŧėḓ ïñŧő ṗȧŧŧėřñş, ŞŐṖş, őř ɠőṽėřñėḓ ķñőẇŀėḓɠė ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ⟧"
+      },
       "learned_patterns_available": {
         "en": "Learned patterns such as {titles} are also available.",
         "ja": "過去の learned pattern（{titles}）も参照できます。",
@@ -8153,10 +8238,35 @@
         "ja": "テナントのドリフトを監視",
         "qps-ploc": "⟦Ẇȧŧƈħ ƒőř ŧėñȧñŧ ḓřïƒŧ ŀőřėɱ ï⟧"
       },
+      "cli_cmd_script_pipeline_accept": {
+        "en": "Accept a pipeline run as the approved baseline",
+        "ja": "パイプライン実行を承認済みの基準として受理",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ȧ ṗïṗėŀïñė řůñ ȧş ŧħė ȧṗṗřőṽėḓ ƀȧşėŀïñė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_mission_residue": {
+        "en": "Purge leftover state from finished missions",
+        "ja": "終了したミッションの残留状態を掃除",
+        "qps-ploc": "⟦Ṗůřɠė ŀėƒŧőṽėř şŧȧŧė ƒřőɱ ƒïñïşħėḓ ɱïşşïőñş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_reasoning_compare": {
+        "en": "Compare reasoning backends on the same prompt",
+        "ja": "同じプロンプトで推論バックエンドを比較",
+        "qps-ploc": "⟦Ƈőɱṗȧřė řėȧşőñïñɠ ƀȧƈķėñḓş őñ ŧħė şȧɱė ṗřőɱṗŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_decisions": {
+        "en": "Work with the decision ledger",
+        "ja": "決定台帳を操作",
+        "qps-ploc": "⟦Ẇőřķ ẇïŧħ ŧħė ḓėƈïşïőñ ŀėḓɠėř ŀőřėɱ ïṗş⟧"
+      },
       "cli_cmd_script_pipeline_promote": {
-        "en": "Promote a successful one-off run into a pipeline",
-        "ja": "成功した単発実行をパイプラインに昇格",
-        "qps-ploc": "⟦Ṗřőɱőŧė ȧ şůƈƈėşşƒůŀ őñė-őƒƒ řůñ ïñŧő ȧ ṗïṗėŀïñė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+        "en": "Promote a successful one-off run into the public pipeline catalog, or a tenant catalog with --tenant",
+        "ja": "成功した単発実行をパイプラインに昇格（公開カタログ、--tenant 指定時はテナントのカタログ）",
+        "qps-ploc": "⟦Ṗřőɱőŧė ȧ şůƈƈėşşƒůŀ őñė-őƒƒ řůñ ïñŧő ŧħė ṗůƀŀïƈ ṗïṗėŀïñė ƈȧŧȧŀőɠ, őř ȧ ŧėñȧñŧ ƈȧŧȧŀőɠ ẇïŧħ --ŧėñȧñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "cli_cmd_script_scratch_promote": {
+        "en": "Keep a useful scratch directory as a tenant or public tool before tmp cleanup",
+        "ja": "一時領域の有用な作業ディレクトリを、削除前にテナントまたは公開のツールとして保存",
+        "qps-ploc": "⟦Ķėėṗ ȧ ůşėƒůŀ şƈřȧŧƈħ ḓïřėƈŧőřẏ ȧş ȧ ŧėñȧñŧ őř ṗůƀŀïƈ ŧőőŀ ƀėƒőřė ŧɱṗ ƈŀėȧñůṗ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
       "cli_cmd_script_inventory": {
         "en": "Manage the work inventory",
@@ -18904,6 +19014,51 @@
         "ja": "キャンセル",
         "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
       },
+      "action_propose_compare": {
+        "en": "Propose a comparison run",
+        "ja": "比較ランの提案",
+        "qps-ploc": "⟦Ṗřőṗőşė ȧ ƈőɱṗȧřïşőñ řůñ ŀőřėɱ ï⟧"
+      },
+      "action_propose_compare_description": {
+        "en": "Draft a CLI proposal that compares the same request across several backends. Nothing runs.",
+        "ja": "同じ依頼を複数 backend で比較する CLI 用の提案を作ります。実行はしません。",
+        "qps-ploc": "⟦Ḓřȧƒŧ ȧ ƇĿÏ ṗřőṗőşȧŀ ŧħȧŧ ƈőɱṗȧřėş ŧħė şȧɱė řėɋůėşŧ ȧƈřőşş şėṽėřȧŀ ƀȧƈķėñḓş. Ñőŧħïñɠ řůñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "field_optimize_for": {
+        "en": "Optimize for",
+        "ja": "最適化の方針",
+        "qps-ploc": "⟦Őṗŧïɱïẑė ƒőř ŀőř⟧"
+      },
+      "option_optimize_default": {
+        "en": "Default (Balance)",
+        "ja": "既定（Balance）",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ (Ƀȧŀȧñƈė) ŀőřėɱ⟧"
+      },
+      "option_optimize_cost": {
+        "en": "Cost",
+        "ja": "Cost",
+        "qps-ploc": "⟦Ƈőşŧ ŀőř⟧"
+      },
+      "option_optimize_balance": {
+        "en": "Balance",
+        "ja": "Balance",
+        "qps-ploc": "⟦Ƀȧŀȧñƈė ŀőř⟧"
+      },
+      "option_optimize_intelligence": {
+        "en": "Intelligence",
+        "ja": "Intelligence",
+        "qps-ploc": "⟦Ïñŧėŀŀïɠėñƈė ŀőř⟧"
+      },
+      "action_propose_compare_empty": {
+        "en": "Enter the request you want to compare.",
+        "ja": "比較したい依頼文を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧħė řėɋůėşŧ ẏőů ẇȧñŧ ŧő ƈőɱṗȧřė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "action_propose_compare_done": {
+        "en": "Drafted a comparison-run proposal. Run it with pnpm reasoning:compare --instruction … --explicit.",
+        "ja": "比較ランの提案を作りました。実行は pnpm reasoning:compare --instruction … --explicit です。",
+        "qps-ploc": "⟦Ḓřȧƒŧėḓ ȧ ƈőɱṗȧřïşőñ-řůñ ṗřőṗőşȧŀ. Řůñ ïŧ ẇïŧħ ṗñṗɱ řėȧşőñïñɠ:ƈőɱṗȧřė --ïñşŧřůƈŧïőñ … --ėẋṗŀïƈïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
       "plugin_views_title": {
         "en": "Plugin views",
         "ja": "プラグインビュー",
@@ -20595,6 +20750,36 @@
         "en": " (audio was too short; minutes were not generated)",
         "ja": " （音声が短すぎたため議事録は未生成）",
         "qps-ploc": "⟦ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "flag_invalid": {
+        "en": "Invalid value for {flag}: {value}",
+        "ja": "{flag} の値が不正です: {value}",
+        "qps-ploc": "⟦Ïñṽȧŀïḓ ṽȧŀůė ƒőř {flag}: {value} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "source_check_hint": {
+        "en": "Muting in Teams/Zoom does not affect the Mac's own microphone. Remote voices need the speaker output routed to BlackHole (Multi-Output Device) before the meeting starts.",
+        "ja": "Teams/Zoom 側のミュートは Mac 本体のマイク入力には効きません。リモートの声は、会議の前にスピーカー出力を BlackHole へ回す(複数出力装置)必要があります。",
+        "qps-ploc": "⟦Ɱůŧïñɠ ïñ Ŧėȧɱş/Ẑőőɱ ḓőėş ñőŧ ȧƒƒėƈŧ ŧħė Ɱȧƈ'ş őẇñ ɱïƈřőṗħőñė. Řėɱőŧė ṽőïƈėş ñėėḓ ŧħė şṗėȧķėř őůŧṗůŧ řőůŧėḓ ŧő ɃŀȧƈķĦőŀė (Ɱůŀŧï-Őůŧṗůŧ Ḓėṽïƈė) ƀėƒőřė ŧħė ɱėėŧïñɠ şŧȧřŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "source_check_macos_only": {
+        "en": "Source check is available on macOS only. Pass --device explicitly on this platform.",
+        "ja": "取得元のチェックは macOS のみ対応です。このプラットフォームでは --device を明示してください。",
+        "qps-ploc": "⟦Şőůřƈė ƈħėƈķ ïş ȧṽȧïŀȧƀŀė őñ ɱȧƈŐŞ őñŀẏ. Ṗȧşş --ḓėṽïƈė ėẋṗŀïƈïŧŀẏ őñ ŧħïş ṗŀȧŧƒőřɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "silence_warning": {
+        "en": "No sound captured for {seconds}s. The source may be wrong or muted — check with: pnpm minutes:record --check",
+        "ja": "{seconds}秒間、音声が取れていません。取得元の誤りやミュートの可能性があります。確認: pnpm minutes:record --check",
+        "qps-ploc": "⟦Ñő şőůñḓ ƈȧṗŧůřėḓ ƒőř {seconds}ş. Ŧħė şőůřƈė ɱȧẏ ƀė ẇřőñɠ őř ɱůŧėḓ — ƈħėƈķ ẇïŧħ: ṗñṗɱ ɱïñůŧėş:řėƈőřḓ --ƈħėƈķ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "work_item_title": {
+        "en": "Create minutes ({missionId})",
+        "ja": "議事録作成 ({missionId})",
+        "qps-ploc": "⟦Ƈřėȧŧė ɱïñůŧėş ({missionId}) ŀőřėɱ ïṗş⟧"
+      },
+      "work_item_description": {
+        "en": "Create minutes and action items from the recording of mission {missionId}",
+        "ja": "ミッション {missionId} の録音から議事録とアクションアイテムを作成する",
+        "qps-ploc": "⟦Ƈřėȧŧė ɱïñůŧėş ȧñḓ ȧƈŧïőñ ïŧėɱş ƒřőɱ ŧħė řėƈőřḓïñɠ őƒ ɱïşşïőñ {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "segment_transcription_failed": {
         "en": "(Transcription of segment {segment} failed: {detail})",
@@ -22808,9 +22993,9 @@
         "qps-ploc": "⟦Ȧşşůɱïñɠ ŧħė ṗėřïőḓ {range}. ŀőřėɱ ïṗş⟧"
       },
       "agenda_read_failed": {
-        "en": "Tried to fetch events for {range}, but calendar-actuator could not read them: {error}",
-        "ja": "{range} の予定を取得しようとしましたが、calendar-actuator で読めませんでした: {error}",
-        "qps-ploc": "⟦Ŧřïėḓ ŧő ƒėŧƈħ ėṽėñŧş ƒőř {range}, ƀůŧ ƈȧŀėñḓȧř-ȧƈŧůȧŧőř ƈőůŀḓ ñőŧ řėȧḓ ŧħėɱ: {error} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+        "en": "I could not read the schedule for {range} just now. Please open the calendar directly, or ask me again later.",
+        "ja": "{range} の予定はいま読めませんでした。カレンダーを直接開いていただくか、あとでもう一度お願いしてください。",
+        "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ řėȧḓ ŧħė şƈħėḓůŀė ƒőř {range} ĵůşŧ ñőẇ. Ṗŀėȧşė őṗėñ ŧħė ƈȧŀėñḓȧř ḓïřėƈŧŀẏ, őř ȧşķ ɱė ȧɠȧïñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
       },
       "operator_event_question": {
         "en": "❓ Question",
@@ -25432,9 +25617,9 @@
         "qps-ploc": "⟦Ȧṗṗřőṽė ïñ Ḓėƈïḓė ŀőřėɱ⟧"
       },
       "hearing_canvas_updating": {
-        "en": "Updating the canvas…",
-        "ja": "キャンバスを更新中…",
-        "qps-ploc": "⟦Ůṗḓȧŧïñɠ ŧħė ƈȧñṽȧş… ŀőřėɱ ⟧"
+        "en": "Showing the draft canvas. A refined version is being prepared.",
+        "ja": "下書きのキャンバスを表示しています。仕上げ版を準備中です。",
+        "qps-ploc": "⟦Şħőẇïñɠ ŧħė ḓřȧƒŧ ƈȧñṽȧş. Ȧ řėƒïñėḓ ṽėřşïőñ ïş ƀėïñɠ ṗřėṗȧřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "hearing_canvas_generated": {
         "en": "Draft by your companion",
@@ -25620,6 +25805,341 @@
         "en": "About {title}",
         "ja": "{title} について",
         "qps-ploc": "⟦Ȧƀőůŧ {title} ŀőřė⟧"
+      },
+      "hearing_req_tenant_item": {
+        "en": "Item to decide",
+        "ja": "決める項目",
+        "qps-ploc": "⟦Ïŧėɱ ŧő ḓėƈïḓė ŀőřė⟧"
+      },
+      "hearing_next_ledger_recorded": {
+        "en": "Recorded in the decision ledger.",
+        "ja": "決定台帳に記録しました。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ïñ ŧħė ḓėƈïşïőñ ŀėḓɠėř. ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_next_ledger_pending": {
+        "en": "Recorded as proposed — waiting for the customer's approval.",
+        "ja": "提案として記録しました。顧客の承認待ちです。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ȧş ṗřőṗőşėḓ — ẇȧïŧïñɠ ƒőř ŧħė ƈůşŧőɱėř'ş ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "hearing_ledger_agenda": {
+        "en": "Open decisions for this case: {open}",
+        "ja": "この案件で決まっていない項目: {open} 件",
+        "qps-ploc": "⟦Őṗėñ ḓėƈïşïőñş ƒőř ŧħïş ƈȧşė: {open} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "hearing_ledger_decide": {
+        "en": "Record the answered items as decisions",
+        "ja": "答えた項目を決定として記録する",
+        "qps-ploc": "⟦Řėƈőřḓ ŧħė ȧñşẇėřėḓ ïŧėɱş ȧş ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "hearing_canvas_projected": {
+        "en": "Drawn from the decision ledger.",
+        "ja": "決定台帳から描画しました。",
+        "qps-ploc": "⟦Ḓřȧẇñ ƒřőɱ ŧħė ḓėƈïşïőñ ŀėḓɠėř. ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_ledger_canvas_title": {
+        "en": "Decisions for this case",
+        "ja": "この案件の決定",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ƒőř ŧħïş ƈȧşė ŀőřėɱ ï⟧"
+      },
+      "hearing_ledger_summary": {
+        "en": "{decided} decided · {open} open · {red} differ from the implementation",
+        "ja": "決定 {decided} 件・未決定 {open} 件・実装と食い違い {red} 件",
+        "qps-ploc": "⟦{decided} ḓėƈïḓėḓ · {open} őṗėñ · {red} ḓïƒƒėř ƒřőɱ ŧħė ïɱṗŀėɱėñŧȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "hearing_ledger_col_item": {
+        "en": "Item",
+        "ja": "項目",
+        "qps-ploc": "⟦Ïŧėɱ ŀőř⟧"
+      },
+      "hearing_ledger_col_decision": {
+        "en": "Decision",
+        "ja": "決定",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ŀőř⟧"
+      },
+      "hearing_ledger_col_implementation": {
+        "en": "Implementation has",
+        "ja": "実装が持つ値",
+        "qps-ploc": "⟦Ïɱṗŀėɱėñŧȧŧïőñ ħȧş ŀőřėɱ⟧"
+      },
+      "hearing_ledger_col_status": {
+        "en": "Status",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "hearing_ledger_verdict_match": {
+        "en": "Matches",
+        "ja": "一致",
+        "qps-ploc": "⟦Ɱȧŧƈħėş ŀőř⟧"
+      },
+      "hearing_ledger_verdict_conflict": {
+        "en": "Differs",
+        "ja": "食い違い",
+        "qps-ploc": "⟦Ḓïƒƒėřş ŀőř⟧"
+      },
+      "hearing_ledger_verdict_stale": {
+        "en": "Older source",
+        "ja": "古い版を参照",
+        "qps-ploc": "⟦Őŀḓėř şőůřƈė ŀőř⟧"
+      },
+      "hearing_ledger_verdict_unprobed": {
+        "en": "Not checked",
+        "ja": "未検査",
+        "qps-ploc": "⟦Ñőŧ ƈħėƈķėḓ ŀőř⟧"
+      },
+      "hearing_ledger_verdict_open": {
+        "en": "Not decided yet",
+        "ja": "未決定",
+        "qps-ploc": "⟦Ñőŧ ḓėƈïḓėḓ ẏėŧ ŀőřė⟧"
+      },
+      "hearing_ledger_answer_pending": {
+        "en": "answered, not yet recorded",
+        "ja": "答え済み・未記録",
+        "qps-ploc": "⟦ȧñşẇėřėḓ, ñőŧ ẏėŧ řėƈőřḓėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_next_question": {
+        "en": "Next, tell me about: {label}",
+        "ja": "次に「{label}」を教えてください。",
+        "qps-ploc": "⟦Ñėẋŧ, ŧėŀŀ ɱė ȧƀőůŧ: {label} ŀőřėɱ ïṗş⟧"
+      },
+      "hearing_all_answered": {
+        "en": "Everything is filled in. Press the decide button when you are ready.",
+        "ja": "すべての項目が埋まりました。よければ「決める」を押してください。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ïş ƒïŀŀėḓ ïñ. Ṗřėşş ŧħė ḓėƈïḓė ƀůŧŧőñ ẇħėñ ẏőů ȧřė řėȧḓẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ask_calendar_unavailable": {
+        "en": "I couldn't read the calendar right now. You can open it directly, or ask me again later.",
+        "ja": "いまカレンダーを読めませんでした。直接開いていただくか、あとでもう一度お願いしてください。",
+        "qps-ploc": "⟦Ï ƈőůŀḓñ'ŧ řėȧḓ ŧħė ƈȧŀėñḓȧř řïɠħŧ ñőẇ. Ẏőů ƈȧñ őṗėñ ïŧ ḓïřėƈŧŀẏ, őř ȧşķ ɱė ȧɠȧïñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "ask_knowledge_found": {
+        "en": "I found {count} related item(s):",
+        "ja": "関連する情報が {count} 件見つかりました。",
+        "qps-ploc": "⟦Ï ƒőůñḓ {count} řėŀȧŧėḓ ïŧėɱ(ş): ŀőřėɱ ïṗşů⟧"
+      },
+      "ask_query_failed": {
+        "en": "I couldn't complete that just now. Please try again in a moment, or rephrase the request.",
+        "ja": "いまは処理できませんでした。少し待ってからもう一度お願いするか、言い方を変えてみてください。",
+        "qps-ploc": "⟦Ï ƈőůŀḓñ'ŧ ƈőɱṗŀėŧė ŧħȧŧ ĵůşŧ ñőẇ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ ïñ ȧ ɱőɱėñŧ, őř řėṗħřȧşė ŧħė řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "hearing_scenario_web_app": {
+        "en": "Shape a web app request",
+        "ja": "Web アプリの要望をまとめる",
+        "qps-ploc": "⟦Şħȧṗė ȧ ẇėƀ ȧṗṗ řėɋůėşŧ ŀőřėɱ ï⟧"
+      },
+      "hearing_scenario_web_app_sub": {
+        "en": "Who it is for, what it does, and what must hold.",
+        "ja": "誰のために、何をする、何を守るか。",
+        "qps-ploc": "⟦Ẇħő ïŧ ïş ƒőř, ẇħȧŧ ïŧ ḓőėş, ȧñḓ ẇħȧŧ ɱůşŧ ħőŀḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "hearing_scenario_process": {
+        "en": "Improve a way of working",
+        "ja": "業務のやり方を改善する",
+        "qps-ploc": "⟦Ïɱṗřőṽė ȧ ẇȧẏ őƒ ẇőřķïñɠ ŀőřėɱ ï⟧"
+      },
+      "hearing_scenario_process_sub": {
+        "en": "How it runs today, what hurts, and what good looks like.",
+        "ja": "今どう回っていて、何が困りごとで、どうなればよいか。",
+        "qps-ploc": "⟦Ħőẇ ïŧ řůñş ŧőḓȧẏ, ẇħȧŧ ħůřŧş, ȧñḓ ẇħȧŧ ɠőőḓ ŀőőķş ŀïķė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "hearing_phase_purpose": {
+        "en": "Purpose",
+        "ja": "目的",
+        "qps-ploc": "⟦Ṗůřṗőşė ŀőř⟧"
+      },
+      "hearing_phase_shape": {
+        "en": "Shape",
+        "ja": "中身",
+        "qps-ploc": "⟦Şħȧṗė ŀőř⟧"
+      },
+      "hearing_phase_limits": {
+        "en": "Boundaries and success",
+        "ja": "制約と成功条件",
+        "qps-ploc": "⟦Ƀőůñḓȧřïėş ȧñḓ şůƈƈėşş ŀőřėɱ ï⟧"
+      },
+      "hearing_phase_current": {
+        "en": "Today",
+        "ja": "現状",
+        "qps-ploc": "⟦Ŧőḓȧẏ ŀőř⟧"
+      },
+      "hearing_phase_pain": {
+        "en": "What hurts",
+        "ja": "困りごと",
+        "qps-ploc": "⟦Ẇħȧŧ ħůřŧş ŀőř⟧"
+      },
+      "hearing_phase_target": {
+        "en": "What good looks like",
+        "ja": "あるべき姿",
+        "qps-ploc": "⟦Ẇħȧŧ ɠőőḓ ŀőőķş ŀïķė ŀőřėɱ ⟧"
+      },
+      "hearing_req_who_does": {
+        "en": "Who does the work",
+        "ja": "誰がやっているか",
+        "qps-ploc": "⟦Ẇħő ḓőėş ŧħė ẇőřķ ŀőřėɱ⟧"
+      },
+      "hearing_req_what_happens": {
+        "en": "What happens, step by step",
+        "ja": "何をどんな手順でやっているか",
+        "qps-ploc": "⟦Ẇħȧŧ ħȧṗṗėñş, şŧėṗ ƀẏ şŧėṗ ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_req_pain_point": {
+        "en": "What is hard about it",
+        "ja": "何に困っているか",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ħȧřḓ ȧƀőůŧ ïŧ ŀőřėɱ ⟧"
+      },
+      "hearing_req_impact": {
+        "en": "What it costs when it goes wrong",
+        "ja": "困ると何が起きるか",
+        "qps-ploc": "⟦Ẇħȧŧ ïŧ ƈőşŧş ẇħėñ ïŧ ɠőėş ẇřőñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_req_desired_state": {
+        "en": "How it should work",
+        "ja": "どうなればよいか",
+        "qps-ploc": "⟦Ħőẇ ïŧ şħőůŀḓ ẇőřķ ŀőřėɱ⟧"
+      },
+      "hearing_req_success_measure": {
+        "en": "How we will know it worked",
+        "ja": "うまくいったと何で分かるか",
+        "qps-ploc": "⟦Ħőẇ ẇė ẇïŀŀ ķñőẇ ïŧ ẇőřķėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_req_boundaries": {
+        "en": "What must not change",
+        "ja": "変えてはいけないこと",
+        "qps-ploc": "⟦Ẇħȧŧ ɱůşŧ ñőŧ ƈħȧñɠė ŀőřėɱ ⟧"
+      },
+      "hearing_phase_progress": {
+        "en": "{phase} ({done}/{total}) — step {index} of {count}",
+        "ja": "{phase}（{done}/{total}）— {count} 段階中 {index} 段階目",
+        "qps-ploc": "⟦{phase} ({done}/{total}) — şŧėṗ {index} őƒ {count} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hearing_next_question_in_phase": {
+        "en": "{phase}: next, tell me about {label}.",
+        "ja": "{phase}について、次に「{label}」を教えてください。",
+        "qps-ploc": "⟦{phase}: ñėẋŧ, ŧėŀŀ ɱė ȧƀőůŧ {label}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "hearing_phase_done": {
+        "en": "{phase} is complete. Moving on to {next}.",
+        "ja": "{phase}の項目がそろいました。次は{next}です。",
+        "qps-ploc": "⟦{phase} ïş ƈőɱṗŀėŧė. Ɱőṽïñɠ őñ ŧő {next}. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chip_process": {
+        "en": "Improve a way of working",
+        "ja": "業務のやり方を改善する",
+        "qps-ploc": "⟦Ïɱṗřőṽė ȧ ẇȧẏ őƒ ẇőřķïñɠ ŀőřėɱ ï⟧"
+      },
+      "flow_title": {
+        "en": "Flows",
+        "ja": "業務フロー",
+        "qps-ploc": "⟦Ƒŀőẇş ŀőř⟧"
+      },
+      "flow_components_title": {
+        "en": "In this area",
+        "ja": "この領域の機能",
+        "qps-ploc": "⟦Ïñ ŧħïş ȧřėȧ ŀőř⟧"
+      },
+      "flow_input_placeholder": {
+        "en": "Type your answer here",
+        "ja": "ここに答えを書いてください",
+        "qps-ploc": "⟦Ŧẏṗė ẏőůř ȧñşẇėř ħėřė ŀőřėɱ ⟧"
+      },
+      "flow_send": {
+        "en": "Send",
+        "ja": "送る",
+        "qps-ploc": "⟦Şėñḓ ŀőř⟧"
+      },
+      "flow_loading": {
+        "en": "Loading…",
+        "ja": "読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "flow_unsupported": {
+        "en": "This part cannot be shown yet.",
+        "ja": "この部品はまだ表示できません。",
+        "qps-ploc": "⟦Ŧħïş ṗȧřŧ ƈȧññőŧ ƀė şħőẇñ ẏėŧ. ŀőřėɱ ïṗşů⟧"
+      },
+      "flow_action_failed": {
+        "en": "That didn't go through. Please try again.",
+        "ja": "操作できませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħȧŧ ḓïḓñ'ŧ ɠő ŧħřőůɠħ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "flow_status_a2ui": {
+        "en": "Available here",
+        "ja": "この画面で使えます",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė ħėřė ŀőřė⟧"
+      },
+      "flow_status_page": {
+        "en": "Opens the current page",
+        "ja": "従来の画面で開きます",
+        "qps-ploc": "⟦Őṗėñş ŧħė ƈůřřėñŧ ṗȧɠė ŀőřėɱ ï⟧"
+      },
+      "flow_status_planned": {
+        "en": "Coming soon",
+        "ja": "準備中",
+        "qps-ploc": "⟦Ƈőɱïñɠ şőőñ ŀőř⟧"
+      },
+      "flow_phases": {
+        "en": "Steps",
+        "ja": "段階",
+        "qps-ploc": "⟦Şŧėṗş ŀőř⟧"
+      },
+      "flow_new_session": {
+        "en": "Start over",
+        "ja": "最初からやり直す",
+        "qps-ploc": "⟦Şŧȧřŧ őṽėř ŀőř⟧"
+      },
+      "component_hearing_title": {
+        "en": "Hearing",
+        "ja": "ヒアリング",
+        "qps-ploc": "⟦Ħėȧřïñɠ ŀőř⟧"
+      },
+      "component_hearing_sub": {
+        "en": "Shape a request by asking, phase by phase.",
+        "ja": "聞きながら、段階ごとに要件を固める",
+        "qps-ploc": "⟦Şħȧṗė ȧ řėɋůėşŧ ƀẏ ȧşķïñɠ, ṗħȧşė ƀẏ ṗħȧşė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "component_decisions_title": {
+        "en": "Decision ledger",
+        "ja": "決定台帳",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ŀėḓɠėř ŀőřė⟧"
+      },
+      "component_decisions_sub": {
+        "en": "What is decided, and what is still open.",
+        "ja": "決めたことと、まだ決めていないこと",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ḓėƈïḓėḓ, ȧñḓ ẇħȧŧ ïş şŧïŀŀ őṗėñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "component_approvals_title": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "component_approvals_sub": {
+        "en": "Requests waiting for your decision.",
+        "ja": "あなたの判断を待っている依頼",
+        "qps-ploc": "⟦Řėɋůėşŧş ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "component_progress_title": {
+        "en": "Progress",
+        "ja": "進み具合",
+        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
+      },
+      "component_progress_sub": {
+        "en": "What is in progress and what is done.",
+        "ja": "進行中のものと、できたもの",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ïñ ṗřőɠřėşş ȧñḓ ẇħȧŧ ïş ḓőñė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "hearing_a2ui_next": {
+        "en": "Next question",
+        "ja": "次の質問",
+        "qps-ploc": "⟦Ñėẋŧ ɋůėşŧïőñ ŀőřė⟧"
+      },
+      "hearing_a2ui_recorded": {
+        "en": "Decided on {at}",
+        "ja": "{at} に確定",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ őñ {at} ŀőřė⟧"
+      },
+      "hearing_a2ui_handed_off": {
+        "en": "Handed off as request {id}",
+        "ja": "依頼 {id} として渡しました",
+        "qps-ploc": "⟦Ħȧñḓėḓ őƒƒ ȧş řėɋůėşŧ {id} ŀőřėɱ ïṗ⟧"
       },
       "settings_member_sso_title": {
         "en": "SSO",
@@ -30191,6 +30711,38 @@
         "qps-ploc": "⟦Şőɱėŧħïñɠ ẇėñŧ ẇřőñɠ ŀőřėɱ ⟧"
       }
     },
+    "media_tooling": {
+      "media_tooling_slide_size_unreadable": {
+        "en": "Could not read the slide size (sldSz) from the presentation.",
+        "ja": "プレゼンテーションからスライドサイズ（sldSz）を読み取れません。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė şŀïḓė şïẑė (şŀḓŞẑ) ƒřőɱ ŧħė ṗřėşėñŧȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "media_tooling_slide_size_mismatch": {
+        "en": "Slide sizes do not match: target={target} source={source}. Regenerate the source at the same aspect ratio (deck_from_html params.aspect).",
+        "ja": "スライドサイズが不一致です。target={target} source={source}。source を同じ比率で生成し直してください（deck_from_html の params.aspect）。",
+        "qps-ploc": "⟦Şŀïḓė şïẑėş ḓő ñőŧ ɱȧŧƈħ: ŧȧřɠėŧ={target} şőůřƈė={source}. Řėɠėñėřȧŧė ŧħė şőůřƈė ȧŧ ŧħė şȧɱė ȧşṗėƈŧ řȧŧïő (ḓėƈķ_ƒřőɱ_ħŧɱŀ ṗȧřȧɱş.ȧşṗėƈŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "media_tooling_append_summary": {
+        "en": "[append-slides] {target} + {added} slide(s) -> {out}\n  slides: {slides} / masters: {masters} / insert position: {position}",
+        "ja": "[append-slides] {target} + {added}枚 → {out}\n  スライド数: {slides} / マスタ: {masters} / 挿入位置: {position}",
+        "qps-ploc": "⟦[ȧṗṗėñḓ-şŀïḓėş] {target} + {added} şŀïḓė(ş) -> {out}\n  şŀïḓėş: {slides} / ɱȧşŧėřş: {masters} / ïñşėřŧ ṗőşïŧïőñ: {position} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "media_tooling_append_position_before": {
+        "en": "before slide {index}",
+        "ja": "{index}枚目の前",
+        "qps-ploc": "⟦ƀėƒőřė şŀïḓė {index} ŀőřėɱ ⟧"
+      },
+      "media_tooling_append_position_end": {
+        "en": "at the end",
+        "ja": "末尾",
+        "qps-ploc": "⟦ȧŧ ŧħė ėñḓ ŀőř⟧"
+      },
+      "media_tooling_measure_summary": {
+        "en": "[measure-deck] {input} -> {out}\n  measured: {boxes} box(es) / {texts} text node(s) / page height {pageH}px\n  slides: {slides} ({aspect}, {ppi}px/in)",
+        "ja": "[measure-deck] {input} → {out}\n  計測: {boxes}箱 / {texts}テキスト / ページ高 {pageH}px\n  スライド {slides}枚 ({aspect}, {ppi}px/in)",
+        "qps-ploc": "⟦[ɱėȧşůřė-ḓėƈķ] {input} -> {out}\n  ɱėȧşůřėḓ: {boxes} ƀőẋ(ėş) / {texts} ŧėẋŧ ñőḓė(ş) / ṗȧɠė ħėïɠħŧ {pageH}ṗẋ\n  şŀïḓėş: {slides} ({aspect}, {ppi}ṗẋ/ïñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      }
+    },
     "voice": {
       "loop_state_calibrating": {
         "en": "🎚  Calibrating the noise floor… (please stay quiet)",
@@ -30588,6 +31140,18 @@
         "en": "Reopen view",
         "ja": "ビューを開き直す",
         "qps-ploc": "⟦Řėőṗėñ ṽïėẇ ŀőř⟧"
+      }
+    },
+    "dot_ask": {
+      "intake_accepted": {
+        "en": "Handed to dot {dot_id} (event {event_id}). It will pick this up on its next wake.",
+        "ja": "dot {dot_id} に引き渡しました（イベント {event_id}）。次回の起動時に処理されます。",
+        "qps-ploc": "⟦Ħȧñḓėḓ ŧő ḓőŧ {dot_id} (ėṽėñŧ {event_id}). Ïŧ ẇïŀŀ ṗïƈķ ŧħïş ůṗ őñ ïŧş ñėẋŧ ẇȧķė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "intake_duplicate": {
+        "en": "Dot {dot_id} already received this request (event {event_id}); nothing new was recorded.",
+        "ja": "dot {dot_id} はこの依頼を受付済みです（イベント {event_id}）。新たな記録はありません。",
+        "qps-ploc": "⟦Ḓőŧ {dot_id} ȧŀřėȧḓẏ řėƈėïṽėḓ ŧħïş řėɋůėşŧ (ėṽėñŧ {event_id}); ñőŧħïñɠ ñėẇ ẇȧş řėƈőřḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       }
     },
     "decision": {
@@ -31446,6 +32010,43 @@
         "en": "## ⚠️ Usage not recorded\n{count} task(s) were completed but no token or resource usage entry exists for this mission. The zero token/cost figures above mean the usage was never recorded — not that the work was free.",
         "ja": "## ⚠️ 使用量が未記録\n{count} 件のタスクが完了していますが、このミッションのトークン／リソース使用量エントリが 1 件もありません。上記のトークン・コストの 0 は「無料」ではなく「未記録」を意味します。",
         "qps-ploc": "⟦## ⚠️ Ůşȧɠė ñőŧ řėƈőřḓėḓ\n{count} ŧȧşķ(ş) ẇėřė ƈőɱṗŀėŧėḓ ƀůŧ ñő ŧőķėñ őř řėşőůřƈė ůşȧɠė ėñŧřẏ ėẋïşŧş ƒőř ŧħïş ɱïşşïőñ. Ŧħė ẑėřő ŧőķėñ/ƈőşŧ ƒïɠůřėş ȧƀőṽė ɱėȧñ ŧħė ůşȧɠė ẇȧş ñėṽėř řėƈőřḓėḓ — ñőŧ ŧħȧŧ ŧħė ẇőřķ ẇȧş ƒřėė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      }
+    },
+    "dot_confirmation": {
+      "card_title": {
+        "en": "Confirm mission admission for {item}",
+        "ja": "ミッション受付の確認: {item}",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ɱïşşïőñ ȧḓɱïşşïőñ ƒőř {item} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "card_summary": {
+        "en": "A covered mandate proposes mission {mission}, but autonomous start is in shadow mode. Approving only begins human admission: preparation, then a separate approval of the mission brief, then start.",
+        "ja": "対象の委任がミッション {mission} を提案していますが、自動開始はシャドーモードです。承認すると人による受付だけが始まります（準備、ミッション概要の別承認、開始の順）。",
+        "qps-ploc": "⟦Ȧ ƈőṽėřėḓ ɱȧñḓȧŧė ṗřőṗőşėş ɱïşşïőñ {mission}, ƀůŧ ȧůŧőñőɱőůş şŧȧřŧ ïş ïñ şħȧḓőẇ ɱőḓė. Ȧṗṗřőṽïñɠ őñŀẏ ƀėɠïñş ħůɱȧñ ȧḓɱïşşïőñ: ṗřėṗȧřȧŧïőñ, ŧħėñ ȧ şėṗȧřȧŧė ȧṗṗřőṽȧŀ őƒ ŧħė ɱïşşïőñ ƀřïėƒ, ŧħėñ şŧȧřŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "card_detail_item": {
+        "en": "work item: {item} (version {version})",
+        "ja": "作業項目: {item}（バージョン {version}）",
+        "qps-ploc": "⟦ẇőřķ ïŧėɱ: {item} (ṽėřşïőñ {version}) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "card_detail_scope": {
+        "en": "tenant: {tenant} / mandate: {mandate}",
+        "ja": "テナント: {tenant} / 委任: {mandate}",
+        "qps-ploc": "⟦ŧėñȧñŧ: {tenant} / ɱȧñḓȧŧė: {mandate} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "card_detail_goal": {
+        "en": "goal: {goal}",
+        "ja": "目的: {goal}",
+        "qps-ploc": "⟦ɠőȧŀ: {goal} ŀőř⟧"
+      },
+      "card_detail_assurance": {
+        "en": "Requires an authenticated A1-or-higher approval; a decision recorded with an assurance shortfall is not applied and the later mission approval would refuse it.",
+        "ja": "認証済みの A1 以上の承認が必要です。保証レベル不足で記録された判断は適用されず、後続のミッション承認でも拒否されます。",
+        "qps-ploc": "⟦Řėɋůïřėş ȧñ ȧůŧħėñŧïƈȧŧėḓ Ȧ1-őř-ħïɠħėř ȧṗṗřőṽȧŀ; ȧ ḓėƈïşïőñ řėƈőřḓėḓ ẇïŧħ ȧñ ȧşşůřȧñƈė şħőřŧƒȧŀŀ ïş ñőŧ ȧṗṗŀïėḓ ȧñḓ ŧħė ŀȧŧėř ɱïşşïőñ ȧṗṗřőṽȧŀ ẇőůŀḓ řėƒůşė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "card_detail_not_learning": {
+        "en": "Shadow stays non-authority: approving is a one-time human decision to start admission for this version, not mandate learning or a standing permission.",
+        "ja": "シャドーは権限になりません。承認はこのバージョンの受付を始める一度きりの人の判断であり、委任の学習や恒常的な許可ではありません。",
+        "qps-ploc": "⟦Şħȧḓőẇ şŧȧẏş ñőñ-ȧůŧħőřïŧẏ: ȧṗṗřőṽïñɠ ïş ȧ őñė-ŧïɱė ħůɱȧñ ḓėƈïşïőñ ŧő şŧȧřŧ ȧḓɱïşşïőñ ƒőř ŧħïş ṽėřşïőñ, ñőŧ ɱȧñḓȧŧė ŀėȧřñïñɠ őř ȧ şŧȧñḓïñɠ ṗėřɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
       }
     },
     "project_ops": {

@@ -164,10 +164,16 @@ function functionLikeOf(declaration: ts.Declaration): ts.SignatureDeclaration | 
   if (
     ts.isFunctionDeclaration(declaration) ||
     ts.isMethodDeclaration(declaration) ||
+    ts.isGetAccessorDeclaration(declaration) ||
+    ts.isSetAccessorDeclaration(declaration) ||
     ts.isArrowFunction(declaration) ||
     ts.isFunctionExpression(declaration)
   ) {
     return declaration;
+  }
+  if (ts.isExportAssignment(declaration)) {
+    const inner = unwrapExpression(declaration.expression);
+    if (ts.isArrowFunction(inner) || ts.isFunctionExpression(inner)) return inner;
   }
   if (
     (ts.isVariableDeclaration(declaration) ||
@@ -388,6 +394,22 @@ export class Analyzer {
       for (const declaration of target?.declarations ?? []) {
         const unit = this.units.unitOf(declaration);
         if (unit) result.push(unit);
+        if (unit) result.push(...this.returnedCapabilityUnits(unit));
+        if (ts.isClassDeclaration(declaration)) {
+          for (const member of declaration.members) {
+            const memberUnit = this.units.unitOf(member);
+            if (memberUnit) result.push(memberUnit);
+          }
+        } else if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name)) {
+          for (const property of this.checker.getPropertiesOfType(
+            this.checker.getTypeAtLocation(declaration.name)
+          )) {
+            for (const member of property.declarations ?? []) {
+              const memberUnit = this.units.unitOf(member);
+              if (memberUnit) result.push(memberUnit);
+            }
+          }
+        }
       }
     }
     return result;
@@ -494,6 +516,7 @@ export class Analyzer {
   }
 
   private scanNode(unit: Unit, node: ts.Node): void {
+    if (this.units.unitOf(node) !== unit) return;
     if (isInTypePosition(node)) return;
     if (
       ts.isInterfaceDeclaration(node) ||
@@ -510,8 +533,59 @@ export class Analyzer {
       this.scanCall(unit, node);
     } else if (ts.isNewExpression(node)) {
       this.scanNewExpression(unit, node);
+    } else if (ts.isElementAccessExpression(node)) {
+      // A computed method key can select any member of the receiver's type.
+      this.addReceiverMethodEdges(unit, node.expression);
+    } else if (ts.isExportAssignment(node)) {
+      this.addReceiverMethodEdges(unit, node.expression);
     }
     ts.forEachChild(node, (child) => this.scanNode(unit, child));
+  }
+
+  private addReceiverMethodEdges(unit: Unit, receiver: ts.Expression): void {
+    for (const target of this.receiverMethodUnits(receiver)) this.addEdge(unit, target);
+  }
+
+  private receiverMethodUnits(receiver: ts.Expression): Unit[] {
+    const result = new Set<Unit>();
+    const type = this.checker.getTypeAtLocation(receiver);
+    for (const member of (type.isUnionOrIntersection() ? type.types : [type]).flatMap((part) =>
+      this.checker.getPropertiesOfType(part)
+    )) {
+      for (const declaration of member.declarations ?? []) {
+        if (
+          ts.isMethodDeclaration(declaration) ||
+          ts.isGetAccessorDeclaration(declaration) ||
+          ts.isSetAccessorDeclaration(declaration)
+        ) {
+          const target = this.units.unitOf(declaration);
+          if (target) result.add(target);
+        }
+      }
+    }
+    return [...result];
+  }
+
+  /** An entry/exported callback can return a capability to unknown consumers.
+   * Ordinary typed calls retain member precision at their actual use site. */
+  returnedCapabilityUnits(unit: Unit): Unit[] {
+    const result = new Set<Unit>();
+    const collect = (expression: ts.Expression) => {
+      for (const target of this.receiverMethodUnits(expression)) result.add(target);
+    };
+    for (const root of unit.roots) {
+      const fn = functionLikeOf(root as ts.Declaration);
+      if (!fn || !('body' in fn) || !fn.body) continue;
+      const body = fn.body as ts.ConciseBody;
+      const visit = (node: ts.Node): void => {
+        if (ts.isFunctionLike(node)) return;
+        if (ts.isReturnStatement(node) && node.expression) collect(node.expression);
+        ts.forEachChild(node, visit);
+      };
+      if (ts.isBlock(body)) visit(body);
+      else collect(body);
+    }
+    return [...result];
   }
 
   private scanCall(unit: Unit, call: ts.CallExpression): void {
@@ -557,6 +631,14 @@ export class Analyzer {
       return;
     }
     const callee = this.calleeDeclaration(call);
+    if (
+      !callee ||
+      !isProjectSource(this.ws, callee.getSourceFile().fileName) ||
+      !('body' in callee) ||
+      !callee.body
+    ) {
+      for (const argument of call.arguments) this.addReceiverMethodEdges(unit, argument);
+    }
     if (callee && this.assumptionDeclarations.has(callee)) {
       const [roleArgument] = call.arguments;
       const resolution = roleArgument
@@ -645,6 +727,20 @@ export class Analyzer {
 
   private scanIdentifier(unit: Unit, node: ts.Identifier | ts.PrivateIdentifier): void {
     const parent = node.parent;
+    if (
+      ts.isIdentifier(node) &&
+      !this.isDeclarationName(node) &&
+      ((ts.isCallExpression(parent) && parent.arguments.includes(node)) ||
+        (ts.isNewExpression(parent) && !!parent.arguments?.includes(node)) ||
+        ts.isPropertyAssignment(parent) ||
+        ts.isShorthandPropertyAssignment(parent) ||
+        ts.isArrayLiteralExpression(parent) ||
+        ts.isSpreadElement(parent) ||
+        (ts.isVariableDeclaration(parent) && ts.isObjectBindingPattern(parent.name)))
+    ) {
+      // Passing/packing an instance exposes its methods to unknown consumers.
+      this.addReceiverMethodEdges(unit, node);
+    }
     let symbol: ts.Symbol | undefined;
     if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
       symbol = this.checker.getShorthandAssignmentValueSymbol(parent);
@@ -690,6 +786,9 @@ export class Analyzer {
         refs.push({ unit, call });
         this.callRefs.set(fn, refs);
       } else if (!this.isDeclarationName(node)) {
+        if (targetUnit)
+          for (const returned of this.returnedCapabilityUnits(targetUnit))
+            this.addEdge(unit, returned);
         const refs = this.valueRefs.get(fn) ?? [];
         refs.push(unit);
         this.valueRefs.set(fn, refs);
@@ -1152,7 +1251,11 @@ export class Analyzer {
   private initializerOf(node: ts.Expression): ts.Expression | 'parameter' | undefined {
     const inner = unwrapExpression(node);
     if (!ts.isIdentifier(inner)) return undefined;
-    const symbol = this.resolveAlias(this.checker.getSymbolAtLocation(inner));
+    const symbol = this.resolveAlias(
+      ts.isShorthandPropertyAssignment(inner.parent)
+        ? this.checker.getShorthandAssignmentValueSymbol(inner.parent)
+        : this.checker.getSymbolAtLocation(inner)
+    );
     const declaration = symbol?.valueDeclaration;
     if (!declaration || !isProjectSource(this.ws, declaration.getSourceFile().fileName)) {
       return undefined;

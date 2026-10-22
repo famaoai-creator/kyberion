@@ -21,6 +21,7 @@ import {
   DOT_EXECUTOR_MISSION_GUIDANCE,
   DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   DotExecutorPreEffectError,
+  DotExecutorStaleAttemptError,
   dotExecutorStatusSection,
   reapStrandedDotWorkItems,
   resetDotExecutorDenialAuditForTests,
@@ -945,6 +946,71 @@ describe('capability, pre-effect and report recovery (PR #915 review)', () => {
     expect(last.releases[0].nextStatus).toBe('archived');
     expect(last.inbox[0].text).toContain('fix the cause, then re-propose');
     expect(last.inbox[0].text).not.toContain('verify effects');
+  });
+
+  it('escalates a deterministic pre-effect refusal on its first attempt without a learning receipt', async () => {
+    const record = vi
+      .spyOn(autonomyState, 'recordAutonomyExecution')
+      .mockImplementation(() => undefined);
+    const pipelineItem = (id: string) =>
+      item(id, { requested_work_shape: 'pipeline', pipeline_ref: 'pipelines/ok.json' });
+    for (const [index, error] of [
+      new DotExecutorPreEffectError('refused before start', { retryable: false }),
+      new DotExecutorPreEffectError('did not start: [POLICY_VIOLATION] tenant.scope_violation'),
+      new DotExecutorPreEffectError('did not start: [RESOURCE_SCOPE_DENIED] outside'),
+    ].entries()) {
+      const target = pipelineItem(`d${index}`);
+      const h = harness([target], 1);
+      const row = await executeDotWorkItem(
+        charter(),
+        target,
+        ports({ runPipeline: vi.fn(async () => Promise.reject(error)) }),
+        h.deps
+      );
+      expect(row).toMatchObject({ status: 'failed', mode: 'escalated' });
+      expect(h.releases[0].nextStatus).toBe('archived');
+      expect(h.releases[0].metadata?.dot_executor).not.toHaveProperty('retryable');
+    }
+    // A retryable pre-effect failure executed nothing either: no receipt.
+    const target = pipelineItem('r1');
+    const h = harness([target], 1);
+    await executeDotWorkItem(
+      charter(),
+      target,
+      ports({
+        runPipeline: vi.fn(async () => Promise.reject(new DotExecutorPreEffectError('transient'))),
+      }),
+      h.deps
+    );
+    expect(h.releases[0].nextStatus).toBe('ready');
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing for a stale attempt: no result, receipt or release', async () => {
+    const record = vi
+      .spyOn(autonomyState, 'recordAutonomyExecution')
+      .mockImplementation(() => undefined);
+    const target = item('w1', {
+      requested_work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/ok.json',
+    });
+    const h = harness([target], 1);
+    const row = await executeDotWorkItem(
+      charter(),
+      target,
+      ports({
+        runPipeline: vi.fn(async () =>
+          Promise.reject(new DotExecutorStaleAttemptError('attempt is no longer current'))
+        ),
+      }),
+      h.deps
+    );
+    expect(row).toMatchObject({ status: 'skipped' });
+    expect(row.summary).toContain('stale attempt');
+    expect(results(charter())).toHaveLength(0);
+    expect(h.releases).toHaveLength(0);
+    expect(h.inbox).toHaveLength(0);
+    expect(record).not.toHaveBeenCalled();
   });
 
   it('treats legacy rows without report_to_dot_id as reported, and recovers new ones once', async () => {

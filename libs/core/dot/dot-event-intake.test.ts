@@ -11,12 +11,14 @@ import {
 import type { DotCharter } from './dot-charter.js';
 import {
   applyEventIntakeHostOptIn,
+  DOT_ASK_EVENT_TYPE,
   DOT_EVENT_LOOKBACK_MS,
   DOT_EVENT_PAYLOAD_MAX_BYTES,
   DOT_EVENT_SCAN_TAIL_BYTES,
   dotEventMatchesTrigger,
   dotEventsLedgerPath,
   evaluateDotEventTriggers,
+  ingestAskIntake,
   ingestInboundEvent,
   ingestLocalEvent,
   loadEventIntakePolicy,
@@ -436,6 +438,81 @@ describe('evaluateDotEventTriggers', () => {
       `event:${systemEvent.event_id}`,
     ]);
     expect(evaluateDotEventTriggers(otherTenant, deps)).toEqual([]);
+  });
+
+  describe('operator ask intake', () => {
+    const askTrigger = { kind: 'event' as const, sources: ['acme'], types: [DOT_ASK_EVENT_TYPE] };
+    const orgDot = (dotId: string, organizationId: string) =>
+      charter({
+        dot_id: dotId,
+        scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: organizationId },
+        attention: { triggers: [askTrigger] },
+      });
+    const orgA = orgDot('org-a-dot', 'org-a');
+    const orgB = orgDot('org-b-dot', 'org-b');
+    const ask = (organizationId: string, text = 'Draft the weekly summary.') =>
+      ingestAskIntake({
+        text,
+        scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: organizationId },
+        charters: [orgA],
+        policy: POLICY,
+        rootDir: TEST_ROOT,
+        now: new Date(now.getTime() - 1000),
+      });
+
+    it('records one org-bound event in the tenant ledger for the matching active dot', () => {
+      const receipt = ask('org-a');
+      expect(receipt).toMatchObject({ status: 'accepted', dot_id: 'org-a-dot', source: 'acme' });
+      const events = readDotInboundEvents('acme', { rootDir: TEST_ROOT });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        tenant_slug: 'acme',
+        organization_id: 'org-a',
+        type: DOT_ASK_EVENT_TYPE,
+      });
+      expect(receipt.status !== 'no_intake' && receipt.event_id).toBe(events[0].event_id);
+      expect(evaluateDotEventTriggers(orgA, deps).map((d) => d.key)).toEqual([
+        `event:${events[0].event_id}`,
+      ]);
+      expect(ask('org-a').status).toBe('duplicate');
+    });
+
+    it('never delivers to another organization of the same tenant', () => {
+      expect(ask('org-b')).toEqual({ status: 'no_intake' });
+      expect(readDotInboundEvents('acme', { rootDir: TEST_ROOT })).toHaveLength(0);
+      ask('org-a');
+      expect(evaluateDotEventTriggers(orgB, deps)).toEqual([]);
+      // tenant-wide (webhook) events still reach every dot of the tenant
+      const webhook = ingest(
+        'w',
+        'failure',
+        new Date(now.getTime() - 500),
+        'acme',
+        DOT_ASK_EVENT_TYPE
+      );
+      expect(evaluateDotEventTriggers(orgB, deps).map((d) => d.key)).toEqual([
+        `event:${webhook.event_id}`,
+      ]);
+    });
+
+    it('needs a full trusted scope, an active charter and a source bound to that tenant', () => {
+      const scope = { tier: 'confidential', tenant_slug: 'acme', organization_id: 'org-a' };
+      const base = { text: 'x', policy: POLICY, rootDir: TEST_ROOT, charters: [orgA] };
+      expect(
+        ingestAskIntake({ ...base, scope: { tier: 'confidential', tenant_slug: 'acme' } })
+      ).toEqual({ status: 'no_intake' });
+      expect(
+        ingestAskIntake({ ...base, scope, charters: [{ ...orgA, status: 'paused' }] })
+      ).toEqual({ status: 'no_intake' });
+      const githubBound = charter({
+        scope: orgA.scope,
+        attention: { triggers: [{ kind: 'event', sources: ['github'] }] },
+      });
+      expect(ingestAskIntake({ ...base, scope, charters: [githubBound] })).toEqual({
+        status: 'no_intake',
+      });
+      expect(safeExistsSync(`${TEST_ROOT}/${dotEventsLedgerPath('acme')}`)).toBe(false);
+    });
   });
 
   it('returns nothing for a charter without event triggers', () => {

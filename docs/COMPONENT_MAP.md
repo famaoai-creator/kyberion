@@ -388,13 +388,10 @@ The charter assumes strict isolation between these tiers. Within the confidentia
 
 ## Recommended reading order for new contributors
 
-1. `README.md`
-2. `AGENTS.md`
-3. `docs/INITIALIZATION.md`
-4. `docs/QUICKSTART.md`
-5. This file
-6. `docs/SURFACES.md`
-7. `docs/GLOSSARY.md`
-8. `CAPABILITIES_GUIDE.md`
+1. `docs/QUICKSTART.md` — the single front door and first win
+2. `docs/CORE_CONCEPTS.md` — the five ideas
+3. `AGENTS.md` — the binding rules
+4. `docs/GLOSSARY.md` — precise definitions and the disambiguation maps
+5. This file, then `docs/SURFACES.md` and `CAPABILITIES_GUIDE.md` — the concrete places to work
 
-That sequence gives you the concept first, then the operating model, then the concrete places to work.
+This is the same order every entry document states, so a newcomer meets each concept before the rules that use it.

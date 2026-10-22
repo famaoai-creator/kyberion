@@ -12,6 +12,8 @@ export interface BrandTokenColors {
   text_primary: string;
   text_secondary: string;
   accent_text?: string;
+  /** Foreground color to place on top of `accent` as a fill (WCAG-safe pair). */
+  accent_on?: string;
   surface?: string;
   muted_text?: string;
   border?: string;

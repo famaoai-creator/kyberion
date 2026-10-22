@@ -5,6 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import {
   buildShellClaudeCliBackendFromEnv,
+  isClaudeCliFallbackEligible,
   isClaudeCliPlaceholderFailure,
   probeShellClaudeCliAvailability,
   resolveClaudeCliFallbackCandidates,
@@ -110,6 +111,13 @@ describe('shell-claude-cli-backend', () => {
       expect(isClaudeCliPlaceholderFailure('Claude Native Binary NOT Installed')).toBe(true);
       expect(isClaudeCliPlaceholderFailure('command not found')).toBe(false);
       expect(isClaudeCliPlaceholderFailure(undefined)).toBe(false);
+    });
+
+    it('searches the install locations when claude is absent from a minimal daemon PATH', () => {
+      expect(isClaudeCliFallbackEligible('spawnSync claude ENOENT')).toBe(true);
+      expect(isClaudeCliFallbackEligible('Error: claude native binary not installed.')).toBe(true);
+      expect(isClaudeCliFallbackEligible('crash on launch')).toBe(false);
+      expect(isClaudeCliFallbackEligible(undefined)).toBe(false);
     });
 
     it('resolves fallback candidates deterministically, excluding node_modules/.bin PATH entries', () => {
@@ -542,6 +550,69 @@ describe('shell-claude-cli-backend', () => {
       expect(opts.signal).toBe(controller.signal);
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
+    });
+  });
+
+  describe('prompted tool calling (generateWithTools)', () => {
+    const tools = [
+      {
+        name: 'read_file',
+        description: 'Read a governed file.',
+        inputSchema: {
+          type: 'object' as const,
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      },
+    ];
+
+    afterEach(() => {
+      spawnMock.mockClear();
+    });
+
+    it('is exposed by default (governed policy opt-in is on for claude-cli)', () => {
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+      expect(typeof backend.generateWithTools).toBe('function');
+    });
+
+    it('is absent when the opt-in is switched off', () => {
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', promptedToolCalling: false });
+      expect(backend.generateWithTools).toBeUndefined();
+    });
+
+    it('returns parsed toolCalls from the CLI output with the CLI tools disabled', async () => {
+      const child = createChild(
+        'Reading it.\n```json\n{"tool_calls":[{"name":"read_file","input":{"path":"a.md"}},{"name":"shell","input":{}}]}\n```'
+      );
+      let stdin = '';
+      child.stdin.on('data', (chunk: Buffer) => (stdin += chunk.toString()));
+      spawnMock.mockReturnValueOnce(child);
+
+      const backend = new ShellClaudeCliBackend({
+        bin: 'claude',
+        model: 'opus',
+        extraArgs: ['--dangerously-skip-permissions'],
+      });
+      const result = await backend.generateWithTools!('Inspect the repo.', tools);
+
+      expect(result.toolCalls).toEqual([{ name: 'read_file', input: { path: 'a.md' } }]);
+      expect(result.text).toContain('Reading it.');
+      expect(result.text).toContain('refused tool call "shell"');
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv[argv.indexOf('--tools') + 1]).toBe('');
+      expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('plan');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+      expect(argv).not.toContain('bypassPermissions');
+      expect(stdin).toContain('Inspect the repo.');
+      expect(stdin).toContain('- name: read_file');
+    });
+
+    it('returns a final answer as text with no toolCalls', async () => {
+      spawnMock.mockReturnValueOnce(createChild('The goal is complete.'));
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+      const result = await backend.generateWithTools!('Wrap up.', tools);
+      expect(result).toEqual({ text: 'The goal is complete.' });
     });
   });
 });

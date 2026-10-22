@@ -245,6 +245,14 @@ jobs:
         shell: bash
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
+      # Runs after the suites above so it sees anything they left behind: a
+      # test that writes into active/missions/ instead of a uniquely named
+      # directory under sharedTmp() leaves a state-less mission directory that
+      # no lifecycle verb can see. CI starts with an empty tree, so any residue
+      # here was created by this run.
+      - name: Check mission tree residue
+        run: pnpm run mission:residue --check
+
       - name: Security scan
         run: pnpm audit --audit-level=moderate
         continue-on-error: true

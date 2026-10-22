@@ -17,6 +17,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
+import { scratchPromotionCandidatesWarning } from '@agent/core/scratch-promotion-grace';
 import { formatDiagnostic } from '@agent/core/logger';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
@@ -1124,6 +1125,9 @@ export async function runBaselineCheck() {
       dist_import_violations: distImportViolations.length
         ? `${distImportViolations.length} dist file(s) import workspace subpaths that don't resolve — run \`pnpm run build\` to rebuild; first: ${distImportViolations[0]}`
         : null,
+      // Warn-only, never a status input: tmp job dirs holding unpromoted code
+      // inside the janitor's code grace window (scratch-tool-promotion-playbook).
+      scratch_promotion_candidates: scratchPromotionCandidatesWarning(),
       stale_dist_targets: staleDistTargets.length
         ? `${staleDistTargets.length} dist target(s) are stale vs their TypeScript sources — run \`pnpm run build\` to rebuild; first: ${staleDistTargets[0]}`
         : null,

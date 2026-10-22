@@ -6,6 +6,7 @@ import {
   safeExistsSync,
   safeStat,
   safeExec,
+  safeReadFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
@@ -25,6 +26,14 @@ import {
 } from './media-document-pipeline-helpers.js';
 import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
 import {
+  assertPptxPackageWrite,
+  slideRenamePartMap,
+  writePptxParts,
+  type PptxPackageCheckLevel,
+  type PptxPartMap,
+} from './pptx-package.js';
+import { replacePptxSlides, resolveReplaceSlidesTheme } from './pptx-replace-slides.js';
+import {
   warnLegacyMediaOp,
   buildUnifiedDocumentBrief,
   normalizeDiagramDocumentBrief,
@@ -42,15 +51,95 @@ import {
   loadDocumentCompositionCatalog,
   resolveObjectInput,
   compileBriefToDesignProtocol,
+  loadThemeCatalog,
 } from './media-design-protocol.js';
 
 import {
   cloneJsonValue,
   buildRetryOptions,
+  loadJsonValue,
   loadLayoutTemplateCatalog,
 } from './media-layout-runtime.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
 import { renderCompiledProtocol, renderDiagramDocumentBrief } from './media-design-protocol.js';
+
+/**
+ * Every governed PPTX write refuses a package PowerPoint would have to repair.
+ * Edit writers pass the source deck as baseline, so only defects the write
+ * introduces block it; inherited ones are logged. `package_check` (error |
+ * warn | never) is the operator override.
+ */
+function pptxPackageGuard(
+  op: string,
+  level: unknown,
+  baseline?: () => Buffer | undefined,
+  partMap?: PptxPartMap
+) {
+  return {
+    beforeWrite: (buffer: Buffer) =>
+      void assertPptxPackageWrite(buffer, op, {
+        baseline: baseline?.(),
+        level: (level ?? 'error') as PptxPackageCheckLevel,
+        partMap,
+      }),
+  };
+}
+
+/** filterPptxSlides emits keepIndices[i] (slideN.xml number) as slide{i+1}.xml and rewrites the slide list. */
+function filterSlidesPartMap(keepIndices: number[]): PptxPartMap {
+  const renames = new Map(
+    keepIndices.map((oldIdx, i) => [
+      `ppt/slides/slide${oldIdx}.xml`,
+      `ppt/slides/slide${i + 1}.xml`,
+    ])
+  );
+  return slideRenamePartMap(renames, ['ppt/presentation.xml', 'ppt/_rels/presentation.xml.rels']);
+}
+
+function readPptxSource(sourcePath: string): () => Buffer {
+  return () => safeReadFile(sourcePath, { encoding: null }) as Buffer;
+}
+
+/** The original package a rawParts protocol was extracted from (slides unpatched). */
+interface RawPartsProtocol {
+  rawParts?: Record<string, unknown>;
+  slides?: Array<{ id?: unknown; rawSlideXml?: string; rawSlideRelsXml?: string } | undefined>;
+}
+
+function rawPartsBaseline(protocol: RawPartsProtocol | undefined): Buffer | undefined {
+  const rawParts = protocol?.rawParts;
+  if (!rawParts || typeof rawParts !== 'object' || Object.keys(rawParts).length === 0) {
+    return undefined;
+  }
+  const parts = new Map<string, Buffer>();
+  for (const [name, base64] of Object.entries(rawParts)) {
+    parts.set(name, Buffer.from(String(base64), 'base64'));
+  }
+  for (const slide of protocol?.slides ?? []) {
+    const n = parseInt(String(slide?.id ?? '').match(/\d+/)?.[0] ?? '0', 10);
+    if (!n) continue;
+    if (slide.rawSlideXml)
+      parts.set(`ppt/slides/slide${n}.xml`, Buffer.from(slide.rawSlideXml, 'utf8'));
+    if (slide.rawSlideRelsXml) {
+      parts.set(`ppt/slides/_rels/slide${n}.xml.rels`, Buffer.from(slide.rawSlideRelsXml, 'utf8'));
+    }
+  }
+  return writePptxParts(parts);
+}
+
+function resolveReplaceSlidesThemeParam(rootDir: string, value: unknown): unknown {
+  if (typeof value !== 'string' || !value.trim()) return value;
+  if (/\.json$/iu.test(value.trim())) {
+    return loadJsonValue(path.resolve(rootDir, value.trim()));
+  }
+  const catalogTheme = loadThemeCatalog(rootDir)?.themes?.[value.trim()];
+  if (!catalogTheme) {
+    throw new Error(
+      `pptx_replace_slides: theme '${value}' is neither a theme JSON path nor a media theme id — the palette cannot be resolved | next: pass a path to a theme JSON (e.g. a tenant design/theme.json) or a theme id from the media theme catalog | evidence: theme=${value}`
+    );
+  }
+  return catalogTheme;
+}
 
 function resolveMediaRepositoryPath(rootDir: string, value: unknown, resolve: Function): string {
   return assertSafeRepositoryPath(path.resolve(rootDir, String(resolve(value))), {
@@ -171,7 +260,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
 
-      await retry(async () => generateNativePptx(protocol, outPath), buildRetryOptions());
+      await retry(
+        async () =>
+          generateNativePptx(
+            protocol,
+            outPath,
+            pptxPackageGuard('pptx_render', resolve(params.package_check), () =>
+              rawPartsBaseline(protocol)
+            )
+          ),
+        buildRetryOptions()
+      );
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
@@ -190,7 +289,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
 
-      patchPptxText(sourcePath, outPath, replacements);
+      patchPptxText(
+        sourcePath,
+        outPath,
+        replacements,
+        pptxPackageGuard('pptx_patch', resolve(params.package_check), readPptxSource(sourcePath))
+      );
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX patched at: ${outPath} (${stats.size} bytes).`);
@@ -205,7 +309,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
 
-      filterPptxSlides(sourcePath, outPath, keepIndices);
+      filterPptxSlides(
+        sourcePath,
+        outPath,
+        keepIndices,
+        pptxPackageGuard(
+          'pptx_filter_slides',
+          resolve(params.package_check),
+          readPptxSource(sourcePath),
+          filterSlidesPartMap(keepIndices)
+        )
+      );
 
       const stats = safeStat(outPath);
       logger.info(
@@ -224,13 +338,56 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
 
-      const result = patchPptxParagraphs(sourcePath, outPath, replacements);
+      const result = patchPptxParagraphs(
+        sourcePath,
+        outPath,
+        replacements,
+        pptxPackageGuard(
+          'pptx_patch_paragraphs',
+          resolve(params.package_check),
+          readPptxSource(sourcePath)
+        )
+      );
 
       const stats = safeStat(outPath);
       logger.info(
         `✅ [MEDIA] PPTX paragraph-patched (${result.match_count} matches across ${result.modified_slides.length} slide(s)) at: ${outPath} (${stats.size} bytes).`
       );
       break;
+    }
+    case 'pptx_replace_slides': {
+      const sourcePath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
+      const outPath = resolveMediaRepositoryPath(rootDir, params.out, resolve);
+      const catalog = loadThemeCatalog(rootDir);
+      const theme = resolveReplaceSlidesTheme(
+        resolveReplaceSlidesThemeParam(rootDir, resolve(params.theme)),
+        catalog?.themes?.[catalog?.default_theme]
+      );
+      const result = replacePptxSlides(safeReadFile(sourcePath, { encoding: null }) as Buffer, {
+        replace_index: Number(resolve(params.replace_index)),
+        template_index:
+          params.template_index !== undefined ? Number(resolve(params.template_index)) : undefined,
+        subtitle_shape:
+          params.subtitle_shape !== undefined ? resolve(params.subtitle_shape) : undefined,
+        theme,
+        slides: resolve(params.slides),
+        package_check: resolve(params.package_check),
+      });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
+      safeWriteFile(outPath, result.buffer);
+      logger.info(
+        `✅ [MEDIA] PPTX slide ${params.replace_index} replaced by ${result.slide_parts.length} slide(s) at: ${outPath} (${result.buffer.length} bytes).`
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pptx_replace_slides']: {
+          path: outPath,
+          slide_parts: result.slide_parts,
+          removed_parts: result.removed_parts,
+          body_zone: result.body_zone,
+        },
+      };
     }
     case 'xlsx_render': {
       const xlsxProtocol = normalizeXlsxDesignProtocol(
@@ -310,7 +467,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         params.path || params.output_path,
         resolve
       );
-      await renderCompiledProtocol(compiled, outPath, params.options);
+      await renderCompiledProtocol(compiled, outPath, {
+        ...(params.options || {}),
+        ...(params.package_check !== undefined
+          ? { package_check: resolve(params.package_check) }
+          : {}),
+      });
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Unified document generated at: ${outPath} (${stats.size} bytes).`);
       return {

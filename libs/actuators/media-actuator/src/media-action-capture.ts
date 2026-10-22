@@ -24,6 +24,7 @@ import {
 } from '@agent/core/media/document-reader';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 import { projectXlsxDesign } from './xlsx-extract-projection.js';
+import { diffPptxPackages, inspectPptxPackage } from './pptx-package.js';
 import * as path from 'node:path';
 
 import { cloneJsonValue, loadJsonValue } from './media-layout-runtime.js';
@@ -309,6 +310,41 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         }));
       }
       return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
+    }
+    case 'pptx_package_check': {
+      const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_package_check');
+      const report = inspectPptxPackage(safeReadFile(sourcePath, { encoding: null }) as Buffer);
+      const failOn = String(params.fail_on ?? 'error');
+      if (!['error', 'warn', 'never'].includes(failOn)) {
+        throw new Error(
+          `pptx_package_check: fail_on '${failOn}' is not supported — the gate level is ambiguous | next: use error, warn or never | evidence: fail_on=${failOn}`
+        );
+      }
+      const failing = report.issues.filter((issue) =>
+        failOn === 'never' ? false : failOn === 'warn' ? true : issue.severity === 'error'
+      );
+      if (failing.length > 0) {
+        throw new Error(
+          `pptx_package_check: ${sourcePath} has ${failing.length} package issue(s) at or above '${failOn}' — PowerPoint may demand a repair | next: fix the writer that produced the deck, or rerun with fail_on: never to inspect | evidence: ${failing
+            .slice(0, 8)
+            .map((issue) => `${issue.code} ${issue.part}: ${issue.detail}`)
+            .join('; ')}`
+        );
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'pptx_package_check']: { path: sourcePath, ...report },
+      };
+    }
+    case 'pptx_package_diff': {
+      const beforePath = resolveMediaInputPath(params.before, resolve, 'pptx_package_diff before');
+      const afterPath = resolveMediaInputPath(params.after, resolve, 'pptx_package_diff after');
+      const diff = diffPptxPackages(
+        safeReadFile(beforePath, { encoding: null }) as Buffer,
+        safeReadFile(afterPath, { encoding: null }) as Buffer,
+        { parts: params.parts !== undefined ? resolve(params.parts) : undefined }
+      );
+      return { ...ctx, [params.export_as || 'pptx_package_diff']: diff };
     }
     case 'xlsx_extract': {
       const xlsxPath = resolveMediaInputPath(params.path, resolve, 'xlsx_extract');

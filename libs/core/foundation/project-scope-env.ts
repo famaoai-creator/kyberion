@@ -2,6 +2,7 @@ import { getRegisteredEnvText, isVitestProcess } from './env.js';
 import { isValidTenantSlug } from './scope.js';
 import { rawExistsSync, rawLstatSync, rawReadTextFile } from '../fs-primitives.js';
 import { assertSafeRepositoryPath, pathResolver } from '../path-resolver.js';
+import { isScopeEnvOnly } from './scope-resolution-mode.js';
 
 const SAFE_PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
@@ -28,7 +29,7 @@ export function resolveProjectScope(): ProjectScopeBinding {
     // test identity resolution. Tests that need a persisted scope point
     // KYBERION_SCOPE_ENV_PATH at their own fixture file.
     const persistedPath =
-      isVitestProcess() && !configuredPath
+      isScopeEnvOnly() || (isVitestProcess() && !configuredPath)
         ? undefined
         : assertSafeRepositoryPath(configuredPath || pathResolver.shared('runtime/scope.env'), {
             allowMissingLeaf: true,

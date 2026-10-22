@@ -14,6 +14,7 @@ import {
   resolveCreativeDesign,
   type ResolvedCreativeDesign,
 } from '@agent/core/creative-design-resolver';
+import { readableText } from '@agent/core/ce-adoption';
 import type { HearingRecord } from './hearing.js';
 import { renderHearingCanvas } from './hearing-runtime.js';
 
@@ -59,11 +60,17 @@ export function buildHearingCanvasBrief(
   };
 }
 
-function designTokenCssVars(tokens: ResolvedCreativeDesign): string {
+/** Exported for SD-05: the deterministic ledger projection (`hearing-ledger-canvas.ts`)
+ * declares exactly the same custom properties the model is asked to use. */
+export function designTokenCssVars(tokens: ResolvedCreativeDesign): string {
   return [
     `--color-primary: ${tokens.colors.primary};`,
     `--color-secondary: ${tokens.colors.secondary};`,
     `--color-accent: ${tokens.colors.accent};`,
+    // The accent is tenant-overridable, so the text that sits on top of it
+    // cannot be assumed to be white — a bright accent (the dark theme's cyan,
+    // for one) leaves white text at roughly 1.4:1. Derive the readable pair.
+    `--color-accent-on: ${readableText(tokens.colors.accent)};`,
     `--color-background: ${tokens.colors.background};`,
     `--color-text: ${tokens.colors.text};`,
     `--color-warning: ${tokens.colors.warning};`,
@@ -96,6 +103,7 @@ export function buildHearingCanvasPrompt(
     '<html><head><style>...</style></head><body>...</body></html>',
     'Use only semantic HTML elements (header, main, section, article, nav, aside, footer, h1-h4, p, ul, ol, li, table, thead, tbody, tr, th, td, blockquote, small, strong, em, span, div, hr, br).',
     'The document must contain no <script>, no event handler attributes, no external resources of any kind (no images, no fonts, no stylesheets or scripts fetched from a URL), no <a> links, no <iframe>/<object>/<embed>, and no <form>.',
+    'Fill any block with var(--color-accent) only when its text uses var(--color-accent-on); never place white text on the accent.',
     'Put ALL styling inline inside the single <style> tag in <head> — never inline style attributes on elements. Declare these CSS custom properties on :root and use var(...) to reference them instead of hardcoded colors or fonts:',
     `:root { ${designTokenCssVars(tokens)} }`,
     `Document title: ${brief.title}`,

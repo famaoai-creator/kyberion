@@ -51,6 +51,9 @@ import { TraceContext, persistTrace } from '../analysis/trace.js';
 import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from '../gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { safeExistsSync } from '../secure-io.js';
+import { loadMissionStateForInference } from './mission-state-reader.js';
+import { findMissionPath } from '../path-resolver.js';
+import { missionPathOrNull } from '../mission-lookup.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import {
   createApprovalBackedManualDriveGate,
@@ -881,11 +884,48 @@ export interface DispatchPlannedMissionTaskInput {
  * Prefers the ledger-backed identity NI-01 stamped on the live runtime
  * registry record at spawn; falls back to the deterministic name derivation
  * when the runtime is not up yet (dispatch opens its trace before
- * ensure/spawn). Best-effort — attribution must never affect dispatch.
+ * ensure/spawn). `organizationId`, when the caller has one in scope, keeps
+ * that derivation inside the mission's own organization instead of the
+ * agent-identity 'default' fallback. Best-effort — attribution must never
+ * affect dispatch.
  */
-export function resolveDispatchActorNhiId(agentId: string): string | undefined {
+export function resolveDispatchActorNhiId(
+  agentId: string,
+  organizationId?: string
+): string | undefined {
   try {
-    return agentRegistry.getRuntimeIdentity?.(agentId) ?? deriveAgentNhiId(agentId) ?? undefined;
+    return (
+      agentRegistry.getRuntimeIdentity?.(agentId) ??
+      deriveAgentNhiId(agentId, organizationId) ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * NI-02: best-effort `organization_id` for a dispatch's NHI derivation, read
+ * directly off `mission-state.json` via `findMissionPath` (tier-agnostic,
+ * unlike `loadMissionStateSnapshot`'s public-tier assumption used elsewhere
+ * in this file for prompt provisioning) — so a tenant mission's dispatched
+ * actor derives into its own organization rather than silently falling back
+ * to 'default'. Never throws; a missing/unreadable state simply leaves the
+ * caller on `deriveAgentNhiId`'s own fallback.
+ */
+function resolveMissionOrganizationIdForDispatch(missionId: string): string | undefined {
+  try {
+    const missionPath = missionPathOrNull(findMissionPath, missionId);
+    if (!missionPath) return undefined;
+    const statePath = `${missionPath}/mission-state.json`;
+    if (!safeExistsSync(statePath)) return undefined;
+    // Legacy mission state predates the containment chain, so this reads
+    // leniently: the strict nine-field contract would reject a partial file
+    // and silently drop the organization the dispatched actor belongs to.
+    const organizationId = loadMissionStateForInference(statePath)?.organization_id;
+    return typeof organizationId === 'string' && organizationId.trim()
+      ? organizationId.trim()
+      : undefined;
   } catch {
     return undefined;
   }
@@ -913,11 +953,14 @@ export function resolveDispatchActorNhiId(agentId: string): string | undefined {
 export function originateMissionDispatchDelegationChain(input: {
   teamRole: string;
   agentId: string;
+  organizationId?: string;
 }): DelegationChain | undefined {
   try {
     const orchestratorActor =
-      resolveDispatchActorNhiId('mission-orchestrator') ?? 'kyberion:mission-orchestrator';
-    const workerActor = resolveDispatchActorNhiId(input.agentId) ?? input.agentId;
+      resolveDispatchActorNhiId('mission-orchestrator', input.organizationId) ??
+      'kyberion:mission-orchestrator';
+    const workerActor =
+      resolveDispatchActorNhiId(input.agentId, input.organizationId) ?? input.agentId;
     const workerTier = resolveCapabilityProfileForTeamRole(
       canonicalizeTeamRole(input.teamRole)
     ) as DelegationCapabilityTier;
@@ -957,7 +1000,8 @@ export async function dispatchPlannedMissionTask(
   // creation point that knows which agent identity the task is dispatched to
   // (input.assignment.agent_id), so worker-attributed traces carry actorNhiId
   // from here without any per-call-site changes elsewhere.
-  const actorNhiId = resolveDispatchActorNhiId(input.assignment.agent_id);
+  const missionOrganizationId = resolveMissionOrganizationIdForDispatch(input.missionId);
+  const actorNhiId = resolveDispatchActorNhiId(input.assignment.agent_id, missionOrganizationId);
   // NI-03: originate the delegation chain at THE dispatch point (same
   // neighborhood as the NI-02 actorNhiId stamp) and record on the trace who
   // the dispatched work is ultimately done on behalf of — the chain's root
@@ -966,6 +1010,7 @@ export async function dispatchPlannedMissionTask(
   const delegationChain = originateMissionDispatchDelegationChain({
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
+    organizationId: missionOrganizationId,
   });
   const gapRecorder = createGapRecorder();
   const onBehalfOf = delegationChain ? delegationChainRootActor(delegationChain) : undefined;
