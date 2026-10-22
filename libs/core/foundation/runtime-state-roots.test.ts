@@ -27,6 +27,12 @@ describe('runtime state registry', () => {
       'TENANT_INVALID'
     );
   });
+  it('keeps organization project storage rooted in the runtime placement registry', () => {
+    expect(runtimeStatePath('organization.projectsRoot')).toEqual({
+      logicalPath: 'active/shared/runtime/projects',
+      physicalPath: 'active/shared/runtime/projects',
+    });
+  });
   it('keeps personal owner queues separate and never interpolates an NHI into paths', () => {
     const owner = 'nhi:person/example';
     const hash = createHash('sha256').update(owner).digest('hex');

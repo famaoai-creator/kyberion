@@ -375,7 +375,7 @@ export interface DelegatedTaskSupervisorEnqueueResult {
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
-const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
+const SOCKET_PATH = `${SOCKET_DIR}/sup.sock`;
 const SPAWN_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-spawn.lock`;
 const START_TIMEOUT_MS = 12_000;
 const HEALTH_TIMEOUT_MS = 4_000;

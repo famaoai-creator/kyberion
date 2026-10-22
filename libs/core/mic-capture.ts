@@ -15,6 +15,12 @@ import { resolveFfmpegBin } from './tool/tool-binary-resolvers.js';
 export interface MicCaptureOptions {
   /** Input device: avfoundation index (":0") on darwin, ALSA device on linux. */
   device?: string;
+  /**
+   * Logical capture source, resolved to a device on darwin when `device` is
+   * not given: `mic` = physical microphone (room audio), `system` = virtual
+   * loopback such as BlackHole (remote audio), `both` = the two mixed.
+   */
+  source?: MicCaptureSource;
   sampleRateHz?: 16000 | 24000 | 48000;
   /** Milliseconds of audio per emitted chunk. */
   chunkMs?: number;
@@ -25,6 +31,8 @@ export interface MicCaptureOptions {
    */
   command?: string[];
 }
+
+export type MicCaptureSource = 'mic' | 'system' | 'both';
 
 export interface MicCaptureSession {
   chunks(): AsyncIterable<AudioChunk>;
@@ -39,12 +47,16 @@ export interface MicCaptureProbeResult {
 
 const MAC_VIRTUAL_AUDIO_DEVICE_RE =
   /blackhole|soundflower|loopback|virtual|aggregate|multi-output/i;
+/** Loopback drivers that carry system audio, best first. */
+const MAC_SYSTEM_AUDIO_PRIORITY = [/blackhole/i, /loopback/i, /soundflower/i];
 
 interface MicCapturePlatformAdapter {
   backend: Exclude<MicCaptureProbeResult['backend'], 'custom' | 'none'>;
   binary: string;
   resolveDevice(explicit?: string): string;
-  command(device: string, sampleRateHz: number): string[];
+  /** Device(s) to open; more than one is mixed (darwin only). */
+  resolveSource?(source: MicCaptureSource): string[];
+  command(devices: string[], sampleRateHz: number): string[];
 }
 
 class DarwinMicCaptureAdapter implements MicCapturePlatformAdapter {
@@ -54,16 +66,33 @@ class DarwinMicCaptureAdapter implements MicCapturePlatformAdapter {
     if (explicit?.trim()) return explicit.trim();
     return detectMacPhysicalAudioDevice() || ':0';
   }
-  command(device: string, sampleRateHz: number): string[] {
+  resolveSource(source: MicCaptureSource): string[] {
+    return resolveMacCaptureSource(detectMacAudioListing(), source);
+  }
+  command(devices: string[], sampleRateHz: number): string[] {
+    const inputs = devices.flatMap((d) => ['-f', 'avfoundation', '-i', d]);
+    // Several inputs run on independent clocks: resample each to a common
+    // timeline, mix (amix divides by N, so scale back up), then limit so
+    // speaker bleed into the mic cannot clip s16.
+    const n = devices.length;
+    const mix =
+      n > 1
+        ? [
+            '-filter_complex',
+            `${devices.map((_, i) => `[${i}:a]aresample=async=1[a${i}]`).join(';')};` +
+              `${devices.map((_, i) => `[a${i}]`).join('')}` +
+              `amix=inputs=${n}:duration=longest,volume=${n},alimiter=limit=0.95[mix]`,
+            '-map',
+            '[mix]',
+          ]
+        : [];
     return [
       resolveFfmpegBin(),
       '-hide_banner',
       '-loglevel',
       'error',
-      '-f',
-      'avfoundation',
-      '-i',
-      device,
+      ...inputs,
+      ...mix,
       '-ac',
       '1',
       '-ar',
@@ -81,7 +110,8 @@ class LinuxMicCaptureAdapter implements MicCapturePlatformAdapter {
   resolveDevice(explicit?: string): string {
     return explicit?.trim() || ':0';
   }
-  command(device: string, sampleRateHz: number): string[] {
+  command(devices: string[], sampleRateHz: number): string[] {
+    const device = devices[0];
     return [
       'arecord',
       ...(device !== ':0' ? ['-D', device] : []),
@@ -103,7 +133,8 @@ class WindowsMicCaptureAdapter implements MicCapturePlatformAdapter {
   resolveDevice(explicit?: string): string {
     return explicit?.trim() || 'default';
   }
-  command(device: string, sampleRateHz: number): string[] {
+  command(devices: string[], sampleRateHz: number): string[] {
+    const device = devices[0];
     return [
       resolveFfmpegBin(),
       '-hide_banner',
@@ -135,12 +166,17 @@ function resolveMicCaptureAdapter(platform: NodeJS.Platform): MicCapturePlatform
   }
 }
 
-/**
- * Select the first physical AVFoundation audio input from ffmpeg's device
- * listing. macOS device indices are host-specific; `:0` is not a safe
- * default because virtual devices such as BlackHole often occupy it.
- */
-export function selectMacPhysicalAudioDevice(listing: string): string | undefined {
+export interface MacAudioDevice {
+  /** avfoundation device string, e.g. ":1". */
+  device: string;
+  name: string;
+  /** Loopback / aggregate drivers rather than physical hardware. */
+  virtual: boolean;
+}
+
+/** Parse ffmpeg's `-list_devices` output into the audio input devices it names. */
+export function listMacAudioDevices(listing: string): MacAudioDevice[] {
+  const devices: MacAudioDevice[] = [];
   let inAudioSection = false;
   for (const line of listing.split(/\r?\n/u)) {
     if (/AVFoundation audio devices:/u.test(line)) {
@@ -170,20 +206,88 @@ export function selectMacPhysicalAudioDevice(listing: string): string | undefine
       if (name) match = { index, name };
     }
     if (!match) continue;
-    const name = match.name;
-    if (MAC_VIRTUAL_AUDIO_DEVICE_RE.test(name)) continue;
-    return `:${match.index}`;
+    devices.push({
+      device: `:${match.index}`,
+      name: match.name,
+      virtual: MAC_VIRTUAL_AUDIO_DEVICE_RE.test(match.name),
+    });
   }
-  return undefined;
+  return devices;
 }
 
-function detectMacPhysicalAudioDevice(): string | undefined {
+/**
+ * Select the first physical AVFoundation audio input from ffmpeg's device
+ * listing. macOS device indices are host-specific; `:0` is not a safe
+ * default because virtual devices such as BlackHole often occupy it.
+ */
+export function selectMacPhysicalAudioDevice(listing: string): string | undefined {
+  return listMacAudioDevices(listing).find((d) => !d.virtual)?.device;
+}
+
+/** The loopback device that carries system (remote-participant) audio, if any. */
+export function selectMacSystemAudioDevice(listing: string): string | undefined {
+  const virtual = listMacAudioDevices(listing).filter((d) => d.virtual);
+  for (const re of MAC_SYSTEM_AUDIO_PRIORITY) {
+    const hit = virtual.find((d) => re.test(d.name));
+    if (hit) return hit.device;
+  }
+  return virtual[0]?.device;
+}
+
+/** Resolve a logical source to the avfoundation device(s) to open; throws when it cannot. */
+export function resolveMacCaptureSource(listing: string, source: MicCaptureSource): string[] {
+  const mic = selectMacPhysicalAudioDevice(listing);
+  const system = selectMacSystemAudioDevice(listing);
+  if ((source === 'mic' || source === 'both') && !mic) {
+    throw new Error('[mic-capture] no physical microphone found — pass --device explicitly');
+  }
+  if ((source === 'system' || source === 'both') && !system) {
+    throw new Error(
+      '[mic-capture] no loopback device (BlackHole etc.) found — system audio cannot be captured'
+    );
+  }
+  if (source === 'mic') return [mic as string];
+  if (source === 'system') return [system as string];
+  return [mic as string, system as string];
+}
+
+export type MeetingShape = 'room' | 'remote' | 'hybrid';
+
+/** Which capture source fits the meeting: room voices reach the mic, remote voices the speaker. */
+export function recommendCaptureSource(shape: MeetingShape): MicCaptureSource {
+  if (shape === 'room') return 'mic';
+  if (shape === 'remote') return 'system';
+  return 'both';
+}
+
+/**
+ * Root-mean-square level of a PCM_S16LE buffer, 0..1. Used to tell a silent
+ * capture (wrong source, muted bus) from a quiet room.
+ */
+export function pcmRms(payload: Uint8Array): number {
+  const samples = Math.floor(payload.byteLength / 2);
+  if (samples === 0) return 0;
+  const view = new DataView(payload.buffer, payload.byteOffset, samples * 2);
+  let sum = 0;
+  for (let i = 0; i < samples; i += 1) {
+    const v = view.getInt16(i * 2, true) / 32768;
+    sum += v * v;
+  }
+  return Math.sqrt(sum / samples);
+}
+
+/** ffmpeg's avfoundation device listing (it exits non-zero by design; the list is on stderr). */
+export function detectMacAudioListing(): string {
   const probe = spawnSync(
     resolveFfmpegBin(),
     ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
   );
-  return selectMacPhysicalAudioDevice(`${probe.stdout || ''}\n${probe.stderr || ''}`);
+  return `${probe.stdout || ''}\n${probe.stderr || ''}`;
+}
+
+function detectMacPhysicalAudioDevice(): string | undefined {
+  return selectMacPhysicalAudioDevice(detectMacAudioListing());
 }
 
 /** Resolve a host-safe default while preserving explicit test/device overrides. */
@@ -191,12 +295,34 @@ export function resolveMicDevice(explicit?: string): string {
   return resolveMicCaptureAdapter(process.platform).resolveDevice(explicit);
 }
 
-function defaultCommand(opts: Required<Pick<MicCaptureOptions, 'device' | 'sampleRateHz'>>): {
-  argv: string[];
-  backend: MicCaptureProbeResult['backend'];
-} {
+/**
+ * Devices to open for an explicit device or a logical source. An explicit
+ * `device` is always a single input, verbatim; combining it with `source` is
+ * ambiguous and rejected.
+ */
+export function resolveCaptureDevices(device?: string, source?: MicCaptureSource): string[] {
+  if (source && device?.trim()) {
+    throw new Error('[mic-capture] pass either a device or a source, not both');
+  }
   const adapter = resolveMicCaptureAdapter(process.platform);
-  return { backend: adapter.backend, argv: adapter.command(opts.device, opts.sampleRateHz) };
+  if (source) {
+    if (!adapter.resolveSource) {
+      throw new Error(
+        `[mic-capture] source "${source}" is supported on macOS only — pass a device`
+      );
+    }
+    return adapter.resolveSource(source);
+  }
+  return [adapter.resolveDevice(device)];
+}
+
+/** The ffmpeg/arecord argv for the given devices on `platform` (exported for tests). */
+export function buildCaptureCommand(
+  devices: string[],
+  sampleRateHz: number,
+  platform: NodeJS.Platform = process.platform
+): string[] {
+  return resolveMicCaptureAdapter(platform).command(devices, sampleRateHz);
 }
 
 export function probeMicCapture(opts: MicCaptureOptions = {}): MicCaptureProbeResult {
@@ -225,7 +351,7 @@ export async function startMicCapture(opts: MicCaptureOptions = {}): Promise<Mic
   const argv =
     opts.command && opts.command.length > 0
       ? opts.command
-      : defaultCommand({ device: resolveMicDevice(opts.device), sampleRateHz }).argv;
+      : buildCaptureCommand(resolveCaptureDevices(opts.device, opts.source), sampleRateHz);
 
   const child: ChildProcessWithoutNullStreams = spawn(argv[0], argv.slice(1), {
     stdio: ['ignore', 'pipe', 'pipe'],

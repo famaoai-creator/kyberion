@@ -157,7 +157,7 @@ last_updated: 2026-05-30
 | 項目            | 内容                                                                                           |
 | --------------- | ---------------------------------------------------------------------------------------------- |
 | Setup           | fake meeting URL、short listen duration、dry-run / mock driver                                 |
-| Command         | `pipelines/meeting-proxy-workflow.json` を preview または dry-run                              |
+| Command         | `knowledge/product/pipeline-templates/meeting-proxy-workflow.json` を preview または dry-run   |
 | Expected        | join/listen/leave action JSON が artifact として生成され、shell 非依存で actuator input に渡る |
 | Failure variant | invalid URL、unsupported platform、missing browser capability                                  |
 

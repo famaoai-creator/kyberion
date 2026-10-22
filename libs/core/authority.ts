@@ -3,6 +3,10 @@ import {
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
+import {
+  isPipelineJournalCapability,
+  PIPELINE_JOURNAL_STORE_ROLE,
+} from './foundation/pipeline-journal-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -15,6 +19,7 @@ import * as pathResolver from './path-resolver.js';
 import { missionPathOrNull } from './mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { resolveProjectScope } from './foundation/project-scope-env.js';
+import { isScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
@@ -67,6 +72,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
   autonomy_learning_store: 'worker',
+  pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
@@ -682,6 +688,7 @@ interface PreparedExecutionContext {
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
   DISCUSSION_REQUEST_STORAGE_ROLE,
+  PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -738,6 +745,14 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability'
+    );
+  if (
+    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
+    (!isPipelineJournalCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
     );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();
@@ -1007,7 +1022,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   // 1. Resolve Persona (and tenantSlug / brokeredTenants) from Mission State.
   // Try the legacy no-tier path first, then fall back to tier-aware lookup
   // (covers active/missions/{personal,confidential,public}/{id}/...).
-  if (missionId) {
+  if (missionId && !isScopeEnvOnly()) {
     const candidates: string[] = [pathResolver.active(`missions/${missionId}/mission-state.json`)];
     // An id that is ambiguous across tenants or not visible to this process
     // contributes no mission identity (the persona stays 'unknown'), so

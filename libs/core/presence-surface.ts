@@ -80,7 +80,7 @@ export function createPresenceVoiceStimulus(
   text: string,
   intent = 'conversation',
   sourceId = 'local-mic',
-  requestId: string = randomUUID(),
+  requestId: string = randomUUID()
 ): PresenceVoiceStimulus {
   const ts = nowIso();
   return {
@@ -203,15 +203,17 @@ export function validatePresenceTimeline(input: unknown): PresenceTimelineAdf {
     if (typeof event.at_ms !== 'number' || event.at_ms < 0) {
       throw new Error('Presence timeline event requires a non-negative at_ms.');
     }
-    if (![
-      'set_status',
-      'set_agent',
-      'set_expression',
-      'set_subtitle',
-      'clear_subtitle',
-      'append_transcript',
-      'clear_transcript',
-    ].includes(event.op)) {
+    if (
+      ![
+        'set_status',
+        'set_agent',
+        'set_expression',
+        'set_subtitle',
+        'clear_subtitle',
+        'append_transcript',
+        'clear_transcript',
+      ].includes(event.op)
+    ) {
       throw new Error(`Unsupported presence timeline op: ${String(event.op)}`);
     }
   }
@@ -223,8 +225,11 @@ export function validatePresenceTimeline(input: unknown): PresenceTimelineAdf {
   };
 }
 
-export function buildPresenceVoiceIngressTimeline(input: PresenceVoiceIngressOptions): PresenceTimelineAdf {
-  const listeningMs = typeof input.listening_ms === 'number' && input.listening_ms >= 0 ? input.listening_ms : 1400;
+export function buildPresenceVoiceIngressTimeline(
+  input: PresenceVoiceIngressOptions
+): PresenceTimelineAdf {
+  const listeningMs =
+    typeof input.listening_ms === 'number' && input.listening_ms >= 0 ? input.listening_ms : 1400;
   const speaker = input.speaker || 'User';
   return {
     action: 'presence_timeline',
@@ -242,9 +247,13 @@ export function buildPresenceVoiceIngressTimeline(input: PresenceVoiceIngressOpt
   };
 }
 
-export function buildPresenceAssistantReplyTimeline(input: PresenceAssistantReplyOptions): PresenceTimelineAdf {
-  const thinkingMs = typeof input.thinking_ms === 'number' && input.thinking_ms >= 0 ? input.thinking_ms : 700;
-  const speakingMs = typeof input.speaking_ms === 'number' && input.speaking_ms >= 0 ? input.speaking_ms : 1700;
+export function buildPresenceAssistantReplyTimeline(
+  input: PresenceAssistantReplyOptions
+): PresenceTimelineAdf {
+  const thinkingMs =
+    typeof input.thinking_ms === 'number' && input.thinking_ms >= 0 ? input.thinking_ms : 700;
+  const speakingMs =
+    typeof input.speaking_ms === 'number' && input.speaking_ms >= 0 ? input.speaking_ms : 1700;
   const speaker = input.speaker || 'Kyberion';
   return {
     action: 'presence_timeline',

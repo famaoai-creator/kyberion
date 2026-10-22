@@ -1426,7 +1426,8 @@ export class CloudflareOsControlPlane {
   refreshFromJournals(): void {
     if (this.journalMode) this.journalStore.refresh();
     else this.refreshPersistedObservations();
-    this.reconcileLinkedApprovals();
+    // Observation callers also refresh this projection. Decision reconciliation
+    // belongs to an explicit owner action, never to a background read.
   }
 
   /** SC-03: observation rollups by mission × resource_ref × tier. */

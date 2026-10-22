@@ -151,27 +151,21 @@ Build the repo before running the detached worker path:
 pnpm build
 ```
 
-### 5.2 Submit A Long Render
+### 5.2 Run The Canonical Demo Pipeline
 
-Use the submit pipeline when you want to start a render and continue later:
-
-```bash
-pnpm pipeline --input pipelines/kyberion-vtuber-narrated-demo-submit.json
-```
-
-The submit step returns a job ticket path in the bundle directory.
-
-### 5.3 Collect The Result
-
-Later, collect the result from the saved ticket:
+The one-shot VTuber demo (brief → narration → compose → validate) lives as a
+template. Instantiate it into a tenant pipeline before a production run:
 
 ```bash
-pnpm pipeline --input pipelines/kyberion-vtuber-narrated-demo-collect.json
+pnpm pipeline --input knowledge/product/pipeline-templates/kyberion-vtuber-narrated-demo.json
 ```
 
-### 5.4 Validate A Completed Artifact
+The former `*-submit` / `*-collect` system pipelines were retired; long renders
+should use the video-composition job ticket on the actuator, not a split ADF.
 
-Run the narrated-video validation fragment or the actuator verification path after collection.
+### 5.3 Validate A Completed Artifact
+
+Run the narrated-video validation fragment or the actuator verification path after the render completes.
 
 ## 6. Operational Rules
 

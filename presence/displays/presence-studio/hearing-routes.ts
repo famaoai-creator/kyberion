@@ -20,8 +20,9 @@ import { frontDeskRoleFromViewerScope, type FrontDeskRole } from '@agent/core/fr
 import { resolveFrontDeskMenu, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import {
+  defaultHearingScenario,
   findHearingScenario,
-  type HearingScenarioCatalogEntry,
+  hearingPhaseProgress,
 } from '@agent/core/hearing-scenario-catalog';
 import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
 import {
@@ -39,6 +40,8 @@ import {
 import {
   applyHearingTurn,
   createHearingRecord,
+  hearingScenarioFromCatalogEntry,
+  nextHearingQuestion,
   validateHearingScenario,
   type HearingDecidedBy,
   type HearingRecord,
@@ -65,6 +68,12 @@ import {
   buildWorkInventoryDecompositionInput,
   renderWorkInventoryCanvasHtml,
 } from './hearing-work-inventory.js';
+import {
+  HearingLedgerRequestError,
+  renderLedgerCanvasForRecord,
+  resolveLedgerScenarioRef,
+} from './hearing-ledger-routes.js';
+import { parseDecisionsScenarioId } from '@agent/core/decision-ledger';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { readHearingCompletion } from './hearing-completion.js';
 import {
@@ -108,19 +117,11 @@ function hearingScenarioFromRecord(
 ): HearingScenario {
   return {
     id: record.scenario,
-    requirements: record.requirements.map(({ id, label_key }) => ({ id, label_key })),
-  };
-}
-
-/** WI-08: `{id, requirements}` projection of a `hearing-scenarios.json`
- * catalog entry — the shape `createHearingRecord`/`applyHearingTurn` need. */
-function hearingScenarioFromCatalogEntry(entry: HearingScenarioCatalogEntry): HearingScenario {
-  return {
-    id: entry.id,
-    requirements: entry.requirements.map(({ id, label_key, aliases }) => ({
+    requirements: record.requirements.map(({ id, label_key, label_source, label_text }) => ({
       id,
       label_key,
-      ...(aliases ? { aliases } : {}),
+      ...(label_source ? { label_source } : {}),
+      ...(label_text ? { label_text } : {}),
     })),
   };
 }
@@ -131,11 +132,25 @@ function hearingScenarioFromCatalogEntry(entry: HearingScenarioCatalogEntry): He
  * fall back to the existing default/`input.scenario` behavior. */
 function resolveHearingScenarioParam(scenarioId: unknown): HearingScenario | undefined {
   if (typeof scenarioId !== 'string' || !scenarioId.trim()) return undefined;
+  // SD-02: a ledger hearing's id (`decisions-<case>-<actor>`) is not a catalog
+  // entry; its record is resolved from the tenant ledger, never from here.
+  if (parseDecisionsScenarioId(scenarioId.trim()) !== undefined) return undefined;
   const entry = findHearingScenario(scenarioId.trim());
   if (!entry) {
     throw new HearingRequestError(`Unknown hearing scenario_id: ${scenarioId}`);
   }
   return hearingScenarioFromCatalogEntry(entry);
+}
+
+/** Read routes: a ledger id resolves from the viewer's tenant ledger so the unpersisted default
+ * record carries the same `scenario` the client validates accepted records against. */
+function resolveReadScenarioParam(
+  namespace: string,
+  scenarioId: unknown
+): HearingScenario | undefined {
+  const id = typeof scenarioId === 'string' ? scenarioId.trim() : '';
+  if (id && parseDecisionsScenarioId(id)) return resolveLedgerScenarioRef(namespace, id);
+  return resolveHearingScenarioParam(scenarioId);
 }
 
 /** WI-08: dispatches to the scenario's own canvas renderer — the
@@ -173,21 +188,6 @@ function workInventoryScopeForHandoff(viewer: PresenceStudioViewerContext): Work
   };
 }
 
-/** WI-08: `?scenario_id=` on the canvas URL itself (not just the record
- * fetch) so the canvas iframe's own, separate request also resolves the
- * right default scenario before anything is persisted — the browser loads
- * this URL directly, it never carries whatever query the record fetch used. */
-function hearingCanvasUrl(
-  sessionId: string,
-  record: HearingRecord,
-  viewer: PresenceStudioViewerContext
-): string {
-  return hearingScopedUrl(
-    `/api/hearing/${encodeURIComponent(sessionId)}/canvas?scenario_id=${encodeURIComponent(record.scenario)}`,
-    viewer
-  );
-}
-
 function buildWorkInventoryNextAction(
   locale: SupportedLocale,
   viewer: PresenceStudioViewerContext
@@ -213,11 +213,95 @@ function withResolvedLabels(
 ) {
   return {
     ...record,
+    // SD-02: the client never re-derives the scenario grammar; the server says
+    // whether this hearing is a decision-ledger hearing.
+    is_ledger: parseDecisionsScenarioId(record.scenario) !== undefined,
     requirements: record.requirements.map((item) => ({
       ...item,
-      label: catalogT(item.label_key as VocabularyKey, undefined, locale),
+      // SD-02: tenant-owned labels (decision ledger items) are free text and
+      // bypass the vocabulary catalog; only `label_source: 'vocabulary'` (or
+      // absent) resolves through `label_key`.
+      label:
+        item.label_source === 'tenant' && item.label_text
+          ? item.label_text
+          : catalogT(item.label_key as VocabularyKey, undefined, locale),
     })),
   };
+}
+
+/** Label of one requirement in the request locale (tenant free text or vocabulary). */
+function requirementLabel(
+  item: { label_key: string; label_source?: 'vocabulary' | 'tenant'; label_text?: string },
+  locale: SupportedLocale
+): string {
+  return item.label_source === 'tenant' && item.label_text
+    ? item.label_text
+    : catalogT(item.label_key as VocabularyKey, undefined, locale);
+}
+
+/** `scenario_ref` naming a catalog sheet (`web_app_build`, `process_improvement`, …). */
+function resolveCatalogScenarioRef(ref: string): HearingScenario | undefined {
+  const found = findHearingScenario(ref);
+  return found ? hearingScenarioFromCatalogEntry(found) : undefined;
+}
+
+export function defaultCatalogScenario(): HearingScenario {
+  return hearingScenarioFromCatalogEntry(defaultHearingScenario());
+}
+
+/** Per-phase progress with resolved titles — the sheet's "where are we". */
+function phasePayload(record: HearingRecord, locale: SupportedLocale) {
+  const progress = hearingPhaseProgress(record.requirements, record.phases ?? []);
+  const withTitles = progress.phases.map((phase) => ({
+    ...phase,
+    title: catalogT(phase.title_key as VocabularyKey, undefined, locale),
+  }));
+  const current = progress.current
+    ? (withTitles.find((phase) => phase.id === progress.current?.id) ?? null)
+    : null;
+  return { phases: record.phases?.length ? withTitles : [], current_phase: current };
+}
+
+/** What the companion asks next, or `null` when every requirement is answered. */
+function nextQuestionPayload(record: HearingRecord, locale: SupportedLocale) {
+  const next = nextHearingQuestion(record);
+  const phases = phasePayload(record, locale);
+  if (!next) {
+    return {
+      next_question: null,
+      prompt: catalogT('front_desk:hearing_all_answered', undefined, locale),
+      ...phases,
+    };
+  }
+  const label = requirementLabel(next, locale);
+  const phase = phases.current_phase;
+  return {
+    next_question: { id: next.id, label, ...(next.phase_id ? { phase_id: next.phase_id } : {}) },
+    prompt: phase
+      ? catalogT('front_desk:hearing_next_question_in_phase', { phase: phase.title, label }, locale)
+      : catalogT('front_desk:hearing_next_question', { label }, locale),
+    ...phases,
+  };
+}
+
+/** The canvas URL changes whenever a new version exists, so an iframe reloads on change.
+ * WI-08: it also carries `?scenario_id=` so the canvas iframe's own, separate
+ * request resolves the right default scenario before anything is persisted —
+ * the browser loads this URL directly, it never carries whatever query the
+ * record fetch used. */
+function hearingCanvasUrl(
+  sessionId: string,
+  record: HearingRecord,
+  viewer: PresenceStudioViewerContext,
+  locale: SupportedLocale
+): string {
+  const latest = record.canvas_versions[record.canvas_versions.length - 1];
+  const base = `/api/hearing/${encodeURIComponent(sessionId)}/canvas`;
+  const params = new URLSearchParams();
+  params.set('scenario_id', record.scenario);
+  if (latest) params.set('version', latest);
+  params.set('locale', locale);
+  return hearingScopedUrl(`${base}?${params.toString()}`, viewer);
 }
 
 function hearingResponseError(req: Request, res: Response, error: unknown): void {
@@ -225,6 +309,7 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
     error instanceof HearingConflictError
       ? 409
       : error instanceof HearingRequestError ||
+          error instanceof HearingLedgerRequestError ||
           error instanceof HearingOperationError ||
           error instanceof HearingScopeError
         ? error.status
@@ -384,14 +469,17 @@ export function registerHearingRoutes(app: express.Express): void {
       // `?scenario_id=` (the same id `/ask?mode=hearing&scenario=...` picked)
       // lets the default in-memory record reflect the chosen scenario
       // instead of always defaulting to `web_app_build`.
-      const scenarioParam = resolveHearingScenarioParam(req.query.scenario_id);
+      const scenarioParam = resolveReadScenarioParam(storage.namespace, req.query.scenario_id);
       const record =
         storage.load(sessionId) || defaultHearingRecord(sessionId, nowIso(), scenarioParam);
       const requestedVersion = typeof req.query.version === 'string' ? req.query.version : '';
       const versionedCanvas = requestedVersion ? storage.canvas(sessionId, requestedVersion) : null;
       if (requestedVersion && !versionedCanvas)
         throw new HearingRequestError('Hearing canvas version was not found.');
-      const html = versionedCanvas || (await renderCurrentHearingCanvas(record, locale));
+      const html =
+        versionedCanvas ||
+        renderLedgerCanvasForRecord(storage.namespace, record, locale) ||
+        (await renderCurrentHearingCanvas(record, locale));
       res.type('html');
       res.setHeader(
         'Content-Security-Policy',
@@ -416,15 +504,18 @@ export function registerHearingRoutes(app: express.Express): void {
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       const existing = storage.load(sessionId);
       // WI-08: same `?scenario_id=` default-record seam as the canvas route.
-      const scenarioParam = resolveHearingScenarioParam(req.query.scenario_id);
-      const record = existing || defaultHearingRecord(sessionId, nowIso(), scenarioParam);
+      const scenarioParam = resolveReadScenarioParam(storage.namespace, req.query.scenario_id);
+      const record =
+        existing ||
+        defaultHearingRecord(sessionId, nowIso(), scenarioParam ?? defaultCatalogScenario());
       res.setHeader('Cache-Control', 'no-store');
       res.json({
         ok: true,
         record: withResolvedLabels(withHearingHandoffSnapshot(record, viewer), locale),
         completion: readHearingCompletion(record, viewer),
         persisted: Boolean(existing),
-        canvas_url: hearingCanvasUrl(sessionId, record, viewer),
+        canvas_url: hearingCanvasUrl(sessionId, record, viewer, locale),
+        ...nextQuestionPayload(record, locale),
       });
     } catch (error) {
       hearingResponseError(req, res, error);
@@ -456,20 +547,37 @@ export function registerHearingRoutes(app: express.Express): void {
       const namespace = storage.namespace;
       const existing = storage.load(sessionId);
       assertHearingEditable(existing);
+      // SD-02: `scenario_ref` (`decisions-<case>-<actor>`) is resolved server-side
+      // from the viewer's tenant ledger — the client never supplies the
+      // decision items themselves; a non-ledger ref names a catalog sheet.
       // WI-08: `scenario_id` (resolved against `hearing-scenarios.json`) is
-      // preferred; the legacy inline `scenario` object stays supported for
-      // backward compatibility, but only when no `scenario_id` was sent.
-      const scenarioFromId = resolveHearingScenarioParam(input.scenario_id);
+      // next; the legacy inline `scenario` object stays supported for
+      // backward compatibility, but only when neither was sent.
+      const scenarioRef = typeof input.scenario_ref === 'string' ? input.scenario_ref.trim() : '';
+      const scenarioFromRef = scenarioRef
+        ? (resolveLedgerScenarioRef(namespace, scenarioRef) ??
+          resolveCatalogScenarioRef(scenarioRef))
+        : undefined;
+      if (scenarioRef && !scenarioFromRef) {
+        throw new HearingRequestError('Unknown hearing scenario.');
+      }
+      const scenarioFromId = scenarioFromRef
+        ? undefined
+        : resolveHearingScenarioParam(input.scenario_id);
       const legacyScenario =
+        !scenarioFromRef &&
         !scenarioFromId &&
         input.scenario &&
         typeof input.scenario === 'object' &&
         !Array.isArray(input.scenario)
           ? (input.scenario as HearingScenario)
           : undefined;
-      if (legacyScenario) validateHearingScenario(legacyScenario);
-      const scenario = scenarioFromId || legacyScenario;
-      const record = existing || createHearingRecord(sessionId, nowIso(), scenario);
+      const scenario = scenarioFromRef || scenarioFromId || legacyScenario;
+      if (scenario) validateHearingScenario(scenario);
+      // New sessions open on the catalog's default sheet (phase-structured),
+      // not the flat built-in list.
+      const record =
+        existing || createHearingRecord(sessionId, nowIso(), scenario ?? defaultCatalogScenario());
       const next = applyHearingTurn(
         record,
         {
@@ -485,33 +593,38 @@ export function registerHearingRoutes(app: express.Express): void {
       // HT-02: save the deterministic template canvas synchronously first —
       // `canvas_url` always works even while a model generation is pending
       // or fails — then kick off the (possibly slow) model generation
-      // without making the caller wait for it (risk table §4). WI-08: a
-      // `work_inventory_table` scenario has no model-generation follow-up
-      // (`renderCurrentHearingCanvas` is the scenario's only, final canvas),
-      // so it never suspends this handler — the ternary's `await` only runs
-      // for a `work_inventory_table` scenario, which is the only branch that
-      // needs it.
+      // without making the caller wait for it (risk table §4).
+      // SD-05: a ledger hearing's canvas is a deterministic projection of the
+      // tenant's decision ledger — drawn synchronously, final, and never
+      // handed to the model. WI-08: a `work_inventory_table` scenario has no
+      // model-generation follow-up either (`renderCurrentHearingCanvas` is the
+      // scenario's only, final canvas), so it is `'template'`-final at once —
+      // never left stuck at `'pending'` the way `web_app_preview` briefly is
+      // while `scheduleHearingCanvasGeneration` runs.
       const scenarioDef = findHearingScenario(next.scenario);
+      const projected = renderLedgerCanvasForRecord(namespace, next, locale);
+      const isWorkInventory = !projected && scenarioDef?.canvas === 'work_inventory_table';
       const canvasHtml =
-        scenarioDef?.canvas === 'work_inventory_table'
+        projected ??
+        (isWorkInventory
           ? await renderWorkInventoryCanvasHtml(next, locale)
-          : renderHearingCanvas(next, locale);
+          : renderHearingCanvas(next, locale));
       const versioned = storage.commitTurn(
         sessionId,
         existing,
         next,
         canvasHtml,
-        scenarioDef?.canvas === 'work_inventory_table' ? 'template' : 'pending'
+        projected ? 'projected' : isWorkInventory ? 'template' : 'pending'
       );
       res.status(200).json({
         ok: true,
         record: withResolvedLabels(withHearingHandoffSnapshot(versioned, viewer), locale),
-        canvas_url: hearingCanvasUrl(sessionId, versioned, viewer),
+        canvas_url: hearingCanvasUrl(sessionId, versioned, viewer, locale),
+        ...nextQuestionPayload(versioned, locale),
       });
-      // WI-08: `work_inventory_table` never calls a reasoning backend for its
-      // canvas — only scenarios that keep the model-drawn `web_app_preview`
-      // canvas schedule the async generation follow-up.
-      if (scenarioDef?.canvas !== 'work_inventory_table') {
+      // Only scenarios that keep the model-drawn `web_app_preview` canvas
+      // schedule the async generation follow-up.
+      if (!projected && !isWorkInventory) {
         scheduleHearingCanvasGeneration({
           storage,
           namespace,

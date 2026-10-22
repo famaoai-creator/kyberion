@@ -864,6 +864,30 @@ describe('organization operating model', () => {
       missing_decision_cadences: ['decision-1:missing-cadence'],
       pending_decisions: ['decision-1'],
     });
+
+    const view = buildOrganizationManagementView({
+      organizationId,
+      tier: 'confidential',
+      tenantSlug,
+    });
+    // A pending decision is reported by reconciliation AND by the decision
+    // record itself. It is still one thing to act on: listing it twice made
+    // the operator's queue half duplicates, and the two copies disagreed on
+    // priority, so the truncated view showed the weaker one.
+    const decisionPoints = view.control_plane.intervention_points.filter(
+      (point) => point.kind === 'decision' && point.id === 'decision-1'
+    );
+    expect(decisionPoints).toHaveLength(1);
+    expect(decisionPoints[0]).toMatchObject({
+      priority: 'high',
+      reason: 'Decision is pending_approval.',
+    });
+    const keys = view.control_plane.intervention_points.map((point) => `${point.kind}:${point.id}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    // Consumers truncate the list, so the urgent entries must survive the cut.
+    const ranks = { low: 0, medium: 1, high: 2 } as const;
+    const priorities = view.control_plane.intervention_points.map((point) => ranks[point.priority]);
+    expect([...priorities].sort((a, b) => b - a)).toEqual(priorities);
   });
 
   it('builds proposed learning candidates without promoting them automatically', () => {

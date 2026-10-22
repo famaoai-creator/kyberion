@@ -61,13 +61,13 @@ export function hearingStorageForViewer(viewer: PresenceStudioViewerContext) {
       expected: HearingRecord | null,
       next: HearingRecord,
       html: string,
-      generation: 'template' | 'pending'
+      generation: 'template' | 'pending' | 'projected'
     ) => {
       const input = structuredClone({ sessionId, expected, next, html, generation });
       if (
         typeof input.sessionId !== 'string' ||
         typeof input.html !== 'string' ||
-        !['template', 'pending'].includes(input.generation) ||
+        !['template', 'pending', 'projected'].includes(input.generation) ||
         input.next.session_id !== input.sessionId ||
         (input.expected && input.expected.session_id !== input.sessionId)
       )
@@ -86,7 +86,7 @@ export function hearingStorageForViewer(viewer: PresenceStudioViewerContext) {
               canvas_generation: input.generation,
               canvas_version_sources: {
                 ...input.next.canvas_version_sources,
-                [version]: 'template',
+                [version]: input.generation === 'projected' ? 'projected' : 'template',
               },
             };
           },

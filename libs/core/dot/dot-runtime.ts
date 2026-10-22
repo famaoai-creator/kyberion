@@ -140,6 +140,8 @@ const DEFAULT_DELEGATED_WAKE_TIMEOUT_MS = 15 * 60 * 1000;
 export interface DotWakeLoopOptions {
   objective: string;
   goalId?: string;
+  /** Accountable actor on the goal driver's tool-call audit records (`dot:<id>`). */
+  actorId?: string;
   systemPrompt?: string;
   toolRole?: string;
   maxTurns?: number;
@@ -168,7 +170,18 @@ export interface DotWakeLoopOptions {
 export interface DotWakeLoopResult {
   turnsRun: number;
   finalState?: string;
-  goal: { budgetStats?: { tokensUsed?: number } };
+  goal: { budgetStats?: { tokensUsed?: number }; terminalReason?: string };
+}
+
+/**
+ * The goal driver ends a wake whose live backend turn outran the wall-clock
+ * budget as `blocked` instead of throwing (the turn is cancelled, not failed).
+ * With nothing collected that wake produced no work and must not read as delivered.
+ */
+function wallClockCancelledReason(result: DotWakeLoopResult): string | undefined {
+  const reason = result.goal.terminalReason ?? '';
+  if (result.finalState !== 'blocked' || !/wall[-_]clock budget/.test(reason)) return undefined;
+  return `wake tool loop exceeded its wall_clock budget before a backend turn completed (${reason})`;
 }
 
 /** Same ~3-chars/token heuristic as the goal driver; governance-grade only. */
@@ -197,6 +210,8 @@ export interface DotWakeLedgerEntry {
   fired_at: string;
   outcome: DotWakeOutcome;
   reason?: string;
+  /** Classified cause of a failed wake; `reason` keeps the original text. */
+  reason_code?: DotWakeReasonCode;
   turns_run?: number;
   tokens_used?: number;
   /** The dot's own words (proposal block removed), so "why did it propose nothing?" is answerable. */
@@ -475,6 +490,7 @@ export function recordDotWakeOutcome(
   outcome: DotWakeOutcome,
   deps: DotRuntimeDeps & {
     reason?: string;
+    reason_code?: DotWakeReasonCode;
     turns_run?: number;
     tokens_used?: number;
     summary?: string;
@@ -509,6 +525,9 @@ export function recordDotWakeOutcome(
       fired_at: now.toISOString(),
       outcome,
       ...(deps.reason ? { reason: deps.reason } : {}),
+      ...(outcome === 'failed'
+        ? { reason_code: deps.reason_code ?? classifyDotWakeReason(deps.reason) }
+        : {}),
       ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
       ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
       ...(deps.summary ? { summary: deps.summary } : {}),
@@ -751,6 +770,27 @@ export function isDotWakeProcessFailure(reason: string | undefined): boolean {
   );
 }
 
+export type DotWakeReasonCode =
+  | 'backend_unavailable'
+  | 'no_tool_backend'
+  | 'provider_failover_exhausted'
+  | 'wall_clock_exceeded'
+  | 'charter'
+  | 'wake';
+
+/** Map a failed wake's reason text (full text or tenant category) to a stable code. */
+export function classifyDotWakeReason(reason: string | undefined): DotWakeReasonCode {
+  const text = String(reason ?? '');
+  if (/wall_clock budget/.test(text)) return 'wall_clock_exceeded';
+  if (/lacks generateWithTools|has no tool-capable backend|failed across 0 candidate/.test(text))
+    return 'no_tool_backend';
+  if (/failed across \d+ candidate/.test(text)) return 'provider_failover_exhausted';
+  if (text === DOT_WAKE_FAILURE_CATEGORY.backend || /no real reasoning backend/.test(text))
+    return 'backend_unavailable';
+  if (text === DOT_WAKE_FAILURE_CATEGORY.charter) return 'charter';
+  return 'wake';
+}
+
 /** Tenant-scoped full-text wake error log for a dot. */
 export function dotWakeErrorsPath(charter: DotCharter): string {
   return dotStatePath(charter, 'wake-errors.jsonl');
@@ -772,7 +812,11 @@ function recordDotWakeFailure(
     recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason });
     return reason;
   }
-  recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason: category });
+  recordDotWakeOutcome(charter, trigger, 'failed', {
+    ...deps,
+    reason: category,
+    reason_code: classifyDotWakeReason(reason),
+  });
   try {
     const now = deps.now?.() ?? new Date();
     appendJsonlEnsured(
@@ -1607,6 +1651,7 @@ export async function runDotWake(
             },
             objective: wakePrompt(current, 'tool', deps.trigger, deps),
             goalId: `dot-${current.dot_id}`,
+            actorId: `dot:${current.dot_id}`,
             systemPrompt: dotSystemPrompt(current, 'tool', deps),
             toolRole: current.authority.authority_role,
             extraTools: [
@@ -1696,6 +1741,12 @@ export async function runDotWake(
         throw new Error(
           'Durable event goal did not complete; dispatched attempt retained for operator recovery'
         );
+      }
+      const cancelled = wallClockCancelledReason(result);
+      if (cancelled && proposalInputs.length === 0 && Object.keys(toolOutputs).length === 0) {
+        throw Object.assign(new Error(cancelled), {
+          dotPartial: { turns_run: Math.max(0, result.turnsRun - 1), tokens_used: tokens },
+        });
       }
       const collected = collectDotProposals(proposalInputs);
       const actions = governProposals(current, collected.proposals, deps);

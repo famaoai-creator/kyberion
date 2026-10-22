@@ -403,8 +403,14 @@ describe('organization digest', () => {
     );
     const step = pipeline.steps.find((entry: { id: string }) => entry.id === 'build_digest');
     expect(step.produces).toMatchObject({ channel: 'organization_digest', sensitive: true });
-    // Chronos delivery still reads the live context, not the journal.
-    expect(pipeline.schedule.deliver_to.template).toBe('{{context.organization_digest.text}}');
+    // Shared delivery carries aggregate counts; organization text stays in its
+    // scoped artifact rather than crossing tenant boundaries through Chronos.
+    expect(pipeline.schedule.deliver_to.template).toContain(
+      '{{context.organization_digest.organization_count}}'
+    );
+    expect(pipeline.schedule.deliver_to.template).not.toContain(
+      '{{context.organization_digest.text}}'
+    );
   });
 
   it('gates on the execution-scope persona, not the process env (B2)', async () => {

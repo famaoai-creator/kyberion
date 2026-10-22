@@ -327,7 +327,7 @@ export interface OrganizationCadenceRecord {
   cadence_id: string;
   organization_id: string;
   name: string;
-  cadence_type: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'ad_hoc';
+  cadence_type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annual' | 'ad_hoc';
   schedule: string;
   owner_role: string;
   decision_ids: string[];

@@ -6,7 +6,7 @@ import {
 } from './notes.js';
 import AdmZip from 'adm-zip';
 import * as path from 'path';
-import { safeExistsSync, safeReadFile } from '../../secure-io.js';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
 import type { PptxDesignProtocol } from '../../contracts/pptx-protocol.js';
 import { generateContentTypes } from './content-types.js';
@@ -22,9 +22,31 @@ import { generateTheme } from './theme.js';
 import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders.js';
 import { applyPptxDesignDefaults } from './design-cascade.js';
 
+/**
+ * Options shared by every PPTX writer in this engine.
+ *
+ * `beforeWrite` receives the finished package bytes before anything lands on
+ * disk; throwing from it refuses the write. The media actuator passes its
+ * package-integrity assertion here so a defective deck is never written.
+ */
+export interface PptxWriteOptions {
+  beforeWrite?: (buffer: Buffer) => void;
+}
+
+function commitPptxZip(zip: AdmZip, outputPath: string, options?: PptxWriteOptions): void {
+  if (!options?.beforeWrite) {
+    zip.writeZip(outputPath);
+    return;
+  }
+  const buffer = zip.toBuffer();
+  options.beforeWrite(buffer);
+  safeWriteFile(outputPath, buffer);
+}
+
 export async function generateNativePptx(
   protocol: PptxDesignProtocol,
-  outputPath: string
+  outputPath: string,
+  options?: PptxWriteOptions
 ): Promise<void> {
   if (!protocol?.slides?.length) {
     throw new Error('generateNativePptx: protocol must have at least one slide');
@@ -115,7 +137,7 @@ export async function generateNativePptx(
       }
     }
 
-    zip.writeZip(outputPath);
+    commitPptxZip(zip, outputPath, options);
     return;
   }
 
@@ -635,7 +657,7 @@ export async function generateNativePptx(
     );
   });
 
-  zip.writeZip(outputPath);
+  commitPptxZip(zip, outputPath, options);
 }
 
 /**
@@ -661,7 +683,8 @@ export function patchPptxParagraphs(
     original: string;
     replacement: string;
     mode?: 'exact' | 'contains';
-  }>
+  }>,
+  options?: PptxWriteOptions
 ): { modified_slides: string[]; match_count: number } {
   if (!safeExistsSync(sourcePath)) {
     throw new Error(`patchPptxParagraphs: source file does not exist: ${sourcePath}`);
@@ -723,7 +746,7 @@ export function patchPptxParagraphs(
     }
   }
 
-  zip.writeZip(outputPath);
+  commitPptxZip(zip, outputPath, options);
   return { modified_slides: Array.from(modifiedSlides), match_count: matchCount };
 }
 
@@ -735,7 +758,8 @@ export function patchPptxParagraphs(
 export function patchPptxText(
   sourcePath: string,
   outputPath: string,
-  textReplacements: { [original: string]: string }
+  textReplacements: { [original: string]: string },
+  options?: PptxWriteOptions
 ): void {
   if (!safeExistsSync(sourcePath)) {
     throw new Error(`patchPptxText: source file does not exist: ${sourcePath}`);
@@ -805,7 +829,7 @@ export function patchPptxText(
     }
   }
 
-  zip.writeZip(outputPath);
+  commitPptxZip(zip, outputPath, options);
 }
 
 function xmlBlocks(xml: string, tag: string): string[] {
@@ -1049,7 +1073,8 @@ export function extractPptxSlides(source: string | Buffer): ExtractedSlide[] {
 export function filterPptxSlides(
   sourcePath: string,
   outputPath: string,
-  keepIndices: number[]
+  keepIndices: number[],
+  options?: PptxWriteOptions
 ): void {
   if (!safeExistsSync(sourcePath)) {
     throw new Error(`filterPptxSlides: source file does not exist: ${sourcePath}`);
@@ -1129,6 +1154,43 @@ export function filterPptxSlides(
     zip.addFile(entryName, data);
   }
 
+  // --- Re-point notes slides ---
+  // A notes slide's rels point back at its slide. Re-target the notes of kept
+  // slides to their renumbered part and drop the notes of removed slides, so no
+  // notes relationship resolves to a missing (or a different) slide.
+  const keptNotes = new Map<string, number>();
+  for (const p of plan) {
+    const slideRels = zip.getEntry(p.newRelsEntry)?.getData().toString('utf8') ?? '';
+    for (const m of slideRels.matchAll(
+      /<Relationship\b[^>]*Target="\.\.\/notesSlides\/(notesSlide\d+\.xml)"[^>]*\/>/g
+    )) {
+      keptNotes.set(`ppt/notesSlides/${m[1]}`, p.newIdx);
+    }
+  }
+  const droppedNotes: string[] = [];
+  const notesEntries = zip
+    .getEntries()
+    .map((e) => e.entryName)
+    .filter((name) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(name));
+  for (const name of notesEntries) {
+    const notesRelsName = name.replace(/([^/]+)$/, '_rels/$1.rels');
+    const newIdx = keptNotes.get(name);
+    if (newIdx === undefined) {
+      droppedNotes.push(name);
+      zip.deleteFile(name);
+      if (zip.getEntry(notesRelsName)) zip.deleteFile(notesRelsName);
+      continue;
+    }
+    const notesRels = zip.getEntry(notesRelsName);
+    if (notesRels) {
+      const retargeted = notesRels
+        .getData()
+        .toString('utf8')
+        .replace(/Target="\.\.\/slides\/slide\d+\.xml"/, `Target="../slides/slide${newIdx}.xml"`);
+      zip.updateFile(notesRelsName, Buffer.from(retargeted, 'utf8'));
+    }
+  }
+
   // --- Update ppt/presentation.xml ---
   const presEntry = zip.getEntry('ppt/presentation.xml');
   if (!presEntry) throw new Error('filterPptxSlides: ppt/presentation.xml is missing');
@@ -1137,7 +1199,15 @@ export function filterPptxSlides(
   if (!sldIdListMatch) {
     throw new Error('filterPptxSlides: <p:sldIdLst> not found in presentation.xml');
   }
-  const sldIdEntries = sldIdListMatch[1].match(/<p:sldId[^/]*\/>/g) || [];
+  // Self-closing or child-bearing <p:sldId>; fail closed when an entry cannot be read.
+  const sldIdEntries =
+    sldIdListMatch[1].match(/<p:sldId\b[^>]*?(?:\/>|>[\s\S]*?<\/p:sldId>)/g) || [];
+  const sldIdOccurrences = (sldIdListMatch[1].match(/<p:sldId\b/g) || []).length;
+  if (sldIdEntries.length !== sldIdOccurrences) {
+    throw new Error(
+      `filterPptxSlides: cannot read the slide list — ${sldIdOccurrences - sldIdEntries.length} <p:sldId> element(s) in presentation.xml are malformed | next: repair the source deck (media:pptx_package_check shows the defect) | evidence: parsed ${sldIdEntries.length} of ${sldIdOccurrences}`
+    );
+  }
   if (sldIdEntries.length < Math.max(...keepIndices)) {
     throw new Error(
       `filterPptxSlides: presentation.xml lists ${sldIdEntries.length} slides, insufficient for requested indices`
@@ -1218,6 +1288,10 @@ export function filterPptxSlides(
   let ctXml = ctEntry.getData().toString('utf8');
   // Drop every slide Override, then add one per kept slide.
   ctXml = ctXml.replace(/<Override[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g, '');
+  ctXml = ctXml.replace(
+    /<Override[^>]*PartName="\/(ppt\/notesSlides\/notesSlide\d+\.xml)"[^>]*\/>/g,
+    (override, partName: string) => (droppedNotes.includes(partName) ? '' : override)
+  );
   const slideCt = plan
     .map(
       (p) =>
@@ -1227,5 +1301,5 @@ export function filterPptxSlides(
   ctXml = ctXml.replace(/<\/Types>\s*$/, `${slideCt}</Types>`);
   zip.updateFile('[Content_Types].xml', Buffer.from(ctXml, 'utf8'));
 
-  zip.writeZip(outputPath);
+  commitPptxZip(zip, outputPath, options);
 }

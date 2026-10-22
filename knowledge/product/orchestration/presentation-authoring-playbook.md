@@ -55,7 +55,7 @@ Good fits for this preflight include proposal decks, internal updates, briefing 
 5. Pattern selection: select a `slide-pattern-pack` pattern for each slide by semantic type, deck purpose, and media kind. Treat theme and structure as separate decisions.
 6. Outline: produce the slide story and section structure with `pattern_id` and `slide_pattern` metadata.
 7. Approval: pause before generating a final deck if source material or style needs confirmation.
-8. Generate: build the deck with the selected brief, theme, and pattern pack.
+8. Generate: build the deck with the selected brief, theme, and pattern pack. When the file is HTML, run [html-output-playbook](html-output-playbook.md) steps 1–6 before this step, and step 7 is the generate.
 9. Review: propose reusable preference updates for `knowledge/personal/` only when the user approves.
 
 ## Deck Modes

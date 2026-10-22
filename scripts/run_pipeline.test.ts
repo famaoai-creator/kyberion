@@ -17,6 +17,7 @@ import {
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runInlineProductivityScore } from './pipeline-domain-ops.js';
+import { isPipelineNotStartedError } from './pipeline-execution-part-results.js';
 import {
   DEFAULT_CORE_WAIT_MS,
   resolveLogMessage,
@@ -156,6 +157,34 @@ describe('run_pipeline compatibility', () => {
         trustResolved: false,
       })
     ).rejects.toThrow('[TRUST_REQUIRED] project-local pipeline/template');
+  });
+
+  it('tags a run that failed before any hook or step as not started', async () => {
+    const error = await executePipelineFile('scripts/demos/workflow-as-code-example.ts', {
+      quiet: true,
+      trustResolved: false,
+    }).catch((e: unknown) => e);
+    expect(String(error)).toContain('[TRUST_REQUIRED]');
+    expect(isPipelineNotStartedError(error)).toBe(true);
+  });
+
+  it('does not tag a run whose lifecycle hooks already ran as not started', async () => {
+    const dispose = getDefaultLifecycleHookEngine().register({
+      id: 'run-pipeline-not-started-test',
+      event: 'session_start',
+      matcher: '.*',
+      handler: () => ({ block: true, reason: 'test block' }),
+    });
+    try {
+      const error = await executePipelineFile(
+        'pipelines/fragments/_test-run-pipeline-include.json',
+        { context: { greeting: 'hello' }, quiet: true, trustResolved: true }
+      ).catch((e: unknown) => e);
+      expect(String(error)).toContain('HOOK_BLOCKED');
+      expect(isPipelineNotStartedError(error)).toBe(false);
+    } finally {
+      dispose();
+    }
   });
 
   it('does not let a nested pipeline widen an unresolved parent trust decision', async () => {

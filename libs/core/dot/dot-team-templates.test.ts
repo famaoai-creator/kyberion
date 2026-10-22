@@ -48,7 +48,9 @@ describe('inactive three-role dot team starter', () => {
       expect(charter.status).toBe('draft');
       expect(charter.scope).toEqual({ tier: 'public' });
       expect(discovered.has(path.join(root, TEMPLATE_DIR, charter.dot_id + '.json'))).toBe(false);
-      expect(listDotCharterPaths(root).map((file) => loadDotCharter(file).dot_id)).not.toContain(
+      // Compare by file name: discovery also lists tenant charters under
+      // knowledge/confidential/<slug>/dots/, which a public-tier test must not read.
+      expect(listDotCharterPaths(root).map((file) => path.basename(file, '.json'))).not.toContain(
         charter.dot_id
       );
     }

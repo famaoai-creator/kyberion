@@ -23,7 +23,7 @@
       },
       "fallback_path": {
         "mode": "kyberion_local_pipeline",
-        "target": "pipelines/a2a-task-contract.json"
+        "target": "knowledge/product/schemas/a2a-task-contract.schema.json"
       },
       "status": "active",
       "notes": "claude mcp — configure and manage MCP servers. Same governance class as gemini-cli mcp; toggling MCP servers changes the agent's reachable tool surface and requires explicit registration."

@@ -20,7 +20,9 @@ describe('User meeting use-case contract', () => {
     expect(guide).toContain('voice-consent.json');
     expect(guide).toContain('meeting:consent grant');
     expect(guide).toContain('meeting:participate');
-    expect(guide).toContain('pnpm kyberion preview pipelines/meeting-proxy-workflow.json');
+    expect(guide).toContain(
+      'pnpm kyberion preview knowledge/product/pipeline-templates/meeting-proxy-workflow.json'
+    );
     expect(guide).toContain('pnpm test -- --suite meeting-dry-run');
     expect(guide).toContain('pnpm kyberion doctor --runtime meeting --mission MSN-...');
     expect(guide).toContain('before recording/capture starts and again before TTS speech');

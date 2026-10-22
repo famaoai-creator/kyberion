@@ -329,7 +329,12 @@ export function evaluateEventContinuation(
             )
               return blocked('invalid or foreign-scope source row');
             const event = value as unknown as DotInboundEvent;
-            const index = triggers.findIndex((trigger) => ports.matches(event, trigger));
+            // An organization-bound event (operator ask) is not this dot's
+            // unless it belongs to the dot's organization.
+            const index =
+              event.organization_id && event.organization_id !== c.scope.organization_id
+                ? -1
+                : triggers.findIndex((trigger) => ports.matches(event, trigger));
             if (index >= 0) {
               const key = eventContinuationKey(c, state.activation_id, event.event_id);
               const item: EventPending = {

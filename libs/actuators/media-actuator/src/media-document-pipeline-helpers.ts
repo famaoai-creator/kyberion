@@ -30,6 +30,7 @@ import type {
 } from './media-report-pipeline-helpers.js';
 import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
 import type { MediaBrief, MediaOutline } from './media-brief-types.js';
+import { assertPptxPackageWrite } from './pptx-package.js';
 
 const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
   'knowledge/public/design-patterns/media-templates/document-layouts.json'
@@ -395,7 +396,17 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     safeMkdir(path.dirname(outPath), { recursive: true });
     const renderers: Record<ProtocolKind, () => Promise<void>> = {
       pptx: async () =>
-        retry(async () => generateNativePptx(compiled.protocol, outPath), { maxRetries: 2 }),
+        retry(
+          async () =>
+            generateNativePptx(compiled.protocol, outPath, {
+              // Brief renders have no source deck: any structural error blocks the write.
+              beforeWrite: (buffer) =>
+                void assertPptxPackageWrite(buffer, 'pptx brief render', {
+                  level: options?.package_check ?? 'error',
+                }),
+            }),
+          { maxRetries: 2 }
+        ),
       xlsx: async () =>
         retry(
           async () =>

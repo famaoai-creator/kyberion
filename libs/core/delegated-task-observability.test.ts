@@ -30,6 +30,7 @@ import {
   delegationNotificationsPath,
   listDelegationNotifications,
 } from './mission/delegation-notifications.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './shell/sandbox-policy.js';
 
 const STORE_OVERRIDE = `active/shared/tmp/kc06-tests/delegations-${process.pid}`;
 const TRACE_OVERRIDE = `active/shared/tmp/kc06-tests/delegations-trace-${process.pid}.jsonl`;
@@ -85,6 +86,19 @@ describe('KC-06 delegated-task-observability store', () => {
     });
     expect(completed?.settlement).toMatchObject({ source: 'owner', status: 'completed' });
     expect(delegatedTaskStoreDir()).toContain('kc06-tests');
+  });
+
+  it('records an untenanted delegation started inside a read-only sandbox', () => {
+    // A system dot wake delegates under a read-only policy with no tenant; its
+    // host bookkeeping must still land instead of failing the whole wake.
+    const trace = withSandboxPolicy(resolveSandboxPolicy({ mode: 'read-only' }), () =>
+      startDelegatedTaskTrace({
+        owner: 'repo-guardian',
+        instruction: 'Review the repository health.',
+        context: 'kc06-read-only-system',
+      })
+    );
+    expect(loadDelegatedTaskRecord(trace.trace_id)?.status).toBe('started');
   });
 
   it('persists the canonical schema payload for resumable snapshots', () => {

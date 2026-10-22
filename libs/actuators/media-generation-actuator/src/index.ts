@@ -1,5 +1,6 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { handleAction } from './media-generation-action-helpers.js';
+import { handleAction as handleGenerationAction } from './media-generation-action-helpers.js';
+import { handleCaptureAction } from './capture-actions.js';
 import {
   currentProcessArgv,
   runActuatorCli,
@@ -7,6 +8,9 @@ import {
 } from '@agent/core/cli-utils';
 import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
+
+export const handleAction = (input: Parameters<typeof handleGenerationAction>[0]) =>
+  handleGenerationAction(input, { capture: handleCaptureAction });
 
 const main = async () => {
   await runActuatorCli({
@@ -20,7 +24,6 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/media-generation-actuator/src
   void runActuatorCliEntryPoint(main, 'media-generation-actuator');
 }
 
-export { handleAction };
 export { registerGenerationProviderHistoryClient } from './generation-provider-clients.js';
 export { registerGenerationHistoryAdapter } from './generation-artifact-adapters.js';
 export type { GenerationHistoryAdapter } from './generation-artifact-adapters.js';

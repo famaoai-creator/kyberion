@@ -6,7 +6,7 @@
  * between them — it cancels out prompt-framing bias but not *model* bias.
  * CT-03's lens-fan-out is the same-model / different-viewpoint axis. This
  * module is the complementary, orthogonal axis: fan the same instruction out
- * to *different provider CLIs* (claude / codex / agy / grok / …) concurrently and
+ * to *different provider CLIs* (claude / codex / agy / grok / cursor / …) concurrently and
  * judge across them, so systematic biases of any one model/vendor get
  * diluted rather than reinforced. Suited to review/judgment/risk-assessment
  * tasks by default (per the plan), but this module itself is domain-neutral.
@@ -55,7 +55,7 @@
  *     fans out when this flag is `1`.
  *   - `KYBERION_BEST_OF_PROVIDERS_LIVE=1`: delegates to
  *     `resolveProviderBackend` (`provider-backend-resolver.ts`), which
- *     lazily constructs a real 'claude'/'codex'/'agy'/'grok' CLI-backed backend
+ *     lazily constructs a real 'claude'/'codex'/'agy'/'grok'/'cursor' CLI-backed backend
  *     (never spawns at resolve time — only when `delegateTask` is actually
  *     called), gated by the XP-01 cached capability registry.
  * A caller can still inject its own `seams.getBackend` (e.g. a future real
@@ -73,8 +73,8 @@
  * `obtainBestOfTaskResultResponse` judge call) — the seam is intentionally
  * the same shape either way.
  *
- * Persistence: verdict records are metadata-only (provider ids, votes,
- * verdict, an instruction digest) — deliberately NOT the raw instruction or
+ * Persistence: verdict records are metadata-only (candidate ids, backend/model
+ * specs, votes, verdict, an instruction digest) — deliberately NOT the raw instruction or
  * candidate output text. `active/shared/runtime/` is an operational area,
  * not itself tier-scoped the way `knowledge/{personal,confidential,public}/`
  * is; writing raw confidential/personal content into it would be a tier leak
@@ -121,7 +121,15 @@ export const BEST_OF_PROVIDERS_LIVE_ENV_VAR = 'KYBERION_BEST_OF_PROVIDERS_LIVE';
  * `ReasoningBackend` satisfies this interface with no adapter.
  */
 export interface BestOfProviderBackend {
-  delegateTask(instruction: string, context?: string): Promise<string>;
+  delegateTask(
+    instruction: string,
+    context?: string,
+    options?: {
+      model?: string;
+      effort?: 'low' | 'medium' | 'high';
+    }
+  ): Promise<string>;
+  resetSession?(): Promise<void>;
 }
 
 /** Injectable backend-acquisition seam. Default: `null` for every provider (see header). */
@@ -129,8 +137,18 @@ export type BestOfProvidersBackendResolver = (
   provider: string
 ) => BestOfProviderBackend | null | undefined;
 
-export interface BestOfProvidersCandidateResult {
+export interface BestOfProviderCandidate {
   provider: string;
+  model?: string;
+  effort?: 'low' | 'medium' | 'high';
+}
+
+export interface BestOfProvidersCandidateResult {
+  /** Stable comparison identity. Provider-only candidates keep the provider id. */
+  candidate_id?: string;
+  provider: string;
+  model?: string;
+  effort?: 'low' | 'medium' | 'high';
   output: string | null;
   error?: string;
 }
@@ -142,6 +160,9 @@ export interface BestOfProvidersJudgeInput {
 }
 
 export interface BestOfProvidersJudgeVerdict {
+  /** Candidate id; falls back to winnerProvider for legacy judges. */
+  winnerCandidateId?: string | null;
+  /** Legacy name retained for compatibility. Its value is a candidate id. */
   winnerProvider: string | null;
   approve: boolean;
   gaps: string[];
@@ -156,7 +177,10 @@ export type BestOfProvidersJudge = (
 ) => BestOfProvidersJudgeVerdict | Promise<BestOfProvidersJudgeVerdict>;
 
 export interface BestOfProvidersExclusion {
+  candidate_id?: string;
   provider: string;
+  model?: string;
+  effort?: 'low' | 'medium' | 'high';
   reason: string;
 }
 
@@ -174,6 +198,12 @@ export interface BestOfProvidersVerdictRecord {
   participants: string[];
   votes: Record<string, number>;
   excluded: BestOfProvidersExclusion[];
+  candidate_specs?: Array<{
+    candidate_id: string;
+    provider: string;
+    model?: string;
+    effort?: 'low' | 'medium' | 'high';
+  }>;
   degraded?: BestOfProvidersDegradation;
 }
 
@@ -193,13 +223,21 @@ export interface RunBestOfProvidersOptions {
   dataTier: TierLevel;
   /** Explicit provider id list. When omitted (or empty), falls back to the XP-01 registry snapshot. */
   providers?: string[];
+  /** Explicit backend/model/effort matrix. Takes precedence over providers. */
+  candidates?: BestOfProviderCandidate[];
   /** Default: `defaultBestOfProvidersJudge` (deterministic heuristic, no LLM call). */
   judge?: BestOfProvidersJudge;
   seams?: BestOfProvidersSeams;
 }
 
 export interface BestOfProvidersResult {
-  winner: { provider: string; output: string } | null;
+  winner: {
+    candidate_id?: string;
+    provider: string;
+    model?: string;
+    effort?: 'low' | 'medium' | 'high';
+    output: string;
+  } | null;
   candidates: BestOfProvidersCandidateResult[];
   verdictRecord: BestOfProvidersVerdictRecord;
   excluded: BestOfProvidersExclusion[];
@@ -240,6 +278,25 @@ function defaultCandidateProviders(seams: BestOfProvidersSeams | undefined): str
   }
   if (!snapshot) return [];
   return snapshot.filter((entry) => entry.binary_found).map((entry) => entry.provider_id);
+}
+
+export function bestOfProviderCandidateId(candidate: BestOfProviderCandidate): string {
+  const provider = String(candidate.provider || '').trim();
+  const model = String(candidate.model || '').trim();
+  const effort = candidate.effort;
+  if (!model && !effort) return provider;
+  return `${provider}:${model || 'default'}${effort ? `@${effort}` : ''}`;
+}
+
+function resultCandidateId(candidate: BestOfProvidersCandidateResult): string {
+  return (
+    candidate.candidate_id ||
+    bestOfProviderCandidateId({
+      provider: candidate.provider,
+      ...(candidate.model ? { model: candidate.model } : {}),
+      ...(candidate.effort ? { effort: candidate.effort } : {}),
+    })
+  );
 }
 
 function digestOf(instruction: string, context?: string): string {
@@ -290,7 +347,9 @@ export const defaultBestOfProvidersJudge: BestOfProvidersJudge = ({
   );
   const gaps = candidates
     .filter((candidate) => candidate.output === null || candidate.output === undefined)
-    .map((candidate) => `${candidate.provider}: ${candidate.error || 'no output produced'}`);
+    .map(
+      (candidate) => `${resultCandidateId(candidate)}: ${candidate.error || 'no output produced'}`
+    );
 
   if (scored.length === 0) {
     return {
@@ -304,12 +363,14 @@ export const defaultBestOfProvidersJudge: BestOfProvidersJudge = ({
 
   if (scored.length === 1) {
     const only = scored[0];
+    const onlyId = resultCandidateId(only);
     return {
-      winnerProvider: only.provider,
+      winnerCandidateId: onlyId,
+      winnerProvider: onlyId,
       approve: true,
       gaps,
-      rationale: `heuristic judge: single eligible provider ('${only.provider}') — no comparison performed`,
-      votes: { [only.provider]: 1 },
+      rationale: `heuristic judge: single eligible candidate ('${onlyId}') — no comparison performed`,
+      votes: { [onlyId]: 1 },
     };
   }
 
@@ -332,7 +393,7 @@ export const defaultBestOfProvidersJudge: BestOfProvidersJudge = ({
         agreementCount += 1;
       }
     }
-    votes[candidate.provider] = agreementCount;
+    votes[resultCandidateId(candidate)] = agreementCount;
   });
 
   let winnerIndex = 0;
@@ -340,13 +401,15 @@ export const defaultBestOfProvidersJudge: BestOfProvidersJudge = ({
     if (agreementScores[i] > agreementScores[winnerIndex]) winnerIndex = i;
   }
   const winner = scored[winnerIndex];
+  const winnerId = resultCandidateId(winner);
 
   return {
-    winnerProvider: winner.provider,
+    winnerCandidateId: winnerId,
+    winnerProvider: winnerId,
     approve: true,
     gaps,
     rationale:
-      `heuristic judge: selected '${winner.provider}' by highest normalized token-Jaccard ` +
+      `heuristic judge: selected '${winnerId}' by highest normalized token-Jaccard ` +
       `agreement across ${scored.length} candidates (score=${agreementScores[winnerIndex].toFixed(3)}); ` +
       'ties broken by input order. Not an LLM judge — inject one via options.judge for semantic comparison.',
     votes,
@@ -384,6 +447,7 @@ function parseBestOfProvidersVerdictRecord(
     'participants',
     'votes',
     'excluded',
+    'candidate_specs',
     'degraded',
   ]);
   const unknownKey = Object.keys(record).find((key) => !allowedKeys.has(key));
@@ -433,7 +497,8 @@ function parseBestOfProvidersVerdictRecord(
   if (!Array.isArray(record.excluded)) throw new Error(`${label}.excluded is invalid`);
   const excluded = record.excluded.map((candidate, index) => {
     const item = parseSafeJsonObjectValue(candidate, `${label}.excluded[${index}]`);
-    if (Object.keys(item).some((key) => key !== 'provider' && key !== 'reason')) {
+    const allowedExclusionKeys = new Set(['candidate_id', 'provider', 'model', 'effort', 'reason']);
+    if (Object.keys(item).some((key) => !allowedExclusionKeys.has(key))) {
       throw new Error(`${label}.excluded[${index}] contains unknown field`);
     }
     if (
@@ -443,7 +508,55 @@ function parseBestOfProvidersVerdictRecord(
     ) {
       throw new Error(`${label}.excluded[${index}] is invalid`);
     }
-    return { provider: item.provider, reason: item.reason };
+    if (
+      item.effort !== undefined &&
+      item.effort !== 'low' &&
+      item.effort !== 'medium' &&
+      item.effort !== 'high'
+    ) {
+      throw new Error(`${label}.excluded[${index}].effort is invalid`);
+    }
+    return {
+      ...(typeof item.candidate_id === 'string' ? { candidate_id: item.candidate_id } : {}),
+      provider: item.provider,
+      ...(typeof item.model === 'string' ? { model: item.model } : {}),
+      ...(item.effort ? { effort: item.effort as 'low' | 'medium' | 'high' } : {}),
+      reason: item.reason,
+    };
+  });
+  const candidateSpecs = record.candidate_specs;
+  if (candidateSpecs !== undefined && !Array.isArray(candidateSpecs)) {
+    throw new Error(`${label}.candidate_specs is invalid`);
+  }
+  const candidateSpecValues: unknown[] = Array.isArray(candidateSpecs) ? candidateSpecs : [];
+  const normalizedCandidateSpecs = candidateSpecValues.map((candidate, index) => {
+    const item = parseSafeJsonObjectValue(candidate, `${label}.candidate_specs[${index}]`);
+    const allowedCandidateKeys = new Set(['candidate_id', 'provider', 'model', 'effort']);
+    if (Object.keys(item).some((key) => !allowedCandidateKeys.has(key))) {
+      throw new Error(`${label}.candidate_specs[${index}] contains unknown field`);
+    }
+    if (
+      typeof item.candidate_id !== 'string' ||
+      !item.candidate_id.trim() ||
+      typeof item.provider !== 'string' ||
+      !item.provider.trim()
+    ) {
+      throw new Error(`${label}.candidate_specs[${index}] is invalid`);
+    }
+    if (
+      item.effort !== undefined &&
+      item.effort !== 'low' &&
+      item.effort !== 'medium' &&
+      item.effort !== 'high'
+    ) {
+      throw new Error(`${label}.candidate_specs[${index}].effort is invalid`);
+    }
+    return {
+      candidate_id: item.candidate_id,
+      provider: item.provider,
+      ...(typeof item.model === 'string' ? { model: item.model } : {}),
+      ...(item.effort ? { effort: item.effort as 'low' | 'medium' | 'high' } : {}),
+    };
   });
   const degradedValue = record.degraded;
   if (
@@ -463,6 +576,7 @@ function parseBestOfProvidersVerdictRecord(
     participants,
     votes: normalizedVotes,
     excluded,
+    ...(normalizedCandidateSpecs.length > 0 ? { candidate_specs: normalizedCandidateSpecs } : {}),
     ...(degradedValue === undefined
       ? {}
       : { degraded: degradedValue as BestOfProvidersDegradation }),
@@ -519,52 +633,102 @@ export async function runBestOfProviders(
     explicitProviders.length > 0
       ? Array.from(new Set(explicitProviders))
       : defaultCandidateProviders(options.seams);
+  const explicitCandidates = (options.candidates || [])
+    .map((candidate) => ({
+      provider: String(candidate.provider || '').trim(),
+      ...(String(candidate.model || '').trim()
+        ? { model: String(candidate.model || '').trim() }
+        : {}),
+      ...(candidate.effort ? { effort: candidate.effort } : {}),
+    }))
+    .filter((candidate) => candidate.provider);
+  const baseCandidates =
+    explicitCandidates.length > 0
+      ? explicitCandidates
+      : baseProviders.map((provider) => ({ provider }));
+  const uniqueCandidates = Array.from(
+    new Map(
+      baseCandidates.map((candidate) => [bestOfProviderCandidateId(candidate), candidate])
+    ).values()
+  );
 
   const excluded: BestOfProvidersExclusion[] = [];
-  const eligible: string[] = [];
-  for (const provider of baseProviders) {
-    const check = checkProviderEgress({ provider, dataTier });
+  const eligible: Array<BestOfProviderCandidate & { candidate_id: string }> = [];
+  for (const candidate of uniqueCandidates) {
+    const candidate_id = bestOfProviderCandidateId(candidate);
+    const check = checkProviderEgress({ provider: candidate.provider, dataTier });
     if (check.allowed) {
-      eligible.push(provider);
+      eligible.push({ ...candidate, candidate_id });
     } else {
-      excluded.push({ provider, reason: check.reason || 'provider egress denied' });
+      excluded.push({
+        ...(explicitCandidates.length > 0
+          ? { candidate_id, ...candidate }
+          : { provider: candidate.provider }),
+        reason: check.reason || 'provider egress denied',
+      });
     }
   }
 
+  // Different providers run concurrently. Candidates sharing one backend run
+  // sequentially and reset resumable sessions so model A cannot contaminate B.
+  const providerQueues = new Map<string, Promise<void>>();
   const candidates: BestOfProvidersCandidateResult[] = await Promise.all(
-    eligible.map((provider) =>
-      withDelegationSlot({ provider }, async (): Promise<BestOfProvidersCandidateResult> => {
-        try {
-          const backend = getBackend(provider);
-          if (!backend) {
-            return {
-              provider,
-              output: null,
-              error: 'no backend available for provider (no seams.getBackend resolver injected)',
+    eligible.map((candidate) => {
+      const previous = providerQueues.get(candidate.provider) ?? Promise.resolve();
+      const task = previous.then(() =>
+        withDelegationSlot(
+          { provider: candidate.provider },
+          async (): Promise<BestOfProvidersCandidateResult> => {
+            const resultBase = {
+              candidate_id: candidate.candidate_id,
+              provider: candidate.provider,
+              ...(candidate.model ? { model: candidate.model } : {}),
+              ...(candidate.effort ? { effort: candidate.effort } : {}),
             };
+            try {
+              const backend = getBackend(candidate.provider);
+              if (!backend) {
+                return {
+                  ...resultBase,
+                  output: null,
+                  error:
+                    'no backend available for provider (no seams.getBackend resolver injected)',
+                };
+              }
+              await backend.resetSession?.();
+              const output = await backend.delegateTask(instruction, context, {
+                ...(candidate.model ? { model: candidate.model } : {}),
+                ...(candidate.effort ? { effort: candidate.effort } : {}),
+              });
+              return { ...resultBase, output };
+            } catch (err) {
+              return {
+                ...resultBase,
+                output: null,
+                error: err instanceof Error ? err.message : String(err),
+              };
+            }
           }
-          const output = await backend.delegateTask(instruction, context);
-          return { provider, output };
-        } catch (err) {
-          return {
-            provider,
-            output: null,
-            error: err instanceof Error ? err.message : String(err),
-          };
-        }
-      })
-    )
+        )
+      );
+      providerQueues.set(
+        candidate.provider,
+        task.then(() => undefined)
+      );
+      return task;
+    })
   );
 
   const judgeVerdict = await judge({ instruction, context, candidates });
   const participants = candidates
     .filter((candidate) => candidate.output !== null && candidate.output !== undefined)
-    .map((candidate) => candidate.provider);
+    .map(resultCandidateId);
 
   let degraded: BestOfProvidersDegradation | undefined;
   if (eligible.length === 0) degraded = 'no-eligible-providers';
   else if (eligible.length === 1) degraded = 'single-provider';
 
+  const winnerCandidateId = judgeVerdict.winnerCandidateId ?? judgeVerdict.winnerProvider;
   const verdictRecord: BestOfProvidersVerdictRecord = {
     ts: now().toISOString(),
     data_tier: dataTier,
@@ -574,19 +738,28 @@ export async function runBestOfProviders(
       gaps: judgeVerdict.gaps,
       rationale: judgeVerdict.rationale,
     },
-    winner: judgeVerdict.winnerProvider,
+    winner: winnerCandidateId,
     participants,
     votes: judgeVerdict.votes,
     excluded,
+    ...(explicitCandidates.length > 0
+      ? {
+          candidate_specs: uniqueCandidates.map((candidate) => ({
+            candidate_id: bestOfProviderCandidateId(candidate),
+            ...candidate,
+          })),
+        }
+      : {}),
     ...(degraded ? { degraded } : {}),
   };
 
   persistVerdictRecord(verdictRecord, verdictLogPath);
 
-  const winnerCandidate = judgeVerdict.winnerProvider
+  const winnerCandidate = winnerCandidateId
     ? candidates.find(
         (candidate) =>
-          candidate.provider === judgeVerdict.winnerProvider &&
+          (resultCandidateId(candidate) === winnerCandidateId ||
+            candidate.provider === winnerCandidateId) &&
           candidate.output !== null &&
           candidate.output !== undefined
       )
@@ -594,7 +767,15 @@ export async function runBestOfProviders(
 
   return {
     winner: winnerCandidate
-      ? { provider: winnerCandidate.provider, output: winnerCandidate.output as string }
+      ? {
+          ...(winnerCandidate.model || winnerCandidate.effort
+            ? { candidate_id: resultCandidateId(winnerCandidate) }
+            : {}),
+          provider: winnerCandidate.provider,
+          ...(winnerCandidate.model ? { model: winnerCandidate.model } : {}),
+          ...(winnerCandidate.effort ? { effort: winnerCandidate.effort } : {}),
+          output: winnerCandidate.output as string,
+        }
       : null,
     candidates,
     verdictRecord,

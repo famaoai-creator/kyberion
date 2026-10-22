@@ -25,6 +25,9 @@ describe('personal pad action seam', () => {
       id: 'screenshot.capture-screen',
       capability: 'os-screenshot',
     });
+    expect(getPadActionDescriptors('memory-capture').map((action) => action.id)).toEqual([
+      'memory.propose-compare',
+    ]);
     expect(getPadActionDescriptors('personal-workbench').map((action) => action.id)).toEqual([
       'workbench.email-draft',
       'workbench.calendar-propose',
@@ -199,5 +202,27 @@ describe('personal pad action seam', () => {
       result: { delivery: 'local-only', draft_only: true },
     });
     expect(JSON.stringify(result)).not.toContain('active/shared');
+  });
+
+  it('proposes a comparison run without calling provider backends', async () => {
+    const result = await executePadAction({
+      pad_id: 'memory-capture',
+      action_id: 'memory.propose-compare',
+      title: '比較',
+      body: 'Summarize the ticket comment and close the issue.',
+      fields: { optimize_for: 'cost' },
+      context,
+      storage_root: 'active/shared/local-pads',
+    });
+    expect(result).toMatchObject({
+      action_id: 'memory.propose-compare',
+      status: 'succeeded',
+      result: {
+        kind: 'reasoning-compare-proposal',
+        optimize_for: 'cost',
+        live: false,
+      },
+    });
+    expect(JSON.stringify(result.result)).not.toContain('Summarize the ticket');
   });
 });

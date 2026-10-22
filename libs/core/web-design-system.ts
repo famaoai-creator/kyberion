@@ -193,6 +193,46 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function mixHex(from: string, toward: string, amount: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(toward);
+  if (!a || !b) return from;
+  const channel = (index: number) => Math.round(a[index] + (b[index] - a[index]) * amount);
+  return `#${[0, 1, 2].map((index) => channel(index).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * The foreground to place on top of a fill: whichever of white / near-black
+ * contrasts better. A theme's accent is brand data — it can be a deep blue or
+ * a neon cyan — so the text on top of it cannot be assumed to be white.
+ */
+function onFill(fill: string): string {
+  return contrastRatio('#ffffff', fill) >= contrastRatio('#0f172a', fill) ? '#ffffff' : '#0f172a';
+}
+
+/**
+ * The accent used as TEXT rather than as a fill. A brand accent is chosen to
+ * look right as a block of color, which routinely leaves it under 4.5:1 as
+ * small text on the page (the companion teal is 2.9:1 on its own cream page).
+ * Walk it toward the page's ink until it clears AA, so accent-colored labels
+ * and links stay readable in any theme.
+ */
+function accentTextOn(accent: string, background: string, ink: string): string {
+  let candidate = accent;
+  for (let step = 0; step <= 10; step += 1) {
+    if (contrastRatio(candidate, background) >= 4.5) return candidate;
+    candidate = mixHex(accent, ink, (step + 1) / 10);
+  }
+  return ink;
+}
+
 /**
  * True when the theme paints light text on a dark page (the Chronos console
  * default), false for the light brand themes (concierge, companion, Chronos
@@ -231,6 +271,18 @@ export function webThemePackToCssVars(themePack: WebThemePack): Record<string, s
     // it as a hex), so emitting the shorthand here silently invalidated those
     // declarations wherever these vars were applied.
     '--kb-border': rgba(colors.text, dark ? 0.1 : 0.16),
+    // The six semantic tokens every surface stylesheet already reads. Without
+    // them here, a page that loads this endpoint AFTER its static
+    // design-tokens.css keeps the static file's slate fallbacks for cards,
+    // muted text and status colors while the base turns brand-colored — the
+    // theme visibly only half-applies. Derived from the pack so they follow
+    // whatever brand the surface is wearing.
+    '--kb-accent-on': onFill(colors.accent),
+    '--kb-accent-text': accentTextOn(colors.accent, colors.background, colors.text),
+    '--kb-surface': mixHex(colors.background, colors.text, dark ? 0.06 : 0.045),
+    '--kb-muted-text': mixHex(colors.text, colors.background, dark ? 0.35 : 0.25),
+    '--kb-success': dark ? '#4ade80' : '#166534',
+    '--kb-danger': dark ? '#f87171' : '#b91c1c',
     '--kb-glow-cyan': `0 0 15px ${rgba(colors.accent, 0.42)}`,
   };
 }

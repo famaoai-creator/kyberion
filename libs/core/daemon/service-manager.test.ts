@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDaemonManager, type DaemonRenderContext } from './service-manager.js';
+import {
+  daemonUserPath,
+  resolveDaemonManager,
+  type DaemonRenderContext,
+} from './service-manager.js';
 import { buildSystemdServiceUnit, buildSystemdTimerUnit, systemdUnitStem } from './systemd-user.js';
 import { DAEMON_SPECS } from './specs.js';
 
@@ -27,6 +31,17 @@ describe('resolveDaemonManager', () => {
 
 describe('launchd manager plans', () => {
   const manager = resolveDaemonManager('darwin')!;
+
+  it("carries the installing shell's PATH so daemons find the operator's CLIs", () => {
+    const content = manager.planInstall(chronos, {
+      ...ctx,
+      userPath: ['/home/alice/.local/bin', '/home/alice/.volta/bin', '/usr/bin'],
+    }).unitFiles[0].content;
+    // node dir first, shell entries next, standard dirs last, no duplicates
+    expect(content).toContain(
+      '<string>/usr/bin:/home/alice/.local/bin:/home/alice/.volta/bin:/opt/homebrew/bin:/usr/local/bin:/bin:/usr/sbin:/sbin</string>'
+    );
+  });
 
   it('installs via bootstrap into the per-user LaunchAgents directory', () => {
     const plan = manager.planInstall(chronos, ctx);
@@ -122,5 +137,16 @@ describe('systemd-user manager plans', () => {
         run: ['systemctl', '--user', 'restart', 'kyberion-chronos.service'],
       }),
     ]);
+  });
+});
+
+describe('daemonUserPath', () => {
+  it('keeps absolute shell PATH entries in order and drops unsafe ones', () => {
+    expect(
+      daemonUserPath(
+        '/home/a/.nvm/versions/node/v24/bin:relative/bin::/repo/node_modules/.bin:/home/a/.local/bin/:/home/a/.local/bin:/opt/homebrew/bin'
+      )
+    ).toEqual(['/home/a/.nvm/versions/node/v24/bin', '/home/a/.local/bin', '/opt/homebrew/bin']);
+    expect(daemonUserPath(undefined)).toEqual([]);
   });
 });

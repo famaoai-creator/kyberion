@@ -20,6 +20,8 @@
  *   system ledger, so events never cross tenants.
  * - The events ledger is tenant-scoped, not organization-scoped: the policy
  *   binds a source to a tenant only, so every dot of that tenant shares it.
+ *   Operator ask events ({@link ingestAskIntake}) additionally carry the
+ *   trusted `organization_id`; only dots of that organization see them.
  * - Stored payloads are bounded to {@link DOT_EVENT_PAYLOAD_MAX_BYTES}; the
  *   digest always covers the full raw body. Payload text is external input:
  *   the wake detail labels it untrusted and carries only a bounded summary.
@@ -45,8 +47,12 @@ import { createLogger } from '../logger.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import { getSecretForIdentity, getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
 import { parseEnvSecretName } from '../secret/secret-identity.js';
+import {
+  readTenantGovernanceOverlays,
+  type TenantGovernanceOverlay,
+} from '../organization/tenant-governance-overlay.js';
 
-import type { DotCharter, DotTrigger } from './dot-charter.js';
+import { listDotCharters, type DotCharter, type DotTrigger } from './dot-charter.js';
 import { DOT_EVENTS_FILE, DOT_STATE_ROOT, type DotInboundEvent } from './dot-state-paths.js';
 import {
   buildDotDueChecker,
@@ -98,6 +104,12 @@ export interface EventIntakeSourcePolicy {
    * and leaves only (source, delivery_id) dedupe.
    */
   replay_window_hours?: number;
+  /**
+   * Set only by the tenant overlay merge (never accepted from a policy file —
+   * the schema forbids it): the source serves trusted local ingestion (local
+   * CLI, scoped ask) and the HTTP webhook refuses it even when enabled.
+   */
+  local_only?: true;
 }
 
 export interface EventIntakePolicy {
@@ -151,23 +163,98 @@ export function applyEventIntakeHostOptIn(
   return { ...policy, sources };
 }
 
-/** Load the governed intake policy; `path` overrides the location (tests). */
+/** Tenant-owned sources: `knowledge/confidential/<slug>/governance/<this file>`. */
+export const TENANT_EVENT_INTAKE_OVERLAY_FILE = 'event-intake-sources.json';
+
+/**
+ * Merge tenant overlay files (same shape as the product policy) into `policy`.
+ * Each overlay source is bound to its directory tenant (a different declared
+ * `tenant_slug` drops it), may not reuse a product source name or a name
+ * another tenant also declares (every claimant is dropped), and is marked
+ * `local_only` so the HTTP webhook never accepts it. An invalid file drops
+ * that tenant's overlay only.
+ */
+export function mergeTenantEventIntakeOverlays(
+  policy: EventIntakePolicy,
+  overlays: readonly TenantGovernanceOverlay[]
+): EventIntakePolicy {
+  const candidates: Array<{ slug: string; name: string; source: EventIntakeSourcePolicy }> = [];
+  for (const overlay of overlays) {
+    let parsed: EventIntakePolicy;
+    try {
+      if (overlay.error) throw new Error(overlay.error);
+      parsed = eventIntakePolicyCatalog.validate(overlay.value, overlay.path);
+    } catch (error) {
+      logger.warn(
+        `tenant ${overlay.tenant_slug} event intake overlay ignored — invalid file | next: fix ${overlay.path} | evidence: ${error instanceof Error ? error.message : String(error)}`
+      );
+      continue;
+    }
+    for (const [name, source] of Object.entries(parsed.sources)) {
+      if (source.tenant_slug !== undefined && source.tenant_slug !== overlay.tenant_slug) {
+        logger.warn(
+          `tenant ${overlay.tenant_slug} event source '${name}' dropped — it declares another tenant | next: remove tenant_slug or set it to '${overlay.tenant_slug}' in ${overlay.path} | evidence: tenant_slug=${source.tenant_slug}`
+        );
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(policy.sources, name)) {
+        logger.warn(
+          `tenant ${overlay.tenant_slug} event source '${name}' dropped — the name is a product source | next: rename it in ${overlay.path} | evidence: ${EVENT_INTAKE_POLICY_PATH}`
+        );
+        continue;
+      }
+      candidates.push({ slug: overlay.tenant_slug, name, source });
+    }
+  }
+  const sources = { ...policy.sources };
+  for (const candidate of candidates) {
+    const claimants = candidates.filter((other) => other.name === candidate.name);
+    if (claimants.length > 1) {
+      logger.warn(
+        `tenant ${candidate.slug} event source '${candidate.name}' dropped — another tenant declares the same name | next: give each tenant source a distinct name | evidence: ${claimants.map((other) => other.slug).join(', ')}`
+      );
+      continue;
+    }
+    sources[candidate.name] = {
+      ...candidate.source,
+      tenant_slug: candidate.slug,
+      local_only: true,
+    };
+  }
+  return { ...policy, sources };
+}
+
+/**
+ * Load the governed intake policy; `path` overrides the location (tests).
+ * `tenantOverlays` also merges every registered tenant's local-only sources
+ * ({@link mergeTenantEventIntakeOverlays}); webhook-facing callers leave it
+ * off so tenant source names never appear in webhook listings.
+ */
 export function loadEventIntakePolicy(
-  options: { path?: string; hostOptIn?: string } = {}
+  options: { path?: string; hostOptIn?: string; tenantOverlays?: boolean; rootDir?: string } = {}
 ): EventIntakePolicy {
   const optIn = options.hostOptIn ?? getRegisteredEnvText('KYBERION_EVENT_INTAKE_SOURCES');
-  if (!options.path) return applyEventIntakeHostOptIn(eventIntakePolicyCatalog.load(), optIn);
-  try {
-    return applyEventIntakeHostOptIn(
-      eventIntakePolicyCatalog.validate(readJson<unknown>(options.path), options.path),
-      optIn
-    );
-  } catch (error) {
-    logger.warn(
-      `event intake policy unavailable — every source stays disabled | fix ${options.path} | ${error instanceof Error ? error.message : String(error)}`
-    );
-    return structuredClone(CLOSED_POLICY);
+  let policy: EventIntakePolicy;
+  if (!options.path) {
+    policy = applyEventIntakeHostOptIn(eventIntakePolicyCatalog.load(), optIn);
+  } else {
+    try {
+      policy = applyEventIntakeHostOptIn(
+        eventIntakePolicyCatalog.validate(readJson<unknown>(options.path), options.path),
+        optIn
+      );
+    } catch (error) {
+      logger.warn(
+        `event intake policy unavailable — every source stays disabled | fix ${options.path} | ${error instanceof Error ? error.message : String(error)}`
+      );
+      policy = structuredClone(CLOSED_POLICY);
+    }
   }
+  if (!options.tenantOverlays) return policy;
+  return mergeTenantEventIntakeOverlays(
+    policy,
+    readTenantGovernanceOverlays(TENANT_EVENT_INTAKE_OVERLAY_FILE, { rootDir: options.rootDir })
+  );
 }
 
 export function _resetEventIntakePolicyCacheForTests(): void {
@@ -495,7 +582,10 @@ export function processInboundEventRequest(request: InboundEventRequest): Inboun
     ? policy.sources[request.source]
     : undefined;
   if (!sourcePolicy) return { status: 401, code: 'unknown_source' };
-  if (!sourcePolicy.enabled) return { status: 401, code: 'disabled_source' };
+  // Tenant overlay sources serve trusted local ingestion only, never the webhook.
+  if (!sourcePolicy.enabled || sourcePolicy.local_only) {
+    return { status: 401, code: 'disabled_source' };
+  }
   const raw = Buffer.isBuffer(request.body) ? request.body : Buffer.from(request.body, 'utf8');
   if (raw.length > sourcePolicy.max_body_bytes) return { status: 413, code: 'too_large' };
   const verified = verifyInboundSignature({
@@ -530,7 +620,8 @@ export function processInboundEventRequest(request: InboundEventRequest): Inboun
 
 /**
  * Local-testing path (operator CLI, no HMAC): the source must be declared in
- * the policy but may be disabled; tenant binding still comes from the policy.
+ * the policy (product or tenant overlay) but may be disabled; tenant binding
+ * still comes from the policy.
  */
 export function ingestLocalEvent(input: {
   source: string;
@@ -540,8 +631,11 @@ export function ingestLocalEvent(input: {
   policy?: EventIntakePolicy;
   rootDir?: string;
   now?: Date;
+  /** Trusted caller scope only (operator ask intake); never read from the body. */
+  organizationId?: string;
 }): IngestInboundEventResult & { event: DotInboundEvent } {
-  const policy = input.policy ?? loadEventIntakePolicy();
+  const policy =
+    input.policy ?? loadEventIntakePolicy({ tenantOverlays: true, rootDir: input.rootDir });
   const sourcePolicy = Object.prototype.hasOwnProperty.call(policy.sources, input.source)
     ? policy.sources[input.source]
     : undefined;
@@ -550,7 +644,7 @@ export function ingestLocalEvent(input: {
     typeof input.body === 'string' || Buffer.isBuffer(input.body)
       ? input.body
       : JSON.stringify(input.body);
-  const event = normalizeInboundEvent({
+  const normalized = normalizeInboundEvent({
     source: input.source,
     policy,
     headers: {
@@ -560,6 +654,9 @@ export function ingestLocalEvent(input: {
     body,
     now: input.now,
   });
+  const event: DotInboundEvent = input.organizationId
+    ? { ...normalized, organization_id: input.organizationId }
+    : normalized;
   return {
     ...ingestInboundEvent(event, {
       rootDir: input.rootDir,
@@ -567,6 +664,107 @@ export function ingestLocalEvent(input: {
     }),
     event,
   };
+}
+
+// ---------------------------------------------------------------------------
+// operator ask intake
+// ---------------------------------------------------------------------------
+
+/** Event type of an operator `ask` turned into a dot intake event. */
+export const DOT_ASK_EVENT_TYPE = 'operator.ask';
+
+export type AskIntakeResult =
+  | {
+      status: 'accepted' | 'duplicate';
+      event_id: string;
+      dot_id: string;
+      source: string;
+      ledger: string;
+    }
+  | { status: 'no_intake' };
+
+/**
+ * `pnpm kyberion ask` under a selected organization scope: hand the text to
+ * the active dot of that organization as one intake event. Tenant and
+ * organization come only from the trusted `scope` (never from `text`); the
+ * charter must match both, and its event source must be declared in the
+ * policy bound to the same tenant so the event lands in that tenant's
+ * ledger. The event carries `organization_id`, so a dot of another
+ * organization in the tenant never wakes on it. `no_intake` lets the caller
+ * keep its existing behaviour.
+ */
+export function ingestAskIntake(input: {
+  text: string;
+  scope: {
+    tier: string;
+    tenant_slug?: string;
+    organization_id?: string;
+    project_id?: string;
+  };
+  charters?: readonly DotCharter[];
+  policy?: EventIntakePolicy;
+  rootDir?: string;
+  now?: Date;
+}): AskIntakeResult {
+  const { tenant_slug: tenantSlug, organization_id: organizationId } = input.scope;
+  if (!tenantSlug || !organizationId || !input.text.trim()) return { status: 'no_intake' };
+  const policy =
+    input.policy ?? loadEventIntakePolicy({ tenantOverlays: true, rootDir: input.rootDir });
+  const charters =
+    input.charters ??
+    listDotCharters(undefined, { status: 'active', errors: [] }).map((entry) => entry.charter);
+  const body = {
+    subject: input.text,
+    text: input.text,
+    organization_id: organizationId,
+    ...(input.scope.project_id ? { project_id: input.scope.project_id } : {}),
+  };
+  const candidates = charters
+    .filter(
+      (charter) =>
+        charter.status === 'active' &&
+        charter.scope.tier === input.scope.tier &&
+        charter.scope.tenant_slug === tenantSlug &&
+        charter.scope.organization_id === organizationId &&
+        (!charter.scope.project_id || charter.scope.project_id === input.scope.project_id)
+    )
+    .sort((a, b) => a.dot_id.localeCompare(b.dot_id));
+  for (const charter of candidates) {
+    for (const trigger of charter.attention.triggers) {
+      if (trigger.kind !== 'event') continue;
+      for (const source of trigger.sources) {
+        const sourcePolicy = Object.prototype.hasOwnProperty.call(policy.sources, source)
+          ? policy.sources[source]
+          : undefined;
+        if (sourcePolicy?.tenant_slug !== tenantSlug) continue;
+        const preview = { source, type: DOT_ASK_EVENT_TYPE, payload: body } as DotInboundEvent;
+        if (!dotEventMatchesTrigger(preview, trigger)) continue;
+        const result = ingestLocalEvent({
+          source,
+          body,
+          type: DOT_ASK_EVENT_TYPE,
+          policy,
+          rootDir: input.rootDir,
+          now: input.now,
+          organizationId,
+        });
+        logger.debug(`ask intake ${result.status} ${result.event_id} for dot ${charter.dot_id}`);
+        return {
+          status: result.status,
+          event_id: result.event_id,
+          dot_id: charter.dot_id,
+          source,
+          ledger: result.ledger,
+        };
+      }
+    }
+  }
+  return { status: 'no_intake' };
+}
+
+/** An organization-bound event is visible only to dots of that organization. */
+export function dotEventVisibleToCharter(event: DotInboundEvent, charter: DotCharter): boolean {
+  return !event.organization_id || event.organization_id === charter.scope.organization_id;
 }
 
 // ---------------------------------------------------------------------------
@@ -619,7 +817,8 @@ export function evaluateDotEventTriggers(
   if (continuation !== null) return continuation;
   const tenantSlug = charter.scope.tenant_slug || undefined;
   const events = readDotInboundEvents(tenantSlug, deps).filter(
-    (event) => (event.tenant_slug || undefined) === tenantSlug
+    (event) =>
+      (event.tenant_slug || undefined) === tenantSlug && dotEventVisibleToCharter(event, charter)
   );
   if (events.length === 0) return [];
   const now = deps.now?.() ?? new Date();

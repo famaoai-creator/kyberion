@@ -23,7 +23,7 @@
       },
       "fallback_path": {
         "mode": "kyberion_local_pipeline",
-        "target": "pipelines/a2a-task-contract.json"
+        "target": "knowledge/product/schemas/a2a-task-contract.schema.json"
       },
       "status": "active",
       "notes": "Hermes Kanban is the durable multi-agent board pattern: named workers, persistent rows, and shared handoffs."

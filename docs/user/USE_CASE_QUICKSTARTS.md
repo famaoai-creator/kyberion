@@ -24,10 +24,11 @@ Use this when you want a narrated report or summary artifact.
 Start here:
 
 ```bash
-pnpm exec tsx scripts/run_pipeline.ts --input pipelines/trial-narrated-report.json
+pnpm pipeline --input knowledge/product/pipeline-templates/media-produce-and-review.json
 ```
 
-This pipeline generates a report summary and attempts audio/video artifacts when the host supports them.
+This template renders a PPTX from a media brief and runs layout and visual-review gates.
+For production, instantiate the template into the active tenant scope before running it.
 
 ## 3. Browser research
 
@@ -36,7 +37,7 @@ Use this when you want Kyberion to explore a page, capture state, or produce a b
 Start here:
 
 ```bash
-pnpm pipeline --input pipelines/persona-beginner-competitor-research.json
+pnpm pipeline --input knowledge/product/pipeline-templates/persona-beginner-competitor-research.json
 ```
 
 For the first clean browser artifact smoke, use:

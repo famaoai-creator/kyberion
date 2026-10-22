@@ -87,12 +87,17 @@ import {
   resolvedSurfaceIntent,
   structuredSurfaceQueryText,
 } from './surface-runtime-helpers.js';
+import { runAcceptedSurfacePipelineRoute } from '../surface-accepted-pipeline.js';
 
 export {
   buildDelegationSummaryContext,
   buildDelegationSummaryInstruction,
   extractFollowUpRequests,
 } from './surface-runtime-helpers.js';
+export {
+  executeAcceptedSurfacePipeline,
+  resolveAcceptedSurfaceBindingContext,
+} from '../surface-accepted-pipeline.js';
 
 import type {
   NerveRoutingProposal,
@@ -1020,7 +1025,11 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
         return await surfaceRuntimeData.handleSurfaceQueryRoute(context, resolved);
       } catch (error: any) {
         if (error instanceof SurfaceConversationCapabilityError) throw error;
-        return emptySurfaceResult(`Query route failed: ${error?.message || String(error)}`);
+        // The raw error (role violations, actuator stderr, file paths) is for
+        // the operator log — the person gets one plain sentence and a way forward.
+        logger.warn(`[surface-runtime] query route failed: ${error?.message || String(error)}`);
+        const locale = normalizeLocale(context.input.locale) ?? resolveLocale();
+        return emptySurfaceResult(t('front_desk:ask_query_failed', undefined, locale));
       }
     },
   },
@@ -1281,6 +1290,12 @@ async function runSurfaceConversationTurn(
     tenantId: input.scope?.tenant_slug,
     packet: originalResolutionPacket,
   });
+  const acceptedPipelineResult = runAcceptedSurfacePipelineRoute(
+    input,
+    originalResolutionPacket,
+    originalText
+  );
+  if (acceptedPipelineResult) return withIntentResolution(acceptedPipelineResult);
   const isDirectDelegationIntent = preResolvedIntent.intentId === 'delegate-mission-task';
   const compiledFlow: UserIntentFlow | null =
     !forcedReceiver &&

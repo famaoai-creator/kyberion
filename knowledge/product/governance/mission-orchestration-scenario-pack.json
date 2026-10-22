@@ -326,7 +326,7 @@
         "reminders_recorded",
         "delivery_ready"
       ],
-      "notes": "Recurring follow-up path using pipelines/action-item-tracking.json and the append-only action-item-store."
+      "notes": "Recurring follow-up path using knowledge/product/pipeline-templates/action-item-tracking.json and the append-only action-item-store."
     },
     {
       "scenario_id": "golden-report-request-single-track",

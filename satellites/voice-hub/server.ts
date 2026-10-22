@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';
 import { resolveSurfacePort, resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import {
   appendJsonLine,
@@ -8,12 +9,7 @@ import {
   parseSafeJsonInput,
   setRegisteredEnv,
 } from '@agent/core/foundation';
-import {
-  detectTextLocale,
-  localeToBcp47,
-  pickByLocale,
-  type SupportedLocale,
-} from '@agent/core/locale-normalize';
+import { localeToBcp47, pickByLocale, type SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
@@ -21,6 +17,9 @@ import * as path from 'node:path';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('voice-hub');
+// Install the real reasoning/intent backend chain before any route registers;
+// without it every intent compile here ran on the stub backend.
+installReasoningBackendsForService('voice-hub');
 import {
   buildPresenceAssistantReplyTimeline,
   buildPresenceVoiceIngressTimeline,
@@ -84,6 +83,7 @@ import {
 // C7: shared supervised spawn/stop (cmd/args/stop-signal preserved).
 import { spawnSupervisedChild, stopSupervisedChild } from '../shared/supervise-child.js';
 import { STT_ADAPTER_BEHAVIORS } from './voice-stt-transcribe.js';
+import { detectReplyLanguage, normalizeTextForTts } from './reply-text.js';
 import {
   createVoiceHubSpeechSynthesizeHandler,
   estimateHostSpeechMs,
@@ -960,42 +960,6 @@ function buildPresenceSurfaceConversationMessageInput(
     locale: options?.locale,
     scope: options?.scope,
   };
-}
-
-function detectReplyLanguage(text: string): 'ja' | 'en' {
-  return detectTextLocale(text) === 'ja' ? 'ja' : 'en';
-}
-
-function normalizeTextForTts(text: string, language: SupportedLocale): string {
-  const profile = getVoiceTtsLanguageConfig(language);
-  const compact = text
-    .replace(/\s+/g, ' ')
-    .replace(
-      /REQ-[A-Z0-9-]+/g,
-      profile.requestIdToken || t('surface:voice_tts_request_id_token', undefined, language)
-    )
-    .replace(
-      /https?:\/\/\S+/g,
-      profile.urlToken || t('surface:voice_tts_url_token', undefined, language)
-    )
-    .trim();
-
-  if (!compact) return text;
-
-  if (pickByLocale(language, { en: false, ja: true })) {
-    return compact
-      .replace(/([。！？])/g, '$1 ')
-      .replace(/、/g, '、 ')
-      .replace(/([0-9])件/g, '$1 件')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  return compact
-    .replace(/([.!?])/g, '$1 ')
-    .replace(/,/g, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function buildCapabilityReply(language: SupportedLocale): string {

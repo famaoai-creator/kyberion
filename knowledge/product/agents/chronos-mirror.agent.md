@@ -70,10 +70,9 @@ denied_actuators: [blockchain-actuator]
 
 **ガバナンス:**
 
-- `knowledge/product/governance/pipelines/code-skill-audit.json` — スキル監査
-- `knowledge/product/governance/pipelines/modeling-graph.json` — 依存関係グラフ生成
-- `knowledge/product/governance/pipelines/modeling-validate.json` — スキーマ検証
-- `knowledge/product/governance/pipelines/wisdom-sync-docs.json` — ドキュメント同期
+- `pipelines/list-capabilities.json` — 標準インテントから能力カタログを生成
+- `pipelines/knowledge-curation-weekly.json` — 週次の知識鮮度・低利用レポート
+- `pipelines/surface-capability-check.json` — surface / bridge 契約の存在確認
 
 **GitHub 連携:**
 

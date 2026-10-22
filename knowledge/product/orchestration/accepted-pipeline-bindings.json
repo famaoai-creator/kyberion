@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/accepted-pipeline-bindings.schema.json",
+  "version": 1,
+  "bindings": []
+}

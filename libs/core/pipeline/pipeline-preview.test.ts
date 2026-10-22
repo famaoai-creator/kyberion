@@ -1,17 +1,33 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-vi.mock('../secure-io.js', () => ({
-  assertSafeRepositoryPath: (p: string) => p,
-  safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
-  safeExistsSync: (p: string) => fs.existsSync(p),
-  safeLstat: (p: string) => fs.lstatSync(p),
-}));
+// Partial mocks only: the ref loader reaches pipeline-contract and
+// governed-catalog, which use more of secure-io / foundation-json than the
+// three IO helpers stubbed here. A factory without the actual spread makes
+// those modules see `undefined` and the ref expansion fails silently as
+// "ref path not readable". assertSafeRepositoryPath is deliberately NOT
+// stubbed — the guard must behave exactly as in production, which is why
+// every fixture below lives on the in-repo governed temp floor.
+vi.mock('../secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js');
+  return {
+    ...actual,
+    safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
+    safeExistsSync: (p: string) => fs.existsSync(p),
+    safeLstat: (p: string) => fs.lstatSync(p),
+  };
+});
 
-vi.mock('../foundation/json.js', () => ({
-  readJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
-}));
+vi.mock('../foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('../foundation/json.js')>('../foundation/json.js');
+  return {
+    ...actual,
+    readJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+  };
+});
 
 // defineCatalog (foundation/governed-catalog.ts) gates its load() on
 // FoundationIo, which the real secure-io.ts would normally register — but
@@ -40,13 +56,28 @@ vi.mock('../foundation/io.js', () => ({
 import { previewPipeline } from './pipeline-preview.js';
 import { pathResolver } from '../path-resolver.js';
 
+// Per-run fixture directory on the governed temp floor: unique so parallel
+// vitest files cannot collide, and removed afterwards so no residue can
+// change a later run.
+let fixtureDir = '';
+const fixture = (name: string): string => path.join(fixtureDir, name);
+
+beforeAll(() => {
+  fixtureDir = pathResolver.sharedTmp(`pipeline-preview-${randomUUID()}`);
+  fs.mkdirSync(fixtureDir, { recursive: true });
+});
+
+afterAll(() => {
+  if (fixtureDir) fs.rmSync(fixtureDir, { recursive: true, force: true });
+});
+
 describe('pipeline-preview', () => {
   describe('previewPipeline', () => {
     it('with valid pipeline returns valid: true', () => {
       const pipeline = {
         steps: [
           { id: 'step1', type: 'capture', op: 'goto', params: { url: 'https://example.com' } },
-          { id: 'step2', type: 'capture', op: 'screenshot', params: { path: '/tmp/shot.png' } },
+          { id: 'step2', type: 'capture', op: 'screenshot', params: { path: fixture('shot.png') } },
         ],
       };
 
@@ -86,7 +117,7 @@ describe('pipeline-preview', () => {
           { id: 'sub2', type: 'capture', op: 'wait', params: { duration: 1000 } },
         ],
       };
-      const tmpPath = pathResolver.shared('tmp/test-preview-sub-pipeline.json');
+      const tmpPath = fixture('sub-pipeline.json');
       fs.writeFileSync(tmpPath, JSON.stringify(subPipeline));
 
       try {
@@ -227,17 +258,25 @@ describe('pipeline-preview', () => {
   });
 
   it('warns instead of reading a ref outside the repository root', () => {
+    // This case is about the scope guard itself, so the path must genuinely
+    // sit outside the repository root — a sibling of the root, never created
+    // on disk (no fixture floor applies, and nothing to clean up).
+    const outside = path.join(
+      pathResolver.rootDir(),
+      '..',
+      `kyberion-preview-outside-${randomUUID()}.json`
+    );
     const result = previewPipeline({
-      steps: [{ op: 'ref', params: { path: '/tmp/preview-outside.json' } }],
+      steps: [{ op: 'ref', params: { path: outside } }],
     });
 
     expect(result.steps[0].children).toBeUndefined();
-    expect(result.warnings).toContain('ref path not readable: /tmp/preview-outside.json');
+    expect(result.warnings).toContain(`ref path not readable: ${outside}`);
   });
 
   it('warns instead of reading a ref reached through a symbolic link', () => {
-    const target = pathResolver.shared('tmp/preview-symlink-target.json');
-    const link = pathResolver.shared('tmp/preview-symlink-link.json');
+    const target = fixture('symlink-target.json');
+    const link = fixture('symlink-link.json');
     fs.writeFileSync(target, JSON.stringify({ steps: [] }));
     fs.symlinkSync(target, link);
     try {
@@ -251,7 +290,7 @@ describe('pipeline-preview', () => {
   });
 
   it('warns instead of previewing a referenced file that is not a pipeline ADF', () => {
-    const invalidPath = pathResolver.shared('tmp/preview-invalid-pipeline.json');
+    const invalidPath = fixture('invalid-pipeline.json');
     fs.writeFileSync(invalidPath, JSON.stringify({ steps: { invalid: true } }));
     try {
       const result = previewPipeline({
@@ -293,7 +332,7 @@ describe('pipeline-preview', () => {
           { id: 's1', type: 'capture', op: 'goto', params: { url: 'https://example.com' } },
           { id: 's2', type: 'capture', op: 'click', params: { selector: '#submit' } },
           { id: 's3', type: 'capture', op: 'fill', params: { selector: '#name' } },
-          { id: 's4', type: 'capture', op: 'screenshot', params: { path: '/tmp/s.png' } },
+          { id: 's4', type: 'capture', op: 'screenshot', params: { path: fixture('s.png') } },
           { id: 's5', type: 'capture', op: 'wait', params: { duration: 500 } },
           { id: 's6', type: 'control', op: 'log', params: { message: 'done' } },
         ],

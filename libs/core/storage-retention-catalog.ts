@@ -163,6 +163,13 @@ export interface RetentionCatalogEntry {
    * them from the trash only after this many further days.
    */
   soft_delete_days?: number;
+  /**
+   * Scratch promotion grace (tmp floor only): an unpromoted job directory that
+   * holds authored code or ADF keeps its files this many days beyond
+   * `ttl_days`, while the janitor warns with the promote command. Default
+   * DEFAULT_CODE_GRACE_DAYS (scratch-promotion.ts) when omitted.
+   */
+  code_grace_days?: number;
   note?: string;
   /** WI-16: per-file status-aware expiry rules nested under this directory. */
   status_rules?: RetentionStatusRule[];
@@ -357,6 +364,15 @@ function validateEntry(raw: unknown, index: number): string | null {
       entry.soft_delete_days <= 0
     ) {
       return `entries[${index}] (${String(entry.path)}): "soft_delete_days" must be a positive number`;
+    }
+  }
+  if (entry.code_grace_days !== undefined) {
+    if (
+      typeof entry.code_grace_days !== 'number' ||
+      !Number.isFinite(entry.code_grace_days) ||
+      entry.code_grace_days < 0
+    ) {
+      return `entries[${index}] (${String(entry.path)}): "code_grace_days" must be a non-negative number`;
     }
   }
   if (entry.note !== undefined && typeof entry.note !== 'string') {

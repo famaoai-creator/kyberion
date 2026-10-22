@@ -20,8 +20,16 @@ import {
 import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import { removeMissionFixture } from '../testing/mission-fixture.js';
 
 const PROMPT_FIXTURE_ROOT = pathResolver.sharedTmp('worker-context-prompt-loader-test');
+
+/**
+ * Carryover persistence writes into the real confidential mission tree, so the
+ * fixture mission is process-scoped and reclaimed in `afterEach`.
+ */
+const MWM_FIXTURE_MISSION_ID = `OH1-MWM-FIXTURE-${process.pid}`;
 
 const CARRYOVER: CompactionCarryover = {
   goal: 'Ship the Q3 governance report',
@@ -39,6 +47,9 @@ afterEach(() => {
   delete process.env.KYBERION_CONTEXT_RESERVE_TOKENS;
   delete process.env.KYBERION_CONTEXT_BUFFER_TOKENS;
   safeRmSync(PROMPT_FIXTURE_ROOT, { recursive: true, force: true });
+  withExecutionContext('mission_controller', () =>
+    removeMissionFixture({ missionId: MWM_FIXTURE_MISSION_ID, tier: 'confidential' })
+  );
 });
 
 describe('worker-context-compaction (OH-01)', () => {
@@ -317,7 +328,7 @@ describe('worker-context-compaction (OH-01)', () => {
 
   it('persists carryover to mission working memory and reloads it', async () => {
     const memory = new MissionWorkingMemory();
-    const missionId = 'OH1-MWM-FIXTURE';
+    const missionId = MWM_FIXTURE_MISSION_ID;
     const big = 'w'.repeat(3_000);
     await compactWorkerContext([toolResult(big), toolResult(big)], {
       profile: { contextWindowTokens: 1_000, reserveTokens: 100, bufferTokens: 100 },

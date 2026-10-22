@@ -756,6 +756,17 @@ export function defineCatalogBackedActuator(options: {
               input && typeof input === 'object' && !Array.isArray(input)
                 ? (input as Record<string, unknown>)
                 : {};
+            // A declared op is dispatched one step at a time, so the default
+            // envelope is the ONLY place the authoring pipeline's session and
+            // session options can reach the actuator. Omitting them silently
+            // demoted every `browser:*` step in an ADF pipeline to an anonymous
+            // `default` session with actuator defaults — a scenario asking for
+            // `headless: false` and a persistent `user_data_dir` ran headless in
+            // a throwaway profile, losing the login it had just performed.
+            // Actuators that declare `actionInput` shape their own input and are
+            // left untouched.
+            const sessionId = context.__pipeline_session_id;
+            const sessionOptions = context.__pipeline_options;
             const result = await options.handleAction(
               (options.actionInput
                 ? options.actionInput(
@@ -771,6 +782,14 @@ export function defineCatalogBackedActuator(options: {
                 : {
                     action: 'pipeline',
                     steps: [{ type: description.kind, op: description.op, params }],
+                    ...(typeof sessionId === 'string' && sessionId
+                      ? { session_id: sessionId }
+                      : {}),
+                    ...(sessionOptions &&
+                    typeof sessionOptions === 'object' &&
+                    !Array.isArray(sessionOptions)
+                      ? { options: sessionOptions }
+                      : {}),
                     context,
                   }) as never
             );

@@ -53,14 +53,30 @@ interface KeychainRegistry {
   entries: RegistryEntry[];
 }
 
+type SecretOp = 'get' | 'set' | 'delete' | 'list';
+
+type SecretParams = {
+  account?: string;
+  service: string;
+  value?: string;
+  export_as?: string;
+};
+
 interface SecretAction {
-  action: 'get' | 'set' | 'delete' | 'list';
-  params: {
-    account?: string;
-    service: string;
-    value?: string;
-    export_as?: string;
-  };
+  action: SecretOp;
+  params: SecretParams;
+}
+
+/**
+ * Pipeline envelope. `defineCatalogBackedActuator` wraps every op dispatch as
+ * `{ action: 'pipeline', steps: [...] }`, so the flat `{action, params}` CLI
+ * shape alone made every `secret:*` step in an ADF pipeline fail with
+ * "Unsupported secret action: pipeline".
+ */
+interface SecretPipelineAction {
+  action: 'pipeline';
+  steps: Array<{ op: SecretOp; type?: string; params?: SecretParams }>;
+  context?: Record<string, unknown>;
 }
 
 function loadRegistry(): KeychainRegistry {
@@ -185,7 +201,36 @@ async function withGovernedMutation(
   }
 }
 
-export async function handleAction(input: SecretAction) {
+export async function handleAction(input: SecretAction | SecretPipelineAction) {
+  if (input && (input as SecretPipelineAction).action === 'pipeline') {
+    return runSecretPipeline(input as SecretPipelineAction);
+  }
+  return runSecretAction(input as SecretAction);
+}
+
+/**
+ * Run the steps of a pipeline envelope in order, merging each step's output so
+ * a `capture` step's `export_as` channel reaches the pipeline context.
+ */
+async function runSecretPipeline(input: SecretPipelineAction) {
+  const steps = Array.isArray(input.steps) ? input.steps : [];
+  const results: Array<Record<string, unknown>> = [];
+  let merged: Record<string, unknown> = {};
+  for (const step of steps) {
+    const result = (await runSecretAction({
+      action: step.op,
+      params: (step.params || {}) as SecretParams,
+    })) as Record<string, unknown>;
+    results.push(result);
+    if (result?.status === 'failed') {
+      return { status: 'failed', results, error: String(result.error ?? 'secret step failed') };
+    }
+    merged = { ...merged, ...result };
+  }
+  return { ...merged, status: 'success', results };
+}
+
+async function runSecretAction(input: SecretAction) {
   const platform = process.platform;
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({

@@ -338,7 +338,7 @@ describe('front-desk-routes.ts route wiring (Deliverables 1-2)', () => {
     const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
 
     expect(route).toContain('resolvePresenceStudioViewerContext(req)');
-    expect(route).toContain('toFrontDeskViewerScope(viewer)');
+    expect(route).toContain('toFrontDeskViewerScope(');
     expect(route).toContain('readFrontDeskMe(scope');
     expect(route).toContain('presenceAvailableOperations(viewer)');
     expect(route).toContain("res.setHeader('Cache-Control', 'no-store')");

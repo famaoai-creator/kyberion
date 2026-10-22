@@ -617,6 +617,7 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:chip_minutes',
   'front_desk:chip_browser',
   'front_desk:chip_webapp',
+  'front_desk:chip_process',
   'front_desk:count_items',
   // FD-09: `resolution_shape` labels for the "Current state" block —
   // `front_desk`-domain plain wording (see `ASK_SHAPE_LABEL_KEY` in
@@ -658,6 +659,11 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_canvas_updating',
   'front_desk:hearing_canvas_generated',
   'front_desk:hearing_canvas_template',
+  // SD-05: a ledger hearing's canvas is a deterministic projection of the
+  // tenant's decision ledger (`canvas_generation: 'projected'`).
+  'front_desk:hearing_canvas_projected',
+  // Phase-structured hearing sheets: current phase line above the canvas.
+  'front_desk:hearing_phase_progress',
   // HT-03 (2nd half): the "confirm and hand off as a request" action on the
   // decided hearing card, and its result — `POST /api/hearing/:session/handoff`.
   'front_desk:hearing_handoff_button',

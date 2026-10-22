@@ -51,7 +51,7 @@ describe('resolveProviderBackend', () => {
 
   it('resolves each known provider to an object satisfying the structural interface, via injected (unmocked-config) constructors', () => {
     const constructCalls: string[] = [];
-    for (const provider of ['claude', 'codex', 'agy', 'grok'] as const) {
+    for (const provider of ['claude', 'codex', 'agy', 'grok', 'cursor'] as const) {
       const handle = resolveProviderBackend(provider, {
         registrySnapshot: () => null, // no cached opinion — fails open, but construction is still seamed below
         construct: {
@@ -64,7 +64,7 @@ describe('resolveProviderBackend', () => {
       expect(handle).not.toBeNull();
       expect(typeof handle?.delegateTask).toBe('function');
     }
-    expect(constructCalls.sort()).toEqual(['agy', 'claude', 'codex', 'grok']);
+    expect(constructCalls.sort()).toEqual(['agy', 'claude', 'codex', 'cursor', 'grok']);
   });
 
   it('never touches real construction when a construct seam is supplied (no config/binary access)', async () => {
@@ -172,6 +172,12 @@ describe('resolveProviderBackend', () => {
       construct: { grok: () => fakeHandle('grok-alias') },
     });
     expect(grokHandle).not.toBeNull();
+
+    const cursorHandle = resolveProviderBackend('cursor-cli', {
+      registrySnapshot: () => null,
+      construct: { cursor: () => fakeHandle('cursor-alias') },
+    });
+    expect(cursorHandle).not.toBeNull();
   });
 });
 
@@ -189,6 +195,12 @@ describe('resolveProviderBackend (default real constructors)', () => {
 
   it('constructs a real Grok backend without probing or spawning a process', () => {
     const handle = resolveProviderBackend('grok', { registrySnapshot: () => null });
+    expect(handle).not.toBeNull();
+    expect(typeof handle?.delegateTask).toBe('function');
+  });
+
+  it('constructs a real Cursor backend without probing or spawning a process', () => {
+    const handle = resolveProviderBackend('cursor', { registrySnapshot: () => null });
     expect(handle).not.toBeNull();
     expect(typeof handle?.delegateTask).toBe('function');
   });

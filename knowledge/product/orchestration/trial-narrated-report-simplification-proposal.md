@@ -1,7 +1,7 @@
 # Trial Narrated Report Simplification Proposal
 
 **Date**: 2026-05-04  
-**Target**: `pipelines/trial-narrated-report.json`
+**Target**: `retired/pipelines/trial-narrated-report.json` (retired 2026-09-16; no longer an active system pipeline)
 
 ## 1. Goal
 
@@ -109,4 +109,5 @@ Recommended final step sequence:
 3. keep the output validation explicit but shorter
 
 ---
-*Proposal distilled on 2026-05-04*
+
+_Proposal distilled on 2026-05-04_

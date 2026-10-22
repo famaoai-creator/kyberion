@@ -5,6 +5,7 @@ import {
   buildExecutionEnv,
   inferPersonaFromRole,
   resolveIdentityContext,
+  resolveRole,
   withExecutionContext,
   withExecutionContextAsync,
 } from './authority.js';

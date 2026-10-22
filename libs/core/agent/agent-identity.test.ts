@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
+import { assertRuntimeNhiScope } from '../tool/runtime-scope.js';
 import {
   activateAgentIdentity,
   activateProvisionedAgentIdentity,
@@ -113,6 +114,52 @@ describe('agent-identity — nhi_id format', () => {
   it('deriveAgentNhiId falls back to the organization profile org, then default', () => {
     const derived = deriveAgentNhiId('nerve-agent');
     expect(derived).toMatch(/^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/nerve-agent$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MO-11: organizationId threading — a tenant-scoped derivation must never
+// collapse to the 'default' org (RUNTIME_NHI_ORGANIZATION_MISMATCH guard).
+// ---------------------------------------------------------------------------
+
+describe('agent-identity — deriveAgentNhiId organization threading', () => {
+  it('derives a tenant-organization nhi_id, not the default fallback, when organizationId is supplied', () => {
+    const nhiId = deriveAgentNhiId('tenant-worker', 'org-a');
+    expect(nhiId).toBe('kyberion://agent/org-a/tenant-worker');
+    expect(nhiId).not.toContain('/default/');
+  });
+
+  it('still falls back to the organization profile (else default) when organizationId is omitted', () => {
+    const nhiId = deriveAgentNhiId('tenant-worker');
+    expect(nhiId).toMatch(/^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/tenant-worker$/);
+  });
+
+  it('a tenant-organization-derived nhi_id satisfies assertRuntimeNhiScope for a scope in that same organization, and is rejected for another', () => {
+    const record = issueTestIdentity('scope-checked-agent', { organizationId: 'org-a' });
+    expect(record.nhi_id).toBe('kyberion://agent/org-a/scope-checked-agent');
+
+    const derivedNhiId = deriveAgentNhiId('scope-checked-agent', 'org-a');
+    expect(derivedNhiId).toBe(record.nhi_id);
+
+    expect(() =>
+      assertRuntimeNhiScope({
+        scope_kind: 'mission',
+        tier: 'confidential',
+        organization_id: 'org-a',
+        mission_id: 'MSN-SCOPE-CHECK',
+        nhi_id: derivedNhiId!,
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      assertRuntimeNhiScope({
+        scope_kind: 'mission',
+        tier: 'confidential',
+        organization_id: 'other-org',
+        mission_id: 'MSN-SCOPE-CHECK',
+        nhi_id: derivedNhiId!,
+      })
+    ).toThrow('[RUNTIME_NHI_ORGANIZATION_MISMATCH]');
   });
 });
 

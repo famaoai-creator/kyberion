@@ -9,6 +9,7 @@ import {
   MEETING_NOTEPAD_DEFAULT_PORT,
   MEETING_NOTEPAD_MAX_BODY_BYTES,
   validateMeetingNotepadContentLength,
+  defaultMeetingNotepadOutputDir,
 } from './server.js';
 
 describe('meeting notepad server harness boundary', () => {
@@ -23,6 +24,23 @@ describe('meeting notepad server harness boundary', () => {
     });
     expect(result?.out).toMatch(/meeting-notepad$/);
     expect(result?.handoff).toMatch(/handoff\.json$/);
+  });
+
+  it('places pads in the owning scope instead of the tmp floor', () => {
+    const scoped = defaultMeetingNotepadOutputDir({ tenant_slug: 'tenant-acme', tier: 'personal' });
+
+    // Deliverables partition as <tier>/<tenant> (storage-layout).
+    expect(scoped).toContain('/artifacts/personal/tenant-acme/evidence/meeting-notepad');
+    // The tmp floor hard-deletes at 24h with no trash grace, so a pad that
+    // has an owning scope must never default there.
+    expect(scoped).not.toContain('/active/shared/tmp/');
+  });
+
+  it('falls back to the tmp floor only when nothing owns the pads', () => {
+    expect(defaultMeetingNotepadOutputDir()).toContain('/active/shared/tmp/meeting-notepad');
+    expect(defaultMeetingNotepadOutputDir({ tier: 'public' })).toContain(
+      '/active/shared/tmp/meeting-notepad'
+    );
   });
 
   it('rejects ports outside the TCP port range', async () => {

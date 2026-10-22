@@ -4,15 +4,18 @@ This glossary translates Kyberion's ecosystem language into practical terms for 
 
 ## How to use this glossary
 
-- **First-win vocabulary**: the six terms needed to understand the basic intent-to-result loop.
+- **First-win vocabulary**: the words you will see in CLI output during the first run.
 - **Contributor vocabulary**: the canonical terms most contributors encounter while changing the repository.
+- **Disambiguation maps**: one place each for the words that carry several meanings — units of work, roles, scope, and grants.
 - **FDE full glossary**: the complete reference below, including governance, tenancy, runtime, and delivery terms.
 
-Entries added for the surface layer are tagged **(first-win)** — meet them in the first hour — or **(advanced)** — needed only when you operate or change surfaces. For the five ideas to learn before anything else, read [CORE_CONCEPTS](./CORE_CONCEPTS.md).
+Entries added for the surface layer are tagged **(first-win)** — meet them in the first hour — or **(advanced)** — needed only when you operate or change surfaces.
+
+Reading order for newcomers: [QUICKSTART](./QUICKSTART.md) → [CORE_CONCEPTS](./CORE_CONCEPTS.md) (the five ideas, canonical first read) → [AGENTS.md](../AGENTS.md) (binding rules) → this glossary (precise definitions).
 
 ### First-win vocabulary
 
-Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to learn first.
+Intent, Plan, Result, Mission, Task Session, and Artifact are the words the first run prints. They are vocabulary, not a second concept list: the ideas behind them are the five in [CORE_CONCEPTS](./CORE_CONCEPTS.md).
 
 ### Contributor vocabulary
 
@@ -48,6 +51,80 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to l
 | Event                | A point-in-time occurrence within a span.                             |
 | Lease                | A durable authority grant with an expiry.                             |
 | Mission Controller   | The governed mission lifecycle entry point.                           |
+
+## Disambiguation maps
+
+### Units of work
+
+Five words name work at different grains. They are not alternatives; each answers a different question.
+
+```text
+Intent ──resolves to an Execution Shape──┬─ direct_reply / actuator_action   (no record)
+                                         ├─ task_session                     (Task Session record)
+                                         ├─ pipeline                         (pipeline run journal)
+                                         └─ mission ── NEXT_TASKS.json ── Task ──handed to a worker as── Task Contract
+                                                │                          │
+                                                └──── each is projected as a WorkItem (claim / lease / visibility)
+```
+
+| Term          | Answers                                    | Canonical source                                            |
+| ------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| Mission       | Which lifecycle, evidence and git history? | `libs/core/mission/mission-status.ts`, `mission_controller` |
+| Task          | Which step inside a mission?               | the mission's `NEXT_TASKS.json`                             |
+| Task Contract | What exactly is one worker allowed to do?  | objective, write scope, outputs, acceptance criteria        |
+| Task Session  | Lighter durable work that is not a mission | task-session records                                        |
+| WorkItem      | Who holds it now, and who can see it?      | `libs/core/workforce/work-coordination.ts`                  |
+
+A WorkItem is the shared record, not a sixth kind of work: a mission owns one WorkItem (`deriveMissionOwnershipItemId`), and each dispatched mission task becomes a WorkItem whose source is `mission:<mission_id>:<task_id>`. "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
+
+### Role terms
+
+Four role words exist. Use the qualified name; never write a bare "role" or "persona" in new docs.
+
+| Term           | What it decides                                                           | Values / source                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persona        | The execution identity class of the running process                       | `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` (`Persona` in `libs/core/types.ts`, `KYBERION_PERSONA`) |
+| Authority Role | Which paths and actuators a process may write to                          | `SYSTEM_ROLE` / `MISSION_ROLE`, `knowledge/product/governance/authority-role-index.json`                                                    |
+| Org Role       | The org-chart role a mission is assigned at activation (`--persona` flag) | a role directory under `knowledge/product/roles/` (the default `worker` has none); see [Team Role vs. Org Role](#team-role-vs-org-role)     |
+| Team Role      | The per-task execution role inside a mission team                         | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                                      |
+
+The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is historical.
+
+### Scope terms
+
+"Scope" carries five meanings. Name the one you mean.
+
+| Term                     | Meaning                                                                                    | Entry                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Entity scope chain       | Containment: `tenant_slug → organization_id → project_id → mission_id → task_id → session` | [WorkItem Context](#workitem-context), `libs/core/entity-scope.ts` |
+| Scope Envelope           | An attenuation record minted at delegation; a child can only narrow it                     | [Scope Envelope](#scope-envelope)                                  |
+| Viewer Scope             | The tenants an HTTP viewer may see, resolved server-side                                   | [ViewerContext / Viewer Scope](#viewercontext--viewer-scope)       |
+| Work Visibility Scope    | Which of six projections over WorkItems a view shows                                       | [Work Visibility Scope](#work-visibility-scope)                    |
+| Binding Scope (volatile) | What a working-memory face is bound to (`session` … `global`)                              | [Scope (Volatile)](#scope-volatile)                                |
+
+Tier (`personal` / `confidential` / `public`) and Stance (`customer/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
+
+### Grants and approvals
+
+| Term               | Lifetime                | What it permits                                                      | Source                                       |
+| ------------------ | ----------------------- | -------------------------------------------------------------------- | -------------------------------------------- |
+| Approval Contract  | One decision            | A human decides one consequential action                             | approval store, `pnpm kyberion approvals`    |
+| Approval assurance | Per approval            | How strongly the approver was verified (A0–A3)                       | `libs/core/governance/approval-assurance.ts` |
+| Standing grant     | Bounded, until expiry   | A capability decided in advance (recording consent, provider egress) | `libs/core/governance/grant-resolver.ts`     |
+| Task-scoped grant  | One task, ≤ 24 h        | One NHI acting inside one mission/task                               | `libs/core/task/task-scoped-grants.ts`       |
+| Mission Lease      | Until expiry or release | Who currently controls a mission, task, bridge, or resource          | [Mission Lease](#mission-lease)              |
+
+A standing grant that itself needs human approval references the approval as its basis (`basis.approval_request_id`).
+
+### Execution definitions
+
+| Term              | Meaning                                                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ADF               | The contract format: a validated JSON document of steps and params.                                                                                                                                                           |
+| Pipeline          | An ADF document under `pipelines/` that Kyberion runs for its own operation (often scheduled).                                                                                                                                |
+| Pipeline Template | A parameterized ADF under `knowledge/product/pipeline-templates/` for user workflows. Run one with `pnpm pipeline --input <path>`; a few named presets in `scripts/run_pipeline.ts` (e.g. `voice-health-check`) resolve here. |
+| Process Template  | A mission process (phases and tasks) that `mission create` expands into `NEXT_TASKS.json` — not an ADF.                                                                                                                       |
+| Fragment          | A reusable ADF piece included by pipelines, never run on its own.                                                                                                                                                             |
 
 ### FDE full glossary
 
@@ -177,6 +254,10 @@ An agent or service acting in the system as a first-class, durable identity rath
 
 The ordered record of who acted on whose behalf across a delegation (NI-03, `libs/core/mission/delegation-chain.ts`): `user:<id> → orchestrator → worker → sub-worker`, one element appended per hop, each carrying the scope granted at that hop. Attenuation is fail-closed — a child's `granted_scope` may never exceed its parent's — and the chain is stamped into the execution ledger, traces and audit chain so a full chain can be reconstructed from audit alone. Same shape as RFC 8693's nested `act` claim.
 
+### ActorContext
+
+The attribution projection carried through a call: actor reference, `ScopeContext`, and the effective authority (`role`, `persona`, `authorities`, `sudo`) (`libs/core/actor-context.ts`). Its `provenance` is `claim` (the dispatch claim holder) or `explicit`; it is never authentication proof or an authorization grant.
+
 ### Task-scoped grant
 
 A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `libs/core/task/task-scoped-grants.ts`): `{grantee_nhi_id, scope, audience: {mission_id, task_id?}, expires_at}`. It is served only inside its declared mission/task, expires within 24h at the latest, and is revoked when the task finishes — so least privilege comes from grants that die, not from standing permissions. The internal analogue of RFC 8707 audience restriction.
@@ -223,7 +304,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 **(advanced)** A satellite that connects one external chat service to Kyberion. It normalizes inbound events into governed artifacts and renders outbound updates from the Surface Outbox. A bridge is the concrete process; the contract it implements is the **Gateway**, and the route a message travels on is a **Channel**.
 
-### Channel
+### Channel (delivery route)
 
 **(advanced)** A named delivery route for one surface or chat conversation, backed by a per-surface outbox under `active/shared/coordination/channels/<surface>/outbox/` and declared in `presence/bridge/channel-registry.json`. See [Channel Outbox](#channel-outbox) and [Gateway](#gateway).
 
@@ -390,12 +471,12 @@ Service bindings should be read together with:
 
 The internal set of specialists Kyberion assigns to a request, such as a browser operator, document specialist, knowledge specialist, or mission lead. Users usually interact with one front-facing assistant while the specialist team works behind it.
 
-### Team Role vs. Assigned Persona
+### Team Role vs. Org Role
 
-Two distinct, non-interchangeable role concepts that are easy to conflate:
+Two distinct, non-interchangeable role concepts that are easy to conflate (the other two role words, Persona and Authority Role, are in [Role terms](#role-terms)):
 
 - **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
-- **Assigned Persona**: the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the 21 roles under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case.
+- **Org Role** (historically "Assigned Persona"; selected with `--persona`): the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the role directories under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case.
 
 ### Evidence
 
@@ -433,7 +514,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
-### Channel
+### Channel (interaction context)
 
 An external interaction context such as Slack or Chronos. A channel may have multiple concrete ports for ingress, egress, and streaming.
 
@@ -619,7 +700,7 @@ The set of structured surfaces (`MEMORY.md`, `NOW.md`, daily journals, TODO, wee
 
 ### Scope (Volatile)
 
-Axis-A of the volatile knowledge model. What a face is bound to: `session` / `mission` / `project` / `personal` / `tenant` / `global`. Determines the physical path and applicable tier restrictions.
+Also called **Binding Scope**; not the entity scope chain (see [Scope terms](#scope-terms)). Axis-A of the volatile knowledge model. What a face is bound to: `session` / `mission` / `project` / `personal` / `tenant` / `global`. Determines the physical path and applicable tier restrictions.
 
 ### Cadence
 

@@ -2,7 +2,14 @@
   "$id": "https://kyberion.local/schemas/changelog-policy.schema.json",
   "title": "Changelog Policy",
   "type": "object",
-  "required": ["version", "breaking_changes_title", "uncategorized_title", "no_commits_template", "header_template", "type_labels"],
+  "required": [
+    "version",
+    "breaking_changes_title",
+    "uncategorized_title",
+    "no_commits_template",
+    "header_template",
+    "type_labels"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "string" },

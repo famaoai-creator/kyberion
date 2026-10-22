@@ -149,12 +149,13 @@ describe('host delegation bookkeeping inside advisory sandbox', () => {
     expect(safeExistsSync(forbiddenPath)).toBe(false);
   });
 
-  it('does not introduce a synthetic tenant for an unbound readonly caller', () => {
-    expect(() =>
-      withSandboxPolicy(readonly, () =>
-        startDelegatedTaskTrace({ owner: 'test', instruction: 'tenantless' })
-      )
-    ).toThrow('SANDBOX_WRITE_DENIED');
+  it('records unbound host bookkeeping while preserving the readonly caller', () => {
+    withSandboxPolicy(readonly, () => {
+      const trace = startDelegatedTaskTrace({ owner: 'test', instruction: 'tenantless' });
+      expect(trace).toBeDefined();
+      expect(getActiveSandboxPolicy()).toEqual(readonly);
+      expect(() => safeWriteFile(forbiddenPath, 'provider effect')).toThrow('SANDBOX_WRITE_DENIED');
+    });
   });
 
   it('retains the parent resource ceiling and restores readonly after a denied host write', async () => {

@@ -14,6 +14,7 @@ module.exports = {
           primary: "var(--kb-primary)",
           secondary: "var(--kb-secondary)",
           accent: "var(--kb-accent)",
+          accent_on: "var(--kb-accent-on)",
           warning: "var(--kb-warning)",
           text_primary: "var(--kb-text-primary)",
           text_secondary: "var(--kb-text-secondary)",

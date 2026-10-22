@@ -1,10 +1,16 @@
 {
   "action": "pipeline",
-  "name": "voice-health-check",
-  "version": "2.0.0",
-  "description": "Verify governed tool runtime inventory for mlx-audio TTS and mlx-whisper STT, then confirm both bridges are installed and functional.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "name": "Voice Health Check",
+  "version": "1.0.0",
+  "description": "Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, STT bridge availability, and the realtime-loop surfaces (silero VAD bridge script).",
   "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Voice Health Check — starting..."
+      }
+    },
     {
       "id": "list_tool_runtimes",
       "role": "source",
@@ -15,65 +21,46 @@
       }
     },
     {
-      "id": "check_tts",
+      "id": "check_tts_bridge",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "tts_health_raw", "type": "ShellResult" },
+      "op": "system:probe",
+      "produces": {
+        "channel": "tts_bridge",
+        "type": "ProbeResult"
+      },
       "params": {
-        "command": "python3",
-        "args": ["-c", "import sys,json; sys.stdin.close(); import subprocess; r=subprocess.run(['python3','libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'],input='{\"action\":\"health\"}',capture_output=True,text=True); print(r.stdout)"]
+        "path": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py"
       }
     },
     {
-      "id": "check_tts_direct",
-      "role": "source",
-      "op": "system:cli_health_check",
-      "produces": { "channel": "mlx_audio_health", "type": "HealthResult" },
-      "params": {
-        "command": "python3",
-        "args": ["-c", "import mlx_audio; print('ok')"],
-        "timeout_ms": 15000
-      }
-    },
-    {
-      "id": "check_stt",
-      "role": "source",
-      "op": "system:cli_health_check",
-      "produces": { "channel": "mlx_whisper_health", "type": "HealthResult" },
-      "params": {
-        "command": "python3",
-        "args": ["-c", "import mlx_whisper; print('ok')"],
-        "timeout_ms": 15000
-      }
-    },
-    {
-      "id": "check_recorder",
-      "role": "source",
-      "op": "system:cli_health_check",
-      "produces": { "channel": "sox_health", "type": "HealthResult" },
-      "params": {
-        "command": "sox",
-        "args": ["--version"]
-      }
-    },
-    {
-      "id": "log_summary",
+      "id": "check_native_tts",
       "role": "sink",
-      "op": "system:log",
-      "consumes": ["tool_runtimes", "mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "op": "system:check_native_tts",
+      "produces": {
+        "channel": "native_tts",
+        "type": "ProbeResult"
+      },
+      "params": {}
+    },
+    {
+      "id": "check_silero_vad_bridge",
+      "role": "source",
+      "op": "system:probe",
+      "produces": {
+        "channel": "silero_vad_bridge",
+        "type": "ProbeResult"
+      },
       "params": {
-        "message": "[voice-health-check] runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} mlx_audio={{mlx_audio_health.available}}, mlx_whisper={{mlx_whisper_health.available}}, sox={{sox_health.available}}"
+        "capability": "silero_vad"
       }
     },
     {
-      "id": "notify_health",
+      "id": "notify",
       "role": "sink",
       "op": "system:system_notify",
-      "consumes": ["tool_runtimes", "mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "consumes": ["tool_runtimes", "tts_bridge", "native_tts", "silero_vad_bridge"],
       "params": {
-        "title": "Voice Health Check",
-        "message": "runtimes: {{tool_runtimes.default_tool_id}} ({{tool_runtimes.tools.length}}) | mlx_audio: {{mlx_audio_health.available}} | mlx_whisper: {{mlx_whisper_health.available}} | sox: {{sox_health.available}}",
-        "subtitle": "voice-health-check"
+        "message": "Voice Health Check: runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} | TTS bridge={{tts_bridge.exists}} native={{native_tts.ready}} sileroVAD={{silero_vad_bridge.available}} reason={{silero_vad_bridge.reason}}"
       }
     }
   ]

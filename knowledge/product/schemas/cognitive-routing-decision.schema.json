@@ -56,6 +56,10 @@
     "prompt_length": {
       "type": "number",
       "minimum": 0
+    },
+    "optimize_for": {
+      "type": "string",
+      "enum": ["cost", "balance", "intelligence"]
     }
   },
   "additionalProperties": true

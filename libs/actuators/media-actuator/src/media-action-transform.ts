@@ -1,6 +1,7 @@
 import { listDesignStyles } from '@agent/core/design-foundation';
 import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
-import { htmlToDeckProtocol } from './html-deck-helpers.js';
+import { DECK_CANVAS_4_3, DECK_CANVAS_16_9, htmlToDeckProtocol } from './html-deck-helpers.js';
+import { buildDeckMeasurementScript, geometryToDeckProtocol } from './deck-geometry-helpers.js';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
 import { localeToBcp47 } from '@agent/core/locale-normalize';
@@ -596,7 +597,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           'deck_from_html requires HTML via params.html, params.path, or a ctx channel (params.from)'
         );
       }
-      const { protocol, slideCount } = htmlToDeckProtocol(html);
+      // 既定は 16:9。既存デッキへ差し込む場合は差し込み先と同じ比率を指定する
+      // （params.aspect: '4:3' | '16:9'、または params.canvas: { w, h } インチ）。
+      const aspect = String(resolve(params.aspect) || '').trim();
+      const canvas =
+        params.canvas ||
+        (aspect === '4:3' ? DECK_CANVAS_4_3 : aspect === '16:9' ? DECK_CANVAS_16_9 : undefined);
+      const { protocol, slideCount } = htmlToDeckProtocol(html, canvas);
       const exportKey = params.export_as || 'last_pptx_design';
       return {
         ...ctx,
@@ -605,6 +612,45 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         last_design_protocol: protocol,
         last_design_protocol_kind: 'pptx',
         deck_from_html_slide_count: slideCount,
+      };
+    }
+    case 'deck_measurement_script': {
+      // ブラウザ内で走らせる計測スクリプトを出す。`browser:evaluate` の params.script に渡す。
+      // 計測スクリプトと deck_from_geometry は同じ幾何スキーマの対なので、
+      // スクリプトをパイプラインに手書きさせず、この actuator が版管理する。
+      const script = buildDeckMeasurementScript({
+        aspect: resolve(params.aspect),
+        canvas: params.canvas,
+        viewportPx: params.viewport_px,
+        font: resolve(params.font),
+        deckCss: resolve(params.deck_css),
+      });
+      return { ...ctx, [params.export_as || 'last_deck_measurement_script']: script };
+    }
+    case 'deck_from_geometry': {
+      // ブラウザが確定させた幾何を PptxDesignProtocol へ転写する（純変換）。
+      // 推定でなく実測なので、列幅・折返し位置がレポート HTML と一致する。
+      const fromKey = resolve(params.from) || 'last_capture';
+      const geometry = params.geometry || ctx[fromKey];
+      if (!geometry || typeof geometry !== 'object') {
+        throw new Error(
+          `deck_from_geometry: geometry not found (params.geometry or ctx.${fromKey})`
+        );
+      }
+      const { protocol, slideCount } = geometryToDeckProtocol(geometry as never, {
+        aspect: resolve(params.aspect),
+        canvas: params.canvas,
+        viewportPx: params.viewport_px,
+        font: resolve(params.font),
+      });
+      const exportKey = params.export_as || 'last_pptx_design';
+      return {
+        ...ctx,
+        [exportKey]: protocol,
+        last_pptx_design: protocol,
+        last_design_protocol: protocol,
+        last_design_protocol_kind: 'pptx',
+        deck_from_geometry_slide_count: slideCount,
       };
     }
     case 'pptx_layout_preflight': {

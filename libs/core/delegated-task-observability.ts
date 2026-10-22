@@ -158,7 +158,16 @@ function writeObservabilityLeaf(filePath: string, serialized: string, append: bo
   const policy = getActiveSandboxPolicy();
   const scope = currentResourceAccessScope();
   const tenantSlug = scope?.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug;
-  if (policy?.mode !== 'read-only' || !tenantSlug) return write();
+  if (policy?.mode !== 'read-only') return write();
+  // A read-only delegation still owns its host bookkeeping: narrow the sandbox
+  // to exactly this leaf instead of writing under the read-only policy, for
+  // untenanted (system) delegations as well as tenant ones.
+  const writeNarrowed = () =>
+    withSandboxPolicy(
+      { ...policy, mode: 'workspace-write', writableRoots: [directory, ...mkdirPaths] },
+      write
+    );
+  if (!tenantSlug) return writeNarrowed();
   const relative = (target: string) =>
     path.relative(pathResolver.rootDir(), target).split(path.sep).join('/');
   runInResourceAccessScope(
@@ -171,11 +180,7 @@ function writeObservabilityLeaf(filePath: string, serialized: string, append: bo
       mkdirExact: mkdirPaths.map(relative),
       allowProductKnowledgeRead: true,
     },
-    () =>
-      withSandboxPolicy(
-        { ...policy, mode: 'workspace-write', writableRoots: [directory, ...mkdirPaths] },
-        write
-      )
+    writeNarrowed
   );
 }
 

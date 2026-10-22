@@ -23,7 +23,7 @@
     "name": { "type": "string", "minLength": 1 },
     "cadence_type": {
       "type": "string",
-      "enum": ["daily", "weekly", "monthly", "quarterly", "ad_hoc"]
+      "enum": ["daily", "weekly", "biweekly", "monthly", "quarterly", "annual", "ad_hoc"]
     },
     "schedule": { "type": "string", "minLength": 1 },
     "owner_role": { "type": "string", "minLength": 1 },

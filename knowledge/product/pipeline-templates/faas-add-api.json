@@ -78,7 +78,7 @@
       "op": "system:log",
       "consumes": ["requirements", "design", "task_plan", "execution"],
       "params": {
-        "message": "faas-add-api done: requirements v{{requirements.version}} / design v{{design.version}} (architecture_ready={{design.architecture_ready.passed}}) / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks, ready={{task_plan.task_plan_ready.passed}}) / execution succeeded={{execution.succeeded}}/{{execution.total_tasks}}. Next: pipelines/code-review-cycle.json → pipelines/release-package.json → pipelines/deploy-release.json."
+        "message": "faas-add-api done: requirements v{{requirements.version}} / design v{{design.version}} (architecture_ready={{design.architecture_ready.passed}}) / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks, ready={{task_plan.task_plan_ready.passed}}) / execution succeeded={{execution.succeeded}}/{{execution.total_tasks}}. Next: knowledge/product/pipeline-templates/code-review-cycle.json → knowledge/product/pipeline-templates/release-package.json → knowledge/product/pipeline-templates/deploy-release.json."
       }
     }
   ]

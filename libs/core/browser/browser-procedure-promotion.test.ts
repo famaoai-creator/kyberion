@@ -1,8 +1,11 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteBrowserProcedure } from './browser-procedure-promotion.js';
 import * as secureIo from '../secure-io.js';
 import * as foundationJson from '../foundation/json.js';
+import { pathResolver } from '../path-resolver.js';
+
 import { getFoundationIo, registerFoundationIo } from '../foundation/io.js';
 
 // defineCatalog reads presence through FoundationIo rather than secure-io's
@@ -57,52 +60,66 @@ const recording = {
   },
 };
 
-describe('promoteBrowserProcedure', () => {
-  const originalFoundationIo = getFoundationIo();
+// The loader reads the recording through the governed catalog boundary, so the
+// fixture has to be a real file inside the allowlisted personal recording
+// store — the review check below is only reached once the catalog can load it.
+const recordingDirs: string[] = [];
 
+/**
+ * The personal tier is a Sovereign Sanctuary: every access — the fixture
+ * writes here and the promotion's own read of the recording — needs an
+ * authorized persona. This test has to place its fixture there because that
+ * store is the only allowlisted home for a *personal* recording, which is
+ * exactly what the assertions below are about. Each fixture lives in its own
+ * directory and is removed in afterEach.
+ */
+function withPersonalAccess<T>(fn: () => T): T {
+  const savedPersona = process.env.KYBERION_PERSONA;
+  process.env.KYBERION_PERSONA = 'sovereign';
+  try {
+    return fn();
+  } finally {
+    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = savedPersona;
+  }
+}
+
+function writeRecordingFixture(value: Record<string, unknown>): string {
+  const dir = pathResolver.knowledge(`personal/browser-recordings/promotion-test-${randomUUID()}`);
+  recordingDirs.push(dir);
+  const filePath = path.join(dir, 'REC-personal-1.json');
+  withPersonalAccess(() => {
+    secureIo.safeMkdir(dir, { recursive: true });
+    secureIo.safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+  });
+  return pathResolver.toRepoRelative(filePath);
+}
+
+describe('promoteBrowserProcedure', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    registerFoundationIo(originalFoundationIo);
+    withPersonalAccess(() => {
+      while (recordingDirs.length > 0) {
+        secureIo.safeRmSync(recordingDirs.pop() as string);
+      }
+    });
   });
 
   it('promotes an approved personal recording without writing the public catalog', () => {
-    const actualRead = secureIo.safeReadFile;
-    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath, options) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return JSON.stringify(recording);
-      }
-      if (filePath.includes('browser-procedures.json')) throw new Error('ENOENT');
-      return actualRead(filePath, options);
-    });
-    overrideFoundationIoExists((filePath) =>
-      filePath.includes('browser-recordings/REC-personal-1.json')
-    );
-    vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
-      filePath.includes('browser-recordings/REC-personal-1.json')
-    );
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    const actualLstat = secureIo.safeLstat;
-    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
-      }
-      return actualLstat(filePath);
-    });
+    const recordingRef = writeRecordingFixture(recording);
+    // Only the promotion's own writes are intercepted, so the personal catalog
+    // under knowledge/ is never mutated by the test.
+    vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
 
-    const result = promoteBrowserProcedure({
-      recordingRef: 'knowledge/personal/browser-recordings/REC-personal-1.json',
-      procedureId: 'personal.example.continue',
-      intentPhrases: ['Continue を押す', '続行'],
-    });
+    const result = withPersonalAccess(() =>
+      promoteBrowserProcedure({
+        recordingRef,
+        procedureId: 'personal.example.continue',
+        intentPhrases: ['Continue を押す', '続行'],
+      })
+    );
 
     expect(result.procedureEntry.procedure_id).toBe('personal.example.continue');
     expect(result.procedureEntry.adapter.recording_ref).toContain('knowledge/personal/');
@@ -127,45 +144,19 @@ describe('promoteBrowserProcedure', () => {
   });
 
   it('refuses an unapproved recording', () => {
-    const actualRead = secureIo.safeReadFile;
-    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath, options) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return JSON.stringify({ ...recording, review: { ...recording.review, status: 'pending' } });
-      }
-      return actualRead(filePath, options);
+    const recordingRef = writeRecordingFixture({
+      ...recording,
+      review: { ...recording.review, status: 'pending' },
     });
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return { ...recording, review: { ...recording.review, status: 'pending' } };
-      }
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return { ...recording, review: { ...recording.review, status: 'pending' } };
-      }
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    const actualLstat = secureIo.safeLstat;
-    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
-      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
-        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
-      }
-      return actualLstat(filePath);
-    });
-    overrideFoundationIoExists((filePath) =>
-      filePath.includes('browser-recordings/REC-personal-1.json')
-    );
-    const actualExists = secureIo.safeExistsSync;
-    vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
-      filePath.includes('browser-recordings/REC-personal-1.json') ? true : actualExists(filePath)
-    );
+
     expect(() =>
-      promoteBrowserProcedure({
-        recordingRef: 'knowledge/personal/browser-recordings/REC-personal-1.json',
-        procedureId: 'personal.example.pending',
-        intentPhrases: ['続行'],
-      })
+      withPersonalAccess(() =>
+        promoteBrowserProcedure({
+          recordingRef,
+          procedureId: 'personal.example.pending',
+          intentPhrases: ['続行'],
+        })
+      )
     ).toThrow('approved');
   });
 });

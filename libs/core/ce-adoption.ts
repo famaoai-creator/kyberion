@@ -397,7 +397,13 @@ function luminance(color: string): number {
     .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
 }
 
-function readableText(fill: string): string {
+/**
+ * The foreground to place on top of a fill: whichever of white / near-black
+ * contrasts better. Exported so surfaces that fill a block with a resolved
+ * accent (which a tenant may override to any hue) can pair it with a readable
+ * text color instead of assuming white.
+ */
+export function readableText(fill: string): string {
   const white = 1.05 / (luminance(fill) + 0.05);
   const dark = (luminance('#0f172a') + 0.05) / 0.05;
   return white >= dark ? '#ffffff' : '#0f172a';

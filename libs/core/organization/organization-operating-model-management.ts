@@ -1225,11 +1225,36 @@ export function buildOrganizationManagementView(input: {
     (entry) => entry.status !== 'resolved' && entry.status !== 'closed'
   );
   const activeOperations = operations.filter((entry) => entry.status === 'active').length;
-  const interventionPoints: OrganizationManagementView['control_plane']['intervention_points'] = [];
+  type InterventionPoint =
+    OrganizationManagementView['control_plane']['intervention_points'][number];
+  const PRIORITY_RANK: Record<InterventionPoint['priority'], number> = {
+    low: 0,
+    medium: 1,
+    high: 2,
+  };
+  // One entity is one intervention point. Reconciliation reports a pending
+  // decision, and so does the decision record itself; pushed blindly, the same
+  // decision appeared twice with contradictory priorities, and the operator's
+  // list was half duplicates. Later, entity-derived entries carry the more
+  // specific reason ("Decision is proposed." beats "pending_decisions requires
+  // operator attention."), so they win the merge — but the priority is the
+  // highest either source claimed, so nothing is quietly downgraded.
+  const interventionByTarget = new Map<string, InterventionPoint>();
+  const addInterventionPoint = (point: InterventionPoint): void => {
+    const key = `${point.kind}:${point.id}`;
+    const existing = interventionByTarget.get(key);
+    interventionByTarget.set(key, {
+      ...point,
+      priority:
+        existing && PRIORITY_RANK[existing.priority] > PRIORITY_RANK[point.priority]
+          ? existing.priority
+          : point.priority,
+    });
+  };
   for (const [key, values] of Object.entries(reconciliation)) {
     if (key === 'status' || !Array.isArray(values)) continue;
     for (const id of values) {
-      interventionPoints.push({
+      addInterventionPoint({
         kind: key.includes('decision')
           ? 'decision'
           : key.includes('operation')
@@ -1249,7 +1274,7 @@ export function buildOrganizationManagementView(input: {
     }
   }
   for (const incident of openIncidents) {
-    interventionPoints.push({
+    addInterventionPoint({
       kind: 'incident',
       id: incident.incident_id,
       priority:
@@ -1260,13 +1285,19 @@ export function buildOrganizationManagementView(input: {
   for (const decision of decisions.filter(
     (entry) => entry.status === 'proposed' || entry.status === 'pending_approval'
   )) {
-    interventionPoints.push({
+    addInterventionPoint({
       kind: 'decision',
       id: decision.decision_id,
       priority: 'high',
       reason: `Decision is ${decision.status}.`,
     });
   }
+  // Consumers truncate this list (Chronos shows the first six), so order is
+  // part of the contract: most urgent first, insertion order preserved within
+  // a priority so the same input always yields the same list.
+  const interventionPoints = [...interventionByTarget.values()].sort(
+    (left, right) => PRIORITY_RANK[right.priority] - PRIORITY_RANK[left.priority]
+  );
   const learningRefs = [
     ...(operationalState?.recent_outcome_refs || []),
     ...serviceStates.flatMap((entry) => entry.last_outcome_refs || []),

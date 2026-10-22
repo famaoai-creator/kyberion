@@ -45,7 +45,7 @@
         "LEAD_QUALIFICATION_GATE passed",
         "APPOINTMENT_SET artifact produced, OR opportunity marked lost with reason"
       ],
-      "recommended_pipeline": "pipelines/sales-outbound-initial-contact.json",
+      "recommended_pipeline": "knowledge/product/pipeline-templates/sales-outbound-initial-contact.json",
       "mission_class": "sales_engagement",
       "tier": "confidential"
     },
@@ -62,7 +62,7 @@
         "PROPOSAL_APPROVAL_GATE passed",
         "CLOSE_CONFIRMATION_GATE passed OR opportunity marked lost with reason"
       ],
-      "recommended_pipeline": "pipelines/sales-inbound-lead-workflow.json",
+      "recommended_pipeline": "knowledge/product/pipeline-templates/sales-inbound-lead-workflow.json",
       "mission_class": "sales_engagement",
       "tier": "confidential"
     },
@@ -79,7 +79,7 @@
         "EXPANSION_PROPOSAL artifact produced",
         "successor delivery or product_discovery Track created or referenced"
       ],
-      "recommended_pipeline": "pipelines/account-expansion-workflow.json",
+      "recommended_pipeline": "knowledge/product/pipeline-templates/account-expansion-workflow.json",
       "mission_class": "account_management",
       "tier": "confidential"
     },
@@ -98,7 +98,7 @@
         "product roadmap artifact produced",
         "successor delivery Track created or referenced"
       ],
-      "recommended_pipeline": "pipelines/customer-discovery-workflow.json",
+      "recommended_pipeline": "knowledge/product/pipeline-templates/customer-discovery-workflow.json",
       "mission_class": "customer_engagement",
       "tier": "confidential",
       "note": "track_type='product_discovery' は mission_controller --track-type に直接渡す値。現在のバリデーションが delivery 等の列挙値のみ受け入れる場合は --track-type delivery で代替し、このポリシーへの参照を --track-note に記載する。"

@@ -384,6 +384,21 @@ export function scheduleExplicitlyOptedIn(
   return restrict.includes(scheduleId) || additive.includes(scheduleId);
 }
 
+/**
+ * Enabled schedules the operator allowlist keeps from running. A plain id in
+ * KYBERION_CHRONOS_SCHEDULES restricts the host to the listed ids, so an
+ * operator who only meant to opt one schedule in silently stops every other
+ * one; the daemon reports this list at startup so that is never invisible.
+ */
+export function listOperatorExcludedSchedules(
+  schedules: readonly Pick<ScheduledPipeline, 'id' | 'enabled'>[],
+  allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
+): string[] {
+  return schedules
+    .filter((schedule) => schedule.enabled && !scheduleAllowedByOperator(schedule.id, allowlist))
+    .map((schedule) => schedule.id);
+}
+
 function parseScheduleAllowlist(allowlist: string): { restrict: string[]; additive: string[] } {
   const entries = allowlist
     .split(',')

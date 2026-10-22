@@ -34,7 +34,7 @@ export {
   extractPptxSlides,
   filterPptxSlides,
 } from './native-pptx-engine/engine.js';
-export type { ExtractedSlide } from './native-pptx-engine/engine.js';
+export type { ExtractedSlide, PptxWriteOptions } from './native-pptx-engine/engine.js';
 export { generateNativeXlsx } from './native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './native-docx-engine/engine.js';
 export {
