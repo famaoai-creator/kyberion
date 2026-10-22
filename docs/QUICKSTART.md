@@ -4,7 +4,7 @@
 
 Looking for a command? The generated [CLI Reference](./CLI_REFERENCE.md) lists every command; task-oriented notes for the everyday ones are in the [Commands Guide](./user/COMMANDS_GUIDE.md).
 
-New to the vocabulary? Read [CORE_CONCEPTS](./CORE_CONCEPTS.md) first — the 5 concepts you need (work, pipeline, capability, tenant/tier, surface).
+Reading order: this page → [CORE_CONCEPTS](./CORE_CONCEPTS.md) (the 5 concepts: work, pipeline, capability, tenant/tier, surface) → [AGENTS.md](../AGENTS.md) (binding rules) → [GLOSSARY](./GLOSSARY.md) (precise definitions).
 
 ---
 

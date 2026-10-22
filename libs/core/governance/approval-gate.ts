@@ -321,7 +321,8 @@ function clampRenewableExpiry(
  */
 export function enforceApprovalGate(
   params: ApprovalGateParams,
-  role: GovernedArtifactRole = 'mission_controller'
+  // Approval persistence needs coordination IO, never mission lifecycle authority.
+  role: GovernedArtifactRole = 'infrastructure_sentinel'
 ): ApprovalGateResult {
   const { intentId, operationId, agentId, callerRole, correlationId, channel, payload, trace } =
     params;

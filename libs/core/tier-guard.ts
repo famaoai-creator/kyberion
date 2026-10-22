@@ -4,6 +4,10 @@ import {
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
+import {
+  isPipelineJournalCapability,
+  PIPELINE_JOURNAL_STORE_ROLE,
+} from './foundation/pipeline-journal-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -637,6 +641,13 @@ function isScopedStructuralMkdir(
         PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning + '/confidential'
     )
       return false;
+  } else if (access.role === PIPELINE_JOURNAL_STORE_ROLE) {
+    if (
+      !isPipelineJournalCapability(currentResourceAccessScope()) ||
+      normalizePath(protectedPrefix) !==
+        PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs + '/confidential'
+    )
+      return false;
   } else if (access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
@@ -995,6 +1006,15 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability',
+    };
+  if (
+    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
+    !isPipelineJournalCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability',
     };
   if (
     normalizedRole === 'concierge_management_reader' &&

@@ -29,6 +29,26 @@
       "documented": true
     },
     {
+      "name": "KYBERION_A2UI_HOST_PORT",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "3036",
+      "subsystem": "a2ui-host",
+      "description": "Loopback port for the standalone A2UI host viewer (presence/displays/a2ui-host).",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_A2UI_HOST_PROVIDERS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "subsystem": "a2ui-host",
+      "description": "Comma-separated `id=base_url` list of A2UI producers the host may proxy to; loopback http(s) origins only. Unset uses the local surfaces (presence-studio, computer-surface).",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ACTUATOR_TEST",
       "category": "runtime",
       "type": "string",
@@ -3509,6 +3529,17 @@
       "description": "Repository root override for path resolution (defaults to the detected repo root).",
       "documented": true,
       "subsystem": "core"
+    },
+    {
+      "name": "KYBERION_ROUTING_OPTIMIZE_FOR",
+      "category": "runtime",
+      "type": "enum",
+      "enum": ["cost", "balance", "balanced", "intelligence"],
+      "required": false,
+      "default": "balance",
+      "description": "Cognitive routing palette: cost keeps more turns on fast reasoning, balance is the default cost/quality midpoint, intelligence upgrades more turns to heavy reasoning. Comparison fan-out stays opt-in except where the palette admits it.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_RUN_ORIGIN",

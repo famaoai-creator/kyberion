@@ -28,7 +28,11 @@ describe('scope governance invariants', () => {
           // from the immutable original scope snapshot, never approval input
           // or the resumed process environment. Exercised by the real library
           // approval continuation integration (including changed ambient task).
-          !line.startsWith('scripts/pipeline-execution-part-results.ts:')
+          !line.startsWith('scripts/pipeline-execution-part-results.ts:') &&
+          // Approval-driven resume is the same boundary in a child process: it
+          // mints from the journal's original execution authority with an empty
+          // env, never from the approver's process.
+          !line.startsWith('libs/core/pipeline/pipeline-approval-resume.ts:')
       );
     expect(offenders).toEqual([]);
   });

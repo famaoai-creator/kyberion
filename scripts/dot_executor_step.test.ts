@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 import { safeRmSync } from '@agent/core/secure-io';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import {
   stubReasoningBackend,
   type ReasoningBackend,
@@ -14,7 +15,11 @@ import {
   runDotExecutorStep,
 } from './dot_executor_step.js';
 import { DOT_SUPERVISOR_STEPS } from './dot_supervisor_extensions.js';
-import { isDotExecutorPreEffectError } from '@agent/core/dot/dot-executor';
+import {
+  isDotExecutorPreEffectError,
+  isDotExecutorPreEffectNonRetryable,
+  isDotExecutorStaleAttemptError,
+} from '@agent/core/dot/dot-executor';
 
 const CHARTER: DotCharter = {
   kind: 'dot-charter',
@@ -243,6 +248,52 @@ describe('buildDotExecutorPorts', () => {
       .catch((e: unknown) => e);
     expect(isDotExecutorPreEffectError(error)).toBe(true);
     expect(String(error)).toMatch(/could not be loaded/);
+  });
+
+  it('refuses a tenant pipeline before start when its run journal cannot be created', async () => {
+    // Real permission floors: the charter role bound to another tenant may
+    // not create this tenant's confidential run journal.
+    vi.stubEnv('VITEST', '');
+    const tenantCharter: DotCharter = {
+      ...CHARTER,
+      scope: { tier: 'confidential', tenant_slug: 'tenant-acme', organization_id: 'tenant-acme' },
+      authority: {
+        authority_role: 'organization_operator',
+        allowed_pipelines: ['pipelines/continuous-operations-report.json'],
+      },
+    };
+    const ports = buildDotExecutorPorts(tenantCharter, { backend: textBackend });
+    const error = await withExecutionContextAsync(
+      'organization_operator',
+      () => ports.runPipeline('pipelines/continuous-operations-report.json', {}),
+      'worker',
+      'tenant-other',
+      'tenant-other'
+    ).catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(error)).toBe(true);
+    expect(isDotExecutorPreEffectNonRetryable(error)).toBe(true);
+    expect(String(error)).toMatch(/refused before start: \[PIPELINE_JOURNAL\]/);
+  });
+
+  it('classifies a pipeline whose attempt is no longer current as stale, never retryable', async () => {
+    // No current WorkItem attempt: the engine's ownership fence refuses at once.
+    const ports = buildDotExecutorPorts(CHARTER, { backend: textBackend });
+    const error = await ports
+      .runPipeline('pipelines/continuous-operations-report.json', {})
+      .catch((e: unknown) => e);
+    expect(isDotExecutorStaleAttemptError(error)).toBe(true);
+    expect(isDotExecutorPreEffectError(error)).toBe(false);
+    expect(String(error)).toMatch(/no longer current/);
+  });
+
+  it('classifies a pipeline that did not start as a retryable pre-effect failure', async () => {
+    const ports = buildDotExecutorPorts(CHARTER, { backend: textBackend });
+    const error = await ports
+      .runPipeline('pipelines/continuous-operations-report.json', {}, AbortSignal.abort('stop'))
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(error)).toBe(true);
+    expect(isDotExecutorPreEffectNonRetryable(error)).toBe(false);
+    expect(String(error)).toMatch(/did not start/);
   });
 
   it('uses a bounded delegated turn when no live tool candidate exists', async () => {

@@ -944,10 +944,6 @@
       "types": "./dist/contracts/docx-protocol.d.ts",
       "default": "./dist/contracts/docx-protocol.js"
     },
-    "./contracts/excel-protocol": {
-      "types": "./dist/contracts/excel-protocol.d.ts",
-      "default": "./dist/contracts/excel-protocol.js"
-    },
     "./contracts/generation-job": {
       "types": "./dist/contracts/generation-job.d.ts",
       "default": "./dist/contracts/generation-job.js"
@@ -4256,6 +4252,10 @@
       "types": "./dist/organization/tenant-registry.d.ts",
       "default": "./dist/organization/tenant-registry.js"
     },
+    "./organization/tenant-rename": {
+      "types": "./dist/organization/tenant-rename.d.ts",
+      "default": "./dist/organization/tenant-rename.js"
+    },
     "./organization/tenant-registry-exceptions": {
       "types": "./dist/organization/tenant-registry-exceptions.d.ts",
       "default": "./dist/organization/tenant-registry-exceptions.js"
@@ -5556,6 +5556,14 @@
       "types": "./dist/scoped-registry.d.ts",
       "default": "./dist/scoped-registry.js"
     },
+    "./scratch-promotion": {
+      "types": "./dist/scratch-promotion.d.ts",
+      "default": "./dist/scratch-promotion.js"
+    },
+    "./scratch-promotion-grace": {
+      "types": "./dist/scratch-promotion-grace.d.ts",
+      "default": "./dist/scratch-promotion-grace.js"
+    },
     "./screen-capture-bridge": {
       "types": "./dist/virtual/screen-capture-bridge.d.ts",
       "default": "./dist/virtual/screen-capture-bridge.js"
@@ -6659,6 +6667,22 @@
     "./testing/reasoning-backend-conformance": {
       "types": "./dist/testing/reasoning-backend-conformance.d.ts",
       "default": "./dist/testing/reasoning-backend-conformance.js"
+    },
+    "./testing/mission-fixture": {
+      "types": "./dist/testing/mission-fixture.d.ts",
+      "default": "./dist/testing/mission-fixture.js"
+    },
+    "./accepted-pipeline-bindings": {
+      "types": "./dist/accepted-pipeline-bindings.d.ts",
+      "default": "./dist/accepted-pipeline-bindings.js"
+    },
+    "./decision-ledger": {
+      "types": "./dist/decision-ledger.d.ts",
+      "default": "./dist/decision-ledger.js"
+    },
+    "./ui-component-registry": {
+      "types": "./dist/ui-component-registry.d.ts",
+      "default": "./dist/ui-component-registry.js"
     },
     "./text-escaping": {
       "types": "./dist/text-escaping.d.ts",

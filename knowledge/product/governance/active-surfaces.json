@@ -77,6 +77,18 @@
       "enabled": false
     },
     {
+      "id": "generation-schedule",
+      "kind": "service",
+      "description": "Recurring generation schedule tick service managed by surface-runtime.",
+      "command": "node",
+      "args": ["dist/scripts/run_generation_schedule_daemon.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": false
+    },
+    {
       "id": "event-intake-surface",
       "kind": "service",
       "description": "Loopback-only HMAC-authenticated inbound event intake (POST /events/<source>) that wakes resident dots. Every source is disabled in event-intake-policy.json until an operator enables it and stores its secret. Operator-launched; not started by reconcile.",
@@ -200,6 +212,9 @@
       "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
       "command": "node",
       "args": ["dist/presence/displays/presence-studio/server.js"],
+      "env": {
+        "KYBERION_TENANT": "default"
+      },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",

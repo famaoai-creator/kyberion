@@ -6,13 +6,13 @@ Each scenario demonstrates how multiple actuators and capability flows chain tog
 
 本リポジトリに実装されたアクチュエータ群と capability flow を組み合わせることで、ソフトウェア開発ライフサイクルの各フェーズを高度に自動化できます。
 
-| #   | Scenario                                  | Primary Persona | Related Playbook                                                                       |
-| --- | ----------------------------------------- | --------------- | -------------------------------------------------------------------------------------- |
-| 1   | Asset Visualization & Reverse Engineering | Engineer        | —                                                                                      |
-| 2   | Requirements-to-Test Quality Pipeline     | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md) |
-| 3   | Automated UI Audit & Visual Report        | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md) |
-| 4   | Pre-commit Security Health Check          | Engineer        | —                                                                                      |
-| 5   | CEO Strategic Executive Report            | CEO / Architect | [ceo-strategic-report](../pipelines/ceo-strategic-report.json)                         |
+| #   | Scenario                                  | Primary Persona | Related Playbook                                                                          |
+| --- | ----------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| 1   | Asset Visualization & Reverse Engineering | Engineer        | —                                                                                         |
+| 2   | Requirements-to-Test Quality Pipeline     | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md)    |
+| 3   | Automated UI Audit & Visual Report        | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md)    |
+| 4   | Pre-commit Security Health Check          | Engineer        | —                                                                                         |
+| 5   | CEO Strategic Executive Report            | CEO / Architect | [ceo-strategic-report](../knowledge/product/pipeline-templates/ceo-strategic-report.json) |
 
 ## 1. 既存資産の可視化とリバースエンジニアリング
 

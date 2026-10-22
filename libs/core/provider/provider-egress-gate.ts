@@ -308,10 +308,8 @@ export function resolveTenantProviderAttestation(input: {
  *
  * The elevation is narrow on purpose: it covers one synchronous read, the
  * gate extracts only what it needs to decide, and it returns allow/deny to
- * the caller — never the profile. `mission_controller` is the narrowest
- * existing authority role with `knowledge/personal/` read access; its
- * governed writes do not include the tenant profile directory, so this read
- * cannot modify the attestation.
+ * the caller — never the profile. The tenant-bound registry reader can read
+ * exactly this profile and cannot modify attestations or other tenant data.
  */
 function readTenantProfileAsPolicyInput(
   slug: string,
@@ -319,7 +317,7 @@ function readTenantProfileAsPolicyInput(
   rootDir?: string
 ): TenantPolicyInput {
   const profile = withExecutionContext(
-    'mission_controller',
+    'workspace_tenant_registry_reader',
     () => resolveTenant(slug, { ...(rootDir ? { rootDir } : {}) }),
     undefined,
     slug

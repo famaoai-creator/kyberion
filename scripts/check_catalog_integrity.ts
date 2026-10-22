@@ -122,6 +122,21 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/governance/work-inventory-taxonomy.json',
   },
   {
+    id: 'ui-component-registry',
+    schemaPath: 'knowledge/product/schemas/ui-component-registry.schema.json',
+    dataPath: 'knowledge/product/orchestration/ui-component-registry.json',
+  },
+  {
+    id: 'accepted-pipeline-bindings',
+    schemaPath: 'knowledge/product/schemas/accepted-pipeline-bindings.schema.json',
+    dataPath: 'knowledge/product/orchestration/accepted-pipeline-bindings.json',
+  },
+  {
+    id: 'decision-authority-policy',
+    schemaPath: 'knowledge/product/schemas/decision-authority-policy.schema.json',
+    dataPath: 'knowledge/product/governance/decision-authority-policy.json',
+  },
+  {
     id: 'specialist-catalog',
     schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/specialist-catalog.json',
@@ -180,6 +195,11 @@ const CHECKS: CatalogCheck[] = [
     id: 'tool-actuator-routing-policy',
     schemaPath: 'knowledge/product/schemas/tool-actuator-routing-policy.schema.json',
     dataPath: 'knowledge/product/governance/tool-actuator-routing-policy.json',
+  },
+  {
+    id: 'cognitive-routing-palette',
+    schemaPath: 'knowledge/product/schemas/cognitive-routing-palette.schema.json',
+    dataPath: 'knowledge/product/governance/cognitive-routing-palette.json',
   },
   {
     id: 'media-backend-registry',
@@ -434,6 +454,31 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
 
   if (check.id === 'user-facing-vocabulary') {
     validateUserFacingVocabulary(data, violations, warnings);
+  }
+
+  if (check.id === 'accepted-pipeline-bindings') {
+    const typed = data as {
+      bindings?: Array<{
+        scope?: {
+          tier?: string;
+          tenant_slug?: string;
+          organization_id?: string;
+          project_id?: string;
+        };
+      }>;
+    };
+    for (const binding of typed.bindings || []) {
+      if (
+        binding.scope?.tier !== 'public' ||
+        binding.scope.tenant_slug ||
+        binding.scope.organization_id ||
+        binding.scope.project_id
+      ) {
+        violations.push(
+          'accepted-pipeline-bindings: public product catalog may contain only unscoped public bindings'
+        );
+      }
+    }
   }
 
   if (check.id === 'specialist-catalog') {

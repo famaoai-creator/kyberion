@@ -284,6 +284,18 @@ export function buildReviewLayerData(options: ReviewLayerOptions = {}): Record<s
   };
 }
 
+/**
+ * レビューレイヤを body 末尾へ挿入する。
+ *
+ * mermaid などをインライン化したレポートでは、minify 済みバンドルの文字列リテラルに
+ * `</body>` が現れる。最初の出現へ挿入するとレイヤが `<script>` の内部に入り、
+ * 描画されないままバンドルまで壊すため、**最後の** `</body>` を基準にする。
+ */
+export function injectReviewLayer(html: string, layer: string): string {
+  const at = html.toLowerCase().lastIndexOf('</body>');
+  return at < 0 ? html + layer : `${html.slice(0, at)}${layer}\n${html.slice(at)}`;
+}
+
 export function reviewLayerMarkup(opts: ReviewLayerOptions = {}): string {
   const selector = opts.contentSelector || '.wrap';
   const locale = opts.locale ?? resolveLocale();

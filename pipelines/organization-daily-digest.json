@@ -9,9 +9,9 @@
     "timezone": "Asia/Tokyo",
     "enabled": false,
     "deliver_to": {
-      "surface": "slack",
-      "channel": "env:KYBERION_OPERATOR_SLACK_DM",
-      "template": "{{context.organization_digest.text}}"
+      "surface": "chronos",
+      "channel": "chronos",
+      "template": "組織要約 ({{context.organization_digest.status}}): 組織 {{context.organization_digest.organization_count}} / 期限到来 {{context.organization_digest.totals.due_operations}} / 締切 {{context.organization_digest.totals.deadlines}} / 未決 {{context.organization_digest.totals.pending_decisions}} / 障害 {{context.organization_digest.totals.open_incidents}} / 期限間近サービス {{context.organization_digest.totals.expiring_services}}。本文は各組織の digests 成果物を参照。"
     }
   },
   "steps": [

@@ -93,6 +93,25 @@
     "default_mode": {
       "type": "string"
     },
+    "prompted_tool_calling": {
+      "description": "Opt-in per text-only CLI mode: expose generateWithTools through the prompted tool-calling protocol (the CLI's own tools stay disabled; Kyberion executes and audits every call). Absent mode = off.",
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "claude-cli",
+          "claude-agent",
+          "codex-cli",
+          "gemini-cli",
+          "agy-cli",
+          "grok-cli",
+          "copilot",
+          "cursor-cli",
+          "opencode-cli",
+          "devin-cli"
+        ]
+      },
+      "additionalProperties": { "type": "boolean" }
+    },
     "openrouter": {
       "type": "object",
       "required": ["default_profile", "default_cost_policy", "required_parameters"],

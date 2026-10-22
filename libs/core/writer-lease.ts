@@ -165,6 +165,11 @@ export interface WithFencedWriterLeaseOptions<T> {
 
 export type WithFencedWriterLeaseSyncOptions<T> = Omit<WithFencedWriterLeaseOptions<T>, 'fn'> & {
   fn: (lease: FencedWriterLease) => T;
+  /**
+   * Runs the lease record IO and `fn` inside the held lock — a store's narrow
+   * IO scope — while the inter-process lock itself stays under the caller.
+   */
+  withinLock?: <R>(run: () => R) => R;
 };
 
 export interface RenewFencedWriterLeaseOptions {
@@ -452,7 +457,7 @@ export function withFencedWriterLeaseSync<T>(options: WithFencedWriterLeaseSyncO
   validateRenewalInterval(options.renewEveryMs, ttlMs);
   const now = options.nowMs ?? (() => Date.now());
 
-  return withLockSync(leaseLockId(resourceId), () => {
+  const underLock = (): T => {
     const current = readLease(options.leasePath);
     const nowMs = now();
     if (current && current.expires_at_ms > nowMs) {
@@ -494,5 +499,7 @@ export function withFencedWriterLeaseSync<T>(options: WithFencedWriterLeaseSyncO
         );
       }
     }
-  });
+  };
+  const withinLock = options.withinLock ?? ((run: () => T): T => run());
+  return withLockSync(leaseLockId(resourceId), () => withinLock(underLock));
 }

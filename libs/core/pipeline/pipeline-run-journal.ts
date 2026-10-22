@@ -7,6 +7,9 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { ScopeContext } from '../scope-context-validation.js';
+import { resolveScopeContext } from '../scope-context.js';
+import { currentScopeEnvelope, type ScopePolicy } from '../scope-envelope.js';
+import { capturePipelineResumePolicyEnvironment } from './pipeline-resume-policy-env.js';
 import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
@@ -24,6 +27,13 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
+import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { validateWritePermission } from '../tier-guard.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import {
+  pipelineJournalCapability,
+  PIPELINE_JOURNAL_STORE_ROLE,
+} from '../foundation/pipeline-journal-capability.js';
 import { missionTierScanDirs } from '../owner-scope.js';
 import {
   appendValidatedJournalEvent,
@@ -54,8 +64,22 @@ export interface PipelineRunJournalEvent {
 export interface PipelineRunStartedPayload {
   pipeline_id: string;
   input_path: string;
+  pipeline_sha256?: string;
   mission_id?: string;
   step_ids: string[];
+  /** Captured by the journal writer, never accepted from a pipeline payload. */
+  execution_authority?: {
+    system_role: string;
+    mission_role: string;
+    persona: string;
+    scope: ScopeContext;
+    nhi_id: string;
+    agent_id: string;
+    task_grants_path: string;
+    scope_policy?: ScopePolicy;
+    policy_env: Record<string, string>;
+    unsupported_policy_env: string[];
+  };
   library_execution?: {
     source_sha256: string;
     initial_context: Record<string, unknown>;
@@ -138,6 +162,76 @@ function pipelineJournalCatalog(filePath: string): GovernedCatalog<PipelineRunJo
   });
 }
 
+type JournalStoreAccess = <R>(run: () => R) => R;
+
+/**
+ * A caller bound to tenant T writes T's confidential library journal through
+ * the narrow pipeline_journal_store role, limited to this one run's files: the
+ * journal is engine bookkeeping, and the caller's own grants are never widened
+ * (its effects still run under its own role). Any other journal — another
+ * tenant's, an unbound caller's, mission or unscoped — keeps the caller's identity.
+ */
+function journalStoreAccess(
+  filePath: string,
+  access: 'read' | 'write' = 'write'
+): JournalStoreAccess | undefined {
+  const relative = path.relative(rootDir(), filePath).split(path.sep).join('/');
+  const tenant = relative.split('/').at(-2);
+  if (!tenant || resolveIdentityContext().tenantSlug !== tenant) return undefined;
+  let capability: ReturnType<typeof pipelineJournalCapability>;
+  try {
+    capability = pipelineJournalCapability(tenant, relative, access === 'write');
+  } catch {
+    return undefined;
+  }
+  return <R>(run: () => R): R =>
+    runInResourceAccessScope(capability, () =>
+      withExecutionContext(PIPELINE_JOURNAL_STORE_ROLE, run, undefined, tenant)
+    );
+}
+
+function withJournalStore<R>(
+  filePath: string,
+  run: () => R,
+  access: 'read' | 'write' = 'write'
+): R {
+  const store = journalStoreAccess(filePath, access);
+  return store ? store(run) : run();
+}
+
+/**
+ * Permission-only preflight for a scoped library run journal: throws when the
+ * current identity could not create it. Pure policy evaluation over the
+ * partition directories and the file — nothing is written or recorded — so a
+ * denial here is provably before any pipeline effect.
+ */
+export function assertPipelineRunJournalCreatable(
+  runId: string,
+  scope: PipelineJournalScope
+): void {
+  const filePath = pipelineRunJournalPath(normalizedSegment(runId), undefined, scope);
+  const depth = storagePartitionSegments({
+    kind: 'tier',
+    tier: scope.tier,
+    tenant: scope.tenantSlug,
+  }).length;
+  const dirs: string[] = [];
+  for (let dir = path.dirname(filePath), i = 0; i <= depth; dir = path.dirname(dir), i++)
+    dirs.unshift(dir);
+  withJournalStore(filePath, () => {
+    for (const [target, operation] of [
+      ...dirs.map((dir) => [dir, 'mkdir'] as const),
+      [filePath, 'write'] as const,
+    ]) {
+      const decision = validateWritePermission(target, operation);
+      if (!decision.allowed)
+        throw new Error(
+          `[PIPELINE_JOURNAL] run journal cannot be created: ${decision.reason ?? 'denied'}`
+        );
+    }
+  });
+}
+
 function ensureRegularPipelineJournalFile(filePath: string): void {
   if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
     throw new Error(`[PIPELINE_JOURNAL] journal must be a regular file: ${filePath}`);
@@ -159,8 +253,46 @@ const pipelineJournalModel = pipelineJournalKernel.defineModel<PipelineJournalPr
 const pipelineStartedSchema = z.object({
   pipeline_id: z.string(),
   input_path: z.string(),
+  pipeline_sha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/u)
+    .optional(),
   mission_id: z.string().optional(),
   step_ids: z.array(z.string()),
+  execution_authority: z
+    .object({
+      system_role: z.string(),
+      mission_role: z.string(),
+      persona: z.string(),
+      scope: z.object({
+        tier: z.enum(['public', 'confidential', 'personal']),
+        tenant_slug: z.string().optional(),
+        organization_id: z.string().optional(),
+        project_id: z.string().optional(),
+        mission_id: z.string().optional(),
+        task_id: z.string().optional(),
+        session_id: z.string().optional(),
+        work_shape: z.string().optional(),
+        customer_stance: z.string().optional(),
+        viewer_principal: z.string().optional(),
+        nhi_id: z.string().optional(),
+      }),
+      nhi_id: z.string(),
+      agent_id: z.string(),
+      task_grants_path: z.string(),
+      scope_policy: z
+        .object({
+          read_tiers: z.array(z.enum(['public', 'confidential', 'personal'])),
+          write_tier: z.enum(['public', 'confidential', 'personal']),
+          purpose: z.string(),
+          external_egress: z.enum(['allow', 'deny']).optional(),
+          allowed_reasoning_backends: z.array(z.string()).optional(),
+        })
+        .optional(),
+      policy_env: z.record(z.string(), z.string()),
+      unsupported_policy_env: z.array(z.string()),
+    })
+    .optional(),
   library_execution: z
     .object({
       source_sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -284,9 +416,11 @@ function appendPipelineJournalEvent(
   payload: Record<string, unknown>
 ): PipelineRunJournalEvent {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  ensureRegularPipelineJournalFile(safeFilePath);
+  const storeAccess = journalStoreAccess(safeFilePath);
+  withJournalStore(safeFilePath, () => ensureRegularPipelineJournalFile(safeFilePath));
   return appendValidatedJournalEvent({
     kernel: pipelineJournalKernel,
+    ...(storeAccess ? { storeAccess } : {}),
     opName: `pipeline.${event}`,
     payload,
     journalPath: safeFilePath,
@@ -493,6 +627,10 @@ function migrateEvent(raw: unknown): PipelineRunJournalEvent {
 
 export function readPipelineRunJournal(filePath: string): PipelineRunJournalState {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return withJournalStore(safeFilePath, () => readJournalFile(safeFilePath), 'read');
+}
+
+function readJournalFile(safeFilePath: string): PipelineRunJournalState {
   if (!safeExistsSync(safeFilePath))
     throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
   ensureRegularPipelineJournalFile(safeFilePath);
@@ -531,6 +669,12 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
     events.push(event);
   }
   if (events.length === 0) throw new Error('[PIPELINE_JOURNAL] empty journal; refusing to resume');
+  // Only createPipelineRunJournal writes run_started, once, as the first event:
+  // a duplicate or late one would silently replace the original run identity.
+  if (events.some((event, index) => (event.event === 'run_started') !== (index === 0)))
+    throw new Error(
+      '[PIPELINE_JOURNAL] run_started must be the single first event; refusing to resume'
+    );
   const runId = events[0].run_id;
   if (events.some((event) => event.run_id !== runId)) {
     throw new Error('[PIPELINE_JOURNAL] mixed run ids; refusing to resume');
@@ -579,7 +723,9 @@ export function loadPipelineRunJournal(
     : missionId
       ? [pipelineRunJournalPath(runId, missionId)]
       : candidateJournalPaths(runId);
-  const found = candidates.find((candidate) => safeExistsSync(candidate));
+  const found = candidates.find((candidate) =>
+    withJournalStore(candidate, () => safeExistsSync(candidate), 'read')
+  );
   if (!found) throw new Error(`[PIPELINE_JOURNAL] run not found: ${runId}`);
   return readPipelineRunJournal(found);
 }
@@ -593,18 +739,34 @@ export function createPipelineRunJournal(
   const id = normalizedSegment(runId);
   const filePath = pipelineRunJournalPath(id, missionId, scope);
   const dir = path.dirname(filePath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  if (safeExistsSync(filePath)) {
-    throw new Error(`[PIPELINE_JOURNAL] run already exists: ${id}`);
-  }
+  withJournalStore(filePath, () => {
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    if (safeExistsSync(filePath)) {
+      throw new Error(`[PIPELINE_JOURNAL] run already exists: ${id}`);
+    }
+  });
   let sequence = 0;
   const append = (event: PipelineRunEventType, payload: Record<string, unknown>) => {
     const envelope = appendPipelineJournalEvent(filePath, id, sequence + 1, event, payload);
     sequence = envelope.sequence;
     return envelope;
   };
+  const identity = resolveIdentityContext();
   append('run_started', {
     ...started,
+    execution_authority: {
+      system_role: getRegisteredEnvText('SYSTEM_ROLE') || '',
+      mission_role: identity.role === 'unknown' ? '' : identity.role,
+      persona: identity.persona === 'unknown' ? '' : identity.persona || '',
+      scope: currentScopeEnvelope()?.identity ?? resolveScopeContext(),
+      nhi_id: getRegisteredEnvText('KYBERION_NHI_ID') || '',
+      agent_id: getRegisteredEnvText('KYBERION_AGENT_ID') || '',
+      task_grants_path: getRegisteredEnvText('KYBERION_TASK_GRANTS_PATH') || '',
+      ...(currentScopeEnvelope()
+        ? { scope_policy: structuredClone(currentScopeEnvelope()!.policy) }
+        : {}),
+      ...capturePipelineResumePolicyEnvironment(),
+    },
     input_path: path.relative(rootDir(), started.input_path) || started.input_path,
   });
   return {

@@ -163,6 +163,12 @@
     "sovereign_concierge": {
       "allow": ["knowledge/personal/", "active/projects/onboarding/"]
     },
+    "decision_ledger": {
+      "allow": [
+        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+        "knowledge/confidential/${KYBERION_TENANT}/customers/"
+      ]
+    },
     "daemon_watchdog": {
       "allow": [
         "active/shared/coordination/autonomy/",

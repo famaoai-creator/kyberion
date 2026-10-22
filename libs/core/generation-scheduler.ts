@@ -536,8 +536,11 @@ export const GENERATION_SCHEDULE_LEADER_ID = 'generation-schedule-daemon';
 async function loadMediaGenerationActuator() {
   return import(
     /* webpackIgnore: true */
-    pathToFileURL(pathResolver.rootResolve('libs/actuators/media-generation-actuator/src/index.js'))
-      .href
+    pathToFileURL(
+      pathResolver.rootResolve(
+        'libs/actuators/media-generation-actuator/src/media-generation-action-helpers.js'
+      )
+    ).href
   );
 }
 

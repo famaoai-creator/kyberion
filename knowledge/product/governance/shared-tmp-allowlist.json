@@ -654,20 +654,8 @@
       "count": 1
     },
     {
-      "file": "pipelines/ceo-strategic-report.json",
-      "count": 4
-    },
-    {
-      "file": "pipelines/contract-review.json",
-      "count": 6
-    },
-    {
       "file": "pipelines/daily-routine.json",
       "count": 1
-    },
-    {
-      "file": "pipelines/executive-narrative-bridge.json",
-      "count": 4
     },
     {
       "file": "pipelines/exposure-check.json",
@@ -758,14 +746,6 @@
       "count": 2
     },
     {
-      "file": "pipelines/generate-design-system-demo.json",
-      "count": 2
-    },
-    {
-      "file": "pipelines/generate-masterclass-pptx.json",
-      "count": 2
-    },
-    {
       "file": "pipelines/i18n-drift-audit.json",
       "count": 2
     },
@@ -774,23 +754,7 @@
       "count": 1
     },
     {
-      "file": "pipelines/kyberion-product-intro.json",
-      "count": 4
-    },
-    {
       "file": "pipelines/launch-first-run-onboarding.json",
-      "count": 2
-    },
-    {
-      "file": "pipelines/marketing-content.json",
-      "count": 1
-    },
-    {
-      "file": "pipelines/media-produce-and-review.json",
-      "count": 1
-    },
-    {
-      "file": "pipelines/meeting-facilitation-workflow.json",
       "count": 2
     },
     {
@@ -798,16 +762,8 @@
       "count": 1
     },
     {
-      "file": "pipelines/meeting-proxy-workflow.json",
-      "count": 4
-    },
-    {
       "file": "pipelines/meeting-tutor-session.json",
       "count": 2
-    },
-    {
-      "file": "pipelines/meeting-watcher.json",
-      "count": 1
     },
     {
       "file": "pipelines/mv-generate.json",
@@ -844,10 +800,6 @@
     {
       "file": "pipelines/test-inventory-device-pipeline.json",
       "count": 3
-    },
-    {
-      "file": "pipelines/trial-narrated-report.json",
-      "count": 4
     },
     {
       "file": "pipelines/verify-session-fallback.json",

@@ -53,6 +53,34 @@ export function hasHelpFlag(argv: readonly string[]): boolean {
   return false;
 }
 
+/** Shared membership check for boolean options in legacy command adapters. */
+export function hasCliFlag(argv: readonly string[], flag: string): boolean {
+  return argv.includes(flag);
+}
+
+/** Shared value lookup for legacy adapters that still expose the raw argv. */
+export function cliOptionValue(argv: readonly string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  return value && !value.startsWith('--') ? value : undefined;
+}
+
+/** Remove declared value-option tokens when a legacy adapter needs positionals. */
+export function cliPositionals(argv: readonly string[], valueFlags: readonly string[]): string[] {
+  const values = new Set(valueFlags);
+  const positionals: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index] as string;
+    if (values.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (!arg.startsWith('--')) positionals.push(arg);
+  }
+  return positionals;
+}
+
 function registryKeys(manifestId?: string): { description?: string; caution?: string } {
   if (!manifestId) return {};
   const manifest = cliManifestCatalog.load();

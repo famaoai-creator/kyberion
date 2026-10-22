@@ -215,4 +215,60 @@ describe('PPTX extract + filter + patch — synthetic multi-owner fixture', () =
     const relsXml = zip.readAsText('ppt/_rels/presentation.xml.rels');
     expect(relsXml).toMatch(new RegExp(`Id="${ridMatch![1]}"[^>]*Target="slides/slide1\\.xml"`));
   });
+
+  it('re-points kept notes to their renumbered slide and drops notes of removed slides', async () => {
+    const withNotes = createMultiOwnerProtocol();
+    withNotes.slides.forEach((slide, i) => {
+      slide.notes = `note for slide ${i + 1}`;
+    });
+    const notedPath = path.join(tmpDir, 'with-notes.pptx');
+    await generateNativePptx(withNotes, notedPath);
+    const outPath = path.join(tmpDir, 'with-notes-filtered.pptx');
+    filterPptxSlides(notedPath, outPath, [3, 1]);
+
+    const zip = new AdmZip(outPath);
+    const entries = new Set(zip.getEntries().map((e) => e.entryName));
+    const notes = [...entries].filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n));
+    expect(notes).toHaveLength(2);
+    for (const slideIdx of [1, 2]) {
+      const slideRels = zip.readAsText(`ppt/slides/_rels/slide${slideIdx}.xml.rels`);
+      const notesTarget = slideRels.match(/Target="\.\.\/notesSlides\/(notesSlide\d+\.xml)"/)![1];
+      const notesRels = zip.readAsText(`ppt/notesSlides/_rels/${notesTarget}.rels`);
+      // the notes slide must point back at the slide that owns it
+      expect(notesRels).toContain(`Target="../slides/slide${slideIdx}.xml"`);
+    }
+    const ct = zip.readAsText('[Content_Types].xml');
+    for (const [, part] of ct.matchAll(/PartName="\/(ppt\/notesSlides\/[^"]+)"/g)) {
+      expect(entries.has(part)).toBe(true);
+    }
+  });
+
+  it('reads child-bearing <p:sldId> entries and fails closed on a malformed slide list', () => {
+    const rewrite = (name: string, edit: (xml: string) => string) => {
+      const zip = new AdmZip(fixturePath);
+      zip.updateFile(
+        'ppt/presentation.xml',
+        Buffer.from(edit(zip.readAsText('ppt/presentation.xml')), 'utf8')
+      );
+      const out = path.join(tmpDir, name);
+      zip.writeZip(out);
+      return out;
+    };
+    const withChildren = rewrite('sldid-children.pptx', (xml) =>
+      xml.replace(
+        /<p:sldId id="(\d+)" r:id="(rId\d+)"\/>/,
+        '<p:sldId id="$1" r:id="$2"><p:extLst/></p:sldId>'
+      )
+    );
+    const out = path.join(tmpDir, 'sldid-children-filtered.pptx');
+    filterPptxSlides(withChildren, out, [1, 2]);
+    expect(new AdmZip(out).readAsText('ppt/presentation.xml').match(/<p:sldId\b/g)).toHaveLength(2);
+
+    const malformed = rewrite('sldid-malformed.pptx', (xml) =>
+      xml.replace(/<p:sldId id="(\d+)" r:id="(rId\d+)"\/>/, '<p:sldId id="$1" r:id="$2">')
+    );
+    expect(() => filterPptxSlides(malformed, path.join(tmpDir, 'never.pptx'), [1])).toThrow(
+      /cannot read the slide list — .* \| next: .* \| evidence: parsed/
+    );
+  });
 });

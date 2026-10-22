@@ -304,6 +304,8 @@ export * from './task/task-knowledge-provisioning.js';
 export * from './cognitive-routing.js';
 
 export * from './reasoning/reasoning-drift-watchdog.js';
+export * from './cognitive-routing-palette.js';
+export * from './routing-compare.js';
 
 export * from './mission/mission-team-binding.js';
 

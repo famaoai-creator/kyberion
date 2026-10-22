@@ -193,6 +193,9 @@
   "tenant_overrides": {},
   "organization_overrides": {},
   "project_overrides": {},
+  "prompted_tool_calling": {
+    "claude-cli": true
+  },
   "openrouter": {
     "default_profile": "free-router",
     "default_cost_policy": "free-only",

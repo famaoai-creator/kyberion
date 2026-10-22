@@ -12,6 +12,7 @@ import {
 } from './provider/provider-health-view.js';
 import {
   registerIdentityContextResolver,
+  readConfiguredActorIdentity,
   resolvePolicyIdentityContext,
 } from './identity-context-bridge.js';
 import {
@@ -20,6 +21,13 @@ import {
 } from './mission/mission-orchestration-worker-dispatch-port.js';
 
 describe('remaining sole seam ports', () => {
+  it('reads configured actor identity through one explicit boundary', () => {
+    expect(
+      readConfiguredActorIdentity({ KYBERION_PERSONA: 'vitest-promoter', MISSION_ROLE: 'reviewer' })
+    ).toEqual({ persona: 'vitest-promoter', role: 'reviewer' });
+    expect(readConfiguredActorIdentity({})).toEqual({ persona: undefined, role: undefined });
+  });
+
   it('registers and disposes the runtime ensurer seam', async () => {
     const handle = { getRecord: () => ({ agent_id: 'agent-1' }) } as never;
     const dispose = registerAgentRuntimeEnsurer(async () => handle);

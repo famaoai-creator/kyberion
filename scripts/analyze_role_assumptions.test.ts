@@ -65,6 +65,19 @@ const FILES: Record<string, string> = {
       { id: 'rawwrite-surface', command: 'node', args: ['dist/apps/rawwrite.js'] },
       { id: 'member-surface', command: 'node', args: ['dist/apps/members.js'] },
       { id: 'member-kinds-surface', command: 'node', args: ['dist/apps/member-kinds.js'] },
+      { id: 'class-init-surface', command: 'node', args: ['dist/apps/class-init.js'] },
+      { id: 'class-call-surface', command: 'node', args: ['dist/apps/class-call.js'] },
+      { id: 'class-computed-surface', command: 'node', args: ['dist/apps/class-computed.js'] },
+      { id: 'class-escape-surface', command: 'node', args: ['dist/apps/class-escape.js'] },
+      { id: 'class-return-surface', command: 'node', args: ['dist/apps/class-return.js'] },
+      { id: 'class-result-surface', command: 'node', args: ['dist/apps/class-result.js'] },
+      { id: 'class-export-surface', command: 'node', args: ['dist/apps/class-export.js'] },
+      { id: 'class-factory-surface', command: 'node', args: ['dist/apps/class-factory.js'] },
+      {
+        id: 'class-destructure-surface',
+        command: 'node',
+        args: ['dist/apps/class-destructure.js'],
+      },
     ],
   }),
   'apps/next-workspace/package.json': JSON.stringify({
@@ -246,6 +259,53 @@ const FILES: Record<string, string> = {
     `import { writeAsSharedWriter } from '${CORE}/stores.js';`,
     "withExecutionContext('role_literal', () => writeAsSharedWriter());",
   ].join('\n'),
+  'libs/core/class-singleton.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    'class Singleton {',
+    "  constructor() { withExecutionContext('class_constructor', () => undefined); }",
+    "  active() { withExecutionContext('class_active', () => undefined); }",
+    "  dormant() { withExecutionContext('class_dormant', () => undefined); }",
+    '}',
+    'export const singleton = new Singleton();',
+    'export function makeStore() { return singleton; }',
+  ].join('\n'),
+  'apps/class-init.ts': `import '${CORE}/class-singleton.js';`,
+  'apps/class-call.ts': [
+    `import { makeStore } from '${CORE}/class-singleton.js';`,
+    'makeStore().active();',
+  ].join('\n'),
+  'apps/class-computed.ts': [
+    `import { singleton } from '${CORE}/class-singleton.js';`,
+    'export function invoke(key: "active" | "dormant") { singleton[key](); }',
+  ].join('\n'),
+  'apps/class-escape.ts': [
+    `import { singleton } from '${CORE}/class-singleton.js';`,
+    'declare function unknownConsumer(value: unknown): void;',
+    'unknownConsumer(singleton);',
+  ].join('\n'),
+  'apps/class-return.ts': [
+    `import { singleton } from '${CORE}/class-singleton.js';`,
+    'export function expose() { return singleton; }',
+  ].join('\n'),
+  'apps/class-result.ts': [
+    `import { makeStore } from '${CORE}/class-singleton.js';`,
+    'declare function externalConsumer(value: unknown): void;',
+    'externalConsumer(makeStore());',
+  ].join('\n'),
+  'apps/class-export.ts': [
+    `import { singleton } from '${CORE}/class-singleton.js';`,
+    'export default singleton;',
+  ].join('\n'),
+  'apps/class-factory.ts': [
+    `import { makeStore } from '${CORE}/class-singleton.js';`,
+    'declare function externalConsumer(value: unknown): void;',
+    'externalConsumer(makeStore);',
+  ].join('\n'),
+  'apps/class-destructure.ts': [
+    `import { singleton } from '${CORE}/class-singleton.js';`,
+    'const { dormant } = singleton;',
+    'dormant();',
+  ].join('\n'),
   'apps/spoof-role.ts': [
     `import { withExecutionContext } from '${CORE}/authority.js';`,
     'function resolveRole(): string { return process.env.INPUT_ROLE || "unknown"; }',
@@ -324,6 +384,8 @@ const FILES: Record<string, string> = {
     '}',
     // A NEW SYSTEM_ROLE: the launched child is not walked under launch_surface.
     "spawn(process.execPath, ['dist/scripts/launched-child.js'], { env: launchEnv() });",
+    "const env = buildSystemRoleLaunchEnv(process.env, 'other_surface');",
+    "spawn(process.execPath, ['dist/scripts/launched-child.js'], { spawnOptions: { env } });",
     // An explicit undefined env inherits process.env like no env at all.
     "spawn(process.execPath, ['dist/scripts/undefined-env-child.js'], { env: undefined });",
     // buildExecutionEnv(undefined, role) defaults to process.env.
@@ -359,6 +421,30 @@ const FILES: Record<string, string> = {
 };
 
 describe('RN-02 role assumption reachability analysis', () => {
+  it('keeps dormant class methods lazy while retaining invocation and escape edges', () => {
+    expect(Object.keys(report.system_roles.class_init_surface.reachable_roles)).toEqual([
+      'class_constructor',
+    ]);
+    expect(Object.keys(report.system_roles.class_call_surface.reachable_roles)).toEqual([
+      'class_active',
+      'class_constructor',
+    ]);
+    for (const id of [
+      'class_computed_surface',
+      'class_escape_surface',
+      'class_destructure_surface',
+      'class_return_surface',
+      'class_result_surface',
+      'class_export_surface',
+      'class_factory_surface',
+    ]) {
+      expect(Object.keys(report.system_roles[id].reachable_roles)).toEqual([
+        'class_active',
+        'class_constructor',
+        'class_dormant',
+      ]);
+    }
+  });
   let report: RoleAssumptionReachabilityReport;
 
   beforeAll(() => {

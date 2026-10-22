@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { capturePipelineResumePolicyEnvironment } from './pipeline-resume-policy-env.js';
 import {
   createPipelineRunJournal,
   hashPipelineOutput,
@@ -12,6 +13,32 @@ import {
 } from './pipeline-run-journal.js';
 
 describe('pipeline run journal', () => {
+  it('captures runtime authority and overwrites caller-supplied authority claims', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
+    try {
+      const journal = createPipelineRunJournal(`test-${newPipelineRunId()}`, {
+        pipeline_id: 'authority',
+        input_path: 'pipelines/example.json',
+        step_ids: [],
+        execution_authority: {
+          system_role: 'forged',
+          mission_role: 'forged',
+          persona: 'forged',
+          scope: { tier: 'personal' },
+          nhi_id: 'forged',
+          agent_id: 'forged',
+          task_grants_path: 'forged',
+          ...capturePipelineResumePolicyEnvironment(),
+        },
+      });
+      expect(journal.state().started?.execution_authority).toMatchObject({
+        system_role: 'generation_schedule',
+      });
+      expect(journal.state().started?.execution_authority?.mission_role).not.toBe('forged');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('keeps protected library partitions inside the isolated runtime root in tests', () => {
     const scope = { tier: 'confidential' as const, tenantSlug: 'acme' };
     expect(pipelineRunJournalPath('isolated-run', undefined, scope)).toBe(
@@ -19,6 +46,23 @@ describe('pipeline run journal', () => {
     );
     expect(pipelineRunJournalPath('isolated-run', undefined, scope)).toContain('vitest-live');
   });
+  it('rejects a duplicate run_started instead of replacing the original run identity', () => {
+    const runId = `test-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'original',
+      input_path: 'pipelines/example.json',
+      step_ids: ['source'],
+    });
+    journal.append('run_started', {
+      pipeline_id: 'forged',
+      input_path: 'pipelines/other.json',
+      step_ids: ['source'],
+    });
+    expect(() => loadPipelineRunJournal(runId)).toThrow(
+      'run_started must be the single first event'
+    );
+  });
+
   it('records declared channel snapshots and restores completed nodes', () => {
     const runId = `test-${newPipelineRunId()}`;
     const journal = createPipelineRunJournal(runId, {

@@ -209,7 +209,15 @@ describe('real external actuator pipeline simulation', () => {
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
     expect(launch).toHaveBeenCalledWith(
       expect.objectContaining({
-        args: [expect.stringContaining('run_pipeline.js'), '--resume', journal.runId],
+        args: [
+          '--input-type=module',
+          '-e',
+          expect.stringContaining('withScopeEnvOnly'),
+          expect.stringMatching(/^file:.*run_pipeline\.js$/),
+          expect.any(String),
+          '--resume',
+          journal.runId,
+        ],
       })
     );
     const resumedJournal = openPipelineRunJournal(loadPipelineRunJournal(journal.runId));

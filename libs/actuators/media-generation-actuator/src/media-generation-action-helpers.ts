@@ -15,13 +15,20 @@ import {
 } from '@agent/core/governance/external-operation';
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import type { GenerationJob } from '@agent/core/contracts/generation-job';
-import { handleCaptureAction } from './capture-actions.js';
+import type { CaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
 import { handleMvOp } from './mv-production-ops.js';
 import * as path from 'node:path';
 
 type MediaActionResult = Record<string, unknown> & Partial<GenerationJob>;
+export interface MediaGenerationActionDependencies {
+  /** Wired only by the full actuator; generation schedules never load desktop capture. */
+  capture?: (
+    action: CaptureAction,
+    params: Record<string, unknown>
+  ) => Promise<Record<string, unknown>>;
+}
 type MediaActionInput = {
   action?: string;
   params?: Record<string, unknown>;
@@ -703,7 +710,10 @@ async function collectGenerationArtifact(params: any) {
   }
 }
 
-async function executeSingleAction(input: MediaActionInput) {
+async function executeSingleAction(
+  input: MediaActionInput,
+  deps: MediaGenerationActionDependencies
+) {
   const action = String(input.action || '');
   const params = input.params || {};
   if (!SUPPORTED_ACTIONS.has(String(action))) {
@@ -730,14 +740,18 @@ async function executeSingleAction(input: MediaActionInput) {
     action === 'capture_focused_window' ||
     action === 'record_screen'
   ) {
-    return handleCaptureAction(action, params);
+    if (!deps.capture) throw new Error('Desktop capture is unavailable in this generation context');
+    return deps.capture(action, params);
   }
 
   logger.info(`🎬 [MEDIA-GEN:PROXY] Dispatching "${action}" to Service Engine...`);
   return await executeServicePreset('media-generation', action, params);
 }
 
-async function handleSingleAction(input: MediaActionInput) {
+async function handleSingleAction(
+  input: MediaActionInput,
+  deps: MediaGenerationActionDependencies
+) {
   const action = String(input.action || '');
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
@@ -750,7 +764,10 @@ async function handleSingleAction(input: MediaActionInput) {
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation media-generation:${action || 'unknown'} was not admitted.`}`
     );
   }
-  return executeSingleAction({ ...input, params: preflight.input as Record<string, unknown> });
+  return executeSingleAction(
+    { ...input, params: preflight.input as Record<string, unknown> },
+    deps
+  );
 }
 
 function mergeTraceEvidence(
@@ -772,7 +789,10 @@ function mergeTraceEvidence(
   };
 }
 
-export async function handleAction(input: MediaActionInput): Promise<MediaActionResult> {
+export async function handleAction(
+  input: MediaActionInput,
+  deps: MediaGenerationActionDependencies = {}
+): Promise<MediaActionResult> {
   const traceCtx = createActuatorTrace(
     'media-generation-actuator',
     String(input?.action || 'unknown')
@@ -806,7 +826,7 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
             execute: async (op, params, context) => ({
               ...context,
               result: await withExternalOperationOccurrence(`media:${occurrence++}`, () =>
-                executeSingleAction({ action: op, params })
+                executeSingleAction({ action: op, params }, deps)
               ),
             }),
           });
@@ -864,7 +884,7 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
     }
   }
   try {
-    const result = await handleSingleAction(input);
+    const result = await handleSingleAction(input, deps);
     traceCtx.endSpan('ok');
     return mergeTraceEvidence(result, finalizeActuatorTrace(traceCtx));
   } catch (err: unknown) {

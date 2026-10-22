@@ -11,6 +11,12 @@ import { spawnManagedProcess } from '../managed-process.js';
 import { loadPipelineRunJournal } from './pipeline-run-journal.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
+import { buildSystemRoleLaunchEnv } from '../authority.js';
+import { pathToFileURL } from 'node:url';
+import {
+  PIPELINE_RESUME_POLICY_ENV_KEYS,
+  restorePipelineResumePolicyEnvironment,
+} from './pipeline-resume-policy-env.js';
 
 export type PipelineApprovalResumeOutcome =
   | { status: 'not_applicable'; reason: string }
@@ -18,6 +24,23 @@ export type PipelineApprovalResumeOutcome =
   | { status: 'started'; reason: string; runId: string; resourceId: string };
 
 const pendingResumes = new Set<string>();
+/** Install the original scope before importing the canonical runner. URL argv
+ * keeps its direct-script guard inactive so main runs exactly once. */
+export const PIPELINE_APPROVAL_RESUME_CHILD = `
+const runnerUrl = process.argv[1];
+const provenance = JSON.parse(process.argv[2]);
+const { withScopeEnvOnly } = await import(new URL('../../libs/core/dist/scope-context.js', runnerUrl));
+await withScopeEnvOnly(async () => {
+  const execute = async () => {
+    const { main } = await import(runnerUrl);
+    await main(process.argv.slice(3));
+  };
+  if (!provenance.policy) return execute();
+  const { mintScopeEnvelope, withScopeEnvelope } = await import(new URL('../../libs/core/dist/scope-envelope.js', runnerUrl));
+  const envelope = mintScopeEnvelope({ identity: provenance.scope, env: {}, policy: provenance.policy });
+  return withScopeEnvelope(envelope, execute);
+}, provenance.scope);
+`;
 
 function nonEmpty(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -117,11 +140,58 @@ export function resumePipelineRunAfterApproval(
   }
   const mismatch = approvalBindsToSuspendedRun(record, runId, missionId, state);
   if (mismatch) return { status: 'not_applicable', reason: mismatch };
+  const originalAuthority = state.started?.execution_authority;
+  if (
+    !originalAuthority?.scope ||
+    !originalAuthority.policy_env ||
+    PIPELINE_RESUME_POLICY_ENV_KEYS.some(
+      (key) => typeof originalAuthority.policy_env[key] !== 'string'
+    )
+  ) {
+    return {
+      status: 'not_applicable',
+      reason: 'original execution authority is missing; resume from the original runtime',
+    };
+  }
+  if (originalAuthority.unsupported_policy_env?.length) {
+    return {
+      status: 'not_applicable',
+      reason: `original policy controls cannot be restored (${originalAuthority.unsupported_policy_env.join(', ')}); resume from the original runtime with pnpm pipeline --resume ${runId}`,
+    };
+  }
 
   const runnerPath = assertSafeRepositoryPath(
     pathResolver.rootResolve('dist/scripts/run_pipeline.js')
   );
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  // The approver may be a scheduler or viewer surface with unrelated grants.
+  // Restore only the authority captured by the original governed journal writer.
+  const scope = originalAuthority.scope;
+  const env = buildSystemRoleLaunchEnv(
+    {
+      ...restorePipelineResumePolicyEnvironment(originalAuthority.policy_env, process.env),
+      KYBERION_TIER: scope.tier,
+      KYBERION_TENANT: scope.tenant_slug ?? '',
+      KYBERION_ORGANIZATION_ID: scope.organization_id ?? '',
+      KYBERION_PROJECT_ID: scope.project_id ?? '',
+      KYBERION_TASK_ID: scope.task_id ?? '',
+      TASK_ID: scope.task_id ?? '',
+      KYBERION_SUDO: '',
+      KYBERION_SUDO_SCOPE: '',
+      KYBERION_SUDO_KEY: '',
+      KYBERION_CUSTOMER: scope.customer_stance ?? '',
+      KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
+      KYBERION_NHI_ACTOR: scope.nhi_id ?? '',
+      KYBERION_NHI_ID: originalAuthority.nhi_id,
+      KYBERION_AGENT_ID: originalAuthority.agent_id,
+      KYBERION_TASK_GRANTS_PATH: originalAuthority.task_grants_path,
+      KYBERION_SCOPE_ENV_PATH: '',
+    },
+    originalAuthority.system_role,
+    {
+      missionRole: originalAuthority.mission_role,
+      persona: originalAuthority.persona,
+    }
+  );
   if (missionId) env.MISSION_ID = missionId;
   else delete env.MISSION_ID;
 
@@ -134,7 +204,14 @@ export function resumePipelineRunAfterApproval(
       ownerType: 'pipeline-approval-resume',
       command: process.execPath,
       args: [
-        runnerPath,
+        '--input-type=module',
+        '-e',
+        PIPELINE_APPROVAL_RESUME_CHILD,
+        pathToFileURL(runnerPath).href,
+        JSON.stringify({
+          scope,
+          ...(originalAuthority.scope_policy ? { policy: originalAuthority.scope_policy } : {}),
+        }),
         '--resume',
         runId,
         ...(state.started?.library_execution && journalScope

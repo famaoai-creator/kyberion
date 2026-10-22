@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kyberion</title>
+    <link rel="stylesheet" href="/design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
+    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <link rel="stylesheet" href="/flow.css" />
+  </head>
+  <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
+        <main class="flow-shell">
+          <aside class="flow-menu" aria-label="">
+            <h2 class="flow-menu-title" id="flow-menu-title"></h2>
+            <ul class="flow-menu-list" id="flow-menu"></ul>
+          </aside>
+          <section class="flow-stage" aria-live="polite">
+            <header class="flow-stage-header">
+              <h1 class="flow-stage-title" id="flow-stage-title"></h1>
+              <p class="flow-stage-summary" id="flow-stage-summary"></p>
+              <button type="button" class="flow-link-button hidden" id="flow-new-session"></button>
+            </header>
+            <div class="flow-surface" id="flow-surface"></div>
+            <p class="flow-status hidden" id="flow-status" role="status"></p>
+            <form class="flow-input-row hidden" id="flow-input-form">
+              <input type="text" class="flow-input" id="flow-input" autocomplete="off" />
+              <button type="submit" class="flow-send" id="flow-send"></button>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="/front-desk-rail.js"></script>
+    <script src="/a2ui-host.js"></script>
+    <script src="/flow.js"></script>
+  </body>
+</html>

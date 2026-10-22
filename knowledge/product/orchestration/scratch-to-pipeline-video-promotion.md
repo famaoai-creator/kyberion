@@ -71,3 +71,4 @@ keep unaffected scenes. Do not promote only a final MP4 and lose its provenance.
 
 - Example scratch renderer: `scripts/kyberion_intro_scratch.ts`
 - Output root pattern: `active/shared/tmp/<slug>-scratch` (governed temp; never a top-level `scratch` directory)
+- Keeping a scratch builder past the tmp TTL, tenant pipelines and the janitor's code grace: [`scratch-tool-promotion-playbook.md`](./scratch-tool-promotion-playbook.md)

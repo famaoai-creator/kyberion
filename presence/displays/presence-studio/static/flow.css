@@ -1,0 +1,292 @@
+/* flow.css — the component host page. Colors/fonts come from the design
+   tokens (design-system.css + /api/design-tokens.css); this file only lays
+   out the host and the A2UI library's fixed components. */
+
+.flow-shell {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 20px;
+  padding: 24px;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.flow-menu {
+  background: var(--panel, #fff);
+  border: 1px solid var(--panel-border, #e3ddd1);
+  border-radius: 16px;
+  padding: 14px;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+.flow-menu-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--muted, #706b60);
+  margin: 0 0 10px;
+  text-transform: none;
+}
+.flow-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.flow-menu-group {
+  font-size: 11px;
+  color: var(--muted, #706b60);
+  margin: 10px 0 2px;
+}
+.flow-menu-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text, #26231d);
+}
+a.flow-menu-link:hover {
+  background: var(--bg-soft, #f3efe7);
+}
+.flow-menu-item-current .flow-menu-link {
+  background: var(--accent-soft, #ecf3f2);
+  border: 1px solid var(--accent, #0f6b62);
+}
+.flow-menu-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.flow-menu-sub {
+  font-size: 12px;
+  color: var(--muted, #706b60);
+}
+.flow-menu-status {
+  font-size: 11px;
+  color: var(--muted, #706b60);
+}
+.flow-menu-status-a2ui {
+  color: var(--accent-strong, #0f6b62);
+}
+
+.flow-stage {
+  background: var(--panel, #fff);
+  border: 1px solid var(--panel-border, #e3ddd1);
+  border-radius: 16px;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.flow-stage-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+}
+.flow-stage-title {
+  font-size: 22px;
+  margin: 0;
+}
+.flow-stage-summary {
+  margin: 0;
+  color: var(--muted, #706b60);
+  flex: 1 1 auto;
+}
+.flow-link-button {
+  font: inherit;
+  font-size: 13px;
+  border: none;
+  background: none;
+  color: var(--accent-strong, #0f6b62);
+  cursor: pointer;
+  padding: 0;
+}
+.flow-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.flow-empty {
+  color: var(--muted, #706b60);
+}
+.flow-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #706b60);
+}
+.flow-status-error {
+  color: var(--warm, #a3412d);
+}
+.flow-input-row {
+  display: flex;
+  gap: 8px;
+}
+.flow-input {
+  flex: 1;
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border, #e3ddd1);
+  background: var(--bg-soft, #f7f5f0);
+}
+.flow-send {
+  font: inherit;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent, #0f6b62);
+  color: #fff;
+  cursor: pointer;
+}
+.hidden {
+  display: none !important;
+}
+
+/* ---- fixed A2UI library ---- */
+.a2ui-hero-title {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.a2ui-hero-subtitle {
+  margin: 0;
+  color: var(--muted, #706b60);
+}
+.a2ui-minor-title,
+.a2ui-section-title,
+.a2ui-card-title {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.a2ui-section {
+  border: 1px solid var(--panel-border, #e3ddd1);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.a2ui-kv-entries {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: 6px 14px;
+}
+.a2ui-kv-row {
+  display: contents;
+}
+.a2ui-kv-key {
+  color: var(--muted, #706b60);
+  font-size: 13px;
+}
+.a2ui-kv-value {
+  margin: 0;
+  font-size: 14px;
+}
+.a2ui-kv-row-highlight .a2ui-kv-key,
+.a2ui-kv-row-highlight .a2ui-kv-value {
+  color: var(--accent-strong, #0f6b62);
+  font-weight: 600;
+}
+.a2ui-progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.a2ui-progress-step {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border, #e3ddd1);
+  font-size: 13px;
+  color: var(--muted, #706b60);
+}
+.a2ui-progress-done {
+  border-color: var(--accent, #0f6b62);
+  color: var(--accent-strong, #0f6b62);
+}
+.a2ui-progress-active {
+  background: var(--accent-soft, #ecf3f2);
+  border-color: var(--accent, #0f6b62);
+  color: var(--text, #26231d);
+  font-weight: 600;
+}
+.a2ui-alert {
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border, #e3ddd1);
+  background: var(--bg-soft, #f7f5f0);
+}
+.a2ui-alert-title {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.a2ui-alert-message {
+  margin: 0;
+}
+.a2ui-alert-success {
+  border-color: var(--accent, #0f6b62);
+  background: var(--accent-soft, #ecf3f2);
+}
+.a2ui-alert-warning,
+.a2ui-alert-error {
+  border-color: var(--warm, #a3412d);
+}
+.a2ui-button {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border, #e3ddd1);
+  background: var(--panel, #fff);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.a2ui-button-primary {
+  background: var(--accent, #0f6b62);
+  color: #fff;
+  border-color: var(--accent, #0f6b62);
+}
+.a2ui-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.a2ui-unsupported {
+  font-size: 12px;
+  color: var(--muted, #706b60);
+  border: 1px dashed var(--panel-border, #e3ddd1);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.a2ui-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.a2ui-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-soft, #f7f5f0);
+}
+.a2ui-list-items {
+  margin: 0;
+  padding-left: 18px;
+}
+.a2ui-list-detail {
+  color: var(--muted, #706b60);
+  margin-left: 6px;
+}
+
+@media (max-width: 900px) {
+  .flow-shell {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  .flow-menu {
+    position: static;
+  }
+}

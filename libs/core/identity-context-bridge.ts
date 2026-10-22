@@ -6,6 +6,21 @@ import { scopedAssumedRole, scopedPersona } from './foundation/execution-scope.j
 
 export type IdentityContextResolver = (tenantOverride?: string) => IdentityContext;
 
+export interface ConfiguredActorIdentity {
+  persona?: string;
+  role?: string;
+}
+
+/** Read process-configured identity at an explicit boundary, independent of scoped overrides. */
+export function readConfiguredActorIdentity(
+  env: Record<string, string | undefined> = process.env
+): ConfiguredActorIdentity {
+  return {
+    persona: getRegisteredEnvText('KYBERION_PERSONA', { env }),
+    role: getRegisteredEnvText('MISSION_ROLE', { env }),
+  };
+}
+
 const DEFAULT_METADATA: SeamProviderMetadata = {
   provenance: 'builtin',
   source: 'libs/core/identity-context-bridge.ts',
@@ -23,7 +38,8 @@ const defaultResolver: IdentityContextResolver = (tenantOverride) => {
   // RA-01: an in-process withExecutionContext* assumption outranks the env.
   const scoped = scopedPersona();
   const projectScope = resolveProjectScope();
-  const envPersona = scoped.bound ? scoped.persona : getRegisteredEnvText('KYBERION_PERSONA');
+  const configured = readConfiguredActorIdentity();
+  const envPersona = scoped.bound ? scoped.persona : configured.persona;
   const persona =
     envPersona === 'sovereign' ||
     envPersona === 'ecosystem_architect' ||
@@ -47,7 +63,7 @@ const defaultResolver: IdentityContextResolver = (tenantOverride) => {
           : 'mission',
     authorities,
     missionId: projectScope.missionId,
-    role: scopedAssumedRole() || getRegisteredEnvText('MISSION_ROLE'),
+    role: scopedAssumedRole() || configured.role,
     tenantSlug: tenantOverride || projectScope.tenantSlug,
   };
 };

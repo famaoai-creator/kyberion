@@ -7,7 +7,16 @@
  * promotion a one-command step instead of manual re-authoring:
  *
  *   pnpm pipeline:promote --input active/shared/tmp/my-run.json \
- *     [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]
+ *     [--name <slug>] [--tenant <slug> | --source-is-public] [--trace <traceId>] [--dry-run] [--no-llm] [--force]
+ *
+ * --tenant <slug>: land the pipeline in the tenant catalog
+ * (knowledge/confidential/<slug>/pipelines/<name>.json + that directory's
+ * README.md row) instead of public pipelines/. The slug is validated against
+ * the tenant registry. Without --tenant a source under a personal/confidential
+ * tier or a tenant-partitioned floor path is refused (it would downgrade the
+ * data into the public catalog), and so is unpartitioned scratch
+ * (`active/shared/tmp/<job>/…`, tier unknown) unless --source-is-public
+ * acknowledges that its content is public.
  *
  * Scope: successful one-off ADF pipeline runs → reusable pipelines/*.json.
  * For browser recordings (Pattern A→B into ProcedureCatalog), use the
@@ -22,6 +31,9 @@
  *   3. stamp provenance (source path, trace id, promoted_at)
  *   4. re-validate the result, write pipelines/<slug>.json, and append a
  *      catalog row to pipelines/README.md ("Promoted" section)
+ *   5. tenant mode only (not --dry-run): append a line to the tenant
+ *      information-asset ledger (`_ledger/assets.jsonl`, source_system `adf`,
+ *      content hash of the written pipeline file), returned as `asset`
  */
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { logger } from '@agent/core/core';
@@ -36,8 +48,10 @@ import {
   isRecord,
   nowIso,
   parseSafeJsonInput,
+  readJsonIfPresent,
   readTextFile,
   slugify,
+  writeJson,
 } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
@@ -48,9 +62,19 @@ import {
 } from '@agent/core/pipeline/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails';
 import { withExecutionContext } from '@agent/core/governance';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli-guard.js';
+import { assertPromotionSourceScope, repoRelative } from './lib/promotion-scope.js';
+import {
+  PIPELINE_PROMOTE_SOURCE_SYSTEM,
+  commitPromotionAsset,
+  planPromotionAsset,
+  promotionAssetSummary,
+  resolvePromotionActor,
+  sha256Text,
+} from './lib/promotion-ledger.js';
 
 interface PromotionAdvice {
   name?: string;
@@ -126,6 +150,62 @@ export function resolvePromotionInputPath(inputPath: string): string {
     throw new Error(`[promote] source ADF must be an existing regular file: ${inputPath}`);
   }
   return resolved;
+}
+
+/** The governed run command for a tenant pipeline (needs a project-trust approval). */
+export function tenantPipelineRunCommand(targetRepoPath: string): string {
+  return `pnpm pipeline --input ${targetRepoPath} --project-trust-approval <id>`;
+}
+
+/**
+ * Next steps after a tenant promotion. Tenant pipelines are project-local:
+ * they run only with a human-approved, content-bound project-trust decision,
+ * so every promotion (including a --force re-promotion) needs a new one.
+ */
+export function tenantPipelineNextSteps(targetRepoPath: string): string[] {
+  return [
+    `pnpm kyberion project-trust request ${targetRepoPath}`,
+    'a human approves the request (approval is bound to this exact content; re-request after every change)',
+    tenantPipelineRunCommand(targetRepoPath),
+  ];
+}
+
+/** Tenant catalog README content with one more pipeline row (idempotent per slug). */
+export function buildTenantPipelineCatalog(
+  existing: string | null,
+  tenant: string,
+  row: { slug: string; command: string; description: string }
+): string | null {
+  const line = `| \`${row.slug}\` | \`${row.command}\` | ${row.description.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} |`;
+  if (existing === null) {
+    return [
+      '---',
+      `title: '${tenant} pipelines'`,
+      `tags: [pipelines, tenant, ${tenant}]`,
+      `last_updated: ${nowIso().slice(0, 10)}`,
+      '---',
+      '',
+      `# ${tenant} pipelines`,
+      '',
+      `Tenant-scoped pipelines promoted with \`pnpm pipeline:promote --tenant ${tenant}\`. Provenance is recorded in each file under \`promotion\`.`,
+      '',
+      'Tenant pipelines are project-local and need a project-trust approval before they run: `pnpm kyberion project-trust request <path>`, a human approves it, then run with `--project-trust-approval <id>`. The approval is bound to the file content — re-request after every change, including a re-promotion.',
+      '',
+      '| Pipeline | Run | Description |',
+      '| --- | --- | --- |',
+      line,
+      '',
+    ].join('\n');
+  }
+  if (existing.includes(`| \`${row.slug}\``)) return null;
+  const lines = existing.split('\n');
+  let insertAt = -1;
+  for (let i = 0; i < lines.length; i++) if (lines[i].startsWith('|')) insertAt = i + 1;
+  if (insertAt < 0) {
+    return `${existing.replace(/\n*$/, '')}\n\n| Pipeline | Run | Description |\n| --- | --- | --- |\n${line}\n`;
+  }
+  lines.splice(insertAt, 0, line);
+  return lines.join('\n');
 }
 
 /** Set a dotted path (e.g. "url" or "args.0") inside a params object. */
@@ -242,23 +322,94 @@ function fail(message: string): never {
   throw new ScriptExitError(1, '', true);
 }
 
-async function main(args: string[] = []): Promise<void> {
+export interface PipelinePromotionResult {
+  target: string;
+  dry_run: boolean;
+  tenant?: string;
+  next_steps: string[];
+  /** Tenant asset-ledger entry for the written pipeline (tenant, non-dry-run only). */
+  asset?: ReturnType<typeof promotionAssetSummary>;
+}
+
+/**
+ * Re-promoting identical content keeps the earlier `promotion.promoted_at`, so
+ * the pipeline file is byte-identical and its ledger content hash matches.
+ */
+export function keepPipelinePromotedAtWhenUnchanged<T extends { promotion?: unknown }>(
+  previous: unknown,
+  next: T
+): T {
+  if (!isRecord(previous) || !isRecord(previous.promotion) || !isRecord(next.promotion)) {
+    return next;
+  }
+  const promotedAt = previous.promotion.promoted_at;
+  if (typeof promotedAt !== 'string') return next;
+  const withoutTime = (value: Record<string, unknown>) =>
+    JSON.stringify({ ...value, promotion: { ...(value.promotion as object), promoted_at: '' } });
+  return withoutTime(previous) === withoutTime(next as unknown as Record<string, unknown>)
+    ? { ...next, promotion: { ...next.promotion, promoted_at: promotedAt } }
+    : next;
+}
+
+async function main(args: string[] = []): Promise<PipelinePromotionResult> {
   const argv = args;
   const inputPath = getFlag(argv, '--input');
   if (!inputPath) {
     fail(
-      'Usage: pipeline_promote --input <adf.json> [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]\n' +
-        'Scope: ADF pipeline runs only. For browser recordings use the promote-procedure pipeline.'
+      '[promote] missing --input — pipeline:promote needs the ADF to promote | ' +
+        'pnpm pipeline:promote --input <adf.json> [--name <slug>] [--tenant <slug> | --source-is-public] [--trace <traceId>] [--dry-run] [--no-llm] [--force] ' +
+        '(ADF pipeline runs only; browser recordings use the promote-procedure pipeline) | evidence: argv'
     );
   }
-  const dryRun = argv.includes('--dry-run');
-  const noLlm = argv.includes('--no-llm');
-  const force = argv.includes('--force');
+  const dryRun = hasCliFlag(argv, '--dry-run');
+  const noLlm = hasCliFlag(argv, '--no-llm');
+  const force = hasCliFlag(argv, '--force');
   const traceId = getFlag(argv, '--trace');
+  const tenant = getFlag(argv, '--tenant')?.trim().toLowerCase();
 
-  const resolvedInput = resolvePromotionInputPath(inputPath);
+  // 0. Tier guard (lexical, before any disk access): never move tier- or
+  // tenant-bound data into a lower catalog or another tenant.
+  let tenantKnowledgeRoot: string | undefined;
+  let resolvedInput = '';
+  try {
+    assertPromotionSourceScope(
+      repoRelative(pathResolver.rootResolve(inputPath)),
+      tenant,
+      'pipeline:promote',
+      { sourceIsPublic: hasCliFlag(argv, '--source-is-public') }
+    );
+    if (tenant) {
+      // Fail closed on an unregistered or inactive tenant (DA-01 spine); the
+      // source is then read under the same tenant-bound role.
+      tenantKnowledgeRoot = withExecutionContext(
+        'asset_promoter',
+        () => resolveTenant(tenant).knowledge_root,
+        undefined,
+        tenant
+      );
+      resolvedInput = withExecutionContext(
+        'asset_promoter',
+        () => resolvePromotionInputPath(inputPath),
+        undefined,
+        tenant
+      );
+    } else {
+      resolvedInput = resolvePromotionInputPath(inputPath);
+    }
+  } catch (err: unknown) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
   // 1. Preflight the source exactly like run_pipeline would.
-  const pipeline: PromotablePipeline = { ...loadPipelineAdfAtPath(resolvedInput) };
+  const pipeline: PromotablePipeline = {
+    ...(tenant
+      ? withExecutionContext(
+          'asset_promoter',
+          () => loadPipelineAdfAtPath(resolvedInput),
+          undefined,
+          tenant
+        )
+      : loadPipelineAdfAtPath(resolvedInput)),
+  };
   const sourceGuardrails = validatePipelineGuardrails(pipeline, inputPath);
   if (!sourceGuardrails.ok) {
     fail(
@@ -313,15 +464,91 @@ async function main(args: string[] = []): Promise<void> {
       : { note: 'verbatim promotion (no advisory pass) — review placeholders manually' }),
   };
 
+  if (tenant) pipeline.promotion = { ...pipeline.promotion, tenant_slug: tenant };
+
   // 4. Re-validate the transformed pipeline and write it out.
+  const catalogDir = tenantKnowledgeRoot ? `${tenantKnowledgeRoot}/pipelines` : 'pipelines';
+  const targetRepoPath = `${catalogDir}/${slug}.json`;
   const promoted = validatePipelineAdf(pipeline);
-  const promotedGuardrails = validatePipelineGuardrails(promoted, `pipelines/${slug}.json`);
+  const promotedGuardrails = validatePipelineGuardrails(promoted, targetRepoPath);
   if (!promotedGuardrails.ok) {
     fail('[promote] transformed pipeline fails guardrails — aborting (source untouched).');
   }
-  const targetPath = assertSafeRepositoryPath(pathResolver.rootResolve(`pipelines/${slug}.json`), {
+  const targetPath = assertSafeRepositoryPath(pathResolver.rootResolve(targetRepoPath), {
     allowMissingLeaf: true,
   });
+  if (tenant && tenantKnowledgeRoot) {
+    const knowledgeRoot = tenantKnowledgeRoot;
+    const exists = withExecutionContext(
+      'asset_promoter',
+      () => safeExistsSync(targetPath),
+      undefined,
+      tenant
+    );
+    if (exists && !force) {
+      fail(`[promote] ${targetRepoPath} already exists — use --force to overwrite.`);
+    }
+    let asset: PipelinePromotionResult['asset'];
+    if (dryRun) {
+      logger.info(`[promote] (dry-run) would write ${targetRepoPath}`);
+    } else {
+      // Tenant catalog writes run under the narrow asset_promoter role bound
+      // to this tenant (security-policy.json grants only the tenant's own
+      // pipelines/, tools/ and _ledger/ directories). The asset-ledger line
+      // is planned before the write and appended right after it.
+      const ledgerOptions = { knowledgeRoot };
+      try {
+        const ingestedBy = resolvePromotionActor('[promote]');
+        asset = withExecutionContext(
+          'asset_promoter',
+          () => {
+            const final = keepPipelinePromotedAtWhenUnchanged(
+              exists ? readJsonIfPresent<unknown>(targetPath) : null,
+              promoted as PromotablePipeline
+            );
+            const text = `${JSON.stringify(final, null, 2)}\n`;
+            const plan = planPromotionAsset(
+              {
+                tenant,
+                sourceSystem: PIPELINE_PROMOTE_SOURCE_SYSTEM,
+                sourceId: repoRelative(resolvedInput),
+                targetPath: targetRepoPath,
+                contentSha256: sha256Text(text),
+                transformChain: ['pipeline_promote'],
+                ingestedBy,
+                now: nowIso(),
+                tag: '[promote]',
+              },
+              ledgerOptions
+            );
+            writeJson(targetPath, final);
+            commitPromotionAsset(tenant, plan, ledgerOptions);
+            return promotionAssetSummary(plan);
+          },
+          undefined,
+          tenant
+        );
+      } catch (err: unknown) {
+        fail(err instanceof Error ? err.message : String(err));
+      }
+      logger.success(`✅ [promote] wrote ${targetRepoPath} (ledger ${asset?.ref})`);
+    }
+    logPlaceholders(appliedPlaceholders, tenantPipelineRunCommand(targetRepoPath));
+    appendTenantCatalogRow(tenant, knowledgeRoot, slug, targetRepoPath, description, dryRun);
+    // Every tenant promotion — first, --force re-promotion or dry run —
+    // invalidates or precedes the content-bound project-trust approval.
+    const nextSteps = tenantPipelineNextSteps(targetRepoPath);
+    logger.info(
+      `[promote] ${dryRun ? '(dry-run) ' : ''}next: ${nextSteps[0]} — ${nextSteps[1]}, then run with: ${nextSteps[2]}`
+    );
+    return {
+      target: targetRepoPath,
+      dry_run: dryRun,
+      tenant,
+      next_steps: nextSteps,
+      ...(asset ? { asset } : {}),
+    };
+  }
   if (safeExistsSync(targetPath) && !force) {
     fail(`[promote] pipelines/${slug}.json already exists — use --force to overwrite.`);
   }
@@ -331,21 +558,53 @@ async function main(args: string[] = []): Promise<void> {
     // Catalog writes run under the same authority role as registry generation
     // (see role-write-access.json: ecosystem_architect owns pipelines/).
     withExecutionContext('ecosystem_architect', () => {
-      safeWriteFile(targetPath, `${JSON.stringify(promoted, null, 2)}\n`);
+      writeJson(targetPath, promoted);
     });
     logger.success(`✅ [promote] wrote pipelines/${slug}.json`);
   }
-  if (appliedPlaceholders.length > 0) {
-    logger.info(
-      `[promote] placeholders:\n${appliedPlaceholders.map((line) => `  - ${line}`).join('\n')}`
-    );
-    logger.info(
-      '[promote] run with: pnpm pipeline --input pipelines/' +
-        slug +
-        '.json --context \'{"<placeholder>": "<value>"}\''
-    );
-  }
+  const runCommand = `pnpm pipeline --input pipelines/${slug}.json`;
+  logPlaceholders(appliedPlaceholders, runCommand);
   appendCatalogRow(slug, description, dryRun);
+  return { target: `pipelines/${slug}.json`, dry_run: dryRun, next_steps: [runCommand] };
+}
+
+function logPlaceholders(appliedPlaceholders: string[], runCommand: string): void {
+  if (appliedPlaceholders.length === 0) return;
+  logger.info(
+    `[promote] placeholders:\n${appliedPlaceholders.map((line) => `  - ${line}`).join('\n')}`
+  );
+  logger.info(`[promote] run with: ${runCommand} --context '{"<placeholder>": "<value>"}'`);
+}
+
+/** Append the tenant catalog row; never touches the public pipelines/README.md. */
+function appendTenantCatalogRow(
+  tenant: string,
+  knowledgeRoot: string,
+  slug: string,
+  targetRepoPath: string,
+  description: string,
+  dryRun: boolean
+): void {
+  const readmeRepoPath = `${knowledgeRoot}/pipelines/README.md`;
+  const readmePath = pathResolver.rootResolve(readmeRepoPath);
+  const existing = withExecutionContext(
+    'asset_promoter',
+    () => (safeExistsSync(readmePath) ? readPipelinePromotionTextFile(readmePath) : null),
+    undefined,
+    tenant
+  );
+  const next = buildTenantPipelineCatalog(existing, tenant, {
+    slug,
+    command: tenantPipelineRunCommand(targetRepoPath),
+    description,
+  });
+  if (next === null) return;
+  if (dryRun) {
+    logger.info(`[promote] (dry-run) would update ${readmeRepoPath}`);
+    return;
+  }
+  withExecutionContext('asset_promoter', () => safeWriteFile(readmePath, next), undefined, tenant);
+  logger.info(`[promote] catalog row appended to ${readmeRepoPath}`);
 }
 
 /** CU-01: `--help` / typos exit before a pipeline or catalog row is written. */
@@ -355,6 +614,8 @@ export const PIPELINE_PROMOTE_CLI: CliGuardSpec = {
   options: [
     { flag: '--input', value: '<adf.json>' },
     { flag: '--name', value: '<slug>' },
+    { flag: '--tenant', value: '<tenant-slug>' },
+    { flag: '--source-is-public' },
     { flag: '--trace', value: '<trace-id>' },
     { flag: '--dry-run' },
     { flag: '--no-llm' },
@@ -367,7 +628,7 @@ export const runPipelinePromotion = defineScript({
   flags: [],
   run: async ({ argv, print }) => {
     if (guardCliArgs(argv, PIPELINE_PROMOTE_CLI, print)) return;
-    await main(argv);
+    return main(argv);
   },
 });
 

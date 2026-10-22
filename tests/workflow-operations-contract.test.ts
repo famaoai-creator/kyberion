@@ -115,7 +115,9 @@ describe('Workflow operations contract', () => {
     expect(crossOs).toContain('pnpm test -- --suite core');
     expect(crossOs).toContain('pnpm test -- --suite meeting-dry-run');
     expect(crossOs).toContain('pnpm run kyberion -- preview pipelines/baseline-check.json');
-    expect(crossOs).toContain('pnpm run kyberion -- preview pipelines/meeting-proxy-workflow.json');
+    expect(crossOs).toContain(
+      'pnpm run kyberion -- preview knowledge/product/pipeline-templates/meeting-proxy-workflow.json'
+    );
     expect(crossOs).toContain('pnpm run check -- --scope full --only pipeline-shell-independence');
     expect(crossOs).not.toContain('|| true');
   });

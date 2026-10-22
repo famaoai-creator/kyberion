@@ -1,5 +1,9 @@
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
-import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
+import {
+  findHearingScenario,
+  hearingRequirementPhases,
+  type HearingScenarioCatalogEntry,
+} from '@agent/core/hearing-scenario-catalog';
 
 export interface HearingScenarioRequirement {
   id: string;
@@ -8,21 +12,64 @@ export interface HearingScenarioRequirement {
    * request locale. Persisted `HearingRequirement`s keep this key too, so a
    * locale change re-renders instead of freezing the answering locale. */
   label_key: string;
+  /** SD-02: `'tenant'` marks a tenant-owned free-text label (a decision ledger item); the
+   * surface renders `label_text` for it and applies the vocabulary gate only to
+   * `'vocabulary'` (the default when absent). */
+  label_source?: 'vocabulary' | 'tenant';
+  label_text?: string;
+  /** Phase of the hearing sheet this item belongs to (catalog scenarios). */
+  phase_id?: string;
   aliases?: string[];
+}
+
+export interface HearingPhase {
+  id: string;
+  title_key: string;
+  requirement_ids: string[];
 }
 
 export interface HearingScenario {
   id: string;
   requirements: HearingScenarioRequirement[];
+  /** Phase-structured sheet (hearing-scenarios catalog); absent for flat scenarios. */
+  phases?: HearingPhase[];
 }
 
-/** WI-08: pure `{id, requirements}` shape derived from the
+/** WI-08: pure `{id, requirements}` shape derived from a
  * `hearing-scenarios.json` catalog entry (`libs/core/hearing-scenario-catalog.ts`)
  * — the catalog is the single source of truth for the requirement set,
  * `createHearingRecord`/`applyHearingTurn` only need this thin projection.
- * Throws (via `findHearingScenario`/`loadHearingScenarios`'s governed-catalog
- * validation) if the catalog is missing its `web_app_build` entry, the same
- * way any other required catalog failing to load would surface. */
+ * A phase-structured entry carries its `phases` and each item's `phase_id`. */
+export function hearingScenarioFromCatalogEntry(
+  entry: HearingScenarioCatalogEntry
+): HearingScenario {
+  const phaseOf = hearingRequirementPhases(entry);
+  return {
+    id: entry.id,
+    requirements: entry.requirements.map(({ id: requirementId, label_key, aliases }) => {
+      const phaseId = phaseOf.get(requirementId);
+      return {
+        id: requirementId,
+        label_key,
+        ...(phaseId ? { phase_id: phaseId } : {}),
+        ...(aliases ? { aliases } : {}),
+      };
+    }),
+    ...(entry.phases?.length
+      ? {
+          phases: entry.phases.map(({ id, title_key, requirement_ids }) => ({
+            id,
+            title_key,
+            requirement_ids: [...requirement_ids],
+          })),
+        }
+      : {}),
+  };
+}
+
+/** Throws (via `findHearingScenario`/`loadHearingScenarios`'s governed-catalog
+ * validation) if the catalog is missing the entry, the same way any other
+ * required catalog failing to load would surface. */
 function hearingScenarioFromCatalog(id: string): HearingScenario {
   const entry = findHearingScenario(id);
   if (!entry) {
@@ -30,24 +77,23 @@ function hearingScenarioFromCatalog(id: string): HearingScenario {
       `[HEARING_SCENARIO_CATALOG_MISSING] no '${id}' entry in hearing-scenarios.json`
     );
   }
-  return {
-    id: entry.id,
-    requirements: entry.requirements.map(({ id: requirementId, label_key, aliases }) => ({
-      id: requirementId,
-      label_key,
-      ...(aliases ? { aliases } : {}),
-    })),
-  };
+  return hearingScenarioFromCatalogEntry(entry);
 }
 
 export const WEB_APP_HEARING_SCENARIO: HearingScenario =
   hearingScenarioFromCatalog('web_app_build');
+
+/** Scenario ids, requirement ids and hearing session ids share one safe-segment grammar. */
+export const HEARING_SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u;
 
 export type HearingRequirementId = string;
 
 export interface HearingRequirement {
   id: HearingRequirementId;
   label_key: string;
+  label_source?: 'vocabulary' | 'tenant';
+  label_text?: string;
+  phase_id?: string;
   answer?: string;
   confidence: number;
   source_turn?: string;
@@ -70,7 +116,7 @@ export interface HearingDecidedBy {
  * version record of which path produced each `vN` (additive; older records
  * without it stay valid — callers must treat a missing entry as unknown,
  * not as `template`). */
-export type HearingCanvasGenerationState = 'pending' | 'generated' | 'template';
+export type HearingCanvasGenerationState = 'pending' | 'generated' | 'template' | 'projected';
 
 export interface HearingDecisionOperation {
   version: 1;
@@ -115,7 +161,14 @@ export interface HearingRecord {
   decided_by?: HearingDecidedBy;
   decided_at?: string;
   canvas_generation?: HearingCanvasGenerationState;
-  canvas_version_sources?: Record<string, 'template' | 'generated'>;
+  canvas_version_sources?: Record<string, 'template' | 'generated' | 'projected'>;
+  /** The requirement the companion asked about last — the next answer lands here
+   * unless the turn's intent resolution names another one. Set by the route after
+   * every answer (`nextHearingQuestion`), so a hearing is a question → answer
+   * sequence instead of "every message fills the next slot in order". */
+  asked_id?: HearingRequirementId;
+  /** The sheet's phases, persisted so coverage and prompts stay phase-aware. */
+  phases?: HearingPhase[];
 }
 
 export interface HearingTurn {
@@ -140,13 +193,19 @@ export function createHearingRecord(
   return {
     session_id: sessionId,
     scenario: scenario.id,
-    requirements: scenario.requirements.map(({ id, label_key }) => ({
-      id,
-      label_key,
-      confidence: 0,
-    })),
+    requirements: scenario.requirements.map(
+      ({ id, label_key, label_source, label_text, phase_id }) => ({
+        id,
+        label_key,
+        ...(label_source ? { label_source } : {}),
+        ...(label_text ? { label_text } : {}),
+        ...(phase_id ? { phase_id } : {}),
+        confidence: 0,
+      })
+    ),
     canvas_versions: [],
     updated_at: now,
+    ...(scenario.phases?.length ? { phases: scenario.phases } : {}),
   };
 }
 
@@ -154,7 +213,7 @@ export function validateHearingScenario(scenario: HearingScenario): void {
   if (
     !scenario ||
     typeof scenario.id !== 'string' ||
-    !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(scenario.id.trim()) ||
+    !HEARING_SAFE_ID_PATTERN.test(scenario.id.trim()) ||
     !Array.isArray(scenario.requirements) ||
     scenario.requirements.length === 0
   ) {
@@ -165,7 +224,7 @@ export function validateHearingScenario(scenario: HearingScenario): void {
     if (
       !requirement ||
       typeof requirement.id !== 'string' ||
-      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(requirement.id.trim()) ||
+      !HEARING_SAFE_ID_PATTERN.test(requirement.id.trim()) ||
       typeof requirement.label_key !== 'string' ||
       !requirement.label_key.trim() ||
       ids.has(requirement.id)
@@ -203,22 +262,29 @@ export function applyHearingTurn(
   const requestedId = turn.intent_resolution?.missing_inputs
     .map((input) => requirementIdForInput(input, scenario))
     .find((id): id is HearingRequirementId => Boolean(id));
+  const asked = record.asked_id
+    ? record.requirements.find((item) => item.id === record.asked_id && !item.answer)
+    : undefined;
   const target =
     record.requirements.find((item) => item.id === requestedId) ||
+    asked ||
     record.requirements.find((item) => !item.answer);
   if (!target) return { ...record, updated_at: now };
 
   const changed = target.answer !== text;
+  const requirements = record.requirements.map((item) =>
+    item.id === target.id
+      ? { ...item, answer: text, confidence: 0.5, source_turn: turn.request_id }
+      : item
+  );
+  const question = nextHearingQuestion({ ...record, requirements });
   const next: HearingRecord = {
     ...record,
     requirements_revision: hearingRevision(record.requirements_revision) + (changed ? 1 : 0),
-    requirements: record.requirements.map((item) =>
-      item.id === target.id
-        ? { ...item, answer: text, confidence: 0.5, source_turn: turn.request_id }
-        : item
-    ),
+    requirements,
     updated_at: now,
   };
+  if (question) next.asked_id = question.id;
   if (changed) {
     delete next.decided_at;
     delete next.decided_by;
@@ -240,6 +306,11 @@ export function hearingRequirementsKey(record: HearingRecord): string {
     record.scenario,
     record.requirements.map((item) => [item.id, item.label_key, item.answer ?? '']),
   ]);
+}
+
+/** The requirement the companion should ask about next: the first unanswered one, or none. */
+export function nextHearingQuestion(record: HearingRecord): HearingRequirement | undefined {
+  return record.requirements.find((item) => !item.answer?.trim());
 }
 
 export function hearingCoverage(record: HearingRecord): { complete: number; total: number } {

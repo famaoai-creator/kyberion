@@ -3,8 +3,14 @@
  * minutes:record — マイク録音から自動議事録。
  *
  * Usage:
- *   pnpm minutes:record --mission <MISSION_ID> [--device ":0"] [--title "定例会議"] [--language ja]
- *     [--meeting-series <calendar series id>] [--meeting-url <url>]
+ *   pnpm minutes:record --mission <MISSION_ID> [--source mic|system|both | --device ":0"]
+ *                       [--title "定例会議"] [--language ja] [--tenant <slug>] [--work-item <ID>]
+ *                       [--meeting-series <calendar series id>] [--meeting-url <url>]
+ *   pnpm minutes:record --check [--shape room|remote|hybrid]   # 取得元の事前チェック(録音しない)
+ *
+ * 取得元は会議の形で決める: room=mic(会議室の声はマイクに届く) /
+ * remote=system(リモートの声はスピーカー出力=BlackHole)/ hybrid=both。
+ * アプリ側のミュートは Mac 本体のマイク入力には効かない。
  *
  * Ctrl-C (SIGINT) で録音を終了し、meeting-followup パイプラインで
  * minutes.md + アクションアイテムを生成する。
@@ -22,7 +28,15 @@ import {
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
 import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
 import { logger } from '@agent/core/core';
-import { probeMicCapture } from '@agent/core/mic-capture';
+import {
+  detectMacAudioListing,
+  listMacAudioDevices,
+  probeMicCapture,
+  recommendCaptureSource,
+  resolveMacCaptureSource,
+  type MeetingShape,
+  type MicCaptureSource,
+} from '@agent/core/mic-capture';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { t as catalogT } from '@agent/core/t';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
@@ -32,6 +46,7 @@ import {
   ScriptExitError,
   setProcessExitCode,
 } from './lib/harness.js';
+import { hasCliFlag } from './lib/cli-guard.js';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -40,14 +55,59 @@ function getFlag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
+const SOURCES: readonly MicCaptureSource[] = ['mic', 'system', 'both'];
+const SHAPES: readonly MeetingShape[] = ['room', 'remote', 'hybrid'];
+
+function pick<T extends string>(value: string | undefined, allowed: readonly T[], flag: string) {
+  if (value === undefined) return undefined;
+  if (!(allowed as readonly string[]).includes(value)) {
+    logger.error(
+      `❌ ${catalogT('minutes_record:flag_invalid', { flag, value })} (${allowed.join('|')})`
+    );
+    throw new ScriptExitError(1, '', true);
+  }
+  return value as T;
+}
+
+/** Preflight: list the inputs and recommend a source. Never starts a recording. */
+function printSourceCheck(shape: MeetingShape | undefined): void {
+  if (process.platform !== 'darwin') {
+    logger.warn(`⚠️  ${catalogT('minutes_record:source_check_macos_only')}`);
+    return;
+  }
+  const listing = detectMacAudioListing();
+  const devices = listMacAudioDevices(listing);
+  for (const d of devices) {
+    logger.info(`  ${d.device}  ${d.name}  [${d.virtual ? 'virtual' : 'physical'}]`);
+  }
+  const shapes = shape ? [shape] : SHAPES;
+  for (const s of shapes) {
+    const source = recommendCaptureSource(s);
+    let resolved: string;
+    try {
+      resolved = resolveMacCaptureSource(listing, source).join(' + ');
+    } catch (error) {
+      resolved = error instanceof Error ? error.message : String(error);
+    }
+    logger.info(`  ${s} → --source ${source}  (${resolved})`);
+  }
+  logger.info(`  ${catalogT('minutes_record:source_check_hint')}`);
+}
+
 async function main(argv: string[] = []): Promise<void> {
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
+  const shape = pick(getFlag(argv, '--shape'), SHAPES, '--shape');
+  if (hasCliFlag(argv, '--check')) {
+    printSourceCheck(shape);
+    return;
+  }
+  const source = pick(getFlag(argv, '--source'), SOURCES, '--source');
   const missionId = getFlag(argv, '--mission');
   if (!missionId) {
     logger.error(
-      'Usage: pnpm minutes:record --mission <MISSION_ID> [--device ":0"] [--title "..."] [--language ja]'
+      'Usage: pnpm minutes:record --mission <MISSION_ID> [--source mic|system|both | --device ":0"] [--title "..."] [--language ja] [--tenant <slug>] [--work-item <ID>]   |   pnpm minutes:record --check [--shape room|remote|hybrid]'
     );
     throw new ScriptExitError(1, '', true);
   }
@@ -95,7 +155,12 @@ async function main(argv: string[] = []): Promise<void> {
       : {}),
     meetingTitle: getFlag(argv, '--title'),
     language: getFlag(argv, '--language') || 'ja',
-    mic: { device: getFlag(argv, '--device') },
+    mic: { device: getFlag(argv, '--device'), source },
+    tenantSlug: getFlag(argv, '--tenant'),
+    workItemId: getFlag(argv, '--work-item'),
+    onSilenceWarning: ({ seconds }) => {
+      logger.warn(`⚠️  ${catalogT('minutes_record:silence_warning', { seconds })}`);
+    },
     onTranscriptChunk: (chunk) => {
       logger.info(`📝 [${chunk.segment}] ${chunk.text}`);
     },

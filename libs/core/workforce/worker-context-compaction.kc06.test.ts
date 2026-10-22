@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   MAX_CARRYOVER_BACKGROUND_TASKS,
   compactWorkerContext,
@@ -10,6 +10,11 @@ import {
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
 import { MissionWorkingMemory } from '../mission/mission-working-memory.js';
+import { withExecutionContext } from '../authority.js';
+import { removeMissionFixture } from '../testing/mission-fixture.js';
+
+/** Persisted carryover lands in the real confidential mission tree. */
+const CARRYOVER_MISSION_ID = `KC06-CARRYOVER-${process.pid}`;
 
 function makeBackgroundTasks(count: number): ActiveBackgroundTaskRef[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -20,6 +25,12 @@ function makeBackgroundTasks(count: number): ActiveBackgroundTaskRef[] {
 }
 
 describe('KC-06 post-compaction active-task snapshot (carryover)', () => {
+  afterAll(() => {
+    withExecutionContext('mission_controller', () =>
+      removeMissionFixture({ missionId: CARRYOVER_MISSION_ID, tier: 'confidential' })
+    );
+  });
+
   it('renders active background tasks inside the carryover block, bounded to 8', () => {
     const carryover: CompactionCarryover = {
       goal: 'ship the report',
@@ -75,7 +86,7 @@ describe('KC-06 post-compaction active-task snapshot (carryover)', () => {
 
   it('round-trips active background tasks through persisted carryover', () => {
     const workingMemory = new MissionWorkingMemory();
-    const missionId = `KC06-CARRYOVER-${process.pid}`;
+    const missionId = CARRYOVER_MISSION_ID;
     const carryover: CompactionCarryover = {
       goal: 'g',
       active_artifacts: [],

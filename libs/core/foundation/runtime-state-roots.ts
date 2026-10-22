@@ -23,6 +23,7 @@ export const RUNTIME_STATE_PATHS = {
   'dot.lifecycleAudit': 'active/shared/runtime/dot-lifecycle-audit.jsonl',
   'memory.promotionQueue': 'active/shared/runtime/memory/promotion-queue.jsonl',
   'memory.tenantRoot': 'active/shared/runtime/tenants',
+  'organization.projectsRoot': 'active/shared/runtime/projects',
   'quota.tenantBuckets': 'active/shared/runtime/tenant-rate-limit-state.json',
 } as const;
 

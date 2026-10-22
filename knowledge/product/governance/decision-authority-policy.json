@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/decision-authority-policy.schema.json",
+  "version": "1.0.0",
+  "basis_required_for_decided": true,
+  "levels": {
+    "product-fixed": { "deciding_roles": ["owner", "approver"] },
+    "product-axis": { "deciding_roles": ["owner", "approver"], "requires_options": true },
+    "customer-value": {
+      "deciding_roles": [],
+      "customer_actor_required": true,
+      "customer_evidence_required": true
+    },
+    "undecided": { "deciding_roles": [] }
+  }
+}

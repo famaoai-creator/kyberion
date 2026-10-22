@@ -1,6 +1,27 @@
 ---
 agentId: reasoning-worker
-capabilities: [reasoning, analysis, planning, strategy, architecture, code, implementation, refactoring, review, testing, design, ux, security, critique, role_play, persona_modeling, documentation, summarization, a2a]
+capabilities:
+  [
+    reasoning,
+    analysis,
+    planning,
+    strategy,
+    architecture,
+    code,
+    implementation,
+    refactoring,
+    review,
+    testing,
+    design,
+    ux,
+    security,
+    critique,
+    role_play,
+    persona_modeling,
+    documentation,
+    summarization,
+    a2a,
+  ]
 auto_spawn: false
 trust_required: 3.0
 allowed_actuators: [agent-actuator, file-actuator, code-actuator, wisdom-actuator, network-actuator]

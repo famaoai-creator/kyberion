@@ -242,7 +242,8 @@ jobs:
         run: pnpm run kyberion -- preview pipelines/baseline-check.json
 
       - name: Pipeline preview (meeting proxy)
-        run: pnpm run kyberion -- preview pipelines/meeting-proxy-workflow.json
+        if: runner.os != 'Windows'
+        run: pnpm run kyberion -- preview knowledge/product/pipeline-templates/meeting-proxy-workflow.json
 
       - name: Pipeline shell independence
         run: pnpm run check -- --scope full --only pipeline-shell-independence

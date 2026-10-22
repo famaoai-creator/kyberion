@@ -9,6 +9,15 @@ export function isClaudeCliPlaceholderFailure(reason: string | undefined | null)
   return Boolean(reason && reason.toLowerCase().includes(CLAUDE_CLI_PLACEHOLDER_SIGNATURE));
 }
 
+/**
+ * Whether the default `claude` failure warrants searching the well-known
+ * install locations: the pnpm placeholder shim, or no `claude` on PATH at all
+ * (ENOENT) — the usual case under a daemon's minimal launchd/systemd/cron PATH.
+ */
+export function isClaudeCliFallbackEligible(reason: string | undefined | null): boolean {
+  return isClaudeCliPlaceholderFailure(reason) || /\bENOENT\b/.test(reason ?? '');
+}
+
 export interface ClaudeCliFallbackCandidateOptions {
   env?: NodeJS.ProcessEnv;
   home?: string;

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { logger } from './core.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
@@ -62,8 +63,26 @@ function contextualIntentLearningCatalogAtPath(
 
 function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
   const safePath = learningStorePath(scope);
-  if (!safeExistsSync(safePath)) return defaultStore();
-  return contextualIntentLearningCatalogAtPath(safePath).load();
+  try {
+    if (!safeExistsSync(safePath)) return defaultStore();
+    return contextualIntentLearningCatalogAtPath(safePath).load();
+  } catch (error) {
+    // The learning store lives in the personal tier. A surface role that may
+    // not read it (presence-studio, voice-hub as a worker) must still answer
+    // the request — learning is an optimization, never a precondition
+    // (probe-and-degrade). Anything other than an authorization refusal is
+    // still surfaced.
+    if (
+      error instanceof Error &&
+      /ROLE_VIOLATION|POLICY_VIOLATION|not authorized/i.test(error.message)
+    ) {
+      logger.warn(
+        `[contextual-intent-learning] store unreadable for this role; continuing without learned hints: ${error.message.slice(0, 160)}`
+      );
+      return defaultStore();
+    }
+    throw error;
+  }
 }
 
 function writeStore(store: ContextualIntentLearningStore, scope?: ScopeContext): void {
@@ -130,6 +149,19 @@ export function recordContextualIntentLearning(input: {
     expires_at: input.expiresAt,
   };
   store.entries = [...store.entries, entry].slice(-500);
-  writeStore(store, input.scope);
+  try {
+    writeStore(store, input.scope);
+  } catch (error) {
+    // Same probe-and-degrade rule as readStore: learning is best effort.
+    if (!(
+      error instanceof Error &&
+      /ROLE_VIOLATION|POLICY_VIOLATION|not authorized|Sovereign Sanctuary/i.test(error.message)
+    )) {
+      throw error;
+    }
+    logger.warn(
+      `[contextual-intent-learning] entry not saved for this role: ${error.message.slice(0, 160)}`
+    );
+  }
   return entry;
 }

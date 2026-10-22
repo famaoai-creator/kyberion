@@ -66,7 +66,7 @@ describe('voice and browser smoke contract', () => {
 
   it('keeps the browser and voice smoke pipelines pointed at the current health checks', () => {
     const browserCatalog = read('libs/actuators/browser-actuator/examples/catalog.json');
-    const voiceHealth = read('pipelines/voice-health-check.json');
+    const voiceHealth = read('knowledge/product/pipeline-templates/voice-health-check.json');
     const packageJson = read('package.json');
     const testSuite = read('scripts/test_suite.ts');
     const smokePipeline = read('pipelines/ui-voice-browser-smoke.json');

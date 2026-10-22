@@ -52,6 +52,7 @@ import { materializeExecutionFeedbackCandidate } from '@agent/core/execution-fee
 import {
   assertAskScopeOptionsSupported,
   buildAskConversationInput,
+  scopedAskIntakeReceipt,
 } from './lib/operator-ask-scope.js';
 import { promoteDesktopProcedure } from '@agent/core/virtual/desktop-recording-compiler';
 import { reconcileDesktopPromotionTransaction } from '@agent/core/virtual/desktop-promotion-transaction';
@@ -323,6 +324,13 @@ async function handleAskSubcommand(
   if (!text.trim()) {
     printOutput(ui('recorder:recorder_ask_usage'));
     throw new ScriptExitError(1, '', true);
+  }
+  // A selected organization with an active dot takes the ask as a dot intake
+  // event; only that path relaxes the scoped-ask refusal below.
+  const intakeReceipt = scopedAskIntakeReceipt(text, json, cliLocale);
+  if (intakeReceipt) {
+    printOutput(intakeReceipt);
+    return;
   }
   const result = await runSurfaceMessageConversation(
     buildAskConversationInput(text, cliLocale, suppliedCorrelationId)

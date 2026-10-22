@@ -15,7 +15,12 @@
 import * as path from 'node:path';
 import { safeWriteFile, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
-import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
+import {
+  reviewLayerMarkup,
+  injectReviewLayer,
+  RV_LAYER_OPEN,
+  RV_LAYER_CLOSE,
+} from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export interface ReportReviewStampPlan {
@@ -59,9 +64,7 @@ export function planReportReviewStamp(
     return { action: 'noop', changed: false, content: html };
 
   const layer = reviewLayerMarkup({ reportId });
-  const content = html.includes('</body>')
-    ? html.replace('</body>', () => `${layer}\n</body>`)
-    : html + layer;
+  const content = injectReviewLayer(html, layer);
   return { action: 'add', changed: true, content };
 }
 

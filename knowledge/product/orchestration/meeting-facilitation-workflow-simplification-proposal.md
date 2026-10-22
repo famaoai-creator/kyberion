@@ -1,7 +1,7 @@
 # Meeting Facilitation Workflow Simplification Proposal
 
 **Date**: 2026-05-04  
-**Target**: `pipelines/meeting-facilitation-workflow.json`
+**Target**: `knowledge/product/pipeline-templates/meeting-facilitation-workflow.json`
 
 ## 1. Goal
 

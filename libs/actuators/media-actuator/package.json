@@ -1,6 +1,6 @@
 {
   "name": "@actuator/media",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
   "main": "../../../dist/libs/actuators/media-actuator/src/index.js",

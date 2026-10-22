@@ -3,7 +3,7 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '../schema-loader.js';
-import { validateA2ATaskContract } from './a2a-task-contract.js';
+import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -123,5 +123,27 @@ describe('a2a-task-contract schema', () => {
     expect(result.valid).toBe(false);
     expect(result.value).toBeUndefined();
     expect(result.errors.some((error) => error.includes('/context/team_role'))).toBe(true);
+  });
+});
+
+describe('isA2ATaskContractLike', () => {
+  it('does not treat a bare surface handoff as a mission task contract', () => {
+    expect(isA2ATaskContractLike({ intent: 'surface_handoff', text: 'hand over' })).toBe(false);
+  });
+
+  it('still validates a surface handoff that carries context', () => {
+    expect(
+      isA2ATaskContractLike({ intent: 'surface_handoff', text: 'x', context: { channel: 'slack' } })
+    ).toBe(true);
+  });
+
+  it('still validates a surface handoff that adds task fields', () => {
+    expect(isA2ATaskContractLike({ intent: 'surface_handoff', text: 'x', objective: 'y' })).toBe(
+      true
+    );
+  });
+
+  it('keeps treating other intents as contracts', () => {
+    expect(isA2ATaskContractLike({ intent: 'request_mission_work', text: 'x' })).toBe(true);
   });
 });

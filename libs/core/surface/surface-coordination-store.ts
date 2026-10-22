@@ -20,7 +20,6 @@ import {
   writeGovernedArtifactJson,
   type GovernedArtifactRole,
 } from '../workforce/artifact-store.js';
-import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 import {
   normalizeEventScope,
   eventScopeMatches,
@@ -95,8 +94,10 @@ function isPersistedScope(value: unknown): value is EventScope {
   }
 }
 
-function surfaceCoordinationRole(surface: SurfaceAsyncChannel): GovernedArtifactRole {
-  return getSurfaceCoordinationRole(surface);
+function surfaceCoordinationRole(_surface: SurfaceAsyncChannel): 'infrastructure_sentinel' {
+  // Store IO is shared infrastructure; channel actor-role overrides are domain
+  // attribution and must not escalate notification or quarantine callers.
+  return 'infrastructure_sentinel';
 }
 
 function systemScope(): EventScope {
@@ -732,7 +733,9 @@ export function enqueueSurfaceOutboxMessage(params: {
   };
   const outputPath = surfaceOutboxLogicalPath(params.surface, record.message_id, scope);
   const validated = validateSurfaceOutboxMessage(record, outputPath);
-  return writeJsonAs(surfaceCoordinationRole(params.surface), outputPath, validated);
+  // Enqueuing a validated delivery record is shared coordination storage.
+  // A personal surface-role mapping must not widen a notification caller.
+  return writeJsonAs('infrastructure_sentinel', outputPath, validated);
 }
 
 export function getSurfaceDeadTarget(

@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "decision-record.schema.json",
+  "title": "Decision Record",
+  "description": "One append-only record of the per-tenant decision ledger (concept name: SSOD, Single Source of Decisions). See README-decision-ledger.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "case_id", "item", "key", "level", "state", "basis", "origin", "status"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "item": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    "level": {
+      "type": "string",
+      "enum": ["product-fixed", "product-axis", "customer-value", "undecided"]
+    },
+    "state": {
+      "type": "string",
+      "enum": ["observed", "enacted", "proposed", "decided", "rejected"]
+    },
+    "value": {},
+    "options": { "type": "array" },
+    "authority": {
+      "type": "string",
+      "enum": ["product", "customer", "core-system", "platform", "regulation", "environment"]
+    },
+    "basis": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "version"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "note": { "type": ["string", "null"] },
+          "approved": { "type": "string" }
+        }
+      }
+    },
+    "bound_to": { "type": "array", "items": { "type": "string" } },
+    "decided_by": { "$ref": "#/definitions/decidedBy" },
+    "decided_at": { "type": "string" },
+    "proposed_by": { "$ref": "#/definitions/actorRef" },
+    "proposed_at": { "type": "string" },
+    "origin": {
+      "type": "string",
+      "enum": ["transcribed", "console", "hearing", "facade", "ssot-sync", "observation"]
+    },
+    "status": { "type": "string", "enum": ["active", "superseded"] },
+    "supersedes": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+    "pending_reason": { "type": "string" },
+    "note": { "type": "string" },
+    "source_turn": { "type": "string" }
+  },
+  "definitions": {
+    "actorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["human", "agent", "service"] },
+        "id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string" },
+        "on_behalf_of": { "type": "string" }
+      }
+    },
+    "decidedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["human"] },
+        "id": { "type": "string", "pattern": "^user:" },
+        "display_name": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "approver", "viewer"] },
+        "on_behalf_of": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actor_id"],
+          "properties": {
+            "actor_id": { "type": "string", "pattern": "^customer:[a-z][a-z0-9-]{0,60}$" },
+            "confirm_target": { "type": "string" },
+            "evidence": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

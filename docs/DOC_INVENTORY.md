@@ -53,7 +53,7 @@ This was the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`, 
 | `docs/playbooks/creative-whiteboard.md`                | `docs/developer/playbooks/creative-whiteboard.md`                |
 | `docs/design/CHRONOS_A2UI_SPEC.md`                     | `docs/developer/design/CHRONOS_A2UI_SPEC.md`                     |
 
-References updated in: `docs/COMPONENT_MAP.md`, `docs/GLOSSARY.md`, `docs/INTENT_LOOP_CONCEPT.md`, `docs/PRODUCTIZATION_ROADMAP.md`, `docs/developer/README.md`, `knowledge/product/architecture/{decision-support-design-rationale,hardening-backlog,kyberion-concept-evaluation-2026-04-26}.md`, `knowledge/product/governance/pipelines/modeling-graph.json`, `knowledge/product/roles/{performance_engineer,product_manager}/PROCEDURE.md`.
+References updated in: `docs/COMPONENT_MAP.md`, `docs/GLOSSARY.md`, `docs/INTENT_LOOP_CONCEPT.md`, `docs/PRODUCTIZATION_ROADMAP.md`, `docs/developer/README.md`, `knowledge/product/architecture/{decision-support-design-rationale,hardening-backlog,kyberion-concept-evaluation-2026-04-26}.md`, `knowledge/product/roles/{performance_engineer,product_manager}/PROCEDURE.md`.
 
 ## 2. Audience classification of root-level `docs/` files
 

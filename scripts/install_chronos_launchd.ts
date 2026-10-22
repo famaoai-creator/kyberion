@@ -38,6 +38,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
+  daemonUserPath,
   resolveDaemonManager,
   type DaemonPlan,
   type DaemonRenderContext,
@@ -85,6 +86,7 @@ export const CHRONOS_FORWARDABLE_ENV = [
   'KYBERION_CHRONOS_SCHEDULES',
   'KYBERION_OPERATOR_SLACK_DM',
   'KYBERION_REASONING_BACKEND',
+  'KYBERION_CLAUDE_CLI_MODEL',
 ] as const;
 
 /**
@@ -244,6 +246,7 @@ export async function main(
     homeDir: os.homedir(),
     uid: currentUid(),
     stagingDir: pathResolver.sharedTmp(`daemon-units/${manager.platform}`),
+    userPath: daemonUserPath(process.env.PATH, path.delimiter),
     env,
     userId:
       options.platform === 'win32' || process.platform === 'win32'

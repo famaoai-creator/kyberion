@@ -1,4 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { pathResolver } from '../path-resolver.js';
+
+// Matches the "overlay exists" branch of the fixture paths below. Declared
+// via vi.hoisted so the vi.mock factories can close over it.
+const PRESENT_OVERLAY_FIXTURE = vi.hoisted(
+  () => /service-engine-overlay-[0-9a-f-]+[\\/]present[\\/]/u
+);
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -104,16 +113,24 @@ vi.mock('../secure-io.js', async () => {
     safeReaddir: mocks.safeReaddir,
     safeStat: mocks.safeStat,
     // loadServiceConnectionAtPath gates reads on safeLstat before the governed
-    // catalog load — a virtual (non-filesystem) overlay path is never a real
-    // regular file, so it must resolve here rather than hitting the real,
-    // policy-enforced implementation.
+    // catalog load. The overlay fixture is a path, not a file: this suite
+    // mocks the JSON readers the policy engine itself loads through, so it
+    // runs with no policies and no real write could succeed. Its content is
+    // served by the per-test safeReadFile stub, so only presence is faked —
+    // the path itself stays in-repo so assertSafeRepositoryPath is genuinely
+    // exercised.
     safeLstat: (filePath: string) =>
-      filePath.startsWith('/virtual/') ? { isFile: () => true } : actual.safeLstat(filePath),
+      PRESENT_OVERLAY_FIXTURE.test(filePath) ? { isFile: () => true } : actual.safeLstat(filePath),
     loadJson: <T>(filePath: string): T => {
       const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
       return JSON.parse(String(raw)) as T;
     },
-    assertSafeRepositoryPath: (filePath: string): string => filePath,
+    // Delegates to the real guard on purpose: a pass-through stub would let
+    // an out-of-repo fixture path look valid here while production rejects
+    // it, which is how the customer-overlay case used to pass with a
+    // '/virtual/...' path.
+    assertSafeRepositoryPath: (filePath: string, options?: Record<string, unknown>): string =>
+      actual.assertSafeRepositoryPath(filePath, options),
   };
 });
 
@@ -145,10 +162,10 @@ vi.mock('../foundation/io.js', async () => {
       },
       appendFile: () => undefined,
       exists: (filePath: string) =>
-        filePath.startsWith('/virtual/') ? true : mocks.safeExistsSync(filePath),
+        PRESENT_OVERLAY_FIXTURE.test(filePath) ? true : mocks.safeExistsSync(filePath),
       readFile: (filePath: string) => String(mocks.safeReadFile(filePath, { encoding: 'utf8' })),
       stat: (filePath: string) =>
-        filePath.startsWith('/virtual/') ? { mtimeMs: 1, size: 1 } : mocks.safeStat(filePath),
+        PRESENT_OVERLAY_FIXTURE.test(filePath) ? { mtimeMs: 1, size: 1 } : mocks.safeStat(filePath),
       writeFile: () => undefined,
     }),
     registerFoundationIo: vi.fn(),
@@ -202,6 +219,34 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
   });
   return { StreamableHTTPClientTransport };
 });
+
+// Customer-overlay paths: the overlay path is validated with
+// assertSafeRepositoryPath before it is read, so an out-of-repo path (the old
+// '/virtual/...') is rejected as RESOURCE_PATH_SCOPE and the overlay silently
+// degrades to the personal fallback. Nothing is written — the guard runs with
+// allowMissingLeaf and every read goes through the mocked JSON readers below,
+// which is also why no real write could succeed here: mocking those readers
+// leaves the policy engine with no policies, and it then fails closed.
+const overlayFixtureDir = pathResolver.sharedTmp(`service-engine-overlay-${randomUUID()}`);
+const overlayConnectionPath = path.join(
+  overlayFixtureDir,
+  'present/customer/acme/connections/slack.json'
+);
+// Exercises "no customer overlay exists".
+const missingOverlayConnectionPath = path.join(
+  overlayFixtureDir,
+  'absent/customer/acme/connections/slack.json'
+);
+const OVERLAY_CONNECTION_DOCUMENT = {
+  path_segment: 'customer-route',
+  token: 'customer-token',
+};
+
+// Pure argument value: safeExec is mocked, so nothing is ever written here —
+// it only has to be a governed path instead of a machine-specific /tmp one.
+const screenCaptureOutputPath = pathResolver.sharedTmp(
+  `service-engine-vision-${randomUUID()}/screen.jpg`
+);
 
 describe('executeServicePreset', () => {
   beforeEach(() => {
@@ -462,15 +507,12 @@ describe('executeServicePreset', () => {
 
   it('prefers a customer overlay connection when active', async () => {
     process.env.KYBERION_CUSTOMER = 'acme';
-    mocks.resolveOverlay.mockReturnValue('/virtual/customer/acme/connections/slack.json');
+    mocks.resolveOverlay.mockReturnValue(overlayConnectionPath);
 
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('customer/acme/connections/slack.json')) {
-        return JSON.stringify({
-          path_segment: 'customer-route',
-          token: 'customer-token',
-        });
+      if (filePath === overlayConnectionPath) {
+        return JSON.stringify(OVERLAY_CONNECTION_DOCUMENT);
       }
       if (filePath.includes('slack.json')) {
         return JSON.stringify({
@@ -500,11 +542,11 @@ describe('executeServicePreset', () => {
 
   it('falls back to personal connection when no customer overlay exists', async () => {
     process.env.KYBERION_CUSTOMER = 'acme';
-    mocks.resolveOverlay.mockReturnValue('/virtual/customer/acme/connections/slack.json');
+    mocks.resolveOverlay.mockReturnValue(missingOverlayConnectionPath);
 
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('customer/acme/connections/slack.json')) {
+      if (filePath === missingOverlayConnectionPath) {
         throw new Error('missing overlay');
       }
       if (filePath.includes('knowledge/personal/connections/slack.json')) {
@@ -594,11 +636,11 @@ describe('executeServicePreset', () => {
       return '';
     });
     mocks.checkBinary.mockResolvedValue(true);
-    mocks.safeExec.mockReturnValue('/tmp/screen.jpg');
+    mocks.safeExec.mockReturnValue(screenCaptureOutputPath);
 
     await expect(
-      executeServicePreset('vision', 'capture_screen', { output: '/tmp/screen.jpg' }, 'none')
-    ).resolves.toBe('/tmp/screen.jpg');
+      executeServicePreset('vision', 'capture_screen', { output: screenCaptureOutputPath }, 'none')
+    ).resolves.toBe(screenCaptureOutputPath);
   });
 
   it('passes secret-guard OAuth env into stdio MCP bridges', async () => {

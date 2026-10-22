@@ -18,9 +18,10 @@ import {
   safeSymlinkSync,
   safeUnlinkSync,
 } from '../secure-io.js';
+import { removeMissionFixtures } from '../testing/mission-fixture.js';
 import type { MissionState } from './mission-types.js';
 
-const MISSION_ID = 'MSN-PM-TEST-REASSIGN';
+const MISSION_ID = `MSN-PM-TEST-REASSIGN-${process.pid}`;
 const SOURCE_PROJECT_ID = 'PRJ-PM-TEST-SOURCE';
 const TARGET_PROJECT_ID = 'PRJ-PM-TEST-TARGET';
 const TARGET_TRACK_ID = 'TRK-PM-TEST-TARGET';
@@ -50,20 +51,20 @@ function cleanup(): void {
   ]) {
     if (safeExistsSync(filePath)) safeRmSync(filePath);
   }
-  const tenantMissionPaths = [TEST_TENANT, 'other-tenant'].map((tenant) =>
-    pathResolver.tenantMissionDir(MISSION_ID, tenant, 'confidential')
-  );
-  for (const [index, workspace] of [
-    missionPath,
-    ...tenantMissionPaths,
-    sourceWorkspace,
-    targetWorkspace,
-  ].entries()) {
+  // Reclaim the mission fixture in every shape the reassignment test can leave
+  // it: untenanted, under the test tenant, and under the foreign tenant the
+  // reassignment moves it to. removeMissionFixture also prunes the tenant-slug
+  // parents (`tenant-reassignment/`, `other-tenant/`), which plain directory
+  // removal left behind as empty shells.
+  for (const tenant of [undefined, TEST_TENANT, 'other-tenant'] as const) {
     const previousTenant = process.env.KYBERION_TENANT;
-    if (index === 2) process.env.KYBERION_TENANT = 'other-tenant';
-    if (safeExistsSync(workspace)) safeRmSync(workspace);
+    if (tenant !== undefined) process.env.KYBERION_TENANT = tenant;
+    removeMissionFixtures([{ missionId: MISSION_ID, tier: 'confidential', tenantSlug: tenant }]);
     if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = previousTenant;
+  }
+  for (const workspace of [missionPath, sourceWorkspace, targetWorkspace]) {
+    if (safeExistsSync(workspace)) safeRmSync(workspace);
   }
 }
 

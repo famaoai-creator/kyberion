@@ -19,6 +19,16 @@ export function validateA2ATaskContract(value: unknown): A2ATaskContractValidati
 export function isA2ATaskContractLike(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
+  // A bare surface handoff is exactly `{ intent, text }`: a conversation
+  // hand-over, not a mission task, so it is not held to the mission-task
+  // contract (which requires context.mission_id / team_role). Any other field
+  // (context, objective, acceptance criteria, …) keeps contract validation.
+  if (
+    record.intent === 'surface_handoff' &&
+    Object.keys(record).every((key) => key === 'intent' || key === 'text')
+  ) {
+    return false;
+  }
   return (
     typeof record.intent === 'string' ||
     typeof record.objective === 'string' ||

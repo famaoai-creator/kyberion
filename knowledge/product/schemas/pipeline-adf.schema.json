@@ -92,7 +92,10 @@
           "type": "object",
           "required": ["surface", "channel"],
           "properties": {
-            "surface": { "type": "string", "enum": ["slack", "telegram", "discord", "imessage"] },
+            "surface": {
+              "type": "string",
+              "enum": ["slack", "telegram", "discord", "imessage", "chronos"]
+            },
             "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
             "thread_ts": { "type": "string", "maxLength": 500 },
             "template": { "type": "string", "minLength": 1, "maxLength": 8000 }

@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "decision-authority-policy.schema.json",
+  "title": "Decision Authority Policy",
+  "description": "Who may promote a decision of each level to decided (SD-00 §2.2, level × actor). Consumed by libs/core/decision-ledger/promote.ts through policy.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "basis_required_for_decided", "levels"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "basis_required_for_decided": { "type": "boolean" },
+    "levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product-fixed", "product-axis", "customer-value", "undecided"],
+      "properties": {
+        "product-fixed": { "$ref": "#/definitions/level" },
+        "product-axis": { "$ref": "#/definitions/level" },
+        "customer-value": { "$ref": "#/definitions/level" },
+        "undecided": { "$ref": "#/definitions/level" }
+      }
+    }
+  },
+  "definitions": {
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deciding_roles"],
+      "properties": {
+        "deciding_roles": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["owner", "approver", "viewer"] }
+        },
+        "requires_options": { "type": "boolean" },
+        "customer_actor_required": { "type": "boolean" },
+        "customer_evidence_required": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import {
   type PipelineScheduleRegistry,
   type ScheduledPipeline,
   scheduleAllowedByOperator,
+  listOperatorExcludedSchedules,
   scheduleExplicitlyOptedIn,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
@@ -422,6 +423,20 @@ describe('pipeline scheduler', () => {
 });
 
 describe('operator schedule allowlist', () => {
+  it('reports enabled schedules a plain-id allowlist silently excludes', () => {
+    const schedules = [
+      { id: 'organization-daily-digest', enabled: false },
+      { id: 'backup-daily', enabled: true },
+      { id: 'storage-janitor-daily', enabled: true },
+    ];
+    expect(listOperatorExcludedSchedules(schedules, 'organization-daily-digest')).toEqual([
+      'backup-daily',
+      'storage-janitor-daily',
+    ]);
+    expect(listOperatorExcludedSchedules(schedules, '+organization-daily-digest')).toEqual([]);
+    expect(listOperatorExcludedSchedules(schedules, undefined)).toEqual([]);
+  });
+
   it('allows every schedule when no allowlist is set', () => {
     expect(scheduleAllowedByOperator('backup-daily', '')).toBe(true);
     expect(scheduleAllowedByOperator('backup-daily', undefined)).toBe(true);

@@ -177,7 +177,14 @@ describe('semantic-design-tokens', () => {
           motionProfile: motion,
           designSystemRef: { css_vars: {} } as never,
         })
-      ).toEqual(golden.css[family]);
+      ).toEqual({
+        ...golden.css[family],
+        // Shared web tokens added after the video palette baseline remain
+        // present without changing any of the original video tokens.
+        '--kb-accent-on': '#0f172a',
+        '--kb-muted-text': '#a2a5ac',
+        '--kb-surface': '#111525',
+      });
     }
   });
 

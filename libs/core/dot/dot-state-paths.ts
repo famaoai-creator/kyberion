@@ -150,6 +150,11 @@ export interface DotInboundEvent {
   delivery_id: string;
   /** Only ever set from intake policy, never from the payload. */
   tenant_slug?: string;
+  /**
+   * Set only by operator ask intake from the trusted selected scope, never
+   * from the payload. When present, only dots of this organization see it.
+   */
+  organization_id?: string;
   received_at: string;
   summary: string;
   payload_digest: string;

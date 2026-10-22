@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineCommand } from './command-harness.js';
+import { cliOptionValue, hasCliFlag } from './cli-guard.js';
 import { clearProcessExitCode, getProcessExitCode } from './script-harness.js';
 
 afterEach(() => {
@@ -8,6 +9,14 @@ afterEach(() => {
 });
 
 describe('command harness', () => {
+  it('shares safe flag and option reads with legacy command adapters', () => {
+    const argv = ['--public', '--name', 'sample', '--dry-run'];
+    expect(hasCliFlag(argv, '--public')).toBe(true);
+    expect(hasCliFlag(argv, '--force')).toBe(false);
+    expect(cliOptionValue(argv, '--name')).toBe('sample');
+    expect(cliOptionValue(argv, '--public')).toBeUndefined();
+  });
+
   it('uses shared value normalization and serializes once', async () => {
     const output = vi.spyOn(console, 'log').mockImplementation(() => {});
     const command = defineCommand({

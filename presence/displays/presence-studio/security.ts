@@ -1,3 +1,4 @@
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
@@ -260,6 +261,24 @@ export interface PresenceStudioViewerContext {
   source: 'loopback' | 'token';
   /** The seam-resolved principal, when authn produced one (authz seam input). */
   principal?: ResolvedPrincipal;
+  /** FD-01: a loopback owner may narrow to any tenant they hold a membership in;
+   * this is the server's default tenant (`KYBERION_TENANT`) used when the page
+   * sends no `?tenant=`. Token viewers never get this. */
+  loopbackDefaultTenant?: string;
+}
+
+/** FD-01 narrowing input: `?tenant=` (query) or `x-kyberion-tenant` header — a hint, never authorization. */
+function requestedTenantHint(
+  req: Pick<Request, 'headers'> & { query?: unknown }
+): string | undefined {
+  const query = (req as { query?: Record<string, unknown> }).query;
+  const raw =
+    (query && typeof query.tenant === 'string' ? query.tenant : undefined) ??
+    (typeof req.headers?.['x-kyberion-tenant'] === 'string'
+      ? (req.headers['x-kyberion-tenant'] as string)
+      : undefined);
+  const slug = String(raw || '').trim();
+  return slug && isValidTenantSlug(slug) ? slug : undefined;
 }
 
 /** Held-action mutations are human operator actions, never readonly token actions. */
@@ -434,7 +453,7 @@ export class PresenceStudioViewerError extends Error {
  * bearer token and an active server tenant.
  */
 export function resolvePresenceStudioViewerContext(
-  req: Pick<Request, 'headers' | 'socket'> & { method?: string }
+  req: Pick<Request, 'headers' | 'socket'> & { method?: string; query?: unknown }
 ): PresenceStudioViewerContext {
   const auth = authorizePresenceStudioRequest(req);
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
@@ -454,17 +473,33 @@ export function resolvePresenceStudioViewerContext(
       registrations: null,
       allowLoopback: true,
       loopbackRole: 'localadmin',
-      loopbackUsesServerTenant: true,
+      // FD-01: the loopback owner is not pinned to the server tenant — they
+      // hold memberships in several tenants and switch between them from the
+      // rail. The server tenant is only the default view; the effective tenant
+      // for this request is the page's `?tenant=` narrowing (validated slug)
+      // or that default. Data routes keep receiving a concrete tenant set.
+      loopbackUsesServerTenant: false,
       principalIds: {
         localadmin: 'human:presence-studio-localadmin',
         readonly: 'human:presence-studio-token',
       },
       surface: 'presence-studio',
     });
+    const source = scope.source === 'loopback' ? 'loopback' : 'token';
+    if (source === 'loopback' && scope.tenantSlugs === 'all') {
+      const effective = requestedTenantHint(req) ?? (tenant || undefined);
+      return {
+        principalId: scope.principalId || 'human:presence-studio-localadmin',
+        tenantSlugs: effective ? [effective] : 'all',
+        source,
+        principal,
+        ...(tenant ? { loopbackDefaultTenant: tenant } : {}),
+      };
+    }
     return {
       principalId: scope.principalId || 'human:presence-studio-token',
       tenantSlugs: scope.tenantSlugs,
-      source: scope.source === 'loopback' ? 'loopback' : 'token',
+      source,
       principal,
     };
   } catch (error) {

@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "decision-customer-actors.schema.json",
+  "title": "Decision Ledger Customer Actor Registry",
+  "description": "Decision actors of one tenant's customer (SD-04). Lives inside the tenant; a member may record a customer-value decision only on behalf of an actor listed here, and only with that actor's approval evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tenant_slug", "customer", "actors"],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "customer": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,60}$" },
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "decides"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^customer:[a-z][a-z0-9-]{0,60}$" },
+          "name": { "type": "string", "minLength": 1 },
+          "decides": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["product-fixed", "product-axis", "customer-value", "undecided"]
+            }
+          },
+          "confirm_target": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { pathResolver } from './path-resolver.js';
+
+// Manifest fixtures must sit on the governed temp floor (in-repo,
+// symlink-free): governed-catalog runs every catalog path through
+// assertSafeRepositoryPath, which rejects /tmp (outside the repository root,
+// and a symlink on macOS) and would silently fall back to the defaults.
+// Nothing is written to disk here — the FoundationIo/json seams below serve
+// the manifest — so each test only needs its own unique path for the
+// per-path catalog cache.
+const manifestFixturePath = (name: string): string =>
+  pathResolver.sharedTmp(`recovery-policy-${randomUUID()}/${name}.json`);
 
 const loadJsonMock = vi.fn();
 const manifestMock = vi.fn();
@@ -85,7 +97,7 @@ describe('recovery-policy', () => {
     });
     const { createGovernedRetryOptionsBuilder } = await import('./recovery-policy.js');
     const buildRetryOptions = createGovernedRetryOptionsBuilder({
-      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-builder.json',
+      manifestPath: manifestFixturePath('manifest-builder'),
       defaults: { maxRetries: 2, initialDelayMs: 500 },
       fallbackCategories: ['timeout'],
     });
@@ -108,7 +120,7 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-first.json',
+      manifestPath: manifestFixturePath('manifest-first'),
       defaults: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 1000, factor: 2, jitter: true },
       override: { maxRetries: 1 },
     });
@@ -128,7 +140,7 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-second.json',
+      manifestPath: manifestFixturePath('manifest-second'),
       defaults: { maxRetries: 1 },
       fallbackCategories: ['resource_unavailable'],
     });

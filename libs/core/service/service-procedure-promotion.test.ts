@@ -1,8 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteServiceProcedure } from './service-procedure-promotion.js';
 import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import * as secureIo from '../secure-io.js';
 import * as foundationJson from '../foundation/json.js';
+import { pathResolver } from '../path-resolver.js';
+
 import { getFoundationIo, registerFoundationIo } from '../foundation/io.js';
 
 // defineCatalog reads presence through FoundationIo rather than secure-io's
@@ -45,38 +49,38 @@ const recording: ServiceRecording = {
 };
 recording.review!.content_hash = serviceRecordingContentHash(recording);
 
-describe('promoteServiceProcedure', () => {
-  const originalFoundationIo = getFoundationIo();
+// The loader reads the recording through the governed catalog boundary, so the
+// fixture has to be a real file inside the allowlisted recording store — the
+// domain checks below are only reached once the catalog can actually load it.
+const recordingDirs: string[] = [];
 
+function writeRecordingFixture(value: ServiceRecording): string {
+  const dir = pathResolver.shared(`runtime/recordings/service-promotion-test-${randomUUID()}`);
+  recordingDirs.push(dir);
+  const filePath = path.join(dir, 'service-promotion-test.json');
+  secureIo.safeMkdir(dir, { recursive: true });
+  secureIo.safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+  return pathResolver.toRepoRelative(filePath);
+}
+
+describe('promoteServiceProcedure', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    registerFoundationIo(originalFoundationIo);
+    while (recordingDirs.length > 0) {
+      secureIo.safeRmSync(recordingDirs.pop() as string);
+    }
   });
 
   it('promotes an approved recording into a non-draft pipeline and personal catalog', () => {
-    const actualRead = secureIo.safeReadFile;
-    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath, options) => {
-      if (filePath.includes('service-promotion-test.json')) return JSON.stringify(recording);
-      return actualRead(filePath, options);
-    });
-    overrideFoundationIoExists((filePath) => filePath.includes('service-promotion-test.json'));
+    const recordingRef = writeRecordingFixture(recording);
+    // Only the promotion's own writes are intercepted: the compiled pipeline
+    // would otherwise land in the tracked pipelines/ tree.
     vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
-    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
-      if (filePath.includes('service-promotion-test.json')) return recording;
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    const actualLstat = secureIo.safeLstat;
-    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
-      if (filePath.includes('service-promotion-test.json')) {
-        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
-      }
-      return actualLstat(filePath);
-    });
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
 
     const result = promoteServiceProcedure({
-      recordingRef: 'active/shared/runtime/recordings/service-promotion-test.json',
+      recordingRef,
       procedureId: 'service.issue-intake.test',
       intentPhrases: ['create an issue'],
       catalogPath: 'active/shared/tmp/service-promotion-test/procedures.json',
@@ -109,31 +113,16 @@ describe('promoteServiceProcedure', () => {
   });
 
   it('refuses a recording that has not passed review', () => {
-    const actualRead = secureIo.safeReadFile;
-    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath, options) => {
-      if (filePath.includes('service-promotion-test.json')) {
-        return JSON.stringify({ ...recording, review: { ...recording.review, status: 'pending' } });
-      }
-      return actualRead(filePath, options);
-    });
-    overrideFoundationIoExists((filePath) => filePath.includes('service-promotion-test.json'));
-    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
-      if (filePath.includes('service-promotion-test.json')) {
-        return { ...recording, review: { ...recording.review, status: 'pending' } };
-      }
-      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
-    });
-    const actualLstat = secureIo.safeLstat;
-    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
-      if (filePath.includes('service-promotion-test.json')) {
-        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
-      }
-      return actualLstat(filePath);
-    });
+    const pending: ServiceRecording = {
+      ...recording,
+      review: { ...recording.review!, status: 'pending' },
+    };
+    pending.review!.content_hash = serviceRecordingContentHash(pending);
+    const recordingRef = writeRecordingFixture(pending);
 
     expect(() =>
       promoteServiceProcedure({
-        recordingRef: 'active/shared/runtime/recordings/service-promotion-test.json',
+        recordingRef,
         procedureId: 'service.issue-intake.pending',
         intentPhrases: ['create an issue'],
       })

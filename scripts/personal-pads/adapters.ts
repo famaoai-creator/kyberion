@@ -341,7 +341,28 @@ export const PAD_ADAPTER_DEFINITIONS: readonly PadAdapterDefinition[] = [
         ],
       },
     ],
-    actions: [],
+    actions: [
+      {
+        id: 'memory.propose-compare',
+        label: 'personal_pads:action_propose_compare',
+        description: 'personal_pads:action_propose_compare_description',
+        effect: 'propose',
+        capability: 'governed',
+        input_fields: [
+          {
+            id: 'optimize_for',
+            label: 'personal_pads:field_optimize_for',
+            kind: 'select',
+            options: [
+              { value: '', label: 'personal_pads:option_optimize_default' },
+              { value: 'cost', label: 'personal_pads:option_optimize_cost' },
+              { value: 'balance', label: 'personal_pads:option_optimize_balance' },
+              { value: 'intelligence', label: 'personal_pads:option_optimize_intelligence' },
+            ],
+          },
+        ],
+      },
+    ],
     preview_template: 'personal_pads:preview_memory_capture',
   },
   {

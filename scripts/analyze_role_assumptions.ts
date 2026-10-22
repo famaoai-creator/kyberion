@@ -155,6 +155,7 @@ function entryUnitsFor(analyzer: Analyzer, ws: Workspace, files: string[]): Unit
   for (const file of files) {
     const rel = ws.rel(file);
     for (const unit of analyzer.units.unitsOfFile(rel)) {
+      if (unit.exported) units.push(...analyzer.returnedCapabilityUnits(unit));
       if (!unit.lazy || unit.exported || unit.entryOnly) units.push(unit);
     }
   }

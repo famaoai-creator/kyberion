@@ -717,6 +717,7 @@ describe('inventory promote (hermetic)', () => {
     expect(result.executed).toBe(false);
     expect(result.pipeline_command).toContain('pipeline:promote');
     expect(result.pipeline_command).toContain('monthly-report');
+    expect(result.pipeline_command).toContain('--tenant');
   });
 });
 
