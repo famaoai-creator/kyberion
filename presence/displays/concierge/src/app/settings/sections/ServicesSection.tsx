@@ -9,6 +9,7 @@ import type { Setup } from '../../../lib/settings-types';
 import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
 import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
+import { ProviderAttestationSection } from './ProviderAttestationSection';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
 /** Service selections are metadata. Token registration and authentication are separate actions. */
@@ -133,6 +134,12 @@ export function ServicesSection({
       </FormScope>
       <OperatorServiceRegistrationPanel t={t} />
       <OnboardingAuthorityPanel
+        locale={locale}
+        tenants={authorityTenants}
+        selectedTenant={selectedTenant}
+      />
+      <ProviderAttestationSection
+        t={t}
         locale={locale}
         tenants={authorityTenants}
         selectedTenant={selectedTenant}

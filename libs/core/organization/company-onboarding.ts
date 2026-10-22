@@ -208,6 +208,10 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   const nextCommands = [
     `pnpm stance:switch ${normalized.slug} && source active/shared/runtime/customer.env`,
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
+    // pnpm scripts do not load .env.local: without these exports the governed
+    // commands below fail with ROLE_VIOLATION / tenant.scope_missing.
+    'export KYBERION_PERSONA=sovereign',
+    `export KYBERION_TENANT=${tenantSlug}`,
     // The stance has its own profile root (customer/<slug>/): missions refuse
     // to start until my-identity.json / my-vision.md / agent-identity.json exist there.
     'pnpm onboarding apply --identity <reviewed-identity-json>',
