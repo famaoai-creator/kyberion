@@ -28,8 +28,11 @@ function tenantAllowed(viewer: { tenantSlugs: string[] | 'all' }, tenant: string
 function attestationInvoker(viewer: {
   memberId?: string;
   principalId?: string;
-}): AttestationInvoker {
-  const actor = viewer.memberId ? `user:${viewer.memberId}` : viewer.principalId || 'concierge';
+}): AttestationInvoker | null {
+  // Attestation requests/records must be attributed to a member-bound viewer;
+  // without memberId there is no verifiable identity to record.
+  if (!viewer.memberId) return null;
+  const actor = `user:${viewer.memberId}`;
   return {
     actor,
     approvalRequester: {
@@ -56,17 +59,14 @@ export async function GET(req: NextRequest) {
       const pending = listApprovalRequests({
         storageChannels: [PROVIDER_ATTESTATION_APPROVAL_CHANNEL],
         status: ['pending', 'approved'],
-      })
-        .filter((record) =>
-          JSON.stringify(record.scope ?? record).includes(`"tenant_slug":"${tenant}"`)
-        )
-        .map((record) => ({
-          request_id: record.id,
-          status: record.status,
-          expires_at: record.expiresAt,
-          approval_channel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
-          presented_digest: computeApprovalPresentedDigest(record),
-        }));
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
+      }).map((record) => ({
+        request_id: record.id,
+        status: record.status,
+        expires_at: record.expiresAt,
+        approval_channel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+        presented_digest: computeApprovalPresentedDigest(record),
+      }));
       return {
         ok: true,
         tenant,
@@ -117,6 +117,17 @@ export async function POST(req: NextRequest) {
   if (trainingUse !== 'none' && trainingUse !== 'used' && trainingUse !== 'unknown') {
     return response({ ok: false, error: 'training_use must be none | used | unknown' }, 400);
   }
+  const invoker = attestationInvoker(resolved.context);
+  if (!invoker) {
+    return response(
+      {
+        ok: false,
+        error:
+          'attestation requires a member-bound viewer session (link an identity to your member)',
+      },
+      403
+    );
+  }
   const input = {
     slug: tenant,
     provider,
@@ -129,7 +140,7 @@ export async function POST(req: NextRequest) {
     ...(typeof body.valid_for_days === 'number' && Number.isInteger(body.valid_for_days)
       ? { valid_for_days: body.valid_for_days }
       : {}),
-    invoker: attestationInvoker(resolved.context),
+    invoker,
   };
   try {
     if (action === 'request') {
