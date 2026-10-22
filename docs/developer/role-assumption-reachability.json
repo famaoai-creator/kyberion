@@ -1909,6 +1909,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/governance-overview/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/governance-overview/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST [delegated child role]",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -4530,6 +4540,7 @@
         "presence/displays/concierge/src/app/api/events/route.ts",
         "presence/displays/concierge/src/app/api/front-desk/links/route.ts",
         "presence/displays/concierge/src/app/api/front-desk/nav/route.ts",
+        "presence/displays/concierge/src/app/api/governance-overview/route.ts",
         "presence/displays/concierge/src/app/api/headless/a2ui/home/route.ts",
         "presence/displays/concierge/src/app/api/headless/home/route.ts",
         "presence/displays/concierge/src/app/api/headless/manifest/route.ts",
@@ -4627,6 +4638,7 @@
         "presence/displays/concierge/src/app/settings/sections/AvatarGenerationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/CharterPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/DisplaySection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/GovernanceSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/IntroduceSecretPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/MemberAdministrationPanel.tsx",
