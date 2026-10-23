@@ -15,6 +15,9 @@ export { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 import { findActiveCharter } from './accountability-charter-registry.js';
 import type { CharterScope } from './accountability-charter.js';
 import {
+  EXTERNAL_OPERATION_DELEGATION,
+  buildExternalOperationTarget,
+  isDelegableExternalOperation,
   parseExternalOperationGrant,
   externalOperationGrantMatches,
 } from './external-operation-target.js';
@@ -82,32 +85,7 @@ export function createOnboardingExternalOperationAuthority(options: {
     const charter = findActiveCharter(scope, new Date());
     if (!charter || !facts.delegable) return authority;
     const effect = facts.effect as Record<string, unknown>;
-    let raw: unknown;
-    if (facts.operationId === 'vcs:pr_create') {
-      if (effect.body_source_tier !== 'public' && effect.body_source_tier !== 'inline')
-        return authority;
-      const repository = effect.repository as
-        { url?: unknown; host?: unknown; slug?: unknown } | undefined;
-      if (repository && typeof repository.url === 'string') {
-        const url = new URL(repository.url);
-        if (
-          url.host === repository.host &&
-          url.pathname.replace(/^\//, '').replace(/\/$/, '') === repository.slug
-        )
-          raw = {
-            operation_id: facts.operationId,
-            repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
-          };
-      }
-    } else if (facts.operationId === 'browser:goto' || facts.operationId === 'browser:open_tab') {
-      if (effect.navigation_confinement !== 'isolated-public-read-v1') return authority;
-      const params = effect.params as { url?: unknown } | undefined;
-      if (typeof params?.url === 'string') {
-        const url = new URL(params.url);
-        if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash)
-          raw = { operation_id: facts.operationId, origin: url.origin };
-      }
-    }
+    const raw = buildExternalOperationTarget(facts.operationId, effect);
     const target = parseExternalOperationGrant(raw);
     if (
       !target ||
@@ -127,7 +105,9 @@ export function createOnboardingExternalOperationAuthority(options: {
           reversible: false,
           irreversible_action_name: target.operation_id,
           estimated_loss: 0,
-          reputational_class: 'B' as const,
+          reputational_class:
+            EXTERNAL_OPERATION_DELEGATION[target.operation_id]?.reputational_class ??
+            ('B' as const),
           blast_radius: { systems: 1, recipients: 1 },
         },
       },
@@ -281,11 +261,7 @@ export function withRuntimeExternalOperationAuthority<T>(
       withExternalOperationAuthority((facts) => {
         if (!onboard) return base(facts);
         const target = onboard(facts);
-        if (
-          ['vcs:pr_create', 'browser:goto', 'browser:open_tab'].includes(facts.operationId) &&
-          target?.charter
-        )
-          return target;
+        if (isDelegableExternalOperation(facts.operationId) && target?.charter) return target;
         // Preserve individual human approval and all existing Slack/meeting
         // delegation while carrying the independent installed standing stop.
         return { ...base(facts), standingScope: target?.standingScope };

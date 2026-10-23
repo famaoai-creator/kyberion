@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-DELEGATION-REGISTRY-20261023-2026_10_23
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-DELEGATION-REGISTRY-20261023-2026_10_23
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-23T20:27:49.763Z
+source_branch: feat/vcs-delegation-20261023
+source_commit: 9c9dc06bf321cca611f1e0f4f83aec7c09aae4b5
+---
+
+# Consolidate delegable-operation wiring into one declarative registry
+
+Charter delegation for external operations previously required four coordinated per-op edits (delegable flag, grant schema/parser, target builder, resolver whitelist). The EXTERNAL_OPERATION_DELEGATION table in external-operation-target.ts now carries fields + buildTarget + reputational_class per op; all four consumers read it, so a same-shaped op is one line and other action domains register their own extractors with the same exact-grant envelope shape.
+
+## Applicability
+
+- mission
+- mission:MSN-DELEGATION-REGISTRY-20261023
+
+## Reusable Steps
+
+1. Charter delegation for external operations previously required four coordinated per-op edits (delegable flag, grant schema/parser, target builder, resolver whitelist)
+2. The EXTERNAL_OPERATION_DELEGATION table in external-operation-target
+3. ts now carries fields + buildTarget + reputational_class per op; all four consumers read it, so a same-shaped op is one line and other action domains register their own extractors with the same exact-grant envelope shape
+
+## Expected Outcome
+
+When introducing declarative registration for per-op policy, keep the boundary flag (delegable), the strict grant parser, the effect-to-target builder and the attach whitelist reading one spec object. Runtime registration hooks are order-fragile; a static exported table is safer for governance code.
+
+## Evidence
+
+- active/missions/public/MSN-DELEGATION-REGISTRY-20261023/evidence/implementation-report.md
+- active/missions/public/MSN-DELEGATION-REGISTRY-20261023/evidence/distillation.md
+
+## Artifacts
