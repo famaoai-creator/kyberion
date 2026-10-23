@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-GOV-BROWSER-20261022-2026_10_23",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "record-evidence does not flip NEXT_TASKS status — reconcile-work or task completion flow is required",
+  "summary": "For direct mission work, checkpoint/record-evidence only appends to the execution ledger; NEXT_TASKS.json task status is unchanged, and the finish gate still reports pending tasks. Write the task deliverable file first, then record-evidence (auto-completes when deliverable+deps present), or use mission_controller reconcile-work for externally completed work.",
+  "candidate_id": "mem-MSN-GOV-BROWSER-20261022-2026_10_23",
+  "evidence_refs": [
+    "active/missions/public/MSN-GOV-BROWSER-20261022/evidence/implementation-report.md",
+    "active/missions/public/MSN-GOV-BROWSER-20261022/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-23T10:18:45.279Z",
+  "applicability": ["mission", "mission:MSN-GOV-BROWSER-20261022"],
+  "reusable_steps": [
+    "For direct mission work, checkpoint/record-evidence only appends to the execution ledger; NEXT_TASKS",
+    "json task status is unchanged, and the finish gate still reports pending tasks",
+    "Write the task deliverable file first, then record-evidence (auto-completes when deliverable+deps present), or use mission_controller reconcile-work for externally completed work"
+  ],
+  "expected_outcome": "Observed on MSN-GOV-BROWSER-20261022: after verify/distill, finish failed with pending tasks even though record-evidence had been called. Fix: create each task deliverable in evidence/, then record-evidence in dependency order — tasks auto-complete. For review-kind tasks, use review-task with an independent reviewer after implementer evidence exists (independence is only evaluated once the implementer actor is recorded).",
+  "source_branch": "main",
+  "source_commit": "1366e6de85cde3a52f17ac32caa6f42c37d2c8b4"
+}

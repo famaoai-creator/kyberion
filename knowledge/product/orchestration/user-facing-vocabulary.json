@@ -16285,6 +16285,166 @@
         "en": "Set up this company",
         "ja": "この会社をセットアップ",
         "qps-ploc": "⟦Şėŧ ůṗ ŧħïş ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "governance.title": {
+        "en": "Governance — approvals & identity",
+        "ja": "ガバナンス — 承認とアイデンティティ",
+        "qps-ploc": "⟦Ɠőṽėřñȧñƈė — ȧṗṗřőṽȧŀş & ïḓėñŧïŧẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "governance.pending_title": {
+        "en": "Pending approvals",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ŀőřėɱ⟧"
+      },
+      "governance.pending_empty": {
+        "en": "No requests are waiting for approval.",
+        "ja": "承認待ちはありません。",
+        "qps-ploc": "⟦Ñő řėɋůėşŧş ȧřė ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "governance.approve_passkey": {
+        "en": "Approve with passkey",
+        "ja": "パスキーで承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ẇïŧħ ṗȧşşķėẏ ŀőřėɱ ⟧"
+      },
+      "governance.rules_title": {
+        "en": "Approval rules",
+        "ja": "承認ルール",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řůŀėş ŀőřė⟧"
+      },
+      "governance.rules_authority": {
+        "en": "Authority & secrets (A3 / dual-key)",
+        "ja": "権限・secret(A3 / dual-key)",
+        "qps-ploc": "⟦Ȧůŧħőřïŧẏ & şėƈřėŧş (Ȧ3 / ḓůȧŀ-ķėẏ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "governance.rules_decisions": {
+        "en": "Business decisions",
+        "ja": "業務上の決定",
+        "qps-ploc": "⟦Ƀůşïñėşş ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "governance.rules_operations": {
+        "en": "Operations & execution",
+        "ja": "操作・実行系",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş & ėẋėƈůŧïőñ ŀőřėɱ ï⟧"
+      },
+      "governance.identity_title": {
+        "en": "Sign-in identity linking",
+        "ja": "サインイン identity の紐付け",
+        "qps-ploc": "⟦Şïɠñ-ïñ ïḓėñŧïŧẏ ŀïñķïñɠ ŀőřėɱ ï⟧"
+      },
+      "governance.identity_current": {
+        "en": "Signed in as: {issuer} / sub {subject}",
+        "ja": "現在のログイン: {issuer} / sub {subject}",
+        "qps-ploc": "⟦Şïɠñėḓ ïñ ȧş: {issuer} / şůƀ {subject} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "governance.identity_linked": {
+        "en": "linked → {member}",
+        "ja": "紐付け済み → {member}",
+        "qps-ploc": "⟦ŀïñķėḓ → {member} ŀőřėɱ⟧"
+      },
+      "governance.identity_unlinked": {
+        "en": "not linked",
+        "ja": "未紐付け",
+        "qps-ploc": "⟦ñőŧ ŀïñķėḓ ŀőř⟧"
+      },
+      "governance.identity_pick": {
+        "en": "Member to link",
+        "ja": "紐付ける member",
+        "qps-ploc": "⟦Ɱėɱƀėř ŧő ŀïñķ ŀőřė⟧"
+      },
+      "governance.identity_link_button": {
+        "en": "Link this sign-in to the member",
+        "ja": "このログインを member に紐付ける",
+        "qps-ploc": "⟦Ŀïñķ ŧħïş şïɠñ-ïñ ŧő ŧħė ɱėɱƀėř ŀőřėɱ ïṗşů⟧"
+      },
+      "governance.identity_not_oidc": {
+        "en": "This session is not an OIDC sign-in. Sign in via /login (Dev IdP etc.) to link a member here.",
+        "ja": "OIDC ログインではありません。`/login` から Dev IdP 等でサインインすると、ここで member に紐付けられます。",
+        "qps-ploc": "⟦Ŧħïş şėşşïőñ ïş ñőŧ ȧñ ŐÏḒƇ şïɠñ-ïñ. Şïɠñ ïñ ṽïȧ /ŀőɠïñ (Ḓėṽ ÏḓṖ ėŧƈ.) ŧő ŀïñķ ȧ ɱėɱƀėř ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "governance.linked_msg": {
+        "en": "linked {subject} → {member}",
+        "ja": "{subject} を {member} に紐付けました",
+        "qps-ploc": "⟦ŀïñķėḓ {subject} → {member} ŀőřėɱ ïṗ⟧"
+      },
+      "governance.approved_msg": {
+        "en": "approved {id}",
+        "ja": "{id} を承認しました",
+        "qps-ploc": "⟦ȧṗṗřőṽėḓ {id} ŀőřė⟧"
+      },
+      "governance.expires": {
+        "en": "expires {at}",
+        "ja": "期限 {at}",
+        "qps-ploc": "⟦ėẋṗïřėş {at} ŀőř⟧"
+      },
+      "attestation.title": {
+        "en": "Provider attestation",
+        "ja": "Provider attestation",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ȧŧŧėşŧȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "attestation.description": {
+        "en": "Attest how each provider is contracted for this tenant (training_use). 'none' opens confidential egress and requires a human approval.",
+        "ja": "各 provider の契約上の扱い(training_use)を tenant ごとに宣言します。'none' は confidential 系 egress を開き、人間の承認が必要です。",
+        "qps-ploc": "⟦Ȧŧŧėşŧ ħőẇ ėȧƈħ ṗřőṽïḓėř ïş ƈőñŧřȧƈŧėḓ ƒőř ŧħïş ŧėñȧñŧ (ŧřȧïñïñɠ_ůşė). 'ñőñė' őṗėñş ƈőñƒïḓėñŧïȧŀ ėɠřėşş ȧñḓ řėɋůïřėş ȧ ħůɱȧñ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "attestation.tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "attestation.provider": {
+        "en": "Provider",
+        "ja": "プロバイダ",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
+      },
+      "attestation.training_use": {
+        "en": "training_use",
+        "ja": "training_use",
+        "qps-ploc": "⟦ŧřȧïñïñɠ_ůşė ŀőř⟧"
+      },
+      "attestation.expires": {
+        "en": "expires",
+        "ja": "期限",
+        "qps-ploc": "⟦ėẋṗïřėş ŀőř⟧"
+      },
+      "attestation.plan": {
+        "en": "plan",
+        "ja": "プラン",
+        "qps-ploc": "⟦ṗŀȧñ ŀőř⟧"
+      },
+      "attestation.basis": {
+        "en": "basis",
+        "ja": "根拠",
+        "qps-ploc": "⟦ƀȧşïş ŀőř⟧"
+      },
+      "attestation.attested_by": {
+        "en": "attested_by",
+        "ja": "宣言者",
+        "qps-ploc": "⟦ȧŧŧėşŧėḓ_ƀẏ ŀőř⟧"
+      },
+      "attestation.valid_days": {
+        "en": "valid_for_days",
+        "ja": "有効日数",
+        "qps-ploc": "⟦ṽȧŀïḓ_ƒőř_ḓȧẏş ŀőřė⟧"
+      },
+      "attestation.record": {
+        "en": "Record attestation",
+        "ja": "attestation を記録",
+        "qps-ploc": "⟦Řėƈőřḓ ȧŧŧėşŧȧŧïőñ ŀőřėɱ⟧"
+      },
+      "attestation.request_approval": {
+        "en": "Request approval",
+        "ja": "承認を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ȧṗṗřőṽȧŀ ŀőřėɱ⟧"
+      },
+      "attestation.requested_msg": {
+        "en": "approval request {id} created",
+        "ja": "承認依頼 {id} を作成しました",
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀ řėɋůėşŧ {id} ƈřėȧŧėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "attestation.recorded_msg": {
+        "en": "attestation recorded",
+        "ja": "attestation を記録しました",
+        "qps-ploc": "⟦ȧŧŧėşŧȧŧïőñ řėƈőřḓėḓ ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
