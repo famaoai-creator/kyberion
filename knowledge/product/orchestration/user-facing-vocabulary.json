@@ -16530,6 +16530,46 @@
         "en": "OAuth available",
         "ja": "OAuth 利用可",
         "qps-ploc": "⟦ŐȦůŧħ ȧṽȧïŀȧƀŀė ŀőřė⟧"
+      },
+      "authority.decisions": {
+        "en": "Delegated decisions",
+        "ja": "委任する決定",
+        "qps-ploc": "⟦Ḓėŀėɠȧŧėḓ ḓėƈïşïőñş ŀőřėɱ ⟧"
+      },
+      "authority.decisions_hint": {
+        "en": "Choose a policy for each business decision type the agent may make under this charter.",
+        "ja": "この charter でエージェントに委任する業務決定ごとの方針を選びます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗőŀïƈẏ ƒőř ėȧƈħ ƀůşïñėşş ḓėƈïşïőñ ŧẏṗė ŧħė ȧɠėñŧ ɱȧẏ ɱȧķė ůñḓėř ŧħïş ƈħȧřŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "authority.decision_unchanged": {
+        "en": "Leave unchanged",
+        "ja": "変更しない",
+        "qps-ploc": "⟦Ŀėȧṽė ůñƈħȧñɠėḓ ŀőřė⟧"
+      },
+      "authority.decision_keep": {
+        "en": "Keep delegated",
+        "ja": "委任を維持",
+        "qps-ploc": "⟦Ķėėṗ ḓėŀėɠȧŧėḓ ŀőřė⟧"
+      },
+      "authority.decision_revoke": {
+        "en": "Revoke delegation",
+        "ja": "委任を取り消す",
+        "qps-ploc": "⟦Řėṽőķė ḓėŀėɠȧŧïőñ ŀőřėɱ⟧"
+      },
+      "authority.policy_allow": {
+        "en": "Allow",
+        "ja": "許可",
+        "qps-ploc": "⟦Ȧŀŀőẇ ŀőř⟧"
+      },
+      "authority.policy_allow_with_review": {
+        "en": "Allow with review",
+        "ja": "レビュー付きで許可",
+        "qps-ploc": "⟦Ȧŀŀőẇ ẇïŧħ řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "authority.policy_forbid": {
+        "en": "Forbid",
+        "ja": "禁止",
+        "qps-ploc": "⟦Ƒőřƀïḓ ŀőř⟧"
       }
     },
     "onboarding": {

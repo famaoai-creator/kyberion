@@ -4,7 +4,8 @@
 import { humanActor } from '../actor.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidMemberId, readMemberProfile } from './member-registry.js';
-import type { CharterScope } from '../governance/accountability-charter.js';
+import type { CharterScope, ExternalEffectPolicy } from '../governance/accountability-charter.js';
+import { delegableCharterDecisions } from '../governance/charter-decision-vocabulary.js';
 import {
   acceptCharter,
   findActiveCharter,
@@ -53,9 +54,33 @@ export interface OnboardingAuthorityInput {
   scope_kind: 'person' | 'organization';
   tenant_slug?: string;
   grants: ExternalOperationGrant[];
+  /** Business decision types delegated by policy (allow/allow_with_review/forbid). */
+  delegated_decisions?: Record<string, ExternalEffectPolicy>;
   expires_at: string;
   mode: 'grant' | 'revoke' | 'activate';
   renew_existing?: boolean;
+}
+
+const DECISION_POLICIES: readonly ExternalEffectPolicy[] = [
+  'forbid',
+  'allow_with_review',
+  'allow',
+] as const;
+
+function parseDelegatedDecisions(raw: unknown): Record<string, ExternalEffectPolicy> | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return deny('delegated_decisions must be an object of decision_type -> policy');
+  const delegable = new Set(delegableCharterDecisions().map((d) => d.decision_type));
+  const out: Record<string, ExternalEffectPolicy> = {};
+  for (const [type, policy] of Object.entries(raw as Record<string, unknown>)) {
+    if (!delegable.has(type))
+      return deny(`delegated_decisions.${type} is not a delegable decision type`);
+    if (typeof policy !== 'string' || !DECISION_POLICIES.includes(policy as ExternalEffectPolicy))
+      return deny(`delegated_decisions.${type} must be forbid, allow_with_review or allow`);
+    out[type] = policy as ExternalEffectPolicy;
+  }
+  return out;
 }
 interface Plan {
   version: 1;
@@ -109,13 +134,23 @@ export function onboardingAuthorityScope(raw: unknown): CharterScope {
 function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
   const scope = onboardingAuthorityScope(raw);
   const value = raw as Record<string, unknown>;
-  const allowed = ['scope_kind', 'tenant_slug', 'grants', 'expires_at', 'mode', 'renew_existing'];
+  const allowed = [
+    'scope_kind',
+    'tenant_slug',
+    'grants',
+    'delegated_decisions',
+    'expires_at',
+    'mode',
+    'renew_existing',
+  ];
   if (Object.keys(value).some((k) => !allowed.includes(k))) return deny('unknown plan field');
   const grants = parseExternalOperationGrants(value.grants);
-  if (!grants || (value.mode !== 'activate' && !grants.length))
-    return deny('choose at least one exact operation and target');
-  if (value.mode === 'activate' && grants.length)
-    return deny('activation-only consent must not include external grants');
+  const delegated_decisions = parseDelegatedDecisions(value.delegated_decisions);
+  const decisionCount = Object.keys(delegated_decisions ?? {}).length;
+  if (!grants || (value.mode !== 'activate' && !grants.length && !decisionCount))
+    return deny('choose at least one exact operation, target or delegated decision');
+  if (value.mode === 'activate' && (grants.length || decisionCount))
+    return deny('activation-only consent must not include external grants or delegated decisions');
   const expires = typeof value.expires_at === 'string' ? Date.parse(value.expires_at) : NaN;
   if (
     !Number.isFinite(expires) ||
@@ -131,6 +166,7 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
     scope_kind: scope.kind,
     ...(scope.kind === 'organization' ? { tenant_slug: scope.tenant_slug } : {}),
     grants,
+    ...(delegated_decisions !== undefined ? { delegated_decisions } : {}),
     expires_at: new Date(expires).toISOString(),
     mode: value.mode,
     ...(value.renew_existing === true ? { renew_existing: true } : {}),
@@ -171,6 +207,13 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
     else if (!byKey.delete(hash(grant))) return deny('revoked target is not currently granted');
   }
   const grants = [...byKey.values()].sort((a, b) => hash(a).localeCompare(hash(b)));
+  const oldDecisions = { ...(active?.envelope.delegated_decisions ?? {}) };
+  for (const [type, policy] of Object.entries(input.delegated_decisions ?? {})) {
+    if (input.mode === 'grant') oldDecisions[type] = policy;
+    else if (!(type in oldDecisions))
+      return deny(`delegated decision ${type} is not currently delegated`);
+    else delete oldDecisions[type];
+  }
   const envelope = active
     ? structuredClone(active.envelope)
     : {
@@ -181,6 +224,10 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
           input.mode === 'activate' ? ('forbid' as const) : ('named_actions_only' as const),
       };
   envelope.external_operations = grants;
+  if (input.delegated_decisions !== undefined) {
+    if (Object.keys(oldDecisions).length) envelope.delegated_decisions = oldDecisions;
+    else delete envelope.delegated_decisions;
+  }
   if (input.mode === 'grant' && envelope.irreversible !== 'allow') {
     // Names under a global forbid were inactive, not existing delegated authority.
     const activeNames =
@@ -552,11 +599,16 @@ export function readOnboardingAuthority(
             ready: false,
             reason: 'reason' in runtime ? runtime.reason : 'agent_accountability_mismatch',
           },
+    delegable_decisions: delegableCharterDecisions().map((entry) => ({
+      decision_type: entry.decision_type,
+      label: entry.label,
+    })),
     charter: charter
       ? {
           id: charter.charter_id,
           expires_at: charter.accountable.expires_at,
           grants: charter.envelope.external_operations ?? [],
+          delegated_decisions: charter.envelope.delegated_decisions ?? {},
           stopped:
             loadCharterUsage(charter, options.now ?? new Date(), options).tripwires_hit.length > 0,
         }
