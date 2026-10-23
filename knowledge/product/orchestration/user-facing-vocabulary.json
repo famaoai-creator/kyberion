@@ -16445,6 +16445,76 @@
         "en": "attestation recorded",
         "ja": "attestation を記録しました",
         "qps-ploc": "⟦ȧŧŧėşŧȧŧïőñ řėƈőřḓėḓ ŀőřėɱ ⟧"
+      },
+      "reasoning.title": {
+        "en": "Reasoning backend",
+        "ja": "推論バックエンド",
+        "qps-ploc": "⟦Řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ⟧"
+      },
+      "reasoning.provider": {
+        "en": "Provider",
+        "ja": "プロバイダ",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
+      },
+      "reasoning.model": {
+        "en": "Model",
+        "ja": "モデル",
+        "qps-ploc": "⟦Ɱőḓėŀ ŀőř⟧"
+      },
+      "reasoning.model_default": {
+        "en": "Provider default",
+        "ja": "プロバイダ既定",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ḓėƒȧůŀŧ ŀőřėɱ⟧"
+      },
+      "reasoning.save": {
+        "en": "Save selection",
+        "ja": "選択を保存",
+        "qps-ploc": "⟦Şȧṽė şėŀėƈŧïőñ ŀőřė⟧"
+      },
+      "reasoning.saved": {
+        "en": "Saved",
+        "ja": "保存しました",
+        "qps-ploc": "⟦Şȧṽėḓ ŀőř⟧"
+      },
+      "reasoning.load_failed": {
+        "en": "Could not load reasoning options",
+        "ja": "推論オプションを読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ řėȧşőñïñɠ őṗŧïőñş ŀőřėɱ ïṗşů⟧"
+      },
+      "reasoning.save_failed": {
+        "en": "Could not save the selection",
+        "ja": "選択を保存できませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şȧṽė ŧħė şėŀėƈŧïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "reasoning.none_ready": {
+        "en": "No selectable reasoning runtime is configured yet.",
+        "ja": "選択可能な推論ランタイムはまだありません。",
+        "qps-ploc": "⟦Ñő şėŀėƈŧȧƀŀė řėȧşőñïñɠ řůñŧïɱė ïş ƈőñƒïɠůřėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "reasoning.unavailable": {
+        "en": "Unavailable runtimes",
+        "ja": "利用できないランタイム",
+        "qps-ploc": "⟦Ůñȧṽȧïŀȧƀŀė řůñŧïɱėş ŀőřėɱ ⟧"
+      },
+      "services.catalog_title": {
+        "en": "Service catalog",
+        "ja": "サービスカタログ",
+        "qps-ploc": "⟦Şėřṽïƈė ƈȧŧȧŀőɠ ŀőřė⟧"
+      },
+      "services.catalog_hint": {
+        "en": "Each service connects via its setup command; secrets go through Secret Guard.",
+        "ja": "各サービスはセットアップコマンドで接続します。秘密情報は Secret Guard 経由です。",
+        "qps-ploc": "⟦Ėȧƈħ şėřṽïƈė ƈőññėƈŧş ṽïȧ ïŧş şėŧůṗ ƈőɱɱȧñḓ; şėƈřėŧş ɠő ŧħřőůɠħ Şėƈřėŧ Ɠůȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "services.catalog_empty": {
+        "en": "No services are registered in the catalog.",
+        "ja": "カタログにサービスが登録されていません。",
+        "qps-ploc": "⟦Ñő şėřṽïƈėş ȧřė řėɠïşŧėřėḓ ïñ ŧħė ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "services.oauth_available": {
+        "en": "OAuth available",
+        "ja": "OAuth 利用可",
+        "qps-ploc": "⟦ŐȦůŧħ ȧṽȧïŀȧƀŀė ŀőřė⟧"
       }
     },
     "onboarding": {
