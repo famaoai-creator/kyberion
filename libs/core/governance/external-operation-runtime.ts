@@ -83,6 +83,20 @@ export function createOnboardingExternalOperationAuthority(options: {
     if (!charter || !facts.delegable) return authority;
     const effect = facts.effect as Record<string, unknown>;
     let raw: unknown;
+    const normalizeRepoTarget = (rawUrl: string): string | undefined => {
+      const https = rawUrl.startsWith('git@')
+        ? `https://${rawUrl.slice(4).replace(/:/, '/')}`
+        : rawUrl.startsWith('ssh://')
+          ? rawUrl.replace(/^ssh:\/\/(?:git@)?/, 'https://')
+          : rawUrl;
+      try {
+        const url = new URL(https);
+        const pathname = url.pathname.replace(/\.git$/, '').replace(/\/$/, '');
+        return `${url.origin}${pathname}`;
+      } catch {
+        return undefined;
+      }
+    };
     if (facts.operationId === 'vcs:pr_create') {
       if (effect.body_source_tier !== 'public' && effect.body_source_tier !== 'inline')
         return authority;
@@ -98,6 +112,32 @@ export function createOnboardingExternalOperationAuthority(options: {
             operation_id: facts.operationId,
             repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
           };
+      }
+    } else if (facts.operationId === 'vcs:pr_merge') {
+      const repository = effect.repository as
+        { url?: unknown; host?: unknown; slug?: unknown } | undefined;
+      if (
+        repository &&
+        typeof repository.url === 'string' &&
+        typeof effect.baseRefName === 'string'
+      ) {
+        const url = new URL(repository.url);
+        if (
+          url.host === repository.host &&
+          url.pathname.replace(/^\//, '').replace(/\/$/, '') === repository.slug
+        )
+          raw = {
+            operation_id: facts.operationId,
+            repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
+            branch: effect.baseRefName,
+          };
+      }
+    } else if (facts.operationId === 'vcs:push') {
+      if (typeof effect.url === 'string' && typeof effect.destination === 'string') {
+        const repository = normalizeRepoTarget(effect.url);
+        const branch = effect.destination.replace(/^refs\/heads\//, '');
+        if (repository && branch && !branch.startsWith('refs/'))
+          raw = { operation_id: facts.operationId, repository, branch };
       }
     } else if (facts.operationId === 'browser:goto' || facts.operationId === 'browser:open_tab') {
       if (effect.navigation_confinement !== 'isolated-public-read-v1') return authority;
@@ -127,7 +167,10 @@ export function createOnboardingExternalOperationAuthority(options: {
           reversible: false,
           irreversible_action_name: target.operation_id,
           estimated_loss: 0,
-          reputational_class: 'B' as const,
+          reputational_class:
+            target.operation_id === 'vcs:pr_merge' || target.operation_id === 'vcs:push'
+              ? ('A' as const)
+              : ('B' as const),
           blast_radius: { systems: 1, recipients: 1 },
         },
       },
@@ -282,7 +325,13 @@ export function withRuntimeExternalOperationAuthority<T>(
         if (!onboard) return base(facts);
         const target = onboard(facts);
         if (
-          ['vcs:pr_create', 'browser:goto', 'browser:open_tab'].includes(facts.operationId) &&
+          [
+            'vcs:pr_create',
+            'vcs:pr_merge',
+            'vcs:push',
+            'browser:goto',
+            'browser:open_tab',
+          ].includes(facts.operationId) &&
           target?.charter
         )
           return target;

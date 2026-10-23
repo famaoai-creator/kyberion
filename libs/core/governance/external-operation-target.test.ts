@@ -189,6 +189,90 @@ describe('exact public operation target grants', () => {
     expect(parseExternalOperationGrants([grant, grant])).toBeUndefined();
     expect(parseExternalOperationGrant({ ...grant, hasHuman: true })).toBeUndefined();
   });
+  it('parses repository+branch grants for pr_merge and push, rejecting wildcard and missing branch', () => {
+    const merge = {
+      operation_id: 'vcs:pr_merge',
+      repository: 'https://github.com/acme/project',
+      branch: 'main',
+    };
+    const push = {
+      operation_id: 'vcs:push',
+      repository: 'https://github.com/acme/project',
+      branch: 'refs/heads/feature/x',
+    };
+    expect(parseExternalOperationGrant(merge)).toEqual({
+      operation_id: 'vcs:pr_merge',
+      repository: 'https://github.com/acme/project',
+      branch: 'main',
+    });
+    expect(parseExternalOperationGrant(push)).toEqual({
+      operation_id: 'vcs:push',
+      repository: 'https://github.com/acme/project',
+      branch: 'feature/x',
+    });
+    expect(
+      parseExternalOperationGrant({ ...merge, repository: 'https://github.com/acme/*' })
+    ).toBeUndefined();
+    expect(parseExternalOperationGrant({ ...merge, branch: 'ma*' })).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ operation_id: 'vcs:push', repository: merge.repository })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ ...merge, repository: 'ssh://git@github.com/acme/project' })
+    ).toBeUndefined();
+  });
+  it('delegates pr_merge and push to exact repo+branch grants only', () => {
+    const mergeGrant = {
+      operation_id: 'vcs:pr_merge' as const,
+      repository: 'https://github.com/acme/project',
+      branch: 'main',
+    };
+    const pushGrant = {
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch: 'release/1',
+    };
+    const c = charter();
+    c.envelope.external_operations = [mergeGrant, pushGrant];
+    state.charter = c;
+    const mergeAuthority = resolve()({
+      operationId: 'vcs:pr_merge',
+      requiresApproval: true,
+      delegable: true,
+      effect: {
+        repository: { url: mergeGrant.repository, host: 'github.com', slug: 'acme/project' },
+        baseRefName: 'main',
+      },
+    });
+    expect(mergeAuthority).toMatchObject({
+      charter: { action: { external_operation: mergeGrant, reputational_class: 'A' } },
+    });
+    const pushAuthority = resolve()({
+      operationId: 'vcs:push',
+      requiresApproval: true,
+      delegable: true,
+      effect: { url: mergeGrant.repository, destination: 'refs/heads/release/1' },
+    });
+    expect(pushAuthority).toMatchObject({
+      charter: { action: { external_operation: pushGrant, reputational_class: 'A' } },
+    });
+    expect(
+      resolve()({
+        operationId: 'vcs:push',
+        requiresApproval: true,
+        delegable: true,
+        effect: { url: mergeGrant.repository, destination: 'refs/heads/main' },
+      })
+    ).not.toHaveProperty('charter');
+    expect(
+      resolve()({
+        operationId: 'vcs:push',
+        requiresApproval: true,
+        delegable: true,
+        effect: { url: 'git@github.com:acme/project.git', destination: 'refs/heads/release/1' },
+      })
+    ).toMatchObject({ charter: { action: { external_operation: pushGrant } } });
+  });
   it('resolves actual repository only and retains real person/agent identity without tenant', () => {
     const authority = resolve()(facts);
     expect(authority).toMatchObject({
