@@ -7,6 +7,7 @@ import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from '.
 
 type Grant =
   | { operation_id: 'vcs:pr_create'; repository: string }
+  | { operation_id: 'vcs:pr_merge' | 'vcs:push'; repository: string; branch: string }
   | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string };
 type Pending = {
   request_id: string;
@@ -37,8 +38,10 @@ const validGrant = (value: unknown): value is Grant =>
   record(value) &&
   (value.operation_id === 'vcs:pr_create'
     ? typeof value.repository === 'string'
-    : ['browser:goto', 'browser:open_tab'].includes(String(value.operation_id)) &&
-      typeof value.origin === 'string');
+    : ['vcs:pr_merge', 'vcs:push'].includes(String(value.operation_id))
+      ? typeof value.repository === 'string' && typeof value.branch === 'string'
+      : ['browser:goto', 'browser:open_tab'].includes(String(value.operation_id)) &&
+        typeof value.origin === 'string');
 function readOverview(value: unknown): Overview | null {
   if (
     !record(value) ||
@@ -107,6 +110,7 @@ export function OnboardingAuthorityPanel({
   const [tenant, setTenant] = React.useState(selectedTenant || '');
   const [operation, setOperation] = React.useState('');
   const [target, setTarget] = React.useState('');
+  const [branch, setBranch] = React.useState('');
   const [expires, setExpires] = React.useState('');
   const [mode, setMode] = React.useState<'grant' | 'revoke'>('grant');
   const [renewExisting, setRenewExisting] = React.useState(false);
@@ -125,9 +129,11 @@ export function OnboardingAuthorityPanel({
   const grants: Grant[] =
     operation === 'vcs:pr_create'
       ? [{ operation_id: operation, repository: target }]
-      : operation === 'browser:goto' || operation === 'browser:open_tab'
-        ? [{ operation_id: operation, origin: target }]
-        : [];
+      : operation === 'vcs:pr_merge' || operation === 'vcs:push'
+        ? [{ operation_id: operation, repository: target, branch }]
+        : operation === 'browser:goto' || operation === 'browser:open_tab'
+          ? [{ operation_id: operation, origin: target }]
+          : [];
   const expiry =
     expires && Number.isFinite(Date.parse(expires)) ? new Date(expires).toISOString() : '';
   const draft = {
@@ -418,7 +424,8 @@ export function OnboardingAuthorityPanel({
               <ul>
                 {overview.charter.grants.map((grant, index) => (
                   <li key={index}>
-                    {grant.operation_id} · {'repository' in grant ? grant.repository : grant.origin}{' '}
+                    {grant.operation_id} · {'repository' in grant ? grant.repository : grant.origin}
+                    {'branch' in grant ? ` · ${grant.branch}` : ''}{' '}
                     <button type="button" disabled={busy} onClick={() => revoke(grant)}>
                       {t('authority.revoke')}
                     </button>
@@ -459,6 +466,7 @@ export function OnboardingAuthorityPanel({
                 setMode('grant');
                 setOperation('');
                 setTarget('');
+                setBranch('');
                 setExpires('');
               }}
             >
@@ -475,6 +483,8 @@ export function OnboardingAuthorityPanel({
               >
                 <option value="">{t('authority.choose')}</option>
                 <option value="vcs:pr_create">{t('authority.pr')}</option>
+                <option value="vcs:pr_merge">{t('authority.merge')}</option>
+                <option value="vcs:push">{t('authority.push')}</option>
                 <option value="browser:goto">{t('authority.goto')}</option>
                 <option value="browser:open_tab">{t('authority.tab')}</option>
               </select>
@@ -488,6 +498,17 @@ export function OnboardingAuthorityPanel({
                 placeholder="https://github.com/owner/repository"
               />
             </label>
+            {operation === 'vcs:pr_merge' || operation === 'vcs:push' ? (
+              <label>
+                {t('authority.branch')}
+                <input
+                  type="text"
+                  value={branch}
+                  onChange={(event) => setBranch(event.target.value)}
+                  placeholder="main"
+                />
+              </label>
+            ) : null}
             <label>
               {t('authority.expiry')}
               <input
