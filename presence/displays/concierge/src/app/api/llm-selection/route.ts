@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const snapshot = await withExecutionContextAsync('settings_admin', () =>
+    const snapshot = await withExecutionContextAsync('sovereign_concierge', () =>
       getLlmSelectionSnapshot()
     );
     return response({ ok: true, ...snapshot });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   try {
     const parsed = await readRequestObject(req, 'request body', ['provider', 'model_id']);
     if (!parsed.ok) return response({ ok: false, error: parsed.error }, 400);
-    const snapshot = await withExecutionContextAsync('settings_admin', () =>
+    const snapshot = await withExecutionContextAsync('sovereign_concierge', () =>
       saveLlmSelectionPreferences(parsed.body)
     );
     return response({ ok: true, ...snapshot });
