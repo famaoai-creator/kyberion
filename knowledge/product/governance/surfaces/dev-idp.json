@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "dev-idp",
+      "kind": "service",
+      "description": "Loopback-only disposable OIDC provider for local browser login. Authenticates nobody — binds 127.0.0.1, only redirects to loopback /auth/callback, and refuses NODE_ENV=production. Enable only for local setup/verification.",
+      "command": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/dev_oidc_idp.ts"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 9099,
+      "healthPath": "/.well-known/openid-configuration",
+      "enabled": false
+    }
+  ]
+}

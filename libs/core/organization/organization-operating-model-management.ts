@@ -748,7 +748,11 @@ export function reconcileOrganizationCatalog(query: {
     .map((entry) => entry.operation_id);
   const invalidExecutionRefs = operations.flatMap((entry) => {
     const ref = entry.execution_target.ref;
-    if (!ref && entry.execution_target.kind !== 'actuator') {
+    // 'mission' and 'actuator' spawn their target per run, so a fixed ref is
+    // not required (onboarding provisions mission-kind ops before the mission
+    // exists). 'pipeline' / 'runbook' / 'task_session' name a static artifact
+    // and are already rejected ref-less at add time.
+    if (!ref && !['actuator', 'mission'].includes(entry.execution_target.kind)) {
       return [`${entry.operation_id}:execution_target`];
     }
     if (!ref) return [];

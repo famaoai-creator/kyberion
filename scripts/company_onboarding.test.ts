@@ -41,6 +41,8 @@ describe('AI company onboarding', () => {
     expect(result.status).toBe('planned');
     expect(result.writtenFiles).toHaveLength(0);
     expect(result.nextCommands).toContain('pnpm kyberion setup report --persona first-time-user');
+    expect(result.nextCommands).toContain('export KYBERION_PERSONA=sovereign');
+    expect(result.nextCommands).toContain('export KYBERION_TENANT=<registered-tenant>');
     expect(result.nextCommands).toContain(
       'pnpm onboarding:context first-work --customer-slug acme-ai --intent "Define the first customer outcome and launch plan" --dry-run --json'
     );

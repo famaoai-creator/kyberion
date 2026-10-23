@@ -137,6 +137,8 @@ export interface OnboardingFirstWorkResolution {
   resolution: OrganizationWorkResolution;
   project_required: boolean;
   next_action: 'bootstrap_project' | 'select_management_unit' | 'request_human_confirmation';
+  /** 'pending' means --apply stays fail-closed until tenant activation is active. */
+  tenant_activation: 'active' | 'pending';
 }
 
 export interface ApplyOnboardingFirstWorkInput extends ResolveOnboardingFirstWorkInput {
@@ -552,6 +554,17 @@ function assertCurrentOnboardingContext(binding: OnboardingContextBinding, rootD
       `Organization '${binding.organization_id}' is ${state.status}; first work is blocked.`
     );
   }
+}
+
+/**
+ * Write gate: only `apply` may demand an active tenant activation. The dry-run
+ * (`resolveOnboardingFirstWork`) previews the classification so a human can
+ * review the result before accepting activation.
+ */
+function assertTenantActivationForFirstWork(
+  binding: OnboardingContextBinding,
+  rootDir: string
+): void {
   if (
     !isTenantActivationActive(
       {
@@ -750,6 +763,15 @@ export function resolveOnboardingFirstWork(
     },
   });
   const projectRequired = resolution.work_shape === 'solution_project';
+  const activationActive = isTenantActivationActive(
+    {
+      customerSlug: binding.customer_slug,
+      tenantSlug: binding.tenant_slug,
+      organizationId: binding.organization_id,
+      tier: binding.tier,
+    },
+    input.rootDir || pathResolver.rootDir()
+  );
   return {
     kind: 'onboarding_first_work_resolution',
     binding,
@@ -761,6 +783,7 @@ export function resolveOnboardingFirstWork(
         : projectRequired
           ? 'bootstrap_project'
           : 'select_management_unit',
+    tenant_activation: activationActive ? 'active' : 'pending',
   };
 }
 
@@ -770,6 +793,7 @@ export function applyOnboardingFirstWork(
   if (!input.accept) throw new Error('Human acceptance is required before applying first work.');
   const resolved = resolveOnboardingFirstWork(input);
   const rootDir = input.rootDir || pathResolver.rootDir();
+  assertTenantActivationForFirstWork(resolved.binding, rootDir);
   return withCustomer(resolved.binding.customer_slug, () => {
     const existingRecord = loadOnboardingFirstWorkRecord(resolved.binding.customer_slug, rootDir);
     if (existingRecord) {

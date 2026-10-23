@@ -48,7 +48,7 @@
     {
       "id": "concierge",
       "kind": "ui",
-      "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
+      "description": "Concierge (\u79d8\u66f8\u5ba4) \u2014 CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
       "command": "node",
       "args": ["server/local-server.ts", "--port", "3050"],
       "cwd": "presence/displays/concierge",
@@ -58,6 +58,20 @@
       "port": 3050,
       "healthPath": "/api/summary",
       "enabled": true
+    },
+    {
+      "id": "dev-idp",
+      "kind": "service",
+      "description": "Loopback-only disposable OIDC provider for local browser login. Authenticates nobody \u2014 binds 127.0.0.1, only redirects to loopback /auth/callback, and refuses NODE_ENV=production. Enable only for local setup/verification.",
+      "command": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/dev_oidc_idp.ts"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 9099,
+      "healthPath": "/.well-known/openid-configuration",
+      "enabled": false
     },
     {
       "id": "discord-bridge",
@@ -70,18 +84,6 @@
         "KYBERION_PERSONA": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
-      "cwd": ".",
-      "shutdownPolicy": "detached",
-      "startupMode": "background",
-      "ownerType": "surface-runtime-manifest",
-      "enabled": false
-    },
-    {
-      "id": "generation-schedule",
-      "kind": "service",
-      "description": "Recurring generation schedule tick service managed by surface-runtime.",
-      "command": "node",
-      "args": ["dist/scripts/run_generation_schedule_daemon.js"],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
@@ -108,6 +110,18 @@
       "enabled": false
     },
     {
+      "id": "generation-schedule",
+      "kind": "service",
+      "description": "Recurring generation schedule tick service managed by surface-runtime.",
+      "command": "node",
+      "args": ["dist/scripts/run_generation_schedule_daemon.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": false
+    },
+    {
       "id": "imessage-bridge",
       "kind": "service",
       "description": "Managed macOS Messages bridge for declared iMessage sending and governed runtime supervision",
@@ -129,7 +143,7 @@
     {
       "id": "mcp-server-cowork",
       "kind": "gateway",
-      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
+      "description": "Kyberion MCP Server facade \u2014 exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
       "command": "node",
       "args": ["dist/scripts/mcp_server.js"],
       "env": {
