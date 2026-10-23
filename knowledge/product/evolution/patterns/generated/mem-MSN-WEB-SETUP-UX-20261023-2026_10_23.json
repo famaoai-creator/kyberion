@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-WEB-SETUP-UX-20261023-2026_10_23",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Reuse the canonical preference facade for browser settings surfaces",
+  "summary": "Browser settings for LLM selection should wrap getLlmSelectionSnapshot/saveLlmSelectionPreferences (validation against policy candidates included) rather than writing .env.local or separate state. The catalog/service surfaces mirror the pattern: expose governed read models and defer mutations to the existing propose/approve flow.",
+  "candidate_id": "mem-MSN-WEB-SETUP-UX-20261023-2026_10_23",
+  "evidence_refs": [
+    "active/missions/public/MSN-WEB-SETUP-UX-20261023/evidence/implementation-report.md",
+    "active/missions/public/MSN-WEB-SETUP-UX-20261023/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-23T21:57:15.809Z",
+  "applicability": ["mission", "mission:MSN-WEB-SETUP-UX-20261023"],
+  "reusable_steps": [
+    "Browser settings for LLM selection should wrap getLlmSelectionSnapshot/saveLlmSelectionPreferences (validation against policy candidates included) rather than writing",
+    "env",
+    "local or separate state",
+    "The catalog/service surfaces mirror the pattern: expose governed read models and defer mutations to the existing propose/approve flow"
+  ],
+  "expected_outcome": "Discovered while adding browser reasoning selection: llm-selection-preferences.ts already validates provider+model against the reasoning route policy — a thin API route suffices. Service connections expose their catalog read-only and keep the CLI propose path for credentials.",
+  "source_branch": "feat/web-setup-ux-20261023",
+  "source_commit": "2855fd90219804b326ebbaccd46a390a2e96e0ff"
+}

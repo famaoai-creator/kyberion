@@ -10,6 +10,8 @@ import { groupConnections, type ConnectionViewItem } from '../../../lib/connecti
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
 import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
 import { ProviderAttestationSection } from './ProviderAttestationSection';
+import { ReasoningSection } from './ReasoningSection';
+import { ServiceCatalogPane } from './ServiceCatalogPane';
 import { GovernanceSection } from './GovernanceSection';
 import { CharterPane } from './CharterPane';
 import { FormScope, type SettingsTranslate } from './form-scope';
@@ -134,6 +136,8 @@ export function ServicesSection({
           </div>
         </SettingsGroup>
       </FormScope>
+      <ReasoningSection t={t} />
+      <ServiceCatalogPane t={t} />
       <OperatorServiceRegistrationPanel t={t} />
       <OnboardingAuthorityPanel
         locale={locale}
