@@ -1950,12 +1950,12 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/llm-selection/route.ts#GET",
-      "roles": ["settings_admin"],
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
       "site": "presence/displays/concierge/src/app/api/llm-selection/route.ts#POST",
-      "roles": ["settings_admin"],
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -2070,7 +2070,7 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/service-catalog/route.ts#GET",
-      "roles": ["settings_admin"],
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -5043,9 +5043,6 @@
             "libs/core/locale.ts#resolveWithoutExplicit",
             "libs/core/locale.ts#resolveScopedLocale"
           ]
-        },
-        "settings_admin": {
-          "example_path": ["presence/displays/concierge/src/app/api/llm-selection/route.ts#GET"]
         },
         "slack_bridge": {
           "example_path": [

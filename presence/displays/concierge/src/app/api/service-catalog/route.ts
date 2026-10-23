@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const catalog = await withExecutionContextAsync('settings_admin', () =>
+    const catalog = await withExecutionContextAsync('sovereign_concierge', () =>
       loadServiceEndpointsCatalog()
     );
     const services = Object.entries(catalog.services).map(([id, record]) => ({
