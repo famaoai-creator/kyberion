@@ -38,6 +38,7 @@ const knowledgeLogger = createLogger('pr:publish');
 
 interface PublishOptions {
   title?: string;
+  body?: string;
   bodyFile?: string;
   base?: string;
   draft: boolean;
@@ -94,6 +95,7 @@ export const PUBLISH_PR_CLI: CliGuardSpec = {
   manifestId: 'script.pr.create',
   options: [
     { flag: '--title', value: '<conventional title>' },
+    { flag: '--body', value: '<markdown>' },
     { flag: '--body-file', value: '<path>' },
     { flag: '--base', value: '<branch>' },
     { flag: '--mission-root', value: '<path>' },
@@ -111,6 +113,7 @@ export function parsePublishArgs(argv: string[]): PublishOptions {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--title') options.title = argv[++i];
+    else if (arg === '--body') options.body = argv[++i];
     else if (arg === '--body-file') options.bodyFile = argv[++i];
     else if (arg === '--base') options.base = argv[++i];
     else if (arg === '--no-draft') options.draft = false;
@@ -243,17 +246,17 @@ function logKnowledgeViolation(violation: { code: string; message: string }): vo
  * `active/` mission records so this is the only place the check can run.
  */
 export function runKnowledgeReadinessGate(options: PublishOptions): void {
-  if (!options.bodyFile) {
+  if (!options.bodyFile && options.body === undefined) {
     logKnowledgeViolation({
       code: 'missing_body_file',
       message:
-        '`--fill` (or omitting --body-file) cannot carry a "## Knowledge" section — pass --body-file with a filled-in .github/PULL_REQUEST_TEMPLATE.md.',
+        '`--fill` (or omitting --body/--body-file) cannot carry a "## Knowledge" section — pass --body-file with a filled-in .github/PULL_REQUEST_TEMPLATE.md, or --body with inline markdown.',
     });
     throw new ScriptExitError(1, '', true);
   }
-  const body = String(
-    safeReadFile(options.bodyFile, { encoding: 'utf8', label: 'PR body file' }) || ''
-  );
+  const body = options.bodyFile
+    ? String(safeReadFile(options.bodyFile, { encoding: 'utf8', label: 'PR body file' }) || '')
+    : (options.body ?? '');
   const repoRoot = pathResolver.rootDir();
   const result = checkPrKnowledgeReadiness({
     body,
@@ -295,6 +298,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
     title: args[args.indexOf('--title') + 1],
     base: args[args.indexOf('--base') + 1],
     head: args[args.indexOf('--head') + 1],
+    body: options.body,
     bodyFile: options.bodyFile,
     draft: options.draft,
   };

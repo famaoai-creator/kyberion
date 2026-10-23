@@ -16286,6 +16286,21 @@
         "ja": "この会社をセットアップ",
         "qps-ploc": "⟦Şėŧ ůṗ ŧħïş ƈőɱṗȧñẏ ŀőřėɱ ⟧"
       },
+      "authority.merge": {
+        "en": "Merge a pull request",
+        "ja": "プルリクエストをマージ",
+        "qps-ploc": "⟦Ɱėřɠė ȧ ṗůŀŀ řėɋůėşŧ ŀőřėɱ ⟧"
+      },
+      "authority.push": {
+        "en": "Push to a branch",
+        "ja": "ブランチへ push",
+        "qps-ploc": "⟦Ṗůşħ ŧő ȧ ƀřȧñƈħ ŀőřėɱ⟧"
+      },
+      "authority.branch": {
+        "en": "Target branch",
+        "ja": "対象ブランチ",
+        "qps-ploc": "⟦Ŧȧřɠėŧ ƀřȧñƈħ ŀőřė⟧"
+      },
       "governance.title": {
         "en": "Governance — approvals & identity",
         "ja": "ガバナンス — 承認とアイデンティティ",
