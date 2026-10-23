@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-FOLLOWUP-UX-20261023-2026_10_23",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "A PR knowledge gate only accepts candidates sourced from its own mission",
+  "summary": "When a mission declares - Mission ID: in the PR Coordination section, the knowledge readiness gate requires at least one memory candidate whose source_ref matches that mission; promoted records carried over from a previous mission do not satisfy it. Run verify+distill on the PR mission before pr create, promote its own candidate into the branch, and declare it with a promoted: line.",
+  "candidate_id": "mem-MSN-FOLLOWUP-UX-20261023-2026_10_23",
+  "evidence_refs": [
+    "active/missions/public/MSN-FOLLOWUP-UX-20261023/evidence/implementation-report.md",
+    "active/missions/public/MSN-FOLLOWUP-UX-20261023/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-23T10:25:32.052Z",
+  "applicability": ["mission", "mission:MSN-FOLLOWUP-UX-20261023"],
+  "reusable_steps": [
+    "When a mission declares - Mission ID: in the PR Coordination section, the knowledge readiness gate requires at least one memory candidate whose source_ref matches that mission; promoted records carried over from a previous mission do not satisfy it",
+    "Run verify+distill on the PR mission before pr create, promote its own candidate into the branch, and declare it with a promoted: line"
+  ],
+  "expected_outcome": "Observed on MSN-FOLLOWUP-UX-20261023: pr create failed with no_mission_candidates even though a promoted record from MSN-GOV-BROWSER was in the diff. The gate filters queue candidates by source_ref == the declared Mission ID. Fix path: verify → distill → memory-approve (product, pr_review) → memory-promote --target-root <worktree> → commit record → declare the candidate in ## Knowledge.",
+  "source_branch": "feat/governance-followup-20261023",
+  "source_commit": "1208da6bd5d76045388691251d8375fa80cb02c8"
+}
