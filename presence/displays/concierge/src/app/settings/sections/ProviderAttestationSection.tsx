@@ -118,14 +118,11 @@ export function ProviderAttestationSection({
   });
 
   return (
-    <SettingsGroup title="Provider attestation">
+    <SettingsGroup title={t('attestation.title')}>
       <div className="settings-row-block">
-        <p className="kb-text kb-text--muted">
-          Attest how each provider is contracted for this tenant (training_use). 'none' opens
-          confidential egress and requires a human approval.
-        </p>
+        <p className="kb-text kb-text--muted">{t('attestation.description')}</p>
         <label>
-          Tenant
+          {t('attestation.tenant')}
           <select value={tenant} onChange={(e) => setTenant(e.target.value)} disabled={busy}>
             {(tenants ?? []).map((entry) => (
               <option key={entry.tenant_slug} value={entry.tenant_slug}>
@@ -141,9 +138,9 @@ export function ProviderAttestationSection({
           <table className="kb-table">
             <thead>
               <tr>
-                <th>provider</th>
-                <th>training_use</th>
-                <th>expires</th>
+                <th>{t('attestation.provider')}</th>
+                <th>{t('attestation.training_use')}</th>
+                <th>{t('attestation.expires')}</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +163,7 @@ export function ProviderAttestationSection({
               {request.request_id} — {request.status}
             </p>
             <Button
-              label={busy ? '…' : 'Approve with passkey'}
+              label={busy ? '…' : t('governance.approve_passkey')}
               disabled={busy || request.status !== 'pending'}
               onClick={() =>
                 void run(async () => {
@@ -183,7 +180,7 @@ export function ProviderAttestationSection({
               }
             />
             <Button
-              label={busy ? '…' : 'Record attestation'}
+              label={busy ? '…' : t('attestation.record')}
               disabled={busy || request.status !== 'approved'}
               onClick={() =>
                 void run(async () => {
@@ -192,7 +189,7 @@ export function ProviderAttestationSection({
                     ...attestationInput(),
                     approval_request_id: request.request_id,
                   });
-                  setMessage('attestation recorded');
+                  setMessage(t('attestation.recorded_msg'));
                   await load(tenant);
                 })
               }
@@ -201,7 +198,7 @@ export function ProviderAttestationSection({
         ))}
         <fieldset disabled={busy}>
           <label>
-            Provider
+            {t('attestation.provider')}
             <select value={provider} onChange={(e) => setProvider(e.target.value)}>
               <option value="">—</option>
               {(overview?.providers ?? []).map((id) => (
@@ -212,7 +209,7 @@ export function ProviderAttestationSection({
             </select>
           </label>
           <label>
-            training_use
+            {t('attestation.training_use')}
             <select
               value={trainingUse}
               onChange={(e) => setTrainingUse(e.target.value as 'none' | 'used' | 'unknown')}
@@ -223,33 +220,39 @@ export function ProviderAttestationSection({
             </select>
           </label>
           <label>
-            plan
+            {t('attestation.plan')}
             <input value={plan} onChange={(e) => setPlan(e.target.value)} />
           </label>
           <label>
-            basis
+            {t('attestation.basis')}
             <input value={basis} onChange={(e) => setBasis(e.target.value)} />
           </label>
           <label>
-            attested_by
+            {t('attestation.attested_by')}
             <input value={attestedBy} onChange={(e) => setAttestedBy(e.target.value)} />
           </label>
           <label>
-            valid_for_days
+            {t('attestation.valid_days')}
             <input value={validDays} onChange={(e) => setValidDays(e.target.value)} />
           </label>
         </fieldset>
         <Button
-          label={busy ? '…' : trainingUse === 'none' ? 'Request approval' : 'Record attestation'}
+          label={
+            busy
+              ? '…'
+              : trainingUse === 'none'
+                ? t('attestation.request_approval')
+                : t('attestation.record')
+          }
           disabled={busy || !tenant || !provider}
           onClick={() =>
             void run(async () => {
               if (trainingUse === 'none') {
                 const result = await post({ action: 'request', ...attestationInput() });
-                setMessage(`approval request ${String(result.request_id ?? '')} created`);
+                setMessage(t('attestation.requested_msg', { id: String(result.request_id ?? '') }));
               } else {
                 await post({ action: 'record', ...attestationInput() });
-                setMessage('attestation recorded');
+                setMessage(t('attestation.recorded_msg'));
               }
               await load(tenant);
             })
