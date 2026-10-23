@@ -1,5 +1,7 @@
 import * as path from 'node:path';
 import { writeJson as writeGovernedJson } from '@agent/core/foundation/json';
+import { safeExec } from '@agent/core/secure-io';
+import { normalizeRepositoryTarget } from '@agent/core/governance/external-operation-target';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
@@ -133,6 +135,34 @@ function activationInputPath(): string {
   return path.join(onboardingRoot(), 'activation-input.json');
 }
 
+function delegationInputPath(): string {
+  return path.join(onboardingRoot(), 'delegation-input.json');
+}
+
+/** Human-editable template for the grant-mode authority request: prefilled
+ * with this repository's own vcs targets so the operator can pick which exact
+ * operations the charter delegates after activation. */
+export function buildDelegationInput(now: Date) {
+  const remote = safeExec('git', ['remote', 'get-url', '--push', 'origin'], {
+    cwd: pathResolver.rootDir(),
+  }).trim();
+  const repository = remote ? normalizeRepositoryTarget(remote) : undefined;
+  const grants = repository
+    ? [
+        { operation_id: 'vcs:pr_create' as const, repository },
+        { operation_id: 'vcs:pr_merge' as const, repository, branch: 'main' },
+        { operation_id: 'vcs:push' as const, repository, branch: 'main' },
+      ]
+    : [];
+  return {
+    scope_kind: 'person' as const,
+    mode: 'grant' as const,
+    renew_existing: true,
+    grants,
+    expires_at: new Date(now.getTime() + 90 * 86_400_000).toISOString(),
+  };
+}
+
 export interface ActivationSetup {
   status: 'activation_available' | 'identity_active' | 'existing_authority' | 'unavailable';
   input_path?: string;
@@ -155,6 +185,9 @@ export async function prepareActivationSetup(now: Date): Promise<ActivationSetup
       if (safeExistsSync(file)) return;
       ensureDir(path.dirname(file));
       writeGovernedJson(file, buildActivationInput(now), { createOnly: true });
+      const delegation = delegationInputPath();
+      if (!safeExistsSync(delegation))
+        writeGovernedJson(delegation, buildDelegationInput(now), { createOnly: true });
     });
   });
   return { status: 'activation_available', input_path: activationInputPath() };
@@ -164,7 +197,8 @@ function activationNextStep(setup?: ActivationSetup): string {
   if (setup?.status !== 'activation_available' || !setup.input_path)
     return 'Inspect existing activation, pending requests and charter limits with `pnpm kyberion onboarding authority show --scope person --json`; resume the listed request with status/apply. Already active identities need no new activation consent.';
   const reviewed = path.join(path.dirname(setup.input_path), 'activation-reviewed.json');
-  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. Otherwise review the expiry in ${setup.input_path}, then run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\`, inspect the saved preview, and request it with \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(reviewed)} --json\`. After human approval, apply the displayed request ID. This grants no standing outbound operations. Existing reviewed files are retained; choose a new output name when changing the plan.`;
+  const delegation = delegationInputPath();
+  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. Otherwise review the expiry in ${setup.input_path}, then run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\`, inspect the saved preview, and request it with \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(reviewed)} --json\`. After human approval, apply the displayed request ID. This grants no standing outbound operations. To delegate exact operations (e.g. creating or merging PRs in a named repository) to this identity, review ${delegation} — it is prefilled with this repository — then run the same preview/request/approve/apply flow for it. Existing reviewed files are retained; choose a new output name when changing the plan.`;
 }
 
 export function ensureDir(p: string) {
