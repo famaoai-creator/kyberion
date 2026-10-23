@@ -1728,6 +1728,10 @@
       "types": "./dist/governance/external-operation-store.d.ts",
       "default": "./dist/governance/external-operation-store.js"
     },
+    "./governance/external-operation-target": {
+      "types": "./dist/governance/external-operation-target.d.ts",
+      "default": "./dist/governance/external-operation-target.js"
+    },
     "./governance/external-operation": {
       "types": "./dist/governance/external-operation.d.ts",
       "default": "./dist/governance/external-operation.js"

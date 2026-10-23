@@ -1,4 +1,5 @@
 import { runExternalOperationSync } from '../governance/external-operation.js';
+import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import type { VcsCommandResult } from './git.js';
 
 /** Canonical synchronous transport boundary; authority comes from the trusted
@@ -14,8 +15,10 @@ export function governVcsCommand(
       operationId,
       effect,
       requiresApproval: mutation,
-      // Only PR creation may consult an exact repository grant. Merge/push stay human-only.
-      delegable: operationId === 'vcs:pr_create',
+      // VCS mutations registered in the delegation registry may consult an
+      // exact repository grant. Push merges and sends resolve against the
+      // charter's repository+branch targets.
+      delegable: isDelegableExternalOperation(operationId),
     },
     execute,
     (result) =>
