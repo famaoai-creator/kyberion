@@ -146,6 +146,35 @@ describe('onboarding context binding', () => {
     expect(result.project_required).toBe(false);
     expect(result.resolution.work_shape).toBe('routine_operation');
     expect(result.resolution.management_unit).toBe('operation');
+    expect(result.tenant_activation).toBe('active');
+  });
+
+  it('previews first work before activation but keeps apply fail-closed', () => {
+    seedFixture();
+    applyOnboardingContextBinding({
+      customerSlug: 'acme-ai',
+      tenantSlug: 'acme-prod',
+      organizationId: 'org-acme-ai',
+      ownerId: 'human:founder',
+      rootDir,
+    });
+
+    const preview = resolveOnboardingFirstWork({
+      customerSlug: 'acme-ai',
+      intent: 'Prepare the monthly operational report',
+      rootDir,
+    });
+    expect(preview.resolution.work_shape).toBe('routine_operation');
+    expect(preview.tenant_activation).toBe('pending');
+
+    expect(() =>
+      applyOnboardingFirstWork({
+        customerSlug: 'acme-ai',
+        intent: 'Prepare the monthly operational report',
+        accept: true,
+        rootDir,
+      })
+    ).toThrow(/Tenant activation is not active/);
   });
 
   it('rejects an unregistered tenant before producing a binding', () => {
