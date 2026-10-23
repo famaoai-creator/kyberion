@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-receipt.schema.json",
+  "title": "Customer Decision Receipt",
+  "description": "A decision receipt (CD-01/CD-08): who answered which approved agenda revision, what they chose, and how strongly they were identified. Immutable once written. Stored at knowledge/confidential/<tenant>/decisions/<case>/receipts/<receipt_id>.json. The decision values live in the SSOD ledger (decision_ids).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "receipt_id",
+    "tenant_slug",
+    "case_id",
+    "agenda_id",
+    "agenda_revision",
+    "content_hash",
+    "invite_id",
+    "participant",
+    "answers",
+    "identity_assurance",
+    "submitted_at",
+    "decision_ids"
+  ],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "receipt_id": { "type": "string", "pattern": "^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "agenda_revision": { "type": "integer", "minimum": 1 },
+    "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "invite_id": { "type": "string", "pattern": "^inv-[a-f0-9]{16}$" },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "actor_id"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "role": { "type": "string", "enum": ["decider", "contributor"] },
+        "actor_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entry_id", "choice"],
+        "properties": {
+          "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+          "choice": {
+            "type": "string",
+            "enum": ["option", "keep", "free_text", "approve", "request_changes"]
+          },
+          "value": {},
+          "comment": { "type": "string", "maxLength": 10000 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "choice": { "const": "option" } }, "required": ["choice"] },
+            "then": { "required": ["value"] }
+          }
+        ]
+      }
+    },
+    "identity_assurance": { "type": "string", "enum": ["invite_link"] },
+    "submitted_at": { "type": "string", "minLength": 1 },
+    "decision_ids": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+      "uniqueItems": true
+    }
+  }
+}

@@ -7,7 +7,7 @@ status: active
 
 # 顧客との調整事項ヒアリングと決定の計画 (CD-01〜13)
 
-- 前提: [stance-tenant-customer-model](../../../knowledge/product/architecture/stance-tenant-customer-model.md)、E2E-06 の顧客モード（`libs/core/customer-conversation.ts`、`customer-conversation-modes.ts`、`customer-channel-binding.ts`）、presence-studio の hearing（`hearing-scenario-catalog.ts`、`hearing-*.ts`）、MO-11 の alignment gate（PR #1223）、公開 ingress（PR #923）
+- 前提: [stance-tenant-customer-model](../../../knowledge/product/architecture/stance-tenant-customer-model.md)、E2E-06 の顧客モード（`libs/core/customer-conversation.ts`、`customer-conversation-modes.ts`、`customer-channel-binding.ts`）、presence-studio の hearing（`hearing-scenario-catalog.ts`、`hearing-*.ts`）、MO-11 の alignment gate（PR #1223）、公開 ingress（PR #923）、決定台帳 SSOD（[SSOD_HEARING_INTEGRATION_PLAN](../improvement-plans-2026-09/SSOD_HEARING_INTEGRATION_PLAN_2026-09-14.ja.md)、`libs/core/decision-ledger/`、`pnpm decisions`）
 - 関連: [AIDLC Integration Process](../../../knowledge/product/orchestration/aidlc-integration-process.md)、`mission-workflow-catalog.json` の `code-change-aidlc`、[Front desk 依頼キュー計画](./FRONT_DESK_INTAKE_QUEUE_PLAN_2026-10-05.ja.md)
 
 ## 背景
@@ -95,16 +95,16 @@ status: active
 
 ### 段階 1: Inception の縦切り（招待リンクで決めてもらえるところまで）
 
-| ID    | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CD-01 | **調整事項のデータ型とスキーマ**: 調整事項・調整セット・決定記録を定義する（`knowledge/product/schemas/customer-decision-*.schema.json`）。調整事項の種類は `choice`（選択肢から選ぶ）、`approval`（成果物を承認 / 修正依頼）、`ranking`（並べ替えと範囲の選択）、`hearing`（対話で聞き取る）の 4 つ。調整事項の状態は `draft → pending_approval → open → customer_decided`（ほかに `closed`（上書きの締め切り後）/ `escalated` / `withdrawn`）。保存先は storage-layout に従い、テナント配下の runtime（`active/shared/runtime/confidential/<tenant>/customer-decisions/`）に置く。`system/` には何も置かない。 |
-| CD-02 | **決定の層と有効な決定の解決**: 層の並び、`requires_customer`、`override_until` をスキーマに持たせる。`resolveEffectiveDecision()`（`libs/core`、副作用のない関数）が、層ごとの追記履歴から有効な決定と、その出どころ（層・決めた人・日時・版）と、暫定か確定かを返す。有効な決定が切り替わったときに、切り替わりのイベント（前の値、新しい値、出どころ）を出す。網羅的な単体テストを付ける（層の欠け、同じ値での確定、締め切り後の変更、`requires_customer`、版の不一致）。                                                                                                                                     |
-| CD-03 | **AI-DLC Inception の hearing sheet**: `hearing-scenarios.json` に `aidlc_inception` を追加する。段階は「意図」「要件の具体化」「非機能要件」「分割と優先順位」の 4 つ。各項目に組織の既定値を持たせられるようにする。語彙は `user-facing-vocabulary.json` に en / ja の両方で追加する。                                                                                                                                                                                                                                                                                                                         |
-| CD-04 | **たたき台の生成**: 意図のヒアリング結果から、ユーザーストーリー・受け入れ条件・非機能要件の選択肢・AI-DLC Unit の分割案と、それぞれのこちらの決定の案を AI が生成し、調整事項の下書きにする。選択肢には「費用」「期日」「範囲」の影響を必ず付ける。根拠はカタログ・価格表・テナントのナレッジに限る（顧客向け対話と同じ制約）。生成は typed op として実装し、pipeline の文字列 JS にしない。                                                                                                                                                                                                                    |
-| CD-05 | **社内承認と版の固定**: 調整セットを approval-actuator 経由で承認にかける。承認時に内容のハッシュを記録し、以後の変更（こちらの決定の変更を含む）は新しい版として再承認する。顧客の回答は必ず特定の版に結び付ける。操作は facade（`pnpm kyberion customer-decision draft / submit / send / status`、名前は実装時に確定）から行う。                                                                                                                                                                                                                                                                               |
-| CD-06 | **招待リンク**: 調整セット 1 件に対して招待トークンを発行する。トークンはランダム値で、保存するのはハッシュだけにする。有効期限、取り消し、利用回数の記録を持つ。リンクで入れるのは、その調整セットの閲覧と回答だけ。トークンからはテナントと調整セットを解決するだけで、他の調整セット・商談・ミッションには届かない。招待時に顧客側の参加者名と役割（決定者 / 意見を言う人）を指定する。                                                                                                                                                                                                                       |
-| CD-07 | **顧客向けの画面**: 新しい display（仮称 `customer-room`）を独立したプロセスとして作り、loopback で待ち受けて公開 ingress（Tailscale Funnel）から出す。画面は A2UI の kyberion-base kit で作り、i18n は en / ja を必須にする。調整事項ごとに、問い・背景・今の有効な決定とその出どころ・選択肢と変えた場合の影響・「このままでよい」・コメント欄を出す。`hearing` 種別の事項は、`runCustomerConversation` の `requirements_hearing` モードで対話する。`active-surfaces.json` への登録と、境界テスト（他の調整セットや社内 API に届かないこと）を同時に入れる。                                                   |
-| CD-08 | **決定記録と反映**: 決定者が確定したら顧客の層に記録する。内容は、回答、参加者、版のハッシュ、日時、`identity_assurance: invite_link`、監査チェーンへの記録。控えを顧客（画面と紐付け済みのチャネル）と担当者に返す。CD-02 の切り替わりイベントを受けて、商談の `requirements_ref` と `agreed.scope`、MO-11 の alignment brief の入力を更新する。金額・契約に関わる決定は、担当者が確認するまで暫定とする。                                                                                                                                                                                                      |
+| ID    | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CD-01 | **調整事項のデータ型とスキーマ**: 調整事項・調整セット・決定記録を定義する（`knowledge/product/schemas/customer-decision-*.schema.json`）。調整事項の種類は `choice`（選択肢から選ぶ）、`approval`（成果物を承認 / 修正依頼）、`ranking`（並べ替えと範囲の選択）、`hearing`（対話で聞き取る）の 4 つ。調整事項の状態は `draft → pending_approval → open → customer_decided`（ほかに `closed`（上書きの締め切り後）/ `escalated` / `withdrawn`）。決定の値は SSOD の決定台帳に置き、調整セット・決定記録・切り替わりは同じ case の配下に置く（「段階 1 の実装設計」の節）。`system/` には何も置かない。 |
+| CD-02 | **決定の層と有効な決定の解決**: 層の並び、`requires_customer`、`override_until` をスキーマに持たせる。`resolveEffectiveDecision()`（`libs/core`、副作用のない関数）が、層ごとの追記履歴から有効な決定と、その出どころ（層・決めた人・日時・版）と、暫定か確定かを返す。有効な決定が切り替わったときに、切り替わりのイベント（前の値、新しい値、出どころ）を出す。網羅的な単体テストを付ける（層の欠け、同じ値での確定、締め切り後の変更、`requires_customer`、版の不一致）。                                                                                                                           |
+| CD-03 | **AI-DLC Inception の hearing sheet**: `hearing-scenarios.json` に `aidlc_inception` を追加する。段階は「意図」「要件の具体化」「非機能要件」「分割と優先順位」の 4 つ。各項目に組織の既定値を持たせられるようにする。語彙は `user-facing-vocabulary.json` に en / ja の両方で追加する。                                                                                                                                                                                                                                                                                                               |
+| CD-04 | **たたき台の生成**: 意図のヒアリング結果から、ユーザーストーリー・受け入れ条件・非機能要件の選択肢・AI-DLC Unit の分割案と、それぞれのこちらの決定の案を AI が生成し、調整事項の下書きにする。選択肢には「費用」「期日」「範囲」の影響を必ず付ける。根拠はカタログ・価格表・テナントのナレッジに限る（顧客向け対話と同じ制約）。生成は typed op として実装し、pipeline の文字列 JS にしない。                                                                                                                                                                                                          |
+| CD-05 | **社内承認と版の固定**: 調整セットを approval-actuator 経由で承認にかける。承認時に内容のハッシュを記録し、以後の変更（こちらの決定の変更を含む）は新しい版として再承認する。顧客の回答は必ず特定の版に結び付ける。操作は facade（`pnpm kyberion customer-decision draft / submit / send / status`、名前は実装時に確定）から行う。                                                                                                                                                                                                                                                                     |
+| CD-06 | **招待リンク**: 調整セット 1 件に対して招待トークンを発行する。トークンはランダム値で、保存するのはハッシュだけにする。有効期限、取り消し、利用回数の記録を持つ。リンクで入れるのは、その調整セットの閲覧と回答だけ。トークンからはテナントと調整セットを解決するだけで、他の調整セット・商談・ミッションには届かない。招待時に顧客側の参加者名と役割（決定者 / 意見を言う人）を指定する。                                                                                                                                                                                                             |
+| CD-07 | **顧客向けの画面**: 新しい display（仮称 `customer-room`）を独立したプロセスとして作り、loopback で待ち受けて公開 ingress（Tailscale Funnel）から出す。画面は A2UI の kyberion-base kit で作り、i18n は en / ja を必須にする。調整事項ごとに、問い・背景・今の有効な決定とその出どころ・選択肢と変えた場合の影響・「このままでよい」・コメント欄を出す。`hearing` 種別の事項は、`runCustomerConversation` の `requirements_hearing` モードで対話する。`active-surfaces.json` への登録と、境界テスト（他の調整セットや社内 API に届かないこと）を同時に入れる。                                         |
+| CD-08 | **決定記録と反映**: 決定者が確定したら顧客の層に記録する。内容は、回答、参加者、版のハッシュ、日時、`identity_assurance: invite_link`、監査チェーンへの記録。控えを顧客（画面と紐付け済みのチャネル）と担当者に返す。CD-02 の切り替わりイベントを受けて、商談の `requirements_ref` と `agreed.scope`、MO-11 の alignment brief の入力を更新する。金額・契約に関わる決定は、担当者が確認するまで暫定とする。                                                                                                                                                                                            |
 
 ### 段階 2: Construction への接続
 
@@ -136,7 +136,42 @@ status: active
 - 版の固定: 承認後に内容を変えると再承認が必要になる。古い版への回答は新しい版に流用されない。
 - 退行: 既存の `requirements_hearing` モードと presence-studio の hearing（`web_app_build` / `work_inventory` / `process_improvement`）の挙動が変わらない。
 
+## 判断済みの事項（2026-10-24 追記）
+
+- `requires_customer: true` の既定: 金額・契約・リリース・変更要求。
+- **決定の切り替わりの伝え方: タスクの境界で照合し、実行中のタスクには割り込まない**。
+  - ミッション（bolt）は、タスクの開始時に有効な決定を読み、使った決定の id と値を固定する（SSOD の `DecisionLock` と同じ形）。
+  - タスクの完了時（evidence を記録する前）に、固定した値と今の有効な決定を照合する。違っていれば、そのタスクの成果を「古い決定に基づく」とし、手戻りを変更の WorkItem として起票する。
+  - 実行中のタスクには割り込まない。途中で止めると成果が中途半端に残り、どこまでが古い決定に基づくかが分からなくなるためである。bolt は数時間〜数日と短く、境界での照合で十分に早い。
+  - 段階 1 では、照合の純関数と切り替わりの記録（`switches.jsonl`）までを作る。ミッションの実行器への組み込みは CD-09 で行う。
+
+## 段階 1 の実装設計
+
+**決定の正本は SSOD の決定台帳に置く**。新しい決定の保存先は作らない。本計画で足すのは、決定台帳の上に載る「依頼と表示の層」（調整セット、招待、決定記録、切り替わり）である。
+
+| 本計画の概念 | 決定台帳での表現                                                                                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 案件         | 決定台帳の case（`knowledge/confidential/<tenant>/decisions/<case>/`）。case id は project id または deal id                                                                          |
+| 調整事項     | 台帳の 1 つの item × key と、調整セットの 1 項目（問い・背景・選択肢と影響・層・`requires_customer`・`override_until`）                                                               |
+| 顧客の決定   | `level: customer-value`、`state: decided` の記録。`decided_by.on_behalf_of` が顧客 actor（`customers/<customer>/actors.json`）、`evidence` が決定記録の id                            |
+| こちらの決定 | `level: customer-value`、`state: proposed` の記録で、id が承認済みの調整セットの版に固定されているもの。版に固定されていない proposed（会話中の答えなど）はこちらの決定として扱わない |
+| 組織の既定値 | 調整セットの項目が持つ値（hearing sheet のひな形から来る）。台帳には書かない                                                                                                          |
+| 上書き       | 台帳の `supersedes`（追記のみ）。顧客の決定はこちらの決定を supersede できるが、逆はできない（facade が拒否する）                                                                     |
+
+置き場:
+
+- 調整セット: `knowledge/confidential/<tenant>/decisions/<case>/agendas/<agenda_id>.json`
+- 決定記録: `knowledge/confidential/<tenant>/decisions/<case>/receipts/<receipt_id>.json`
+- 切り替わりの記録: `knowledge/confidential/<tenant>/decisions/<case>/switches.jsonl`
+- 招待（秘密値のハッシュのみ）: `active/shared/runtime/customer-decision-invites/confidential/<tenant>/<invite_id>.json`（tier-guard と tenant scope の保護対象になる `<root>/<tier>/<tenant>` の並び）
+
+モジュール:
+
+- `libs/core/customer-decision/`: 型、内容ハッシュ、有効な決定の解決（純関数）、切り替わりの検出、照合、招待トークン、保存。
+- `scripts/customer_decision.ts`（`pnpm customer-decision`）: 書き込みの唯一の窓口。`draft` / `generate` / `submit` / `send` / `status` / `revoke`、および顧客向け画面が子プロセスとして呼ぶ `view` / `respond`。台帳への書き込みは `libs/core/decision-ledger` の関数を使う。
+- `presence/displays/customer-room/`: 独立したプロセス。1 プロセスは 1 テナントだけを扱う（`KYBERION_CUSTOMER_ROOM_TENANT`）。招待トークンは URL のフラグメントで渡し、画面からはヘッダで送る（サーバのアクセスログに残さない）。読み書きとも facade の子プロセスを通し、ライブラリから台帳を直接触らない。
+- 段階 1 では、`hearing` 種別の事項は自由記述で受ける。画面内の対話（`requirements_hearing` モード）は段階 1 の後の改善で入れる。
+
 ## 未決事項
 
-- `requires_customer: true` を既定にする事項の範囲（案: 金額・契約・リリース・変更要求。CD-03 の hearing sheet で決める）。
-- 有効な決定の切り替わりを、実行中のミッションにどう割り込ませるか（次のタスクの開始時に読むだけにするか、実行中のタスクにも知らせるか。CD-09 の着手時に決める）。
+- 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。

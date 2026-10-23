@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-agenda.schema.json",
+  "title": "Customer Decision Agenda",
+  "description": "A decision agenda (CD-01): the bundle of decision requests sent to a customer in one invitation. Stored at knowledge/confidential/<tenant>/decisions/<case>/agendas/<agenda_id>.json on top of the SSOD decision ledger, which holds the decision values. See libs/core/customer-decision/model.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "agenda_id",
+    "tenant_slug",
+    "case_id",
+    "customer",
+    "title",
+    "phase",
+    "revision",
+    "locale",
+    "entries",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "customer": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,60}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "phase": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "locale": { "type": "string", "enum": ["ja", "en"] },
+    "deal_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "entries": { "type": "array", "items": { "$ref": "#/definitions/entry" } },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "pending_approval", "approved", "sent", "closed", "withdrawn"]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_hash", "approved_at", "approved_by"],
+      "properties": {
+        "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "minLength": 1 },
+        "approved_by": { "type": "string", "minLength": 1 }
+      }
+    },
+    "milestones_passed": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "created_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "enum": ["approved", "sent"] } },
+        "required": ["status"]
+      },
+      "then": { "required": ["approval"] }
+    }
+  ],
+  "definitions": {
+    "layer": { "type": "string", "enum": ["customer", "ours", "org_default"] },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "item", "key", "kind", "question", "requires_customer"],
+      "properties": {
+        "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+        "item": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+        "kind": { "type": "string", "enum": ["choice", "approval", "ranking", "hearing"] },
+        "question": { "type": "string", "minLength": 1 },
+        "background": { "type": "string" },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": {},
+              "label": { "type": "string", "minLength": 1 },
+              "impact": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "cost": { "type": "string" },
+                  "schedule": { "type": "string" },
+                  "scope": { "type": "string" },
+                  "rework": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "layers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/layer" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "our_decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": {
+            "value": {},
+            "rationale": { "type": "string" },
+            "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" }
+          }
+        },
+        "org_default": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "source"],
+          "properties": {
+            "value": {},
+            "source": { "type": "string", "minLength": 1 }
+          }
+        },
+        "requires_customer": { "type": "boolean" },
+        "override_until": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "at"],
+              "properties": {
+                "kind": { "const": "date" },
+                "at": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "milestone"],
+              "properties": {
+                "kind": { "const": "milestone" },
+                "milestone": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "requires_customer entries carry no lower layers: work waits for the customer.",
+          "if": {
+            "properties": { "requires_customer": { "const": true } },
+            "required": ["requires_customer"]
+          },
+          "then": {
+            "not": { "anyOf": [{ "required": ["our_decision"] }, { "required": ["org_default"] }] }
+          }
+        }
+      ]
+    }
+  }
+}
