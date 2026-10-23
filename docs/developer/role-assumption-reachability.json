@@ -1949,6 +1949,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/llm-selection/route.ts#GET",
+      "roles": ["settings_admin"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/llm-selection/route.ts#POST",
+      "roles": ["settings_admin"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/me/passkeys/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2056,6 +2066,11 @@
     {
       "site": "presence/displays/concierge/src/app/api/secrets/introduce/route.ts#POST",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/service-catalog/route.ts#GET",
+      "roles": ["settings_admin"],
       "unresolved": []
     },
     {
@@ -4552,6 +4567,7 @@
         "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
+        "presence/displays/concierge/src/app/api/llm-selection/route.ts",
         "presence/displays/concierge/src/app/api/management/participants/route.ts",
         "presence/displays/concierge/src/app/api/management/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
@@ -4578,6 +4594,7 @@
         "presence/displays/concierge/src/app/api/response-status/route.ts",
         "presence/displays/concierge/src/app/api/secrets/apply/route.ts",
         "presence/displays/concierge/src/app/api/secrets/introduce/route.ts",
+        "presence/displays/concierge/src/app/api/service-catalog/route.ts",
         "presence/displays/concierge/src/app/api/services/operator/route.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-actions.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-generation/route.ts",
@@ -4653,7 +4670,9 @@
         "presence/displays/concierge/src/app/settings/sections/ProviderAttestationSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/PushPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/QuietHoursPane.tsx",
+        "presence/displays/concierge/src/app/settings/sections/ReasoningSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/RecordingConsentSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/ServiceCatalogPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/ServicesSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/SettingsSaveFeedback.tsx",
         "presence/displays/concierge/src/app/settings/sections/VoiceSection.tsx",
@@ -5024,6 +5043,9 @@
             "libs/core/locale.ts#resolveWithoutExplicit",
             "libs/core/locale.ts#resolveScopedLocale"
           ]
+        },
+        "settings_admin": {
+          "example_path": ["presence/displays/concierge/src/app/api/llm-selection/route.ts#GET"]
         },
         "slack_bridge": {
           "example_path": [
