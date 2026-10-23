@@ -1196,5 +1196,8 @@
 ## 📁 public/test-runners
 - [test-runners](./public/test-runners/README.md) (public | Unknown)
 
+## 📁 public/tmp
+- [pr-body-cli-charter](./public/tmp/pr-body-cli-charter.md) (public | Unknown)
+
 ## 📁 public/voice-of-customer
 - [voice-of-customer/](./public/voice-of-customer/README.md) (public | Unknown)
