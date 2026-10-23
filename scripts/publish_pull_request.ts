@@ -15,6 +15,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
 import { ghMust } from '@agent/core/vcs';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
+import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
 import { publishWithWorktreeGovernance } from './lib/pr-worktree-governance.js';
 import {
   checkPrKnowledgeReadiness,
@@ -307,7 +308,13 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
       cwd: pathResolver.rootDir(),
     }).trim(),
   });
-  const result = publishWithWorktreeGovernance(publication, invocationId, print);
+  // Run inside the installed runtime authority context so an accountability
+  // charter with an exact vcs:pr_create grant can delegate this publication;
+  // without a matching grant the normal human approval path applies.
+  const result = withRuntimeExternalOperationAuthority(
+    { stepId: 'pr:publish', runId: invocationId },
+    () => publishWithWorktreeGovernance(publication, invocationId, print)
+  );
   if (result.error || result.status !== 0) {
     throw new Error(result.stderr?.trim() || result.error?.message || 'GitHub PR creation failed');
   }
