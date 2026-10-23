@@ -117,6 +117,19 @@ IdP への通信は `secureFetch`(egress policy と監査)を通ります。Goog
 
 Google / Entra のクライアントを作らずに、ローカルで `/login` を試すための使い捨て IdP です(`scripts/dev_oidc_idp.ts`)。誰が来ても固定の subject(既定 `dev-user`)としてサインインさせるため、**`127.0.0.1` にしかバインドせず**、リダイレクト先も `http://localhost:<port>/auth/callback` に限定し、`NODE_ENV=production` では起動しません。検証専用で、リモート公開には使えません。
 
+### surfaces 管理での有効化(推奨)
+
+`dev-idp` surface(既定 disabled)として登録済みです。`setup` サブコマンドが OIDC 設定を全 surface 共通の secret-guard(`kyberion-oidc`)と session 鍵(`kyberion-browser-session`)に書くため、env export や再起動なしで各 surface の `/login` が使えます。
+
+```bash
+node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts setup   # OIDC 設定を store に書く
+pnpm surfaces enable --surface dev-idp                               # IdP を :9099 で起動
+pnpm organization member link-identity <member-id> --issuer http://localhost:9099 --subject dev-user
+# http://localhost:<surface-port>/ → /login → Dev IdP ボタン
+```
+
+### 手動 env 経路(従来)
+
 ```bash
 # 1. 開発 IdP を起動(別ターミナルで起動したままにする)
 node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts

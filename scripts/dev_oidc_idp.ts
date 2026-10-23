@@ -24,6 +24,7 @@ import {
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { oidcEnvConfigured, saveOidcLoginSettings } from '@agent/core/surface/oidc-login-settings';
 import {
   currentProcessArgv,
   defineScript,
@@ -275,11 +276,51 @@ if (
     flags: [],
     async run(context) {
       const argv = await createStandardYargs(currentProcessArgv())
+        .command(
+          'setup',
+          'Write the dev IdP into the shared surface OIDC settings so /login works without env vars'
+        )
         .option('port', { type: 'number', default: DEFAULT_PORT })
         .option('client-id', { type: 'string', default: DEFAULT_CLIENT_ID })
         .option('subject', { type: 'string', default: DEFAULT_SUBJECT })
         .option('email', { type: 'string' })
         .parseAsync(context.argv);
+      if (argv._[0] === 'setup') {
+        if (getRegisteredEnvText('NODE_ENV') === 'production') {
+          throw new ScriptExitError(
+            2,
+            'dev OIDC IdP signs in anyone; it refuses to run with NODE_ENV=production'
+          );
+        }
+        const port = Number(argv.port);
+        const clientId = String(argv['client-id']);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new ScriptExitError(2, '--port must be 1-65535');
+        }
+        if (oidcEnvConfigured()) {
+          context.print(
+            '[dev:oidc-idp] KYBERION_OIDC_* env vars are set; they win over stored settings, so surfaces started with them will not use this document.'
+          );
+        }
+        const issuer = `http://localhost:${port}`;
+        const saved = saveOidcLoginSettings({
+          issuer,
+          client_id: clientId,
+          provider_label: 'Dev IdP',
+        });
+        context.print(`[dev:oidc-idp] stored OIDC settings (issuer=${saved.summary.issuer}).`);
+        context.print(`[dev:oidc-idp] browser session key ${saved.session_key}.`);
+        context.print('');
+        context.print('# Next:');
+        context.print('pnpm surfaces enable --surface dev-idp   # starts the IdP on :9099');
+        context.print(
+          `pnpm organization member link-identity <member-id> --issuer ${issuer} --subject ${argv.subject}   # once, per member`
+        );
+        context.print(
+          '# Then open http://localhost:<surface-port>/ and use /login. Stored settings are read per request, so no surface restart is needed.'
+        );
+        return;
+      }
       const options: DevOidcIdpOptions = {
         port: Number(argv.port),
         clientId: String(argv['client-id']),

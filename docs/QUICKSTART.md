@@ -162,7 +162,7 @@ Wait for a surface's health to become `healthy` in `pnpm surfaces status` before
 
 Choose the surface for the task (full role map: [SURFACES](./SURFACES.md)):
 
-- **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want. On a fresh install with no owner yet, run `pnpm organization first-run code` on the host first and open the printed `/setup/first-run` URL once ([operations](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md)).
+- **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want. On a fresh install with no owner yet, run `pnpm organization first-run code` on the host first and open the printed `/setup/first-run` URL once ([operations](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md)). For browser sign-in without an external IdP, run `node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts setup` then `pnpm surfaces enable --surface dev-idp` and link the dev subject to your member (same operations doc, "ローカル検証用の開発 IdP").
 - **Inspect a runtime or investigate a failure:** Chronos at `http://127.0.0.1:3000`.
 - **Try voice and live transcripts:** Presence Studio at `http://127.0.0.1:3031`, with a healthy `voice-hub` and the voice prerequisites reported by `pnpm kyberion doctor --runtime voice`.
 - **Use a terminal control view:** `pnpm tui`.

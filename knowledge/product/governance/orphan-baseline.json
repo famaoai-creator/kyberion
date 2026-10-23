@@ -74,10 +74,6 @@
   ],
   "scripts": [
     {
-      "id": "scripts/dev_oidc_idp.ts",
-      "reason": "Operator-run local dev tool: a loopback-only throw-away OIDC IdP for trying the surface /login flow without a Google or Entra client. Started by hand per docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md (no package script, to stay under the SX-05 script ratchet); unit-tested by scripts/dev_oidc_idp.test.ts."
-    },
-    {
       "id": "scripts/contrastive_probe.ts",
       "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it \u2014 unit-tested via libs/core/harnessing tests."
     }
@@ -384,7 +380,7 @@
     },
     {
       "id": "wisdom:write_artifact",
-      "reason": "Forwarding alias wisdom → file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Forwarding alias wisdom \u2192 file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:write_file",

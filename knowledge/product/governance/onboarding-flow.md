@@ -511,7 +511,8 @@ pnpm onboarding:context first-work \
 `solution_project` / `bootstrap_project` になる）。
 
 activation が `active` でない場合、first-work の apply は fail-closed で拒否される。
-レビューして受け入れた後にだけ apply する。
+`--dry-run` は activation 前でも分類結果を返す(結果の `tenant_activation` が `pending` と出る)ので、
+分類をレビューしてから activation の受け入れを判断できる。レビューして受け入れた後にだけ apply する。
 
 ```bash
 pnpm onboarding:context first-work \

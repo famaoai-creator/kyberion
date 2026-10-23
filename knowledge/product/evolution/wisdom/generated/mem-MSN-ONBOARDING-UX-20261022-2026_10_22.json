@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-ONBOARDING-UX-20261022-2026_10_22",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Record review deliverables before re-running review gates",
+  "summary": "A review can be recorded as approved yet the task gate stays blocked when the required REVIEW-<task>.md deliverable is missing; reviewer independence is only evaluated once implementer evidence and the deliverable exist.",
+  "candidate_id": "mem-MSN-ONBOARDING-UX-20261022-2026_10_22",
+  "evidence_refs": [
+    "active/missions/public/MSN-ONBOARDING-UX-20261022/evidence/ux-contract.json",
+    "active/missions/public/MSN-ONBOARDING-UX-20261022/evidence/ux-review.md"
+  ],
+  "created_at": "2026-10-22T14:51:07.566Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "During MSN-ONBOARDING-UX-20261022 the ux-review approval was recorded twice but remained blocked until evidence/ux-contract.json and REVIEW-contract_authoring-ux-contract.md existed and the implementer actor was recorded. Lesson: write the task deliverable and implementer evidence first, then record the review."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-ONBOARDING-UX-20261022/evidence/ux-contract.json",
+    "active/missions/public/MSN-ONBOARDING-UX-20261022/evidence/ux-review.md"
+  ],
+  "source_branch": "feat/onboarding-ux-20261022",
+  "source_commit": "cc73b70c0baaf6628b8668959de266a955570a24"
+}

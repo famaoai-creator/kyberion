@@ -615,6 +615,41 @@ describe('organization operating model', () => {
         `op-archived-evidence:${archivedRef}`
       );
       expect(reconciliation.invalid_evidence_refs).toContain(`op-archived-evidence:${missingRef}`);
+
+      // Reconcile agrees with the add-time gate: a ref-less mission op is a
+      // valid unbound target (it spawns a mission per run), while a ref-less
+      // task_session record (e.g. written outside the governed facade) is
+      // still flagged.
+      const unboundMission = buildOrganizationOperationRecord(
+        {
+          organizationId: orgId,
+          operationId: 'op-unbound-mission',
+          name: 'Unbound mission op',
+          operationType: 'event_driven',
+          ownerRole: 'operator',
+          tier: 'public',
+          executionKind: 'mission',
+          rootDir,
+        },
+        '2026-10-06T00:00:00.000Z'
+      );
+      saveOrganizationOperation(unboundMission, { rootDir });
+      saveOrganizationOperation(
+        {
+          ...unboundMission,
+          operation_id: 'op-legacy-task-session',
+          execution_target: { kind: 'task_session' },
+        },
+        { rootDir }
+      );
+      const reloaded = reconcileOrganizationCatalog({
+        organizationId: orgId,
+        tier: 'public',
+        tenantSlug: 'shared',
+        rootDir,
+      });
+      expect(reloaded.invalid_execution_refs).not.toContain('op-unbound-mission:execution_target');
+      expect(reloaded.invalid_execution_refs).toContain('op-legacy-task-session:execution_target');
     } finally {
       safeRmSync(rootDir);
     }
