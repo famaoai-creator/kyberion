@@ -70,6 +70,8 @@
       "active/shared/runtime/discussion-create-requests/confidential/",
       "active/shared/runtime/grants/personal/",
       "active/shared/runtime/grants/confidential/",
+      "active/shared/runtime/customer-decision-invites/personal/",
+      "active/shared/runtime/customer-decision-invites/confidential/",
       "active/shared/runtime/autonomy-learning/personal/",
       "active/shared/runtime/autonomy-learning/confidential/",
       "active/shared/runtime/pipeline-library-runs/personal/",
