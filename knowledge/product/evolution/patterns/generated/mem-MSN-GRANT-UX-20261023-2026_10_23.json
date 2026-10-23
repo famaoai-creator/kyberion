@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-GRANT-UX-20261023-2026_10_23",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Delegation scope belongs to a human-editable grant template, not a flags list",
+  "summary": "Charter external_operations grants are chosen at onboarding via a generated delegation-input.json (repo-prefilled, mode: grant, renew_existing) and edited later in Concierge OnboardingAuthorityPanel — both feed the same preview→request→approve→apply facade; nothing writes the charter directly.",
+  "candidate_id": "mem-MSN-GRANT-UX-20261023-2026_10_23",
+  "evidence_refs": [
+    "active/missions/public/MSN-GRANT-UX-20261023/evidence/implementation-report.md",
+    "active/missions/public/MSN-GRANT-UX-20261023/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-23T21:41:29.151Z",
+  "applicability": ["mission", "mission:MSN-GRANT-UX-20261023"],
+  "reusable_steps": [
+    "Charter external_operations grants are chosen at onboarding via a generated delegation-input",
+    "json (repo-prefilled, mode: grant, renew_existing) and edited later in Concierge OnboardingAuthorityPanel — both feed the same preview→request→approve→apply facade; nothing writes the charter directly"
+  ],
+  "expected_outcome": "Pattern: generate a prefilled grant template beside activation-input.json at onboarding, and expose the same grant shape in the settings UI with a digest-bound request flow. New @agent/core subpath imports require an exports-map entry in libs/core/package.json.",
+  "source_branch": "feat/vcs-delegation-20261023",
+  "source_commit": "822894cbbdb70c75a00a770a5a1775cbf36fd33e"
+}
