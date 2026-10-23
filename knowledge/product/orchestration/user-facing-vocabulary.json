@@ -28920,6 +28920,106 @@
         "en": "This destination is unavailable in the selected scope. Check the tenant, organization, and project selection before confirming again. Your answers are kept.",
         "ja": "選択した範囲では登録先を利用できません。テナント・組織・プロジェクトの選択を確認してから、再度登録してください。回答は保持されています。",
         "qps-ploc": "⟦Ŧħïş ḓėşŧïñȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė ïñ ŧħė şėŀėƈŧėḓ şƈőṗė. Ƈħėƈķ ŧħė ŧėñȧñŧ, őřɠȧñïẑȧŧïőñ, ȧñḓ ṗřőĵėƈŧ şėŀėƈŧïőñ ƀėƒőřė ƈőñƒïřɱïñɠ ȧɠȧïñ. Ẏőůř ȧñşẇėřş ȧřė ķėṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
+      },
+      "hearing_req_aidlc_purpose": {
+        "en": "Purpose of the product",
+        "ja": "製品の目的",
+        "qps-ploc": "⟦Ṗůřṗőşė őƒ ŧħė ṗřőḓůƈŧ ŀőřėɱ ï⟧"
+      },
+      "hearing_req_aidlc_success_criteria": {
+        "en": "Success criteria",
+        "ja": "成功の条件",
+        "qps-ploc": "⟦Şůƈƈėşş ƈřïŧėřïȧ ŀőřėɱ⟧"
+      },
+      "hearing_req_aidlc_users": {
+        "en": "Primary users",
+        "ja": "主な利用者",
+        "qps-ploc": "⟦Ṗřïɱȧřẏ ůşėřş ŀőřė⟧"
+      },
+      "hearing_req_aidlc_user_stories": {
+        "en": "User stories",
+        "ja": "ユーザーストーリー（誰が何をしたいか）",
+        "qps-ploc": "⟦Ůşėř şŧőřïėş ŀőř⟧"
+      },
+      "hearing_req_aidlc_acceptance_criteria": {
+        "en": "Acceptance criteria",
+        "ja": "受け入れ条件（できていると言える基準）",
+        "qps-ploc": "⟦Ȧƈƈėṗŧȧñƈė ƈřïŧėřïȧ ŀőřėɱ ⟧"
+      },
+      "hearing_req_aidlc_performance": {
+        "en": "Performance expectations",
+        "ja": "性能の期待",
+        "qps-ploc": "⟦Ṗėřƒőřɱȧñƈė ėẋṗėƈŧȧŧïőñş ŀőřėɱ ï⟧"
+      },
+      "hearing_req_aidlc_security": {
+        "en": "Security expectations",
+        "ja": "セキュリティの期待",
+        "qps-ploc": "⟦Şėƈůřïŧẏ ėẋṗėƈŧȧŧïőñş ŀőřėɱ ⟧"
+      },
+      "hearing_req_aidlc_availability": {
+        "en": "Availability expectations",
+        "ja": "止まってよい時間・可用性の期待",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀïŀïŧẏ ėẋṗėƈŧȧŧïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_req_aidlc_platforms": {
+        "en": "Supported platforms",
+        "ja": "対応する環境（端末・ブラウザなど）",
+        "qps-ploc": "⟦Şůṗṗőřŧėḓ ṗŀȧŧƒőřɱş ŀőřėɱ ⟧"
+      },
+      "hearing_req_aidlc_unit_split": {
+        "en": "How the work is split into units",
+        "ja": "作る単位への分け方",
+        "qps-ploc": "⟦Ħőẇ ŧħė ẇőřķ ïş şṗŀïŧ ïñŧő ůñïŧş ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_req_aidlc_mvp_scope": {
+        "en": "Scope of the first release",
+        "ja": "最初に出す範囲",
+        "qps-ploc": "⟦Şƈőṗė őƒ ŧħė ƒïřşŧ řėŀėȧşė ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_req_aidlc_budget": {
+        "en": "Budget range",
+        "ja": "予算の範囲",
+        "qps-ploc": "⟦Ƀůḓɠėŧ řȧñɠė ŀőř⟧"
+      },
+      "hearing_req_aidlc_timeline": {
+        "en": "Target timeline",
+        "ja": "希望の時期",
+        "qps-ploc": "⟦Ŧȧřɠėŧ ŧïɱėŀïñė ŀőřė⟧"
+      },
+      "hearing_phase_aidlc_intent": {
+        "en": "What you want to achieve",
+        "ja": "実現したいこと",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ẇȧñŧ ŧő ȧƈħïėṽė ŀőřėɱ ï⟧"
+      },
+      "hearing_phase_aidlc_elaboration": {
+        "en": "Making the requirements concrete",
+        "ja": "要件を具体的にする",
+        "qps-ploc": "⟦Ɱȧķïñɠ ŧħė řėɋůïřėɱėñŧş ƈőñƈřėŧė ŀőřėɱ ïṗşů⟧"
+      },
+      "hearing_phase_aidlc_nfr": {
+        "en": "Quality and environment",
+        "ja": "品質と対応環境",
+        "qps-ploc": "⟦Ɋůȧŀïŧẏ ȧñḓ ėñṽïřőñɱėñŧ ŀőřėɱ ï⟧"
+      },
+      "hearing_phase_aidlc_units": {
+        "en": "Splitting the work and priorities",
+        "ja": "作業の分け方と優先順位",
+        "qps-ploc": "⟦Şṗŀïŧŧïñɠ ŧħė ẇőřķ ȧñḓ ṗřïőřïŧïėş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "hearing_phase_aidlc_constraints": {
+        "en": "Budget and timing",
+        "ja": "予算と時期",
+        "qps-ploc": "⟦Ƀůḓɠėŧ ȧñḓ ŧïɱïñɠ ŀőřėɱ⟧"
+      },
+      "hearing_scenario_aidlc_inception_label": {
+        "en": "Software project kickoff (AI-DLC Inception)",
+        "ja": "ソフトウェア開発の立ち上げヒアリング（AI-DLC Inception）",
+        "qps-ploc": "⟦Şőƒŧẇȧřė ṗřőĵėƈŧ ķïƈķőƒƒ (ȦÏ-ḒĿƇ Ïñƈėṗŧïőñ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "hearing_scenario_aidlc_inception_description": {
+        "en": "Walk through purpose, requirements, quality needs, how to split the work, and budget and timing before development starts.",
+        "ja": "開発を始める前に、目的、要件、品質の希望、作業の分け方、予算と時期を順に確認します。",
+        "qps-ploc": "⟦Ẇȧŀķ ŧħřőůɠħ ṗůřṗőşė, řėɋůïřėɱėñŧş, ɋůȧŀïŧẏ ñėėḓş, ħőẇ ŧő şṗŀïŧ ŧħė ẇőřķ, ȧñḓ ƀůḓɠėŧ ȧñḓ ŧïɱïñɠ ƀėƒőřė ḓėṽėŀőṗɱėñŧ şŧȧřŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
       }
     },
     "operator": {
@@ -32817,6 +32917,493 @@
         "en": "Event needing attention",
         "ja": "要確認の事象",
         "qps-ploc": "⟦Ėṽėñŧ ñėėḓïñɠ ȧŧŧėñŧïőñ ŀőřėɱ ï⟧"
+      }
+    },
+    "customer_decision": {
+      "template_aidlc_inception_title": {
+        "en": "Project kickoff decisions",
+        "ja": "開発の立ち上げで決めていただくこと",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ķïƈķőƒƒ ḓėƈïşïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "purpose_success_question": {
+        "en": "What do you want this product to achieve, and how will we know it has succeeded?",
+        "ja": "この製品で何を実現したいですか。うまくいったと判断できる基準も教えてください。",
+        "qps-ploc": "⟦Ẇħȧŧ ḓő ẏőů ẇȧñŧ ŧħïş ṗřőḓůƈŧ ŧő ȧƈħïėṽė, ȧñḓ ħőẇ ẇïŀŀ ẇė ķñőẇ ïŧ ħȧş şůƈƈėėḓėḓ? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "purpose_success_background": {
+        "en": "Everything else is planned from your answer. A short statement of the goal and one or two measurable signs of success is enough.",
+        "ja": "ここでの回答をもとに、以降の計画を立てます。目的と、成果を測れる目安を一つか二つ、短くお書きください。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ėŀşė ïş ṗŀȧññėḓ ƒřőɱ ẏőůř ȧñşẇėř. Ȧ şħőřŧ şŧȧŧėɱėñŧ őƒ ŧħė ɠőȧŀ ȧñḓ őñė őř ŧẇő ɱėȧşůřȧƀŀė şïɠñş őƒ şůƈƈėşş ïş ėñőůɠħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "primary_users_question": {
+        "en": "Who will use this product most?",
+        "ja": "この製品を主に使うのはどなたですか。",
+        "qps-ploc": "⟦Ẇħő ẇïŀŀ ůşė ŧħïş ṗřőḓůƈŧ ɱőşŧ? ŀőřėɱ ïṗşů⟧"
+      },
+      "primary_users_background": {
+        "en": "Knowing the main users helps us choose screens, wording and supported devices.",
+        "ja": "主な利用者がわかると、画面や言葉づかい、対応する端末を選びやすくなります。",
+        "qps-ploc": "⟦Ķñőẇïñɠ ŧħė ɱȧïñ ůşėřş ħėŀṗş ůş ƈħőőşė şƈřėėñş, ẇőřḓïñɠ ȧñḓ şůṗṗőřŧėḓ ḓėṽïƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "user_stories_question": {
+        "en": "Please review the user stories we drafted. Do they describe what users need?",
+        "ja": "作成したユーザーストーリー（誰が何をしたいか）をご確認ください。利用者の望みと合っていますか。",
+        "qps-ploc": "⟦Ṗŀėȧşė řėṽïėẇ ŧħė ůşėř şŧőřïėş ẇė ḓřȧƒŧėḓ. Ḓő ŧħėẏ ḓėşƈřïƀė ẇħȧŧ ůşėřş ñėėḓ? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "user_stories_background": {
+        "en": "We draft the stories from your earlier answers. Approve them as they are, or send back corrections.",
+        "ja": "先ほどのご回答をもとに案を作りました。そのまま承認するか、修正をご依頼ください。",
+        "qps-ploc": "⟦Ẇė ḓřȧƒŧ ŧħė şŧőřïėş ƒřőɱ ẏőůř ėȧřŀïėř ȧñşẇėřş. Ȧṗṗřőṽė ŧħėɱ ȧş ŧħėẏ ȧřė, őř şėñḓ ƀȧƈķ ƈőřřėƈŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "acceptance_criteria_question": {
+        "en": "Please review the acceptance criteria. Is this how you will judge the work as done?",
+        "ja": "受け入れ条件をご確認ください。この基準で「できた」と判断してよいですか。",
+        "qps-ploc": "⟦Ṗŀėȧşė řėṽïėẇ ŧħė ȧƈƈėṗŧȧñƈė ƈřïŧėřïȧ. Ïş ŧħïş ħőẇ ẏőů ẇïŀŀ ĵůḓɠė ŧħė ẇőřķ ȧş ḓőñė? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "acceptance_criteria_background": {
+        "en": "Acceptance criteria are the checks we will run before handing over each part of the work.",
+        "ja": "受け入れ条件は、各部分をお渡しする前に確認する基準です。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧȧñƈė ƈřïŧėřïȧ ȧřė ŧħė ƈħėƈķş ẇė ẇïŀŀ řůñ ƀėƒőřė ħȧñḓïñɠ őṽėř ėȧƈħ ṗȧřŧ őƒ ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "performance_target_question": {
+        "en": "How fast should the product respond under normal use?",
+        "ja": "通常の利用で、どのくらいの速さで反応する必要がありますか。",
+        "qps-ploc": "⟦Ħőẇ ƒȧşŧ şħőůŀḓ ŧħė ṗřőḓůƈŧ řėşṗőñḓ ůñḓėř ñőřɱȧŀ ůşė? ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "performance_target_background": {
+        "en": "Faster targets usually need more design and testing effort. Pick the level that matches how people will really use it.",
+        "ja": "速さの目標が高いほど、設計や確認の手間が増えるのが一般的です。実際の使われ方に合う水準をお選びください。",
+        "qps-ploc": "⟦Ƒȧşŧėř ŧȧřɠėŧş ůşůȧŀŀẏ ñėėḓ ɱőřė ḓėşïɠñ ȧñḓ ŧėşŧïñɠ ėƒƒőřŧ. Ṗïƈķ ŧħė ŀėṽėŀ ŧħȧŧ ɱȧŧƈħėş ħőẇ ṗėőṗŀė ẇïŀŀ řėȧŀŀẏ ůşė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "performance_target_opt_standard_label": {
+        "en": "Standard: pages respond in a few seconds",
+        "ja": "標準：数秒以内に画面が反応する",
+        "qps-ploc": "⟦Şŧȧñḓȧřḓ: ṗȧɠėş řėşṗőñḓ ïñ ȧ ƒėẇ şėƈőñḓş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "performance_target_opt_standard_impact_cost": {
+        "en": "Baseline effort.",
+        "ja": "基準となる手間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė ėƒƒőřŧ. ŀőřėɱ⟧"
+      },
+      "performance_target_opt_standard_impact_schedule": {
+        "en": "Baseline schedule.",
+        "ja": "基準となる期間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "performance_target_opt_standard_impact_scope": {
+        "en": "No change to scope.",
+        "ja": "範囲への影響はありません。",
+        "qps-ploc": "⟦Ñő ƈħȧñɠė ŧő şƈőṗė. ŀőřėɱ ⟧"
+      },
+      "performance_target_opt_fast_label": {
+        "en": "Fast: most actions respond in about one second",
+        "ja": "高速：ほとんどの操作が1秒前後で反応する",
+        "qps-ploc": "⟦Ƒȧşŧ: ɱőşŧ ȧƈŧïőñş řėşṗőñḓ ïñ ȧƀőůŧ őñė şėƈőñḓ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "performance_target_opt_fast_impact_cost": {
+        "en": "Higher tier adds design and testing effort.",
+        "ja": "上の水準では設計と確認の手間が増えます。",
+        "qps-ploc": "⟦Ħïɠħėř ŧïėř ȧḓḓş ḓėşïɠñ ȧñḓ ŧėşŧïñɠ ėƒƒőřŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "performance_target_opt_fast_impact_schedule": {
+        "en": "May lengthen the schedule slightly.",
+        "ja": "期間がやや延びる場合があります。",
+        "qps-ploc": "⟦Ɱȧẏ ŀėñɠŧħėñ ŧħė şƈħėḓůŀė şŀïɠħŧŀẏ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "performance_target_opt_fast_impact_scope": {
+        "en": "Scope unchanged; some features may be simplified to meet the target.",
+        "ja": "範囲は変わりませんが、目標のために一部の機能を簡素にすることがあります。",
+        "qps-ploc": "⟦Şƈőṗė ůñƈħȧñɠėḓ; şőɱė ƒėȧŧůřėş ɱȧẏ ƀė şïɱṗŀïƒïėḓ ŧő ɱėėŧ ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "performance_target_opt_very_fast_label": {
+        "en": "Very fast: near-instant responses even at peak use",
+        "ja": "非常に高速：混雑時でもほぼ即座に反応する",
+        "qps-ploc": "⟦Ṽėřẏ ƒȧşŧ: ñėȧř-ïñşŧȧñŧ řėşṗőñşėş ėṽėñ ȧŧ ṗėȧķ ůşė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "performance_target_opt_very_fast_impact_cost": {
+        "en": "Adds significant design, testing and infrastructure effort.",
+        "ja": "設計、確認、環境面の手間が大きく増えます。",
+        "qps-ploc": "⟦Ȧḓḓş şïɠñïƒïƈȧñŧ ḓėşïɠñ, ŧėşŧïñɠ ȧñḓ ïñƒřȧşŧřůƈŧůřė ėƒƒőřŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "performance_target_opt_very_fast_impact_schedule": {
+        "en": "Usually lengthens the schedule.",
+        "ja": "期間が延びるのが一般的です。",
+        "qps-ploc": "⟦Ůşůȧŀŀẏ ŀėñɠŧħėñş ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "performance_target_opt_very_fast_impact_scope": {
+        "en": "Some features may need to be reduced or phased.",
+        "ja": "機能を絞る、または段階的に出す必要が出ることがあります。",
+        "qps-ploc": "⟦Şőɱė ƒėȧŧůřėş ɱȧẏ ñėėḓ ŧő ƀė řėḓůƈėḓ őř ṗħȧşėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "security_level_question": {
+        "en": "How strong should the security protections be?",
+        "ja": "セキュリティは、どの程度の強さが必要ですか。",
+        "qps-ploc": "⟦Ħőẇ şŧřőñɠ şħőůŀḓ ŧħė şėƈůřïŧẏ ṗřőŧėƈŧïőñş ƀė? ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "security_level_background": {
+        "en": "Stricter levels add safeguards such as stronger sign-in and activity records. Choose according to the kind of data you will handle.",
+        "ja": "強い水準では、本人確認の強化や操作記録などの対策が加わります。扱う情報の性質に合わせてお選びください。",
+        "qps-ploc": "⟦Şŧřïƈŧėř ŀėṽėŀş ȧḓḓ şȧƒėɠůȧřḓş şůƈħ ȧş şŧřőñɠėř şïɠñ-ïñ ȧñḓ ȧƈŧïṽïŧẏ řėƈőřḓş. Ƈħőőşė ȧƈƈőřḓïñɠ ŧő ŧħė ķïñḓ őƒ ḓȧŧȧ ẏőů ẇïŀŀ ħȧñḓŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "security_level_opt_basic_label": {
+        "en": "Basic: standard sign-in and encrypted communication",
+        "ja": "基本：通常のログインと通信の暗号化",
+        "qps-ploc": "⟦Ƀȧşïƈ: şŧȧñḓȧřḓ şïɠñ-ïñ ȧñḓ ėñƈřẏṗŧėḓ ƈőɱɱůñïƈȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "security_level_opt_basic_impact_cost": {
+        "en": "Baseline effort.",
+        "ja": "基準となる手間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė ėƒƒőřŧ. ŀőřėɱ⟧"
+      },
+      "security_level_opt_basic_impact_schedule": {
+        "en": "Baseline schedule.",
+        "ja": "基準となる期間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "security_level_opt_basic_impact_scope": {
+        "en": "Baseline scope.",
+        "ja": "基準となる範囲です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈőṗė. ŀőřė⟧"
+      },
+      "security_level_opt_enhanced_label": {
+        "en": "Enhanced: adds stronger sign-in and activity records",
+        "ja": "強化：本人確認の強化と操作記録を加える",
+        "qps-ploc": "⟦Ėñħȧñƈėḓ: ȧḓḓş şŧřőñɠėř şïɠñ-ïñ ȧñḓ ȧƈŧïṽïŧẏ řėƈőřḓş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "security_level_opt_enhanced_impact_cost": {
+        "en": "Higher tier adds implementation and testing effort.",
+        "ja": "上の水準では実装と確認の手間が増えます。",
+        "qps-ploc": "⟦Ħïɠħėř ŧïėř ȧḓḓş ïɱṗŀėɱėñŧȧŧïőñ ȧñḓ ŧėşŧïñɠ ėƒƒőřŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "security_level_opt_enhanced_impact_schedule": {
+        "en": "May lengthen the schedule.",
+        "ja": "期間が延びる場合があります。",
+        "qps-ploc": "⟦Ɱȧẏ ŀėñɠŧħėñ ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗ⟧"
+      },
+      "security_level_opt_enhanced_impact_scope": {
+        "en": "Adds sign-in and record-keeping features.",
+        "ja": "ログインと記録に関する機能が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş şïɠñ-ïñ ȧñḓ řėƈőřḓ-ķėėṗïñɠ ƒėȧŧůřėş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "security_level_opt_strict_label": {
+        "en": "Strict: adds independent review and tighter access control",
+        "ja": "厳格：第三者の確認とより細かいアクセス制御を加える",
+        "qps-ploc": "⟦Şŧřïƈŧ: ȧḓḓş ïñḓėṗėñḓėñŧ řėṽïėẇ ȧñḓ ŧïɠħŧėř ȧƈƈėşş ƈőñŧřőŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "security_level_opt_strict_impact_cost": {
+        "en": "Adds substantial effort, including review.",
+        "ja": "確認を含め、大きな手間が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş şůƀşŧȧñŧïȧŀ ėƒƒőřŧ, ïñƈŀůḓïñɠ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "security_level_opt_strict_impact_schedule": {
+        "en": "Usually lengthens the schedule.",
+        "ja": "期間が延びるのが一般的です。",
+        "qps-ploc": "⟦Ůşůȧŀŀẏ ŀėñɠŧħėñş ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "security_level_opt_strict_impact_scope": {
+        "en": "Adds access control and review steps.",
+        "ja": "アクセス制御と確認の工程が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş ȧƈƈėşş ƈőñŧřőŀ ȧñḓ řėṽïėẇ şŧėṗş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "availability_target_question": {
+        "en": "How much downtime can you accept?",
+        "ja": "サービスが止まってよい時間は、どのくらいですか。",
+        "qps-ploc": "⟦Ħőẇ ɱůƈħ ḓőẇñŧïɱė ƈȧñ ẏőů ȧƈƈėṗŧ? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "availability_target_background": {
+        "en": "Higher availability needs extra preparation such as backups and monitoring.",
+        "ja": "止まりにくくするには、バックアップや監視などの追加の備えが必要になります。",
+        "qps-ploc": "⟦Ħïɠħėř ȧṽȧïŀȧƀïŀïŧẏ ñėėḓş ėẋŧřȧ ṗřėṗȧřȧŧïőñ şůƈħ ȧş ƀȧƈķůṗş ȧñḓ ɱőñïŧőřïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "availability_target_opt_business_hours_label": {
+        "en": "Business hours: occasional short stops outside working hours are fine",
+        "ja": "営業時間中: 営業時間外の短い停止は許容できる",
+        "qps-ploc": "⟦Ƀůşïñėşş ħőůřş: őƈƈȧşïőñȧŀ şħőřŧ şŧőṗş őůŧşïḓė ẇőřķïñɠ ħőůřş ȧřė ƒïñė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "availability_target_opt_business_hours_impact_cost": {
+        "en": "Baseline effort.",
+        "ja": "基準となる手間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė ėƒƒőřŧ. ŀőřėɱ⟧"
+      },
+      "availability_target_opt_business_hours_impact_schedule": {
+        "en": "Baseline schedule.",
+        "ja": "基準となる期間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "availability_target_opt_business_hours_impact_scope": {
+        "en": "Baseline scope.",
+        "ja": "基準となる範囲です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈőṗė. ŀőřė⟧"
+      },
+      "availability_target_opt_always_on_label": {
+        "en": "Always on: planned stops only, announced in advance",
+        "ja": "常時稼働：事前に知らせた計画的な停止のみ許容する",
+        "qps-ploc": "⟦Ȧŀẇȧẏş őñ: ṗŀȧññėḓ şŧőṗş őñŀẏ, ȧññőůñƈėḓ ïñ ȧḓṽȧñƈė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "availability_target_opt_always_on_impact_cost": {
+        "en": "Higher tier adds operations and monitoring effort.",
+        "ja": "上の水準では運用と監視の手間が増えます。",
+        "qps-ploc": "⟦Ħïɠħėř ŧïėř ȧḓḓş őṗėřȧŧïőñş ȧñḓ ɱőñïŧőřïñɠ ėƒƒőřŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "availability_target_opt_always_on_impact_schedule": {
+        "en": "May lengthen the schedule.",
+        "ja": "期間が延びる場合があります。",
+        "qps-ploc": "⟦Ɱȧẏ ŀėñɠŧħėñ ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗ⟧"
+      },
+      "availability_target_opt_always_on_impact_scope": {
+        "en": "Adds monitoring and recovery preparation.",
+        "ja": "監視と復旧の備えが加わります。",
+        "qps-ploc": "⟦Ȧḓḓş ɱőñïŧőřïñɠ ȧñḓ řėƈőṽėřẏ ṗřėṗȧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "availability_target_opt_high_availability_label": {
+        "en": "Highly available: stays up even if part of the system fails",
+        "ja": "高可用：一部が故障しても止まらないようにする",
+        "qps-ploc": "⟦Ħïɠħŀẏ ȧṽȧïŀȧƀŀė: şŧȧẏş ůṗ ėṽėñ ïƒ ṗȧřŧ őƒ ŧħė şẏşŧėɱ ƒȧïŀş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "availability_target_opt_high_availability_impact_cost": {
+        "en": "Adds substantial infrastructure and testing effort.",
+        "ja": "環境と確認の手間が大きく増えます。",
+        "qps-ploc": "⟦Ȧḓḓş şůƀşŧȧñŧïȧŀ ïñƒřȧşŧřůƈŧůřė ȧñḓ ŧėşŧïñɠ ėƒƒőřŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "availability_target_opt_high_availability_impact_schedule": {
+        "en": "Usually lengthens the schedule.",
+        "ja": "期間が延びるのが一般的です。",
+        "qps-ploc": "⟦Ůşůȧŀŀẏ ŀėñɠŧħėñş ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "availability_target_opt_high_availability_impact_scope": {
+        "en": "Adds redundancy-related work.",
+        "ja": "冗長化に関する作業が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş řėḓůñḓȧñƈẏ-řėŀȧŧėḓ ẇőřķ. ŀőřėɱ ïṗş⟧"
+      },
+      "supported_platforms_question": {
+        "en": "Which devices and browsers must the product support?",
+        "ja": "どの端末やブラウザで使えるようにする必要がありますか。",
+        "qps-ploc": "⟦Ẇħïƈħ ḓėṽïƈėş ȧñḓ ƀřőẇşėřş ɱůşŧ ŧħė ṗřőḓůƈŧ şůṗṗőřŧ? ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "supported_platforms_background": {
+        "en": "Each additional environment must be built for and checked separately.",
+        "ja": "対応する環境が増えるごとに、個別の作り込みと確認が必要になります。",
+        "qps-ploc": "⟦Ėȧƈħ ȧḓḓïŧïőñȧŀ ėñṽïřőñɱėñŧ ɱůşŧ ƀė ƀůïŀŧ ƒőř ȧñḓ ƈħėƈķėḓ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "supported_platforms_opt_desktop_web_label": {
+        "en": "Computers (desktop browsers)",
+        "ja": "パソコン（ブラウザ）",
+        "qps-ploc": "⟦Ƈőɱṗůŧėřş (ḓėşķŧőṗ ƀřőẇşėřş) ŀőřėɱ ïṗş⟧"
+      },
+      "supported_platforms_opt_desktop_web_impact_cost": {
+        "en": "Baseline effort.",
+        "ja": "基準となる手間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė ėƒƒőřŧ. ŀőřėɱ⟧"
+      },
+      "supported_platforms_opt_desktop_web_impact_schedule": {
+        "en": "Baseline schedule.",
+        "ja": "基準となる期間です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "supported_platforms_opt_desktop_web_impact_scope": {
+        "en": "Baseline scope.",
+        "ja": "基準となる範囲です。",
+        "qps-ploc": "⟦Ƀȧşėŀïñė şƈőṗė. ŀőřė⟧"
+      },
+      "supported_platforms_opt_desktop_and_mobile_web_label": {
+        "en": "Computers and smartphones (browsers)",
+        "ja": "パソコンとスマートフォン（ブラウザ）",
+        "qps-ploc": "⟦Ƈőɱṗůŧėřş ȧñḓ şɱȧřŧṗħőñėş (ƀřőẇşėřş) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "supported_platforms_opt_desktop_and_mobile_web_impact_cost": {
+        "en": "Adds layout and testing effort for small screens.",
+        "ja": "小さい画面向けの設計と確認の手間が増えます。",
+        "qps-ploc": "⟦Ȧḓḓş ŀȧẏőůŧ ȧñḓ ŧėşŧïñɠ ėƒƒőřŧ ƒőř şɱȧŀŀ şƈřėėñş. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "supported_platforms_opt_desktop_and_mobile_web_impact_schedule": {
+        "en": "May lengthen the schedule slightly.",
+        "ja": "期間がやや延びる場合があります。",
+        "qps-ploc": "⟦Ɱȧẏ ŀėñɠŧħėñ ŧħė şƈħėḓůŀė şŀïɠħŧŀẏ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "supported_platforms_opt_desktop_and_mobile_web_impact_scope": {
+        "en": "Adds smartphone layouts.",
+        "ja": "スマートフォン向けの画面が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş şɱȧřŧṗħőñė ŀȧẏőůŧş. ŀőřėɱ ï⟧"
+      },
+      "supported_platforms_opt_web_and_native_app_label": {
+        "en": "Browsers plus a dedicated smartphone app",
+        "ja": "ブラウザに加えて、専用のスマートフォンアプリ",
+        "qps-ploc": "⟦Ƀřőẇşėřş ṗŀůş ȧ ḓėḓïƈȧŧėḓ şɱȧřŧṗħőñė ȧṗṗ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "supported_platforms_opt_web_and_native_app_impact_cost": {
+        "en": "Adds a separate app to build and maintain.",
+        "ja": "別のアプリを作り、保守する手間が加わります。",
+        "qps-ploc": "⟦Ȧḓḓş ȧ şėṗȧřȧŧė ȧṗṗ ŧő ƀůïŀḓ ȧñḓ ɱȧïñŧȧïñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "supported_platforms_opt_web_and_native_app_impact_schedule": {
+        "en": "Usually lengthens the schedule.",
+        "ja": "期間が延びるのが一般的です。",
+        "qps-ploc": "⟦Ůşůȧŀŀẏ ŀėñɠŧħėñş ŧħė şƈħėḓůŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "supported_platforms_opt_web_and_native_app_impact_scope": {
+        "en": "Adds an app and its release process.",
+        "ja": "アプリとその公開手続きが加わります。",
+        "qps-ploc": "⟦Ȧḓḓş ȧñ ȧṗṗ ȧñḓ ïŧş řėŀėȧşė ṗřőƈėşş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "unit_split_question": {
+        "en": "Please review how we propose to split the work into independent units.",
+        "ja": "作業を独立した単位に分ける案をご確認ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė řėṽïėẇ ħőẇ ẇė ṗřőṗőşė ŧő şṗŀïŧ ŧħė ẇőřķ ïñŧő ïñḓėṗėñḓėñŧ ůñïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "unit_split_background": {
+        "en": "Each unit is a set of features that can be built and checked on its own. Approve the split or ask for changes.",
+        "ja": "各単位は、単独で作って確認できる機能のまとまりです。この分け方を承認するか、変更をご依頼ください。",
+        "qps-ploc": "⟦Ėȧƈħ ůñïŧ ïş ȧ şėŧ őƒ ƒėȧŧůřėş ŧħȧŧ ƈȧñ ƀė ƀůïŀŧ ȧñḓ ƈħėƈķėḓ őñ ïŧş őẇñ. Ȧṗṗřőṽė ŧħė şṗŀïŧ őř ȧşķ ƒőř ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "mvp_scope_question": {
+        "en": "Which units matter most? Please order them, and mark where the first release should end.",
+        "ja": "どの単位が重要ですか。重要な順に並べ、最初の公開をどこまでにするか印を付けてください。",
+        "qps-ploc": "⟦Ẇħïƈħ ůñïŧş ɱȧŧŧėř ɱőşŧ? Ṗŀėȧşė őřḓėř ŧħėɱ, ȧñḓ ɱȧřķ ẇħėřė ŧħė ƒïřşŧ řėŀėȧşė şħőůŀḓ ėñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "mvp_scope_background": {
+        "en": "We build in short rounds. The units at the top of your order go into the first round, so this order decides what you see first.",
+        "ja": "短い反復で作ります。上に並べた単位から最初の反復に入れるため、この順番が最初にお見せするものを決めます。",
+        "qps-ploc": "⟦Ẇė ƀůïŀḓ ïñ şħőřŧ řőůñḓş. Ŧħė ůñïŧş ȧŧ ŧħė ŧőṗ őƒ ẏőůř őřḓėř ɠő ïñŧő ŧħė ƒïřşŧ řőůñḓ, şő ŧħïş őřḓėř ḓėƈïḓėş ẇħȧŧ ẏőů şėė ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "budget_range_question": {
+        "en": "Which budget range should we plan within?",
+        "ja": "どの予算の範囲で計画しますか。",
+        "qps-ploc": "⟦Ẇħïƈħ ƀůḓɠėŧ řȧñɠė şħőůŀḓ ẇė ṗŀȧñ ẇïŧħïñ? ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "budget_range_background": {
+        "en": "We plan scope to fit the range you choose. This decision is confirmed with you directly and is not decided on your behalf.",
+        "ja": "選んでいただいた範囲に収まるように、作る範囲を計画します。この事項は、必ずお客様ご自身で決めていただきます。",
+        "qps-ploc": "⟦Ẇė ṗŀȧñ şƈőṗė ŧő ƒïŧ ŧħė řȧñɠė ẏőů ƈħőőşė. Ŧħïş ḓėƈïşïőñ ïş ƈőñƒïřɱėḓ ẇïŧħ ẏőů ḓïřėƈŧŀẏ ȧñḓ ïş ñőŧ ḓėƈïḓėḓ őñ ẏőůř ƀėħȧŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "budget_range_opt_lean_label": {
+        "en": "Lean: essential features only",
+        "ja": "抑えめ：必要最小限の機能のみ",
+        "qps-ploc": "⟦Ŀėȧñ: ėşşėñŧïȧŀ ƒėȧŧůřėş őñŀẏ ŀőřėɱ ïṗş⟧"
+      },
+      "budget_range_opt_lean_impact_cost": {
+        "en": "Lowest of the three ranges.",
+        "ja": "三つの中で最も低い範囲です。",
+        "qps-ploc": "⟦Ŀőẇėşŧ őƒ ŧħė ŧħřėė řȧñɠėş. ŀőřėɱ ïṗ⟧"
+      },
+      "budget_range_opt_lean_impact_schedule": {
+        "en": "Shortest of the three.",
+        "ja": "三つの中で最も短い期間です。",
+        "qps-ploc": "⟦Şħőřŧėşŧ őƒ ŧħė ŧħřėė. ŀőřėɱ ï⟧"
+      },
+      "budget_range_opt_lean_impact_scope": {
+        "en": "Essential features only; others deferred.",
+        "ja": "必要最小限の機能のみで、他は後回しになります。",
+        "qps-ploc": "⟦Ėşşėñŧïȧŀ ƒėȧŧůřėş őñŀẏ; őŧħėřş ḓėƒėřřėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "budget_range_opt_standard_label": {
+        "en": "Standard: core features with room for refinement",
+        "ja": "標準：主要な機能に、調整の余裕を持たせる",
+        "qps-ploc": "⟦Şŧȧñḓȧřḓ: ƈőřė ƒėȧŧůřėş ẇïŧħ řőőɱ ƒőř řėƒïñėɱėñŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "budget_range_opt_standard_impact_cost": {
+        "en": "Middle of the three ranges.",
+        "ja": "三つの中で中間の範囲です。",
+        "qps-ploc": "⟦Ɱïḓḓŀė őƒ ŧħė ŧħřėė řȧñɠėş. ŀőřėɱ ïṗ⟧"
+      },
+      "budget_range_opt_standard_impact_schedule": {
+        "en": "Typical schedule.",
+        "ja": "一般的な期間です。",
+        "qps-ploc": "⟦Ŧẏṗïƈȧŀ şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "budget_range_opt_standard_impact_scope": {
+        "en": "Core features with moderate extras.",
+        "ja": "主要な機能と、いくつかの追加が含まれます。",
+        "qps-ploc": "⟦Ƈőřė ƒėȧŧůřėş ẇïŧħ ɱőḓėřȧŧė ėẋŧřȧş. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "budget_range_opt_extended_label": {
+        "en": "Extended: broad feature set and extra polish",
+        "ja": "拡大：幅広い機能と仕上げの作り込み",
+        "qps-ploc": "⟦Ėẋŧėñḓėḓ: ƀřőȧḓ ƒėȧŧůřė şėŧ ȧñḓ ėẋŧřȧ ṗőŀïşħ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "budget_range_opt_extended_impact_cost": {
+        "en": "Highest of the three ranges.",
+        "ja": "三つの中で最も高い範囲です。",
+        "qps-ploc": "⟦Ħïɠħėşŧ őƒ ŧħė ŧħřėė řȧñɠėş. ŀőřėɱ ïṗş⟧"
+      },
+      "budget_range_opt_extended_impact_schedule": {
+        "en": "Longest of the three.",
+        "ja": "三つの中で最も長い期間です。",
+        "qps-ploc": "⟦Ŀőñɠėşŧ őƒ ŧħė ŧħřėė. ŀőřėɱ ⟧"
+      },
+      "budget_range_opt_extended_impact_scope": {
+        "en": "Broad feature set with extras.",
+        "ja": "幅広い機能と追加の作り込みが含まれます。",
+        "qps-ploc": "⟦Ƀřőȧḓ ƒėȧŧůřė şėŧ ẇïŧħ ėẋŧřȧş. ŀőřėɱ ïṗşů⟧"
+      },
+      "target_release_question": {
+        "en": "When would you like the first release?",
+        "ja": "最初の公開は、いつ頃をご希望ですか。",
+        "qps-ploc": "⟦Ẇħėñ ẇőůŀḓ ẏőů ŀïķė ŧħė ƒïřşŧ řėŀėȧşė? ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "target_release_background": {
+        "en": "An earlier date means a smaller first release. This decision is confirmed with you directly and is not decided on your behalf.",
+        "ja": "時期が早いほど、最初の公開の範囲は小さくなります。この事項は、必ずお客様ご自身で決めていただきます。",
+        "qps-ploc": "⟦Ȧñ ėȧřŀïėř ḓȧŧė ɱėȧñş ȧ şɱȧŀŀėř ƒïřşŧ řėŀėȧşė. Ŧħïş ḓėƈïşïőñ ïş ƈőñƒïřɱėḓ ẇïŧħ ẏőů ḓïřėƈŧŀẏ ȧñḓ ïş ñőŧ ḓėƈïḓėḓ őñ ẏőůř ƀėħȧŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "target_release_opt_within_one_month_label": {
+        "en": "Within about one month",
+        "ja": "1か月以内",
+        "qps-ploc": "⟦Ẇïŧħïñ ȧƀőůŧ őñė ɱőñŧħ ŀőřėɱ ï⟧"
+      },
+      "target_release_opt_within_one_month_impact_cost": {
+        "en": "Early dates can raise cost because work runs in parallel.",
+        "ja": "早い時期では、並行して進めるため費用が増えることがあります。",
+        "qps-ploc": "⟦Ėȧřŀẏ ḓȧŧėş ƈȧñ řȧïşė ƈőşŧ ƀėƈȧůşė ẇőřķ řůñş ïñ ṗȧřȧŀŀėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "target_release_opt_within_one_month_impact_schedule": {
+        "en": "Shortest schedule.",
+        "ja": "最も短い期間です。",
+        "qps-ploc": "⟦Şħőřŧėşŧ şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "target_release_opt_within_one_month_impact_scope": {
+        "en": "First release will be small.",
+        "ja": "最初の公開は小さな範囲になります。",
+        "qps-ploc": "⟦Ƒïřşŧ řėŀėȧşė ẇïŀŀ ƀė şɱȧŀŀ. ŀőřėɱ ïṗş⟧"
+      },
+      "target_release_opt_within_three_months_label": {
+        "en": "Within about three months",
+        "ja": "3か月以内",
+        "qps-ploc": "⟦Ẇïŧħïñ ȧƀőůŧ ŧħřėė ɱőñŧħş ŀőřėɱ ïṗ⟧"
+      },
+      "target_release_opt_within_three_months_impact_cost": {
+        "en": "Typical cost.",
+        "ja": "一般的な費用です。",
+        "qps-ploc": "⟦Ŧẏṗïƈȧŀ ƈőşŧ. ŀőřė⟧"
+      },
+      "target_release_opt_within_three_months_impact_schedule": {
+        "en": "Typical schedule.",
+        "ja": "一般的な期間です。",
+        "qps-ploc": "⟦Ŧẏṗïƈȧŀ şƈħėḓůŀė. ŀőřėɱ⟧"
+      },
+      "target_release_opt_within_three_months_impact_scope": {
+        "en": "Core scope fits.",
+        "ja": "主要な範囲が収まります。",
+        "qps-ploc": "⟦Ƈőřė şƈőṗė ƒïŧş. ŀőřėɱ⟧"
+      },
+      "target_release_opt_flexible_label": {
+        "en": "No fixed date; release when ready",
+        "ja": "期限は設けない。準備ができ次第公開する",
+        "qps-ploc": "⟦Ñő ƒïẋėḓ ḓȧŧė; řėŀėȧşė ẇħėñ řėȧḓẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "target_release_opt_flexible_impact_cost": {
+        "en": "Lowest pressure on cost.",
+        "ja": "費用面の負担が最も小さくなります。",
+        "qps-ploc": "⟦Ŀőẇėşŧ ṗřėşşůřė őñ ƈőşŧ. ŀőřėɱ ï⟧"
+      },
+      "target_release_opt_flexible_impact_schedule": {
+        "en": "Schedule follows the scope.",
+        "ja": "期間は範囲に応じて決まります。",
+        "qps-ploc": "⟦Şƈħėḓůŀė ƒőŀŀőẇş ŧħė şƈőṗė. ŀőřėɱ ïṗ⟧"
+      },
+      "target_release_opt_flexible_impact_scope": {
+        "en": "Scope can be the widest.",
+        "ja": "範囲を最も広く取れます。",
+        "qps-ploc": "⟦Şƈőṗė ƈȧñ ƀė ŧħė ẇïḓėşŧ. ŀőřėɱ ï⟧"
       }
     }
   }

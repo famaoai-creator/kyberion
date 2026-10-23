@@ -112,6 +112,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/orchestration/hearing-scenarios.json',
   },
   {
+    id: 'customer-decision-template-aidlc-inception',
+    schemaPath: 'knowledge/product/schemas/customer-decision-template.schema.json',
+    dataPath: 'knowledge/product/orchestration/customer-decision-templates/aidlc-inception.json',
+  },
+  {
     id: 'charter-decision-vocabulary',
     schemaPath: 'knowledge/product/schemas/charter-decision-vocabulary.schema.json',
     dataPath: 'knowledge/product/governance/charter-decision-vocabulary.json',
