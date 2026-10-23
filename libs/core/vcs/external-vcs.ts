@@ -14,8 +14,12 @@ export function governVcsCommand(
       operationId,
       effect,
       requiresApproval: mutation,
-      // Only PR creation may consult an exact repository grant. Merge/push stay human-only.
-      delegable: operationId === 'vcs:pr_create',
+      // VCS mutations may consult an exact repository grant. Push merges and
+      // sends resolve against the charter's repository+branch targets.
+      delegable:
+        operationId === 'vcs:pr_create' ||
+        operationId === 'vcs:pr_merge' ||
+        operationId === 'vcs:push',
     },
     execute,
     (result) =>
