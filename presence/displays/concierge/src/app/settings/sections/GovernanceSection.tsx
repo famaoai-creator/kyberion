@@ -4,6 +4,7 @@ import * as React from 'react';
 import { decideWithPasskey } from '../../../lib/passkey-client';
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { Button, SettingsGroup, Badge } from '@agent/shared-ui';
+import type { SettingsTranslate } from './form-scope';
 
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -52,7 +53,7 @@ function readOverview(value: unknown): Overview | null {
   };
 }
 
-export function GovernanceSection() {
+export function GovernanceSection({ t }: { t: SettingsTranslate }) {
   const [data, setData] = React.useState<Overview | null>(null);
   const [linkMember, setLinkMember] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -85,17 +86,17 @@ export function GovernanceSection() {
 
   const ruleGroups = [
     {
-      label: '権限・secret(A3 / dual-key)',
+      label: t('governance.rules_authority'),
       rules: data.approval_rules.filter((r) => r.min_assurance === 'A3'),
     },
     {
-      label: '業務上の決定',
+      label: t('governance.rules_decisions'),
       rules: data.approval_rules.filter(
         (r) => r.min_assurance !== 'A3' && r.decision_types.length > 0
       ),
     },
     {
-      label: '操作・実行系',
+      label: t('governance.rules_operations'),
       rules: data.approval_rules.filter(
         (r) => r.min_assurance !== 'A3' && r.decision_types.length === 0
       ),
@@ -103,11 +104,11 @@ export function GovernanceSection() {
   ];
 
   return (
-    <SettingsGroup title="Governance — approvals & identity">
+    <SettingsGroup title={t('governance.title')}>
       <div className="settings-row-block">
-        <h4>承認待ち</h4>
+        <h4>{t('governance.pending_title')}</h4>
         {data.pending_approvals.length === 0 && (
-          <p className="kb-text kb-text--muted">承認待ちはありません。</p>
+          <p className="kb-text kb-text--muted">{t('governance.pending_empty')}</p>
         )}
         {data.pending_approvals.map((request) => (
           <div key={request.request_id} className="settings-integration">
@@ -117,11 +118,13 @@ export function GovernanceSection() {
               </p>
               <p className="kb-text kb-text--muted">
                 {request.request_id} · {request.channel}
-                {request.expires_at ? ` · expires ${request.expires_at}` : ''}
+                {request.expires_at
+                  ? ` · ${t('governance.expires', { at: request.expires_at })}`
+                  : ''}
               </p>
             </div>
             <Button
-              label={busy ? '…' : 'Approve with passkey'}
+              label={busy ? '…' : t('governance.approve_passkey')}
               disabled={busy || request.status !== 'pending'}
               onClick={() =>
                 void run(async () => {
@@ -132,7 +135,7 @@ export function GovernanceSection() {
                     storageChannel: request.channel,
                     presentedDigest: request.presented_digest,
                   });
-                  setMessage(`approved ${request.request_id}`);
+                  setMessage(t('governance.approved_msg', { id: request.request_id }));
                   await load();
                 })
               }
@@ -142,9 +145,9 @@ export function GovernanceSection() {
       </div>
 
       <div className="settings-row-block">
-        <h4>承認ルール</h4>
+        <h4>{t('governance.rules_title')}</h4>
         {ruleGroups.map((group) => (
-          <details key={group.label} open={group.label.startsWith('権限')}>
+          <details key={group.label} open={group.rules.length > 0}>
             <summary>
               {group.label} ({group.rules.length})
             </summary>
@@ -164,22 +167,27 @@ export function GovernanceSection() {
       </div>
 
       <div className="settings-row-block">
-        <h4>サインイン identity の紐付け</h4>
+        <h4>{t('governance.identity_title')}</h4>
         {data.current_identity ? (
           <>
             <p className="kb-text">
-              現在のログイン: <code>{data.current_identity.issuer}</code> / sub{' '}
-              <code>{data.current_identity.subject}</code>
+              {t('governance.identity_current', {
+                issuer: data.current_identity.issuer,
+                subject: data.current_identity.subject,
+              })}{' '}
               {data.viewer_member_id ? (
-                <Badge label={`linked → ${data.viewer_member_id}`} tone="success" />
+                <Badge
+                  label={t('governance.identity_linked', { member: data.viewer_member_id })}
+                  tone="success"
+                />
               ) : (
-                <Badge label="未紐付け" tone="warning" />
+                <Badge label={t('governance.identity_unlinked')} tone="warning" />
               )}
             </p>
             {!data.viewer_member_id && (
               <>
                 <label>
-                  紐付ける member
+                  {t('governance.identity_pick')}
                   <select value={linkMember} onChange={(e) => setLinkMember(e.target.value)}>
                     <option value="">—</option>
                     {data.members.map((member) => (
@@ -190,7 +198,7 @@ export function GovernanceSection() {
                   </select>
                 </label>
                 <Button
-                  label={busy ? '…' : 'このログインを member に紐付ける'}
+                  label={busy ? '…' : t('governance.identity_link_button')}
                   disabled={busy || !linkMember}
                   onClick={() =>
                     void run(async () => {
@@ -206,7 +214,12 @@ export function GovernanceSection() {
                             ? value.error
                             : `http_${res.status}`
                         );
-                      setMessage(`linked ${data.current_identity?.subject} → ${linkMember}`);
+                      setMessage(
+                        t('governance.linked_msg', {
+                          subject: data.current_identity?.subject ?? '',
+                          member: linkMember,
+                        })
+                      );
                       await load();
                     })
                   }
@@ -215,10 +228,7 @@ export function GovernanceSection() {
             )}
           </>
         ) : (
-          <p className="kb-text kb-text--muted">
-            OIDC ログインではありません。`/login` から Dev IdP 等でサインインすると、ここで member
-            に紐付けられます。
-          </p>
+          <p className="kb-text kb-text--muted">{t('governance.identity_not_oidc')}</p>
         )}
         {data.members.some((m) => m.external_identities.length > 0) && (
           <ul>

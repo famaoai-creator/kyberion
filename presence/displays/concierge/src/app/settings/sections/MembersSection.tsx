@@ -25,7 +25,7 @@ import type {
   TrainingProgressSummary,
   TrainingTrack,
 } from '../../../lib/settings-types';
-import { CharterPane } from './CharterPane';
+
 import { InvitesPane } from './InvitesPane';
 import { OrgReadinessPane } from './OrgReadinessPane';
 import { MemberAdministrationPanel } from './MemberAdministrationPanel';
@@ -559,7 +559,6 @@ export function MembersSection({
       </FormScope>
       <OrgReadinessPane t={t} />
       <InvitesPane t={t} />
-      <CharterPane t={t} />
     </div>
   );
 }
