@@ -2885,6 +2885,16 @@
       "group": "start"
     },
     {
+      "id": "script.onboarding.nhi-session",
+      "module": "scripts/onboarding_nhi_session.ts",
+      "command": "onboarding nhi-session",
+      "noun": "onboarding",
+      "verb": "nhi-session",
+      "audience": "operator",
+      "description": "cli_cmd_script_onboarding_nhi_session",
+      "group": "start"
+    },
+    {
       "id": "script.onboarding.context",
       "script": "onboarding:context",
       "command": "onboarding context",
