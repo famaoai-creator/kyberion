@@ -36,7 +36,11 @@ import {
   withWallClockBudget,
   DelegationWallClockExceededError,
 } from '../mission/delegation-concurrency.js';
-import { normalizeCodexSchema, resolveCodexBinary } from './codex-cli-query.js';
+import {
+  normalizeCodexSchema,
+  resolveCodexBinary,
+  stripNullObjectProperties,
+} from './codex-cli-query.js';
 
 /** codex-cli `major.minor` versions the isolation probe has verified. */
 export const TESTED_CODEX_CLI_VERSIONS: readonly string[] = ['0.163'];
@@ -473,7 +477,14 @@ function parseLastAgentMessage<T>(events: unknown[], schema: ZodType<T>): T {
       'CODEX_PARSE_FAILED'
     );
   }
-  const parsed = schema.safeParse(json);
+  let parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    // Optional fields reach the model as nullable (normalizeCodexSchema), so a
+    // declined optional legitimately comes back as `null` — strip null-valued
+    // properties once before declaring a schema failure.
+    const reparsed = schema.safeParse(stripNullObjectProperties(json));
+    if (reparsed.success) parsed = reparsed;
+  }
   if (!parsed.success) {
     throw new CodexIsolatedQueryError(
       `[CODEX_PARSE_FAILED] schema validation failed: ${parsed.error.message}`,

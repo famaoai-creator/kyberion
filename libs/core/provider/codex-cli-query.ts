@@ -162,7 +162,16 @@ class CodexCliQuery {
       );
       const clean = extractJsonPayload(raw);
       const parsedJson = parseSafeJsonInput(clean, 'Codex CLI structured response');
-      const parsed = params.schema.safeParse(parsedJson);
+      let parsed = params.schema.safeParse(parsedJson);
+      if (!parsed.success) {
+        // `normalizeCodexSchema` makes optional properties nullable for the
+        // strict output schema, so the model legitimately answers `null` for a
+        // declined optional field while zod `.optional()` only accepts absent.
+        // Strip null-valued properties (the inverse transform) and retry once
+        // before declaring a schema failure. See: distill `experience: null`.
+        const reparsed = params.schema.safeParse(stripNullObjectProperties(parsedJson));
+        if (reparsed.success) parsed = reparsed;
+      }
       if (!parsed.success) {
         throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
       }
@@ -320,6 +329,24 @@ function extractJsonPayload(raw: string): string {
     return fenced[1].trim();
   }
   return trimmed;
+}
+
+/**
+ * Inverse of the optional→nullable normalization in {@link normalizeCodexSchema}:
+ * returns a copy of `value` with every `null`-valued object property removed
+ * (arrays keep their elements; `null` elements inside arrays are left alone).
+ * Use only as a validation retry — a required nullable property still parses
+ * on the first pass untouched.
+ */
+export function stripNullObjectProperties(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripNullObjectProperties);
+  if (value === null || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (entry === null) continue;
+    out[key] = stripNullObjectProperties(entry);
+  }
+  return out;
 }
 
 /**
