@@ -110,10 +110,13 @@ async function executeOrganizationOperationLocked(input: {
   runId: string;
   tier: 'public' | 'confidential' | 'personal';
   tenantSlug?: string;
-  /** Scheduled runs bind the pipeline to the operation's tenant/organization scope. */
+  /**
+   * Attended CLI vs scheduled tick. Both paths bind the same
+   * organization_operator context; kept for callers / future divergence.
+   */
   scheduled?: boolean;
 }): Promise<void> {
-  const { flags, organizationId, operationId, runId, tier, tenantSlug, scheduled } = input;
+  const { flags, organizationId, operationId, runId, tier, tenantSlug } = input;
   const operation = loadOrganizationOperation(operationId, { organizationId, tier, tenantSlug });
   if (!operation || operation.status !== 'active')
     throw new Error(`Active operation not found: ${operationId}`);
@@ -191,12 +194,12 @@ async function executeOrganizationOperationLocked(input: {
       });
     // Bind tenant/organization so scoped cadence ops (standup/retro) list
     // `active/organizations/<tier>/<tenant>/` instead of the protected tier
-    // parent. Scheduled ticks run as organization_operator; attended CLI keeps
-    // sovereign so customer-stance traces remain writable.
+    // parent. Both scheduled and CLI paths use organization_operator — do not
+    // assume sovereign here (RN-03: many surfaces can reach this entry).
     const result = await withExecutionContextAsync(
-      scheduled ? SCHEDULED_OPERATION_ROLE : 'sovereign',
+      SCHEDULED_OPERATION_ROLE,
       runPipeline,
-      scheduled ? undefined : 'sovereign',
+      undefined,
       tenantSlug,
       organizationId
     );
