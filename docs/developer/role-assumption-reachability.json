@@ -915,7 +915,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent",
+      "site": "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent",
       "roles": ["organization_operator"],
       "unresolved": []
     },
@@ -4039,7 +4039,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -4463,7 +4463,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -5176,7 +5176,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -5646,7 +5646,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -6362,7 +6362,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -6824,7 +6824,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -7397,7 +7397,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -7988,7 +7988,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -8483,7 +8483,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -8921,7 +8921,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -9336,7 +9336,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -9797,7 +9797,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -10216,7 +10216,7 @@
             "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -10656,7 +10656,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -11076,7 +11076,7 @@
             "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
             "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
             "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
-            "libs/core/mission/mission-context-pack-organization.ts#loadScopedOrganizationIntent"
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
