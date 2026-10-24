@@ -40,13 +40,18 @@ body {
   min-height: 48px;
 }
 
+/* Rows stack: each row is a label + value pair, not a cell of the kit's two-column kv grid. */
 .cr-impact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
   margin: var(--kb-ui-space-2) 0 0;
   font-size: var(--kb-ui-font-size-sm);
 }
 
 .cr-impact__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--kb-ui-space-2);
 }
 

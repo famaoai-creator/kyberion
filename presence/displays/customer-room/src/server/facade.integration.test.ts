@@ -8,13 +8,20 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
+import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '@agent/core/authority';
 import { agendaContentHash, writeAgenda, type DecisionAgenda } from '@agent/core/customer-decision';
 import { DECISION_LEDGER_ROLES } from '@agent/core/decision-ledger';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from '@agent/core/secure-io';
+import {
+  safeExecResult,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+} from '@agent/core/secure-io';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import { createFacadeSpawner, FACADE_SCRIPT } from './facade.js';
 import { registerCustomerRoomRoutes } from './routes.js';
@@ -28,6 +35,7 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
   let server: Server;
   let base: string;
   let token: string;
+  let deciderToken: string;
   let hash: string;
 
   const post = (path: string, body: unknown, bearer = token) =>
@@ -119,6 +127,20 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       '1',
     ]);
     token = String(sent.link).split('#t=')[1];
+    const decider = operator([
+      'send',
+      '--agenda',
+      agenda.agenda_id,
+      '--name',
+      'Hanako',
+      '--role',
+      'decider',
+      '--actor',
+      'customer:hanako',
+      '--ttl-days',
+      '1',
+    ]);
+    deciderToken = String(decider.link).split('#t=')[1];
     const app = express();
     registerCustomerRoomRoutes(app, {
       spawner: createFacadeSpawner({ tenant: TENANT, extraArgs: ['--dir', dir] }),
@@ -172,6 +194,46 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
     const body = (await response.json()) as Record<string, unknown>;
     expect(body).toMatchObject({ ok: true });
     expect(response.status).toBe(200);
+  }, 30_000);
+
+  it('turns a decider answer into a customer decision, a switch and the brief input', async () => {
+    const response = await post(
+      '/api/respond',
+      {
+        content_hash: hash,
+        answers: [{ entry_id: 'auth.method', choice: 'option', value: 'password' }],
+      },
+      deciderToken
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, switches: 1, change_requests: 0 });
+    const view = (await (await post('/api/view', {}, deciderToken)).json()) as {
+      entries: Array<{ current: Record<string, unknown> }>;
+    };
+    expect(view.entries[0].current).toMatchObject({
+      status: 'confirmed',
+      layer: 'customer',
+      value: 'password',
+    });
+    const read = (name: string) => String(safeReadFile(path.join(dir, name), { encoding: 'utf8' }));
+    const switches = read('switches.jsonl')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(switches).toHaveLength(1);
+    expect(switches[0]).toMatchObject({
+      kind: 'value_changed',
+      entry_id: 'auth.method',
+      to: { layer: 'customer', value: 'password' },
+    });
+    const brief = JSON.parse(read('brief-input.json')) as {
+      decisions: Array<Record<string, unknown>>;
+    };
+    expect(brief.decisions[0]).toMatchObject({
+      entry_id: 'auth.method',
+      status: 'confirmed',
+      value: 'password',
+    });
   }, 30_000);
 
   it('answers a stale page with stale_version and a wrong link with invalid_link', async () => {
