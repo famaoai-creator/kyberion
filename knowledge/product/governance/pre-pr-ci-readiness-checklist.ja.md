@@ -102,10 +102,15 @@ gh pr checks <number> --watch
   フルパス（`active/missions/<tier>/<ID>/evidence/...`）だけを書く（`evidence/x.md` のような短縮形は
   拒否される）。手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
 - **`[EXTERNAL_APPROVAL_REQUIRED]` は失敗ではなく正常な終点**。公開操作は人間ゲートで止まるのが
-  設計どおり（`vcs:pr_create` の charter grant がある場合は本文が public floor 上にあるときだけ
-  委任され、人間承認を省略できる）。表示された依頼 ID を人間が
+  設計どおり。表示された依頼 ID を人間が
   `pnpm kyberion approvals --approve <id>` で承認したあと、**同じ `pr create` コマンドを再実行する**
   （その時点で `gh pr create` が走る）。
+  **charter の `vcs:pr_create` grant に委任して人間承認を省略するには3条件が必要**:
+  (a) grant が charter の `external_operations` に admission 済みであること、
+  (b) `--body-file` が public partition 上にあり `body_source_tier: "public"` であること、
+  (c) 呼び出しセッションが委任先 NHI として admission されていること — `pnpm onboarding nhi-session`
+  系の承認で発行される env pair（`KYBERION_NHI_ACTOR` 等）を付けて実行する。slug を env に書くだけでは
+  委任されない（セッション証明が要る）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
   PR 作成が走る。オプションはこの文書で確認する。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
