@@ -832,7 +832,11 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
   },
   pulse_status: async ({ params, ctx }) => {
     const { ledger } = await import('@agent/core/ledger');
-    return { ...ctx, [String(params.export_as ?? 'ledger_valid')]: ledger.verifyIntegrity() };
+    // The system ledger plus every tenant ledger partition this process may bind (D9).
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'ledger_valid')]: ledger.verifyAllLedgerIntegrity().ok,
+    };
   },
   baseline_check: async ({ params, ctx }) => {
     const report = await runBaselineCheck();

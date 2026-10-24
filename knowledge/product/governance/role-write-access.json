@@ -126,6 +126,12 @@
     "audit_mirror_writer": {
       "allow": ["customer/${KYBERION_TENANT}/logs/audit/"]
     },
+    "tenant_ledger_store": {
+      "allow": [
+        "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
+      ]
+    },
     "surface_runtime": {
       "allow": [
         "active/shared/inbox/",

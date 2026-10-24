@@ -19,6 +19,13 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   customer_decision_invites: 'active/shared/runtime/customer-decision-invites',
 } as const;
 
+/**
+ * D9: root of the hash-chained tenant partitions of the hybrid ledger
+ * (libs/core/ledger.ts). An append-only ledger root, registered in
+ * storage-layout.ts PARTITIONED_RUNTIME_LEDGER_ROOTS — not a state root.
+ */
+export const TENANT_LEDGER_ROOT_PATH = 'active/shared/runtime/tenant-ledger';
+
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
   'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',

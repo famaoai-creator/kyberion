@@ -54,6 +54,7 @@
     "libs/core/mission/mission-evidence-doc.test.ts",
     "libs/core/mission/mission-governance.test.ts",
     "libs/core/mission/mission-hygiene.test.ts",
+    "libs/core/mission/mission-ledger-tenant-scope.test.ts",
     "libs/core/mission/mission-lifecycle-service.test.ts",
     "libs/core/mission/mission-maintenance.purge.test.ts",
     "libs/core/mission/mission-orchestration-events.test.ts",

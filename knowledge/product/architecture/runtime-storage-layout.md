@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-09
+last_updated: 2026-10-24
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -307,6 +307,61 @@ tokens, cost per component call) share one mechanism:
 - An execution-metrics row without a `scope` or tenant field stays in the
   system file even when it carries a tenant mission's `mission_id`:
   placement follows the row's own scope and tenant only, as for usage rows.
+
+### Hybrid audit ledger (system ledger, tenant ledgers)
+
+`ledger.record(type, data)` (`libs/core/ledger.ts`) writes a hash-chained
+entry. Unlike the metrics ledgers, a record with a `mission_id` takes its
+scope from **its mission's location** (`active/missions/<tier>/<tenant|shared>/<id>`,
+or its archive dir) — the path tier-guard enforces — filling what the record
+omits and overriding a conflicting value; organization and project come from
+the mission state inside the located tenant. A tenant mission is therefore
+never recorded as `public` or untenanted.
+
+| Record                                      | Detailed entry                                                                       | Metadata entry (`MISSION_EVENT:<type>`)                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| untenanted mission (public / `shared`)      | `<mission>/evidence/ledger.jsonl`                                                    | `active/audit/system-ledger.jsonl`                                                   |
+| tenant mission (any tier)                   | `<mission>/evidence/ledger.jsonl`                                                    | `active/shared/runtime/tenant-ledger/<personal\|confidential>/<tenant>/ledger.jsonl` |
+| archived tenant mission, or a tenant record | `active/shared/runtime/tenant-ledger/<personal\|confidential>/<tenant>/ledger.jsonl` | —                                                                                    |
+| no mission ledger, untenanted               | `active/audit/system-ledger.jsonl`                                                   | —                                                                                    |
+
+- **The system ledger carries no tenant data**: no tenant slug and no tenant
+  mission metadata. Entries written before this rule (2026-10, finding D9)
+  stay where they are — the chain is append-only and is never rewritten, so
+  pre-D9 rows (and tenant offboarding, which leaves them) still hold tenant
+  mission ids.
+- **Partitions live only under protected tiers.** A `public` tenant record is
+  stored in the tenant's `confidential` partition; its recorded scope keeps
+  tier `public`. There is no `tenant-ledger/public/`.
+- A tenant partition is read (chain tail) and appended as the tenant-bound
+  `tenant_ledger_store` role, bound to the record's tenant. Its subtrees are
+  `tenant_scope.protected_prefixes`; tenant offboarding exports and
+  soft-deletes the tenant's partitions (target kind `tenant_ledger`).
+- **Refusals never throw and never fall back to the system ledger.** When the
+  process is bound to another tenant than the record's, when the mission state
+  names another tenant or tier than its location (or a tenant its location
+  does not carry — e.g. an ephemeral mission), or when the mission id exists
+  but is not resolvable by this process, `record` writes the mission's
+  detailed entry (if it has an active mission ledger) and skips the tenant
+  entry with a diagnostic warn. A failure writing the metadata entry is a warn
+  too (the detailed entry is already durable); the detailed / no-mission entry
+  itself still fails loudly, and a ledger whose tail cannot be parsed refuses
+  to append (`[LEDGER_TAIL_UNREADABLE]`) instead of restarting its chain.
+- **Residual case**: a `mission_id` that no process can place — no active or
+  archived mission dir anywhere this process can see (a purged mission, or a
+  Chronos `MISSION_RUNTIME_REMEDIATION` lease for an id that never was a
+  mission) and no `tenant_slug` in the record — stays a system record,
+  payload included.
+- Each file is its own hash chain. `verifyAllLedgerIntegrity()` (used by
+  `pnpm audit:verify` / `system:audit_verify` and `system:pulse_status`)
+  verifies the system ledger plus every tenant partition the process may
+  bind; partitions of another tenant than a bound caller's are counted as
+  withheld, never read or named. `finish` verifies the system ledger and the
+  mission's tenant partition (`verifyScopedIntegrity`).
+- Readers: `loadForScope(filter)` reads the system ledger plus, for a filter
+  that names tenants (`tenant_slug`, `tenant_slugs`), those tenants'
+  partitions under the reader's own tier-guard decision — a client-supplied
+  tenant only narrows; a partition the reader may not see is skipped.
 
 ## 3. Surface visibility
 
