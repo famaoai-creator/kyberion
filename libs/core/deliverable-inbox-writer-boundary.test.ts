@@ -214,4 +214,40 @@ describe('deliverable_inbox_writer on the real tier guard', () => {
       )
     ).toBe(false);
   });
+
+  it('appends after a malformed and an older-format line, keeping both byte-identical', () => {
+    const file = path.join(ROOT, 'active/shared/inbox/entries.jsonl');
+    const current = asWriter(() => String(io.safeReadFile(file, { encoding: 'utf8' })));
+    const malformed = '{"entry_id": "INBOX-BROKEN", truncated';
+    // Older format: other key order, spacing, no kind / tenant fields.
+    const older =
+      '{"title":"Old deliverable","entry_id":"INBOX-OLD00001","status":"unread", "artifact_paths":[],"summary":"","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z"}';
+    const seeded = `${current}${malformed}\n${older}`; // no trailing newline
+    authority.withExecutionContext('surface_runtime', () => io.safeWriteFile(file, seeded));
+    const added = asWriter(() =>
+      inbox.addInboxEntry({
+        entryId: 'INBOX-AFTER-ODD',
+        ifAbsent: true,
+        title: 'After odd lines',
+        tenantSlug: TENANT,
+        kind: 'customer_decision_handoff',
+      })
+    );
+    expect(added.entry_id).toBe('INBOX-AFTER-ODD');
+    const after = asWriter(() => String(io.safeReadFile(file, { encoding: 'utf8' })));
+    expect(after.startsWith(`${seeded}\n`)).toBe(true);
+    expect(after.split('\n').filter(Boolean).at(-1)).toContain('INBOX-AFTER-ODD');
+    // ifAbsent finds the existing entry tolerantly; the older line is found too.
+    const again = asWriter(() =>
+      inbox.addInboxEntry({
+        entryId: 'INBOX-AFTER-ODD',
+        ifAbsent: true,
+        title: 'After odd lines',
+        tenantSlug: TENANT,
+        kind: 'customer_decision_handoff',
+      })
+    );
+    expect(again.entry_id).toBe('INBOX-AFTER-ODD');
+    expect(asWriter(() => String(io.safeReadFile(file, { encoding: 'utf8' })))).toBe(after);
+  });
 });
