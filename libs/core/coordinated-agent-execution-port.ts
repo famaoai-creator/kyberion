@@ -15,6 +15,7 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { stripCustomerDecisionsFromReply } from './task/task-result-contract.js';
 import { parseActorRef } from './actor.js';
 import { withActorContext } from './actor-context.js';
 import {
@@ -192,9 +193,23 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       throw error;
     }
 
+    // CD-09: what this port STORES (the WorkItem attempt summary and receipt;
+    // the work-coordination store is not tenant-partitioned) never carries a
+    // task_result's customer_decisions. The returned receipt is the caller's
+    // reply, untouched: a shared transport never decides what a caller may read.
+    const stored =
+      typeof receipt.output === 'string'
+        ? { ...receipt, output: stripCustomerDecisionsFromReply(receipt.output) }
+        : receipt;
+    if (stored.output !== receipt.output) {
+      logger.warn(
+        `[coordinated-agent-execution-port] customer_decisions left out of the stored WorkItem record — the work-coordination store is not tenant-partitioned | the caller still receives its reply | work_item_id=${request.work_item_id} task_id=${request.task_id}`
+      );
+    }
+
     if (receipt.status !== 'succeeded') {
       logger.error(
-        `[coordinated-agent-execution-port] delegation failed for work_item_id=${request.work_item_id} task_id=${request.task_id} status=${receipt.status}: ${receipt.error || receipt.output || '(no error detail returned)'}`
+        `[coordinated-agent-execution-port] delegation failed for work_item_id=${request.work_item_id} task_id=${request.task_id} status=${receipt.status}: ${stored.error || stored.output || '(no error detail returned)'}`
       );
     }
 
@@ -204,9 +219,9 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
       claimed.item,
       this.actorPeerId,
       terminalStatus,
-      receipt.error || receipt.output || `agent execution ${receipt.status}`,
+      stored.error || stored.output || `agent execution ${stored.status}`,
       attemptId,
-      receipt,
+      stored,
       request.security_scope
     );
     return {

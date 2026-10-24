@@ -11,6 +11,10 @@ import {
   isCustomerDecisionInviteCapability,
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
 } from './foundation/customer-decision-invite-capability.js';
+import {
+  isCustomerDecisionConsumerCapability,
+  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+} from './foundation/customer-decision-consumer-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -692,6 +696,7 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
+  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
   'customer_decision_deal_note_writer',
   DISCUSSION_REQUEST_STORAGE_ROLE,
@@ -768,6 +773,14 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability'
+    );
+  if (
+    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
+    (!isCustomerDecisionConsumerCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability'
     );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();

@@ -1520,4 +1520,378 @@ describe('customer-decision facade', () => {
     await run(['draft', ...base(), '--agenda', secondId, '--file', file]);
     expect(agendaOf(secondId).entries.map((entry) => entry.entry_id)).toEqual(['again']);
   });
+
+  it('files one rework WorkItem for a completed task that pinned a decision the customer switched (CD-09)', async () => {
+    const { pinTaskDecisions, reconcileTaskDecisions } =
+      await import('@agent/core/mission/mission-decision-lock');
+    const coordination = await import('@agent/core/workforce/work-coordination');
+    coordination.setWorkCoordinationNamespace(`customer-decision-cd09-${process.pid}`);
+    coordination.clearWorkCoordinationStore();
+    try {
+      const { token, agendaId } = await approvedAndSent();
+      const decisionCase = {
+        tenantSlug: TENANT,
+        caseId: CASE,
+        source: 'project' as const,
+        location: { dir },
+      };
+      const task = { missionId: 'MSN-CD09-FACADE', taskId: 'build' };
+      expect(pinTaskDecisions(task, { decisionCase, now: NOW })?.pinned_count).toBe(4);
+      // The task finishes before the customer answers: fresh, nothing filed.
+      expect(reconcileTaskDecisions(task, { decisionCase, now: NOW })).toMatchObject({
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      const rework = () =>
+        coordination.listWorkItems({}).filter((item) => item.item_id.startsWith('WI-CDR-'));
+      expect(rework()).toEqual([]);
+
+      const view = await customerRun('view', { token });
+      const body = {
+        token,
+        content_hash: view.out.content_hash,
+        answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+      };
+      const response = await customerRun('respond', body);
+      // The customer's response is unchanged by the sweep.
+      expect(response.out).toMatchObject({ ok: true, switches: 1 });
+      const items = rework();
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        status: 'backlog',
+        context: { tenant_slug: TENANT, mission_id: 'MSN-CD09-FACADE' },
+        metadata: { case_id: CASE, consumer: 'mission-MSN-CD09-FACADE.build', stale_count: 1 },
+      });
+      // The shared WorkItem store gets no decision content.
+      expect(JSON.stringify(items[0])).not.toMatch(/password|auth\.method|nfr\.auth|"NFR"/u);
+      // A double submit and the completion check both find the same single item.
+      await customerRun('respond', body);
+      expect(reconcileTaskDecisions(task, { decisionCase, now: NOW }).rework_work_item_ids).toEqual(
+        [items[0].item_id]
+      );
+      expect(rework().map((item) => item.item_id)).toEqual([items[0].item_id]);
+      expect(agendaOf(agendaId).status).toBe('sent');
+    } finally {
+      coordination.clearWorkCoordinationStore();
+      coordination.clearWorkCoordinationNamespace();
+    }
+  });
+
+  describe('task proposals (CD-09 実装中の判断を顧客に回す)', () => {
+    interface TaskProposalStatus {
+      pending: { count: number; proposal_ids: string[] };
+      awaiting_customer: Array<Record<string, unknown>>;
+    }
+    const decisionCase = () => ({
+      tenantSlug: TENANT,
+      caseId: CASE,
+      source: 'project' as const,
+      location: { dir },
+    });
+    const sendCollected = async (agendaId: string) => {
+      approveNext();
+      await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+      await run(['actor-add', ...base(), '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+      const sent = (await run([
+        'send',
+        ...base(),
+        '--agenda',
+        agendaId,
+        '--name',
+        'Hanako',
+        '--role',
+        'decider',
+        '--actor',
+        ACTOR,
+      ])) as { link: string };
+      return sent.link.split('#t=')[1];
+    };
+    const taskStatus = async () =>
+      ((await run(['status', ...base()])) as { task_proposals: TaskProposalStatus }).task_proposals;
+    type Coordination = typeof import('@agent/core/workforce/work-coordination');
+    const withCoordination = async (fn: (coordination: Coordination) => Promise<void>) => {
+      const coordination = await import('@agent/core/workforce/work-coordination');
+      coordination.setWorkCoordinationNamespace(`customer-decision-cd09-tp-${process.pid}`);
+      coordination.clearWorkCoordinationStore();
+      try {
+        await fn(coordination);
+      } finally {
+        coordination.clearWorkCoordinationStore();
+        coordination.clearWorkCoordinationNamespace();
+      }
+    };
+
+    it('a task goes on with its proposal; collect → submit → a different customer answer files one rework', async () => {
+      const { recordTaskDecisionProposals, reconcileTaskDecisions } =
+        await import('@agent/core/mission/mission-decision-lock');
+      await withCoordination(async (coordination) => {
+        const task = { missionId: 'MSN-CD09-TP', taskId: 'build' };
+        const recorded = recordTaskDecisionProposals(
+          {
+            ...task,
+            requests: [
+              {
+                question: 'Which colour theme should the portal use?',
+                item: 'UX',
+                key: 'ui.theme',
+                proposed_value: 'dark',
+                options: [
+                  { value: 'dark', label: 'Dark' },
+                  { value: 'light', label: 'Light' },
+                ],
+                requires_customer: false,
+              },
+            ],
+          },
+          { decisionCase: decisionCase(), now: NOW }
+        );
+        expect(recorded).toMatchObject({ case_found: true, recorded: 1, hold_proposal_ids: [] });
+        const [proposalId] = recorded.proposal_ids;
+        // The task completes on our proposal: nobody decided otherwise yet.
+        expect(
+          reconcileTaskDecisions(task, { decisionCase: decisionCase(), now: NOW })
+        ).toMatchObject({ stale_count: 0, rework_work_item_ids: [] });
+        expect(await taskStatus()).toMatchObject({
+          pending: { count: 1, proposal_ids: [proposalId] },
+          awaiting_customer: [],
+        });
+
+        const collected = (await run([
+          'draft',
+          ...base(),
+          '--from-tasks',
+          '--customer',
+          'acme',
+        ])) as { agenda_id: string };
+        expect(collected).toMatchObject({ status: 'draft', collected: 1, added: 1, entries: 1 });
+        const agendaId = collected.agenda_id;
+        expect(agendaOf(agendaId).entries).toEqual([
+          expect.objectContaining({
+            entry_id: proposalId,
+            kind: 'choice',
+            our_decision: { value: 'dark' },
+            requires_customer: false,
+          }),
+        ]);
+        // Idempotent: a collected proposal is not added again.
+        expect(await run(['draft', ...base(), '--from-tasks', '--customer', 'acme'])).toMatchObject(
+          { collected: 0, added: 0 }
+        );
+        expect((await taskStatus()).pending.count).toBe(0);
+
+        const token = await sendCollected(agendaId);
+        const rework = () =>
+          coordination.listWorkItems({}).filter((item) => item.item_id.startsWith('WI-CDR-'));
+        expect(rework()).toEqual([]);
+        const view = await customerRun('view', { token });
+        const response = await customerRun('respond', {
+          token,
+          content_hash: view.out.content_hash,
+          answers: [{ entry_id: proposalId, choice: 'option', value: 'light' }],
+        });
+        expect(response.out).toMatchObject({ ok: true, switches: 1 });
+        const items = rework();
+        expect(items).toHaveLength(1);
+        expect(items[0]).toMatchObject({
+          metadata: { consumer: 'mission-MSN-CD09-TP.build', stale_count: 1 },
+        });
+        expect(JSON.stringify(items[0])).not.toMatch(/colour|ui\.theme|"light"|"dark"/u);
+      });
+    });
+
+    it('a requires_customer proposal holds the task until the operator confirms the decision', async () => {
+      const { recordTaskDecisionProposals } =
+        await import('@agent/core/mission/mission-decision-lock');
+      await withCoordination(async (coordination) => {
+        const workItem = coordination.createWorkItem({
+          title: 'build',
+          description: 'build',
+          status: 'blocked',
+          metadata: { blocked_reason: 'awaiting_customer_decision' },
+        });
+        const held = recordTaskDecisionProposals(
+          {
+            missionId: 'MSN-CD09-HOLD',
+            taskId: 'release',
+            requests: [
+              {
+                question: 'May we release the order screen on 11/1?',
+                item: 'RELEASE',
+                key: 'order.release',
+                requires_customer: true,
+              },
+            ],
+            workItemId: workItem.item_id,
+          },
+          { decisionCase: decisionCase(), now: NOW }
+        );
+        expect(held.hold_proposal_ids).toEqual(held.proposal_ids);
+        const [proposalId] = held.proposal_ids;
+        expect((await taskStatus()).awaiting_customer).toEqual([
+          expect.objectContaining({
+            consumer: 'mission-MSN-CD09-HOLD.release',
+            status: 'awaiting',
+            proposal_ids: [proposalId],
+            uncollected: 1,
+          }),
+        ]);
+        const collected = (await run([
+          'draft',
+          ...base(),
+          '--from-tasks',
+          '--customer',
+          'acme',
+        ])) as { agenda_id: string };
+        const agendaId = collected.agenda_id;
+        // requires_customer: the customer approves the question itself (no decision of ours).
+        expect(agendaOf(agendaId).entries[0]).toEqual({
+          entry_id: proposalId,
+          item: 'RELEASE',
+          key: 'order.release',
+          kind: 'approval',
+          question: 'May we release the order screen on 11/1?',
+          requires_customer: true,
+        });
+        const token = await sendCollected(agendaId);
+        const view = await customerRun('view', { token });
+        await customerRun('respond', {
+          token,
+          content_hash: view.out.content_hash,
+          answers: [{ entry_id: proposalId, choice: 'approve' }],
+        });
+        // Decided but provisional: still awaiting the operator's confirmation.
+        expect((await taskStatus()).awaiting_customer[0]).toMatchObject({
+          status: 'awaiting',
+          uncollected: 0,
+          decision_ids: [],
+        });
+        approveNext('apr-tp');
+        await run([
+          'confirm',
+          ...base(),
+          '--agenda',
+          agendaId,
+          '--entry',
+          proposalId,
+          '--by',
+          'user:alice',
+        ]);
+        const decisionId = readLedger({ dir }).find((record) => record.key === 'order.release')
+          ?.id as string;
+        expect((await taskStatus()).awaiting_customer[0]).toMatchObject({
+          status: 'resolved',
+          decision_ids: [decisionId],
+          next: 'pnpm mission resume MSN-CD09-HOLD',
+        });
+        const noted = coordination.getWorkItem(workItem.item_id);
+        expect(noted).toMatchObject({
+          status: 'blocked',
+          metadata: {
+            customer_decision_hold: { status: 'resolved', decision_ids: [decisionId] },
+          },
+        });
+        expect(JSON.stringify(noted)).not.toMatch(/order screen|order\.release|RELEASE/u);
+      });
+    });
+
+    it('refuses to add task proposals to an agenda that is not a draft', async () => {
+      const { agendaId } = await approvedAndSent();
+      await expect(run(['draft', ...base(), '--from-tasks', '--agenda', agendaId])).rejects.toThrow(
+        /adds to a draft agenda only/u
+      );
+    });
+
+    describe('a requires_customer question never rides on an entry our decision settles', () => {
+      const ask = (taskId: string, requires: boolean, now: string) =>
+        import('@agent/core/mission/mission-decision-lock').then(
+          ({ recordTaskDecisionProposals }) =>
+            recordTaskDecisionProposals(
+              {
+                missionId: 'MSN-CD09-REQ',
+                taskId,
+                requests: [
+                  {
+                    question: 'Which sign-in method?',
+                    item: 'NFR',
+                    key: 'auth.method',
+                    requires_customer: requires,
+                    ...(requires ? {} : { proposed_value: 'sso' }),
+                  },
+                ],
+              },
+              { decisionCase: decisionCase(), now }
+            )
+        );
+      const collect = async () =>
+        (await run(['draft', ...base(), '--from-tasks', '--customer', 'acme'])) as {
+          agenda_id: string | null;
+          collected: number;
+          promoted: number;
+          conflicts?: Array<{ proposal_id: string; agenda_id: string }>;
+        };
+      const authEntry = (agendaId: string) =>
+        agendaOf(agendaId).entries.find((entry) => entry.key === 'auth.method');
+
+      it('ours first, then requires_customer (one collect): the entry is promoted', async () => {
+        await ask('a', false, NOW);
+        await ask('b', true, '2026-10-24T01:00:00.000Z');
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 2, promoted: 1 });
+        const entry = authEntry(collected.agenda_id!);
+        expect(entry).toMatchObject({ requires_customer: true });
+        expect(entry).not.toHaveProperty('our_decision');
+      });
+
+      it('requires_customer first, then ours: the entry stays requires_customer', async () => {
+        await ask('a', true, NOW);
+        await ask('b', false, '2026-10-24T01:00:00.000Z');
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 2, promoted: 0 });
+        expect(authEntry(collected.agenda_id!)).toMatchObject({ requires_customer: true });
+        expect(authEntry(collected.agenda_id!)).not.toHaveProperty('our_decision');
+      });
+
+      it('an entry of another draft agenda is promoted and linked', async () => {
+        const draftId = await draftAgenda();
+        await ask('a', true, NOW);
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 1, promoted: 1, agenda_id: null });
+        expect(authEntry(draftId)).toMatchObject({ requires_customer: true });
+        expect(authEntry(draftId)).not.toHaveProperty('our_decision');
+      });
+
+      it('a promoted entry never resolves to the stale ours its last approval pinned', async () => {
+        const { agendaId } = await approvedAndSent();
+        // Edit after approval: a draft whose in_force still pins our sso decision.
+        const file = path.join(dir, 'edit.json');
+        safeWriteFile(file, JSON.stringify({ entries: ENTRIES }), { encoding: 'utf8' });
+        await run(['draft', ...base(), '--agenda', agendaId, '--file', file]);
+        expect(agendaOf(agendaId)).toMatchObject({ status: 'draft' });
+        expect(agendaOf(agendaId).in_force?.pinned_ids.length).toBeGreaterThan(0);
+        await ask('a', true, NOW);
+        expect(await collect()).toMatchObject({ collected: 1, promoted: 1 });
+        expect(authEntry(agendaId)).toMatchObject({ requires_customer: true });
+        const status = (await run(['status', ...base(), '--agenda', agendaId])) as {
+          effective: unknown;
+        };
+        expect(pick(status.effective, 'nfr.auth')).toMatchObject({
+          layer: 'none',
+          status: 'awaiting_customer',
+        });
+        expect(pick(status.effective, 'nfr.auth')).not.toHaveProperty('value');
+      });
+
+      it('a sent agenda asking it without requires_customer leaves the question pending', async () => {
+        const { agendaId } = await approvedAndSent();
+        const recorded = await ask('a', true, NOW);
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 0, promoted: 0 });
+        expect(collected.conflicts).toEqual([
+          { proposal_id: recorded.proposal_ids[0], agenda_id: agendaId, entry_id: 'nfr.auth' },
+        ]);
+        expect(authEntry(agendaId)).toMatchObject({ requires_customer: false });
+        expect((await taskStatus()).pending.count).toBe(1);
+      });
+    });
+  });
 });

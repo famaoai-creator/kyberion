@@ -3476,6 +3476,10 @@
       "types": "./dist/mission/mission-creation.d.ts",
       "default": "./dist/mission/mission-creation.js"
     },
+    "./mission/mission-decision-lock": {
+      "types": "./dist/mission/mission-decision-lock.d.ts",
+      "default": "./dist/mission/mission-decision-lock.js"
+    },
     "./mission/mission-dispatch-io": {
       "types": "./dist/mission/mission-dispatch-io.d.ts",
       "default": "./dist/mission/mission-dispatch-io.js"

@@ -176,6 +176,32 @@ status: active
 - `presence/displays/customer-room/`: 独立したプロセス。1 プロセスは 1 テナントだけを扱う（`KYBERION_CUSTOMER_ROOM_TENANT`）。招待トークンは URL のフラグメントで渡し、画面からはヘッダで送る（サーバのアクセスログに残さない）。読み書きとも facade の子プロセスを通し、ライブラリから台帳を直接触らない。
 - 段階 1 では、`hearing` 種別の事項は自由記述で受ける。画面内の対話（`requirements_hearing` モード）は段階 1 の後の改善で入れる。
 
+## CD-09 の実装設計（2026-10-24）
+
+**何を固定するか**: タスクの開始時に、そのミッションの案件で効いているすべての決定（閉じていない調整セットの全項目の有効な決定）を固定する。タスクがどの決定を使ったかは分からないため、案件の全体を保守的に固定する。手戻りの WorkItem には変わった項目だけを並べ、要否は担当者が判断する。
+
+**案件の見つけ方**: ミッションの `tenant_slug` と `relationships.project.project_id` を使う。無ければ `mission_ids` にそのミッションを含む商談の deal id を使う。どちらにも決定台帳の案件ディレクトリが無ければ、何もしない（顧客の決定と無関係なミッションの動作は変えない）。
+
+**固定の置き場**: `knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json`（`ConsumedDecisionLock`、schema つき）。値は顧客のデータなので案件と同じ tier・テナントに置き、`decision_ledger` 権限で読み書きする。ミッションの evidence（public）には固定の件数と照合の結果（古いかどうか、起票した WorkItem の id）だけを書き、項目名や値は書かない。
+
+**照合する場所**（実行中のタスクには割り込まない）:
+
+| 時点         | 場所                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------- |
+| タスクの開始 | worker: `dispatchPlannedMissionTaskCore` の WorkItem 取り込みの直後。CLI: `recordTask`                     |
+| タスクの完了 | worker: 成功の確定（WorkItem を `done` にする）の直前。CLI: `recordEvidence` が台帳に記録する直前          |
+| 顧客の回答   | `customer-decision respond` が切り替わりを記録した後。切り替わった項目を固定している完了済みのタスクを探す |
+
+古い決定に基づく成果は、タスクを止めずに完了させ、手戻りの WorkItem を起票する（`createWorkItemIfAbsent`、id はミッション・タスク・切り替わった決定から決めるので、完了時と回答時の両方で見つけても 1 件になる）。
+
+**実装中の判断を顧客に回す**: worker の結果に、文字列の `needs` とは別の構造化した `customer_decisions`（問い・item・key・こちらの案・選択肢・`requires_customer`・理由・話題）を足す（`TaskResultBlock`、`TaskCustomerDecisionRequest`）。形の崩れた項目は警告を出して捨て、結果全体は失敗にしない。question-resolution に「顧客判断」（`customer_judgment`）の分類を足す。技術の選択はこちらで決め、顧客に見える製品の選択は顧客判断としてこちらの案で進め、金額・契約・リリース・変更要求は `requires_customer` にする（policy の `customer_judgment.requires_customer_topics` に当たる話題は、worker が何と言っても `requires_customer` になる）。
+
+- **worker に調整セットを書く権限を与えない**。worker は結果を記録する前に `customer_decisions` を取り除き、そのタスク自身の固定（`consumers/<consumer>.json`）に `task_proposal` の層の項目として記録する（狭い `customer_decision_consumer_store` 権限のまま）。ミッションの evidence・タスクのイベント・`NEXT_TASKS.json`・WorkItem には、問いや値を書かず、提案の id（`tp-<hash>`）と件数だけを書く。
+- **調整セットへの取り込みは運用者が行う**。`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --customer <slug>`（既存の下書きに足すときは `--agenda <id>`）が、まだ調整セットに載っていない提案を下書きの項目にする。選択肢があれば `choice`、なければ `approval` で、こちらの決定はタスクの案にする。`requires_customer` の問いは schema の規則どおりこちらの決定を持たない。同じ item × key を別の開いている調整セットが聞いていれば、項目を足さずにその項目に結び付ける。ただし `requires_customer` の問いは、`requires_customer` でない項目には結び付けない。その項目が下書きなら `requires_customer` に上げ（こちらの決定と組織の既定値を外す）、承認済み・送付済みなら取り込まずに衝突として出す。取り込んだ提案には固定の側に調整セットと項目の id を書き戻すので、2 回目の取り込みでは何も足さない。承認と送付は既存の `submit` / `send` で行う。`status`（`--agenda` は省略できる）は、取り込み待ちの提案と、顧客の判断を待っているタスクを id と件数で出す。
+- **タスクはこちらの案で完了する**。固定に提案の値が残るので、顧客が後から違う値に決めると、回答時の照合が手戻りの WorkItem を 1 件起票する。取り込む前の提案と、誰もまだ決めていない提案は照合しない。
+- **`requires_customer` の問いだけはタスクを判断待ちにする**。WorkItem は `blocked`（`blocked_reason: awaiting_customer_decision`）、タスクは `blocked` で、`evidence/task-clarification-<task>.json` には id と件数だけを書く。顧客の決定を運用者が確認すると（`confirm` の後の照合）、固定に解決を記録し、WorkItem の `metadata.customer_decision_hold` に解決した決定の id を書く。タスクの再実行は既存の再開（`pnpm mission resume <MISSION_ID>`、blocked のタスクを planned に戻す）で行う。worker はタスクを渡すたびに固定を作り直すが、タスク自身の提案（取り込み済み・解決済みを含む）は引き継ぐので、調整セットが閉じられた後でも同じ問いを聞き直さない。
+- **決定の案件がないミッション**では台帳に何も書かず、診断の警告を出す。`requires_customer` の問いは通常の `needs` として扱い（`needs_input` で止まる）、それ以外はこちらの案で進める。
+
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。
@@ -184,16 +210,17 @@ status: active
 
 段階 1（CD-01〜08）を実装した（ブランチ `feat/customer-decision-20261024`、ミッション `MSN-CUSTOMER-DECISION-20261024`）。
 
-| ID    | 状況                       | 実装の位置                                                                                                                                 |
-| ----- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| CD-01 | 完了                       | `libs/core/customer-decision/{model,store,hash}.ts`、`customer-decision-{agenda,receipt,switch}.schema.json`                               |
-| CD-02 | 完了                       | `libs/core/customer-decision/effective.ts`（有効な決定・切り替わり・照合・上書きの可否）。承認済みの決定は編集中も `in_force` で効力を保つ |
-| CD-03 | 完了                       | `hearing-scenarios.json` の `aidlc_inception`、`customer-decision-templates/aidlc-inception.json`、語彙 `customer_decision:*`              |
-| CD-04 | 完了                       | `libs/core/customer-decision/{template,draft}.ts`、`customer-decision generate`。推論が使えないときは組織の既定値を案にする                |
-| CD-05 | 完了                       | `customer-decision submit`（承認ゲート、内容ハッシュ、こちらの決定を台帳の proposed として固定）                                           |
-| CD-06 | 完了                       | `libs/core/customer-decision/invite.ts`、権限 `customer_decision_invite_store`（招待の置き場だけに絞った capability）                      |
-| CD-07 | 完了（対話ヒアリングは未） | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                       |
-| CD-08 | 完了                       | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）     |
+| ID    | 状況                       | 実装の位置                                                                                                                                                                                                                              |
+| ----- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CD-01 | 完了                       | `libs/core/customer-decision/{model,store,hash}.ts`、`customer-decision-{agenda,receipt,switch}.schema.json`                                                                                                                            |
+| CD-02 | 完了                       | `libs/core/customer-decision/effective.ts`（有効な決定・切り替わり・照合・上書きの可否）。承認済みの決定は編集中も `in_force` で効力を保つ                                                                                              |
+| CD-03 | 完了                       | `hearing-scenarios.json` の `aidlc_inception`、`customer-decision-templates/aidlc-inception.json`、語彙 `customer_decision:*`                                                                                                           |
+| CD-04 | 完了                       | `libs/core/customer-decision/{template,draft}.ts`、`customer-decision generate`。推論が使えないときは組織の既定値を案にする                                                                                                             |
+| CD-05 | 完了                       | `customer-decision submit`（承認ゲート、内容ハッシュ、こちらの決定を台帳の proposed として固定）                                                                                                                                        |
+| CD-06 | 完了                       | `libs/core/customer-decision/invite.ts`、権限 `customer_decision_invite_store`（招待の置き場だけに絞った capability）                                                                                                                   |
+| CD-07 | 完了（対話ヒアリングは未） | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                                                                                                                    |
+| CD-08 | 完了                       | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）                                                                                                  |
+| CD-09 | 完了                       | `libs/core/customer-decision/consumption.ts`、`libs/core/mission/mission-decision-lock.ts`、`customer-decision draft --from-tasks`（ブランチ `feat/customer-decision-cd09-20261024`、ミッション `MSN-CUSTOMER-DECISION-CD09-20261024`） |
 
 第 2 回レビューの対応（2026-10-24）:
 
@@ -213,6 +240,8 @@ pnpm kyberion customer-decision submit --tenant <t> --case <case> --agenda <id> 
 pnpm kyberion customer-decision actor-add --tenant <t> --case <case> --customer <c> --actor customer:<id> --name <name>
 pnpm kyberion customer-decision send --tenant <t> --case <case> --agenda <id> --name <name> --role decider --actor customer:<id>
 pnpm kyberion customer-decision status --tenant <t> --case <case> --agenda <id>
+pnpm kyberion customer-decision status --tenant <t> --case <case>   # タスクの提案と判断待ちのタスク（CD-09）
+pnpm kyberion customer-decision draft --tenant <t> --case <case> --from-tasks --customer <c>
 pnpm kyberion customer-decision confirm --tenant <t> --case <case> --agenda <id> --entry <entry_id> --by user:<member>
 pnpm kyberion customer-decision close --tenant <t> --case <case> --agenda <id> --by user:<member>
 pnpm kyberion customer-decision withdraw --tenant <t> --case <case> --agenda <id> --by user:<member> --reason <text>
@@ -225,7 +254,10 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - 招待リンクを紐付け済みチャネルから送る（`sendToCustomer` の `deliver` を持つブリッジ側で行う。CLI はリンクを運用者に一度だけ表示する）。
 - 公開 ingress の背後では接続元がすべて 127.0.0.1 になるため、レート制限は全顧客で共有になる。信頼するプロキシ段数の設定を入れて `X-Forwarded-For` を使う。
 - 商談メモの項目名を問いの全文ではなく短いラベルにする（テンプレートに `label_key` を足す）。
-- CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。
+- CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。（実装済み。「CD-09 の実装設計」の節）
+- CD-09 の残り: 判断待ちから再開したタスクの指示に、確定した顧客の決定の値を渡していない（値は confidential なので、渡し方を決めてから入れる）。
+- CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。
+- CD-09 の残り: 1 つの固定ファイルだけを対象にする capability は、照合（sweep）とタスクの境界とで同じ形になり、guard では区別できない。タスク境界の呼び出し元が自分の固定ファイルだけに書けることを、capability の中の owner で guard が確かめるようにする。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
 - 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。

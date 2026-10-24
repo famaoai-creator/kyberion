@@ -36,6 +36,20 @@
         }
       }
     },
+    "customer_judgment": {
+      "description": "CD-09: how a question raised while executing a mission task is classified as the customer's (customer_judgment). Topics listed here always wait for the customer (requires_customer).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requires_customer_topics"],
+      "properties": {
+        "requires_customer_topics": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "uniqueItems": true
+        },
+        "rationale": { "type": "string" }
+      }
+    },
     "intent_rules": {
       "type": "array",
       "items": {
