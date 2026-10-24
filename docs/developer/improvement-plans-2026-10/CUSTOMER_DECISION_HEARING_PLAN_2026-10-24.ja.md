@@ -290,6 +290,8 @@ status: active
 
 結果はテナントの中のレポート（`knowledge/confidential/<tenant>/decisions/_reports/learning-<date>.json`）に置き、改善の提案を組織の学びの候補（出どころ `customer_decision`、tier confidential、テナントつき）として登録する。提案は「どのひな形のどの項目の、組織の既定値や選択肢をどう変えるか」を持ち、担当者が既存の `organization learning transition` で受け入れる。製品のひな形（`customer-decision-templates/*`）は自動では書き換えない。テナントのパイプライン（`customer-decision learning --tenant <t> --install --by user:<member>`）で週 1 回動かす。パイプラインの結果には id と件数だけを出す。
 
+**提案はテナントに 1 つ**: 同じ提案（提案のキー）の候補は、テナントの中で 1 つだけにする。日付が変わっても、組織が違っても、候補の状態（提案中・受け入れ・却下・反映済み）がどれでも、先に登録した候補をそのまま使う。もう一度登録するのは、提案する値が変わったときと、件数が登録したときの 2 倍以上になったときだけ（比べるのは、登録したときの件数。その後の週のレポートの件数ではない）。そのため、`--organization-id` を変えて動かしても、提案のキーは最初に登録した組織の候補に結び付いたままになる（学びの候補を書く役割は自分の組織の置き場しか読めないので、テナントの過去のレポートを記録として使う）。
+
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。
