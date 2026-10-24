@@ -21,7 +21,14 @@ type Pending = {
 };
 type Overview = {
   accountable: { id: string; display_name: string };
-  charter: null | { id: string; expires_at: string; grants: Grant[]; stopped: boolean };
+  charter: null | {
+    id: string;
+    expires_at: string;
+    grants: Grant[];
+    delegated_decisions: Record<string, string>;
+    stopped: boolean;
+  };
+  delegable_decisions: { decision_type: string; label: Record<string, string> }[];
   pending_requests: Pending[];
   runtime: { ready: boolean; agent_id?: string; reason?: string };
   renewal_required: boolean;
@@ -81,7 +88,8 @@ function readOverview(value: unknown): Overview | null {
       typeof value.charter.expires_at !== 'string' ||
       typeof value.charter.stopped !== 'boolean' ||
       !Array.isArray(value.charter.grants) ||
-      !value.charter.grants.every(validGrant))
+      !value.charter.grants.every(validGrant) ||
+      !record(value.charter.delegated_decisions))
   )
     return null;
   return value as unknown as Overview;
@@ -111,6 +119,7 @@ export function OnboardingAuthorityPanel({
   const [operation, setOperation] = React.useState('');
   const [target, setTarget] = React.useState('');
   const [branch, setBranch] = React.useState('');
+  const [decisions, setDecisions] = React.useState<Record<string, string>>({});
   const [expires, setExpires] = React.useState('');
   const [mode, setMode] = React.useState<'grant' | 'revoke'>('grant');
   const [renewExisting, setRenewExisting] = React.useState(false);
@@ -136,9 +145,15 @@ export function OnboardingAuthorityPanel({
           : [];
   const expiry =
     expires && Number.isFinite(Date.parse(expires)) ? new Date(expires).toISOString() : '';
+  const chosenDecisions = Object.fromEntries(
+    Object.entries(decisions)
+      .filter(([, policy]) => policy)
+      .map(([type, policy]) => [type, policy === '__revoke__' ? 'forbid' : policy])
+  );
   const draft = {
     ...scope,
     grants,
+    ...(Object.keys(chosenDecisions).length ? { delegated_decisions: chosenDecisions } : {}),
     expires_at: expiry,
     mode,
     ...(renewExisting ? { renew_existing: true } : {}),
@@ -342,6 +357,21 @@ export function OnboardingAuthorityPanel({
       setBusy(false);
     }
   }
+  function revokeDecision(type: string) {
+    setMode('revoke');
+    setOperation('');
+    setTarget('');
+    setBranch('');
+    setDecisions({ [type]: '__revoke__' });
+    const timestamp = Date.parse(overview?.charter?.expires_at || '');
+    const date = new Date(timestamp);
+    setExpires(
+      Number.isFinite(timestamp)
+        ? new Date(timestamp - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+        : ''
+    );
+    setPreview(null);
+  }
   function revoke(grant: Grant) {
     setMode('revoke');
     setOperation(grant.operation_id);
@@ -431,6 +461,16 @@ export function OnboardingAuthorityPanel({
                     </button>
                   </li>
                 ))}
+                {Object.entries(overview.charter.delegated_decisions ?? {}).map(
+                  ([type, policy]) => (
+                    <li key={type}>
+                      {type} · {policy}{' '}
+                      <button type="button" disabled={busy} onClick={() => revokeDecision(type)}>
+                        {t('authority.revoke')}
+                      </button>
+                    </li>
+                  )
+                )}
               </ul>
             </>
           ) : (
@@ -509,6 +549,53 @@ export function OnboardingAuthorityPanel({
                 />
               </label>
             ) : null}
+            {(overview.delegable_decisions ?? []).length ? (
+              <fieldset>
+                <legend>{t('authority.decisions')}</legend>
+                <p>{t('authority.decisions_hint')}</p>
+                {overview.delegable_decisions.map((entry) => {
+                  const current =
+                    overview.charter?.delegated_decisions?.[entry.decision_type] ?? '';
+                  const value = decisions[entry.decision_type] ?? '';
+                  const rowLabel = entry.label?.[locale] ?? entry.label?.en ?? entry.decision_type;
+                  return (
+                    <div key={entry.decision_type}>
+                      <span>
+                        {rowLabel}
+                        {current ? ` (${current})` : ''}
+                      </span>
+                      <select
+                        value={value}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setDecisions((previous) => ({
+                            ...previous,
+                            [entry.decision_type]: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">
+                          {mode === 'revoke'
+                            ? t('authority.decision_keep')
+                            : t('authority.decision_unchanged')}
+                        </option>
+                        {mode === 'revoke' ? (
+                          <option value="__revoke__">{t('authority.decision_revoke')}</option>
+                        ) : (
+                          <>
+                            <option value="allow_with_review">
+                              {t('authority.policy_allow_with_review')}
+                            </option>
+                            <option value="allow">{t('authority.policy_allow')}</option>
+                            <option value="forbid">{t('authority.policy_forbid')}</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  );
+                })}
+              </fieldset>
+            ) : null}
             <label>
               {t('authority.expiry')}
               <input
@@ -520,8 +607,8 @@ export function OnboardingAuthorityPanel({
             <button
               type="button"
               disabled={
-                !grants.length ||
-                !target ||
+                (!grants.length && !Object.keys(chosenDecisions).length) ||
+                (grants.length && !target) ||
                 !expiry ||
                 Date.parse(expiry) <= Date.now() ||
                 (overview.renewal_required && !renewExisting)
