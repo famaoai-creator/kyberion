@@ -101,13 +101,17 @@ export function usage(): string {
     'pnpm kyberion customer-decision withdraw  --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
     'pnpm kyberion customer-decision revoke    --tenant <slug> --case <id> --invite <id> --reason <text>',
     'pnpm kyberion customer-decision remind    --tenant <slug> [--case <id>] [--dry-run] [--now <iso>]',
-    'pnpm kyberion customer-decision reminders --tenant <slug> --install [--force] [--dry-run]',
+    'pnpm kyberion customer-decision reminders --tenant <slug> --install --by user:<member> [--force] [--dry-run]',
+    'pnpm kyberion customer-decision overview  --tenant <slug> [--case <id>] [--now <iso>] --json   (read-only)',
+    'pnpm kyberion customer-decision learning  --tenant <slug> [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]',
+    'pnpm kyberion customer-decision learning  --tenant <slug> --install --by user:<member> [--force] [--dry-run]',
     'pnpm kyberion customer-decision view      --tenant <slug> [--case <id>] --json   (stdin: {"token"})',
     'pnpm kyberion customer-decision respond   --tenant <slug> [--case <id>] --json   (stdin: {"token","content_hash","answers","general_question"?})',
     'pnpm kyberion customer-decision attachment --tenant <slug> [--case <id>] --json  (stdin: {"token","attachment_id"})',
     '',
     'send prints the invite link once; forward it to the customer yourself.',
     "Reminders (remind / the daily tenant pipeline) go through the decider's bound channel via sendToCustomer.",
+    'learning queues suggestions as organization learning candidates; accept one with pnpm organization learning transition.',
   ].join('\n');
 }
 

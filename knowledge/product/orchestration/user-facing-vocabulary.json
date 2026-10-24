@@ -33665,6 +33665,26 @@
         "ja": "「{title}」のご回答は {date} {time}（{zone}）まで変更できます。それ以降、まだお決めいただいていない項目はこちらの案で進めます。お送りしたリンクから開いてください。",
         "qps-ploc": "⟦Ẏőů ƈȧñ şŧïŀŀ ƈħȧñɠė ẏőůř ȧñşẇėřş ŧő “{title}” ůñŧïŀ {date} {time} ({zone}). Ȧƒŧėř ŧħȧŧ, ŧħė ïŧėɱş ẏőů ħȧṽė ñőŧ ḓėƈïḓėḓ ƒőŀŀőẇ őůř ṗřőṗőşȧŀ. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "learning_title_change_org_default": {
+        "en": "Review the organization default of {subject} (customers keep choosing another option)",
+        "ja": "{subject} の組織の既定値を見直す（顧客が別の選択肢を選び続けている）",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė őřɠȧñïẑȧŧïőñ ḓėƒȧůŀŧ őƒ {subject} (ƈůşŧőɱėřş ķėėṗ ƈħőőşïñɠ ȧñőŧħėř őṗŧïőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "learning_title_revise_options": {
+        "en": "Revise the options of {subject} (many change requests)",
+        "ja": "{subject} の選択肢を見直す（修正依頼が多い）",
+        "qps-ploc": "⟦Řėṽïşė ŧħė őṗŧïőñş őƒ {subject} (ɱȧñẏ ƈħȧñɠė řėɋůėşŧş) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "learning_title_clarify_entry": {
+        "en": "Clarify the question {subject} (many answers outside the options or comments)",
+        "ja": "{subject} の問いをわかりやすくする（選択肢の外の回答やコメントが多い）",
+        "qps-ploc": "⟦Ƈŀȧřïƒẏ ŧħė ɋůėşŧïőñ {subject} (ɱȧñẏ ȧñşẇėřş őůŧşïḓė ŧħė őṗŧïőñş őř ƈőɱɱėñŧş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "learning_candidate_summary": {
+        "en": "From customer decisions: {count} of {samples} for {subject} ({kind}). The suggested change and the evidence are in this candidate's metadata and the tenant report {report}. Accept it with pnpm organization learning transition; product templates are not changed automatically.",
+        "ja": "顧客の決定から: {subject} で {samples} 件中 {count} 件（{kind}）。提案する変更と根拠は、この候補の metadata とテナントのレポート {report} にあります。受け入れるときは pnpm organization learning transition を使います。製品のひな形は自動では変わりません。",
+        "qps-ploc": "⟦Ƒřőɱ ƈůşŧőɱėř ḓėƈïşïőñş: {count} őƒ {samples} ƒőř {subject} ({kind}). Ŧħė şůɠɠėşŧėḓ ƈħȧñɠė ȧñḓ ŧħė ėṽïḓėñƈė ȧřė ïñ ŧħïş ƈȧñḓïḓȧŧė'ş ɱėŧȧḓȧŧȧ ȧñḓ ŧħė ŧėñȧñŧ řėṗőřŧ {report}. Ȧƈƈėṗŧ ïŧ ẇïŧħ ṗñṗɱ őřɠȧñïẑȧŧïőñ ŀėȧřñïñɠ ŧřȧñşïŧïőñ; ṗřőḓůƈŧ ŧėɱṗŀȧŧėş ȧřė ñőŧ ƈħȧñɠėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
       "reminder_outbound_title": {
         "en": "Customer decision reminder {reminderId} for agenda {agendaId}",
         "ja": "調整セット {agendaId} の顧客へのリマインド {reminderId}",

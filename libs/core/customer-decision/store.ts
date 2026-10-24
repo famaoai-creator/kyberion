@@ -44,13 +44,19 @@ import {
   safeExistsSync,
   safeMkdir,
   safePublishExclusiveFileSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
 import { resolveRole } from '../authority.js';
 import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
-import { CUSTOMER_SLUG_PATTERN, canonicalJson } from '../decision-ledger/model.js';
+import {
+  CASE_ID_PATTERN,
+  CUSTOMER_SLUG_PATTERN,
+  DECISION_LEDGER_LAYOUT,
+  canonicalJson,
+} from '../decision-ledger/model.js';
 import {
   ledgerDir,
   withDecisionLedgerLock,
@@ -76,6 +82,7 @@ import {
   type DecisionSwitch,
   type EffectiveDecision,
 } from './model.js';
+import { LEARNING_REPORT_DATE_PATTERN, type CustomerDecisionLearningReport } from './learning.js';
 
 /** Same shape as the ledger location: a tenant + case, or a test `dir`. */
 export type CustomerDecisionLocation = DecisionLedgerLocation;
@@ -86,6 +93,7 @@ const SCHEMA_FILES = {
   switch: 'knowledge/product/schemas/customer-decision-switch.schema.json',
   journal: 'knowledge/product/schemas/customer-decision-respond-journal.schema.json',
   consumer: 'knowledge/product/schemas/customer-decision-consumer-lock.schema.json',
+  learning_report: 'knowledge/product/schemas/customer-decision-learning-report.schema.json',
 } as const;
 
 type SchemaName = keyof typeof SCHEMA_FILES;
@@ -672,4 +680,77 @@ export function listConsumedDecisionLocks(
     }
   }
   return locks;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant-wide views (CD-12): the case listing and the learning reports
+// ---------------------------------------------------------------------------
+
+/**
+ * Tenant reports live beside the cases, under `decisions/_reports/`. The
+ * leading underscore keeps the directory outside the case id grammar
+ * (`CASE_ID_PATTERN` starts with a letter or digit), so it is never listed or
+ * resolved as a case.
+ */
+export const CUSTOMER_DECISION_REPORTS_DIR = '_reports';
+
+function tenantDecisionsRoot(tenantSlug: string): string {
+  if (!isValidTenantSlug(tenantSlug))
+    throw new Error('[CUSTOMER_DECISION_TENANT_INVALID] invalid tenant slug');
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.rootDir(),
+      DECISION_LEDGER_LAYOUT.confidentialRoot,
+      tenantSlug,
+      DECISION_LEDGER_LAYOUT.decisionsDir
+    ),
+    { allowMissingLeaf: true }
+  );
+}
+
+/**
+ * The case ids of a tenant: the directories under its `decisions/` whose
+ * name is a case id (drafts without invites included; `_reports` and stray
+ * files excluded). Sorted. Call as the tenant-bound ledger role.
+ */
+export function listTenantCaseIds(tenantSlug: string): string[] {
+  const root = tenantDecisionsRoot(tenantSlug);
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root)
+    .filter((name) => CASE_ID_PATTERN.test(name))
+    .filter((name) => safeLstat(path.join(root, name)).isDirectory())
+    .sort();
+}
+
+export function learningReportPath(tenantSlug: string, reportDate: string): string {
+  if (!LEARNING_REPORT_DATE_PATTERN.test(reportDate))
+    throw new Error('[CUSTOMER_DECISION_REPORT_DATE_INVALID] invalid report date');
+  return path.join(
+    tenantDecisionsRoot(tenantSlug),
+    CUSTOMER_DECISION_REPORTS_DIR,
+    `learning-${reportDate}.json`
+  );
+}
+
+/** Write (or replace) the tenant's learning report of a date. Call as the tenant-bound ledger role. */
+export function writeLearningReport(report: CustomerDecisionLearningReport): {
+  path: string;
+  report: CustomerDecisionLearningReport;
+} {
+  const validated = validate<CustomerDecisionLearningReport>('learning_report', report);
+  const file = prepareWrite(learningReportPath(validated.tenant_slug, validated.report_date));
+  writeJson(file, validated);
+  return { path: file, report: validated };
+}
+
+export function readLearningReport(
+  tenantSlug: string,
+  reportDate: string
+): CustomerDecisionLearningReport | undefined {
+  const raw = readRecord(learningReportPath(tenantSlug, reportDate));
+  if (raw === undefined) return undefined;
+  const report = validate<CustomerDecisionLearningReport>('learning_report', raw);
+  if (report.tenant_slug !== tenantSlug || report.report_date !== reportDate)
+    throw new Error('[CUSTOMER_DECISION_REPORT_MISMATCH] report does not match its file');
+  return report;
 }

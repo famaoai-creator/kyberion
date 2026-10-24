@@ -3,6 +3,7 @@ import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import {
   parseInlineOnboardingInput,
   runInlineApprovalStoreHygiene,
+  runInlineCustomerDecisionLearning,
   runInlineCustomerDecisionReminders,
   runInlineDecisionDigest,
   runInlineProductivityDryRunValidation,
@@ -99,6 +100,20 @@ describe('core:customer_decision_reminders (CD-11)', () => {
       await expect(
         runInlineCustomerDecisionReminders({ id: 'remind' } as never, {}, {})
       ).rejects.toThrow('CUSTOMER_DECISION_REMINDERS_TENANT_REQUIRED');
+    } finally {
+      if (saved !== undefined) process.env.KYBERION_TENANT = saved;
+    }
+  });
+});
+
+describe('core:customer_decision_learning (CD-12)', () => {
+  it('refuses to run outside a tenant-bound run, before reading any store', async () => {
+    const saved = process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_TENANT;
+    try {
+      await expect(
+        runInlineCustomerDecisionLearning({ id: 'learn' } as never, {}, {})
+      ).rejects.toThrow('CUSTOMER_DECISION_LEARNING_TENANT_REQUIRED');
     } finally {
       if (saved !== undefined) process.env.KYBERION_TENANT = saved;
     }

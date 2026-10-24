@@ -1104,6 +1104,28 @@ export async function runInlineCustomerDecisionReminders(
 }
 
 /**
+ * core:customer_decision_learning (CD-12) — the weekly learning run of the
+ * tenant the run is bound to (installed with `customer-decision learning
+ * --install`): runs `customer-decision learning --tenant <t>` as a facade
+ * child without SYSTEM_ROLE (learning-op.ts). `params.tenant`, when given,
+ * must be the bound tenant; `dry_run: true` writes nothing. Returns ids and counts.
+ */
+export async function runInlineCustomerDecisionLearning(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const requested = String(resolveVars(params.tenant ?? '', ctx)).trim();
+  const { runCustomerDecisionLearningOp } = await import('./customer-decision/learning-op.js');
+  const result = await runCustomerDecisionLearningOp({
+    ...(requested ? { tenant: requested } : {}),
+    dryRun: resolveVars(params.dry_run ?? false, ctx) === true,
+    now: nowIso(),
+  });
+  return exportValue(params, step, { ...result }, ctx);
+}
+
+/**
  * core:pr_shadow_observe — one shadow-mode pass over the open pull requests:
  * record what the autonomy gate would do with each and settle the ones that
  * were merged or closed. Read-only toward GitHub (`gh pr list|view|checks`);

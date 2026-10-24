@@ -1100,6 +1100,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/operational-learning.ts#enqueueOperationalLearningCandidateOnce",
+      "roles": ["operational_learning_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/operational-learning.ts#enqueueOperationalLearningSignal",
       "roles": ["operational_learning_writer"],
       "unresolved": []
@@ -2819,6 +2824,11 @@
     {
       "site": "scripts/customer-decision/common.ts#noteDealSwitches",
       "roles": ["customer_decision_deal_note_writer"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/learning.ts#queueSuggestion",
+      "roles": ["decision_ledger"],
       "unresolved": []
     },
     {
