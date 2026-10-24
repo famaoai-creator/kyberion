@@ -507,3 +507,39 @@ describe('standingLearningSuggestions (CD-12)', () => {
     );
   });
 });
+
+describe('standing baseline (CD-12)', () => {
+  it('compares against the evidence the candidate was queued with: 3 → 5 → 9 re-queues', () => {
+    const entry = (
+      date: string,
+      learningId: string,
+      count: number,
+      candidate: 'created' | 'existing'
+    ) => ({
+      report_date: date,
+      suggestions: [
+        {
+          item: 'NFR',
+          key: 'auth.method',
+          template_id: null,
+          entry_id: null,
+          suggestion_key: 'revise_options:NFR/auth.method',
+          kind: 'revise_options' as const,
+          evidence: { samples: 10, count },
+          learning_id: learningId,
+          candidate,
+        },
+      ],
+    });
+    const reports = [
+      entry('2026-10-17', 'cdl-0000000000000001', 3, 'created'),
+      // Next week: 5 < 2 × 3, the candidate stands; the report records 5.
+      entry('2026-10-24', 'cdl-0000000000000001', 5, 'existing'),
+    ];
+    const prior = standingLearningSuggestions(reports).get('revise_options:NFR/auth.method');
+    expect(prior?.evidence.count).toBe(3);
+    expect(isMaterialEvidenceChange(prior, { evidence: { samples: 10, count: 5 } })).toBe(false);
+    // 9 ≥ 2 × 3 (queued baseline), although only 1.8 × last week's 5.
+    expect(isMaterialEvidenceChange(prior, { evidence: { samples: 10, count: 9 } })).toBe(true);
+  });
+});
