@@ -54,6 +54,9 @@
     "veto_window_minutes": 60,
     "escalate_channel": "slack"
   },
+  "autonomy": {
+    "min_level": "L3"
+  },
   "notification": {
     "delivery_mode": "inbox",
     "deliver_to": {

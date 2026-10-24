@@ -316,6 +316,9 @@ export interface ApprovalRequestSource {
   missionId?: string;
   taskId?: string;
   agentId?: string;
+  /** The requesting action class (e.g. a dot's proposal action_id) — lets
+   *  a same-class newer request supersede prior pendings. */
+  actionId?: string;
 }
 
 export interface SessionApprovalCacheEntry {
@@ -748,7 +751,7 @@ function cancelApprovalRequestUnlocked(
   return updated;
 }
 
-const APPROVAL_SOURCE_FIELDS = ['missionId', 'taskId', 'agentId'] as const;
+const APPROVAL_SOURCE_FIELDS = ['missionId', 'taskId', 'agentId', 'actionId'] as const;
 
 /**
  * KC-03: cancel every pending approval request originating from the given
