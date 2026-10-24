@@ -605,6 +605,8 @@ export type ConsumedDecisionLockStatus = 'in_progress' | 'completed';
 export interface ConsumedDecisionLockRecord extends ConsumedDecisionLock {
   version: '1.0.0';
   tenant_slug?: string;
+  /** The mission's project: the typed context of a rework WorkItem filed for this consumer. */
+  project_id?: string;
   mission_id: string;
   task_id: string;
   status: ConsumedDecisionLockStatus;

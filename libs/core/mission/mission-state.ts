@@ -472,13 +472,30 @@ function isArchivedMissionVisible(archived: MissionState, tenantSlug?: string): 
 
 function loadArchivedMissionState(upperId: string): MissionState | null {
   try {
-    const dir = pathResolver.findArchivedMissionDir(upperId);
-    if (!dir) return null;
-    const statePath = assertSafeRepositoryPath(path.join(dir, 'mission-state.json'));
-    return safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
+    const statePath = findArchivedMissionStatePath(upperId);
+    return statePath && safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Where an archived mission's `mission-state.json` would be
+ * (`<archive>/<tier>/<tenant|shared>/<id>` or the legacy flat `<archive>/<id>`),
+ * or null when the mission has no archive directory. The path is returned even
+ * when the directory holds no state file: locating it reads no state and does
+ * not check the file, because the archive's confidential and personal tiers
+ * are protected stores — the caller checks existence and reads it under an
+ * authority that may (a missing file is then "not found").
+ */
+export function findArchivedMissionStatePath(missionId: string): string | null {
+  const upperId = missionId.trim().toUpperCase();
+  if (!isValidMissionId(upperId)) return null;
+  const dir = pathResolver.findArchivedMissionDir(upperId);
+  if (!dir) return null;
+  return assertSafeRepositoryPath(path.join(dir, 'mission-state.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function isValidMissionId(missionId: string): boolean {
