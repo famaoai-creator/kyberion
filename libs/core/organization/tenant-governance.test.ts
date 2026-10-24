@@ -23,6 +23,7 @@ import { checkProviderEgress } from '../provider/provider-egress-gate.js';
 import {
   assertPrintableCommandValue,
   attestTenantProvider,
+  findProviderAttestationGrantAuthority,
   mutateTenant,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
   deleteTenant,
@@ -785,5 +786,136 @@ describe('tenant rename and delete', () => {
     );
     expect(purged.removed_knowledge_root_path).toBeDefined();
     expect(safeExistsSync(path.join(rootDir, 'knowledge', 'confidential', 'purged'))).toBe(false);
+  });
+});
+
+describe('training_use none attestations may be delegated by an exact charter grant', () => {
+  const parent = pathResolver.sharedTmp('tenant-governance-delegation-tests');
+  let rootDir = '';
+  let record: ReturnType<typeof vi.spyOn>;
+
+  const claim = {
+    slug: 'beta',
+    provider: 'codex',
+    training_use: 'none' as const,
+    plan: 'ChatGPT Enterprise',
+    basis: 'https://openai.com/enterprise-privacy',
+    attested_by: 'human:owner',
+  };
+  const grant = {
+    operation_id: 'tenant:attest_provider',
+    tenant_slug: 'beta',
+    provider: 'codex',
+    training_use: 'none',
+    plan: 'ChatGPT Enterprise',
+    basis: 'https://openai.com/enterprise-privacy',
+    attested_by: 'human:owner',
+  };
+
+  function writeCharter(scope: 'organization' | 'person', grants: unknown[], id: string): void {
+    const dir =
+      scope === 'organization'
+        ? path.join(rootDir, 'knowledge', 'confidential', 'beta', 'charters')
+        : path.join(rootDir, 'knowledge', 'personal', 'charters');
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(
+      path.join(dir, `${id}.json`),
+      JSON.stringify({
+        charter_id: id,
+        scope:
+          scope === 'organization'
+            ? { kind: 'organization', tenant_slug: 'beta' }
+            : { kind: 'person' },
+        accountable: {
+          actor: 'user:owner',
+          authority_basis: { kind: 'owner', evidence_ref: 'profile:owner' },
+          accepted_at: '2026-01-01T00:00:00Z',
+          expires_at: '2099-01-01T00:00:00Z',
+          statement_sha256: 'a'.repeat(64),
+          deputies: [],
+        },
+        envelope: {
+          money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+          data_tier: { read: [], write: [] },
+          external_effects: {},
+          irreversible: 'named_actions_only',
+          irreversible_named_actions: ['tenant:attest_provider'],
+          external_operations: grants,
+        },
+        appetite: {
+          max_loss_per_incident: 0,
+          reputational_class_max: 'A',
+          blast_radius_max: { systems: 1, recipients: 1 },
+          tripwires: ['manual-stop'],
+        },
+      }),
+      { encoding: 'utf8' }
+    );
+  }
+
+  function apply(overrides: Partial<typeof claim> = {}) {
+    return withExecutionContext('sovereign_concierge', () =>
+      attestTenantProvider({
+        ...claim,
+        ...overrides,
+        rootDir,
+        invoker: { actor: 'agent-delegate' },
+      })
+    );
+  }
+
+  beforeEach(() => {
+    rootDir = path.join(parent, `fixture-${process.pid}-${Date.now()}-${Math.random()}`);
+    safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'tenants'), { recursive: true });
+    record = vi.spyOn(auditChain, 'record').mockImplementation(() => ({}) as never);
+    withExecutionContext('sovereign_concierge', () => {
+      mutateTenant({ verb: 'create', slug: 'beta', rootDir, apply: true });
+      mutateTenant({ verb: 'create', slug: 'gamma', rootDir, apply: true });
+    });
+    record.mockClear();
+  });
+
+  afterEach(() => {
+    record.mockRestore();
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('applies the exact granted claim under an organization charter without an approval', () => {
+    writeCharter('organization', [grant], 'chr-attest-beta');
+    const result = apply();
+    expect(result.delegation).toMatchObject({
+      charter_id: 'chr-attest-beta',
+      scope_kind: 'organization',
+    });
+    expect(result.approval).toBeUndefined();
+    expect(result.attestation.training_use).toBe('none');
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tenant.attest_provider',
+        metadata: expect.objectContaining({ delegated_via_charter: 'chr-attest-beta' }),
+      })
+    );
+  });
+
+  it('applies under a person charter grant as well', () => {
+    writeCharter('person', [grant], 'chr-attest-person');
+    const result = apply();
+    expect(result.delegation).toMatchObject({
+      charter_id: 'chr-attest-person',
+      scope_kind: 'person',
+    });
+  });
+
+  it('still requires approval when the claim drifts from the grant', () => {
+    writeCharter('organization', [grant], 'chr-attest-beta');
+    expect(() => apply({ plan: 'a different plan' })).toThrow(/needs a human approval/);
+    expect(() => apply({ provider: 'claude' })).toThrow(/needs a human approval|unknown provider/);
+  });
+
+  it('ignores grants held under a different tenant scope', () => {
+    writeCharter('organization', [{ ...grant, tenant_slug: 'gamma' }], 'chr-other');
+    // The gamma-scoped grant fails parse for beta's claim → no delegation.
+    expect(findProviderAttestationGrantAuthority({ ...claim }, { rootDir })).toBeUndefined();
+    expect(() => apply()).toThrow(/needs a human approval/);
   });
 });

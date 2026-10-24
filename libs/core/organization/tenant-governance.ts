@@ -34,6 +34,13 @@ import {
   DEFAULT_ATTESTATION_TTL_DAYS,
   loadProviderEgressPolicy,
 } from '../provider/provider-egress-gate.js';
+import { findActiveCharter } from '../governance/accountability-charter-registry.js';
+import {
+  buildExternalOperationTarget,
+  externalOperationGrantMatches,
+  parseExternalOperationGrant,
+} from '../governance/external-operation-target.js';
+import type { CharterScope } from '../governance/accountability-charter.js';
 import { resolveIdentityContext } from '../authority.js';
 import { currentActor } from '../actor-context.js';
 import { pathResolver } from '../path-resolver.js';
@@ -377,6 +384,8 @@ export interface TenantProviderAttestationResult {
   profile_path: string;
   /** Set when the attestation was applied under a human approval. */
   approval?: { request_id: string; approved_by: string };
+  /** Set when a standing charter grant authorized the apply instead of a per-instance approval. */
+  delegation?: { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string };
 }
 
 export interface AttestationInvoker {
@@ -875,16 +884,70 @@ function assertProviderAttestationApproval(
 }
 
 /**
+ * A standing charter grant may substitute the single-use human approval. The
+ * grant itself was signed by the accountable human through `pnpm onboarding
+ * authority` and names the exact claim (tenant, provider, training_use, plan,
+ * basis, attested_by) verbatim, so a delegate can apply that one statement —
+ * including renewals — but cannot drift into a different claim. The grant is
+ * consulted in the attested tenant's organization charter first, then the
+ * installed person charter; a miss keeps the per-instance approval path.
+ */
+export function findProviderAttestationGrantAuthority(
+  input: {
+    slug: string;
+    provider: string;
+    training_use: string;
+    plan?: string;
+    basis?: string;
+    attested_by?: string;
+  },
+  options: TenantRegistryPathOptions = {}
+): { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string } | undefined {
+  if (input.training_use !== 'none') return undefined;
+  const target = parseExternalOperationGrant(
+    buildExternalOperationTarget('tenant:attest_provider', {
+      tenant_slug: input.slug,
+      provider: input.provider,
+      training_use: input.training_use,
+      plan: input.plan,
+      basis: input.basis,
+      attested_by: input.attested_by,
+    })
+  );
+  if (!target) return undefined;
+  const scopes: CharterScope[] = [
+    { kind: 'organization', tenant_slug: input.slug },
+    { kind: 'person' },
+  ];
+  for (const scope of scopes) {
+    const charter = findActiveCharter(scope, new Date(), options);
+    if (!charter) continue;
+    const matched = (charter.envelope.external_operations ?? []).some((grant) =>
+      externalOperationGrantMatches(grant, target)
+    );
+    if (matched) {
+      return {
+        charter_id: charter.charter_id,
+        scope_kind: scope.kind,
+        grant_hash: computeApprovalPayloadHash(target),
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
  * Governed entry point for recording a tenant provider attestation — shared by
  * `pnpm tenant attest-provider` and `pnpm onboarding llm attest`.
  *
  * Only providers declared in provider-egress-policy.json can be attested: the
  * gate never lets an attestation invent an egress identity. `training_use:
  * none` opens confidential egress, so it is applied only under an approved,
- * unexpired human approval bound to the exact claim (used once). `used` /
- * `unknown` never open egress and are recorded directly. Every attestation is
- * written to the audit chain (`tenant.attest_provider`) with the invoking actor
- * and, when approved, the human approver.
+ * unexpired human approval bound to the exact claim (used once) or under an
+ * active charter grant naming that exact claim. `used` / `unknown` never open
+ * egress and are recorded directly. Every attestation is written to the audit
+ * chain (`tenant.attest_provider`) with the invoking actor and, when approved
+ * or delegated, the human approver or the charter id.
  */
 export function attestTenantProvider(
   input: AttestTenantProviderInput
@@ -894,27 +957,36 @@ export function attestTenantProvider(
     input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
+  let delegated:
+    { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string } | undefined;
   if (input.training_use === 'none') {
-    if (!input.approvalRequestId?.trim()) {
-      throw new Error(
-        "[tenant-governance] training_use 'none' opens confidential egress and needs a human approval: request one with --request-approval, have a human run 'pnpm kyberion approvals --approve <id>', then re-run with --approval-request-id <id>."
+    if (input.approvalRequestId?.trim()) {
+      const checked = assertProviderAttestationApproval(input.approvalRequestId.trim(), {
+        ...input,
+        slug,
+        provider,
+      });
+      // At most once: an approval cannot be replayed to keep extending the claim.
+      const claimId = claimApprovalApply('mission_controller', {
+        channel: checked.approval.channel,
+        storageChannel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+        requestId: checked.approval.id,
+        appliedBy: actor,
+        expectedRecordHash: computeApprovalPayloadHash({ record: checked.approval }),
+        rerequestCommand: providerAttestationRequestCommand({ ...input, slug, provider }),
+      }).applyClaim.claimId;
+      approved = { ...checked, claimId };
+    } else {
+      delegated = findProviderAttestationGrantAuthority(
+        { slug, provider, ...input },
+        input.rootDir ? { rootDir: input.rootDir } : {}
       );
+      if (!delegated) {
+        throw new Error(
+          "[tenant-governance] training_use 'none' opens confidential egress and needs a human approval or an exact charter grant: request one with --request-approval, have a human run 'pnpm kyberion approvals --approve <id>', then re-run with --approval-request-id <id>. To delegate this exact claim instead, grant it via 'pnpm onboarding authority' (operation tenant:attest_provider)."
+        );
+      }
     }
-    const checked = assertProviderAttestationApproval(input.approvalRequestId.trim(), {
-      ...input,
-      slug,
-      provider,
-    });
-    // At most once: an approval cannot be replayed to keep extending the claim.
-    const claimId = claimApprovalApply('mission_controller', {
-      channel: checked.approval.channel,
-      storageChannel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
-      requestId: checked.approval.id,
-      appliedBy: actor,
-      expectedRecordHash: computeApprovalPayloadHash({ record: checked.approval }),
-      rerequestCommand: providerAttestationRequestCommand({ ...input, slug, provider }),
-    }).applyClaim.claimId;
-    approved = { ...checked, claimId };
   }
   const {
     actor: _actor,
@@ -955,6 +1027,13 @@ export function attestTenantProvider(
       ...(approved
         ? { approved_by: approved.humanDecider, approval_request_id: approved.approval.id }
         : {}),
+      ...(delegated
+        ? {
+            delegated_via_charter: delegated.charter_id,
+            delegation_scope: delegated.scope_kind,
+            grant_hash: delegated.grant_hash,
+          }
+        : {}),
     },
   });
   if (approved) {
@@ -979,5 +1058,6 @@ export function attestTenantProvider(
     ...(approved
       ? { approval: { request_id: approved.approval.id, approved_by: approved.humanDecider } }
       : {}),
+    ...(delegated ? { delegation: delegated } : {}),
   };
 }

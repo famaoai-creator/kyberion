@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildExternalOperationTarget,
   parseExternalOperationGrant,
   parseExternalOperationGrants,
 } from './external-operation-target.js';
@@ -402,5 +403,51 @@ describe('exact public operation target grants', () => {
     ])
       expect(text).toContain(value);
     expect(envelopeFromForm(parsed.form).irreversible_named_actions).toContain('vcs:pr_create');
+  });
+});
+
+describe('tenant:attest_provider delegation grants', () => {
+  const attest = {
+    operation_id: 'tenant:attest_provider' as const,
+    tenant_slug: 'acme',
+    provider: 'claude',
+    training_use: 'none' as const,
+    plan: 'Claude Code subscription',
+    basis: 'operator-declared terms',
+    attested_by: 'user:owner',
+  };
+  it('parses an exact attestation grant and matches it verbatim', () => {
+    expect(parseExternalOperationGrant(attest)).toEqual(attest);
+    expect(parseExternalOperationGrants([attest])).toEqual([attest]);
+  });
+  it('rejects non-none training_use, wildcards, unknown fields and missing claim fields', () => {
+    expect(parseExternalOperationGrant({ ...attest, training_use: 'used' })).toBeUndefined();
+    expect(parseExternalOperationGrant({ ...attest, provider: 'cla*' })).toBeUndefined();
+    expect(parseExternalOperationGrant({ ...attest, valid_for_days: 30 })).toBeUndefined();
+    const { attested_by: _omit, ...incomplete } = attest;
+    expect(parseExternalOperationGrant(incomplete)).toBeUndefined();
+    expect(parseExternalOperationGrant({ ...attest, plan: '  ' })).toBeUndefined();
+  });
+  it('buildTarget trims claim fields but only builds the egress-opening claim', () => {
+    const effect = {
+      tenant_slug: ' acme ',
+      provider: 'claude',
+      training_use: 'none',
+      plan: ' plan ',
+      basis: ' basis ',
+      attested_by: ' user:owner ',
+    };
+    expect(buildExternalOperationTarget('tenant:attest_provider', effect)).toEqual({
+      ...attest,
+      plan: 'plan',
+      basis: 'basis',
+      attested_by: 'user:owner',
+    });
+    expect(
+      buildExternalOperationTarget('tenant:attest_provider', { ...effect, training_use: 'used' })
+    ).toBeUndefined();
+    expect(
+      buildExternalOperationTarget('tenant:attest_provider', { ...effect, plan: 42 })
+    ).toBeUndefined();
   });
 });
