@@ -1,0 +1,88 @@
+/* Customer room: mobile first, one column. Colors and spacing come only from the kit tokens. */
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: var(--kb-ui-canvas);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+  font-size: var(--kb-ui-font-size-md);
+  line-height: 1.6;
+}
+
+.cr-root {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--kb-ui-space-4);
+  padding-bottom: calc(var(--kb-ui-space-7) * 2);
+}
+
+.cr-entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+}
+
+.cr-entry__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+}
+
+.cr-choice {
+  min-height: 48px;
+}
+
+.cr-impact {
+  margin: var(--kb-ui-space-2) 0 0;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.cr-impact__row {
+  display: flex;
+  gap: var(--kb-ui-space-2);
+}
+
+.cr-progress {
+  align-self: flex-start;
+}
+
+.cr-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: var(--kb-ui-space-3);
+  padding: var(--kb-ui-space-3) 0;
+  background: var(--kb-ui-canvas);
+}
+
+.cr-actions .kb-btn {
+  flex: 1;
+  min-height: 48px;
+}
+
+.cr-state {
+  margin-top: var(--kb-ui-space-6);
+}
+
+.cr-error {
+  margin: 0;
+}
+
+.cr-error[hidden] {
+  display: none;
+}
+
+@media (min-width: 40rem) {
+  .cr-actions .kb-btn {
+    flex: 0 1 auto;
+    min-width: 10rem;
+  }
+}
