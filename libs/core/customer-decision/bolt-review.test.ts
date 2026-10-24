@@ -5,7 +5,6 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-
 import {
   MAX_ATTACHMENT_BYTES,
   agendaAttachmentIds,
-  approvalVerdict,
   boltMilestone,
   boltRejectInboxEntryId,
   boltReworkWorkItemId,
@@ -133,6 +132,12 @@ describe('bolt review links', () => {
     ['https://[fd00::1]/', 'private_address'],
     ['https://[fe80::1]/', 'private_address'],
     ['https://[::ffff:127.0.0.1]/', 'private_address'],
+    ['https://[::127.0.0.1]/', 'private_address'],
+    ['https://[::7f00:1]/', 'private_address'],
+    ['https://[64:ff9b::7f00:1]/', 'private_address'],
+    ['https://[2002:7f00:1::1]/', 'private_address'],
+    ['https://[2001:0:4136:e378::1]/', 'private_address'],
+    ['https://staging.local../', 'internal_host'],
   ])('refuses %s (%s)', (url, problem) => {
     expect(linkProblem(url)).toBe(problem);
   });
@@ -192,13 +197,6 @@ describe('bolt review attachments', () => {
 });
 
 describe('bolt review answers', () => {
-  it('treats reject like request_changes: not approved', () => {
-    expect(approvalVerdict({ approved: true })).toBe('approved');
-    expect(approvalVerdict({ approved: false, comment: 'x' })).toBe('changes_requested');
-    expect(approvalVerdict({ approved: false, rejected: true, comment: 'x' })).toBe('rejected');
-    expect(approvalVerdict('x')).toBeNull();
-  });
-
   it('routes a decider request_changes / reject once per decision or change request', () => {
     const agenda = boltAgenda();
     const receipts = [

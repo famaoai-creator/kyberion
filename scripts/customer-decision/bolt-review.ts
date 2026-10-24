@@ -46,6 +46,7 @@ import {
   fileBoltReviewWorkItem,
   notifyBoltReviewRejected,
 } from '@agent/core/mission/mission-bolt-review';
+import { loadMissionStateIncludingArchive } from '@agent/core/mission/mission-state';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   type CustomerDecisionIo,
@@ -109,7 +110,10 @@ function assertMissionInCase(
 ): void {
   const resolved = io.missionCase
     ? io.missionCase(missionId)
-    : resolveMissionDecisionCase(missionId);
+    : // A finished bolt is archived by `finish`: resolve from the archive too.
+      resolveMissionDecisionCase(missionId, {
+        loadMissionState: (id) => loadMissionStateIncludingArchive(id, { tenantSlug: tenant }),
+      });
   if (!resolved) {
     throw new ScriptExitError(
       2,
@@ -263,21 +267,29 @@ export function routeBoltReview(
             ...(agenda.project_id ? { projectId: agenda.project_id } : {}),
           };
           try {
-            const record: BoltReviewRouting =
-              target.outcome === 'request_changes'
-                ? { ...target, work_item_id: fileBoltReviewWorkItem(input), at: now }
-                : {
-                    ...target,
-                    inbox_entry_id: notifyBoltReviewRejected(input).inbox_entry_id,
-                    notified_at: now,
-                    at: now,
-                  };
+            let record: BoltReviewRouting;
+            let done = true;
+            if (target.outcome === 'request_changes') {
+              record = { ...target, work_item_id: fileBoltReviewWorkItem(input), at: now };
+            } else {
+              const notice = notifyBoltReviewRejected(input);
+              // A retryable push is not a notification yet: keep the inbox
+              // entry, leave `notified_at` unset, retry on the next respond / status.
+              done = notice.push_status !== 'retryable';
+              record = {
+                ...target,
+                inbox_entry_id: notice.inbox_entry_id,
+                ...(done ? { notified_at: now } : {}),
+                at: now,
+              };
+            }
             const index = routing.findIndex(
               (entry) => entry.entry_id === target.entry_id && entry.ref === target.ref
             );
             if (index >= 0) routing[index] = record;
             else routing.push(record);
             summary.routed += 1;
+            if (!done) summary.pending += 1;
           } catch (error) {
             summary.pending += 1;
             logger.warn(
