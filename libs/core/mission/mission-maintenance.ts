@@ -71,7 +71,11 @@ import { retireIdentitiesForScopeBestEffort } from '../nhi-lifecycle-governance.
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
-import { pinTaskDecisions, reconcileTaskDecisions } from './mission-decision-lock.js';
+import {
+  isTaskAwaitingCustomerDecision,
+  pinTaskDecisions,
+  reconcileTaskDecisions,
+} from './mission-decision-lock.js';
 import {
   assertApprovalUsable,
   computeApprovalPayloadHash,
@@ -962,7 +966,21 @@ export async function recordEvidence(args: {
     // deliverable is in place. Gated on this explicit, task_id-scoped call so
     // a bare file-existence check is never trusted without an agent
     // deliberately asserting the work for THAT task is done.
-    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
+    // CD-09: a task waiting for a customer decision keeps its evidence but is
+    // not closed (nor any cascade candidate that is itself held).
+    const heldIds = decisionCheck.held_proposal_ids ?? [];
+    if (heldIds.length > 0) {
+      logger.warn(
+        `task ${args.taskId} not completed — it waits for a customer decision (requires_customer) | the evidence is recorded; confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId} consumer=${decisionCheck.consumer ?? ''} proposals=${heldIds.join(',')}`
+      );
+    }
+    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
+      // The task's own check re-reads its lock too, so a failed reconcile never
+      // lets a held task close (the hold check fails closed).
+      isHeld: (taskId) =>
+        (taskId === args.taskId && heldIds.length > 0) ||
+        isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
+    });
     if (autoComplete.completed) {
       logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
       recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { appendDecisions } from '../decision-ledger/ledger.js';
 import type { DealRecord } from '../deal-store.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
@@ -24,6 +24,7 @@ import {
 import {
   pinTaskDecisions,
   reconcileTaskDecisions,
+  isTaskAwaitingCustomerDecision,
   recordTaskDecisionProposals,
   resolveMissionDecisionCase,
   sweepDecisionConsumers,
@@ -385,9 +386,11 @@ describe('mission decision lock (CD-09)', () => {
         pinned_count: 1,
         pinned: true,
       });
-      expect(readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')).not.toHaveProperty(
-        'hold'
-      );
+      // The open requires_customer question keeps the re-pinned task held.
+      expect(readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')?.hold).toEqual({
+        work_item_id: 'WI-TASK',
+        at: NOW,
+      });
     });
 
     it('completes on our proposal while nobody decided it: no rework', () => {
@@ -658,6 +661,130 @@ describe('mission decision lock (CD-09)', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('customer decision consumer sweep skipped')
       );
+    });
+
+    describe('a held task stays held until the customer decision is confirmed', () => {
+      const releaseAgenda = (confirmed: boolean) => ({
+        ...agenda(),
+        entries: [...agenda().entries, releaseEntry],
+        status: 'sent' as const,
+        approval: { content_hash: 'a'.repeat(64), approved_at: NOW, approved_by: 'user:boss' },
+        ...(confirmed
+          ? {
+              operator_confirmations: [
+                { entry_id: 'release', decision_id: 'D-0001', by: 'user:boss', at: LATER },
+              ],
+            }
+          : {}),
+      });
+      const holdOn = () => {
+        pinTaskDecisions(task, { decisionCase, now: NOW });
+        const held = recordTaskDecisionProposals(
+          { ...task, requests: [askRelease], workItemId: 'WI-TASK' },
+          { decisionCase, now: NOW }
+        );
+        expect(held.hold_proposal_ids).toHaveLength(1);
+        return held.hold_proposal_ids;
+      };
+
+      it('resumed before confirm, a result with no questions is still held', () => {
+        const ids = holdOn();
+        // mission resume → a new dispatch attempt re-pins.
+        pinTaskDecisions(task, { decisionCase, now: LATER });
+        expect(lockNow().hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
+        const rerun = recordTaskDecisionProposals(
+          { ...task, requests: [] },
+          { decisionCase, now: LATER }
+        );
+        expect(rerun).toMatchObject({ case_found: true, hold_proposal_ids: ids });
+      });
+
+      it('a rerun that drops the requires_customer flag cannot lift the hold', () => {
+        const ids = holdOn();
+        pinTaskDecisions(task, { decisionCase, now: LATER });
+        const rerun = recordTaskDecisionProposals(
+          {
+            ...task,
+            requests: [{ ...askRelease, requires_customer: false, proposed_value: 'ship it' }],
+          },
+          { decisionCase, now: LATER }
+        );
+        expect(rerun.hold_proposal_ids).toEqual(ids);
+        expect(proposalsNow()).toEqual([
+          expect.objectContaining({
+            proposal: expect.objectContaining({ requires_customer: true }),
+          }),
+        ]);
+        expect(proposalsNow()[0]).not.toHaveProperty('value');
+      });
+
+      it('fails closed once the case is known, open before it is found', () => {
+        const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        holdOn();
+        // A case whose state cannot be read (here: a corrupt agenda).
+        safeWriteFile(
+          `${customerDecisionPaths({ dir }).agendas}/agd-broken01.json`,
+          '{"version":"1.0.0"}'
+        );
+        const failed = recordTaskDecisionProposals(
+          { ...task, requests: [] },
+          { decisionCase, now: LATER }
+        );
+        expect(failed).toMatchObject({ case_found: true, failed: true, case_id: 'case-a' });
+        expect(
+          isTaskAwaitingCustomerDecision({ ...task, taskId: 'unrelated' }, { decisionCase })
+        ).toBe(true);
+        // Finding the case itself fails (state unreadable, another tenant bound): not held.
+        const lookupFails = {
+          loadMissionState: () => {
+            throw new Error('[ROLE_TENANT_SCOPE_MISMATCH] other tenant');
+          },
+        };
+        expect(isTaskAwaitingCustomerDecision(task, lookupFails)).toBe(false);
+        expect(recordTaskDecisionProposals({ ...task, requests: [] }, lookupFails)).toMatchObject({
+          case_found: false,
+          hold_proposal_ids: [],
+        });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('customer decision case lookup failed')
+        );
+      });
+
+      it('record-evidence reconcile keeps a held lock in progress and reports the hold by id', () => {
+        const ids = holdOn();
+        expect(isTaskAwaitingCustomerDecision(task, { decisionCase })).toBe(true);
+        const check = reconcileTaskDecisions(task, { decisionCase, now: LATER });
+        expect(check).toMatchObject({ held_proposal_ids: ids });
+        expect(JSON.stringify(check)).not.toMatch(/release|RELEASE|secret/u);
+        expect(lockNow()).toMatchObject({ status: 'in_progress', hold: { at: NOW } });
+        expect(lockNow().last_check).toMatchObject({ at: LATER });
+        expect(isTaskAwaitingCustomerDecision({ ...task, taskId: 'other' }, { decisionCase })).toBe(
+          false
+        );
+      });
+
+      it('after the operator confirms, the rerun completes', () => {
+        writeAgenda({ dir }, releaseAgenda(false));
+        holdOn();
+        decide('RELEASE', 'release.go', { approved: true });
+        // Decided but not confirmed: still held.
+        expect(
+          recordTaskDecisionProposals({ ...task, requests: [] }, { decisionCase, now: LATER })
+            .hold_proposal_ids
+        ).toHaveLength(1);
+        writeAgenda({ dir }, releaseAgenda(true));
+        pinTaskDecisions(task, { decisionCase, now: LATER });
+        expect(lockNow()).not.toHaveProperty('hold');
+        const rerun = recordTaskDecisionProposals(
+          { ...task, requests: [] },
+          { decisionCase, now: LATER }
+        );
+        expect(rerun.hold_proposal_ids).toEqual([]);
+        expect(reconcileTaskDecisions(task, { decisionCase, now: LATER })).toMatchObject({
+          stale_count: 0,
+        });
+        expect(lockNow().status).toBe('completed');
+      });
     });
   });
 });

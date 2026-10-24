@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
 import type { ResourceAccessScope } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
@@ -20,6 +21,38 @@ const AGENDA_FILE = /^agendas\/agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}\.json$/u;
 const CONSUMER_FILE =
   /^consumers\/mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.json$/u;
 const READABLE = new Set(['decisions.jsonl', 'switches.jsonl', 'agendas', 'consumers']);
+
+/**
+ * The response / confirm sweep is a distinct capability kind: only it may list
+ * `consumers/` or touch more than one consumer lock, and only while
+ * {@link runInCustomerDecisionConsumerSweep} runs (checked when the capability
+ * is built and again whenever the guard validates it). A task boundary
+ * builds an owner-bound capability and can never obtain the sweep kind by
+ * construction. A single consumer file is structurally the same either way.
+ */
+const SWEEP_KEY = Symbol.for('kyberion.core.customer-decision-consumer-sweep.v1');
+const sweepRegistry = globalThis as typeof globalThis & {
+  [SWEEP_KEY]?: AsyncLocalStorage<true>;
+};
+const sweepStorage =
+  sweepRegistry[SWEEP_KEY] ?? (sweepRegistry[SWEEP_KEY] = new AsyncLocalStorage());
+
+/** Run the case-wide consumer sweep (`sweepDecisionConsumers` only). */
+export function runInCustomerDecisionConsumerSweep<T>(fn: () => T): T {
+  return sweepStorage.run(true, fn);
+}
+
+function inSweep(): boolean {
+  return sweepStorage.getStore() === true;
+}
+
+/** Does this access need the sweep kind (a listing, or several consumer locks)? */
+function sweepShaped(relatives: readonly string[]): boolean {
+  return (
+    relatives.includes('consumers') ||
+    new Set(relatives.filter((relative) => CONSUMER_FILE.test(relative))).size > 1
+  );
+}
 
 export interface CustomerDecisionConsumerAccess {
   /** Case-relative paths to read: the ledger, switches, the two listings, agenda and consumer files. */
@@ -98,6 +131,14 @@ export function customerDecisionConsumerCapability(
         '[RESOURCE_SCOPE_INVALID] A task boundary may only touch its own customer decision consumer lock'
       );
   }
+  if (
+    access.owner === undefined &&
+    sweepShaped([...access.read, ...(access.write ? [access.write] : [])]) &&
+    !inSweep()
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_INVALID] Only the customer decision consumer sweep may touch other consumer locks'
+    );
   const inCase = (relative: string) => `${caseDir}/${relative}`;
   const read = [...new Set([...access.read, ...(access.write ? [access.write] : [])])].sort();
   return {
@@ -127,6 +168,8 @@ export function isCustomerDecisionConsumerCapability(
   const relative = (target: string) =>
     target.startsWith(prefix) ? target.slice(prefix.length) : '';
   try {
+    // The sweep kind is valid only inside the sweep.
+    if (sweepShaped(scope.readExact.map(relative)) && !inSweep()) return false;
     const write = scope.writeExact[0] ? relative(scope.writeExact[0]) : undefined;
     const expected = customerDecisionConsumerCapability(scope.tenantSlug, caseDir, {
       read: scope.readExact.map(relative),

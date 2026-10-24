@@ -412,5 +412,37 @@ describe(
       expect(blockedCall()).toBeUndefined();
       expect(doneCalled()).toBe(true);
     });
+
+    it('a resumed held task whose result asks nothing stays blocked on the lock hold', async () => {
+      mocks.recordTaskDecisionProposals.mockReturnValue({
+        case_found: true,
+        consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+        case_id: 'PRJ-1',
+        recorded: 0,
+        proposal_ids: [],
+        hold_proposal_ids: ['tp-fedcba9876543210'],
+      });
+      await dispatch([]);
+      expect(mocks.recordTaskDecisionProposals).toHaveBeenCalledWith(
+        expect.objectContaining({ requests: [] })
+      );
+      expect(blockedCall()?.metadata?.blocked_reason).toBe('awaiting_customer_decision');
+      expect(doneCalled()).toBe(false);
+    });
+
+    it('a failed hold check on a known case blocks the task (fail closed)', async () => {
+      mocks.recordTaskDecisionProposals.mockReturnValue({
+        case_found: true,
+        consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+        case_id: 'PRJ-1',
+        recorded: 0,
+        proposal_ids: [],
+        hold_proposal_ids: [],
+        failed: true,
+      });
+      await dispatch([]);
+      expect(blockedCall()?.metadata?.blocked_reason).toBe('awaiting_customer_decision');
+      expect(doneCalled()).toBe(false);
+    });
   }
 );

@@ -1222,6 +1222,66 @@ describe('mission work item dispatch', () => {
     });
   });
 
+  it('drops customer_decisions on the WorkItem path: not persisted, not quoted in the retry (CD-09)', async () => {
+    createWorkItem({
+      title: `${missionId}: Theme decision`,
+      description:
+        'Choose the portal colour theme and return a structured task_result block with the evidence.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-customer-decisions`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/theme.md',
+        target_path: 'deliverables/theme.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+    const withDecisions = (needs: string[]) =>
+      [
+        '```task_result',
+        JSON.stringify({
+          summary: 'Picked a theme.',
+          artifacts: [{ path: 'deliverables/theme.md', kind: 'markdown' }],
+          verification_done: ['Checked the theme.'],
+          gaps: [],
+          needs,
+          customer_decisions: [
+            {
+              question: 'Which secret colour theme?',
+              item: 'UX',
+              key: 'ui.theme',
+              proposed_value: 'secret-dark',
+              requires_customer: false,
+            },
+          ],
+        }),
+        '```',
+      ].join('\n');
+    const delegateTask = vi
+      .fn()
+      .mockResolvedValueOnce(withDecisions(['brand_guide']))
+      .mockResolvedValueOnce(withDecisions([]));
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'review' },
+      { delegateTask }
+    );
+    expect(delegateTask).toHaveBeenCalledTimes(2);
+    const retryPrompt = String((delegateTask.mock.calls[1] as unknown[])[0]);
+    expect(retryPrompt).not.toMatch(/secret|ui\.theme/u);
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const persisted = String(safeReadFile(responseFile, { encoding: 'utf8' }));
+    expect(persisted).toContain('Picked a theme.');
+    expect(persisted).not.toMatch(/secret|ui\.theme|"customer_decisions":/u);
+    expect(JSON.stringify(manifest)).not.toMatch(/secret|ui\.theme/u);
+  });
+
   it('blocks the work item and records a clarification packet when task_result needs remain', async () => {
     createWorkItem({
       title: `${missionId}: Request missing inputs`,

@@ -74,7 +74,7 @@ describe('task result retry and customer decisions (CD-09)', () => {
     const response = await obtainTaskResultResponse(deps(recorded), input);
     expect(response.retried).toBe(true);
     const retry = recorded.find((entry) => entry.form === 'task_result_retry');
-    expect(retry?.content).toContain('customer_decisions omitted from this excerpt: 1');
+    expect(retry?.content).toContain('customer decisions omitted from this excerpt: 1');
     expect(retry?.content).not.toMatch(/secret|ui\.theme|"UX"/u);
     const sent = JSON.stringify(mocks.route.mock.calls[1]);
     expect(sent).not.toMatch(/secret|ui\.theme/u);
@@ -88,5 +88,26 @@ describe('task result retry and customer decisions (CD-09)', () => {
     expect(redactCustomerDecisionsForPrompt('{"customer_decisions":[{"question":"q"}]}')).toBe('');
     const plain = block(result());
     expect(redactCustomerDecisionsForPrompt(plain)).toBe(plain);
+    // Idempotent: a second pass (two redaction points on one path) keeps the text.
+    const once = redactCustomerDecisionsForPrompt(
+      block(result({ customer_decisions: [{ question: 'secret q' }] }))
+    );
+    expect(once).toContain('"summary":"done"');
+    expect(redactCustomerDecisionsForPrompt(once)).toBe(once);
+    // An escaped key is still the field: parsed first, then redacted.
+    const escaped = [
+      '```task_result',
+      '{"summary":"done","artifacts":[],"verification_done":["c"],"gaps":[],"needs":[],"\\u0063ustomer_decisions":[{"question":"secret q"}]}',
+      '```',
+    ].join('\n');
+    const redacted = redactCustomerDecisionsForPrompt(escaped);
+    expect(redacted).not.toMatch(/secret|u0063/u);
+    expect(redacted).toContain('"summary":"done"');
+    // Unparseable with an escape: not quoted.
+    expect(
+      redactCustomerDecisionsForPrompt(
+        '```task_result\n{"\\u0063ustomer_decisions": [ "secret"\n```'
+      )
+    ).not.toMatch(/secret/u);
   });
 });

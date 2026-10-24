@@ -251,8 +251,11 @@ export async function dispatchPlannedMissionTaskCore(
   // holds it. Without a decision case they are ordinary questions: the
   // requires_customer ones become needs, the others go on with the proposal.
   const customerDecisionRequests = takeTaskCustomerDecisions(response.taskResult);
+  // Every structured result answers to the task's holds, even one with no
+  // questions: a resumed task whose requires_customer question is still open
+  // stays held instead of completing on what the worker happened to repeat.
   const decisionProposals =
-    customerDecisionRequests.length > 0
+    response.taskResult || customerDecisionRequests.length > 0
       ? recordTaskDecisionProposals({
           missionId: input.missionId,
           taskId: input.task.task_id,
@@ -434,7 +437,11 @@ export async function dispatchPlannedMissionTaskCore(
 
   // CD-09: a requires_customer question holds the task until the customer
   // decides (the needs → blocked path). Public evidence: ids and counts only.
-  if (decisionProposals?.case_found && decisionProposals.hold_proposal_ids.length > 0) {
+  // A failed check on a known case is a hold too (fail closed).
+  if (
+    decisionProposals?.case_found &&
+    (decisionProposals.hold_proposal_ids.length > 0 || decisionProposals.failed)
+  ) {
     const hold = {
       consumer: decisionProposals.consumer,
       ...(decisionProposals.case_id ? { case_id: decisionProposals.case_id } : {}),

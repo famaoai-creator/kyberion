@@ -395,12 +395,34 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       /RESOURCE_SCOPE_INVALID/u
     );
     expect(() => bound({ read: ['consumers'] })).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    // The sweep kind: only inside the sweep, at construction and at use.
+    const sweepAccess = {
+      read: ['consumers', 'consumers/mission-MSN-X.other.json', `consumers/${own}.json`],
+      write: 'consumers/mission-MSN-X.other.json',
+    };
     expect(() =>
-      capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
-        read: ['consumers', 'consumers/mission-MSN-X.other.json'],
-        write: 'consumers/mission-MSN-X.other.json',
-      })
-    ).not.toThrow();
+      capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), sweepAccess)
+    ).toThrow(/Only the customer decision consumer sweep/u);
+    const sweepScope = capability.runInCustomerDecisionConsumerSweep(() =>
+      capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), sweepAccess)
+    );
+    expect(capability.isCustomerDecisionConsumerCapability(sweepScope)).toBe(false);
+    expect(
+      capability.runInCustomerDecisionConsumerSweep(() =>
+        capability.isCustomerDecisionConsumerCapability(sweepScope)
+      )
+    ).toBe(true);
+    // A task-boundary caller holding a sweep-shaped scope outside the sweep is refused.
+    expect(() =>
+      resourceScope.runInResourceAccessScope(sweepScope, () =>
+        authority.withExecutionContext(
+          capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+          () => undefined,
+          undefined,
+          TENANT
+        )
+      )
+    ).toThrow(/RESOURCE_SCOPE/u);
     // Task proposals go through the same own-lock path on the real guard.
     seedCase(TENANT);
     const recorded = lockModule.recordTaskDecisionProposals(

@@ -580,4 +580,32 @@ describe('CD-09 review fixes', () => {
       })
     ).toBe('D-0002');
   });
+
+  it('requires_customer is sticky per item × key for the task, in either order and across results', () => {
+    const ask = (requires: boolean) => ({
+      question: 'Ship it?',
+      item: 'RELEASE',
+      key: 'release.go',
+      requires_customer: requires,
+      ...(requires ? {} : { proposed_value: 'yes' }),
+    });
+    for (const order of [
+      [ask(true), ask(false)],
+      [ask(false), ask(true)],
+    ]) {
+      const merged = mergeTaskProposals({ lock: empty, requests: order, agendas: [], now: NOW });
+      expect(taskProposalsOf(merged)).toHaveLength(1);
+      expect(taskProposalsOf(merged)[0].proposal.requires_customer).toBe(true);
+      expect(taskProposalsOf(merged)[0]).not.toHaveProperty('value');
+    }
+    const first = mergeTaskProposals({ lock: empty, requests: [ask(true)], agendas: [], now: NOW });
+    const later = mergeTaskProposals({
+      lock: { consumer, decisions: first.decisions },
+      requests: [ask(false)],
+      agendas: [],
+      now: LATER,
+    });
+    expect(taskProposalsOf(later)[0].proposal.requires_customer).toBe(true);
+    expect(taskProposalsOf(later)[0]).not.toHaveProperty('value');
+  });
 });

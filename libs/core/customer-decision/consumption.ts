@@ -329,16 +329,15 @@ export function mergeTaskProposals(input: {
       proposalIds.push(proposalId);
       continue;
     }
-    const linked = openEntryFor(
-      input.agendas,
-      request.item,
-      request.key,
-      request.requires_customer
-    );
+    // A later answer on the same item × key never lifts requires_customer.
+    const requires =
+      request.requires_customer ||
+      (existing >= 0 && decisions[existing].proposal?.requires_customer === true);
+    const linked = openEntryFor(input.agendas, request.item, request.key, requires);
     const proposal: TaskDecisionProposal = {
       proposal_id: proposalId,
       question: request.question,
-      requires_customer: request.requires_customer,
+      requires_customer: requires,
       ...(request.options?.length
         ? { options: request.options.map((option) => ({ ...option })) }
         : {}),
@@ -352,7 +351,7 @@ export function mergeTaskProposals(input: {
       item: request.item,
       key: request.key,
       layer: 'task_proposal',
-      ...(!request.requires_customer && request.proposed_value !== undefined
+      ...(!requires && request.proposed_value !== undefined
         ? { value: request.proposed_value }
         : {}),
       proposal,

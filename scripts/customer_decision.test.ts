@@ -1860,6 +1860,27 @@ describe('customer-decision facade', () => {
         expect(authEntry(draftId)).not.toHaveProperty('our_decision');
       });
 
+      it('a promoted entry never resolves to the stale ours its last approval pinned', async () => {
+        const { agendaId } = await approvedAndSent();
+        // Edit after approval: a draft whose in_force still pins our sso decision.
+        const file = path.join(dir, 'edit.json');
+        safeWriteFile(file, JSON.stringify({ entries: ENTRIES }), { encoding: 'utf8' });
+        await run(['draft', ...base(), '--agenda', agendaId, '--file', file]);
+        expect(agendaOf(agendaId)).toMatchObject({ status: 'draft' });
+        expect(agendaOf(agendaId).in_force?.pinned_ids.length).toBeGreaterThan(0);
+        await ask('a', true, NOW);
+        expect(await collect()).toMatchObject({ collected: 1, promoted: 1 });
+        expect(authEntry(agendaId)).toMatchObject({ requires_customer: true });
+        const status = (await run(['status', ...base(), '--agenda', agendaId])) as {
+          effective: unknown;
+        };
+        expect(pick(status.effective, 'nfr.auth')).toMatchObject({
+          layer: 'none',
+          status: 'awaiting_customer',
+        });
+        expect(pick(status.effective, 'nfr.auth')).not.toHaveProperty('value');
+      });
+
       it('a sent agenda asking it without requires_customer leaves the question pending', async () => {
         const { agendaId } = await approvedAndSent();
         const recorded = await ask('a', true, NOW);

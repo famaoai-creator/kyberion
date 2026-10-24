@@ -1418,6 +1418,44 @@ describe('mission lifecycle finish gate', () => {
 });
 
 describe('tryAutoCompleteTaskFromEvidence', () => {
+  it('never closes or cascades a task that waits for a customer decision (CD-09)', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'design', status: 'planned', deliverable: 'evidence/design.json' },
+          {
+            task_id: 'release',
+            status: 'planned',
+            dependencies: ['design'],
+            deliverable: 'evidence/release.json',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('design.json', '{}');
+    seedMissionEvidence('release.json', '{}');
+    const statuses = () =>
+      (
+        JSON.parse(
+          String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+        ) as MissionTaskSnapshot[]
+      ).map((task) => task.status);
+    // The task itself is held: nothing changes.
+    expect(
+      tryAutoCompleteTaskFromEvidence(missionPath, 'design', { isHeld: (id) => id === 'design' })
+    ).toEqual({ completed: false, reason: 'awaiting a customer decision', cascaded: [] });
+    expect(statuses()).toEqual(['planned', 'planned']);
+    // A held dependent is not cascaded.
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'design', {
+      isHeld: (id) => id === 'release',
+    });
+    expect(result).toMatchObject({ completed: true, cascaded: [] });
+    expect(statuses()).toEqual(['completed', 'planned']);
+  });
+
   it('completes a normal (non-repair-prefixed) task once its deliverable exists and dependencies are done', () => {
     safeWriteFile(
       `${missionPath}/NEXT_TASKS.json`,

@@ -33,6 +33,7 @@ import {
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   customerDecisionConsumerCapability,
   customerDecisionsRootDir,
+  runInCustomerDecisionConsumerSweep,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
@@ -112,6 +113,8 @@ export interface TaskDecisionReconciliation {
   checked: number;
   stale_count: number;
   rework_work_item_ids: string[];
+  /** Unresolved requires_customer proposals: the lock was not completed (ids only). */
+  held_proposal_ids?: string[];
 }
 
 const NOTHING_CHECKED: TaskDecisionReconciliation = {
@@ -320,8 +323,8 @@ export function resolveMissionDecisionCase(
  * A re-pin keeps the task's own proposals (`task_proposal` entries, in every
  * state): a question already asked — collected, answered, even on an agenda
  * closed since — is not asked again, and an uncollected one still waits to be
- * collected. The hold is dropped: the new attempt decides again whether it
- * waits. Null when the mission has no decision case, or on failure (logged).
+ * collected. A hold stays while any requires_customer proposal of the task
+ * lacks a confirmed customer decision. Null when the mission has no decision case, or on failure (logged).
  */
 export function pinTaskDecisions(
   input: { missionId: string; taskId: string; mode?: 'start' | 'if_absent' },
@@ -346,14 +349,30 @@ export function pinTaskDecisions(
         ledger,
         now,
       });
+      const proposals = existing ? taskProposalsOf(existing) : [];
+      // An unresolved requires_customer proposal keeps the task held across a
+      // re-pin (a resume before the operator confirmed the customer's decision).
+      const stillHeld = taskProposalHolds({ decisions: proposals }, agendas, ledger, now).some(
+        (hold) => !hold.resolved_decision_id
+      );
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
-        decisions: [...lock.decisions, ...(existing ? taskProposalsOf(existing) : [])],
+        decisions: [...lock.decisions, ...proposals],
         ...('dir' in decisionCase.location ? {} : { tenant_slug: decisionCase.tenantSlug }),
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
         status: 'in_progress',
+        ...(stillHeld
+          ? {
+              hold: {
+                ...(existing?.hold?.work_item_id
+                  ? { work_item_id: existing.hold.work_item_id }
+                  : {}),
+                at: existing?.hold?.at ?? now,
+              },
+            }
+          : {}),
       });
       return { consumer, pinned_count: lock.decisions.length, pinned: true };
     });
@@ -414,9 +433,11 @@ export function recordTaskDecisionProposals(
     ),
   ];
   const nothing = { consumer, recorded: 0, proposal_ids: [], hold_proposal_ids: [] };
-  if (input.requests.length === 0) return { case_found: false, ...nothing };
+  let caseId: string | undefined;
   try {
     const decisionCase = resolveMissionDecisionCase(input.missionId, options);
+    caseId = decisionCase?.caseId;
+    if (!decisionCase && input.requests.length === 0) return { case_found: false, ...nothing };
     if (!decisionCase) {
       logger.warn(
         `customer decision proposals not recorded — the mission has no decision case | requires_customer questions become clarification needs, the others go on with the proposal; create the case to collect them | ${consumer} count=${input.requests.length}`
@@ -426,6 +447,10 @@ export function recordTaskDecisionProposals(
     const now = options.now ?? nowIso();
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
       const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
+      // A result with no questions still answers to the lock's own holds.
+      if (!locks[0] && input.requests.length === 0) {
+        return { case_found: true, ...nothing, case_id: decisionCase.caseId };
+      }
       const base: ConsumedDecisionLockRecord = locks[0] ?? {
         version: '1.0.0',
         ...buildConsumedDecisionLock({
@@ -441,9 +466,9 @@ export function recordTaskDecisionProposals(
         status: 'in_progress',
       };
       const merged = mergeTaskProposals({ lock: base, requests: input.requests, agendas, now });
-      const holds = taskProposalHolds({ decisions: merged.decisions }, agendas, ledger, now).filter(
-        (hold) => requestedHolds.includes(hold.proposal_id)
-      );
+      // Every requires_customer proposal of the task holds it until resolved,
+      // whether or not this result repeats the question.
+      const holds = taskProposalHolds({ decisions: merged.decisions }, agendas, ledger, now);
       const resolved = new Map(
         holds.flatMap((hold) =>
           hold.resolved_decision_id ? [[hold.proposal_id, hold.resolved_decision_id] as const] : []
@@ -452,8 +477,27 @@ export function recordTaskDecisionProposals(
       const pending = holds
         .filter((hold) => !hold.resolved_decision_id)
         .map((hold) => hold.proposal_id);
-      const { hold: _previousHold, ...rest } = base;
-      void _previousHold;
+      const { hold: previousHold, ...rest } = base;
+      const newlyResolved = merged.decisions.some(
+        (entry) =>
+          isTaskProposalEntry(entry) &&
+          !entry.proposal.resolved &&
+          resolved.has(entry.proposal.proposal_id)
+      );
+      const unchanged =
+        input.requests.length === 0 &&
+        !newlyResolved &&
+        Boolean(previousHold) === pending.length > 0;
+      if (unchanged) {
+        return {
+          case_found: true,
+          consumer,
+          case_id: decisionCase.caseId,
+          recorded: 0,
+          proposal_ids: [],
+          hold_proposal_ids: pending,
+        };
+      }
       writeLock(decisionCase, {
         ...rest,
         decisions: merged.decisions.map((entry) => {
@@ -468,7 +512,16 @@ export function recordTaskDecisionProposals(
             : entry;
         }),
         ...(pending.length > 0
-          ? { hold: { ...(input.workItemId ? { work_item_id: input.workItemId } : {}), at: now } }
+          ? {
+              hold: {
+                ...(input.workItemId
+                  ? { work_item_id: input.workItemId }
+                  : previousHold?.work_item_id
+                    ? { work_item_id: previousHold.work_item_id }
+                    : {}),
+                at: previousHold?.at ?? now,
+              },
+            }
           : {}),
       });
       return {
@@ -481,10 +534,24 @@ export function recordTaskDecisionProposals(
       };
     });
   } catch (error) {
+    if (caseId === undefined) {
+      // Not even the case was found: like a mission without one (the caller
+      // turns requires_customer questions into needs, which block).
+      warnOnce(input.missionId, 'customer decision case lookup failed', error, consumer);
+      return { case_found: false, ...nothing };
+    }
+    // The case is known but its lock could not be read or written (e.g. a
+    // case-lock timeout during a respond): fail closed — the task is held.
     logger.warn(
-      `customer decision proposals not recorded — ${diagnosticCode(error)} | the task waits on its requires_customer questions and goes on with the others; resume the mission to retry | ${consumer}`
+      `customer decision proposals not recorded — ${diagnosticCode(error)} | the task is held (awaiting_customer_decision) because its holds could not be checked; resume the mission to retry | ${consumer} case=${caseId}`
     );
-    return { case_found: true, ...nothing, hold_proposal_ids: requestedHolds, failed: true };
+    return {
+      case_found: true,
+      ...nothing,
+      case_id: caseId,
+      hold_proposal_ids: requestedHolds,
+      failed: true,
+    };
   }
 }
 
@@ -669,7 +736,8 @@ function settleLock(
   result: { checked: number; stale: StaleConsumedDecision[] },
   now: string,
   options: MissionDecisionLockOptions,
-  complete: boolean
+  complete: boolean,
+  sweep = !complete
 ): TaskDecisionReconciliation {
   const pending = unreworkedStale(lock, result.stale);
   const rework = [...(lock.rework ?? [])];
@@ -689,13 +757,58 @@ function settleLock(
     last_check: { at: now, checked: result.checked, stale_count: result.stale.length },
     ...(rework.length > 0 ? { rework } : {}),
   };
-  writeLock(decisionCase, next, !complete);
+  writeLock(decisionCase, next, sweep);
   return {
     consumer: lock.consumer,
     checked: result.checked,
     stale_count: result.stale.length,
     rework_work_item_ids: [...new Set(coveringReworkIds(next, result.stale))].sort(),
   };
+}
+
+/** The task's requires_customer proposals without a confirmed customer decision. */
+function unresolvedHoldIds(
+  lock: Pick<ConsumedDecisionLockRecord, 'decisions'>,
+  agendas: readonly DecisionAgenda[],
+  ledger: ReturnType<typeof readLedger>,
+  now: string
+): string[] {
+  return taskProposalHolds(lock, agendas, ledger, now)
+    .filter((hold) => !hold.resolved_decision_id)
+    .map((hold) => hold.proposal_id);
+}
+
+/**
+ * Is the task waiting for a customer decision (an unresolved requires_customer
+ * proposal on its lock)? The record-evidence auto-complete gate asks this for
+ * the task and every cascade candidate. False without a case or a lock, and
+ * when finding the case fails; true (logged) when the case is known but its
+ * lock cannot be read: a task is never closed on a guess.
+ */
+export function isTaskAwaitingCustomerDecision(
+  input: { missionId: string; taskId: string },
+  options: MissionDecisionLockOptions = {}
+): boolean {
+  const consumer = missionTaskConsumerId(input.missionId, input.taskId);
+  let decisionCase: MissionDecisionCase | null;
+  try {
+    decisionCase = resolveMissionDecisionCase(input.missionId, options);
+  } catch (error) {
+    // Finding the case failed (another tenant bound, unreadable state): this
+    // says nothing about a hold, so the task is not held.
+    warnOnce(input.missionId, 'customer decision case lookup failed', error, consumer);
+    return false;
+  }
+  if (!decisionCase) return false;
+  try {
+    const now = options.now ?? nowIso();
+    const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
+    return Boolean(locks[0] && unresolvedHoldIds(locks[0], agendas, ledger, now).length > 0);
+  } catch (error) {
+    // The case exists but the lock cannot be read: never close on a guess.
+    warnOnce(input.missionId, 'customer decision hold check failed', error, consumer);
+    return true;
+  }
 }
 
 /**
@@ -718,7 +831,19 @@ export function reconcileTaskDecisions(
       const lock = locks[0];
       if (!lock) return { ...NOTHING_CHECKED };
       const result = reconcileConsumedDecisionLock(lock, agendas, ledger, now);
-      return settleLock(decisionCase, lock, result, now, options, true);
+      // A task waiting for the customer never completes its lock: the check
+      // is recorded, the lock stays in progress and keeps its hold.
+      const held = unresolvedHoldIds(lock, agendas, ledger, now);
+      const settled = settleLock(
+        decisionCase,
+        lock,
+        result,
+        now,
+        options,
+        held.length === 0,
+        false
+      );
+      return held.length > 0 ? { ...settled, held_proposal_ids: held } : settled;
     });
   } catch (error) {
     warnOnce(input.missionId, 'customer decision reconciliation skipped', error, consumer);
@@ -769,46 +894,50 @@ export function sweepDecisionConsumers(
       source: 'project',
       location: input.location,
     };
-    withCustomerDecisionCaseLock(
-      input.location,
-      () => {
-        const snapshot = readCase(decisionCase, 'all', (consumer, error) =>
-          warn('customer decision consumer lock unreadable', error, consumer)
-        );
-        const switches =
-          input.switches ??
-          snapshot.switches.filter((item) => !input.agendaId || item.agenda_id === input.agendaId);
-        const findings =
-          switches.length === 0
-            ? []
-            : findStaleConsumersForSwitches({
-                locks: snapshot.locks,
-                switches,
-                agendas: snapshot.agendas,
-                ledger: snapshot.ledger,
-                now,
-              });
-        for (const finding of findings) {
-          try {
-            const settled = settleLock(
-              decisionCase,
-              finding.lock,
-              { checked: finding.checked, stale: finding.stale },
-              now,
-              options,
-              false
+    runInCustomerDecisionConsumerSweep(() =>
+      withCustomerDecisionCaseLock(
+        input.location,
+        () => {
+          const snapshot = readCase(decisionCase, 'all', (consumer, error) =>
+            warn('customer decision consumer lock unreadable', error, consumer)
+          );
+          const switches =
+            input.switches ??
+            snapshot.switches.filter(
+              (item) => !input.agendaId || item.agenda_id === input.agendaId
             );
-            // Findings only hold entries no rework item covered yet.
-            result.stale_consumers.push(finding.lock.consumer);
-            result.rework_work_item_ids.push(...settled.rework_work_item_ids);
-          } catch (error) {
-            warn('customer decision rework filing skipped', error, finding.lock.consumer);
+          const findings =
+            switches.length === 0
+              ? []
+              : findStaleConsumersForSwitches({
+                  locks: snapshot.locks,
+                  switches,
+                  agendas: snapshot.agendas,
+                  ledger: snapshot.ledger,
+                  now,
+                });
+          for (const finding of findings) {
+            try {
+              const settled = settleLock(
+                decisionCase,
+                finding.lock,
+                { checked: finding.checked, stale: finding.stale },
+                now,
+                options,
+                false
+              );
+              // Findings only hold entries no rework item covered yet.
+              result.stale_consumers.push(finding.lock.consumer);
+              result.rework_work_item_ids.push(...settled.rework_work_item_ids);
+            } catch (error) {
+              warn('customer decision rework filing skipped', error, finding.lock.consumer);
+            }
           }
-        }
-        const released = releaseResolvedHolds(decisionCase, snapshot, now, options);
-        if (released.length > 0) result.released_holds = released.sort();
-      },
-      options.lockTimeoutMs ?? SWEEP_LOCK_TIMEOUT_MS
+          const released = releaseResolvedHolds(decisionCase, snapshot, now, options);
+          if (released.length > 0) result.released_holds = released.sort();
+        },
+        options.lockTimeoutMs ?? SWEEP_LOCK_TIMEOUT_MS
+      )
     );
   } catch (error) {
     warn('customer decision consumer sweep skipped', error, `case ${input.caseId}`);

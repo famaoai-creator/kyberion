@@ -141,26 +141,73 @@ const CUSTOMER_DECISIONS_MARK = 'customer_decisions';
 export function redactCustomerDecisionsForPrompt(raw: string): string {
   let omitted = 0;
   const text = replaceFencedBlocks(raw, (lang, content, block) => {
-    if (lang.toLowerCase() !== 'task_result' || !content.includes(CUSTOMER_DECISIONS_MARK))
-      return block;
+    if (lang.toLowerCase() !== 'task_result') return block;
+    // Parse first: an escaped key (`\u0063ustomer_decisions`) is still the field.
+    let parsed: unknown;
     try {
-      const parsed = parseSafeJsonInput(content.trim(), 'task_result block');
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      parsed = parseSafeJsonInput(content.trim(), 'task_result block');
+    } catch {
+      parsed = undefined;
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (!Object.prototype.hasOwnProperty.call(parsed, CUSTOMER_DECISIONS_MARK)) {
+        if (!content.includes(CUSTOMER_DECISIONS_MARK)) return block;
+        // The mark appears only inside a value: quote the parsed form, not the raw text.
+        const rendered = JSON.stringify(parsed);
+        if (!rendered.includes(CUSTOMER_DECISIONS_MARK)) {
+          return ['```task_result', rendered, '```'].join('\n');
+        }
+      } else {
         const { customer_decisions: decisions, ...rest } = parsed as Record<string, unknown>;
         omitted += Array.isArray(decisions) ? decisions.length : 1;
         const rendered = JSON.stringify(rest);
         if (!rendered.includes(CUSTOMER_DECISIONS_MARK)) {
           return ['```task_result', rendered, '```'].join('\n');
         }
+        omitted -= Array.isArray(decisions) ? decisions.length : 1;
       }
-    } catch {
-      // fall through: an unparseable block is not quoted
+    } else if (!content.includes(CUSTOMER_DECISIONS_MARK) && !/\\u00/u.test(content)) {
+      // Unparseable and plainly free of the field: quoted as-is (the retry repairs it).
+      return block;
     }
     omitted += 1;
     return '```task_result\n[omitted: the block carried customer_decisions]\n```';
   });
   if (text.includes(CUSTOMER_DECISIONS_MARK)) return '';
   return omitted > 0
-    ? `${text}\n(customer_decisions omitted from this excerpt: ${omitted}; return them again if they still apply)`
+    ? `${text}\n(customer decisions omitted from this excerpt: ${omitted}; return them again if they still apply)`
     : text;
+}
+
+/**
+ * CD-09: a worker reply as it is consumed or stored on a path that has no
+ * customer decision case (WorkItem dispatch, the coordinated execution
+ * port's WorkItem record). Unlike the prompt redactor it never blanks the
+ * reply: each parseable task_result block loses only its `customer_decisions`
+ * field (the rest is re-serialized, a summary that merely mentions the word
+ * stays), prose is kept as-is, and only an unparseable task_result block that
+ * looks like it carries the field is replaced (it would not parse either way).
+ */
+export function stripCustomerDecisionsFromReply(raw: string): string {
+  return replaceFencedBlocks(raw, (lang, content, block) => {
+    if (lang.toLowerCase() !== 'task_result') return block;
+    let parsed: unknown;
+    try {
+      parsed = parseSafeJsonInput(content.trim(), 'task_result block');
+    } catch {
+      return content.includes(CUSTOMER_DECISIONS_MARK) || /\\u00/u.test(content)
+        ? '```task_result\n[omitted: an unparseable block that may carry customer_decisions]\n```'
+        : block;
+    }
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      !Object.prototype.hasOwnProperty.call(parsed, CUSTOMER_DECISIONS_MARK)
+    )
+      return block;
+    const { customer_decisions: _decisions, ...rest } = parsed as Record<string, unknown>;
+    void _decisions;
+    return ['```task_result', JSON.stringify(rest), '```'].join('\n');
+  });
 }

@@ -80,6 +80,14 @@ vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => 
 vi.mock('./mission-decision-lock.js', () => ({
   pinTaskDecisions: mocks.pinTaskDecisions,
   reconcileTaskDecisions: mocks.reconcileTaskDecisions,
+  // Every structured result re-checks the task's holds; none here.
+  recordTaskDecisionProposals: () => ({
+    case_found: false,
+    consumer: 'mission-MSN-CD09-WORKER.task-1',
+    recorded: 0,
+    proposal_ids: [],
+    hold_proposal_ids: [],
+  }),
 }));
 
 vi.mock('../workforce/work-coordination.js', async (importOriginal) => {

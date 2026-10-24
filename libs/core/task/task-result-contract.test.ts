@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   extractTaskResultBlocks,
+  redactCustomerDecisionsForPrompt,
   repairTaskResult,
+  stripCustomerDecisionsFromReply,
   validateTaskResult,
 } from './task-result-contract.js';
 
@@ -311,5 +313,46 @@ describe('TaskResultSchema — customer_decisions (CD-09)', () => {
       baseTaskResult({ customer_decisions: [{ ...proposal, proposed_value: 'y'.repeat(2046) }] })
     );
     expect(atLimit.valid).toBe(true);
+  });
+});
+
+describe('stripCustomerDecisionsFromReply (CD-09, consumption and storage paths)', () => {
+  const block = (value: unknown) => ['```task_result', JSON.stringify(value), '```'].join('\n');
+  const base = {
+    summary: 'Explained why customer_decisions were not needed.',
+    artifacts: [],
+    verification_done: ['checked'],
+    gaps: [],
+    needs: [],
+  };
+
+  it('keeps a summary that merely mentions the word, and prose mentioning it', () => {
+    const reply = `I left customer_decisions empty on purpose.\n${block(base)}`;
+    expect(stripCustomerDecisionsFromReply(reply)).toBe(reply);
+    // The prompt redactor is stricter by design: it would not quote this reply.
+    expect(redactCustomerDecisionsForPrompt(reply)).toBe('');
+    const parsed = extractTaskResultBlocks(stripCustomerDecisionsFromReply(reply));
+    expect(parsed.taskResults[0]?.summary).toBe(base.summary);
+  });
+
+  it('removes only the field from a parseable block, escaped keys included', () => {
+    const decisions = [
+      { question: 'secret q', item: 'UX', key: 'ui.theme', requires_customer: true },
+    ];
+    const stripped = stripCustomerDecisionsFromReply(
+      `Notes stay.\n${block({ ...base, customer_decisions: decisions })}`
+    );
+    expect(stripped).toContain('Notes stay.');
+    expect(stripped).not.toMatch(/secret|ui\.theme/u);
+    expect(extractTaskResultBlocks(stripped).taskResults[0]).toMatchObject({
+      summary: base.summary,
+    });
+    const escaped = block({ ...base }).replace(
+      '"needs":[]',
+      '"needs":[],"\\u0063ustomer_decisions":[{"question":"secret q"}]'
+    );
+    expect(stripCustomerDecisionsFromReply(escaped)).not.toMatch(/secret/u);
+    // Idempotent.
+    expect(stripCustomerDecisionsFromReply(stripped)).toBe(stripped);
   });
 });
