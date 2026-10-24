@@ -32,6 +32,7 @@ import {
 import { IntroduceSecretPanel } from '../src/app/settings/sections/IntroduceSecretPanel';
 import { VoiceSection, VOICE_SAMPLE_ACCEPT } from '../src/app/settings/sections/VoiceSection';
 import { AvatarGenerationPanel } from '../src/app/settings/sections/AvatarGenerationPanel';
+import { SettingsReadiness } from '../src/app/settings/settings-readiness';
 import { conciergeText, type ConciergeMessageKey } from '../src/lib/i18n';
 import type { Setup } from '../src/lib/settings-types';
 
@@ -227,6 +228,47 @@ const prop = (el: FakeElement, name: string) => (el as unknown as Record<string,
 const flush = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 describe('settings interaction', () => {
+  it('keeps readiness compact while exposing errors and retaining the repair deep link', () => {
+    const onNavigate = vi.fn();
+    const m = mount(
+      createElement(SettingsReadiness, {
+        diagnostics: [
+          { id: 'profile', status: 'ok' },
+          {
+            id: 'services',
+            status: 'error',
+            action: { type: 'navigate', target: '#setup-services' },
+          },
+        ],
+        t,
+        onNavigate,
+      })
+    );
+    expect(m.q('details').getAttribute('open')).toBeNull();
+    expect(m.q('summary').textContent).toContain(t('setup.diag_error'));
+    expect(m.q('summary').textContent).toContain('1/2');
+    expect(m.container.querySelectorAll('button')).toHaveLength(1);
+    act(() => fireEvent(m.q('button'), 'click'));
+    expect(onNavigate).toHaveBeenCalledWith('#setup-services');
+    m.unmount();
+  });
+
+  it('preserves localized reasoning recovery guidance inside the overview', () => {
+    const html = renderToStaticMarkup(
+      withKit(
+        createElement(SettingsReadiness, {
+          diagnostics: [{ id: 'reasoning', status: 'incomplete', command: 'pnpm doctor' }],
+          t: (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
+            conciergeText(key, 'ja', params),
+          onNavigate: () => {},
+        })
+      )
+    );
+    expect(html).toContain(conciergeText('setup.reasoning_guidance', 'ja'));
+    expect(html).toContain('pnpm doctor');
+    expect(html).not.toContain('setup.reasoning_guidance');
+  });
+
   it('SecretField: value goes only into /api/secrets/apply, never into markup, and is cleared', async () => {
     const calls = mockFetch((url) =>
       url.startsWith('/api/secrets/introduce?')

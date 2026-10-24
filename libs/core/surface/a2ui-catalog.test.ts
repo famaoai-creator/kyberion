@@ -91,8 +91,36 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     ],
   },
   // UI-01c settings & forms
+  'ui:settings-nav': {
+    label: '設定',
+    active: 'profile',
+    groups: [
+      {
+        id: 'personal',
+        label: '個人',
+        items: [
+          {
+            id: 'profile',
+            label: 'プロフィール',
+            description: 'あなたの情報',
+            icon: 'user',
+            href: '#profile',
+            badge: '1',
+            status: 'needs_setup',
+            action: { id: 'settings.open' },
+          },
+        ],
+      },
+    ],
+  },
   'ui:settings-group': { title: '通知', description: 'いつ知らせるか' },
-  'ui:setting-row': { label: 'メール通知', description: '承認待ちを知らせる', tone: 'neutral' },
+  'ui:setting-row': {
+    label: 'メール通知',
+    description: '承認待ちを知らせる',
+    tone: 'neutral',
+    control_id: 'notify-email',
+    layout: 'stacked',
+  },
   'ui:switch': { name: 'notify.email', label: 'メール通知', value: true, hide_label: true },
   'ui:checkbox': { name: 'agree', label: '同意する', value: false, required: true },
   'ui:select': {
@@ -322,6 +350,15 @@ describe('kyberion-base A2UI catalog', () => {
 
   it.each(A2UI_BASE_COMPONENT_TYPES)('accepts a valid %s example', (type) => {
     expect(() => validateA2UIComponentProps(type, VALID_EXAMPLES[type])).not.toThrow();
+  });
+
+  it('rejects malformed child field references and unsupported setting row layouts', () => {
+    expect(() =>
+      validateA2UIComponentProps('ui:setting-row', { label: 'Policy', control_id: '' })
+    ).toThrow(/control_id/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:setting-row', { label: 'Policy', layout: 'floating' })
+    ).toThrow(/layout/u);
   });
 
   it.each(A2UI_BASE_COMPONENT_TYPES)('rejects unknown props on %s', (type) => {

@@ -65,7 +65,7 @@ export function ProfileSection({
           title={frontDeskText('settings_nav_profile', locale)}
           description={t('setup.profile_description')}
         >
-          <SettingRow label={t('setup.display_name')}>
+          <SettingRow label={t('setup.display_name')} control_id="profile-name">
             <TextField
               id="profile-name"
               name="profile.name"
@@ -75,7 +75,7 @@ export function ProfileSection({
               placeholder="e.g. Alex Morgan"
             />
           </SettingRow>
-          <SettingRow label={t('setup.primary_domain')}>
+          <SettingRow label={t('setup.primary_domain')} control_id="profile-domain">
             <TextField
               id="profile-domain"
               name="profile.primary_domain"
@@ -85,13 +85,17 @@ export function ProfileSection({
               placeholder="e.g. business development"
             />
           </SettingRow>
-          <SettingRow label={t('setup.secretary_policy')}>
+          <SettingRow
+            label={t('setup.secretary_policy')}
+            control_id="profile-vision"
+            layout="stacked"
+          >
             <Textarea
               id="profile-vision"
               name="profile.vision"
               label={t('setup.secretary_policy')}
               hide_label
-              rows={3}
+              rows={5}
               value={profile.vision}
               placeholder={t('setup.priority_placeholder')}
             />

@@ -117,6 +117,14 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
   'ui:flow': { props: { nodes: [{ id: 'a', label: 'A' }] }, root: 'kb-chart', tag: 'FIGURE' },
   'ui:stat-list': { props: { items: [{ label: 'p95', value: 2 }] }, root: 'kb-stat-list' },
   // UI-01c settings & forms (renderers: forms.js; see forms.test.ts)
+  'ui:settings-nav': {
+    props: {
+      label: 'Settings',
+      groups: [{ id: 'personal', items: [{ id: 'profile', label: 'Profile', href: '#profile' }] }],
+    },
+    root: 'kb-settings-nav',
+    tag: 'NAV',
+  },
   'ui:settings-group': { props: { title: '通知' }, root: 'kb-settings-group', tag: 'SECTION' },
   'ui:setting-row': { props: { label: 'メール' }, root: 'kb-setting-row' },
   'ui:switch': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
