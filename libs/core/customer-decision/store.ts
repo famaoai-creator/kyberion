@@ -48,7 +48,9 @@ import {
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { CUSTOMER_SLUG_PATTERN } from '../decision-ledger/model.js';
+import { resolveRole } from '../authority.js';
+import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
+import { CUSTOMER_SLUG_PATTERN, canonicalJson } from '../decision-ledger/model.js';
 import {
   ledgerDir,
   withDecisionLedgerLock,
@@ -59,6 +61,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   attachmentExtension,
   checkAttachmentBytes,
+  linkProblem,
 } from './bolt-review.js';
 import {
   AGENDA_ID_PATTERN,
@@ -191,14 +194,87 @@ export function readAgenda(
   return agenda;
 }
 
+/**
+ * Every entry link must be one a customer may be sent (CD-10): public https
+ * only, never an internal host. Checked on every agenda write, so neither
+ * `draft --file` nor a hand-edited record can carry one to submit / send.
+ */
+export function assertAgendaLinks(agenda: Pick<DecisionAgenda, 'entries'>): void {
+  for (const entry of agenda.entries) {
+    for (const link of entry.links ?? []) {
+      const problem = linkProblem(link.url);
+      if (problem)
+        throw new Error(
+          `[CUSTOMER_DECISION_LINK_REFUSED] entry ${entry.entry_id}: ${problem} — only a public https URL may be shown to a customer`
+        );
+    }
+  }
+}
+
+/** The agenda without the fields a milestone write may change. */
+function withoutMilestones(
+  agenda: DecisionAgenda
+): Omit<DecisionAgenda, 'milestones_passed' | 'updated_at'> {
+  const { milestones_passed: _passed, updated_at: _updated, ...rest } = agenda;
+  void _passed;
+  void _updated;
+  return rest;
+}
+
+/**
+ * Is `next` exactly `previous` plus milestones appended to `milestones_passed`
+ * (and a new `updated_at`)? The only agenda change the milestone store role
+ * may make (CD-10).
+ */
+export function isMilestoneOnlyChange(previous: DecisionAgenda, next: DecisionAgenda): boolean {
+  const before = previous.milestones_passed ?? [];
+  const after = next.milestones_passed ?? [];
+  return (
+    after.length > before.length &&
+    before.every((milestone, index) => after[index] === milestone) &&
+    canonicalJson(withoutMilestones(previous)) === canonicalJson(withoutMilestones(next))
+  );
+}
+
 export function writeAgenda(
   location: CustomerDecisionLocation,
   agenda: DecisionAgenda
 ): DecisionAgenda {
   const validated = validate<DecisionAgenda>('agenda', agenda);
   assertBelongs(location, validated, 'agenda');
-  writeJson(prepareWrite(agendaPath(location, validated.agenda_id)), validated);
+  assertAgendaLinks(validated);
+  const file = agendaPath(location, validated.agenda_id);
+  if (resolveRole() === CUSTOMER_DECISION_MILESTONE_STORE_ROLE) {
+    // The milestone role (a shared core role) may only append milestones to an
+    // existing agenda: re-read it here and refuse any other change.
+    const previous = readAgenda(location, validated.agenda_id);
+    if (!previous || !isMilestoneOnlyChange(previous, validated))
+      throw new Error(
+        '[CUSTOMER_DECISION_MILESTONE_WRITE_REFUSED] the milestone store may only append to milestones_passed'
+      );
+  }
+  writeJson(prepareWrite(file), validated);
   return validated;
+}
+
+/**
+ * CD-10: append a milestone to an agenda's `milestones_passed` — the write
+ * path of the milestone store role. Re-reads the agenda (call holding the
+ * case lock); null when the agenda is missing or already has the milestone.
+ */
+export function markAgendaMilestonePassed(
+  location: CustomerDecisionLocation,
+  agendaId: string,
+  milestone: string,
+  now: string
+): DecisionAgenda | null {
+  const current = readAgenda(location, agendaId);
+  if (!current || (current.milestones_passed ?? []).includes(milestone)) return null;
+  return writeAgenda(location, {
+    ...current,
+    milestones_passed: [...(current.milestones_passed ?? []), milestone],
+    updated_at: now,
+  });
 }
 
 /** Agenda ids of a case (a listing of `agendas/`, no record is read). */

@@ -71,10 +71,15 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
   const agendaId = opts.agenda?.trim();
-  // CD-10: retry the routing of bolt-review answers a respond could not finish.
-  if (agendaId) routeBoltReview(tenant, location, agendaId, now);
+  // CD-10: retry the routing of bolt-review answers a respond could not
+  // finish — after completing interrupted responses, so their receipts count.
+  let early: ReturnType<typeof reconcileCase> | undefined;
+  if (agendaId) {
+    early = withCaseLock(location, () => reconcileCase(tenant, location, now));
+    routeBoltReview(tenant, location, agendaId, now);
+  }
   return withCaseLock(location, () => {
-    const reconciled = reconcileCase(tenant, location, now);
+    const reconciled = early ?? reconcileCase(tenant, location, now);
     if (!agendaId) {
       return {
         case_id: caseId,

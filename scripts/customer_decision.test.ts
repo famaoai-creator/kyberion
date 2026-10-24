@@ -2083,6 +2083,38 @@ describe('customer-decision facade', () => {
       expect(agendaCount()).toBe(0);
     });
 
+    it('refuses internal links on any agenda write: draft --file, and submit of a hand-edited record', async () => {
+      const drafted = (await boltRun(draftArgs())) as { agenda_id: string };
+      const agenda = agendaOf(drafted.agenda_id);
+      const withLink = (url: string) => [
+        { ...agenda.entries[0], links: [{ label: 'Preview', url }] },
+      ];
+      for (const url of [
+        'https://localhost/',
+        'https://10.0.0.5/',
+        'https://app.internal/',
+        'https://[::127.0.0.1]/',
+      ]) {
+        const edit = file('edit.json', JSON.stringify({ entries: withLink(url) }));
+        await expect(
+          run(['draft', ...base(), '--agenda', drafted.agenda_id, '--file', edit])
+        ).rejects.toThrow(/CUSTOMER_DECISION_LINK_REFUSED/u);
+      }
+      expect(agendaOf(drafted.agenda_id).entries[0].links).toBeUndefined();
+      // A record edited by hand (outside the facade) never gets approved or sent.
+      safeWriteFile(
+        path.join(dir, 'agendas', `${drafted.agenda_id}.json`),
+        JSON.stringify({ ...agenda, entries: withLink('https://staging.local/') })
+      );
+      approveNext();
+      await expect(
+        run(['submit', ...base(), '--agenda', drafted.agenda_id, '--by', 'user:alice'])
+      ).rejects.toThrow(/CUSTOMER_DECISION_LINK_REFUSED/u);
+      // Refused before the approval gate and before any ledger pin.
+      expect(mocks.gate).not.toHaveBeenCalled();
+      expect(readLedger({ dir })).toEqual([]);
+    });
+
     it('serves only images listed on the sent agenda, same shape as an unknown link otherwise', async () => {
       const drafted = (await boltRun(
         draftArgs(MISSION_ID, ['--attach', file('form.png', PNG)])
@@ -2192,6 +2224,23 @@ describe('customer-decision facade', () => {
         expect(status.bolt_review.routing).toHaveLength(1);
         expect(boltItems(coordination)).toHaveLength(1);
       });
+    });
+
+    it('a retryable rejection push is retried by the next status, never recorded as notified', async () => {
+      const drafted = (await boltRun(draftArgs())) as { agenda_id: string };
+      const token = await sendReview(drafted.agenda_id);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      mocks.notify.mockImplementationOnce(() => ({ status: 'retryable' as never }));
+      expect((await answer(token, 'reject', COMMENT)).out).toMatchObject({ ok: true });
+      expect(agendaOf(drafted.agenda_id).bolt_routing).toEqual([
+        expect.not.objectContaining({ notified_at: expect.anything() }),
+      ]);
+      const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
+        bolt_review: { routing: Array<Record<string, unknown>> };
+      };
+      expect(mocks.notify).toHaveBeenCalledTimes(2);
+      expect(status.bolt_review.routing).toEqual([expect.objectContaining({ notified: true })]);
+      warn.mockRestore();
     });
 
     it('reject notifies the operator with ids only and files no WorkItem', async () => {
