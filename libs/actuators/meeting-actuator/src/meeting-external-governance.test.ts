@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentActor } from '@agent/core/actor';
 import type { ExternalOperationAuthority } from '@agent/core/governance/external-operation';
@@ -100,15 +101,20 @@ describe('meeting external operation boundary', () => {
     }
   );
 
-  it('passes trusted charter authority and executes exactly once', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+  it('requires exact approval for an unproven target despite broad charter authority', async () => {
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     await handleAction(
       { action: 'chat', params: { platform: 'auto', text: 'agreed follow-up' } },
       options
     );
     expect(enforceApprovalGate).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: authority.agentId, charter: authority.charter })
+      expect.objectContaining({ agentId: authority.agentId, requireApproval: true })
     );
+    expect(vi.mocked(enforceApprovalGate).mock.calls[0]![0].charter).toBeUndefined();
     expect(runPythonBridge).toHaveBeenCalledTimes(1);
     expect(auditChain.record).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ outcome: 'succeeded' }) })
@@ -148,7 +154,11 @@ describe('meeting external operation boundary', () => {
     [{ status: 'error' }, 'failed'],
     [{ status: 'success', partial_state: true }, 'unknown'],
   ] as const)('records result %j without retry', async (result, outcome) => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     vi.mocked(runPythonBridge).mockResolvedValue(result);
     await handleAction({ action: 'chat', params: { platform: 'auto', text: 'hello' } }, options);
     expect(runPythonBridge).toHaveBeenCalledTimes(1);
@@ -158,7 +168,11 @@ describe('meeting external operation boundary', () => {
   });
 
   it('retains independent voice consent after external approval', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     vi.mocked(checkSpeakConsent).mockReturnValue({
       allowed: false,
       reason: 'recording consent missing',
@@ -170,7 +184,11 @@ describe('meeting external operation boundary', () => {
   });
 
   it('never joins again after an auto driver may have joined before persistence failed', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     vi.mocked(runRegisteredJoinDriver).mockRejectedValue(
       new Error('transcript write failed after join')
     );
@@ -196,7 +214,11 @@ describe('meeting external operation boundary', () => {
   });
 
   it('retains independent recording consent before joining after external approval', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     vi.mocked(checkRecordingConsent).mockReturnValue({
       allowed: false,
       reason: 'recording consent missing',
@@ -219,7 +241,11 @@ describe('meeting external operation boundary', () => {
   });
 
   it('assigns distinct stable occurrence identities to inner meeting session steps', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     const identities: string[] = [];
     const externalAuthority = () => {
       const invocationId = currentExternalOperationOccurrence().join('/');
@@ -260,7 +286,11 @@ describe('meeting external operation boundary', () => {
   });
 
   it('forwards trusted authority through pipeline session steps', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' } as never);
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    } as never);
     const externalAuthority = vi.fn(() => authority);
     const result = await handleAction(
       {
@@ -274,7 +304,17 @@ describe('meeting external operation boundary', () => {
     expect(externalAuthority).toHaveBeenCalledTimes(1);
     expect(runPythonBridge).toHaveBeenCalledTimes(1);
     expect(enforceApprovalGate).toHaveBeenCalledWith(
-      expect.objectContaining({ charter: authority.charter })
+      expect.objectContaining({ agentId: authority.agentId, requireApproval: true })
     );
+    expect(vi.mocked(enforceApprovalGate).mock.calls[0]![0].charter).toBeUndefined();
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

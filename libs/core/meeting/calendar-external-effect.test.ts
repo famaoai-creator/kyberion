@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ gate: vi.fn(), audit: vi.fn(), send: vi.fn() }));
 vi.mock('../governance/approval-gate.js', () => ({ enforceApprovalGate: mocks.gate }));
@@ -25,7 +26,11 @@ import {
 describe('calendar exact admission forwarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
   });
   it('forwards the exact adapter input once without a second admission', async () => {
     const source = { title: 'meeting' };
@@ -102,3 +107,12 @@ describe('calendar exact admission forwarding', () => {
     expect(mocks.send).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('../governance/approval-store.js', async (original) => ({
+  ...(await original<typeof import('../governance/approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

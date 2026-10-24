@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { runtimeStatePath, type RuntimeStateScope } from './runtime-state-roots.js';
-import { isVitestProcess } from './env.js';
+import { runtimeStatePath, type RuntimeStateScope } from '../foundation/runtime-state-roots.js';
+import { isVitestProcess } from '../foundation/env.js';
 import { storageFloorRelativePath } from '../storage-layout.js';
 
 export const MEMORY_PROVENANCE_READER_ROLE = 'memory_provenance_reader';

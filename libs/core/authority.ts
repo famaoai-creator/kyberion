@@ -6,7 +6,7 @@ import { isAutonomyLearningCapability } from './foundation/autonomy-learning-cap
 import {
   MEMORY_PROVENANCE_READER_ROLE,
   currentMemoryProvenanceReadCapability,
-} from './foundation/memory-provenance-capability.js';
+} from './knowledge/memory-provenance-capability.js';
 import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,

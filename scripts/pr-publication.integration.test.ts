@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult, safeRmSync } from '@agent/core/secure-io';
+import { safeExecResult, safeRmSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { seedFirstJobTestRoot } from './fixtures/first-job-approval-fixture.js';
 
 // The only fake is the external VCS transport. Policy, secure-io, scoped review
@@ -102,6 +102,8 @@ let root = '';
 beforeAll(() => {
   root = pathResolver.shared(`tmp/pr-publication-integration-${randomUUID()}`);
   seedFirstJobTestRoot(pathResolver.rootDir(), root);
+  const manifest = 'libs/actuators/vcs-actuator/manifest.json';
+  safeWriteFile(path.join(root, manifest), safeReadFile(pathResolver.rootResolve(manifest)));
 }, 60_000);
 afterAll(() => {
   if (root) safeRmSync(root, { recursive: true, force: true });

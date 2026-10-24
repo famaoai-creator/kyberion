@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-24
+last_updated: 2026-10-25
 ---
 
 # Operations Hygiene Runbook
@@ -2070,3 +2070,14 @@ must recognize exactly the corresponding compact name; do not relax foreign
 hardlink protection. Verify real contention with a seeded legacy long-name lock,
 maximal-length publication, stale cleanup and no-overwrite/cleanup behavior in
 the lock-utils and secure-io regression suites.
+Ephemeral sibling names need independent cryptographic randomness, not a hash
+of a possibly sensitive target basename. Keep them in the checked directory,
+open with exclusive creation, and verify uniqueness even when clocks and weaker
+random suffixes repeat. This does not change durable lock identities.
+When adding a live-interface admission floor, cover direct typed hosts as well
+as pipeline dispatch. Map built-in families to their canonical manifests;
+unknown domains stay unbound. Seed actual reviewed manifests in minimal
+installation fixtures, pair positive host-origin cases with un-attested denials,
+and keep test query scopes separate from the active authenticated tenant.
+Boundary/unit fixtures must target the current creator/reader/commit seams;
+they must not obtain success by weakening production admission checks.

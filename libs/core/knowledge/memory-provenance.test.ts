@@ -15,7 +15,7 @@ import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js'
 import {
   memoryProvenanceStatePath,
   MEMORY_PROVENANCE_READER_ROLE,
-} from '../foundation/memory-provenance-capability.js';
+} from './memory-provenance-capability.js';
 import { savePromotedMemoryRecord } from '../promoted-memory.js';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
 import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';

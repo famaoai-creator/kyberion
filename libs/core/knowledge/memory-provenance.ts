@@ -8,7 +8,7 @@ import {
   MEMORY_PROVENANCE_READER_ROLE,
   memoryProvenanceStatePath,
   withMemoryProvenanceReadCapability,
-} from '../foundation/memory-provenance-capability.js';
+} from './memory-provenance-capability.js';
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 import { detectTier } from '../tier-guard.js';
 import { readTextFile } from '../foundation/text.js';

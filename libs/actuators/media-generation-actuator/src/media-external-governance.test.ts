@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   gate: vi.fn(),
@@ -56,7 +57,11 @@ describe('external generation admission and replay', () => {
   });
 
   it('records accepted submission, not final rendering completion', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.fetch.mockResolvedValue({ id: 'video-task-1' });
     const { provider, request } = runway();
     const result = await provider.submit(request);
@@ -68,7 +73,11 @@ describe('external generation admission and replay', () => {
   });
 
   it('stops after an attempted video send with no retry', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.fetch.mockRejectedValue(new Error('response lost'));
     const { provider, request } = runway();
     const observer = vi.fn();
@@ -80,7 +89,11 @@ describe('external generation admission and replay', () => {
   });
 
   it('stops model repair after a successful submit followed by failed polling', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.fetch
       .mockResolvedValueOnce({ id: 'video-task-1' })
       .mockRejectedValueOnce(new Error('status response lost'));
@@ -111,7 +124,11 @@ describe('external generation admission and replay', () => {
   });
 
   it('keeps workflow request outcome unknown when no receipt id exists', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.service.mockResolvedValue({ message: 'maybe accepted' });
     const observer = vi.fn();
     await withExternalOperationApprovalObserver(observer, () =>
@@ -145,3 +162,12 @@ describe('external generation admission and replay', () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
