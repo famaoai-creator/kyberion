@@ -368,6 +368,7 @@
 
 ## 📁 product/orchestration
 - [3役で始める dot チーム — 非稼働スターターテンプレート](./product/orchestration/dot-team-starter-playbook.ja.md) (public | Unknown)
+- [A2UI 設定画面の設計と検証](./product/orchestration/a2ui-settings-design-playbook.md) (public | Unknown)
 - [ACE (Autonomous Consensus Engine) Operating Standard](./product/orchestration/consensus-protocol.md) (public | Ecosystem Architect)
 - [ADF Pipeline Learning Playbook](./product/orchestration/adf-pipeline-learning-playbook.md) (public | Kyberion)
 - [ADF Pipeline Quickstart](./product/orchestration/adf-pipeline-quickstart.md) (public | Unknown)

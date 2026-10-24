@@ -901,6 +901,7 @@ Object.assign(
     appendChildren,
     safeHref,
     iconPaths: KB_ICON_PATHS,
+    isPlainActivation,
   })
 );
 

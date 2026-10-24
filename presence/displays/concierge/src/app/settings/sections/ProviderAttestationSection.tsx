@@ -118,7 +118,7 @@ export function ProviderAttestationSection({
   });
 
   return (
-    <SettingsGroup title={t('attestation.title')}>
+    <SettingsGroup id="settings-provider-attestation" title={t('attestation.title')}>
       <div className="settings-row-block">
         <p className="kb-text kb-text--muted">{t('attestation.description')}</p>
         <label>

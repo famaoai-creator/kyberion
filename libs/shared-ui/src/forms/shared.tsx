@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import type { KbFieldBase } from '@agent/core/surface/a2ui-catalog';
 import { useA2UIActions } from '../actions.js';
 import { useKbI18n } from '../i18n.js';
@@ -28,8 +28,18 @@ export interface KbFormComponentId {
   id?: string;
 }
 
-export function useFieldIds(id: string | undefined, name: unknown): KbFormFieldIds {
-  return formFieldIds(id, name);
+/** A row labels only its declared field, never unrelated nested controls. */
+export const SettingRowLabelContext = createContext<{
+  inputId: string;
+  labelId: string;
+} | null>(null);
+
+type ResolvedFieldIds = KbFormFieldIds & { externalLabelId?: string };
+
+export function useFieldIds(id: string | undefined, name: unknown): ResolvedFieldIds {
+  const ids = formFieldIds(id, name);
+  const row = useContext(SettingRowLabelContext);
+  return row?.inputId === ids.input ? { ...ids, externalLabelId: row.labelId } : ids;
 }
 
 /**
@@ -76,11 +86,12 @@ export function fieldRootProps(p: Pick<KbFieldBase, 'disabled' | 'error'>, contr
 
 export function controlProps(
   p: Pick<KbFieldBase, 'help' | 'error' | 'required' | 'disabled'>,
-  ids: KbFormFieldIds,
+  ids: ResolvedFieldIds,
   extra?: readonly (string | undefined)[]
 ) {
   return {
     id: ids.input,
+    'aria-labelledby': ids.externalLabelId,
     'aria-describedby': describedBy(ids, p, extra),
     'aria-invalid': typeof p.error === 'string' && p.error ? (true as const) : undefined,
     required: p.required === true || undefined,
