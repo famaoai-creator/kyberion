@@ -293,7 +293,10 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       { tenantSlug: TENANT, caseId: CASE, location: decisionCase().location, switches },
       { now: LATER }
     );
-    expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([]);
+    // Only this path's warnings count; an unset CI locale warns on its own.
+    expect(
+      warn.mock.calls.map((call) => String(call[0])).filter((line) => !line.startsWith('[locale]'))
+    ).toEqual([]);
     expect(result.rework_work_item_ids).toHaveLength(1);
     expect(rework().map((item) => item.item_id)).toEqual(result.rework_work_item_ids);
     warn.mockRestore();

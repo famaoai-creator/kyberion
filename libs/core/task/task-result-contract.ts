@@ -1,4 +1,3 @@
-import { logger } from '../core.js';
 import {
   TaskCustomerDecisionRequestSchema,
   TaskResultSchema,
@@ -7,6 +6,9 @@ import {
 import type { TaskResultBlock } from '../surface/channel-surface-types.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { replaceFencedBlocks } from '../foundation/text.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('task-result-contract');
 
 export interface TaskResultValidationResult {
   valid: boolean;
