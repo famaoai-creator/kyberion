@@ -22,7 +22,7 @@
     },
     "source_type": {
       "type": "string",
-      "enum": ["mission", "task_session", "artifact", "incident"]
+      "enum": ["mission", "task_session", "artifact", "incident", "authored"]
     },
     "source_ref": {
       "type": "string",

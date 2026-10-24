@@ -28,6 +28,10 @@ import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-di
 import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { projectRecordPath, saveProjectRecord } from '../project/project-registry.js';
+import {
+  organizationPurposePath,
+  saveOrganizationPurpose,
+} from '../organization/organization-operating-model.js';
 
 vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
   findRelevantDistilledKnowledge: vi.fn(async () => []),
@@ -38,14 +42,26 @@ const missionPath = pathResolver.sharedTmp(`mission-context-pack/${missionId}`);
 const artifactRegistryPath = artifactOwnershipRegistryPath();
 const registryProjectId = 'PRJ-CONTEXT-PACK-REGISTRY-001';
 const registryProjectPath = projectRecordPath(registryProjectId);
+const intentOrgId = 'ORG-CONTEXT-PACK-INTENT';
+const intentProjectId = 'PRJ-CONTEXT-PACK-INTENT-001';
+const intentPurposePath = organizationPurposePath(intentOrgId, 'confidential', 'acme');
+const intentProjectPath = projectRecordPath(intentProjectId);
 let originalArtifactRegistryRaw: string | null = null;
 let originalRegistryProjectRaw: string | null = null;
+let originalIntentPurposeRaw: string | null = null;
+let originalIntentProjectRaw: string | null = null;
 
 if (safeExistsSync(artifactRegistryPath)) {
   originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
 }
 if (safeExistsSync(registryProjectPath)) {
   originalRegistryProjectRaw = safeReadFile(registryProjectPath, { encoding: 'utf8' }) as string;
+}
+if (safeExistsSync(intentPurposePath)) {
+  originalIntentPurposeRaw = safeReadFile(intentPurposePath, { encoding: 'utf8' }) as string;
+}
+if (safeExistsSync(intentProjectPath)) {
+  originalIntentProjectRaw = safeReadFile(intentProjectPath, { encoding: 'utf8' }) as string;
 }
 
 afterEach(() => {
@@ -59,6 +75,23 @@ afterEach(() => {
     safeWriteFile(registryProjectPath, originalRegistryProjectRaw);
   } else if (safeExistsSync(registryProjectPath)) {
     safeRmSync(registryProjectPath);
+  }
+  const previousSudo = process.env.KYBERION_SUDO;
+  process.env.KYBERION_SUDO = 'true';
+  try {
+    if (originalIntentPurposeRaw !== null) {
+      safeWriteFile(intentPurposePath, originalIntentPurposeRaw);
+    } else if (safeExistsSync(intentPurposePath)) {
+      safeRmSync(intentPurposePath);
+    }
+    if (originalIntentProjectRaw !== null) {
+      safeWriteFile(intentProjectPath, originalIntentProjectRaw);
+    } else if (safeExistsSync(intentProjectPath)) {
+      safeRmSync(intentProjectPath);
+    }
+  } finally {
+    if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
+    else process.env.KYBERION_SUDO = previousSudo;
   }
 });
 
@@ -134,6 +167,55 @@ function seedPriorWorkItemDispatchManifest(): void {
       2
     )
   );
+}
+
+function seedIntentOrganization(): void {
+  const previousSudo = process.env.KYBERION_SUDO;
+  process.env.KYBERION_SUDO = 'true';
+  try {
+    saveOrganizationPurpose({
+      version: '1.0.0',
+      organization_id: intentOrgId,
+      name: 'Intent Org',
+      purpose: 'Ship governed intent propagation.',
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      owner_role: 'ceo',
+      approval_state: 'approved',
+      updated_at: '2026-06-05T00:00:00.000Z',
+      objectives: [
+        {
+          objective_id: 'obj-linked',
+          title: 'Linked objective',
+          status: 'active',
+          key_results: [
+            {
+              kr_id: 'kr-1',
+              title: 'Objective coverage',
+              metric: { source: 'manual' },
+              target: 80,
+              direction: 'increase',
+              unit: '%',
+            },
+          ],
+        },
+        { objective_id: 'obj-unlinked', title: 'Not linked to the project' },
+      ],
+    });
+    saveProjectRecord({
+      project_id: intentProjectId,
+      name: 'Intent project',
+      summary: 'Advances the linked objective.',
+      status: 'active',
+      tier: 'confidential',
+      organization_id: intentOrgId,
+      tenant_slug: 'acme',
+      objective_ids: ['obj-linked'],
+    });
+  } finally {
+    if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
+    else process.env.KYBERION_SUDO = previousSudo;
+  }
 }
 
 function seedRegistryProject(): void {
@@ -874,6 +956,86 @@ describe('mission-context-pack', () => {
     });
 
     expect(pack.security_scope.organization_id).toBe('ORG-CONTEXT-PACK-REGISTRY-001');
+  });
+
+  it('injects organization intent for org-bound missions within tier and tenant scope', () => {
+    seedIntentOrganization();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-ORG-INTENT`,
+        tier: 'confidential',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        organization_id: intentOrgId,
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-org-intent',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: { project_id: intentProjectId, relationship_type: 'supports' },
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.organization_intent).toMatchObject({
+      organization_id: intentOrgId,
+      purpose: 'Ship governed intent propagation.',
+      approval_state: 'approved',
+    });
+    expect(pack.organization_intent?.objectives).toEqual([
+      expect.objectContaining({
+        objective_id: 'obj-linked',
+        key_results: [
+          expect.objectContaining({ kr_id: 'kr-1', target: 80, direction: 'increase' }),
+        ],
+      }),
+    ]);
+    expect(pack.sources.map((entry) => entry.ref)).toContain(`organization-purpose:${intentOrgId}`);
+    const rendered = renderMissionContextPack(pack);
+    expect(rendered).toContain('Organization intent: ORG-CONTEXT-PACK-INTENT');
+    expect(rendered).toContain('Objective: obj-linked');
+    expect(rendered).not.toContain('obj-unlinked');
+  });
+
+  it('does not leak confidential organization intent into a public-tier pack', () => {
+    seedIntentOrganization();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-ORG-INTENT-PUBLIC`,
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        organization_id: intentOrgId,
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-org-intent-public',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {},
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.organization_intent).toBeUndefined();
+    expect(renderMissionContextPack(pack)).not.toContain('Ship governed intent propagation.');
   });
 
   it('saves the pack in mission-local coordination storage', () => {
