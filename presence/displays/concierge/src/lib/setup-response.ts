@@ -291,8 +291,9 @@ function parseSetup(value: unknown): Setup | undefined {
         !stringField(entry, 'display_name') ||
         !stringField(entry, 'lifecycle_status') ||
         !stringField(entry, 'organization_id') ||
-        !stringField(entry, 'provider_hint') ||
-        !stringField(entry, 'model_hint')
+        // hints are legitimately empty when no provider/model hint is set
+        !isStringField(entry, 'provider_hint') ||
+        !isStringField(entry, 'model_hint')
     )
   ) {
     return undefined;
