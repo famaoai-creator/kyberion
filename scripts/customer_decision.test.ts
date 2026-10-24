@@ -2113,7 +2113,20 @@ describe('customer-decision facade', () => {
       await expect(boltRun(draftArgs(), () => null)).rejects.toThrow(
         /not found or has no decision case/u
       );
+      // --project may only restate the mission's own project.
+      const ofProject = () => ({ tenantSlug: TENANT, caseId: CASE, projectId: 'PRJ-OWN' });
+      await expect(
+        boltRun(draftArgs(MISSION_ID, ['--project', 'PRJ-OTHER']), ofProject)
+      ).rejects.toThrow(/--project PRJ-OTHER is not the project of mission/u);
+      await expect(boltRun(draftArgs(MISSION_ID, ['--project', 'PRJ-OWN']))).rejects.toThrow(
+        /\(it has none\)/u
+      );
       expect(agendaCount()).toBe(0);
+      const restated = (await boltRun(
+        draftArgs(MISSION_ID, ['--project', 'PRJ-OWN']),
+        ofProject
+      )) as { agenda_id: string };
+      expect(agendaOf(restated.agenda_id).project_id).toBe('PRJ-OWN');
     });
 
     it('refuses internal links on any agenda write: draft --file, and submit of a hand-edited record', async () => {

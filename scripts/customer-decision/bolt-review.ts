@@ -118,6 +118,12 @@ function assertMissionInCase(
         // archive too, bound to this tenant.
         resolveMissionDecisionCase(missionId, { tenantSlug: tenant });
   } catch (error) {
+    if (diagnosticCode(error) === 'MISSION_STATE_TENANT_MISMATCH') {
+      throw new ScriptExitError(
+        2,
+        `mission ${missionId}: --tenant ${tenant} differs from the tenant this process is bound to (KYBERION_TENANT); run it for the bound tenant`
+      );
+    }
     if (diagnosticCode(error) === 'MISSION_STATE_ACCESS_DENIED') {
       throw new ScriptExitError(
         1,
@@ -170,7 +176,15 @@ export function runBoltReview(
   const links = previewLinks(opts, locale);
   const by = opts.by ? memberActorId(opts.by) : undefined;
   const missionProject = assertMissionInCase(io, missionId, tenant, caseId);
-  const projectId = opts.project || missionProject;
+  // The review belongs to the mission's own project: `--project` may only
+  // restate it (its WorkItems carry it as their typed context).
+  const requestedProject = opts.project?.trim();
+  if (requestedProject && requestedProject !== missionProject) {
+    throw usageError(
+      `--project ${requestedProject} is not the project of mission ${missionId}${missionProject ? ` (${missionProject})` : ' (it has none)'}; omit --project`
+    );
+  }
+  const projectId = missionProject;
   const images = files.map(readAttachmentFile);
 
   return withCaseLock(location, () => {

@@ -830,10 +830,17 @@ function showReview(): void {
       )
     )
   );
-  const error = el('p', 'kb-callout cr-error');
-  error.dataset.tone = 'danger';
+  const { box: error, content: errorContent } = createCallout(
+    document,
+    'div',
+    'cr-error',
+    'danger'
+  );
   error.setAttribute('role', 'alert');
   error.hidden = true;
+  // One text line in the content column (set when the answers are refused).
+  const errorLine = el('p', 'kb-text');
+  errorContent.append(errorLine);
   if (built.answers.length === 0 && !general.question) {
     root.append(el('p', 'kb-text', t('review_empty')));
   }
@@ -873,7 +880,7 @@ function showReview(): void {
   submit.type = 'button';
   submit.disabled = built.answers.length === 0 && !general.question;
   submit.addEventListener('click', () => {
-    void send(built.answers, general.question, submit, back, error);
+    void send(built.answers, general.question, submit, back, { box: error, line: errorLine });
   });
   bar.append(back, submit);
   root.append(bar);
@@ -885,13 +892,13 @@ async function send(
   question: string | undefined,
   submit: HTMLButtonElement,
   back: HTMLButtonElement,
-  error: HTMLElement
+  error: { box: HTMLElement; line: HTMLElement }
 ): Promise<void> {
   if (!session || !token) return;
   submit.disabled = true;
   back.disabled = true;
   submit.textContent = t('submitting');
-  error.hidden = true;
+  error.box.hidden = true;
   const result = await respond(fetchFn, token, session.view.content_hash, answers, question);
   const body = result.body;
   if (body && body.ok === true) {
@@ -901,8 +908,8 @@ async function send(
   }
   const reason = body?.reason;
   if (reason === 'invalid_answers' || reason === 'invalid_request') {
-    error.textContent = t('answers_invalid');
-    error.hidden = false;
+    error.line.textContent = t('answers_invalid');
+    error.box.hidden = false;
     submit.disabled = false;
     back.disabled = false;
     submit.textContent = t('submit');
