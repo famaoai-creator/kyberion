@@ -388,7 +388,9 @@
         "active/organizations/confidential/${KYBERION_TENANT}/",
         "active/organizations/public/${KYBERION_TENANT}/",
         "active/shared/runtime/",
-        "active/shared/observability/"
+        "active/shared/observability/",
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/"
       ],
       "scope_classes": ["organization_operating_model", "operations_runtime", "observability"],
       "allowed_actuators": ["process-actuator"],
