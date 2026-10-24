@@ -6,7 +6,7 @@ const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const HEALTH = ['healthy', 'degraded', 'critical', 'unknown'] as const;
 const PRIORITIES = ['high', 'medium', 'low'] as const;
 const INTERVENTIONS = ['reconciliation', 'project', 'incident', 'decision', 'operation'] as const;
-const APPROVAL = ['draft', 'approved'] as const;
+const APPROVAL = ['draft', 'pending_approval', 'approved', 'superseded'] as const;
 const READINESS_PURPOSE = ['missing', 'draft', 'approved'] as const;
 const READINESS_OPERATIONAL = ['missing', 'available'] as const;
 
@@ -242,7 +242,40 @@ function parseView(value: unknown): OrganizationOperatingModelView | undefined {
       const objective_id = source && stringField(source, 'objective_id');
       const title = source && stringField(source, 'title');
       const coverage = source && enumField(source.coverage, ['linked', 'unlinked'] as const);
-      return objective_id && title && coverage ? { objective_id, title, coverage } : undefined;
+      if (!(objective_id && title && coverage)) return undefined;
+      const key_results = arrayOf(source.key_results, (kr) => {
+        const row = safeRecord(kr);
+        const kr_id = row && stringField(row, 'kr_id');
+        const krTitle = row && stringField(row, 'title');
+        if (!(kr_id && krTitle)) return undefined;
+        const progress = numberField(row, 'progress');
+        const measured_at = stringField(row, 'measured_at');
+        return {
+          kr_id,
+          title: krTitle,
+          ...(progress !== undefined ? { progress } : {}),
+          ...(measured_at ? { measured_at } : {}),
+        };
+      });
+      const projects = arrayOf(source.projects, (project) => {
+        const row = safeRecord(project);
+        const project_id = row && stringField(row, 'project_id');
+        const name = row && stringField(row, 'name');
+        const status = row && stringField(row, 'status');
+        const mission_ids = row && stringArray(row.mission_ids);
+        return project_id && name && status && mission_ids
+          ? { project_id, name, status, mission_ids }
+          : undefined;
+      });
+      const progress = numberField(source, 'progress');
+      return {
+        objective_id,
+        title,
+        coverage,
+        ...(progress !== undefined ? { progress } : {}),
+        ...(key_results ? { key_results } : {}),
+        ...(projects ? { projects } : {}),
+      };
     });
   if (
     !accounting ||

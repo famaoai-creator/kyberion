@@ -23,6 +23,17 @@ export function dotStatePath(charter: DotCharter, ...parts: string[]): string {
 export const DOT_WORK_RESULTS_FILE = 'work-results.jsonl';
 export const DOT_KR_LEDGER_FILE = 'kr-ledger.jsonl';
 export const DOT_ORG_KR_LEDGER_FILE = 'org-kr-ledger.jsonl';
+
+/** Repo-relative org-scoped KR ledger path (`org-kr-ledger.jsonl`). */
+export function orgKrLedgerPath(scope: { tenantSlug?: string; organizationId?: string }): string {
+  // Untenanted organizations share the flat ledger; rows carry organization_id.
+  if (!scope.tenantSlug) return `${DOT_STATE_ROOT}/${DOT_ORG_KR_LEDGER_FILE}`;
+  return physicalScopedPath(
+    DOT_STATE_ROOT,
+    { tenant_slug: scope.tenantSlug, organization_id: scope.organizationId },
+    DOT_ORG_KR_LEDGER_FILE
+  );
+}
 export const DOT_OUTCOMES_FILE = 'outcomes.jsonl';
 export const DOT_OUTCOME_PENDING_FILE = 'outcome-pending.jsonl';
 export const DOT_FOLLOWUPS_FILE = 'followups.jsonl';

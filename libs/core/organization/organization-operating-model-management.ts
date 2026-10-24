@@ -47,6 +47,9 @@ import {
   loadOrganizationCadence,
   loadOrganizationOperation,
 } from './organization-operating-model-operations.js';
+import { rollUpObjectiveProgress } from './organization-objective-progress.js';
+import { orgKrLedgerPath, type KrMeasurementRow } from '../dot/dot-state-paths.js';
+import { readJsonLines } from '../foundation/json.js';
 import type {
   OrganizationTier,
   OrganizationRelationshipType,
@@ -1316,6 +1319,31 @@ export function buildOrganizationManagementView(input: {
       : state;
   });
   const outcomeRefs = [...new Set(learningRefs)];
+  const objectiveProgressById = new Map(
+    (purpose
+      ? rollUpObjectiveProgress(
+          {
+            organizationId: input.organizationId,
+            tenantSlug: tenantSlug === 'shared' ? undefined : tenantSlug,
+            tier: purpose.tier,
+          },
+          {
+            loadPurpose: () => purpose,
+            readMeasurements: (scope) => {
+              try {
+                return readJsonLines(
+                  path.resolve(input.rootDir || pathResolver.rootDir(), orgKrLedgerPath(scope)),
+                  { onMalformed: 'skip' }
+                ) as KrMeasurementRow[];
+              } catch {
+                return [];
+              }
+            },
+          }
+        ).objectives
+      : []
+    ).map((entry) => [entry.objective_id, entry])
+  );
   const outcomeAccounting = {
     objectives: (purpose?.objectives || []).map((objective) => ({
       objective_id: objective.objective_id,
@@ -1324,6 +1352,28 @@ export function buildOrganizationManagementView(input: {
         ? ('linked' as const)
         : ('unlinked' as const),
       refs: outcomeRefs.filter((ref) => ref.includes(objective.objective_id)),
+      ...(objectiveProgressById.get(objective.objective_id)?.progress !== undefined
+        ? { progress: objectiveProgressById.get(objective.objective_id)!.progress }
+        : {}),
+      key_results: (objective.key_results || []).map((kr) => {
+        const measured = objectiveProgressById
+          .get(objective.objective_id)
+          ?.key_results.find((entry) => entry.kr_id === kr.kr_id);
+        return {
+          kr_id: kr.kr_id,
+          title: kr.title,
+          ...(measured?.progress !== undefined ? { progress: measured.progress } : {}),
+          ...(measured?.measured_at ? { measured_at: measured.measured_at } : {}),
+        };
+      }),
+      projects: solutionProjects
+        .filter((project) => project.objective_ids?.includes(objective.objective_id))
+        .map((project) => ({
+          project_id: project.project_id,
+          name: project.name,
+          status: project.status,
+          mission_ids: project.mission_ids,
+        })),
     })),
     services: services.map((service) => {
       const state = serviceStateById.get(service.service_id);

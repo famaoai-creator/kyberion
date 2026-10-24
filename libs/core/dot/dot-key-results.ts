@@ -46,6 +46,7 @@ import {
   DOT_ORG_KR_LEDGER_FILE,
   DOT_STATE_ROOT,
   dotStatePath,
+  orgKrLedgerPath,
   type KrMeasurementRow,
 } from './dot-state-paths.js';
 
@@ -119,16 +120,7 @@ function appendLedger(rel: string, rows: KrMeasurementRow[], rootDir: string | u
   for (const row of rows) appendJsonLine(file, row);
 }
 
-/** Repo-relative org-scoped KR ledger path (`org-kr-ledger.jsonl`). */
-export function orgKrLedgerPath(scope: { tenantSlug?: string; organizationId?: string }): string {
-  // Untenanted organizations share the flat ledger; rows carry organization_id.
-  if (!scope.tenantSlug) return `${DOT_STATE_ROOT}/${DOT_ORG_KR_LEDGER_FILE}`;
-  return physicalScopedPath(
-    DOT_STATE_ROOT,
-    { tenant_slug: scope.tenantSlug, organization_id: scope.organizationId },
-    DOT_ORG_KR_LEDGER_FILE
-  );
-}
+export { orgKrLedgerPath };
 
 function extractJsonPath(value: unknown, jsonPath: string): unknown {
   let current: unknown = value;

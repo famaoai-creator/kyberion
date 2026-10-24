@@ -46,7 +46,7 @@ export type OrganizationOperatingModelView = {
   purpose: {
     name: string;
     purpose: string;
-    approval_state: 'draft' | 'approved';
+    approval_state: 'draft' | 'pending_approval' | 'approved' | 'superseded';
     objectives?: Array<{ objective_id: string; title: string }>;
   } | null;
   operational_state: {
@@ -95,6 +95,19 @@ export type OrganizationOperatingModelView = {
         objective_id: string;
         title: string;
         coverage: 'linked' | 'unlinked';
+        progress?: number;
+        key_results?: Array<{
+          kr_id: string;
+          title: string;
+          progress?: number;
+          measured_at?: string;
+        }>;
+        projects?: Array<{
+          project_id: string;
+          name: string;
+          status: string;
+          mission_ids: string[];
+        }>;
       }>;
     };
   };
@@ -408,11 +421,33 @@ export function OrganizationOperatingModel({
                   </h4>
                   <List
                     items={view.purpose.objectives.map((objective) => {
-                      const coverage = view.control_plane.outcome_accounting.objectives.find(
-                        (entry) => entry.objective_id === objective.objective_id
-                      )?.coverage;
+                      const entry = view.control_plane.outcome_accounting.objectives.find(
+                        (candidate) => candidate.objective_id === objective.objective_id
+                      );
+                      const coverage = entry?.coverage;
+                      const krMeta = entry?.key_results?.length
+                        ? entry.key_results
+                            .map(
+                              (kr) =>
+                                `${kr.kr_id} ${kr.progress === undefined ? uxText('chronos_org_kr_unmeasured', locale) : `${Math.round(kr.progress * 100)}%`}`
+                            )
+                            .join(' · ')
+                        : undefined;
+                      const projectMeta = entry?.projects?.length
+                        ? entry.projects
+                            .map(
+                              (project) =>
+                                `${project.project_id} → ${uxMessage('chronos_org_objective_missions', { count: project.mission_ids.length }, `${project.mission_ids.length} missions`, locale)}`
+                            )
+                            .join(' · ')
+                        : uxText('chronos_org_objective_no_projects', locale);
+                      const meta = [krMeta, projectMeta].filter(Boolean).join(' | ') || undefined;
                       return {
                         title: objective.title,
+                        ...(meta ? { meta } : {}),
+                        ...(entry?.progress !== undefined
+                          ? { progress: Math.round(entry.progress * 100) }
+                          : {}),
                         ...(coverage
                           ? {
                               status: (coverage === 'linked' ? 'connected' : 'missing') as KbStatus,
