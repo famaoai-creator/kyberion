@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 // Real secure-io lock IO (no audit-chain mock): the hard-link rules apply.
@@ -21,6 +22,29 @@ const lockFile = path.join(
 const tomb = `${lockFile}.stale-99999-${Date.now()}-1`;
 
 describe('lock release while a recovery tomb links the record', () => {
+  it('reads the exact own-inode compact tomb of a maximal legacy main name', async () => {
+    const longId = `vitest-compact-tomb-${RUN}-`.padEnd(250, 'x');
+    const base = path.join(path.dirname(lockFile), longId + '.lock');
+    const compact = path.join(
+      path.dirname(base),
+      '@tomb-' +
+        createHash('sha256').update(path.basename(base)).digest('hex') +
+        `.stale-${process.pid}-${Date.now()}-1`
+    );
+    try {
+      expect(await acquireLock(longId, 0)).toBe(true);
+      safeLinkExclusiveSync(base, compact);
+      releaseLock(longId);
+      expect(safeExistsSync(base)).toBe(false);
+      expect(await acquireLock(longId, 0)).toBe(true);
+      releaseLock(longId);
+    } finally {
+      releaseLock(longId);
+      safeRmSync(compact, { force: true });
+      safeRmSync(base, { force: true });
+    }
+  });
+
   afterEach(() => {
     safeRmSync(lockFile, { force: true });
     for (const name of safeReaddir(path.dirname(lockFile))) {

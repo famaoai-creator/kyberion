@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// Mocked scanner/ranker fixtures have no governed runtime; real lineage is tested separately.
+vi.mock('./memory-provenance.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./memory-provenance.js')>()),
+  resolveMemoryEligibility: () => ({ eligible: true }),
+  createMemoryEligibilityResolver: () => () => ({ eligible: true }),
+}));
 
 // Mock dependencies
 vi.mock('../path-resolver.js', async (importOriginal) => ({

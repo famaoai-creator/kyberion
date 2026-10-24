@@ -38,6 +38,8 @@ import { resolveTenantServiceEngineAdmission } from './service-engine-admission.
 const logger = createLogger('service-engine');
 
 export { executeMcp } from './service-engine-execution.js';
+export { withMcpStartupAttempt } from './service-mcp-execution.js';
+export type { McpApprovalContinuation } from './service-mcp-execution.js';
 
 export interface ServicePresetCacheOptions {
   /** When set, the result is cached in the Data Vault for this many milliseconds. */

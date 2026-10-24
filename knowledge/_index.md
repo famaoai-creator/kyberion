@@ -249,6 +249,7 @@
 - [Organization Operations Runbook](./product/governance/organization-operations-runbook.md) (public | Unknown)
 - [PR publication store の明示的な installation catalog 更新](./product/governance/publication-role-installation-upgrade.ja.md) (public | Unknown)
 - [PR前CI準備チェックリスト](./product/governance/pre-pr-ci-readiness-checklist.ja.md) (public | Codex)
+- [Provenance, authorization and recoverable repair boundaries](./product/governance/provenance-authorization-controls.md) (public | Unknown)
 - [Running and Probing Tenant-Bound Pipelines Without Policy Violations](./product/governance/tenant-bound-runtime-probing.md) (public | Unknown)
 - [SOP: Multi-Agent Software Development & Review](./product/governance/multi-agent-development-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)

@@ -4,8 +4,22 @@ const reservations = vi.hoisted(() => new Set<string>());
 vi.mock('../scope-envelope.js', () => ({ currentScopeEnvelope: () => undefined }));
 vi.mock('../scope-context.js', () => ({ resolveScopeContext: () => ({}) }));
 vi.mock('./approval-gate.js', () => ({
-  enforceApprovalGate: () => ({ allowed: true, status: 'approved' }),
+  enforceApprovalGate: vi.fn(() => ({
+    allowed: true,
+    status: 'approved',
+    requestId: '00000000-0000-4000-8000-000000000001',
+  })),
 }));
+vi.mock('./approval-store.js', async (original) => ({
+  ...(await original<typeof import('./approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
+import { enforceApprovalGate } from './approval-gate.js';
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 vi.mock('./external-operation-store.js', () => ({
   reserveExternalOperation: (input: { operationId: string; invocationId: string }) => {
@@ -23,7 +37,10 @@ import { createRuntimeExternalOperationAuthority } from './external-operation-ru
 import { admitExternalOperation } from './external-operation.js';
 
 describe('trusted external execution occurrences', () => {
-  beforeEach(() => reservations.clear());
+  beforeEach(() => {
+    reservations.clear();
+    vi.clearAllMocks();
+  });
 
   it('admits same-target iterations once each and rejects replay of the same iteration', () => {
     const resolve = createRuntimeExternalOperationAuthority({ runId: 'run', stepId: 'send' });

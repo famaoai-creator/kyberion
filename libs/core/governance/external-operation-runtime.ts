@@ -13,6 +13,9 @@ import { inspectInstalledOnboardingRuntime } from '../organization/onboarding-ru
 import { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 export { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 import { findActiveCharter } from './accountability-charter-registry.js';
+import { operationInterfaceResolver, withOperationInterface } from './operation-protection.js';
+import type { ResolvedActuatorOperation } from '../actuator/actuator-op-registry.js';
+export { operationInterfaceResolver } from './operation-protection.js';
 import type { CharterScope } from './accountability-charter.js';
 import {
   EXTERNAL_OPERATION_DELEGATION,
@@ -37,6 +40,21 @@ export interface ExternalOperationRuntimeOptions {
   runId?: string;
   stepId: string;
   hasHuman?: boolean;
+}
+
+/** Covers proposal AND transport so existing execution proofs bind the live schema. */
+export function withResolvedOperationInterface<T>(
+  operation: ResolvedActuatorOperation | null,
+  dispatch: () => T
+): T {
+  if (!operation || operation.source === 'scenario-fixture') return dispatch();
+  return withOperationInterface(
+    operationInterfaceResolver({
+      op: `${operation.domain}:${operation.action}`,
+      manifestPath: operation.manifestPath,
+    }),
+    dispatch
+  );
 }
 
 /** The onboarding facade proves profile ownership and installed agent identity.

@@ -24,6 +24,39 @@ import {
   delegatedExecutionIdentity,
 } from './delegated-execution.js';
 import { currentHumanExecutionAuthorization, hasHumanExecutionContext } from './human-execution.js';
+import {
+  currentOperationInterface,
+  defaultOperationInterface,
+  evaluateOperationArguments,
+  type OperationInterfaceBinding,
+} from './operation-protection.js';
+export {
+  operationInterfaceResolver,
+  withOperationArgumentOrigins,
+  withOperationInterface,
+} from './operation-protection.js';
+export type { OperationArgumentOrigin, OperationInterfaceBinding } from './operation-protection.js';
+import {
+  buildExternalOperationTarget,
+  parseExternalOperationGrant,
+  externalOperationGrantMatches,
+} from './external-operation-target.js';
+import { remoteMcpBindingForEffect } from './remote-mcp-interface.js';
+import {
+  captureExternalApprovalProof,
+  verifyExternalOperationCommitProof,
+  type ExternalOperationCommitProof,
+} from './external-operation-proof.js';
+export {
+  withTrustedRemoteMcpInterface,
+  describeRemoteMcpInterface,
+  remoteMcpServerDigest,
+} from './remote-mcp-interface.js';
+export type {
+  RemoteMcpInterfaceBinding,
+  RemoteMcpServer,
+  RemoteMcpTool,
+} from './remote-mcp-interface.js';
 
 const logger = createLogger('external-operation');
 type ExternalOperationFacts = Pick<
@@ -34,6 +67,18 @@ export type ExternalOperationAuthorityResolver = (
   facts: ExternalOperationFacts
 ) => ExternalOperationAuthority | undefined;
 const authorityContext = new AsyncLocalStorage<ExternalOperationAuthorityResolver>();
+const invocationAttempts = new AsyncLocalStorage<{ operationId: string; attemptId: string }>();
+/** Host-selected, separately approved attempt identity. It grants no permission
+ * and affects only the named operation, never a pending downstream tool call. */
+export function withExternalOperationInvocationAttempt<T>(
+  operationId: string,
+  attemptId: string,
+  body: () => T
+): T {
+  if (!attemptId.trim() || attemptId.length > 128)
+    throw new Error('[EXTERNAL_ATTEMPT_INVALID] Bounded nonempty host attempt identity required');
+  return invocationAttempts.run({ operationId, attemptId }, body);
+}
 const explicitRequestContext = new AsyncLocalStorage<{
   operationId: string;
   reviewArtifacts: (effect: Record<string, unknown>) => string[];
@@ -101,12 +146,50 @@ export function withExternalOperationApprovalObserver<T>(
 ): T {
   return approvalBlockContext.run(observer, body);
 }
+/** One host-handled pending decision may continue in the SAME connected
+ * process. The callback is not approval: full admission runs again. */
+export async function continueExternalOperationApproval<T>(
+  execute: () => Promise<T>,
+  wait: ((block: ExternalOperationApprovalBlock) => Promise<void>) | undefined
+): Promise<T> {
+  if (!wait) return execute();
+  const parent = approvalBlockContext.getStore();
+  let observed: ExternalOperationApprovalBlock | undefined;
+  try {
+    return await approvalBlockContext.run(
+      (block) => {
+        observed = block;
+      },
+      async () => {
+        try {
+          return await execute();
+        } catch (error) {
+          if (
+            !(error instanceof ExternalOperationApprovalRequired) ||
+            !observed?.approval.requestId ||
+            !['created', 'pending'].includes(observed.approval.requestStatus ?? '')
+          )
+            throw error;
+          await wait(observed);
+          observed = undefined;
+          return execute();
+        }
+      }
+    );
+  } catch (error) {
+    if (observed) parent?.(observed);
+    throw error;
+  }
+}
 const admittedOperations = new WeakMap<
   ExternalOperation,
   {
     authority?: ExternalOperationAuthority;
     operationId: string;
     effectHash: string;
+    protectionHash: string;
+    proof?: ExternalOperationCommitProof;
+    committed?: boolean;
   }
 >();
 
@@ -162,6 +245,119 @@ export interface ExternalOperation {
    * rules without asking for two independent decisions. */
   approvalPolicy?: { intentId: string; scope: 'governance' | 'policy' | 'review_gate' };
   authority?: ExternalOperationAuthority;
+  /** Trusted typed boundary resolver, never deserialized from effect/action JSON. */
+  interface?: () => OperationInterfaceBinding;
+  /** Additional reviewed argument paths requiring user/policy origins or exact approval. */
+  protectedArguments?: string[][];
+}
+
+function protectionFor(input: ExternalOperation) {
+  const transport = input.interface?.() ?? defaultOperationInterface(input.operationId);
+  const runtime = currentOperationInterface();
+  let binding =
+    transport && runtime
+      ? {
+          tool: runtime.tool,
+          schema_digest: computeApprovalPayloadHash({
+            transport: transport.schema_digest,
+            runtime: runtime.schema_digest,
+          }),
+          capability_digest: computeApprovalPayloadHash({
+            transport: transport.capability_digest,
+            runtime: runtime.capability_digest,
+          }),
+          candidate_set: [
+            ...new Set([...runtime.candidate_set, ...transport.candidate_set]),
+          ].sort(),
+        }
+      : (transport ?? runtime);
+  const remote = input.requiresApproval
+    ? remoteMcpBindingForEffect(input.operationId, input.effect)
+    : undefined;
+  if (remote)
+    binding = {
+      tool: remote.tool,
+      schema_digest: computeApprovalPayloadHash({
+        local: binding?.schema_digest,
+        remote: remote.schema_digest,
+      }),
+      capability_digest: computeApprovalPayloadHash({
+        local: binding?.capability_digest,
+        remote: remote.capability_digest,
+      }),
+      candidate_set: remote.candidate_set,
+    };
+  if (!binding && input.requiresApproval)
+    throw new Error(
+      '[OP_INTERFACE_UNAVAILABLE] Executing effects require a live trusted interface resolver'
+    );
+  const effectiveBinding = binding ?? {
+    tool: input.operationId,
+    schema_digest: computeApprovalPayloadHash({ boundary: 'read-only.v1' }),
+    capability_digest: computeApprovalPayloadHash({ boundary: 'read-only.v1' }),
+    candidate_set: [input.operationId],
+  };
+  const argumentsCheck = evaluateOperationArguments(
+    input.operationId,
+    input.effect,
+    input.protectedArguments
+  );
+  return {
+    binding: effectiveBinding,
+    argumentsCheck,
+    hash: computeApprovalPayloadHash({
+      binding: effectiveBinding,
+      evidence: argumentsCheck.evidence_digest,
+      tenant: input.tenantSlug,
+      runtime_scope: currentScopeEnvelope()
+        ? { identity: currentScopeEnvelope()!.identity, policy: currentScopeEnvelope()!.policy }
+        : null,
+    }),
+  };
+}
+
+/** Detect mutation, interface drift and revoked ancestry at the actual commit point. */
+export function assertExternalOperationCommit(input: ExternalOperation): void {
+  const admitted = admittedOperations.get(input);
+  if (!admitted) stopExternalGovernance('[EXTERNAL_ADMISSION_REQUIRED] No current admission');
+  if (admitted.committed)
+    stopExternalGovernance('[EXTERNAL_COMMIT_ALREADY_USED] An admission permits one commit only');
+  let current: ReturnType<typeof protectionFor>;
+  try {
+    current = protectionFor(input);
+  } catch {
+    admittedOperations.delete(input);
+    admissions.delete(input);
+    stopExternalGovernance(
+      '[EXTERNAL_PROTECTION_CHANGED] Argument source or interface is no longer valid'
+    );
+  }
+  if (
+    admitted.operationId !== input.operationId ||
+    admitted.effectHash !== computeApprovalPayloadHash(input.effect) ||
+    admitted.protectionHash !== current.hash
+  ) {
+    admittedOperations.delete(input);
+    admissions.delete(input);
+    stopExternalGovernance(
+      '[EXTERNAL_PROTECTION_CHANGED] Effect, interface or argument evidence changed after admission'
+    );
+  }
+  currentServiceExecutionProof(input);
+  if (admitted.proof) {
+    try {
+      verifyExternalOperationCommitProof(admitted.proof);
+    } catch (error) {
+      admittedOperations.delete(input);
+      admissions.delete(input);
+      stopExternalGovernance(
+        error instanceof Error
+          ? error.message
+          : '[EXTERNAL_AUTHORITY_CHANGED] Commit proof unavailable'
+      );
+    }
+  }
+  admitted.committed = true;
 }
 
 export class ExternalOperationApprovalRequired extends Error {
@@ -249,12 +445,24 @@ function currentServiceExecutionProof(input: ExternalOperation) {
       reference: `${human.reference.channel}:${human.reference.requestId}:${human.reference.claimId}`,
     };
   if (delegated)
-    return { kind: 'delegated' as const, target: delegated.target, reference: delegated.permitId };
+    return {
+      kind: 'delegated' as const,
+      target: delegated.target,
+      reference: delegated.permitId,
+    };
 }
 
 export function admitExternalOperation(input: ExternalOperation): ApprovalGateResult {
   admissions.delete(input);
   admittedOperations.delete(input);
+  let protection: ReturnType<typeof protectionFor>;
+  try {
+    protection = protectionFor(input);
+  } catch {
+    stopExternalGovernance(
+      '[EXTERNAL_PROTECTION_UNAVAILABLE] Cannot verify current interface or argument sources'
+    );
+  }
   const resolved =
     input.authority ??
     authorityContext.getStore()?.({
@@ -284,6 +492,12 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
     : resolved
       ? structuredClone(resolved)
       : undefined;
+  const attempt = invocationAttempts.getStore();
+  if (authority && attempt?.operationId === input.operationId)
+    authority.invocationId = computeApprovalPayloadHash({
+      base: authority.invocationId,
+      attempt: attempt.attemptId,
+    });
   if (authority && input.tenantSlug && authority.tenantSlug !== input.tenantSlug) {
     stopExternalGovernance(
       '[EXTERNAL_SCOPE_MISMATCH] Authority must match the boundary tenant binding'
@@ -299,7 +513,12 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   }
   const effectHash = computeApprovalPayloadHash(input.effect);
   if (!input.requiresApproval) {
-    admittedOperations.set(input, { authority, operationId: input.operationId, effectHash });
+    admittedOperations.set(input, {
+      authority,
+      operationId: input.operationId,
+      effectHash,
+      protectionHash: protection.hash,
+    });
     return { allowed: true, status: 'not_required' };
   }
   if (authority && (!authority.agentId?.trim() || !authority.invocationId?.trim())) {
@@ -348,17 +567,31 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       }
     }
   }
-  const charter = input.delegable ? authority?.charter : undefined;
+  const target = parseExternalOperationGrant(
+    buildExternalOperationTarget(input.operationId, input.effect)
+  );
+  const literalGrant =
+    target &&
+    authority?.charter?.action.external_operation &&
+    externalOperationGrantMatches(authority.charter.action.external_operation, target);
+  const needsExactApproval = protection.argumentsCheck.requiresExactApproval && !literalGrant;
+  // A broad delegation is not proof of the origin of a new destination.
+  if (serviceProof?.kind === 'delegated' && needsExactApproval)
+    stopExternalGovernance(
+      '[OP_ARGUMENT_AUTHORITY_REQUIRED] Destination needs exact human approval or a verified user/policy origin'
+    );
+  const declaredCharter = input.delegable ? authority?.charter : undefined;
   if (
-    charter &&
-    (charter.scope.kind === 'person'
+    declaredCharter &&
+    (declaredCharter.scope.kind === 'person'
       ? Boolean(trustedTenant)
-      : !authority?.tenantSlug || charter.scope.tenant_slug !== authority.tenantSlug)
+      : !authority?.tenantSlug || declaredCharter.scope.tenant_slug !== authority.tenantSlug)
   ) {
     stopExternalGovernance(
       '[EXTERNAL_SCOPE_MISMATCH] Charter must match the trusted tenant binding'
     );
   }
+  const charter = needsExactApproval ? undefined : declaredCharter;
   // Invocation identity prevents one approval becoming a standing grant for
   // identical messages; the effect hash prevents edits while awaiting approval.
   const request = explicitRequestContext.getStore();
@@ -376,6 +609,18 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   const artifactRefs = enqueueRequest
     ? request!.reviewArtifacts(structuredClone(input.effect))
     : authority?.review?.artifactRefs;
+  const approvalPayload = {
+    ...(input.approvalPolicy ? { scope: input.approvalPolicy.scope } : {}),
+    effect_hash: effectHash,
+    interface_binding: protection.binding,
+    argument_evidence_digest: protection.argumentsCheck.evidence_digest,
+    rationale:
+      authority?.review?.summary ||
+      `Review external operation ${input.operationId}${authority?.tenantSlug ? ` for tenant ${authority.tenantSlug}` : ''}`,
+    ...(artifactRefs ? { artifact_refs: artifactRefs } : {}),
+    ...(authority?.tenantSlug ? { tenant_slug: authority.tenantSlug } : {}),
+    ...(charter?.action.decision_type ? { decision_type: charter.action.decision_type } : {}),
+  };
   const approval: ApprovalGateResult = serviceProof
     ? {
         allowed: true,
@@ -397,16 +642,7 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
         ...(authority?.pipelineContext
           ? { requestedByContext: authority.pipelineContext, kind: 'mission_gate' as const }
           : {}),
-        payload: {
-          ...(input.approvalPolicy ? { scope: input.approvalPolicy.scope } : {}),
-          effect_hash: effectHash,
-          rationale:
-            authority?.review?.summary ||
-            `Review external operation ${input.operationId}${authority?.tenantSlug ? ` for tenant ${authority.tenantSlug}` : ''}`,
-          ...(artifactRefs ? { artifact_refs: artifactRefs } : {}),
-          ...(authority?.tenantSlug ? { tenant_slug: authority.tenantSlug } : {}),
-          ...(charter?.action.decision_type ? { decision_type: charter.action.decision_type } : {}),
-        },
+        payload: approvalPayload,
       });
   if (!approval.allowed) {
     approvalBlockContext.getStore()?.({
@@ -415,6 +651,33 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       channel: 'external-operation',
     });
     throw new ExternalOperationApprovalRequired(approval);
+  }
+  let proof: ExternalOperationCommitProof | undefined;
+  if (!serviceProof) {
+    if (approval.acceptedCharter && charter)
+      proof = {
+        kind: 'charter',
+        charter: structuredClone(approval.acceptedCharter),
+        input: structuredClone(charter),
+      };
+    else if (approval.requestId) {
+      try {
+        proof = captureExternalApprovalProof(
+          approval.requestId,
+          input.operationId,
+          computeApprovalPayloadHash(approvalPayload)
+        );
+      } catch (error) {
+        stopExternalGovernance(
+          error instanceof Error
+            ? error.message
+            : '[EXTERNAL_APPROVAL_CHANGED] Approval unavailable'
+        );
+      }
+    } else
+      stopExternalGovernance(
+        '[EXTERNAL_AUTHORITY_PROOF_REQUIRED] An exact current approval or accepted charter is required'
+      );
   }
   // Admit once, then reserve durably before any caller may perform the effect.
   // Pending approvals never reserve. A started reservation is never released:
@@ -431,7 +694,9 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       error instanceof Error && error.message.includes('EXTERNAL_EXECUTION_ALREADY_RESERVED');
     stopExternalGovernance(
       conflict
-        ? '[EXTERNAL_EXECUTION_ALREADY_RESERVED] Verify prior execution before any new invocation'
+        ? input.operationId === 'mcp:connect'
+          ? '[MCP_STARTUP_ALREADY_CONSUMED] This stdio startup cannot respawn automatically | next: have the host select a new withMcpStartupAttempt identity and approve that startup separately; the original exact tool approval remains bound to its own unchanged invocation'
+          : '[EXTERNAL_EXECUTION_ALREADY_RESERVED] Verify prior execution before any new invocation'
         : '[EXTERNAL_RESERVATION_UNAVAILABLE] Cannot durably reserve execution; verify storage before retrying',
       `external:${correlationId}`
     );
@@ -482,7 +747,13 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       );
     }
   }
-  admittedOperations.set(input, { authority, operationId: input.operationId, effectHash });
+  admittedOperations.set(input, {
+    authority,
+    operationId: input.operationId,
+    effectHash,
+    protectionHash: protection.hash,
+    proof,
+  });
   if (approval.acceptedCharter && charter) {
     admissions.set(input, {
       charter: structuredClone(approval.acceptedCharter),
@@ -503,6 +774,7 @@ export async function runExternalOperation<T>(
   classify: (result: T) => 'succeeded' | 'failed' | 'unknown'
 ): Promise<T> {
   admitExternalOperation(input);
+  assertExternalOperationCommit(input);
   let result: T;
   try {
     result = await execute();
@@ -537,6 +809,7 @@ export function runExternalOperationSync<T>(
   classify: (result: T) => 'succeeded' | 'failed' | 'unknown'
 ): T {
   admitExternalOperation(input);
+  assertExternalOperationCommit(input);
   let result: T;
   try {
     result = execute();

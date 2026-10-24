@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';
+import { withExecutionContextAsync } from '../authority.js';
 import * as path from 'node:path';
 
 import { pathResolver } from '../path-resolver.js';
@@ -21,6 +22,17 @@ const kiCacheDir = pathResolver.sharedTmp(`da07-tenant-retrieval-ki-cache-${proc
 const fixtureEnv: NodeJS.ProcessEnv = {};
 
 const TOPIC = 'quantum billing reconciliation';
+
+/** Fixture callers are authenticated to their synthetic tenant before searching.
+ * The facade's tenant selector itself must never establish caller authority. */
+function queryAsFixtureTenant(input: Parameters<typeof queryTenantKnowledge>[0]) {
+  return withExecutionContextAsync(
+    'worker',
+    () => queryTenantKnowledge(input),
+    'worker',
+    input.tenantSlug
+  );
+}
 
 function writeDoc(relPath: string, title: string): void {
   const abs = path.join(fixtureRoot, relPath);
@@ -161,7 +173,7 @@ describe('normalizeTenantKnowledgeSourcePath', () => {
 
 describe('queryTenantKnowledge (reachability + isolation)', () => {
   it('reaches the tenant subtree, customer overlay, and common with repo-relative paths', async () => {
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-x',
       topic: TOPIC,
       limit: 10,
@@ -182,7 +194,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
   it("NEVER returns another tenant's document, even when it would outscore everything", async () => {
     // tenant-y's fixture doc repeats the query terms (highest lexical score
     // corpus-wide) — it must still be structurally unreachable.
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-x',
       topic: TOPIC,
       limit: 50,
@@ -193,7 +205,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
   });
 
   it('never returns knowledge/personal/ content (overlay tier is overlay-only)', async () => {
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-x',
       topic: TOPIC,
       limit: 50,
@@ -204,7 +216,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
   });
 
   it('strict_isolation=true also drops knowledge/confidential/common', async () => {
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-strict',
       topic: TOPIC,
       limit: 50,
@@ -218,7 +230,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
   });
 
   it('fails open to [] for an unregistered tenant', async () => {
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-unknown',
       topic: TOPIC,
       limit: 5,
@@ -230,7 +242,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
 
   it('returns [] for a blank topic or a zero limit', async () => {
     expect(
-      await queryTenantKnowledge({
+      await queryAsFixtureTenant({
         tenantSlug: 'tenant-x',
         topic: '   ',
         limit: 5,
@@ -239,7 +251,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
       })
     ).toEqual([]);
     expect(
-      await queryTenantKnowledge({
+      await queryAsFixtureTenant({
         tenantSlug: 'tenant-x',
         topic: TOPIC,
         limit: 0,
@@ -250,7 +262,7 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
   });
 
   it('orders deterministically: score descending, ties by codepoint path order', async () => {
-    const hits = await queryTenantKnowledge({
+    const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-x',
       topic: TOPIC,
       limit: 10,
@@ -278,7 +290,7 @@ describe('lexical scoped retrieval never embeds unadmitted knowledge', () => {
         'knowledge/confidential/tenant-x/organizations/org-secret/projects/PRJ-SECRET/quantum.md',
         'PRIVATE PROJECT quantum billing reconciliation'
       );
-      const hits = await queryTenantKnowledge({
+      const hits = await queryAsFixtureTenant({
         tenantSlug: 'tenant-x',
         topic: TOPIC,
         limit: 20,

@@ -586,6 +586,17 @@
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []
     },
+    "memory_provenance_reader": {
+      "allow_read": [
+        "active/shared/runtime/memory/provenance.json",
+        "active/shared/runtime/tenants/${KYBERION_TENANT}/memory/provenance.json",
+        "active/personal/owners/",
+        "active/shared/tmp/public/",
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/personal/"
+      ],
+      "allow_write": []
+    },
     "peer_catalog_reader": {
       "allow_read": [
         "knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json",

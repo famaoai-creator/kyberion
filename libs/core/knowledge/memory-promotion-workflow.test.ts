@@ -64,6 +64,20 @@ describe('memory-promotion-workflow', () => {
         } catch {
           /* best-effort — still remove the record below */
         }
+        // A publisher can fail after writing bytes but before promoted_ref is
+        // recorded. Probe only this test's exact candidate files, never trees.
+        const roots = [
+          'knowledge/product/evolution',
+          ...['public', 'confidential', 'personal'].map((tier) => `knowledge/${tier}/common`),
+        ];
+        for (const root of roots)
+          for (const kind of ['patterns', 'operations', 'wisdom', 'templates'])
+            for (const extension of ['json', 'md']) {
+              const file = pathResolver.rootResolve(
+                `${root}/${kind}/generated/${candidateId}.${extension}`
+              );
+              if (safeExistsSync(file)) safeRmSync(file);
+            }
         safeRmSync(recordPath);
       }
       createdDistillCandidateIds.clear();

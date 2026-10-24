@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveRole, withExecutionContextAsync } from '../authority.js';
 import { humanActor } from '../actor.js';
+import { withOperationInterface } from './operation-protection.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
@@ -31,7 +32,9 @@ const mocks = vi.hoisted(() => ({
   escalates: false,
   humanClaims: [] as unknown[],
 }));
-vi.mock('./approval-store-reader.js', () => ({ listApprovalRequests: () => mocks.humanClaims }));
+vi.mock('./approval-store-reader.js', () => ({
+  listApprovalRequests: () => mocks.humanClaims,
+}));
 vi.mock('./approval-policy.js', () => ({
   resolveApprovalPolicy: () => ({
     requiresApproval: false,
@@ -82,6 +85,31 @@ describe('operation-bound delegated execution', () => {
     policy,
     now: NOW,
     availability: { accountable_available: true, available_deputies: [] },
+  });
+  it('invalidates an issued permit when the reviewed tool interface changes before commit', async () => {
+    const binding = {
+      tool: 'enterprise:sign',
+      schema_digest: 'a'.repeat(64),
+      capability_digest: 'b'.repeat(64),
+      candidate_set: ['sign'],
+    };
+    const effect = vi.fn(async () => 'signed');
+    await withOperationInterface(
+      () => binding,
+      async () => {
+        const issued = authorizeDelegatedExecution(target(), options());
+        expect(issued.allowed).toBe(true);
+        expect(
+          verifyDelegatedExecution({ ...target(), permitId: issued.permitId! }, options())
+        ).toBe(true);
+        binding.schema_digest = 'c'.repeat(64);
+        expect(
+          verifyDelegatedExecution({ ...target(), permitId: issued.permitId! }, options())
+        ).toBe(false);
+        await expect(runDelegatedExecution(target(), effect, options())).rejects.toThrow('changed');
+        expect(effect).not.toHaveBeenCalled();
+      }
+    );
   });
   it('fences human claims before issuance and again before the delegated effect claim', async () => {
     const effect = vi.fn(async () => 'paid');
@@ -219,7 +247,10 @@ describe('operation-bound delegated execution', () => {
       };
       const first = hashDelegatedServiceConfiguration(snapshot);
       expect(
-        hashDelegatedServiceConfiguration({ ...snapshot, connection: { password: 'guessable' } })
+        hashDelegatedServiceConfiguration({
+          ...snapshot,
+          connection: { password: 'guessable' },
+        })
       ).toBe(first);
       expect(
         hashDelegatedServiceConfiguration({ ...snapshot, connection: { password: 'changed' } })

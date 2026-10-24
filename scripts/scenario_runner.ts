@@ -23,7 +23,7 @@ import {
 import { loadScenarioFile, type ScenarioLane } from '@agent/core/scenario/scenario-definition';
 import { runScenario, type ScenarioPipelineRunner } from '@agent/core/scenario/scenario-executor';
 import {
-  isFailingScenarioStatus,
+  isFailingScenarioReport,
   renderScenarioReportMarkdown,
   type ScenarioReport,
   type ScenarioRunStatus,
@@ -47,6 +47,7 @@ export interface ScenarioRunSummaryEntry {
   scenario_id: string | null;
   run_id: string | null;
   status: ScenarioRunStatus;
+  authorization?: ScenarioReport['authorization'];
   reason?: string;
   report_dir?: string;
   /** Repo-relative run root, present only when it was kept (`--keep`). */
@@ -187,6 +188,7 @@ export async function runScenarioFiles(
         scenario_id: report.scenario_id,
         run_id: report.run_id,
         status: report.status,
+        ...(report.authorization ? { authorization: report.authorization } : {}),
         ...(report.reason ? { reason: report.reason } : {}),
         report_dir: writeReportFiles(report, trajectory),
         ...(args.keep && runRoot ? { run_root: pathResolver.toRepoRelative(runRoot) } : {}),
@@ -217,7 +219,7 @@ export async function runScenarioFiles(
     scenarios.push(entry);
   }
   return {
-    ok: !scenarios.some((entry) => isFailingScenarioStatus(entry.status)),
+    ok: !scenarios.some((entry) => isFailingScenarioReport(entry)),
     counts,
     scenarios,
   };
@@ -227,7 +229,8 @@ export function formatScenarioSummary(summary: ScenarioRunSummary): string {
   const lines = summary.scenarios.map((entry) => {
     const label = entry.status.toUpperCase().padEnd(12);
     const warned = entry.warnings ? ` (${entry.warnings} warning(s), see report)` : '';
-    const suffix = `${warned}${entry.reason ? ` — ${entry.reason}` : ''}`;
+    const alignment = entry.authorization ? ` (${entry.authorization.outcome})` : '';
+    const suffix = `${warned}${alignment}${entry.reason ? ` — ${entry.reason}` : ''}`;
     return `${label} ${entry.scenario_id ?? entry.file}${suffix}`;
   });
   const counts = Object.entries(summary.counts)

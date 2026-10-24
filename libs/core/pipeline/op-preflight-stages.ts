@@ -18,7 +18,7 @@ import { detectTier } from '../tier-guard.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { classifyEgressDestination } from '../egress-policy.js';
 import { evaluateProvenanceEgress } from '../provenance-taint.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';

@@ -9,6 +9,8 @@ import serviceActuatorManifest from '../manifest.json';
 vi.mock('@agent/core/governance/external-operation', () => ({
   assertExternalOperationBatchResumable: vi.fn(),
   admitExternalOperation: vi.fn(() => ({ allowed: true, status: 'not_required' })),
+  assertExternalOperationCommit: vi.fn(),
+  operationInterfaceResolver: vi.fn(() => vi.fn()),
   recordExternalOperationOutcome: vi.fn(),
 }));
 

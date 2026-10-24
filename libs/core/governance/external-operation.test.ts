@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { aroundEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentActor } from '../actor.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 
@@ -18,6 +18,7 @@ vi.mock('./approval-store.js', async (original) => ({
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),
   evaluateApprovalUsability: vi.fn(() => null),
+  loadApprovalRequest: vi.fn(),
 }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 vi.mock('./accountability-charter-registry.js', () => ({
@@ -37,6 +38,7 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   computeApprovalPayloadHash,
+  loadApprovalRequest,
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 import {
@@ -58,7 +60,30 @@ import {
   runExternalOperationSync,
   withExternalOperationApprovalObserver,
   withExplicitExternalApprovalRequest,
+  withOperationArgumentOrigins,
+  withOperationInterface,
+  assertExternalOperationCommit,
+  withTrustedRemoteMcpInterface,
+  describeRemoteMcpInterface,
 } from './external-operation.js';
+import { defaultOperationInterface, evaluateOperationArguments } from './operation-protection.js';
+
+// Existing admission tests start with a host-attested request. Security cases
+// explicitly replace this with external/missing origins.
+aroundEach((runTest) =>
+  withOperationArgumentOrigins(
+    [
+      {
+        path: [],
+        value_hash: computeApprovalPayloadHash({
+          value: { recipient: 'ops', body: 'sensitive-payload' },
+        }),
+        authority: 'policy',
+      },
+    ],
+    runTest
+  )
+);
 
 const charter: ApprovalGateCharterInput = {
   scope: { kind: 'organization', tenant_slug: 'acme' },
@@ -68,6 +93,12 @@ const charter: ApprovalGateCharterInput = {
     reversible: false,
   },
 };
+const acceptedFixture = {
+  charter_id: 'chr-fixture',
+  scope: charter.scope,
+  accountable: { expires_at: '2099-01-01T00:00:00Z' },
+  appetite: { tripwires: [] },
+} as unknown as Charter;
 const operation = (overrides: Partial<ExternalOperation> = {}): ExternalOperation => ({
   operationId: 'service:preset:create_issue',
   requiresApproval: true,
@@ -84,6 +115,225 @@ const operation = (overrides: Partial<ExternalOperation> = {}): ExternalOperatio
 });
 
 describe('external operation common admission', () => {
+  it.each(['missing', 'revoked', 'expired', 'binding', 'scope'] as const)(
+    'refuses a direct approval %s after reservation before commit',
+    async (change) => {
+      const input = operation();
+      input.authority = { ...input.authority!, hasHuman: true, charter: undefined };
+      expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+      const request = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+      const record = { ...request, id: 'approval-race', status: 'approved' } as never;
+      vi.mocked(listApprovalRequests).mockReturnValue([record]);
+      vi.mocked(reserveExternalOperation).mockImplementationOnce(() => {
+        if (change === 'missing') vi.mocked(loadApprovalRequest).mockReturnValue(null);
+        else if (change === 'expired') Object.assign(record, { expiresAt: '2000-01-01T00:00:00Z' });
+        else if (change === 'revoked')
+          Object.assign(record, {
+            revocation: { revokedBy: 'user:owner', revokedAt: new Date().toISOString() },
+          });
+        else if (change === 'binding')
+          Object.assign(record, {
+            accountability: {
+              finalDecision: 'human_only',
+              payloadHash: 'changed',
+              effectBinding: input.operationId,
+            },
+          });
+        else Object.assign(record, { scope: { tier: 'confidential', tenant_slug: 'other' } });
+      });
+      const transport = vi.fn(async () => 'sent');
+      await expect(runExternalOperation(input, transport, () => 'succeeded')).rejects.toThrow(
+        'EXTERNAL_APPROVAL_CHANGED'
+      );
+      expect(transport).not.toHaveBeenCalled();
+    }
+  );
+  it('refuses an allowed gate result lacking an exact approval record or accepted charter', () => {
+    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'unbound test result' });
+    expect(() => admitExternalOperation(operation())).toThrow('EXTERNAL_AUTHORITY_PROOF_REQUIRED');
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+  });
+  it.each(['retired', 'amended', 'stop'] as const)(
+    'rechecks standing charter %s without recharging its budget',
+    async (change) => {
+      const accepted = { ...acceptedFixture, appetite: { tripwires: ['halt'] } } as Charter;
+      vi.mocked(runCharterGate).mockReturnValue({
+        kind: 'allow',
+        acceptedCharter: accepted,
+        message: 'allowed',
+      });
+      vi.mocked(reserveExternalOperation).mockImplementationOnce(() => {
+        if (change === 'retired') vi.mocked(findActiveCharter).mockReturnValue(null);
+        if (change === 'amended')
+          vi.mocked(findActiveCharter).mockReturnValue({ ...accepted, charter_id: 'different' });
+        if (change === 'stop')
+          vi.mocked(loadCharterUsage).mockReturnValue({
+            spent_today: 0,
+            spent_this_month: 0,
+            tripwires_hit: ['halt'],
+          });
+      });
+      const transport = vi.fn(async () => 'sent');
+      await expect(runExternalOperation(operation(), transport, () => 'succeeded')).rejects.toThrow(
+        'EXTERNAL_CHARTER_CHANGED'
+      );
+      expect(transport).not.toHaveBeenCalled();
+      expect(runCharterGate).toHaveBeenCalledTimes(1);
+    }
+  );
+  it('does not reject its own final consumed budget slot or charge admission twice', async () => {
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'last slot admitted',
+    });
+    vi.mocked(loadCharterUsage).mockReturnValue({
+      spent_today: Number.MAX_SAFE_INTEGER,
+      spent_this_month: Number.MAX_SAFE_INTEGER,
+      tripwires_hit: [],
+    });
+    const transport = vi.fn(async () => 'sent');
+    await expect(runExternalOperation(operation(), transport, () => 'succeeded')).resolves.toBe(
+      'sent'
+    );
+    expect(runCharterGate).toHaveBeenCalledTimes(1);
+    expect(recordCharterExecutionStarted).toHaveBeenCalledTimes(1);
+  });
+  it('refuses a generic MCP wrapper without exact remote evidence and accepts a host-bound exact schema', () => {
+    const server = { transport: 'stdio' as const, command: 'reviewed-server', args: [] };
+    const input = operation({
+      operationId: 'service:demo:mcp:send',
+      effect: {
+        mode: 'MCP',
+        action: 'send',
+        params: { command: server.command, args: [], arguments: { to: 'a' } },
+      },
+    });
+    input.authority = { ...input.authority!, hasHuman: true, charter: undefined };
+    expect(() => admitExternalOperation(input)).toThrow('EXTERNAL_PROTECTION_UNAVAILABLE');
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+    const binding = describeRemoteMcpInterface(server, 'send', [
+      { name: 'send', inputSchema: { type: 'object' } },
+    ]);
+    withTrustedRemoteMcpInterface(
+      () => binding,
+      () => {
+        expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+        const request = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+        vi.mocked(listApprovalRequests).mockReturnValue([
+          { ...request, id: 'remote-approved', status: 'approved' } as never,
+        ]);
+        expect(admitExternalOperation(input).allowed).toBe(true);
+        assertExternalOperationCommit(input);
+      }
+    );
+  });
+  it('refuses unreviewed executing interfaces even when an interactive human is available', () => {
+    const input = operation({ operationId: 'unreviewed:execute' });
+    input.authority = { ...input.authority!, hasHuman: true };
+    expect(() => admitExternalOperation(input)).toThrow('EXTERNAL_PROTECTION_UNAVAILABLE');
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+  });
+  it('requires exact human approval for missing/external argument origins despite a broad charter', async () => {
+    const transport = vi.fn(async () => 'sent');
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'broad permission',
+    });
+    await withOperationArgumentOrigins([], async () => {
+      await expect(runExternalOperation(operation(), transport, () => 'succeeded')).rejects.toThrow(
+        'HUMAN_REQUIRED'
+      );
+      expect(transport).not.toHaveBeenCalled();
+      expect(reserveExternalOperation).not.toHaveBeenCalled();
+      expect(runCharterGate).not.toHaveBeenCalled();
+      const input = operation();
+      input.authority = { ...input.authority!, hasHuman: true };
+      expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+      const request = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+      vi.mocked(listApprovalRequests).mockReturnValue([
+        { ...request, id: 'exact', status: 'approved' } as never,
+      ]);
+      expect(await runExternalOperation(input, transport, () => 'succeeded')).toBe('sent');
+      expect(transport).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not reuse approval after interface drift, and refuses legacy unbound approvals', () => {
+    const binding = {
+      tool: 'service:preset',
+      schema_digest: 'a'.repeat(64),
+      capability_digest: 'b'.repeat(64),
+      candidate_set: ['preset'],
+    };
+    const input = operation();
+    input.authority = { ...input.authority!, hasHuman: true, charter: undefined };
+    withOperationInterface(
+      () => binding,
+      () => {
+        expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+        const request = vi.mocked(createApprovalRequest).mock.calls[0]![1];
+        vi.mocked(listApprovalRequests).mockReturnValue([
+          { ...request, id: 'approved', status: 'approved' } as never,
+        ]);
+        expect(admitExternalOperation(input).allowed).toBe(true);
+        binding.schema_digest = 'c'.repeat(64);
+        expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+        vi.mocked(listApprovalRequests).mockReturnValue([
+          { ...request, accountability: undefined, id: 'legacy', status: 'approved' } as never,
+        ]);
+        expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+      }
+    );
+  });
+
+  it.each(['effect', 'interface'] as const)(
+    'checks %s again between admission and actual commit',
+    async (change) => {
+      const binding = {
+        tool: 'test',
+        schema_digest: 'a'.repeat(64),
+        capability_digest: 'b'.repeat(64),
+        candidate_set: ['send'],
+      };
+      const input = operation();
+      const transport = vi.fn(async () => 'sent');
+      vi.mocked(runCharterGate).mockReturnValue({
+        kind: 'allow',
+        acceptedCharter: acceptedFixture,
+        message: 'within charter',
+      });
+      vi.mocked(reserveExternalOperation).mockImplementationOnce(() => {
+        if (change === 'effect') input.effect.recipient = 'attacker';
+        else binding.capability_digest = 'c'.repeat(64);
+      });
+      await withOperationInterface(
+        () => binding,
+        async () => {
+          await expect(runExternalOperation(input, transport, () => 'succeeded')).rejects.toThrow(
+            'EXTERNAL_PROTECTION_CHANGED'
+          );
+          expect(transport).not.toHaveBeenCalled();
+          expect(() => assertExternalOperationCommit(input)).toThrow('EXTERNAL_ADMISSION_REQUIRED');
+        }
+      );
+    }
+  );
+
+  it('consumes a successful admission at one commit point', () => {
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'within charter',
+    });
+    const input = operation();
+    admitExternalOperation(input);
+    assertExternalOperationCommit(input);
+    expect(() => assertExternalOperationCommit(input)).toThrow('EXTERNAL_COMMIT_ALREADY_USED');
+    recordExternalOperationOutcome(input, 'succeeded');
+  });
+
   it('enqueues only the explicitly selected headless operation and binds its protected review', () => {
     const review = vi.fn(() => ['active/review/private.json']);
     const input = operation({
@@ -181,7 +431,11 @@ describe('external operation common admission', () => {
       runExternalOperationSync(operation({ authority: undefined }), execute, () => 'succeeded')
     ).toThrow(ExternalOperationApprovalRequired);
     expect(execute).not.toHaveBeenCalled();
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
     expect(runExternalOperationSync(operation(), execute, () => 'succeeded')).toEqual({
       status: 0,
     });
@@ -194,7 +448,11 @@ describe('external operation common admission', () => {
   });
 
   it('stops synchronous attempted effects and absorbed nonzero receipts at the outer observer', () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
     const observer = vi.fn();
     withExternalOperationApprovalObserver(observer, () => {
       expect(() =>
@@ -228,7 +486,22 @@ describe('external operation common admission', () => {
     vi.mocked(auditChain.record).mockImplementation(() => undefined as never);
     vi.mocked(currentScopeEnvelope).mockReturnValue(undefined);
     vi.mocked(reserveExternalOperation).mockReset();
-    vi.mocked(findActiveCharter).mockReturnValue(null);
+    vi.mocked(findActiveCharter).mockImplementation(() => {
+      const latest = vi.mocked(runCharterGate).mock.results.at(-1)?.value;
+      return latest?.kind === 'allow' ? (latest.acceptedCharter ?? null) : null;
+    });
+    vi.mocked(loadCharterUsage).mockReturnValue({
+      spent_today: 0,
+      spent_this_month: 0,
+      tripwires_hit: [],
+    });
+    vi.mocked(loadApprovalRequest).mockImplementation((_channel, id) => {
+      const records =
+        vi.mocked(listApprovalRequests).getMockImplementation()?.({
+          storageChannels: ['external-operation'],
+        }) ?? [];
+      return records.find((record) => record.id === id) ?? null;
+    });
   });
 
   it('admits a trusted person charter without a fabricated tenant and preserves its standing stop', () => {
@@ -241,7 +514,11 @@ describe('external operation common admission', () => {
         charter: person,
       },
     });
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'Exact person grant' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'Exact person grant',
+    });
     expect(admitExternalOperation(input).allowed).toBe(true);
     expect(reserveExternalOperation).toHaveBeenCalledWith(
       expect.objectContaining({ tenantSlug: undefined })
@@ -327,7 +604,11 @@ describe('external operation common admission', () => {
   });
 
   it('allows a charter decision and preserves its stop', () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'within charter' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'within charter',
+    });
     expect(admitExternalOperation(operation()).allowed).toBe(true);
     vi.mocked(runCharterGate).mockReturnValue({ kind: 'stop', message: 'tripwire stopped' });
     expect(() => admitExternalOperation(operation())).toThrow('tripwire stopped');
@@ -341,7 +622,11 @@ describe('external operation common admission', () => {
   });
 
   it('never offers an opaque human-only effect to a charter', () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'within charter' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'within charter',
+    });
     expect(() => admitExternalOperation(operation({ delegable: false }))).toThrow(
       ExternalOperationApprovalRequired
     );
@@ -391,6 +676,9 @@ describe('external operation common admission', () => {
     expect(draft.accountability?.payloadHash).toBe(
       computeApprovalPayloadHash({
         effect_hash: computeApprovalPayloadHash(input.effect),
+        interface_binding: defaultOperationInterface(input.operationId),
+        argument_evidence_digest: evaluateOperationArguments(input.operationId, input.effect)
+          .evidence_digest,
         tenant_slug: 'acme',
         rationale: 'Review external operation service:preset:create_issue for tenant acme',
       })
@@ -403,7 +691,10 @@ describe('external operation common admission', () => {
     expect(() => admitExternalOperation(input)).toThrow();
     const first = vi.mocked(createApprovalRequest).mock.calls[0]![1].correlationId;
     expect(() =>
-      admitExternalOperation({ ...input, authority: { ...input.authority, invocationId: 'inv-2' } })
+      admitExternalOperation({
+        ...input,
+        authority: { ...input.authority, invocationId: 'inv-2' },
+      })
     ).toThrow();
     expect(vi.mocked(createApprovalRequest).mock.calls[1]![1].correlationId).not.toBe(first);
   });
@@ -468,7 +759,11 @@ describe('external operation common admission', () => {
   });
 
   it('records charter feedback only from an actual accepted admission, once', () => {
-    const accepted = { charter_id: 'chr-acme-proof', scope: charter.scope } as Charter;
+    const accepted = {
+      ...acceptedFixture,
+      charter_id: 'chr-acme-proof',
+      scope: charter.scope,
+    } as Charter;
     const input = operation();
     recordExternalOperationOutcome(input, 'failed');
     expect(recordCharterExecutionOutcome).not.toHaveBeenCalled();
@@ -485,7 +780,10 @@ describe('external operation common admission', () => {
       expect.objectContaining({
         outcome: 'unknown',
         operation_id: input.operationId,
-        effect_hash: computeApprovalPayloadHash({ recipient: 'ops', body: 'sensitive-payload' }),
+        effect_hash: computeApprovalPayloadHash({
+          recipient: 'ops',
+          body: 'sensitive-payload',
+        }),
       }),
       undefined
     );
@@ -497,7 +795,7 @@ describe('external operation common admission', () => {
     vi.mocked(runCharterGate).mockReturnValue({
       kind: 'allow',
       message: 'allowed',
-      acceptedCharter: { charter_id: 'chr-1' } as Charter,
+      acceptedCharter: { ...acceptedFixture, charter_id: 'chr-1' } as Charter,
     });
     const input = operation();
     admitExternalOperation(input);
@@ -508,7 +806,11 @@ describe('external operation common admission', () => {
   });
 
   it('inherits trusted async authority with nested and concurrent isolation', async () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
     const seen: string[] = [];
     const run = (id: string) =>
       withExternalOperationAuthority(
@@ -573,7 +875,7 @@ describe('external operation common admission', () => {
     vi.mocked(runCharterGate).mockReturnValue({
       kind: 'allow',
       message: 'allow',
-      acceptedCharter: { charter_id: 'chr-1' } as Charter,
+      acceptedCharter: { ...acceptedFixture, charter_id: 'chr-1' } as Charter,
     });
     const input = operation();
     vi.mocked(reserveExternalOperation).mockImplementationOnce(() => {
@@ -611,7 +913,7 @@ describe('external operation common admission', () => {
       vi.mocked(runCharterGate).mockReturnValue({
         kind: 'allow',
         message: 'allow',
-        acceptedCharter: { charter_id: 'chr-1' } as Charter,
+        acceptedCharter: { ...acceptedFixture, charter_id: 'chr-1' } as Charter,
       });
       const input = operation();
       if (kind === 'charter_stop') {
@@ -666,7 +968,11 @@ describe('external operation common admission', () => {
   );
 
   it('stops repair of attempted mutations even when an SDK absorbs the error', async () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
     const observer = vi.fn();
     const transport = vi.fn(async () => {
       throw new Error('connection lost');
@@ -694,7 +1000,11 @@ describe('external operation common admission', () => {
   it.each(['failed', 'unknown'] as const)(
     'propagates %s mutation receipts to the outer verification stop',
     async (outcome) => {
-      vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+      vi.mocked(runCharterGate).mockReturnValue({
+        kind: 'allow',
+        acceptedCharter: acceptedFixture,
+        message: 'allow',
+      });
       const observer = vi.fn();
       const result = await withExternalOperationApprovalObserver(observer, () =>
         runExternalOperation(
@@ -727,7 +1037,11 @@ describe('external operation common admission', () => {
   });
 
   it('allows only one delayed execution for an invocation including after unknown outcome', async () => {
-    vi.mocked(runCharterGate).mockReturnValue({ kind: 'allow', message: 'allow' });
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
     const reservations = new Set<string>();
     vi.mocked(reserveExternalOperation).mockImplementation((input) => {
       const key = `${input.tenantSlug}:${input.operationId}:${input.invocationId}`;
