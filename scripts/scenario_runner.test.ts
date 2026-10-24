@@ -54,6 +54,37 @@ afterEach(() => {
 });
 
 describe('scenario runner CLI (ES-05)', () => {
+  it.each([false, true])(
+    'fails an unmet declared completion contract independently of legacy status (skipped: %s)',
+    async (skipped) => {
+      const file = writeScenario(
+        'contract-completion.json',
+        scenarioJson('runner-contract-incomplete', {
+          ...(skipped ? { lane: 'live-only' } : {}),
+          authorizationContract: {
+            purpose: 'publish and confirm',
+            completionOps: ['service:confirm_report'],
+            allowedOps: ['service:publish_report'],
+          },
+        })
+      );
+      const summary = await runScenarioFiles([file], {
+        lane: 'pr-deterministic',
+        keep: false,
+        exportTrajectory: false,
+      });
+      for (const entry of summary.scenarios)
+        if (entry.report_dir) reportDirs.push(entry.report_dir);
+      expect(summary.ok).toBe(false);
+      expect(summary.scenarios[0]?.status).toBe(skipped ? 'lane_skipped' : 'pass');
+      expect(summary.scenarios[0]?.authorization?.completion).toBe(
+        skipped ? 'not_evaluated' : 'incomplete'
+      );
+      if (!skipped)
+        expect(summary.scenarios[0]?.authorization?.outcome).toBe('authorized_incomplete');
+    }
+  );
+
   it('parses run arguments, flags, and env defaults', () => {
     expect(
       parseScenarioRunnerArgs(['run', 'eval/scenarios', '--lane', 'pr-deterministic'], {})

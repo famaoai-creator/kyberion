@@ -13,6 +13,7 @@
       "customer_decision_milestone_store",
       "infrastructure_sentinel",
       "knowledge_steward",
+      "memory_provenance_reader",
       "metrics_cap_reader",
       "notification_preferences_reader",
       "organization_operator",

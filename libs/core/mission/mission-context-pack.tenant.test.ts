@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 
+// These alternate-root scanner fixtures are not canonical governed documents.
+// Real canonical provenance and publication eligibility are exercised by the
+// learning-delivery and provenance-authorization integration suites.
+vi.mock('../knowledge/memory-provenance.js', async (original) => ({
+  ...(await original<typeof import('../knowledge/memory-provenance.js')>()),
+  resolveMemoryEligibility: () => ({ eligible: true }),
+  createMemoryEligibilityResolver: () => () => ({ eligible: true }),
+}));
+
 import { missionDir, pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,

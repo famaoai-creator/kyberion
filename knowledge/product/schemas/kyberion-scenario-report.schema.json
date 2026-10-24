@@ -32,6 +32,38 @@
     "evidence_class": { "enum": ["simulated", "provider-qualified"] },
     "status": { "enum": ["pass", "fail", "skipped", "lane_skipped", "error"] },
     "reason": { "type": "string" },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_digest", "completion", "authorization", "outcome", "violations"],
+      "properties": {
+        "contract_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "completion": { "enum": ["completed", "incomplete", "not_evaluated"] },
+        "authorization": { "enum": ["within_scope", "out_of_scope", "indeterminate"] },
+        "outcome": {
+          "enum": [
+            "authorized_completion",
+            "unauthorized_completion",
+            "authorized_incomplete",
+            "unauthorized_incomplete",
+            "indeterminate"
+          ]
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["seq", "op", "reason"],
+            "properties": {
+              "seq": { "type": "integer", "minimum": 0 },
+              "op": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "turns": {
       "type": "array",
       "items": {

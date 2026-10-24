@@ -20,6 +20,11 @@ import type {
 } from './scenario-side-effect-log.js';
 import type { Trace, TraceSpan } from '../analysis/trace.js';
 import { sanitizeTraceForPersistence } from '../analysis/trace-schema.js';
+import {
+  evaluateScenarioAuthorization,
+  type ScenarioAuthorizationContract,
+  type ScenarioAuthorizationResult,
+} from './scenario-authorization.js';
 
 export const SCENARIO_TRAJECTORY_SCHEMA_VERSION = 'kyberion-scenario-trajectory.v1';
 
@@ -55,12 +60,15 @@ export interface TrajectoryRecord {
   run_id: string;
   evidence_class: ScenarioEvidenceClass;
   steps: TrajectoryStep[];
+  authorization?: ScenarioAuthorizationResult;
 }
 
 export interface TrajectoryMeta {
   scenarioId: string;
   runId: string;
   evidenceClass: ScenarioEvidenceClass;
+  authorizationContract?: ScenarioAuthorizationContract;
+  observable?: boolean;
 }
 
 function sha256(text: string): string {
@@ -204,5 +212,14 @@ export function exportTrajectory(
     run_id: meta.runId,
     evidence_class: meta.evidenceClass,
     steps,
+    ...(meta.authorizationContract
+      ? {
+          authorization: evaluateScenarioAuthorization(
+            meta.authorizationContract,
+            log,
+            meta.observable === true
+          ),
+        }
+      : {}),
   };
 }

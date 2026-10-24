@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ gate: vi.fn(), run: vi.fn() }));
 vi.mock('@agent/core/secure-io', async (original) => ({
@@ -49,7 +50,11 @@ describe('VCS actuator public boundary', () => {
     expect(mocks.run.mock.calls.some(([, args]) => args[0] === 'push')).toBe(false);
   });
   it('passes trusted runtime authority to the canonical gate', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await withExternalOperationAuthority(
       () => ({ agentId: 'trusted-owner', invocationId: 'owned-push' }),
       () => handleAction({ op: 'push', params: { cwd: '/fixture', ref: 'feature' } })
@@ -85,3 +90,12 @@ describe('VCS actuator public boundary', () => {
     expect(mocks.gate).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

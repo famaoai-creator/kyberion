@@ -30,13 +30,10 @@ import { parseSafeJsonObjectValue, readJson } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { isRecord } from '../foundation/text.js';
-import {
-  createApprovalRequest,
-  computeApprovalPayloadHash,
-  listApprovalRequests,
-  loadApprovalRequest,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { listApprovalRequests, loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { withExecutionContext } from '../authority.js';
 import {
   resolveActivationStatus,

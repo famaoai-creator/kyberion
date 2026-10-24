@@ -30,6 +30,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 vi.mock('@agent/core/governance/external-operation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/governance/external-operation')>()),
   admitExternalOperation: vi.fn(() => ({ allowed: true, status: 'not_required' })),
+  assertExternalOperationCommit: vi.fn(),
   recordExternalOperationOutcome: vi.fn(),
 }));
 
@@ -590,7 +591,8 @@ describe('service-actuator handleAction', () => {
     expect(mocks.executeMcp).toHaveBeenCalledWith(
       'npx',
       ['-y', '@modelcontextprotocol/server-github'],
-      expect.objectContaining({ action: 'call_tool', name: 'search_repositories' })
+      expect.objectContaining({ action: 'call_tool', name: 'search_repositories' }),
+      undefined
     );
     expect(result).toEqual({ tools: [] });
   });

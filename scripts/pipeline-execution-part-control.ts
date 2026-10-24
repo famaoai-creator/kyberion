@@ -19,7 +19,10 @@ import {
   resolveCapabilityEffect,
 } from '@agent/core/actuator/actuator-manifest-index';
 import { logger } from '@agent/core/core';
-import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
+import {
+  withRuntimeExternalOperationAuthority,
+  withResolvedOperationInterface,
+} from '@agent/core/governance/external-operation-runtime';
 import {
   withExternalOperationApprovalObserver,
   type ExternalOperationApprovalBlock,
@@ -1365,43 +1368,45 @@ async function dispatchResolvedActuatorOperation(
     (denied as Error & { adfControlFlow: string }).adfControlFlow = 'preflight';
     throw denied;
   };
-  const result = await runLeafEffect(step, ctx, opts, params, async () => {
-    let admittedResult: Awaited<ReturnType<typeof dispatch>>;
-    try {
-      admittedResult = await withExternalOperationApprovalObserver(
-        (block) => {
-          observed.block ??= block;
-        },
-        () =>
-          withRuntimeExternalOperationAuthority(
-            {
-              runId: opts.runId,
-              stepId: step.id || step.op,
-              hasHuman: opts.hasHuman,
-            },
-            () =>
-              dispatch(
-                action,
-                {
-                  ...params,
-                  _reasoning_policy: stepPolicy,
-                  _facets: step.facets,
-                  _step_id: step.id || step.op,
-                },
-                ctx,
-                effectiveType,
-                opts.trace,
-                stepPolicy
-              )
-          )
-      );
-    } catch (error) {
+  const result = await withResolvedOperationInterface(resolvedOperation, () =>
+    runLeafEffect(step, ctx, opts, params, async () => {
+      let admittedResult: Awaited<ReturnType<typeof dispatch>>;
+      try {
+        admittedResult = await withExternalOperationApprovalObserver(
+          (block) => {
+            observed.block ??= block;
+          },
+          () =>
+            withRuntimeExternalOperationAuthority(
+              {
+                runId: opts.runId,
+                stepId: step.id || step.op,
+                hasHuman: opts.hasHuman,
+              },
+              () =>
+                dispatch(
+                  action,
+                  {
+                    ...params,
+                    _reasoning_policy: stepPolicy,
+                    _facets: step.facets,
+                    _step_id: step.id || step.op,
+                  },
+                  ctx,
+                  effectiveType,
+                  opts.trace,
+                  stepPolicy
+                )
+            )
+        );
+      } catch (error) {
+        throwObservedApproval();
+        throw error;
+      }
       throwObservedApproval();
-      throw error;
-    }
-    throwObservedApproval();
-    return admittedResult;
-  });
+      return admittedResult;
+    })
+  );
   if (!result.handled) {
     throw new Error(`Unsupported pipeline op: ${step.op}`);
   }
