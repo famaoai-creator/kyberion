@@ -25,9 +25,8 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from '../secure-io.js';
+import { safeExistsSync, safeMkdir } from '../secure-io.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
-import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { createLogger } from '../logger.js';
 import type { DotCharter, DotFeedTrigger } from './dot-charter.js';
 import {
@@ -480,6 +479,10 @@ export async function evaluateDotFeedTriggers(
       continue;
     }
 
+    // A timed-out call stays in flight; its late result is discarded by the
+    // settled race (and a late rejection is already handled, so it cannot
+    // crash the sweep), but the failure must say "timed out", not "bad shape".
+    const FETCH_TIMEOUT = Symbol('feed-fetch-timeout');
     let raw: unknown;
     try {
       raw = await Promise.race([
@@ -488,7 +491,9 @@ export async function evaluateDotFeedTriggers(
           action: trigger.action,
           params: trigger.params ?? {},
         }),
-        new Promise<undefined>((resolve) => setTimeout(resolve, DOT_FEED_FETCH_TIMEOUT_MS)),
+        new Promise<typeof FETCH_TIMEOUT>((resolve) =>
+          setTimeout(() => resolve(FETCH_TIMEOUT), DOT_FEED_FETCH_TIMEOUT_MS)
+        ),
       ]);
     } catch (error) {
       const message = boundedError(error);
@@ -506,6 +511,26 @@ export async function evaluateDotFeedTriggers(
         below_cursor: 0,
         truncated: false,
         error: message,
+      });
+      continue;
+    }
+
+    if (raw === FETCH_TIMEOUT) {
+      const error = `fetch timed out after ${Math.round(DOT_FEED_FETCH_TIMEOUT_MS / 1000)}s`;
+      state = recordFailure(charter, trigger, state, now, error);
+      writeFeedState(charter, state, deps);
+      logger.warn(
+        `feed ${charter.dot_id}/${specId} fetch timed out — ${trigger.service_id}:${trigger.action} did not answer within ${Math.round(DOT_FEED_FETCH_TIMEOUT_MS / 1000)}s | next: check provider health; the in-flight call is abandoned | evidence: ${feedStatePath(charter, specId)}`
+      );
+      polls.push({
+        ...base,
+        status: 'failed',
+        observed: 0,
+        ingested: 0,
+        duplicate: 0,
+        below_cursor: 0,
+        truncated: false,
+        error,
       });
       continue;
     }
