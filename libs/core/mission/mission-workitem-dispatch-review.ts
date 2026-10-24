@@ -55,7 +55,12 @@ import { ensureJudgmentBackendsRegistered } from '../reasoning/judgment-provider
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
 import { HarnessSubagentDispatcher } from '../agent/agent-dispatch.js';
-import { buildWorkingPrinciplesLines } from '../working-principles.js';
+import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from '../working-principles.js';
+import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
+import {
+  assertProviderCanProjectProfile,
+  resolveCliProviderDescriptorOrNull,
+} from '../provider/provider-permission-profiles.js';
 import type { MissionState } from './mission-types.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
@@ -1087,8 +1092,16 @@ export async function delegateSubagentTask(input: {
   securityScope: ContextSecurityScope;
   contextMode: AgentContextMode;
   purpose?: 'implementation' | 'review';
+  /**
+   * KD-05 tier the delegation must run under — resolved by the caller from
+   * the team role × purpose ceiling (resolveDelegationCapabilityProfile).
+   * Falls back to the purpose-only floor for legacy callers.
+   */
+  capabilityProfile?: string;
 }): Promise<WorkItemExecutionOutcome> {
   const delegationContext = input.purpose === 'review' ? 'workitem-review' : 'workitem';
+  const capabilityProfile =
+    input.capabilityProfile ?? (input.purpose === 'review' ? 'explorer' : 'implementer');
   const delegationIdentity = input.assigneePeerId || input.item.assignee_peer_id;
   const delegationContextRef = delegationIdentity
     ? `${delegationContext}:${input.item.item_id}:agent=${delegationIdentity}`
@@ -1097,6 +1110,11 @@ export async function delegateSubagentTask(input: {
     input.item.metadata?.mission_id || input.item.project_id || input.item.item_id
   ).trim();
   const backend = getReasoningBackend();
+  // The ambient CLI backend must be able to project this tier too —
+  // unknown/non-CLI adapters are skipped (they execute no tools).
+  if (resolveCliProviderDescriptorOrNull(backend.name)) {
+    assertProviderCanProjectProfile(backend.name, capabilityProfile);
+  }
   const nativeDispatcher = new HarnessSubagentDispatcher();
   const nativeAdopter = backend.getNativeSubagentAdopter?.() ?? null;
 
@@ -1127,7 +1145,7 @@ export async function delegateSubagentTask(input: {
         return nativeDispatcher.dispatch(input.prompt, delegationContextRef, backend, {
           ...input.routingOptions,
           context_mode: input.contextMode,
-          profile: input.purpose === 'review' ? 'explorer' : 'implementer',
+          profile: capabilityProfile,
           role: input.purpose === 'review' ? 'reviewer' : 'implementer',
           signal: input.signal,
         });
@@ -1272,6 +1290,17 @@ export async function routeToAgentOrSubagent(input: {
 
   const notes: string[] = [];
   const surfacePurpose = input.surfacePurpose || 'implementation';
+  // Role-driven capability bound: the narrower of the team role's KD-05
+  // projection and the dispatch purpose ceiling. A reviewer-staffed task
+  // stays read-only even when its purpose is 'implementation'.
+  const capabilityProfile = resolveDelegationCapabilityProfile({
+    teamRole: input.teamRole ? canonicalizeTeamRole(input.teamRole) : undefined,
+    purpose: surfacePurpose,
+  });
+  notes.push(`capability profile: ${capabilityProfile}`);
+  // Candidacy: an explicitly selected provider that cannot structurally
+  // project this tier is refused here (fail-closed), never run wider.
+  assertProviderCanProjectProfile(input.provider, capabilityProfile);
   const runtimeSecurityScope = resolveRuntimeSecurityScope(input.securityScope, input.provider);
   const surfaceDecision = resolveWorkItemExecutionSurface(
     input.item,
@@ -1319,6 +1348,7 @@ export async function routeToAgentOrSubagent(input: {
       securityScope: input.securityScope,
       contextMode: input.contextMode,
       purpose: surfacePurpose,
+      capabilityProfile,
     });
     return {
       executionMode: 'subagent',
@@ -1346,6 +1376,7 @@ export async function routeToAgentOrSubagent(input: {
       securityScope: input.securityScope,
       contextMode: input.contextMode,
       purpose: surfacePurpose,
+      capabilityProfile,
     });
     return {
       executionMode: 'subagent',
@@ -1407,6 +1438,7 @@ export async function routeToAgentOrSubagent(input: {
                 mission_id: input.missionId,
                 work_item_id: input.item.item_id,
                 team_role: input.teamRole,
+                capability_profile: capabilityProfile,
                 ...(input.provider ? { provider: input.provider } : {}),
                 ...(input.providerModelId ? { provider_model_id: input.providerModelId } : {}),
                 ...(roleAssignment
