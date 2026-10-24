@@ -141,7 +141,7 @@
           "status": { "type": "string", "enum": ["sent", "approval_pending", "manual", "denied"] },
           "reason": {
             "type": "string",
-            "enum": ["no_channel", "binding_missing", "surface_unsupported"]
+            "enum": ["no_channel", "binding_missing", "surface_unsupported", "template_refused"]
           },
           "approval_request_id": { "type": "string", "minLength": 1, "maxLength": 200 },
           "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },

@@ -114,6 +114,27 @@ describe('sendToCustomer × accountability charter', () => {
     expect(
       renderCustomerRoutineTemplate({ ...base, params: { title: 'T', date: '2026-10-30' } })
     ).toBeTypeOf('string');
+    // A long (≤ 300, the agenda title limit), punctuated, Japanese title is fine.
+    expect(
+      renderCustomerRoutineTemplate({
+        ...base,
+        params: { title: `要件の確認（第2.0版）— ${'あ'.repeat(250)}`, date: '2026-10-30' },
+      })
+    ).toBeTypeOf('string');
+    // The override notice carries the closing time and zone; an unknown zone is refused.
+    const closing = { id: 'customer_decision.reminder.override_closing', locale: 'en' as const };
+    expect(
+      renderCustomerRoutineTemplate({
+        ...closing,
+        params: { title: 'T', date: '2026-11-05', time: '09:00', zone: 'JST' },
+      })
+    ).toBeTypeOf('string');
+    expect(
+      renderCustomerRoutineTemplate({
+        ...closing,
+        params: { title: 'T', date: '2026-11-05', time: '09:00', zone: 'PST' },
+      })
+    ).toBeNull();
     for (const params of [
       { title: 'see https://evil.example', date: '2026-10-30' },
       { title: 'www.evil.example', date: '2026-10-30' },
@@ -121,9 +142,52 @@ describe('sendToCustomer × accountability charter', () => {
       { title: 'T', date: 'tomorrow' },
       { title: 'T' },
       { title: 'T', date: '2026-10-30', extra: 'x' },
-      { title: 'x'.repeat(201), date: '2026-10-30' },
+      { title: 'x'.repeat(301), date: '2026-10-30' },
+      // Bidi / zero-width / line and paragraph separators and NEL.
+      { title: 'abc\u202Edef', date: '2026-10-30' },
+      { title: 'a\u200Bb', date: '2026-10-30' },
+      { title: 'a\u2028b', date: '2026-10-30' },
+      { title: 'a\u0085b', date: '2026-10-30' },
+      // Bare domains and fullwidth link syntax.
+      { title: 'visit evil.example now', date: '2026-10-30' },
+      { title: 'https：／／evil', date: '2026-10-30' },
+      // Mention / broadcast syntax.
+      { title: '<!channel> hi', date: '2026-10-30' },
+      { title: '<@U123> hi', date: '2026-10-30' },
+      { title: 'hi @everyone', date: '2026-10-30' },
+      { title: 'hi @here', date: '2026-10-30' },
     ]) {
       expect(renderCustomerRoutineTemplate({ ...base, params })).toBeNull();
     }
+  });
+
+  it('passes enqueueRequest and the request scope to the gate only when given, and reports the request status (CD-11)', async () => {
+    charterFor.mockReturnValue(undefined);
+    await sendToCustomer(input('Hello'));
+    expect(gate.mock.calls[0][0]).not.toHaveProperty('enqueueRequest');
+    expect(gate.mock.calls[0][0]).not.toHaveProperty('requestScope');
+    gate.mockReturnValueOnce({
+      allowed: false,
+      status: 'pending',
+      requestId: 'apr-9',
+      requestStatus: 'rejected',
+      message: 'rejected',
+    });
+    const scope = {
+      scope_kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: 'acme',
+    };
+    const held = await sendToCustomer({
+      ...input('Hello'),
+      enqueueRequest: true,
+      requestScope: scope,
+    });
+    expect(gate.mock.calls[1][0]).toMatchObject({ enqueueRequest: true, requestScope: scope });
+    expect(held).toMatchObject({
+      status: 'approval_pending',
+      approvalRequestId: 'apr-9',
+      approvalRequestStatus: 'rejected',
+    });
   });
 });

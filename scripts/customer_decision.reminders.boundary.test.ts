@@ -61,6 +61,48 @@ const keys = [
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const savedRoot = process.env.KYBERION_ROOT;
 
+/**
+ * The child-process test runs the BUILT facade. When any built file it runs is
+ * missing or older than the sources it covers, it is skipped with that reason
+ * (run `pnpm -s build`) instead of silently testing stale code.
+ */
+const DIST_FILES = [
+  'dist/scripts/customer_decision.js',
+  'dist/scripts/customer-decision/reminders.js',
+  'libs/core/dist/customer-decision/reminders.js',
+  'libs/core/dist/customer-conversation.js',
+  'libs/core/dist/customer-outbound-templates.js',
+  'libs/core/dist/customer-channel-binding.js',
+];
+const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
+const SOURCE_FILES = [
+  'scripts/customer_decision.ts',
+  'libs/core/customer-conversation.ts',
+  'libs/core/customer-outbound-templates.ts',
+  'libs/core/customer-channel-binding.ts',
+];
+function staleDistReason(): string | null {
+  const mtime = (relative: string) => {
+    const file = path.join(SOURCE_ROOT, relative);
+    return initialIO.safeExistsSync(file) ? initialIO.safeStat(file).mtimeMs : null;
+  };
+  const built = DIST_FILES.map(mtime);
+  if (built.some((value) => value === null)) return 'dist/ is not built';
+  const sources = [
+    ...SOURCE_FILES,
+    ...SOURCE_DIRS.flatMap((dir) =>
+      initialIO
+        .safeReaddir(path.join(SOURCE_ROOT, dir))
+        .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+        .map((name) => `${dir}/${name}`)
+    ),
+  ];
+  const newestSource = Math.max(...sources.map((file) => mtime(file) ?? 0));
+  const oldestBuilt = Math.min(...built.map((value) => value ?? 0));
+  return newestSource > oldestBuilt ? 'dist/ is older than its sources' : null;
+}
+const STALE_DIST = staleDistReason();
+
 let facade: typeof import('./customer_decision.js');
 let io: typeof import('@agent/core/secure-io');
 
@@ -301,13 +343,42 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     // Ids only: the agenda title never reaches the shared inbox.
     expect(JSON.stringify(entries)).not.toContain(TITLE);
 
+    // A real, durable request was opened for a human, scoped to the tenant.
+    const held = (first.reminders as Out[]).find((item) => item.actor_id === ACTOR) as Out;
+    expect(held.approval_request_id).toEqual(expect.any(String));
+    const { listApprovalRequests } = await import('@agent/core/governance/approval-store');
+    const requests = () =>
+      initialContext('surface_runtime', () => listApprovalRequests({ storageChannels: ['slack'] }));
+    const opened = requests().filter((request) => request.id === held.approval_request_id);
+    expect(opened).toEqual([
+      expect.objectContaining({
+        status: 'pending',
+        scope: expect.objectContaining({ tenant_slug: TENANT, tier: 'confidential' }),
+      }),
+    ]);
+    // Visible to the tenant's scope only.
+    const scoped = (tenant: string) =>
+      initialContext('surface_runtime', () =>
+        listApprovalRequests({
+          storageChannels: ['slack'],
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
+        })
+      ).some((request) => request.id === held.approval_request_id);
+    expect(scoped(TENANT)).toBe(true);
+    expect(scoped(CHARTERED)).toBe(false);
+    // The request title carries ids only; the message is in the scoped summary.
+    expect(String(opened[0].title ?? '')).not.toContain(TITLE);
+
     // Same day again: the manual task is not repeated; the held reminder re-asks
     // the gate with the same correlation id (one approval request, not two).
     const second = await run(['remind', '--tenant', TENANT, '--now', D_MINUS_1]);
     expect(second.counts).toEqual({ approval_pending: 1 });
-    expect((second.reminders as Out[])[0].approval_request_id).toBe(
-      (first.reminders as Out[]).find((item) => item.actor_id === ACTOR)?.approval_request_id
-    );
+    expect((second.reminders as Out[])[0].approval_request_id).toBe(held.approval_request_id);
+    expect(
+      requests().filter((request) =>
+        String(request.correlationId).includes(String(held.reminder_id))
+      )
+    ).toHaveLength(1);
     const status = await run(['status', ...base(TENANT), '--agenda', plain.agendaId], D_MINUS_1);
     expect(status.reminders).toMatchObject({
       respond_by: '2026-10-30',
@@ -316,6 +387,28 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       next: expect.arrayContaining([
         expect.objectContaining({ kind: 'due', send_on: '2026-10-30' }),
       ]),
+    });
+
+    // A human rejects it: the next run records it denied and stops asking.
+    const { decideApprovalRequest } = await import('@agent/core/governance/approval-store');
+    decideApprovalRequest('mission_controller', {
+      channel: 'slack',
+      requestId: String(held.approval_request_id),
+      decision: 'rejected',
+      decidedBy: 'user:boss',
+      decidedByType: 'human',
+      authenticated: true,
+      authMethod: 'surface_session',
+      payloadHash: opened[0].accountability?.payloadHash,
+      effectBinding: opened[0].accountability?.effectBinding,
+    });
+    const third = await run(['remind', '--tenant', TENANT, '--now', D_MINUS_1]);
+    expect(third.counts).toEqual({ denied: 1 });
+    expect((await run(['remind', '--tenant', TENANT, '--now', D_MINUS_1])).counts).toEqual({});
+    const after = await run(['status', ...base(TENANT), '--agenda', plain.agendaId], D_MINUS_1);
+    expect(after.reminders).toMatchObject({
+      pending_approval: [],
+      denied: [expect.objectContaining({ actor_id: ACTOR, kind: 'before_due' })],
     });
   }, 120_000);
 
@@ -477,65 +570,83 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         (entry) => entry.kind === 'customer_decision_handoff'
       )
     ).toHaveLength(1);
-    // The decider answered: no D0 reminder for them, the unbound decider still gets one.
-    const d0 = await run([
-      'remind',
-      '--tenant',
-      TENANT,
-      '--dry-run',
-      '--now',
-      '2026-10-30T01:00:00.000Z',
-    ]);
-    expect((d0.reminders as Out[]).map((item) => [item.actor_id, item.kind])).toEqual([
+    const d0 = () =>
+      run(['remind', '--tenant', TENANT, '--dry-run', '--now', '2026-10-30T01:00:00.000Z']);
+    const remindedOn = async () =>
+      ((await d0()).reminders as Out[]).map((item) => [item.actor_id, item.kind]).sort();
+    // A comment-only answer and a general question are not an answer: still reminded.
+    expect(await remindedOn()).toEqual([
+      [ACTOR, 'due'],
       [UNBOUND, 'due'],
     ]);
+    // Once the decider answers the open entry, only the unbound decider is reminded.
+    const view2 = await customer('view', TENANT, { token }, D_MINUS_1);
+    expect(
+      (
+        await customer(
+          'respond',
+          TENANT,
+          {
+            token,
+            content_hash: view2.out.content_hash,
+            answers: [{ entry_id: 'auth', choice: 'option', value: 'password' }],
+          },
+          D_MINUS_1
+        )
+      ).out
+    ).toMatchObject({ ok: true });
+    expect(await remindedOn()).toEqual([[UNBOUND, 'due']]);
   }, 120_000);
 
-  it('the daily op runs the facade as a child bound to its tenant, and refuses another tenant', async () => {
-    const { runCustomerDecisionReminderOp, reminderFacadeEnv } =
-      await import('./customer-decision/reminder-op.js');
-    const { buildTenantRunEnv } = await import('./chronos_daemon.js');
-    // The pipeline process: the identity a chronos tenant child runs with.
-    const env = buildTenantRunEnv(TENANT);
-    for (const key of [
-      'KYBERION_TENANT',
-      'KYBERION_TENANT_SCOPE_REQUIRED',
-      'MISSION_ROLE',
-      'KYBERION_PERSONA',
-    ] as const)
-      process.env[key] = env[key];
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
-    try {
-      // The facade child never inherits a role, persona or SYSTEM_ROLE; it keeps the tenant binding.
-      expect(reminderFacadeEnv(TENANT)).toMatchObject({
-        SYSTEM_ROLE: '',
-        MISSION_ROLE: '',
-        KYBERION_PERSONA: '',
-        KYBERION_TENANT: TENANT,
-        KYBERION_TENANT_SCOPE_REQUIRED: '1',
-        KYBERION_ROOT: ROOT,
-      });
-      const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer_decision.js');
-      const at = '2026-10-30T01:00:00.000Z';
-      const dry = await runCustomerDecisionReminderOp({ dryRun: true, now: at, scriptPath });
-      expect(dry).toMatchObject({
-        tenant: TENANT,
-        dry_run: true,
-        agenda_failures: 0,
-        counts: { would_remind_manually: 1 },
-      });
-      // A real run in the child: the unbound decider's D0 inbox task.
-      const real = await runCustomerDecisionReminderOp({ now: at, scriptPath });
-      expect(real).toMatchObject({ agenda_failures: 0, counts: { manual: 1 } });
-      expect(real.reminder_ids).toHaveLength(1);
-      await expect(
-        runCustomerDecisionReminderOp({ tenant: CHARTERED, now: at, scriptPath })
-      ).rejects.toThrow(/TENANT_MISMATCH/u);
-    } finally {
-      for (const key of keys) delete process.env[key];
-    }
-    await expect(runCustomerDecisionReminderOp({ now: NOW })).rejects.toThrow(/TENANT_REQUIRED/u);
-  }, 120_000);
+  it.skipIf(STALE_DIST !== null)(
+    `the daily op runs the facade as a child bound to its tenant, and refuses another tenant${STALE_DIST ? ` (skipped: ${STALE_DIST} — run pnpm -s build)` : ''}`,
+    async () => {
+      const { runCustomerDecisionReminderOp, reminderFacadeEnv } =
+        await import('./customer-decision/reminder-op.js');
+      const { buildTenantRunEnv } = await import('./chronos_daemon.js');
+      // The pipeline process: the identity a chronos tenant child runs with.
+      const env = buildTenantRunEnv(TENANT);
+      for (const key of [
+        'KYBERION_TENANT',
+        'KYBERION_TENANT_SCOPE_REQUIRED',
+        'MISSION_ROLE',
+        'KYBERION_PERSONA',
+      ] as const)
+        process.env[key] = env[key];
+      process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+      try {
+        // The facade child never inherits a role, persona or SYSTEM_ROLE; it keeps the tenant binding.
+        expect(reminderFacadeEnv(TENANT)).toMatchObject({
+          SYSTEM_ROLE: '',
+          MISSION_ROLE: '',
+          KYBERION_PERSONA: '',
+          KYBERION_TENANT: TENANT,
+          KYBERION_TENANT_SCOPE_REQUIRED: '1',
+          KYBERION_ROOT: ROOT,
+        });
+        const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer_decision.js');
+        const at = '2026-10-30T01:00:00.000Z';
+        const dry = await runCustomerDecisionReminderOp({ dryRun: true, now: at, scriptPath });
+        expect(dry).toMatchObject({
+          tenant: TENANT,
+          dry_run: true,
+          agenda_failures: 0,
+          counts: { would_remind_manually: 1 },
+        });
+        // A real run in the child: the unbound decider's D0 inbox task.
+        const real = await runCustomerDecisionReminderOp({ now: at, scriptPath });
+        expect(real).toMatchObject({ agenda_failures: 0, counts: { manual: 1 } });
+        expect(real.reminder_ids).toHaveLength(1);
+        await expect(
+          runCustomerDecisionReminderOp({ tenant: CHARTERED, now: at, scriptPath })
+        ).rejects.toThrow(/TENANT_MISMATCH/u);
+      } finally {
+        for (const key of keys) delete process.env[key];
+      }
+      await expect(runCustomerDecisionReminderOp({ now: NOW })).rejects.toThrow(/TENANT_REQUIRED/u);
+    },
+    120_000
+  );
 
   it('reminders --install promotes the template into the tenant pipeline catalog', async () => {
     process.env.KYBERION_PERSONA = 'sovereign';
@@ -565,5 +676,35 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     } finally {
       delete process.env.KYBERION_PERSONA;
     }
+  }, 60_000);
+
+  it('warns when a channel is linked to deciders of two customers (bindings name no customer)', async () => {
+    const out = await run([
+      'actor-add',
+      ...base(TENANT),
+      '--customer',
+      'globex',
+      '--actor',
+      'customer:globex-cto',
+      '--name',
+      'CTO',
+      '--channel',
+      'slack:C-ACME',
+    ]);
+    expect(out.warnings).toEqual(['channel_shared_with_customer:acme']);
+    const again = await run([
+      'actor-add',
+      ...base(TENANT),
+      '--customer',
+      'globex',
+      '--actor',
+      'customer:globex-cto',
+      '--name',
+      'CTO',
+      '--channel',
+      'none',
+    ]);
+    expect(again).not.toHaveProperty('warnings');
+    expect(again.actor).not.toHaveProperty('channel');
   }, 60_000);
 });

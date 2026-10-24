@@ -192,8 +192,9 @@ export const AGENDA_REMINDER_KINDS: readonly AgendaReminderKind[] = [
 /**
  * What became of one reminder: `sent` (delivered through the bound channel),
  * `approval_pending` (held at the outbound approval gate; the next sweep
- * retries with the same correlation id), `manual` (no usable bound channel:
- * an operator inbox task to remind by hand), `denied` (the gate refused it).
+ * retries with the same correlation id), `manual` (no usable bound channel,
+ * or a title the fixed template refuses: an operator inbox task to remind by
+ * hand), `denied` (the gate refused it, or the approval was rejected or lapsed).
  * A `delivery_failed` attempt is not recorded, so the next sweep retries.
  */
 export type AgendaReminderStatus = 'sent' | 'approval_pending' | 'manual' | 'denied';
@@ -207,7 +208,7 @@ export interface AgendaReminderRecord {
   target_date: string;
   status: AgendaReminderStatus;
   /** `manual`: why no channel was used. */
-  reason?: 'no_channel' | 'binding_missing' | 'surface_unsupported';
+  reason?: 'no_channel' | 'binding_missing' | 'surface_unsupported' | 'template_refused';
   approval_request_id?: string;
   inbox_entry_id?: string;
   at: string;
