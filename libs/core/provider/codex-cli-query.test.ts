@@ -551,3 +551,31 @@ describe('codex-cli-query', () => {
     });
   });
 });
+
+describe('stripNullObjectProperties (nullable-optional inverse)', () => {
+  it('removes null-valued properties recursively and lets an optional zod field pass', async () => {
+    const { stripNullObjectProperties } = await import('./codex-cli-query.js');
+    const schema = z.object({
+      title: z.string(),
+      experience: z.object({ cue: z.string() }).optional(),
+      edit_rows: z.array(z.object({ component: z.string() })).optional(),
+    });
+    const declined = { title: 't', experience: null, edit_rows: null };
+    expect(schema.safeParse(declined).success).toBe(false);
+    expect(schema.safeParse(stripNullObjectProperties(declined)).success).toBe(true);
+    // Present values survive; nested nulls inside kept objects are stripped too.
+    expect(stripNullObjectProperties({ a: { b: null, c: 1 }, d: [{ e: null }, null] })).toEqual({
+      a: { c: 1 },
+      d: [{}, null],
+    });
+  });
+
+  it('does not rescue a genuinely required nullable field returning the wrong type', async () => {
+    const { stripNullObjectProperties } = await import('./codex-cli-query.js');
+    const schema = z.object({ v: z.union([z.string(), z.null()]) });
+    // Required-but-nullable: real null parses on the first pass, unchanged path.
+    expect(schema.safeParse({ v: null }).success).toBe(true);
+    // A wrong type still fails even after stripping.
+    expect(schema.safeParse(stripNullObjectProperties({ v: 42 })).success).toBe(false);
+  });
+});
