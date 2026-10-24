@@ -6644,17 +6644,17 @@
       "chronos_org_objective_missions": {
         "en": "{count} missions",
         "ja": "ミッション {count}件",
-        "qps-ploc": "⟦{count} ɱïşşïőñş ŀőř⟧"
+        "qps-ploc": "⟦{count} ɱïşşïőñş ŀőřėɱ⟧"
       },
       "chronos_org_objective_no_projects": {
         "en": "no linked projects",
         "ja": "紐づくプロジェクトなし",
-        "qps-ploc": "⟦ñő ŀïñķėḓ þřőĵėƈŧş⟧"
+        "qps-ploc": "⟦ñő ŀïñķėḓ ṗřőĵėƈŧş ŀőřėɱ⟧"
       },
       "chronos_org_kr_unmeasured": {
         "en": "unmeasured",
         "ja": "未測定",
-        "qps-ploc": "⟦ůñɱėȧşůřėḓ⟧"
+        "qps-ploc": "⟦ůñɱėȧşůřėḓ ŀőř⟧"
       },
       "chronos_org_priority_high": {
         "en": "High",
