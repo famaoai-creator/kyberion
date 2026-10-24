@@ -59,6 +59,8 @@ import {
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
+/** Writes `active/shared/inbox/` (shared core role; the local-inbox delivery of operator-notifications.ts). */
+const INBOX_WRITER_ROLE = 'surface_runtime';
 
 function diagnosticCode(error: unknown): string {
   if (error instanceof WorkCoordinationError) return error.code;
@@ -285,15 +287,19 @@ export function notifyBoltReviewRejected(input: BoltRoutingInput): BoltRejectNot
   };
   const title = t('customer_decision:bolt_review_rejected_title', params);
   const body = t('customer_decision:bolt_review_rejected_body', params);
-  addInboxEntry({
-    entryId,
-    ifAbsent: true,
-    missionId: input.missionId,
-    title,
-    summary: body,
-    tenantSlug: input.tenantSlug,
-    kind: 'customer_decision_bolt_rejected',
-  });
+  // The inbox store's own governed writer, as operator-notifications.ts writes
+  // the local inbox: the facade (customer-triggered respond) has no inbox grant.
+  withExecutionContext(INBOX_WRITER_ROLE, () =>
+    addInboxEntry({
+      entryId,
+      ifAbsent: true,
+      missionId: input.missionId,
+      title,
+      summary: body,
+      tenantSlug: input.tenantSlug,
+      kind: 'customer_decision_bolt_rejected',
+    })
+  );
   const receipt = notifyOperatorWithReceiptSync(
     'question',
     {

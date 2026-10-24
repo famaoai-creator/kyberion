@@ -199,9 +199,27 @@ function writeInvite(invite: CustomerDecisionInvite, expectedGeneration: string 
           `[CD_INVITE_CONFLICT] invite ${invite.invite_id} changed: expected generation ${expectedGeneration ?? 'missing'}, current ${current ?? 'missing'}`
         );
       }
-      safeMkdir(path.dirname(filePath), { recursive: true });
+      try {
+        safeMkdir(path.dirname(filePath), { recursive: true });
+      } catch (error) {
+        throw tierPartitionError(invite.tenant_slug, error);
+      }
       writeJson(filePath, validated);
     })
+  );
+}
+
+/**
+ * The tier directory of the invite store (`…/confidential/`) is a protected
+ * partition: the guard lets the invite store create it only for a tenant that
+ * is registered and active (tier-guard `isScopedStructuralMkdir`). Name that
+ * cause instead of the raw policy refusal; any other error passes through.
+ */
+function tierPartitionError(tenantSlug: string, error: unknown): unknown {
+  if (!errorText(error).includes('tenant.scope_invalid_prefix')) return error;
+  return new Error(
+    `[CD_INVITE_TENANT_NOT_REGISTERED] tenant '${tenantSlug}' is not a registered active tenant, so its customer decision invite partition cannot be created | ` +
+      `register the tenant (knowledge/personal/tenants/${tenantSlug}.json, status active — pnpm onboarding) and send again | tenant=${tenantSlug}`
   );
 }
 
