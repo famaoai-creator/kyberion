@@ -1,0 +1,307 @@
+{
+  "$schema": "../../schemas/customer-decision-template.schema.json",
+  "version": "1.0.0",
+  "template_id": "aidlc-inception",
+  "phase": "aidlc_inception",
+  "title_key": "customer_decision:template_aidlc_inception_title",
+  "entries": [
+    {
+      "entry_id": "purpose_success",
+      "item": "inception.purpose_success",
+      "key": "inception.purpose_success",
+      "kind": "hearing",
+      "question_key": "customer_decision:purpose_success_question",
+      "background_key": "customer_decision:purpose_success_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "primary_users",
+      "item": "inception.primary_users",
+      "key": "inception.primary_users",
+      "kind": "hearing",
+      "question_key": "customer_decision:primary_users_question",
+      "background_key": "customer_decision:primary_users_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "user_stories",
+      "item": "inception.user_stories",
+      "key": "inception.user_stories",
+      "kind": "approval",
+      "question_key": "customer_decision:user_stories_question",
+      "background_key": "customer_decision:user_stories_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "acceptance_criteria",
+      "item": "inception.acceptance_criteria",
+      "key": "inception.acceptance_criteria",
+      "kind": "approval",
+      "question_key": "customer_decision:acceptance_criteria_question",
+      "background_key": "customer_decision:acceptance_criteria_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "performance_target",
+      "item": "inception.nfr.performance",
+      "key": "nfr.performance",
+      "kind": "choice",
+      "question_key": "customer_decision:performance_target_question",
+      "background_key": "customer_decision:performance_target_background",
+      "options": [
+        {
+          "value": "standard",
+          "label_key": "customer_decision:performance_target_opt_standard_label",
+          "impact_keys": {
+            "cost": "customer_decision:performance_target_opt_standard_impact_cost",
+            "schedule": "customer_decision:performance_target_opt_standard_impact_schedule",
+            "scope": "customer_decision:performance_target_opt_standard_impact_scope"
+          }
+        },
+        {
+          "value": "fast",
+          "label_key": "customer_decision:performance_target_opt_fast_label",
+          "impact_keys": {
+            "cost": "customer_decision:performance_target_opt_fast_impact_cost",
+            "schedule": "customer_decision:performance_target_opt_fast_impact_schedule",
+            "scope": "customer_decision:performance_target_opt_fast_impact_scope"
+          }
+        },
+        {
+          "value": "very_fast",
+          "label_key": "customer_decision:performance_target_opt_very_fast_label",
+          "impact_keys": {
+            "cost": "customer_decision:performance_target_opt_very_fast_impact_cost",
+            "schedule": "customer_decision:performance_target_opt_very_fast_impact_schedule",
+            "scope": "customer_decision:performance_target_opt_very_fast_impact_scope"
+          }
+        }
+      ],
+      "org_default": {
+        "value": "standard",
+        "source": "template:aidlc-inception"
+      },
+      "requires_customer": false
+    },
+    {
+      "entry_id": "security_level",
+      "item": "inception.nfr.security",
+      "key": "nfr.security",
+      "kind": "choice",
+      "question_key": "customer_decision:security_level_question",
+      "background_key": "customer_decision:security_level_background",
+      "options": [
+        {
+          "value": "basic",
+          "label_key": "customer_decision:security_level_opt_basic_label",
+          "impact_keys": {
+            "cost": "customer_decision:security_level_opt_basic_impact_cost",
+            "schedule": "customer_decision:security_level_opt_basic_impact_schedule",
+            "scope": "customer_decision:security_level_opt_basic_impact_scope"
+          }
+        },
+        {
+          "value": "enhanced",
+          "label_key": "customer_decision:security_level_opt_enhanced_label",
+          "impact_keys": {
+            "cost": "customer_decision:security_level_opt_enhanced_impact_cost",
+            "schedule": "customer_decision:security_level_opt_enhanced_impact_schedule",
+            "scope": "customer_decision:security_level_opt_enhanced_impact_scope"
+          }
+        },
+        {
+          "value": "strict",
+          "label_key": "customer_decision:security_level_opt_strict_label",
+          "impact_keys": {
+            "cost": "customer_decision:security_level_opt_strict_impact_cost",
+            "schedule": "customer_decision:security_level_opt_strict_impact_schedule",
+            "scope": "customer_decision:security_level_opt_strict_impact_scope"
+          }
+        }
+      ],
+      "org_default": {
+        "value": "basic",
+        "source": "template:aidlc-inception"
+      },
+      "requires_customer": false
+    },
+    {
+      "entry_id": "availability_target",
+      "item": "inception.nfr.availability",
+      "key": "nfr.availability",
+      "kind": "choice",
+      "question_key": "customer_decision:availability_target_question",
+      "background_key": "customer_decision:availability_target_background",
+      "options": [
+        {
+          "value": "business_hours",
+          "label_key": "customer_decision:availability_target_opt_business_hours_label",
+          "impact_keys": {
+            "cost": "customer_decision:availability_target_opt_business_hours_impact_cost",
+            "schedule": "customer_decision:availability_target_opt_business_hours_impact_schedule",
+            "scope": "customer_decision:availability_target_opt_business_hours_impact_scope"
+          }
+        },
+        {
+          "value": "always_on",
+          "label_key": "customer_decision:availability_target_opt_always_on_label",
+          "impact_keys": {
+            "cost": "customer_decision:availability_target_opt_always_on_impact_cost",
+            "schedule": "customer_decision:availability_target_opt_always_on_impact_schedule",
+            "scope": "customer_decision:availability_target_opt_always_on_impact_scope"
+          }
+        },
+        {
+          "value": "high_availability",
+          "label_key": "customer_decision:availability_target_opt_high_availability_label",
+          "impact_keys": {
+            "cost": "customer_decision:availability_target_opt_high_availability_impact_cost",
+            "schedule": "customer_decision:availability_target_opt_high_availability_impact_schedule",
+            "scope": "customer_decision:availability_target_opt_high_availability_impact_scope"
+          }
+        }
+      ],
+      "org_default": {
+        "value": "business_hours",
+        "source": "template:aidlc-inception"
+      },
+      "requires_customer": false
+    },
+    {
+      "entry_id": "supported_platforms",
+      "item": "inception.nfr.platforms",
+      "key": "nfr.platforms",
+      "kind": "choice",
+      "question_key": "customer_decision:supported_platforms_question",
+      "background_key": "customer_decision:supported_platforms_background",
+      "options": [
+        {
+          "value": "desktop_web",
+          "label_key": "customer_decision:supported_platforms_opt_desktop_web_label",
+          "impact_keys": {
+            "cost": "customer_decision:supported_platforms_opt_desktop_web_impact_cost",
+            "schedule": "customer_decision:supported_platforms_opt_desktop_web_impact_schedule",
+            "scope": "customer_decision:supported_platforms_opt_desktop_web_impact_scope"
+          }
+        },
+        {
+          "value": "desktop_and_mobile_web",
+          "label_key": "customer_decision:supported_platforms_opt_desktop_and_mobile_web_label",
+          "impact_keys": {
+            "cost": "customer_decision:supported_platforms_opt_desktop_and_mobile_web_impact_cost",
+            "schedule": "customer_decision:supported_platforms_opt_desktop_and_mobile_web_impact_schedule",
+            "scope": "customer_decision:supported_platforms_opt_desktop_and_mobile_web_impact_scope"
+          }
+        },
+        {
+          "value": "web_and_native_app",
+          "label_key": "customer_decision:supported_platforms_opt_web_and_native_app_label",
+          "impact_keys": {
+            "cost": "customer_decision:supported_platforms_opt_web_and_native_app_impact_cost",
+            "schedule": "customer_decision:supported_platforms_opt_web_and_native_app_impact_schedule",
+            "scope": "customer_decision:supported_platforms_opt_web_and_native_app_impact_scope"
+          }
+        }
+      ],
+      "org_default": {
+        "value": "desktop_and_mobile_web",
+        "source": "template:aidlc-inception"
+      },
+      "requires_customer": false
+    },
+    {
+      "entry_id": "unit_split",
+      "item": "inception.unit_split",
+      "key": "units.split",
+      "kind": "approval",
+      "question_key": "customer_decision:unit_split_question",
+      "background_key": "customer_decision:unit_split_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "mvp_scope",
+      "item": "inception.mvp_scope",
+      "key": "units.mvp_scope",
+      "kind": "ranking",
+      "question_key": "customer_decision:mvp_scope_question",
+      "background_key": "customer_decision:mvp_scope_background",
+      "requires_customer": false
+    },
+    {
+      "entry_id": "budget_range",
+      "item": "inception.budget_range",
+      "key": "constraints.budget",
+      "kind": "choice",
+      "question_key": "customer_decision:budget_range_question",
+      "background_key": "customer_decision:budget_range_background",
+      "options": [
+        {
+          "value": "lean",
+          "label_key": "customer_decision:budget_range_opt_lean_label",
+          "impact_keys": {
+            "cost": "customer_decision:budget_range_opt_lean_impact_cost",
+            "schedule": "customer_decision:budget_range_opt_lean_impact_schedule",
+            "scope": "customer_decision:budget_range_opt_lean_impact_scope"
+          }
+        },
+        {
+          "value": "standard",
+          "label_key": "customer_decision:budget_range_opt_standard_label",
+          "impact_keys": {
+            "cost": "customer_decision:budget_range_opt_standard_impact_cost",
+            "schedule": "customer_decision:budget_range_opt_standard_impact_schedule",
+            "scope": "customer_decision:budget_range_opt_standard_impact_scope"
+          }
+        },
+        {
+          "value": "extended",
+          "label_key": "customer_decision:budget_range_opt_extended_label",
+          "impact_keys": {
+            "cost": "customer_decision:budget_range_opt_extended_impact_cost",
+            "schedule": "customer_decision:budget_range_opt_extended_impact_schedule",
+            "scope": "customer_decision:budget_range_opt_extended_impact_scope"
+          }
+        }
+      ],
+      "requires_customer": true
+    },
+    {
+      "entry_id": "target_release",
+      "item": "inception.target_release",
+      "key": "constraints.target_release",
+      "kind": "choice",
+      "question_key": "customer_decision:target_release_question",
+      "background_key": "customer_decision:target_release_background",
+      "options": [
+        {
+          "value": "within_one_month",
+          "label_key": "customer_decision:target_release_opt_within_one_month_label",
+          "impact_keys": {
+            "cost": "customer_decision:target_release_opt_within_one_month_impact_cost",
+            "schedule": "customer_decision:target_release_opt_within_one_month_impact_schedule",
+            "scope": "customer_decision:target_release_opt_within_one_month_impact_scope"
+          }
+        },
+        {
+          "value": "within_three_months",
+          "label_key": "customer_decision:target_release_opt_within_three_months_label",
+          "impact_keys": {
+            "cost": "customer_decision:target_release_opt_within_three_months_impact_cost",
+            "schedule": "customer_decision:target_release_opt_within_three_months_impact_schedule",
+            "scope": "customer_decision:target_release_opt_within_three_months_impact_scope"
+          }
+        },
+        {
+          "value": "flexible",
+          "label_key": "customer_decision:target_release_opt_flexible_label",
+          "impact_keys": {
+            "cost": "customer_decision:target_release_opt_flexible_impact_cost",
+            "schedule": "customer_decision:target_release_opt_flexible_impact_schedule",
+            "scope": "customer_decision:target_release_opt_flexible_impact_scope"
+          }
+        }
+      ],
+      "requires_customer": true
+    }
+  ]
+}

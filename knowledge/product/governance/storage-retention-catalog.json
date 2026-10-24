@@ -34,6 +34,12 @@
       "note": "PG-03 standing grants (governance/grant-store.ts), partitioned by tier and tenant. Expired and revoked records are kept as the evidence of what was allowed and when; never expire automatically. Removal requires an explicit retention review (tenant offboarding)."
     },
     {
+      "path": "active/shared/runtime/customer-decision-invites",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "CD-06 customer decision invite links (customer-decision/invite.ts), partitioned by tier and tenant. Holds secret hashes, expiry, revocation and a bounded use log only; never the token. Revoked and expired records are kept as evidence of who could reach which agenda; never expire automatically. Removal requires an explicit retention review (tenant offboarding)."
+    },
+    {
       "path": "active/shared/runtime/hearing",
       "artifact_class": "state",
       "action": "review_required",

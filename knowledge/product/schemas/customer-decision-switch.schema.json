@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-switch.schema.json",
+  "title": "Customer Decision Switch",
+  "description": "One effective-decision switch event (CD-02): the value work follows changed, or a provisional value was confirmed by the customer. Appended to knowledge/confidential/<tenant>/decisions/<case>/switches.jsonl and reconciled at task boundaries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "switch_id",
+    "case_id",
+    "agenda_id",
+    "entry_id",
+    "item",
+    "key",
+    "kind",
+    "from",
+    "to",
+    "at"
+  ],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "switch_id": { "type": "string", "pattern": "^sw-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "item": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    "kind": { "type": "string", "enum": ["value_changed", "confirmed"] },
+    "from": { "$ref": "#/definitions/side" },
+    "to": { "$ref": "#/definitions/side" },
+    "at": { "type": "string", "minLength": 1 },
+    "cause_receipt_id": { "type": "string", "pattern": "^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" }
+  },
+  "definitions": {
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layer"],
+      "properties": {
+        "layer": { "type": "string", "enum": ["customer", "ours", "org_default", "none"] },
+        "value": {},
+        "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" }
+      }
+    }
+  }
+}

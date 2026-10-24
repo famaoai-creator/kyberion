@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/hearing-scenarios.schema.json",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "default_scenario": "web_app_build",
   "scenarios": [
     {
@@ -173,6 +173,103 @@
           "id": "target",
           "title_key": "front_desk:hearing_phase_target",
           "requirement_ids": ["desired_state", "success_measure", "boundaries"]
+        }
+      ],
+      "canvas": "web_app_preview",
+      "handoff": "mission"
+    },
+    {
+      "id": "aidlc_inception",
+      "label_key": "front_desk:hearing_scenario_aidlc_inception_label",
+      "description_key": "front_desk:hearing_scenario_aidlc_inception_description",
+      "requirements": [
+        {
+          "id": "purpose",
+          "label_key": "front_desk:hearing_req_aidlc_purpose",
+          "aliases": ["goal_statement"]
+        },
+        {
+          "id": "success_criteria",
+          "label_key": "front_desk:hearing_req_aidlc_success_criteria",
+          "aliases": ["success"]
+        },
+        {
+          "id": "users",
+          "label_key": "front_desk:hearing_req_aidlc_users",
+          "aliases": ["audience"]
+        },
+        {
+          "id": "user_stories",
+          "label_key": "front_desk:hearing_req_aidlc_user_stories",
+          "aliases": ["stories"]
+        },
+        {
+          "id": "acceptance_criteria",
+          "label_key": "front_desk:hearing_req_aidlc_acceptance_criteria",
+          "aliases": ["acceptance"]
+        },
+        {
+          "id": "performance",
+          "label_key": "front_desk:hearing_req_aidlc_performance"
+        },
+        {
+          "id": "security",
+          "label_key": "front_desk:hearing_req_aidlc_security"
+        },
+        {
+          "id": "availability",
+          "label_key": "front_desk:hearing_req_aidlc_availability"
+        },
+        {
+          "id": "platforms",
+          "label_key": "front_desk:hearing_req_aidlc_platforms",
+          "aliases": ["platform"]
+        },
+        {
+          "id": "unit_split",
+          "label_key": "front_desk:hearing_req_aidlc_unit_split",
+          "aliases": ["units"]
+        },
+        {
+          "id": "mvp_scope",
+          "label_key": "front_desk:hearing_req_aidlc_mvp_scope",
+          "aliases": ["mvp"]
+        },
+        {
+          "id": "budget",
+          "label_key": "front_desk:hearing_req_aidlc_budget"
+        },
+        {
+          "id": "timeline",
+          "label_key": "front_desk:hearing_req_aidlc_timeline",
+          "aliases": ["schedule"]
+        }
+      ],
+      "phases": [
+        {
+          "id": "intent",
+          "title_key": "front_desk:hearing_phase_aidlc_intent",
+          "requirement_ids": ["purpose", "success_criteria", "users"]
+        },
+        {
+          "id": "elaboration",
+          "title_key": "front_desk:hearing_phase_aidlc_elaboration",
+          "requirement_ids": ["user_stories", "acceptance_criteria"]
+        },
+        {
+          "id": "nfr",
+          "title_key": "front_desk:hearing_phase_aidlc_nfr",
+          "requirement_ids": ["performance", "security", "availability", "platforms"]
+        },
+        {
+          "id": "units",
+          "title_key": "front_desk:hearing_phase_aidlc_units",
+          "requirement_ids": ["unit_split", "mvp_scope"]
+        },
+        {
+          "id": "constraints",
+          "title_key": "front_desk:hearing_phase_aidlc_constraints",
+          "requirement_ids": ["budget", "timeline"]
         }
       ],
       "canvas": "web_app_preview",
