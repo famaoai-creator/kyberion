@@ -226,6 +226,7 @@
 - [Authority, Role & Persona Model (v3.0)](./product/governance/AUTHORITY_MODEL.md) (public | Unknown)
 - [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
+- [Delegated Agent Operations Runbook](./product/governance/delegated-agent-operations-runbook.md) (public | Unknown)
 - [Dependency Placement Policy](./product/governance/dependency-placement-policy.md) (public | Unknown)
 - [Dot の委任枠と満杯時の待機運用](./product/governance/dot-capacity-operations.ja.md) (public | Unknown)
 - [Dual-Key Policy](./product/governance/dual-key-policy.md) (public | Unknown)

@@ -102,7 +102,10 @@ export async function main(
       typeof envelope.base_hash !== 'string'
     )
       throw new Error(
-        'Request requires the exact reviewed preview envelope with input, digest and base_hash.'
+        'Request requires the exact reviewed preview envelope with input, digest and base_hash. ' +
+          'Generate it first — the digest binds to YOUR identity, so run preview yourself:\n' +
+          '  pnpm onboarding authority preview --file <plan.json> --scope <person|organization> [--tenant <slug>] --out knowledge/personal/<name>-preview.json\n' +
+          'then request with that file.'
       );
     return requestOnboardingAuthority(principal, input, {
       digest: envelope.digest,
