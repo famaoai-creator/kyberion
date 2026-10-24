@@ -314,7 +314,9 @@ function appendInboxEntryRaw(
   const validated = inboxEntryCatalog(filePath).validate(entry, filePath);
   ensureInboxDir();
   const separator = raw === '' || raw.endsWith('\n') ? '' : '\n';
-  safeWriteFile(filePath, `${raw}${separator}${JSON.stringify(validated)}\n`);
+  // A JSONL append written whole: the writer-role guard compares the full content with the file.
+  const line = JSON.stringify(validated);
+  safeWriteFile(filePath, `${raw}${separator}${line}\n`);
   return validated;
 }
 
