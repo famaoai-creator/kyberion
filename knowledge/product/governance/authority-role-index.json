@@ -116,6 +116,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "customer_decision_consumer_store": {
+      "description": "Customer decision consumer lock storage (CD-09, libs/core/mission/mission-decision-lock.ts): reads the bound tenant's decision case (decisions.jsonl, switches.jsonl, agendas/, consumers/) and writes only consumers/<consumer>.json under knowledge/confidential/<tenant>/decisions/<case>/. Requires an exact deny-only case capability (libs/core/foundation/customer-decision-consumer-capability.ts) naming every path before each operation; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). No ledger, agenda, receipt, switch, invite or customers/ write authority.",
+      "default_persona": "unknown",
+      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
+      "scope_classes": ["knowledge_core"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "customer_decision_deal_note_writer": {
       "description": "Customer decision deal-note writer (scripts/customer_decision.ts respond / confirm, CD-08): reads and appends notes to the bound tenant's deal records under customer/<tenant>/deals/ only, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES). Assumed only for the best-effort deal note that a customer decision switch adds, so the customer-triggered respond path never needs mission_controller. No knowledge, decision ledger, agenda, receipt, invite or other customer/ authority.",
       "default_persona": "worker",

@@ -5,6 +5,7 @@
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { readLedger } from '@agent/core/decision-ledger';
+import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
 import {
   agendaContentHash,
   appendSwitches,
@@ -42,6 +43,7 @@ import {
   noteDealSwitches,
 } from './common.js';
 import { reconcileCase, unreconciledDecisions } from './reconcile.js';
+import { taskProposalStatus } from './task-proposals.js';
 
 function effectiveView(decision: EffectiveDecision): Record<string, unknown> {
   return {
@@ -57,13 +59,27 @@ function effectiveView(decision: EffectiveDecision): Record<string, unknown> {
   };
 }
 
+/**
+ * `status --agenda <id>`: the agenda's decisions, invites, receipts and
+ * switches. Without `--agenda`, the case's task proposals only (CD-09). Both
+ * forms carry `task_proposals` (pending proposals and held tasks).
+ */
 export function runStatus(opts: Record<string, string>, now: string): unknown {
   const tenant = tenantOf(opts);
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
-  const agendaId = requireOpt(opts, 'agenda');
+  const agendaId = opts.agenda?.trim();
   return withCaseLock(location, () => {
     const reconciled = reconcileCase(tenant, location, now);
+    if (!agendaId) {
+      return {
+        case_id: caseId,
+        reconciled,
+        task_proposals: asLedgerWriter(tenant, () =>
+          taskProposalStatus(tenant, caseId, location, now)
+        ),
+      };
+    }
     const agenda = loadAgenda(location, tenant, agendaId);
     const invites = listInvites(tenant, { agendaId: agenda.agenda_id, caseId: agenda.case_id });
     return asLedgerWriter(tenant, () => {
@@ -110,6 +126,7 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
           new Set(receipts.map((receipt) => receipt.receipt_id)),
           pending
         ),
+        task_proposals: taskProposalStatus(tenant, agenda.case_id, location, now),
       };
     });
   });
@@ -135,6 +152,24 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
  * effective resolver (`resolveAgendaEffective`), not the ledger state alone.
  */
 export function runConfirm(opts: Record<string, string>, now: string): unknown {
+  const result = confirmDecision(opts, now);
+  // CD-09: a confirmed requires_customer decision releases the tasks holding
+  // on it (a `confirmed` switch never files rework). After the case lock (the
+  // sweep takes it itself); best-effort, never fails the confirmation.
+  const caseId = requireOpt(opts, 'case');
+  sweepDecisionConsumers(
+    {
+      tenantSlug: tenantOf(opts),
+      caseId,
+      location: locationOf(opts, caseId),
+      agendaId: requireOpt(opts, 'agenda'),
+    },
+    { now }
+  );
+  return result;
+}
+
+function confirmDecision(opts: Record<string, string>, now: string): unknown {
   const tenant = tenantOf(opts);
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);

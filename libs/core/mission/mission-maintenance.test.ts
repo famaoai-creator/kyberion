@@ -32,6 +32,21 @@ const usageCollector = vi.hoisted(() => ({
 vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
+// CD-09 seam: the real lock calls by default (no decision case → no-op);
+// a test overrides the result to see what reaches the public ledger.
+const decisionLock = vi.hoisted(() => ({ pin: vi.fn(), reconcile: vi.fn() }));
+vi.mock('./mission-decision-lock.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-decision-lock.js')>();
+  decisionLock.pin.mockImplementation(actual.pinTaskDecisions);
+  decisionLock.reconcile.mockImplementation(actual.reconcileTaskDecisions);
+  return {
+    ...actual,
+    pinTaskDecisions: (...args: Parameters<typeof actual.pinTaskDecisions>) =>
+      decisionLock.pin(...args),
+    reconcileTaskDecisions: (...args: Parameters<typeof actual.reconcileTaskDecisions>) =>
+      decisionLock.reconcile(...args),
+  };
+});
 vi.mock('../metrics.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../metrics.js')>();
   const fallback = new actual.MetricsCollector({ persist: false });
@@ -436,6 +451,87 @@ describe('direct-CLI usage accounting', () => {
         total_tokens: null,
       },
     });
+  });
+
+  it('record-evidence reconciles customer decisions first; the ledger gets counts and ids only (CD-09)', async (ctx) => {
+    const { missionId, missionPath, readTasks } = seedMission(
+      ctx,
+      [{ task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' }],
+      ['evidence/report.md']
+    );
+    const lockResult = {
+      consumer: `mission-${missionId}.impl`,
+      checked: 2,
+      stale_count: 1,
+      rework_work_item_ids: ['WI-CDR-0123456789ABCDEF'],
+    };
+    decisionLock.reconcile.mockReturnValueOnce(lockResult);
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    expect(decisionLock.reconcile).toHaveBeenLastCalledWith({ missionId, taskId: 'impl' });
+    const entries = String(
+      safeReadFile(`${missionPath}/execution-ledger.jsonl`, { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const recorded = entries.find((entry) => entry.event_type === 'evidence_recorded');
+    expect(recorded.payload.customer_decision_lock).toEqual(lockResult);
+    // A stale result does not block completion.
+    expect(readTasks()[0].status).toBe('completed');
+  });
+
+  it('record-evidence on a task held for a customer decision records the evidence but does not complete it (CD-09)', async (ctx) => {
+    const { missionId, missionPath, readTasks } = seedMission(
+      ctx,
+      [{ task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' }],
+      ['evidence/report.md']
+    );
+    const held = {
+      consumer: `mission-${missionId}.impl`,
+      checked: 1,
+      stale_count: 0,
+      rework_work_item_ids: [],
+      held_proposal_ids: ['tp-0123456789abcdef'],
+    };
+    decisionLock.reconcile.mockReturnValueOnce(held);
+    const warn = vi.spyOn(logger, 'warn');
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    const ledger = String(
+      safeReadFile(`${missionPath}/execution-ledger.jsonl`, { encoding: 'utf8' })
+    );
+    expect(ledger).toContain('evidence_recorded');
+    expect(readTasks()[0].status).toBe('planned');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('task impl not completed — it waits for a customer decision')
+    );
+    warn.mockRestore();
+  });
+
+  it('record-task naming a task pins its customer decisions once (CD-09)', async (ctx) => {
+    const { missionId } = seedMission(ctx, [{ task_id: 'impl', status: 'planned' }], []);
+    decisionLock.pin.mockClear();
+    await recordTask(missionId, 'Note without a task', { next_step: 'later' });
+    expect(decisionLock.pin).not.toHaveBeenCalled();
+    await recordTask(missionId.toLowerCase(), 'Start impl', { task_id: ' impl ' });
+    expect(decisionLock.pin).toHaveBeenCalledWith({
+      missionId,
+      taskId: 'impl',
+      mode: 'if_absent',
+    });
+  });
+
+  it('record-evidence on a mission without a decision case adds nothing (CD-09)', async (ctx) => {
+    const { missionId, missionPath } = seedMission(
+      ctx,
+      [{ task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' }],
+      ['evidence/report.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    const ledger = String(
+      safeReadFile(`${missionPath}/execution-ledger.jsonl`, { encoding: 'utf8' })
+    );
+    expect(ledger).toContain('evidence_recorded');
+    expect(ledger).not.toContain('customer_decision_lock');
   });
 
   it('records an entry for each task completed by cascade', async (ctx) => {

@@ -611,4 +611,117 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(getWorkItem(item.item_id)?.status).toBe('blocked');
     loggerErrorSpy.mockRestore();
   });
+
+  it('never stores customer_decisions from a delegation output, and returns the reply as is (CD-09)', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-CD09',
+      title: 'coordinated task',
+      description: 'run through the shared execution boundary',
+      projectId: 'MSN-COORDINATED-CD09',
+      status: 'ready',
+    });
+    const output = [
+      '```task_result',
+      JSON.stringify({
+        summary: 'done',
+        artifacts: [],
+        verification_done: ['checked'],
+        gaps: [],
+        needs: [],
+        customer_decisions: [
+          {
+            question: 'Which secret colour theme?',
+            item: 'UX',
+            key: 'ui.theme',
+            proposed_value: 'secret-dark',
+            requires_customer: false,
+          },
+        ],
+      }),
+      '```',
+    ].join('\n');
+    const receipt = await delegateCoordinatedCliSubagentTask(
+      {
+        work_item_id: item.item_id,
+        task_id: 'task-cd09',
+        mission_id: 'MSN-COORDINATED-CD09',
+        security_scope: {
+          tenant_id: 'default',
+          mission_id: 'MSN-COORDINATED-CD09',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'coordinated execution test',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-cd09',
+      },
+      async () => ({
+        execution_kind: 'agent_delegation' as const,
+        task_id: 'task-cd09',
+        agent_id: 'agent-1',
+        status: 'succeeded' as const,
+        output_ref: `${item.item_id}:result`,
+        output,
+      })
+    );
+    // The caller gets its reply untouched; only what the port stores is stripped.
+    expect(receipt.output).toBe(output);
+    const stored = JSON.stringify(getWorkItem(item.item_id));
+    expect(stored).not.toMatch(/secret|ui\.theme/u);
+    expect(stored).toContain('summary');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('customer_decisions left out of the stored WorkItem record')
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secret|ui\.theme/u);
+    warn.mockRestore();
+  });
+
+  it('the reasoning-backend adapter chain hands the caller its reply with customer_decisions intact (CD-09)', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const { delegateWorkItemWithReasoningBackend } =
+      await import('./reasoning/reasoning-backend-execution-adapter.js');
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-CD09-ADAPTER',
+      title: 'adapter task',
+      description: 'run through the reasoning backend adapter',
+      projectId: 'MSN-COORDINATED-CD09',
+      status: 'ready',
+    });
+    const reply = [
+      '```task_result',
+      JSON.stringify({
+        summary: 'done',
+        artifacts: [],
+        verification_done: ['checked'],
+        gaps: [],
+        needs: [],
+        customer_decisions: [
+          { question: 'Secret?', item: 'UX', key: 'ui.theme', requires_customer: true },
+        ],
+      }),
+      '```',
+    ].join('\n');
+    const backend = {
+      name: 'stub',
+      delegateTask: vi.fn(async () => reply),
+    } as unknown as Parameters<typeof delegateWorkItemWithReasoningBackend>[0];
+    const receipt = await delegateWorkItemWithReasoningBackend(backend, {
+      work_item_id: item.item_id,
+      task_id: 'task-adapter',
+      mission_id: 'MSN-COORDINATED-CD09',
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: 'MSN-COORDINATED-CD09',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'coordinated execution test',
+      },
+      instruction: 'execute the task',
+      idempotency_key: 'coord-cd09-adapter',
+    });
+    expect(receipt.output).toBe(reply);
+    expect(JSON.stringify(getWorkItem(item.item_id))).not.toMatch(/Secret|ui\.theme/u);
+    warn.mockRestore();
+  });
 });

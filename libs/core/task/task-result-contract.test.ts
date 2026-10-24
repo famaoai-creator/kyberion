@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { extractTaskResultBlocks, validateTaskResult } from './task-result-contract.js';
+import {
+  extractTaskResultBlocks,
+  redactCustomerDecisionsForPrompt,
+  repairTaskResult,
+  stripCustomerDecisionsFromReply,
+  validateTaskResult,
+} from './task-result-contract.js';
 
 // KP-05: task_result gained an optional `knowledge_feedback` field. These
 // tests pin two things: (1) every pre-KP-05 (old-format) task_result keeps
@@ -225,5 +231,128 @@ describe('TaskResultSchema — provenance (XP-05)', () => {
   it('rejects provenance that is not an object', () => {
     const result = validateTaskResult(baseTaskResult({ provenance: 'nope' }));
     expect(result.valid).toBe(false);
+  });
+});
+
+describe('TaskResultSchema — customer_decisions (CD-09)', () => {
+  const block = (value: unknown) => ['```task_result', JSON.stringify(value), '```'].join('\n');
+  const proposal = {
+    question: 'Which sign-in method should the customer portal use?',
+    item: 'NFR',
+    key: 'auth.method',
+    proposed_value: 'sso',
+    options: [
+      { value: 'sso', label: 'SSO' },
+      { value: 'password', label: 'Password' },
+    ],
+    requires_customer: false,
+    rationale: 'Enterprise users',
+  };
+
+  it('accepts a valid proposal and a requires_customer question without a value', () => {
+    const result = validateTaskResult(
+      baseTaskResult({
+        customer_decisions: [
+          proposal,
+          {
+            question: 'Release on 11/1?',
+            item: 'RELEASE',
+            key: 'release.go',
+            requires_customer: true,
+          },
+        ],
+      })
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value?.customer_decisions).toHaveLength(2);
+  });
+
+  it('drops invalid entries without failing the task_result', () => {
+    const parsed = extractTaskResultBlocks(
+      block(
+        baseTaskResult({
+          customer_decisions: [
+            proposal,
+            { ...proposal, proposed_value: undefined },
+            { ...proposal, key: 'Not A Key' },
+            'not an object',
+          ],
+        })
+      )
+    );
+    expect(parsed.taskResultErrors).toEqual([]);
+    expect(parsed.taskResults[0]?.customer_decisions).toEqual([proposal]);
+    expect(parsed.taskResultRepairs).toEqual(['customer_decisions: 3 invalid entries dropped']);
+    const none = extractTaskResultBlocks(block(baseTaskResult({ customer_decisions: 'oops' })));
+    expect(none.taskResultErrors).toEqual([]);
+    expect(none.taskResults[0]).not.toHaveProperty('customer_decisions');
+  });
+
+  it('repairTaskResult keeps the valid entries of a mixed list and drops a non-array', () => {
+    const big = 'x'.repeat(2100);
+    const mixed = repairTaskResult(
+      baseTaskResult({
+        customer_decisions: [
+          proposal,
+          { ...proposal, proposed_value: big },
+          { ...proposal, options: [{ value: big, label: 'Huge' }] },
+          { ...proposal, requires_customer: 'yes' },
+          null,
+        ],
+      })
+    );
+    expect(mixed.value?.customer_decisions).toEqual([proposal]);
+    expect(mixed.repairs).toEqual(['customer_decisions: 4 invalid entries dropped']);
+    expect(mixed.requiresReview).toBe(false);
+    const nonArray = repairTaskResult(baseTaskResult({ customer_decisions: { question: 'q' } }));
+    expect(nonArray.value).toBeDefined();
+    expect(nonArray.value).not.toHaveProperty('customer_decisions');
+    expect(nonArray.repairs).toEqual(['customer_decisions: 1 invalid entries dropped']);
+    // A value at the limit is accepted.
+    const atLimit = validateTaskResult(
+      baseTaskResult({ customer_decisions: [{ ...proposal, proposed_value: 'y'.repeat(2046) }] })
+    );
+    expect(atLimit.valid).toBe(true);
+  });
+});
+
+describe('stripCustomerDecisionsFromReply (CD-09, consumption and storage paths)', () => {
+  const block = (value: unknown) => ['```task_result', JSON.stringify(value), '```'].join('\n');
+  const base = {
+    summary: 'Explained why customer_decisions were not needed.',
+    artifacts: [],
+    verification_done: ['checked'],
+    gaps: [],
+    needs: [],
+  };
+
+  it('keeps a summary that merely mentions the word, and prose mentioning it', () => {
+    const reply = `I left customer_decisions empty on purpose.\n${block(base)}`;
+    expect(stripCustomerDecisionsFromReply(reply)).toBe(reply);
+    // The prompt redactor is stricter by design: it would not quote this reply.
+    expect(redactCustomerDecisionsForPrompt(reply)).toBe('');
+    const parsed = extractTaskResultBlocks(stripCustomerDecisionsFromReply(reply));
+    expect(parsed.taskResults[0]?.summary).toBe(base.summary);
+  });
+
+  it('removes only the field from a parseable block, escaped keys included', () => {
+    const decisions = [
+      { question: 'secret q', item: 'UX', key: 'ui.theme', requires_customer: true },
+    ];
+    const stripped = stripCustomerDecisionsFromReply(
+      `Notes stay.\n${block({ ...base, customer_decisions: decisions })}`
+    );
+    expect(stripped).toContain('Notes stay.');
+    expect(stripped).not.toMatch(/secret|ui\.theme/u);
+    expect(extractTaskResultBlocks(stripped).taskResults[0]).toMatchObject({
+      summary: base.summary,
+    });
+    const escaped = block({ ...base }).replace(
+      '"needs":[]',
+      '"needs":[],"\\u0063ustomer_decisions":[{"question":"secret q"}]'
+    );
+    expect(stripCustomerDecisionsFromReply(escaped)).not.toMatch(/secret/u);
+    // Idempotent.
+    expect(stripCustomerDecisionsFromReply(stripped)).toBe(stripped);
   });
 });

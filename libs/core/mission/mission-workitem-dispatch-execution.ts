@@ -4,6 +4,7 @@
  */
 
 import * as nodePath from 'node:path';
+import { logger } from '../core.js';
 import type { AgentContextMode } from '../context-boundary.js';
 import { readCanonicalWorkGraph } from '../workforce/work-graph-projection.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
@@ -26,6 +27,10 @@ import {
   formatReasoningDriftWatchdogDecision,
 } from '../reasoning/reasoning-drift-watchdog.js';
 import { extractSurfaceBlocks } from '../surface/surface-response-blocks.js';
+import {
+  redactCustomerDecisionsForPrompt,
+  stripCustomerDecisionsFromReply,
+} from '../task/task-result-contract.js';
 import {
   renderMissionContextPack,
   resolveMissionContextPack,
@@ -581,6 +586,22 @@ export function summarizeDispatchObservability(input: {
   };
 }
 
+/**
+ * CD-09: a WorkItem dispatch reply without customer decisions (no decision
+ * case on this path to route them to). Warns with counts only.
+ */
+export function withoutCustomerDecisions<T extends { responseText: string }>(
+  response: T,
+  itemId: string
+): T {
+  const redacted = stripCustomerDecisionsFromReply(response.responseText);
+  if (redacted === response.responseText) return response;
+  logger.warn(
+    `work item dispatch: customer_decisions dropped — this dispatch path has no customer decision case | dispatch the work as a mission task to route customer judgments; the reply is kept without them | item=${itemId}`
+  );
+  return { ...response, responseText: redacted };
+}
+
 export function parseTaskResultResponse(responseText: string): {
   taskResult?: NonNullable<ReturnType<typeof extractSurfaceBlocks>['taskResults']>[number];
   parseErrors: string[];
@@ -590,8 +611,11 @@ export function parseTaskResultResponse(responseText: string): {
   plainText: string;
 } {
   const structured = extractSurfaceBlocks(responseText);
+  const taskResult = structured.taskResults?.[0];
+  // Defensive: never carry customer decisions on this path (see withoutCustomerDecisions).
+  if (taskResult && 'customer_decisions' in taskResult) delete taskResult.customer_decisions;
   return {
-    taskResult: structured.taskResults?.[0],
+    taskResult,
     parseErrors: structured.taskResultErrors || [],
     repairs: structured.taskResultRepairs || [],
     repairRequiresReview: Boolean(structured.taskResultRepairRequiresReview),
@@ -667,7 +691,14 @@ export async function obtainTaskResultResponse(input: {
   let attemptPrompt = input.prompt;
   const notes: string[] = [];
   let retried = false;
+  // CD-09: this path has no decision case. A worker reply's customer_decisions
+  // are dropped here, before the reply is parsed, persisted
+  // (workitem-dispatch-<item>.json) or quoted back in a retry prompt.
   const route = (prompt: string, contextMode: AgentContextMode) =>
+    routeOnce(prompt, contextMode).then((routed) =>
+      withoutCustomerDecisions(routed, input.item.item_id)
+    );
+  const routeOnce = (prompt: string, contextMode: AgentContextMode) =>
     runWithWorkItemResponseDeadline((signal) =>
       routeToAgentOrSubagent({
         missionId: input.missionId,
@@ -716,7 +747,8 @@ export async function obtainTaskResultResponse(input: {
     attemptPrompt = buildTaskResultRetryPrompt({
       missionId: input.missionId,
       item: input.item,
-      previousResponse: response.responseText,
+      // Already stripped (withoutCustomerDecisions); the excerpt also gets the prompt redactor.
+      previousResponse: redactCustomerDecisionsForPrompt(response.responseText),
       parseErrors: [
         ...(taskResult?.needs?.length ? [`needs unresolved: ${taskResult.needs.join('; ')}`] : []),
         ...parseErrors,

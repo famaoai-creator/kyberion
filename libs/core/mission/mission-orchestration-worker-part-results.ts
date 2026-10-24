@@ -352,6 +352,20 @@ export async function obtainBestOfProvidersJudgeVerdict(input: {
   }
 }
 
+/**
+ * CD-09: a task result as the judge prompt (mission-visible) and the kept
+ * alternative (public evidence) may show it — without customer decisions.
+ * The winner's own customer_decisions reach the worker, which routes them.
+ */
+function withoutCustomerDecisionsField(
+  taskResult: TaskResultBlock | undefined
+): Omit<TaskResultBlock, 'customer_decisions'> | undefined {
+  if (!taskResult) return taskResult;
+  const { customer_decisions: _decisions, ...rest } = taskResult;
+  void _decisions;
+  return rest;
+}
+
 export async function obtainBestOfTaskResultResponse(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -390,10 +404,16 @@ export async function obtainBestOfTaskResultResponse(input: {
       : '',
     '',
     `Candidate A (${BEST_OF_APPROACHES[0].directive}):`,
-    JSON.stringify(first.response.taskResult, null, 2).slice(0, 6000),
+    JSON.stringify(withoutCustomerDecisionsField(first.response.taskResult), null, 2).slice(
+      0,
+      6000
+    ),
     '',
     `Candidate B (${BEST_OF_APPROACHES[1].directive}):`,
-    JSON.stringify(second.response.taskResult, null, 2).slice(0, 6000),
+    JSON.stringify(withoutCustomerDecisionsField(second.response.taskResult), null, 2).slice(
+      0,
+      6000
+    ),
     '',
     'Pick the candidate that best satisfies the task and criteria.',
     'Return JSON only: { "winner": "A" | "B", "rationale": string, "merge_hints": string[] }',
@@ -476,7 +496,7 @@ export async function obtainBestOfTaskResultResponse(input: {
           winner: winnerKey,
           judge_rationale: verdict?.rationale,
           merge_hints: verdict?.merge_hints,
-          task_result: loser.response.taskResult,
+          task_result: withoutCustomerDecisionsField(loser.response.taskResult),
         }),
       });
     }

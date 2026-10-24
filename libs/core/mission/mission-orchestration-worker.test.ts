@@ -1819,6 +1819,137 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     ]);
   });
 
+  it('turns reviewer gaps without review_findings into must-fix rework on the review target', async () => {
+    const { missionDir } = await import('../path-resolver.js');
+    const { safeWriteFile, safeReadFile } = await import('../secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(`${missionPath}/deliverables/REVIEW-task-1.md`, '# review notes');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-1',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the base work',
+            deliverable: 'deliverables/task-a.md',
+          },
+          {
+            task_id: 'task-2',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            description: 'Review the implementation',
+            deliverable: 'deliverables/REVIEW-task-1.md',
+            dependencies: ['task-1'],
+            review_target: 'task-1',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      [
+        '# TASK_BOARD: MSN-FOLLOWUP',
+        '',
+        '## Status: Planning Ready',
+        '',
+        '### 🛠️ Execution Phase',
+        '- [x] Step 1: Research and Strategy',
+        '- [ ] Step 2: Implementation',
+        '- [ ] Step 3: Validation',
+        '',
+      ].join('\n')
+    );
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
+    });
+    mocks.resolveMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-FOLLOWUP',
+      mission_type: 'product_development',
+      assignments: [],
+    });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    }));
+    mocks.route.mockImplementation(
+      async (envelope: { payload?: { text?: string; context?: { task_id?: string } } }) => {
+        const taskId = String(envelope?.payload?.context?.task_id || '');
+        const prompt = String(envelope?.payload?.text || '');
+        if (taskId === 'task-1' && prompt.includes('## Review findings to address')) {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'Reworked the implementation.',
+                artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
+                verification_done: ['Addressed the reviewer findings.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
+        if (taskId === 'task-1') {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'Completed the base implementation.',
+                artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
+                verification_done: ['Confirmed the base implementation.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
+        if (taskId === 'task-2' && prompt.includes('Review findings to address')) {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'The implementation now passes review.',
+                artifacts: [{ path: 'deliverables/REVIEW-task-1.md', kind: 'markdown' }],
+                verification_done: ['Confirmed the revised implementation.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
+        return {
+          payload: {
+            text: makeTaskResultText({
+              summary: 'Review found one must-fix issue.',
+              artifacts: [{ path: 'deliverables/REVIEW-task-1.md', kind: 'markdown' }],
+              verification_done: ['Reviewed the target work.'],
+              gaps: ['Clarify the implementation heading hierarchy.'],
+              needs: [],
+            }),
+          },
+        };
+      }
+    );
+
+    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    const prompts = mocks.route.mock.calls.map((call) =>
+      String((call[0] as { payload?: { text?: string } } | undefined)?.payload?.text || '')
+    );
+    expect(prompts[2]).toContain('## Review findings to address');
+    expect(prompts[2]).toContain('must_fix @ task-1');
+  });
+
   it('injects upstream results and team snapshot, then replays reviewer findings as rework', async () => {
     const { missionDir } = await import('../path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('../secure-io.js');

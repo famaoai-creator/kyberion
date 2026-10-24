@@ -4,7 +4,11 @@ import { clamp, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
-import { resolveQuestionInteractionPacket } from '../question-resolver.js';
+import {
+  classifyQuestionDecision,
+  resolveQuestionInteractionPacket,
+} from '../question-resolver.js';
+import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import { parsePlanningReviewVerdict } from './mission-planning-packet.js';
 import { extractSurfaceBlocks } from '../surface/surface-response-blocks.js';
 import { renderStructuredOutputSchemaPrompt } from '../structured-output-contracts.js';
@@ -897,6 +901,9 @@ export function buildTaskExecutionPrompt(input: {
     // which "Knowledge hints" above (by path) actually helped or didn't, and
     // any topic you needed but were not given.
     'Optionally include knowledge_feedback: {used, not_used, missing_topics} to report which of the knowledge hints above (by path) helped, which did not, and which topics were needed but missing.',
+    // CD-09: customer-judgment questions travel apart from `needs`
+    // (question-resolution-playbook "Whose question is it").
+    'If a choice is the customer’s to make (product behavior, wording, screens, scope priority the customer will see), do not put it in needs: add it to customer_decisions [{question, item, key, proposed_value, options?, requires_customer, rationale?, topic?}] and keep working on your proposed_value. Use requires_customer: true with no proposed_value only for money, contract, release, or change requests; that task waits for the customer. Technical choices are yours to decide.',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -1046,6 +1053,31 @@ export function parseTaskResultResponse(responseText: string): {
     surfaceParseErrors: structured.surfaceParseErrors || [],
     plainText: structured.text,
   };
+}
+
+/**
+ * CD-09: take the customer-judgment questions out of a task result before any
+ * of it is stored (last_result, task events and evidence are public mission
+ * data; the questions and values belong to the confidential decision case).
+ * The question-resolution policy may raise `requires_customer` by topic.
+ */
+export function takeTaskCustomerDecisions(
+  taskResult: TaskResultBlock | undefined
+): TaskCustomerDecisionRequest[] {
+  if (!taskResult || !('customer_decisions' in taskResult)) return [];
+  const requests = taskResult.customer_decisions ?? [];
+  delete taskResult.customer_decisions;
+  return requests.map((request) => {
+    const { requires_customer } = classifyQuestionDecision({
+      customerVisible: true,
+      requiresCustomer: request.requires_customer,
+      ...(request.topic ? { topic: request.topic } : {}),
+    });
+    if (!requires_customer) return request;
+    const { proposed_value: _proposal, ...rest } = request;
+    void _proposal;
+    return { ...rest, requires_customer: true };
+  });
 }
 
 export function buildTaskClarificationPacket(input: {

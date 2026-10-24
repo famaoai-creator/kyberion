@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  classifyQuestionDecision,
   resolveQuestionInteractionPacket,
   resolveQuestionResolution,
 } from './question-resolver.js';
@@ -142,5 +143,26 @@ describe('question-resolver', () => {
     });
 
     expect(packet).toBeUndefined();
+  });
+
+  it('classifies customer judgments (CD-09): policy topics wait for the customer, the rest goes on', () => {
+    expect(classifyQuestionDecision({ customerVisible: false, requiresCustomer: true })).toEqual({
+      decision_class: 'ours',
+      requires_customer: false,
+    });
+    expect(classifyQuestionDecision({ customerVisible: true, topic: 'product_behavior' })).toEqual({
+      decision_class: 'customer_judgment',
+      requires_customer: false,
+    });
+    for (const topic of ['money', 'Contract', 'release', 'change-request']) {
+      expect(classifyQuestionDecision({ customerVisible: true, topic }).requires_customer).toBe(
+        true
+      );
+    }
+    // The worker's own requires_customer is never lifted by the policy.
+    expect(
+      classifyQuestionDecision({ customerVisible: true, requiresCustomer: true, topic: 'ux' })
+        .requires_customer
+    ).toBe(true);
   });
 });

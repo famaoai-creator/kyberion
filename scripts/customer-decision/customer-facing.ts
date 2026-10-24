@@ -24,6 +24,7 @@ import {
   type CustomerDecisionInvite,
   type DecisionAgenda,
 } from '@agent/core/customer-decision';
+import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   AUDIT_AGENT,
@@ -198,7 +199,7 @@ function runRespond(
   now: string
 ): unknown {
   const { tenant, invite, location } = openInvite(opts, input.token, 'respond', now);
-  return withCaseLock(location, () => {
+  const result = withCaseLock(location, () => {
     reconcileCase(tenant, location, now);
     return asLedgerWriter(tenant, () => {
       // Re-read under the lock: everything below plans on the current state.
@@ -286,6 +287,17 @@ function runRespond(
       };
     });
   });
+  // CD-09: completed mission tasks that pinned a decision this agenda switched
+  // get a rework WorkItem. After the case lock (the sweep takes it itself);
+  // best-effort and idempotent over every recorded switch of the agenda, so a
+  // failure never fails the customer's response and the next one retries it.
+  // Its lock wait is short (SWEEP_LOCK_TIMEOUT_MS), so respond stays inside
+  // the customer room's facade timeout even when the case is busy.
+  sweepDecisionConsumers(
+    { tenantSlug: tenant, caseId: invite.case_id, location, agendaId: invite.agenda_id },
+    { now }
+  );
+  return result;
 }
 
 export async function runCustomerFacing(
