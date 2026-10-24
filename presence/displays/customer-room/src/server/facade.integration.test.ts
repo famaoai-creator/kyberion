@@ -342,7 +342,7 @@ describe.skipIf(!BUILT)('customer-room attachments against the built facade', ()
           item: 'bolt:MSN-ROOM-IT',
           key: 'bolt.acceptance',
           kind: 'approval',
-          question: 'Do you accept the results of this bolt?',
+          question: 'Do you accept the results of this round of work?',
           our_decision: { value: { approved: true } },
           requires_customer: false,
           attachments: [image],

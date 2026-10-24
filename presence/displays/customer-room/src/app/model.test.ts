@@ -22,6 +22,7 @@ import {
   needsOurConfirmation,
   parseFragmentToken,
   pickLocale,
+  roleBannerKey,
   screenForReason,
   sourceKey,
   type Draft,
@@ -364,6 +365,20 @@ describe('general question', () => {
   });
 });
 
+describe('role banner', () => {
+  it('tells a decider that requires_customer answers stay provisional until confirmed', () => {
+    expect(roleBannerKey('contributor', [entry({ requires_customer: true })])).toBe(
+      'role_contributor'
+    );
+    expect(roleBannerKey('decider', [entry(), entry({ requires_customer: false })])).toBe(
+      'role_decider'
+    );
+    expect(roleBannerKey('decider', [entry(), entry({ requires_customer: true })])).toBe(
+      'role_decider_with_confirmation'
+    );
+  });
+});
+
 describe('vocabulary coverage', () => {
   const read = (relative: string): string =>
     safeReadFile(pathResolver.rootResolve(relative), { encoding: 'utf8' }) as string;
@@ -391,7 +406,9 @@ describe('vocabulary coverage', () => {
       }
     }
     for (const lit of main.matchAll(/'((?:state|impact)_[a-z_]+)'/gu)) keys.add(lit[1]);
-    for (const lit of model.matchAll(/'(source_[a-z_]+|comment_missing|reject_reason_missing)'/gu))
+    for (const lit of model.matchAll(
+      /'(source_[a-z_]+|role_[a-z_]+|comment_missing|reject_reason_missing)'/gu
+    ))
       keys.add(lit[1]);
     for (const lit of main.matchAll(
       /'(current_line[a-z_]*|review_lead_[a-z]+|receipt_[a-z]+|reload|retry_action)'/gu

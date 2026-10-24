@@ -354,13 +354,21 @@ export function keepPipelinePromotedAtWhenUnchanged<T extends { promotion?: unkn
 /**
  * The promotion itself, for governed callers that install a known template
  * into a tenant catalog (`customer-decision reminders --install`, CD-11).
- * Same argv as the CLI; throws `ScriptExitError` on refusal.
+ * Same argv as the CLI; throws `ScriptExitError` on refusal. `ingestedBy`
+ * names the operator who asked (e.g. `user:<member>` from the caller's own
+ * `--by`) for the tenant asset ledger, instead of the process identity.
  */
-export async function promotePipelineAdf(args: string[]): Promise<PipelinePromotionResult> {
-  return main(args);
+export async function promotePipelineAdf(
+  args: string[],
+  options: { ingestedBy?: string } = {}
+): Promise<PipelinePromotionResult> {
+  return main(args, options);
 }
 
-async function main(args: string[] = []): Promise<PipelinePromotionResult> {
+async function main(
+  args: string[] = [],
+  options: { ingestedBy?: string } = {}
+): Promise<PipelinePromotionResult> {
   const argv = args;
   const inputPath = getFlag(argv, '--input');
   if (!inputPath) {
@@ -507,7 +515,7 @@ async function main(args: string[] = []): Promise<PipelinePromotionResult> {
       // is planned before the write and appended right after it.
       const ledgerOptions = { knowledgeRoot };
       try {
-        const ingestedBy = resolvePromotionActor('[promote]');
+        const ingestedBy = options.ingestedBy?.trim() || resolvePromotionActor('[promote]');
         asset = withExecutionContext(
           'asset_promoter',
           () => {

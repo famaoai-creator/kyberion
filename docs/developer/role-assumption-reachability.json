@@ -965,6 +965,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-decision-lock.ts#loadDecisionCaseMissionState",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-dispatch-io.ts#appendJsonLine",
       "roles": ["mission_controller"],
       "unresolved": []

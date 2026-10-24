@@ -688,10 +688,27 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     120_000
   );
 
+  it('reminders --install needs --by (the asset ledger never lands an anonymous asset)', async () => {
+    await expect(run(['reminders', '--tenant', TENANT, '--install'])).rejects.toThrow(
+      /--by user:<member> is required/u
+    );
+  });
+
   it('reminders --install promotes the template into the tenant pipeline catalog', async () => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    // No identity env: the operator's --by is the asset ledger's ingested_by.
+    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedRole = process.env.MISSION_ROLE;
+    delete process.env.KYBERION_PERSONA;
+    delete process.env.MISSION_ROLE;
     try {
-      const out = await run(['reminders', '--tenant', TENANT, '--install']);
+      const out = await run([
+        'reminders',
+        '--tenant',
+        TENANT,
+        '--install',
+        '--by',
+        'user:ops-lead',
+      ]);
       expect(out).toMatchObject({
         installed: `knowledge/confidential/${TENANT}/pipelines/customer-decision-reminders.json`,
         dry_run: false,
@@ -713,8 +730,20 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
           }),
         ])
       );
+      const ledger = initialContext('ecosystem_architect', () =>
+        String(
+          io.safeReadFile(
+            path.join(ROOT, `knowledge/confidential/${TENANT}/_ledger/assets.jsonl`),
+            { encoding: 'utf8' }
+          )
+        )
+      );
+      expect(ledger).toContain('"ingested_by":"user:ops-lead"');
     } finally {
-      delete process.env.KYBERION_PERSONA;
+      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = savedRole;
     }
   }, 60_000);
 

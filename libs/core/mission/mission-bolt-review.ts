@@ -47,15 +47,13 @@ import { t } from '../t.js';
 import { WorkCoordinationError } from '../workforce/work-coordination-error.js';
 import { createWorkItemIfAbsent, getWorkItem } from '../workforce/work-coordination.js';
 import {
+  loadDecisionCaseMissionState,
   resolveMissionDecisionCase,
   SWEEP_LOCK_TIMEOUT_MS,
   type MissionDecisionCase,
   type MissionDecisionLockOptions,
 } from './mission-decision-lock.js';
-import {
-  loadMissionStateIncludingArchive,
-  SATISFIED_PREREQUISITE_STATUSES,
-} from './mission-state.js';
+import { SATISFIED_PREREQUISITE_STATUSES } from './mission-state.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
@@ -122,12 +120,12 @@ export function passBoltReviewMilestones(
     const decisionCase = resolveMissionDecisionCase(upper, options);
     if (!decisionCase) return null;
     const now = options.now ?? nowIso();
-    // A finished bolt is archived by `finish`: read the archive too, and
-    // accept the statuses that satisfy a prerequisite (completed, archived).
+    // A finished bolt is archived by `finish`: read the archive too (bound to
+    // the case's tenant), and accept the statuses that satisfy a prerequisite
+    // (completed, archived).
     const load =
       options.loadMissionState ??
-      ((id: string) =>
-        loadMissionStateIncludingArchive(id, { tenantSlug: decisionCase.tenantSlug }));
+      ((id: string) => loadDecisionCaseMissionState(id, decisionCase.tenantSlug));
     const isCompleted = (id: string) =>
       SATISFIED_PREREQUISITE_STATUSES.has(load(id.toUpperCase())?.status ?? '');
     return withCustomerDecisionCaseLock(
@@ -234,6 +232,7 @@ export function fileBoltReviewWorkItem(
       priority: 'normal',
       source: 'local',
       sourceRef: `customer-decision:${input.caseId}:${input.agendaId}:${input.entryId}`,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
       context: {
         tenant_slug: input.tenantSlug,
         ...(input.projectId ? { project_id: input.projectId } : {}),
