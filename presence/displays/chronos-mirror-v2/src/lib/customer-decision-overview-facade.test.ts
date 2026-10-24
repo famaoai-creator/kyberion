@@ -69,7 +69,7 @@ describe('customer-decision overview facade child (CD-12)', () => {
     const [command, args, options] = mocks.safeExecResultAsync.mock.calls[0];
     expect(command).toBe(process.execPath);
     expect(String(args[0]).endsWith(OVERVIEW_FACADE_SCRIPT)).toBe(true);
-    expect(args.slice(1)).toEqual(['overview', '--tenant', 'acme', '--json']);
+    expect(args.slice(1)).toEqual(['overview', '--tenant', 'acme', '--summary', '--json']);
     expect(options.env).toEqual(overviewChildEnv('acme'));
     expect(options.env.SYSTEM_ROLE).toBe('');
     expect(options.env).not.toHaveProperty('PATH');

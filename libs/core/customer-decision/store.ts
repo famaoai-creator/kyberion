@@ -743,6 +743,19 @@ export function writeLearningReport(report: CustomerDecisionLearningReport): {
   return { path: file, report: validated };
 }
 
+const LEARNING_REPORT_FILE_PATTERN = /^learning-(\d{4}-\d{2}-\d{2})\.json$/u;
+
+/** The dates of the tenant's learning reports, oldest first. Call as the tenant-bound ledger role. */
+export function listLearningReportDates(tenantSlug: string): string[] {
+  const dir = path.join(tenantDecisionsRoot(tenantSlug), CUSTOMER_DECISION_REPORTS_DIR);
+  const safe = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safe)) return [];
+  return safeReaddir(safe)
+    .map((name) => name.match(LEARNING_REPORT_FILE_PATTERN)?.[1])
+    .filter((date): date is string => date !== undefined)
+    .sort();
+}
+
 export function readLearningReport(
   tenantSlug: string,
   reportDate: string

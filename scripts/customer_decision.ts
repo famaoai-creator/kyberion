@@ -29,10 +29,11 @@
  *            else an operator inbox task; --dry-run writes nothing
  *   reminders --install --by user:<member> [--force]    install the daily tenant reminder pipeline (pipeline:promote);
  *            --by is the asset ledger's ingested_by (no identity env needed)
- *   overview [--case <id>] [--now <iso>]   read-only tenant overview (CD-12; JSON contract
+ *   overview [--case <id>] [--now <iso>] [--summary]   read-only tenant overview (CD-12; JSON contract
  *            `CustomerDecisionOverview`, libs/core/customer-decision/overview.ts): status counts,
  *            deadlines, change requests, hand-offs, reminders and held tasks per agenda; never
- *            reconciles, routes or writes; refuses a --tenant other than a bound KYBERION_TENANT
+ *            reconciles, routes or writes; refuses a --tenant other than a bound KYBERION_TENANT;
+ *            --summary omits agenda entries and caps attention at 50 (totals.attention_total)
  *   learning [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]   count overturned
  *            decisions, recurring questions and change requests (CD-12), write the tenant report
  *            decisions/_reports/learning-<date>.json and queue organization learning candidates
@@ -147,7 +148,7 @@ export async function runCustomerDecision(
     case 'reminders':
       return runRemindersInstall(opts, flags);
     case 'overview':
-      return runOverview(opts, now);
+      return runOverview(opts, flags, now);
     case 'learning':
       return flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now);
     case 'confirm':

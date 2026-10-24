@@ -9,6 +9,7 @@ import {
 } from '@agent/core/customer-decision';
 import {
   OVERVIEW_ATTENTION_REASONS,
+  OVERVIEW_LIMITS,
   parseCustomerDecisionOverview,
   parseCustomerDecisionOverviewResponse,
   SUPPORTED_CUSTOMER_DECISION_OVERVIEW_VERSION,
@@ -92,7 +93,7 @@ describe('customer-decision overview projection (CD-12)', () => {
     const source = realOverview();
     const parsed = parseCustomerDecisionOverview(JSON.parse(JSON.stringify(source)), 'acme');
     expect(parsed).toBeDefined();
-    expect(parsed?.totals).toEqual(source.totals);
+    expect(parsed?.totals).toEqual({ ...source.totals, attention_total: source.attention.length });
     expect(parsed?.attention).toEqual(source.attention);
     expect(parsed?.case_failures).toEqual(source.case_failures);
     const [agenda] = parsed!.cases[0].agendas;
@@ -145,5 +146,38 @@ describe('customer-decision overview projection (CD-12)', () => {
       parseCustomerDecisionOverviewResponse({ overview: realOverview('acme') }, 'acme')
     ).toBeDefined();
     expect(parseCustomerDecisionOverviewResponse({ error: 'x' })).toBeUndefined();
+  });
+
+  it('truncates oversized lists instead of rejecting the overview', () => {
+    const value = structuredClone(realOverview());
+    const item = value.attention[0];
+    value.attention = Array.from({ length: 600 }, () => item);
+    value.cases = Array.from({ length: 700 }, (_, index) => ({
+      ...value.cases[0],
+      case_id: `case-${index}`,
+      agendas: Array.from({ length: 300 }, () => value.cases[0].agendas[0]),
+    }));
+    const parsed = parseCustomerDecisionOverview(value, 'acme');
+    expect(parsed).toBeDefined();
+    expect(parsed!.attention).toHaveLength(OVERVIEW_LIMITS.attention);
+    expect(parsed!.totals.attention_total).toBe(600);
+    expect(parsed!.cases).toHaveLength(OVERVIEW_LIMITS.cases);
+    expect(parsed!.cases[0].agendas).toHaveLength(OVERVIEW_LIMITS.agendas_per_case);
+    expect(parsed!.cases[0].agendas_total).toBe(300);
+  });
+
+  it('reads attention_total from the summary form', () => {
+    const source = structuredClone(realOverview());
+    const value = {
+      ...source,
+      totals: { ...source.totals, attention_total: 75 },
+      cases: source.cases.map((item) => ({
+        ...item,
+        agendas: item.agendas.map(({ entries: _entries, ...agenda }) => agenda),
+      })),
+    };
+    expect(parseCustomerDecisionOverview(value, 'acme')?.totals.attention_total).toBe(75);
+    value.totals.attention_total = -1;
+    expect(parseCustomerDecisionOverview(value, 'acme')).toBeUndefined();
   });
 });

@@ -63,6 +63,12 @@ export interface OverturnStat extends LearningSubject {
   customer_values: LearningValueCount[];
   /** Overturns to a value that is not an offered option (free text: not shown). */
   other_values: number;
+  /**
+   * The organization default in force: the entry's `org_default` on the most
+   * recently updated agenda that is not withdrawn (absent when none carries one).
+   * The facade overrides it with the product template's current default.
+   */
+  current_org_default?: unknown;
 }
 
 export interface QuestionStat extends LearningSubject {
@@ -235,6 +241,8 @@ export function buildDecisionLearningMetrics(
     string,
     Omit<ChangeRequestStat, 'rate' | 'requested_values'> & { values: ValueTally }
   >();
+  /** Template entry → the org default of the most recently updated agenda carrying it. */
+  const defaults = new Map<string, { value: unknown; updated_at: string }>();
   let agendaCount = 0;
   let receiptCount = 0;
   let switchCount = 0;
@@ -268,6 +276,24 @@ export function buildDecisionLearningMetrics(
     const entryOf = (agendaId: string, entryId: string): AgendaEntry | undefined =>
       agendas.get(agendaId)?.entries.find((entry) => entry.entry_id === entryId);
 
+    // An `option` answer was checked against the options of the revision it
+    // answered, so it was offered whatever the current revision says.
+    const optionAnswers = new Set<string>();
+    for (const receipt of item.receipts) {
+      for (const answer of receipt.answers) {
+        if (answer.choice === 'option' && answer.value !== undefined)
+          optionAnswers.add(
+            `${receipt.receipt_id}\u0000${answer.entry_id}\u0000${valueKey(answer.value)}`
+          );
+      }
+    }
+    const offeredBySwitch = (record: DecisionSwitch, entry: AgendaEntry | undefined): boolean =>
+      (record.cause_receipt_id !== undefined &&
+        optionAnswers.has(
+          `${record.cause_receipt_id}\u0000${record.entry_id}\u0000${valueKey(record.to.value)}`
+        )) ||
+      isOffered(entry, record.to.value);
+
     for (const record of item.switches) {
       if (!inSince(record.at, opts.since)) continue;
       switchCount += 1;
@@ -295,7 +321,7 @@ export function buildDecisionLearningMetrics(
           continue;
         }
         slot.overturned += 1;
-        if (isOffered(entry, record.to.value)) slot.customer.add(record.to.value);
+        if (offeredBySwitch(record, entry)) slot.customer.add(record.to.value);
         else slot.other += 1;
       }
     }
@@ -313,6 +339,10 @@ export function buildDecisionLearningMetrics(
         };
         question.agendaIds.add(`${item.case_id}\u0000${agenda.agenda_id}`);
         questions.set(id, question);
+        if (agenda.status === 'withdrawn' || !entry.org_default || !subject.template_id) continue;
+        const known = defaults.get(id);
+        if (!known || agenda.updated_at >= known.updated_at)
+          defaults.set(id, { value: entry.org_default.value, updated_at: agenda.updated_at });
       }
     }
 
@@ -334,24 +364,61 @@ export function buildDecisionLearningMetrics(
           if (answer.choice === 'free_text' && entry.kind !== 'hearing') question.off_option += 1;
           else if (answer.comment) question.comments += 1;
         }
-        if (receipt.participant.role !== 'decider') continue;
-        const change = changes.get(id) ?? {
-          ...subject,
-          kind: entry.kind,
-          answers: 0,
-          change_requests: 0,
-          request_changes: 0,
-          reject: 0,
-          values: new ValueTally(),
-        };
-        change.answers += 1;
-        if (answer.outcome === 'change_request') {
-          change.change_requests += 1;
-          if (isOffered(entry, answer.value)) change.values.add(answer.value);
-        } else if (answer.choice === 'request_changes') change.request_changes += 1;
-        else if (answer.choice === 'reject') change.reject += 1;
-        changes.set(id, change);
       }
+    }
+    // Change requests: a decider who answers the same revision again replaces
+    // the earlier answer, so only the latest answer per agenda × revision ×
+    // decider × entry counts.
+    const latest = new Map<
+      string,
+      { receipt: DecisionReceipt; answer: DecisionReceipt['answers'][number] }
+    >();
+    const ordered = item.receipts
+      .filter((receipt) => receipt.participant.role === 'decider')
+      .filter((receipt) => inSince(receipt.submitted_at, opts.since))
+      .sort(
+        (a, b) =>
+          a.submitted_at.localeCompare(b.submitted_at) || a.receipt_id.localeCompare(b.receipt_id)
+      );
+    for (const receipt of ordered) {
+      for (const answer of receipt.answers) {
+        latest.set(
+          [
+            receipt.agenda_id,
+            String(receipt.agenda_revision),
+            receipt.participant.actor_id,
+            answer.entry_id,
+          ].join('\u0000'),
+          { receipt, answer }
+        );
+      }
+    }
+    for (const { receipt, answer } of latest.values()) {
+      const entry = entryOf(receipt.agenda_id, answer.entry_id);
+      if (!entry) continue;
+      const subject = subjectOf(entry);
+      const id = subjectId(subject);
+      const change = changes.get(id) ?? {
+        ...subject,
+        kind: entry.kind,
+        answers: 0,
+        change_requests: 0,
+        request_changes: 0,
+        reject: 0,
+        values: new ValueTally(),
+      };
+      change.answers += 1;
+      if (answer.outcome === 'change_request') {
+        change.change_requests += 1;
+        // Offered at the receipt's revision (an `option` answer), or now.
+        if (
+          answer.value !== undefined &&
+          (answer.choice === 'option' || isOffered(entry, answer.value))
+        )
+          change.values.add(answer.value);
+      } else if (answer.choice === 'request_changes') change.request_changes += 1;
+      else if (answer.choice === 'reject') change.reject += 1;
+      changes.set(id, change);
     }
     for (const [agendaId, tally] of receiptsByAgenda) {
       agendaQuestions.push({
@@ -367,6 +434,10 @@ export function buildDecisionLearningMetrics(
     sortBySubject(
       [...map.values()].map((slot) => {
         const decided = slot.overturned + slot.kept;
+        const current =
+          slot.subject.template_id && slot.from_layer === 'org_default'
+            ? defaults.get(subjectId(slot.subject))
+            : undefined;
         return {
           ...slot.subject,
           from_layer: slot.from_layer,
@@ -377,6 +448,7 @@ export function buildDecisionLearningMetrics(
           proposed_values: slot.proposed.sorted(),
           customer_values: slot.customer.sorted(),
           other_values: slot.other,
+          ...(current ? { current_org_default: current.value } : {}),
         };
       }),
       (stat) => stat.from_layer
@@ -436,7 +508,15 @@ function subjectFields(subject: LearningSubject): LearningSubject {
  */
 export function buildLearningSuggestions(
   metrics: CustomerDecisionLearningMetrics,
-  thresholds: Partial<LearningThresholds> = {}
+  thresholds: Partial<LearningThresholds> = {},
+  opts: {
+    /**
+     * The organization default in force per template entry
+     * (`<template_id>#<entry_id>` → value), read from the product template;
+     * wins over the agendas' default.
+     */
+    currentDefaults?: ReadonlyMap<string, unknown>;
+  } = {}
 ): LearningSuggestion[] {
   const limits = { ...DEFAULT_LEARNING_THRESHOLDS, ...thresholds };
   const suggestions: LearningSuggestion[] = [];
@@ -446,7 +526,13 @@ export function buildLearningSuggestions(
       continue;
     const top = stat.customer_values[0];
     if (!top || top.count < limits.min_value_count) continue;
-    const current = stat.proposed_values[0]?.value;
+    // The default in force now (the template, else the latest agenda) — never
+    // the historically most frequent one, so an applied change is not
+    // suggested again.
+    const id = subjectId(stat);
+    const current = opts.currentDefaults?.has(id)
+      ? opts.currentDefaults.get(id)
+      : stat.current_org_default;
     if (current !== undefined && valueKey(current) === valueKey(top.value)) continue;
     suggestions.push({
       ...subjectFields(stat),
@@ -497,7 +583,38 @@ export interface CustomerDecisionLearningReport {
   since: string | null;
   thresholds: LearningThresholds;
   metrics: CustomerDecisionLearningMetrics;
-  suggestions: Array<LearningSuggestion & { learning_id: string }>;
+  suggestions: Array<
+    LearningSuggestion & {
+      /** The candidate this suggestion stands for (queued now, or an earlier one that stands). */
+      learning_id: string;
+      /** What became of it; absent on reports written before outcomes were recorded. */
+      candidate?: LearningCandidateOutcome;
+    }
+  >;
+}
+
+/**
+ * `created` (queued now), `existing` (an earlier candidate stands), `refused`
+ * (the learning scope refused it), `failed` (the write failed; the next run retries).
+ */
+export type LearningCandidateOutcome = 'created' | 'existing' | 'refused' | 'failed';
+
+/**
+ * The suggestions earlier reports stand for, by suggestion key: the latest
+ * report entry whose candidate was queued (`created` / `existing`, or no
+ * recorded outcome). `reports` in any order.
+ */
+export function standingLearningSuggestions(
+  reports: readonly Pick<CustomerDecisionLearningReport, 'report_date' | 'suggestions'>[]
+): Map<string, CustomerDecisionLearningReport['suggestions'][number]> {
+  const standing = new Map<string, CustomerDecisionLearningReport['suggestions'][number]>();
+  for (const report of [...reports].sort((a, b) => a.report_date.localeCompare(b.report_date))) {
+    for (const suggestion of report.suggestions) {
+      if (suggestion.candidate === 'refused' || suggestion.candidate === 'failed') continue;
+      standing.set(suggestion.suggestion_key, suggestion);
+    }
+  }
+  return standing;
 }
 
 /**
@@ -515,4 +632,27 @@ export function learningCandidateId(
     .digest('hex')
     .slice(0, 16);
   return `cdl-${digest}`;
+}
+
+/**
+ * Does a new suggestion carry materially new evidence over an earlier
+ * candidate for the same suggestion key (`previous` is that candidate's
+ * metadata)? Yes when the suggested default differs, or when the counted
+ * evidence at least doubled. Otherwise the earlier candidate — proposed,
+ * approved, rejected or promoted — stands and nothing is queued again.
+ */
+export function isMaterialEvidenceChange(
+  previous: { readonly suggested_org_default?: unknown; readonly evidence?: unknown } | undefined,
+  next: Pick<LearningSuggestion, 'suggested_org_default' | 'evidence'>
+): boolean {
+  if (!previous) return true;
+  if (valueKey(previous.suggested_org_default) !== valueKey(next.suggested_org_default))
+    return true;
+  const evidence = previous.evidence;
+  const count =
+    evidence && typeof evidence === 'object' && 'count' in evidence
+      ? Number((evidence as { count: unknown }).count)
+      : Number.NaN;
+  if (!Number.isFinite(count) || count <= 0) return true;
+  return next.evidence.count >= 2 * count;
 }

@@ -1,11 +1,14 @@
+import { createHash } from 'node:crypto';
 import { logger } from './core.js';
 import { formatDiagnostic } from './logger.js';
 import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { loadOrganizationProfile } from './organization/organization-profile.js';
 import {
   enqueueOrganizationLearningCandidate,
   listOrganizationLearningCandidates,
+  type OrganizationLearningCandidate,
   type OrganizationLearningSourceType,
   type OrganizationTier,
   type QueueOrganizationLearningCandidateInput,
@@ -161,42 +164,76 @@ export function enqueueOperationalLearningSignal(
 }
 
 export interface OperationalLearningCandidateOnceResult {
+  /** The candidate queued now, or the earlier candidate that stands. */
   learning_id: string;
-  /** false when a candidate with this id already existed (left untouched, whatever its status). */
+  /** false when an earlier candidate stands (left untouched, whatever its status). */
   created: boolean;
 }
 
 /**
- * Queue a candidate under a caller-chosen, deterministic id exactly once: an
- * existing candidate with that id (proposed, approved, rejected or promoted)
- * is never overwritten. Same scope rules and the same narrow writer role as
- * {@link enqueueOperationalLearningSignal}; throws on a write failure (the
- * caller reports it). Null when the scope refuses the signal.
+ * Queue a candidate exactly once per dedupe key: an earlier candidate of the
+ * organization with the same id, or with the same `metadata.dedupe_key`
+ * (proposed, approved, rejected or promoted), stands and is never overwritten
+ * — unless `supersedes(latest)` says the new evidence materially changed. The
+ * check and the write run under one inter-process lock per tier × tenant ×
+ * dedupe key (taken under the caller's identity, outside the writer role), so
+ * concurrent runs cannot both queue it. The writer role reads only its own
+ * organization's learning store, so a caller that may target several
+ * organizations of one tenant keeps its own tenant-level record of what it
+ * queued (CD-12: the tenant learning reports) and asks only for new ones. Same scope rules and the
+ * same narrow writer role as {@link enqueueOperationalLearningSignal}; throws
+ * on a write failure (the caller reports it). Null when the scope refuses the
+ * signal.
  */
 export function enqueueOperationalLearningCandidateOnce(
-  signal: OperationalLearningSignal & { learningId: string },
-  options: { rootDir?: string } = {}
+  signal: OperationalLearningSignal & { learningId: string; dedupeKey?: string },
+  options: {
+    rootDir?: string;
+    supersedes?: (latest: OrganizationLearningCandidate) => boolean;
+  } = {}
 ): OperationalLearningCandidateOnceResult | null {
   const scope = resolveLearningScope(signal, options);
   if (!scope) return null;
-  return withExecutionContext(
-    'operational_learning_writer',
-    () => {
-      const existing = listOrganizationLearningCandidates({
-        organizationId: scope.organizationId,
-        tier: scope.tier,
-        ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
-        ...(options.rootDir ? { rootDir: options.rootDir } : {}),
-      }).some((candidate) => candidate.learning_id === signal.learningId);
-      if (existing) return { learning_id: signal.learningId, created: false };
-      enqueueOrganizationLearningCandidate({
-        ...candidateInput(signal, signal.learningId, scope),
-        ...(options.rootDir ? { rootDir: options.rootDir } : {}),
-      });
-      return { learning_id: signal.learningId, created: true };
-    },
-    undefined,
-    scope.tenantSlug,
-    scope.organizationId
+  const dedupeKey = signal.dedupeKey ?? signal.learningId;
+  const lockId = `operational-learning-${scope.tier}-${scope.tenantSlug || 'shared'}-${createHash(
+    'sha256'
+  )
+    .update(dedupeKey)
+    .digest('hex')
+    .slice(0, 24)}`;
+  return withLockSync(lockId, () =>
+    withExecutionContext(
+      'operational_learning_writer',
+      () => {
+        const matches = listOrganizationLearningCandidates({
+          organizationId: scope.organizationId,
+          tier: scope.tier,
+          tenantSlug: scope.tenantSlug || 'shared',
+          ...(options.rootDir ? { rootDir: options.rootDir } : {}),
+        }).filter(
+          (candidate) =>
+            (candidate.tenant_slug ?? undefined) === scope.tenantSlug &&
+            (candidate.learning_id === signal.learningId ||
+              candidate.metadata?.dedupe_key === dedupeKey)
+        );
+        const same = matches.find((candidate) => candidate.learning_id === signal.learningId);
+        if (same) return { learning_id: same.learning_id, created: false };
+        const latest = [...matches].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+        if (latest && !(options.supersedes?.(latest) ?? false))
+          return { learning_id: latest.learning_id, created: false };
+        enqueueOrganizationLearningCandidate({
+          ...candidateInput(
+            { ...signal, metadata: { ...(signal.metadata ?? {}), dedupe_key: dedupeKey } },
+            signal.learningId,
+            scope
+          ),
+          ...(options.rootDir ? { rootDir: options.rootDir } : {}),
+        });
+        return { learning_id: signal.learningId, created: true };
+      },
+      undefined,
+      scope.tenantSlug,
+      scope.organizationId
+    )
   );
 }

@@ -1106,9 +1106,10 @@ export async function runInlineCustomerDecisionReminders(
 /**
  * core:customer_decision_learning (CD-12) — the weekly learning run of the
  * tenant the run is bound to (installed with `customer-decision learning
- * --install`): runs `customer-decision learning --tenant <t>` as a facade
- * child without SYSTEM_ROLE (learning-op.ts). `params.tenant`, when given,
- * must be the bound tenant; `dry_run: true` writes nothing. Returns ids and counts.
+ * --install`): runs `customer-decision learning --tenant <t> --since <now -
+ * window_days>` as a facade child without SYSTEM_ROLE (learning-op.ts;
+ * `window_days` defaults to 90). `params.tenant`, when given, must be the
+ * bound tenant; `dry_run: true` writes nothing. Returns ids and counts.
  */
 export async function runInlineCustomerDecisionLearning(
   step: PipelineAdfStep,
@@ -1117,8 +1118,10 @@ export async function runInlineCustomerDecisionLearning(
 ): Promise<Record<string, unknown>> {
   const requested = String(resolveVars(params.tenant ?? '', ctx)).trim();
   const { runCustomerDecisionLearningOp } = await import('./customer-decision/learning-op.js');
+  const windowDays = Number(resolveVars(params.window_days ?? 0, ctx));
   const result = await runCustomerDecisionLearningOp({
     ...(requested ? { tenant: requested } : {}),
+    ...(windowDays > 0 ? { windowDays } : {}),
     dryRun: resolveVars(params.dry_run ?? false, ctx) === true,
     now: nowIso(),
   });

@@ -21,6 +21,7 @@ import {
   listInvites,
   listReceipts,
   listTenantCaseIds,
+  summarizeCustomerDecisionOverview,
   type CaseOverview,
   type CustomerDecisionInvite,
   type CustomerDecisionOverview,
@@ -89,8 +90,16 @@ function caseOverview(
   );
 }
 
-/** `overview --tenant <t> [--case <c>] [--now <iso>]` */
-export function runOverview(opts: Record<string, string>, now: string): CustomerDecisionOverview {
+/**
+ * `overview --tenant <t> [--case <c>] [--now <iso>] [--summary]` — `--summary`
+ * omits the entries of each agenda and caps `attention` (with
+ * `totals.attention_total`); see `summarizeCustomerDecisionOverview`.
+ */
+export function runOverview(
+  opts: Record<string, string>,
+  flags: ReadonlySet<string>,
+  now: string
+): CustomerDecisionOverview {
   const tenant = boundTenantOf(opts);
   const at = nowOf(opts, now);
   const caseIds = selectedCaseIds(tenant, opts);
@@ -110,10 +119,11 @@ export function runOverview(opts: Record<string, string>, now: string): Customer
       );
     }
   }
-  return buildCustomerDecisionOverview({
+  const overview = buildCustomerDecisionOverview({
     tenant_slug: tenant,
     cases,
     case_failures: failures,
     now: at,
   });
+  return flags.has('summary') ? summarizeCustomerDecisionOverview(overview) : overview;
 }
