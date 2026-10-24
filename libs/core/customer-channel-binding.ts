@@ -4,6 +4,11 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { readTenantProfile, listTenantProfileSlugs } from './organization/tenant-registry.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { logger } from './core.js';
+import { isValidTenantSlug } from './foundation/scope.js';
+import { withExecutionContext } from './authority.js';
+
+/** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
+const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
 
 /**
  * E2E-06 Task 1: channel → customer binding.
@@ -55,6 +60,24 @@ function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBin
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(`[customer-channel-binding] failed to read ${filePath}: ${message}`);
     return [];
+  }
+}
+
+/**
+ * Is this one tenant registered and active? Read as the tenant registry's
+ * narrow reader (`knowledge/personal/tenants/<tenant>.json` only), so a
+ * process without a personal-tier persona can check it; any failure is "no".
+ */
+function isActiveTenant(tenantSlug: string, rootDir: string): boolean {
+  try {
+    return withExecutionContext(
+      TENANT_REGISTRY_READER_ROLE,
+      () => readTenantProfile(tenantSlug, { rootDir })?.status === 'active',
+      'worker',
+      tenantSlug
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -135,4 +158,42 @@ export function resolveCustomerBinding(
     return { tenantSlug: entry.tenantSlug, binding: entry.binding };
   }
   return null;
+}
+
+/**
+ * CD-11: one tenant's bindings only (`customer/<tenant>/connections/channel-bindings.json`),
+ * never a walk over other tenants, and none for a tenant that is not
+ * registered and active (fails closed). A file that cannot be read or does
+ * not validate is logged and yields no bindings.
+ */
+export function readTenantCustomerChannelBindings(
+  tenantSlug: string,
+  options: CustomerChannelBindingListOptions = {}
+): CustomerChannelBinding[] {
+  if (!isValidTenantSlug(tenantSlug)) return [];
+  const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  // Same rule as the cross-tenant listing: only a registered, active tenant
+  // has bindings (a suspended tenant never messages its customers).
+  if (!isActiveTenant(tenantSlug, rootDir)) return [];
+  const filePath = path.join(
+    rootDir,
+    'customer',
+    tenantSlug,
+    'connections',
+    'channel-bindings.json'
+  );
+  return readBindingsFile(filePath, rootDir);
+}
+
+/** CD-11: the tenant's active binding for exactly this surface + channel, or null. */
+export function findTenantCustomerChannelBinding(
+  tenantSlug: string,
+  surface: string,
+  channelId: string,
+  options: CustomerChannelBindingListOptions = {}
+): ResolvedCustomerBinding | null {
+  const binding = readTenantCustomerChannelBindings(tenantSlug, options).find(
+    (item) => item.active !== false && item.surface === surface && item.channel_id === channelId
+  );
+  return binding ? { tenantSlug, binding } : null;
 }
