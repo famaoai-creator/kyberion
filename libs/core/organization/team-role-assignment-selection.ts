@@ -14,6 +14,8 @@ import { loadProviderConfig } from '../provider/provider-config.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
 import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce/workforce-load.js';
 import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
+import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
+import { resolveCapabilityProfileForTeamRole } from '../subagent-capability-profiles.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -192,6 +194,8 @@ interface SelectionCandidate {
   authorityRecord: AuthorityRoleRecord;
   resolvedTarget: ResolvedAgentProviderTarget;
   score: number;
+  /** Set when the preferred provider could not project the role's tier and an alternate was substituted. */
+  projectionFallback?: { from: string; tier: string };
 }
 
 function selectedModelHasHint(modelId: string, preferredModels: Set<string>): boolean {
@@ -281,6 +285,9 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
   const selectionHints = resolveTeamRoleSelectionHints(teamRoleRecord);
   const preferredAgents = new Set(selectionHints.preferred_agents);
   const preferredModels = new Set(selectionHints.preferred_models);
+  // The KD-05 tier this role's delegation must run under — providers that
+  // cannot project it are excluded during candidacy, not just at dispatch.
+  const requiredTier = resolveCapabilityProfileForTeamRole(teamRole);
   const candidates = Object.entries(agents)
     .flatMap(([agentId, profile]) => {
       if (!profile.team_roles.includes(teamRole)) return [];
@@ -332,6 +339,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         agentId
       );
       let resolvedTarget: ResolvedAgentProviderTarget;
+      let projectionFallback: { from: string; tier: string } | undefined;
       try {
         resolvedTarget = resolveAgentProviderTarget(
           {
@@ -365,6 +373,61 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       if (explicitSelection && resolvedTarget.strategy === 'unresolved') {
         blockedReasons.add('No available provider/model satisfies the requested selection.');
         return [];
+      }
+      // Capability-projection candidacy: a provider that cannot structurally
+      // project this team role's KD-05 tier must not win this slot — but the
+      // candidate is only dropped when no fallback provider can either. A
+      // fixed/requested provider that cannot project is never substituted.
+      if (
+        resolvedTarget.provider &&
+        !providerCanProjectProfile(resolvedTarget.provider, requiredTier)
+      ) {
+        const failedProvider = resolvedTarget.provider;
+        if (fixedSelection || explicitSelection) {
+          blockedReasons.add(
+            `Provider "${failedProvider}" cannot project the "${requiredTier}" capability tier.`
+          );
+          return [];
+        }
+        const alternates = [
+          ...new Set(
+            [...(profile.fallback_providers || []), ...providerConfig.default_priority].filter(
+              (alt): alt is string =>
+                typeof alt === 'string' && alt !== failedProvider && alt !== resolvedTarget.provider
+            )
+          ),
+        ];
+        let recovered = false;
+        for (const alt of alternates) {
+          if (!providerCanProjectProfile(alt, requiredTier)) continue;
+          try {
+            const retry = resolveAgentProviderTarget(
+              {
+                preferredProvider: alt,
+                preferredModelId: undefined,
+                providerStrategy:
+                  providerPreference?.strategy || profile.provider_strategy || 'adaptive',
+                fallbackProviders: [],
+                requiredCapabilities: profile.capabilities,
+              },
+              discoveredProviders
+            );
+            if (retry.provider && retry.strategy !== 'unresolved') {
+              resolvedTarget = retry;
+              recovered = true;
+              break;
+            }
+          } catch {
+            // Try the next alternate; resolution failures here are not fatal.
+          }
+        }
+        if (recovered) projectionFallback = { from: failedProvider, tier: requiredTier };
+        if (!recovered) {
+          blockedReasons.add(
+            `No provider can project the "${requiredTier}" capability tier for this candidate.`
+          );
+          return [];
+        }
       }
       const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
         profileCapabilities.has(capability)
@@ -433,6 +496,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
             authorityRecord,
             resolvedTarget,
             score,
+            ...(projectionFallback ? { projectionFallback } : {}),
           } satisfies SelectionCandidate,
         ];
       });
@@ -505,6 +569,10 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       notes: `${teamRoleRecord.autonomy_level} autonomy; capability-first match (${winner.resolvedTarget.strategy})${
         separationFallback
           ? '; WARNING separation-of-duties fallback — no independent actor available'
+          : ''
+      }${
+        winner.projectionFallback
+          ? `; capability-tier fallback — ${winner.projectionFallback.from} cannot project ${winner.projectionFallback.tier}`
           : ''
       }`,
     };

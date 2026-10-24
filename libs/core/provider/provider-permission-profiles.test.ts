@@ -5,6 +5,7 @@ import {
   resolveActiveProviderPermissionArgs,
   resolveEffectiveProviderPermissionProfile,
   assertProviderCanProjectProfile,
+  providerCanProjectProfile,
   resolveCliProviderDescriptorOrNull,
   resolveProviderPermissionArgs,
   type ProviderId,
@@ -345,5 +346,22 @@ describe('resolveCliProviderDescriptorOrNull', () => {
     expect(resolveCliProviderDescriptorOrNull('anthropic')).toBeUndefined();
     expect(resolveCliProviderDescriptorOrNull('stub')).toBeUndefined();
     expect(resolveCliProviderDescriptorOrNull(undefined)).toBeUndefined();
+  });
+});
+
+describe('providerCanProjectProfile', () => {
+  it('returns false only for governed CLI adapters that cannot project the tier', () => {
+    expect(providerCanProjectProfile('codex', 'planner')).toBe(false);
+    expect(providerCanProjectProfile('devin-cli', 'planner')).toBe(false);
+    expect(providerCanProjectProfile('agy', 'planner')).toBe(false);
+    expect(providerCanProjectProfile('claude', 'planner')).toBe(true);
+    expect(providerCanProjectProfile('codex', 'explorer')).toBe(true);
+  });
+
+  it('does not exclude unknown identifiers or non-CLI adapters (registry gap must not drop candidates)', () => {
+    expect(providerCanProjectProfile('made-up-cli', 'planner')).toBe(true);
+    expect(providerCanProjectProfile('anthropic', 'planner')).toBe(true);
+    expect(providerCanProjectProfile('stub', 'planner')).toBe(true);
+    expect(providerCanProjectProfile(undefined, 'planner')).toBe(true);
   });
 });
