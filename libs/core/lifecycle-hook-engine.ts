@@ -484,8 +484,8 @@ async function materializeLifecycleHookApproval(
 ): Promise<LifecycleHookOutcome> {
   if (outcome.decision !== 'ask') return outcome;
 
-  const { createApprovalRequest, listApprovalRequests } =
-    await import('./governance/approval-store.js');
+  const { createApprovalRequest } = await import('./governance/approval-request-create.js');
+  const { listApprovalRequests } = await import('./governance/approval-store-reader.js');
   const pending = listApprovalRequests({ status: 'pending', kind: 'channel-approval' }).find(
     (record) =>
       record.correlationId === surface.correlationId &&

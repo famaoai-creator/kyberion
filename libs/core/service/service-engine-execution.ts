@@ -1,4 +1,9 @@
 import { createLogger } from '../logger.js';
+import {
+  connectGovernedMcpServer,
+  executeGovernedMcpTool,
+  type McpApprovalContinuation,
+} from './service-mcp-execution.js';
 import { platform } from '../platform.js';
 import { secureFetch } from '../network.js';
 import { safeExec } from '../secure-io.js';
@@ -70,15 +75,25 @@ export async function executeMcp(
   command: string,
   args: string[],
   actionRequest: { action: string; name?: string; arguments?: any },
-  options?: { env?: Record<string, unknown> }
+  options?: { env?: Record<string, unknown> } & McpApprovalContinuation
 ) {
+  const request = structuredClone(actionRequest);
+  const server = {
+    transport: 'stdio' as const,
+    command: String(command),
+    args: args.map(String),
+    env: buildPresetProcessEnv(options?.env),
+  };
+  const continuation = options
+    ? { onApprovalRequired: options.onApprovalRequired, approvalWaitMs: options.approvalWaitMs }
+    : undefined;
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
 
   const transport = new StdioClientTransport({
-    command,
-    args,
-    env: buildPresetProcessEnv(options?.env),
+    command: server.command,
+    args: server.args,
+    env: server.env,
     stderr: 'inherit',
   });
   const client = new Client(
@@ -87,17 +102,20 @@ export async function executeMcp(
   );
 
   try {
-    await client.connect(transport);
-    if (actionRequest.action === 'list_tools') return await client.listTools();
-    if (actionRequest.action === 'list_resources') return await client.listResources();
-    if (actionRequest.action === 'call_tool') {
-      if (!actionRequest.name) throw new Error('Tool name is required for MCP call_tool');
-      return await client.callTool({
-        name: actionRequest.name,
-        arguments: actionRequest.arguments || {},
-      });
+    await connectGovernedMcpServer(server, () => client.connect(transport), continuation);
+    if (request.action === 'list_tools') return await client.listTools();
+    if (request.action === 'list_resources') return await client.listResources();
+    if (request.action === 'call_tool') {
+      if (!request.name) throw new Error('Tool name is required for MCP call_tool');
+      return await executeGovernedMcpTool(
+        client,
+        server,
+        request.name,
+        request.arguments || {},
+        continuation
+      );
     }
-    throw new Error(`Unsupported MCP action: ${actionRequest.action}`);
+    throw new Error(`Unsupported MCP action: ${request.action}`);
   } finally {
     try {
       await transport.close();
@@ -110,15 +128,24 @@ export async function executeMcp(
 export async function executeRemoteMcp(
   url: string,
   actionRequest: { action: string; name?: string; arguments?: any },
-  options?: { headers?: Record<string, unknown> }
+  options?: { headers?: Record<string, unknown> } & McpApprovalContinuation
 ) {
+  const request = structuredClone(actionRequest);
+  const server = {
+    transport: 'http' as const,
+    url: new URL(url).toString(),
+    headers: buildChildEnv(options?.headers),
+  };
+  const continuation = options
+    ? { onApprovalRequired: options.onApprovalRequired, approvalWaitMs: options.approvalWaitMs }
+    : undefined;
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StreamableHTTPClientTransport } =
     await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
-  const transport = new StreamableHTTPClientTransport(new URL(url), {
+  const transport = new StreamableHTTPClientTransport(new URL(server.url), {
     requestInit: {
-      headers: buildChildEnv(options?.headers),
+      headers: server.headers,
     },
   });
   const client = new Client(
@@ -128,16 +155,19 @@ export async function executeRemoteMcp(
 
   try {
     await client.connect(transport);
-    if (actionRequest.action === 'list_tools') return await client.listTools();
-    if (actionRequest.action === 'list_resources') return await client.listResources();
-    if (actionRequest.action === 'call_tool') {
-      if (!actionRequest.name) throw new Error('Tool name is required for MCP call_tool');
-      return await client.callTool({
-        name: actionRequest.name,
-        arguments: actionRequest.arguments || {},
-      });
+    if (request.action === 'list_tools') return await client.listTools();
+    if (request.action === 'list_resources') return await client.listResources();
+    if (request.action === 'call_tool') {
+      if (!request.name) throw new Error('Tool name is required for MCP call_tool');
+      return await executeGovernedMcpTool(
+        client,
+        server,
+        request.name,
+        request.arguments || {},
+        continuation
+      );
     }
-    throw new Error(`Unsupported MCP action: ${actionRequest.action}`);
+    throw new Error(`Unsupported MCP action: ${request.action}`);
   } finally {
     try {
       await transport.close();

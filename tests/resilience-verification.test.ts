@@ -90,13 +90,16 @@ describe('Resilience Verification', () => {
     const { handleAction } = await import('../libs/actuators/service-actuator/src/index');
     const mockFetch = vi.mocked(network.secureFetch);
     mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
-    // This transport-resilience fixture starts after admission. Real approval,
+    // This transport-resilience fixture starts after admission and commit. Real approval,
     // reservation and replay behavior is covered by the external-operation
     // suites and the external-actuator simulation, without admission mocks.
     const admission = vi.spyOn(externalOperations, 'admitExternalOperation').mockReturnValue({
       allowed: true,
       status: 'approved',
     });
+    const commit = vi
+      .spyOn(externalOperations, 'assertExternalOperationCommit')
+      .mockReturnValue(undefined);
     try {
       await expect(
         handleAction({
@@ -108,9 +111,11 @@ describe('Resilience Verification', () => {
         })
       ).rejects.toThrow('outcome is unknown');
       expect(admission).toHaveBeenCalledTimes(1);
+      expect(commit).toHaveBeenCalledTimes(1);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     } finally {
       admission.mockRestore();
+      commit.mockRestore();
     }
   });
 });

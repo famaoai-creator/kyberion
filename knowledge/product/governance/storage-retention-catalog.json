@@ -344,7 +344,7 @@
       "path": "active/shared/runtime/memory",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Memory promotion queue (memory-promotion-queue.ts) — pending promotions are un-regenerable learning. Tenant-scoped candidates live under active/shared/runtime/tenants/<tenant>/memory; the global path is retained for legacy/unscoped records until reviewed."
+      "note": "Memory promotion queue and authoritative provenance generations (memory-promotion-queue.ts, memory-provenance.ts). Pending promotions and revocation tombstones are load-bearing, not re-generable cache. Keep provenance.json outside checkpoint restore and do not TTL-delete it: removal could resurrect revoked descendants. Tenant-scoped state lives under active/shared/runtime/tenants/<tenant>/memory; the global path retains public/legacy state until reviewed."
     },
     {
       "path": "active/shared/runtime/oauth",

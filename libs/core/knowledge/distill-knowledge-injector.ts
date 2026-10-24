@@ -27,6 +27,7 @@
 
 import * as path from 'node:path';
 import { knowledgeTextSha256 } from './knowledge-delivery-snapshot.js';
+import { createMemoryEligibilityResolver, selectIndependentMemory } from './memory-provenance.js';
 import * as pathResolver from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeReaddir, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -115,6 +116,8 @@ export interface DistilledKnowledgeEntry {
    */
   excerpt: string;
   source_sha256?: string;
+  /** Protected registry families; never markdown source-family declarations. */
+  source_families?: string[];
   /** Match score for the active query (set by findRelevant…). */
   score?: number;
 }
@@ -182,6 +185,7 @@ function tokenize(s: string): string[] {
 
 function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
   const out: DistilledKnowledgeEntry[] = [];
+  const resolve = createMemoryEligibilityResolver();
   const seenKeys = new Set<string>();
   const dirNames = [...new Set([CURRENT_DISTILL_DIR, ...LEGACY_DISTILL_DIRS])];
   if (scope?.tier === 'confidential' && scope.tenant_slug && isValidTenantSlug(scope.tenant_slug)) {
@@ -225,6 +229,22 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
       const fm = parseFrontmatter(text);
       const bodyStart = text.indexOf('\n---\n', 4);
       const body = bodyStart >= 0 ? text.slice(bodyStart + 5) : text;
+      const sha256 = knowledgeTextSha256(text);
+      const sourceScope = dirName.startsWith('knowledge/confidential/')
+        ? { tier: 'confidential' as const, tenant_slug: scope!.tenant_slug }
+        : { tier: 'public' as const };
+      const eligibility = resolve({
+        documentPath: key,
+        sha256,
+        scope: sourceScope,
+        consumerScope: scope,
+      });
+      if (
+        !eligibility.eligible ||
+        ((fm.source_family_id || fm.memory_origin_id) && !eligibility.origin)
+      )
+        continue;
+      if (fm.superseded_by || fm.validity === 'revoked' || fm.validity === 'corrected') continue;
       const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
       out.push({
         path: `${dirName}/${name}`,
@@ -239,7 +259,10 @@ function loadAllDistilled(scope?: ScopeContext): DistilledKnowledgeEntry[] {
             ? { last_updated: fm.audit_date }
             : {}),
         excerpt: firstParagraph(body),
-        source_sha256: knowledgeTextSha256(text),
+        source_sha256: sha256,
+        source_families: eligibility.source_families || [
+          'content:' + knowledgeTextSha256(body.trim()),
+        ],
       });
       seenKeys.add(key);
     }
@@ -337,6 +360,23 @@ export async function findRelevantDistilledKnowledge(
   if (queryTokens.size === 0 && queryTags.size === 0) return [];
 
   const all = loadAllDistilled(input.scope);
+  // Fresh current-use check at every return, especially after awaited embeddings.
+  const finish = (ranked: DistilledKnowledgeEntry[]) => {
+    const resolve = createMemoryEligibilityResolver();
+    const eligible = ranked.filter((entry) => {
+      const tenant = entry.path.match(/^knowledge\/confidential\/([^/]+)\//)?.[1];
+      return resolve({
+        documentPath: entry.path,
+        sha256: entry.source_sha256,
+        scope: tenant ? { tier: 'confidential', tenant_slug: tenant } : { tier: 'public' },
+        consumerScope: input.scope,
+      }).eligible;
+    });
+    return selectIndependentMemory(eligible, (entry) => entry.source_families || []).slice(
+      0,
+      limit
+    );
+  };
 
   // ── Lexical ranking ─────────────────────────────────────────────────────
   const lexicalScored = all
@@ -347,12 +387,12 @@ export async function findRelevantDistilledKnowledge(
   const backend = getEmbeddingBackend();
   if (!backend) {
     // Lexical-only fallback (same as before)
-    return lexicalScored
-      .sort((a, b) => {
+    return finish(
+      lexicalScored.sort((a, b) => {
         if ((b.score ?? 0) !== (a.score ?? 0)) return (b.score ?? 0) - (a.score ?? 0);
         return (b.last_updated ?? '').localeCompare(a.last_updated ?? '');
       })
-      .slice(0, limit);
+    );
   }
 
   // ── Semantic ranking (hybrid path) ──────────────────────────────────────
@@ -370,15 +410,16 @@ export async function findRelevantDistilledKnowledge(
 
   if (!queryVec) {
     // Backend present but embed failed — fall back to lexical
-    return lexicalScored.slice(0, limit);
+    return finish(lexicalScored);
   }
 
   // Embed candidate entries in batch for efficiency
-  const unembed = pool.filter((e) => !cache.has(e.path));
+  const embeddingKey = (entry: DistilledKnowledgeEntry) => entry.path + ':' + entry.source_sha256;
+  const unembed = pool.filter((e) => !cache.has(embeddingKey(e)));
   if (unembed.length > 0) {
     try {
       const vectors = await backend.embedBatch(unembed.map(_corpusText));
-      unembed.forEach((e, i) => cache.set(e.path, vectors[i]));
+      unembed.forEach((e, i) => cache.set(embeddingKey(e), vectors[i]));
     } catch {
       // If batch fails, individual entries will miss and fall through
     }
@@ -386,7 +427,7 @@ export async function findRelevantDistilledKnowledge(
 
   const semanticScored = pool
     .map((e) => {
-      const vec = cache.get(e.path);
+      const vec = cache.get(embeddingKey(e));
       return { entry: e, sim: vec ? cosineSimilarity(queryVec, vec) : 0 };
     })
     .filter((x) => x.sim > 0)
@@ -402,14 +443,18 @@ export async function findRelevantDistilledKnowledge(
   const maxRrf = Math.max(0, ...rrfScores.values());
   const scale = lexicalScored[0]?.score ?? minScore;
 
-  return pool
-    .map((e) => ({ ...e, score: maxRrf > 0 ? ((rrfScores.get(e.path) ?? 0) / maxRrf) * scale : 0 }))
-    .filter((e) => (e.score ?? 0) > 0)
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return (b.last_updated ?? '').localeCompare(a.last_updated ?? '');
-    })
-    .slice(0, limit);
+  return finish(
+    pool
+      .map((e) => ({
+        ...e,
+        score: maxRrf > 0 ? ((rrfScores.get(e.path) ?? 0) / maxRrf) * scale : 0,
+      }))
+      .filter((e) => (e.score ?? 0) > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.last_updated ?? '').localeCompare(a.last_updated ?? '');
+      })
+  );
 }
 
 /**

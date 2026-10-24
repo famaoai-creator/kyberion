@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-22
+last_updated: 2026-10-25
 ---
 
 # Operations Hygiene Runbook
@@ -2030,3 +2030,54 @@ After building Concierge, run `KYBERION_TEST_CONCIERGE_BROWSER=1 pnpm exec vites
 Next-based surface adapters pass `surfaceMutationRequestUrl(req)` to the shared mutation guard. Next normalizes numeric loopback hosts in its public URL getter; use the native branded Request URL to preserve the server-bound origin. Never repair this by accepting loopback aliases or trusting Host/forwarded headers. The actual NextRequest regression gate is `presence/displays/concierge/src/lib/native-request-origin.test.ts`, including IPv4/IPv6, cross-port, cross-origin, and spoofed-header refusals.
 
 Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding_authority.test.ts`, and `scripts/onboarding_apply.identity.integration.test.ts`.
+
+## Provenance, consent and repair recurrence checks
+
+Follow [provenance-authorization-controls](./provenance-authorization-controls.md)
+when changing tool interfaces, external-effect admission, memory publication or
+retrieval, scenario evaluation, or automatic ADF repair. Provenance and task
+success never grant execution authority.
+
+- Read the current trusted tool interface at approval and commit. Changing a
+  schema, candidate set, protected argument or scope invalidates the prior
+  binding. Do not copy a consent flag into a repaired action.
+- Register exact bytes and verified parent references through governed memory
+  producers. Preserve source revocation state outside checkpoint/cache restores;
+  never TTL-delete its tombstones or rebuild them from Markdown claims.
+- Filter current evidence eligibility before top-k selection, and select by
+  source family rather than counting repeated derivatives as independent support.
+  Read authoritative state once per query partition, not once per candidate.
+- Record task completion and authorization adherence separately. Missing
+  observation is indeterminate, and a failed apply may already be a violation.
+- Calibrate validators with positive and negative controls. Unattended repair
+  requests read-only candidates, validates before host commit and preserves
+  exact original bytes. File rollback does not recover external side effects.
+
+Regression checks: `libs/core/knowledge/memory-provenance.test.ts`,
+`libs/core/governance/external-operation.test.ts`, the operation-protection tests,
+`libs/core/scenario/scenario-authorization.test.ts`, ADF-repair/repair-assurance
+tests and `tests/provenance-authorization.integration.test.ts`. Run relevant
+approval, delegated-execution, retrieval, promotion and scenario regressions too.
+Use synthetic state and no real external transport; test isolation must not
+redirect production provenance stores or weaken their authorization checks.
+
+Lock names and exclusive-publication siblings must fit filesystem component
+limits even under long checkout paths. Preserve every existing valid main-lock
+and cleanup-guard name: remapping a live resource between releases splits mutual
+exclusion. Compact only names that cannot fit, including publication temps and
+tombs, with a reserved collision-resistant namespace. Own-inode tomb recovery
+must recognize exactly the corresponding compact name; do not relax foreign
+hardlink protection. Verify real contention with a seeded legacy long-name lock,
+maximal-length publication, stale cleanup and no-overwrite/cleanup behavior in
+the lock-utils and secure-io regression suites.
+Ephemeral sibling names need independent cryptographic randomness, not a hash
+of a possibly sensitive target basename. Keep them in the checked directory,
+open with exclusive creation, and verify uniqueness even when clocks and weaker
+random suffixes repeat. This does not change durable lock identities.
+When adding a live-interface admission floor, cover direct typed hosts as well
+as pipeline dispatch. Map built-in families to their canonical manifests;
+unknown domains stay unbound. Seed actual reviewed manifests in minimal
+installation fixtures, pair positive host-origin cases with un-attested denials,
+and keep test query scopes separate from the active authenticated tenant.
+Boundary/unit fixtures must target the current creator/reader/commit seams;
+they must not obtain success by weakening production admission checks.
