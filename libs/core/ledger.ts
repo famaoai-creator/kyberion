@@ -8,7 +8,7 @@ import {
   safeReaddir,
 } from './secure-io.js';
 import { validateReadPermission } from './tier-guard.js';
-import { withExecutionContext } from './authority.js';
+import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -51,7 +51,7 @@ const logger = createLogger('ledger');
  * tenant — from the record itself, or from its mission's state and location —
  * writes its metadata entry (or, without a mission ledger, its detailed entry)
  * to that tenant's own partition,
- * `active/shared/runtime/tenant-ledger/<tier>/<tenant>/ledger.jsonl`, as the
+ * `active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/ledger.jsonl`, as the
  * tenant-bound `tenant_ledger_store` role. Untenanted records keep the system
  * ledger. See knowledge/product/architecture/runtime-storage-layout.md.
  */
@@ -75,7 +75,30 @@ function asTenantLedgerStore<T>(tenantSlug: string, fn: () => T): T {
   return withExecutionContext(TENANT_LEDGER_STORE_ROLE, fn, undefined, tenantSlug);
 }
 
-/** Absolute path of one tenant's ledger partition (`<root>/<tier>/<tenant>/ledger.jsonl`). */
+/**
+ * Why this process may not bind `tenantSlug` (its active tenant is another
+ * one), checked BEFORE any write so a record never half-writes and then
+ * throws [ROLE_TENANT_SCOPE_MISMATCH] into a lifecycle step. The message
+ * names only this process's own tenant.
+ */
+function tenantBindingConflict(tenantSlug: string): string | undefined {
+  const active = (resolveIdentityContext().tenantSlug || '').trim().toLowerCase();
+  return active && active !== tenantSlug.toLowerCase()
+    ? `this process is bound to tenant '${active}', not the record's tenant`
+    : undefined;
+}
+
+/**
+ * Storage tier of a tenant partition. Tenant data never lands under an
+ * unprotected tier: a `public` tenant record is stored in the tenant's
+ * `confidential` partition (a tenant_scope protected prefix); its recorded
+ * scope keeps tier `public`.
+ */
+export function tenantLedgerPartitionTier(tier: StorageDataTier): 'personal' | 'confidential' {
+  return tier === 'personal' ? 'personal' : 'confidential';
+}
+
+/** Absolute path of one tenant's ledger partition (`<root>/<personal|confidential>/<tenant>/ledger.jsonl`). */
 export function tenantLedgerPath(tier: StorageDataTier, tenantSlug: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
     throw new Error(`[LEDGER_TENANT_INVALID] '${tenantSlug}' is not a tenant slug`);
@@ -83,7 +106,11 @@ export function tenantLedgerPath(tier: StorageDataTier, tenantSlug: string): str
   return pathResolver.resolve(
     path.posix.join(
       TENANT_LEDGER_ROOT,
-      ...storagePartitionSegments({ kind: 'tier', tier, tenant: tenantSlug }),
+      ...storagePartitionSegments({
+        kind: 'tier',
+        tier: tenantLedgerPartitionTier(tier),
+        tenant: tenantSlug,
+      }),
       TENANT_LEDGER_FILE
     )
   );
@@ -148,13 +175,26 @@ export const record = (type: string, data: any) => {
   const timestamp = nowIso();
   const missionId = data.mission_id;
 
-  // 1. Locate the mission: its state and location are the scope authority.
-  let missionPath: string | null = null;
-  if (missionId && missionId !== 'None') {
-    missionPath = (pathResolver as any).findMissionPath(missionId);
+  // 1. Locate the mission: its location (what tier-guard enforces) is the
+  //    scope authority; its state may only agree with it.
+  const mission: MissionResolution =
+    missionId && missionId !== 'None' ? resolveMission(String(missionId)) : { kind: 'none' };
+  if (mission.kind === 'hidden') {
+    // The id exists but is not resolvable by this process (another tenant's,
+    // or ambiguous): never put it in the system ledger.
+    logger.warn(
+      `ledger record skipped — mission ${String(missionId)} is not resolvable by this process | next: record it from a process scoped to the mission's tenant | evidence: ${type}: ${mission.reason}`
+    );
+    return '';
   }
-  const scope = resolveLedgerScope(data, missionPath ? missionLedgerScope(missionPath) : {});
+  const scope = resolveLedgerScope(
+    data,
+    mission.kind === 'active' || mission.kind === 'archived' ? mission.scope : {}
+  );
   const tenantSlug = scope.tenant_slug;
+  const refusal =
+    (mission.kind === 'active' || mission.kind === 'archived' ? mission.conflict : undefined) ??
+    (tenantSlug ? tenantBindingConflict(tenantSlug) : undefined);
   const writeScoped = (entry: Record<string, unknown>): string => {
     if (!tenantSlug) return _writeToLedger(GLOBAL_LEDGER_PATH, entry);
     const tenantPath = tenantLedgerPath(scope.tier, tenantSlug);
@@ -170,27 +210,83 @@ export const record = (type: string, data: any) => {
     payload: data,
   };
 
-  // 2. Without a mission ledger the detailed entry goes to the scoped ledger:
-  //    the tenant's partition, or the system ledger for an untenanted record.
-  if (!missionPath) return writeScoped(detail);
+  // 2. Without an active mission ledger (no mission, an archived one, or an
+  //    unknown id) the detailed entry goes to the scoped ledger: the tenant's
+  //    partition, or the system ledger for an untenanted record. A refused
+  //    tenant record is skipped — never rerouted to the system ledger.
+  if (mission.kind !== 'active') {
+    if (refusal) {
+      logger.warn(
+        `ledger record skipped — ${refusal} | next: record it from a process scoped to the record's tenant, or repair the mission state | evidence: ${type} mission ${String(missionId ?? 'None')}`
+      );
+      return '';
+    }
+    return writeScoped(detail);
+  }
 
   // 3. Detailed entry in the mission's evidence ledger; metadata entry in the
-  //    scoped ledger (never the system ledger for a tenant mission).
+  //    scoped ledger (never the system ledger for a tenant mission). The
+  //    detailed entry is durable evidence, so a refused or failed metadata
+  //    entry is a diagnostic warn, never an error thrown into the lifecycle
+  //    step that recorded it after changing state.
   const detailHash = _writeToLedger(
-    safeLedgerPath(path.join(missionPath, 'evidence/ledger.jsonl')),
+    safeLedgerPath(path.join(mission.path, 'evidence/ledger.jsonl')),
     detail
   );
-  writeScoped({
-    timestamp,
-    type: `MISSION_EVENT:${type}`,
-    scope,
-    role: data.role || 'Unknown',
-    mission_id: missionId,
-    detail_hash: detailHash, // Link to the detailed ledger
-    note: 'Metadata only. See mission evidence for details.',
-  });
+  if (refusal) {
+    logger.warn(
+      `ledger metadata entry skipped — ${refusal} | next: record it from a process scoped to the mission's tenant, or repair the mission state | evidence: ${type} mission ${String(missionId)} detail ${detailHash}`
+    );
+    return detailHash;
+  }
+  try {
+    writeScoped({
+      timestamp,
+      type: `MISSION_EVENT:${type}`,
+      scope,
+      role: data.role || 'Unknown',
+      mission_id: missionId,
+      detail_hash: detailHash, // Link to the detailed ledger
+      note: 'Metadata only. See mission evidence for details.',
+    });
+  } catch (err) {
+    logger.warn(
+      `ledger metadata entry not written — ${err instanceof Error ? err.message : String(err)} | next: run pnpm audit:verify and repair the scoped ledger | evidence: ${type} mission ${String(missionId)} detail ${detailHash}`
+    );
+  }
   return detailHash;
 };
+
+type MissionResolution =
+  | { kind: 'none' }
+  | { kind: 'active'; path: string; scope: MissionLedgerScope; conflict?: string }
+  | { kind: 'archived'; scope: MissionLedgerScope; conflict?: string }
+  | { kind: 'hidden'; reason: string }
+  | { kind: 'unknown' };
+
+/**
+ * Where a mission id lives: an active mission dir, an archived one (its
+ * scope still routes the record to the tenant), not resolvable by this
+ * process (the locator refused it), or nowhere this process can see. An
+ * unknown id stays a system record — the residual case documented in
+ * runtime-storage-layout.md.
+ */
+function resolveMission(missionId: string): MissionResolution {
+  const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+  try {
+    const found = pathResolver.findMissionPath(missionId);
+    if (found) return { kind: 'active', path: found, ...missionLedgerScope(found) };
+  } catch (err) {
+    return { kind: 'hidden', reason: errorText(err) };
+  }
+  try {
+    const archived = pathResolver.findArchivedMissionDir(missionId);
+    if (archived) return { kind: 'archived', ...missionLedgerScope(archived) };
+  } catch (err) {
+    return { kind: 'hidden', reason: errorText(err) };
+  }
+  return { kind: 'unknown' };
+}
 
 interface MissionLedgerScope {
   tier?: StorageDataTier;
@@ -232,10 +328,17 @@ function loadMissionStateRecord(missionPath: string): Record<string, unknown> | 
 }
 
 /**
- * Scope of a mission from its state (authoritative) and its location. An
- * unreadable state leaves the location's answer; nothing here invents a tenant.
+ * Scope of a mission from its LOCATION — what tier-guard enforces — with the
+ * state file (data a worker may edit) only allowed to agree. A state whose
+ * tenant or tier disagrees with the location (including a state naming a
+ * tenant its location does not carry) yields `conflict`, and the record's
+ * tenant-scoped entry is refused. Organization and project come from the
+ * state, only inside the located tenant. Nothing here invents a tenant.
  */
-function missionLedgerScope(missionPath: string): MissionLedgerScope {
+function missionLedgerScope(missionPath: string): {
+  scope: MissionLedgerScope;
+  conflict?: string;
+} {
   const relative = path.relative(pathResolver.rootDir(), missionPath).split(path.sep).join('/');
   const located = MISSION_LOCATION.exec(relative);
   const locatedTier = located?.[1] as StorageDataTier | undefined;
@@ -248,18 +351,29 @@ function missionLedgerScope(missionPath: string): MissionLedgerScope {
   const stateTier = STORAGE_DATA_TIERS.includes(rawTier as StorageDataTier)
     ? (rawTier as StorageDataTier)
     : undefined;
-  const stateTenant = nestedString(state, 'tenant_slug');
-  const tenant = stateTenant && isValidTenantSlug(stateTenant) ? stateTenant : locatedTenant;
-  const tier = stateTier || locatedTier;
+  const stateTenant = nestedString(state, 'tenant_slug')?.toLowerCase();
+  let conflict: string | undefined;
+  if ((stateTenant || undefined) !== locatedTenant) {
+    conflict = locatedTenant
+      ? `mission state names another tenant than the mission's location (${relative})`
+      : `mission state names a tenant the mission's location does not carry (${relative})`;
+  } else if (stateTier && locatedTier && stateTier !== locatedTier) {
+    conflict = `mission state tier '${stateTier}' disagrees with the mission's location (${relative})`;
+  }
+  const tenant = locatedTenant;
+  const tier = locatedTier || stateTier;
   const organization =
     nestedString(state, 'organization_id') ||
     nestedString(state, 'relationships', 'organization', 'organization_id');
   const project = nestedString(state, 'relationships', 'project', 'project_id');
   return {
-    ...(tier ? { tier } : {}),
-    ...(tenant ? { tenant_slug: tenant } : {}),
-    ...(tenant && organization ? { organization_id: organization } : {}),
-    ...(tenant && organization && project ? { project_id: project } : {}),
+    scope: {
+      ...(tier ? { tier } : {}),
+      ...(tenant ? { tenant_slug: tenant } : {}),
+      ...(tenant && organization ? { organization_id: organization } : {}),
+      ...(tenant && organization && project ? { project_id: project } : {}),
+    },
+    ...(conflict ? { conflict } : {}),
   };
 }
 
@@ -297,18 +411,29 @@ function _getLastHash(ledgerPath: string) {
   ledgerPath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
   ensureRegularLedgerFile(ledgerPath);
+  // An existing ledger whose tail cannot be read or parsed must not restart
+  // its chain at genesis (that would silently fork it): fail with a
+  // diagnostic. record() keeps a metadata-entry failure non-fatal.
+  let tailHash: unknown;
   try {
-    const content = readTextFile(ledgerPath);
-    const trimmed = content.trim();
+    const trimmed = readTextFile(ledgerPath).trim();
     if (!trimmed) return GENESIS_HASH;
     const lines = trimmed.split('\n');
     const lastEntry = normalizeLedgerRecord(
       parseSafeJsonInput(lines[lines.length - 1], 'ledger tail entry')
     );
-    return lastEntry?.hash || GENESIS_HASH;
-  } catch (_e) {
-    return GENESIS_HASH;
+    tailHash = lastEntry?.hash;
+  } catch (err) {
+    throw new Error(
+      `[LEDGER_TAIL_UNREADABLE] ledger tail cannot be read — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${ledgerPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
+  if (typeof tailHash !== 'string' || !tailHash) {
+    throw new Error(
+      `[LEDGER_TAIL_UNREADABLE] ledger tail entry has no hash — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${ledgerPath}`
+    );
+  }
+  return tailHash;
 }
 
 export interface LedgerIntegrityReport {
@@ -393,12 +518,13 @@ function listDirectory(dir: string): string[] {
   }
 }
 
-/** Every tenant ledger partition file that exists (`<root>/<tier>/<tenant>/ledger.jsonl`). */
+/** Every tenant ledger partition file that exists (`<root>/<personal|confidential>/<tenant>/ledger.jsonl`). */
 export function listTenantLedgerPartitions(): TenantLedgerPartition[] {
   const root = pathResolver.resolve(TENANT_LEDGER_ROOT);
   const partitions: TenantLedgerPartition[] = [];
   for (const tier of listDirectory(root)) {
-    if (!STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) continue;
+    // Partitions exist only under the protected tiers (tenantLedgerPartitionTier).
+    if (tier !== 'personal' && tier !== 'confidential') continue;
     for (const tenant of listDirectory(path.join(root, tier))) {
       if (!isValidTenantSlug(tenant)) continue;
       const filePath = tenantLedgerPath(tier as StorageDataTier, tenant);
@@ -431,7 +557,12 @@ export function verifyTenantLedgerIntegrity(
 ): ScopedLedgerIntegrityReport {
   const ledgerPath = tenantLedgerPath(tier, tenantSlug);
   const report = asTenantLedgerStore(tenantSlug, () => verifyLedgerIntegrityDetailed(ledgerPath));
-  return { ...report, path: ledgerPath, tier, tenant_slug: tenantSlug };
+  return {
+    ...report,
+    path: ledgerPath,
+    tier: tenantLedgerPartitionTier(tier),
+    tenant_slug: tenantSlug,
+  };
 }
 
 export interface AllLedgerIntegrityReport {
@@ -457,7 +588,8 @@ export function verifyAllLedgerIntegrity(): AllLedgerIntegrityReport {
     } catch (err) {
       withheld += 1;
       logger.debug(
-        `tenant ledger verification skipped — this process may not bind the tenant | next: verify from an unbound operator process or as that tenant | evidence: ${partition.tier}/${partition.tenant_slug}: ${err instanceof Error ? err.message : String(err)}`
+        // Never name the other tenant to a bound caller.
+        `tenant ledger verification skipped — this process may not bind that partition's tenant | next: verify from an unbound operator process or as that tenant | evidence: a ${partition.tier} partition: ${err instanceof Error && /ROLE_TENANT_SCOPE_MISMATCH/u.test(err.message) ? 'ROLE_TENANT_SCOPE_MISMATCH' : 'verification failed'}`
       );
     }
   }
@@ -521,7 +653,7 @@ export const loadForScope = (
       ? listTenantLedgerPartitions()
       : tenants.flatMap((tenant) =>
           isValidTenantSlug(tenant)
-            ? STORAGE_DATA_TIERS.map((tier) => ({
+            ? (['personal', 'confidential'] as const).map((tier) => ({
                 tier,
                 tenant_slug: tenant,
                 path: tenantLedgerPath(tier, tenant),
