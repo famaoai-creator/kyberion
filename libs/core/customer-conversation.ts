@@ -30,6 +30,7 @@ import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,
   getActiveDealForChannel,
+  getDeal,
   loadPriceBook,
   openDeal,
   summarizeDealForConversation,
@@ -64,6 +65,8 @@ import { isValidTenantSlug } from './entity-scope.js';
  */
 
 const ESCALATION_MARKER = '[NEEDS_OPERATOR]';
+/** Deal notes keep this many characters of a message (deal-store `appendDealNote`). */
+const DEAL_NOTE_MAX_CHARS = 2000;
 
 // I18N-06: the deterministic "we will confirm and get back to you" reply
 // used when there is no LLM turn to phrase it (backend failure below).
@@ -255,14 +258,25 @@ export async function runCustomerConversation(
   const escalated = replyText.includes(ESCALATION_MARKER);
   const customerText = replyText.split(ESCALATION_MARKER)[0].trim();
   if (escalated) {
-    const question = replyText.split(ESCALATION_MARKER)[1]?.trim() || input.text.slice(0, 200);
-    // E2E-04 Task 2 landed: push the question to the operator's channel;
-    // sendOpsAlert stays as the durable JSONL record (deduped).
+    // Ids only: operator notifications and ops alerts are not tenant-partitioned,
+    // so neither the customer's message nor the model's question goes there. The
+    // operator reads the message in the tenant's deal record by its hash.
+    const stored = input.text.slice(0, DEAL_NOTE_MAX_CHARS);
+    const messageSha256 = createHash('sha256').update(stored, 'utf8').digest('hex');
+    const command = `pnpm kyberion customer-channel question --tenant ${tenantSlug} --deal ${deal.deal_id} --sha256 ${messageSha256}`;
+    const ids = {
+      tenant: tenantSlug,
+      dealId: deal.deal_id,
+      surface: binding.binding.surface,
+      length: stored.length,
+      sha256: messageSha256,
+      command,
+    };
     void notifyOperator('question', {
       title: t('deal_ops:customer_question_title', { tenant: tenantSlug, dealId: deal.deal_id }),
-      body: question,
-      link_hint: `deal ${deal.deal_id} on ${binding.binding.surface}:${binding.binding.channel_id}`,
-      correlation_id: `${deal.deal_id}:${question.slice(0, 40)}`,
+      body: t('deal_ops:customer_question_body', ids),
+      link_hint: `deal ${deal.deal_id} on ${binding.binding.surface}`,
+      correlation_id: `${deal.deal_id}:${messageSha256.slice(0, 16)}`,
     });
     sendOpsAlert({
       severity: 'warning',
@@ -271,12 +285,11 @@ export async function runCustomerConversation(
         tenant_slug: tenantSlug,
         deal_id: deal.deal_id,
         surface: binding.binding.surface,
-        channel_id: binding.binding.channel_id,
-        question,
+        message_sha256: messageSha256,
+        message_length: stored.length,
       },
-      recommendation:
-        'Answer via the bound channel using sendToCustomer (approval-gated), then record the answer as a deal note.',
-      dedupe_key: `customer-question:${deal.deal_id}:${question.slice(0, 40)}`,
+      recommendation: `Read the message with: ${command}. Answer via the bound channel using sendToCustomer (approval-gated), then record the answer as a deal note.`,
+      dedupe_key: `customer-question:${deal.deal_id}:${messageSha256.slice(0, 16)}`,
     });
   }
 
@@ -345,6 +358,7 @@ async function captureRequirementsTurn(input: {
  */
 export interface SendToCustomerInput {
   binding: ResolvedCustomerBinding;
+  /** Ids only (deal id, document version, reminder id …): never message text. */
   title: string;
   body: string;
   correlationId?: string;
@@ -370,13 +384,22 @@ export interface SendToCustomerInput {
    */
   requestScope?: EventScopeInput;
   /**
-   * CD-11: the approval request's summary instead of the message itself, for
-   * a body that must not be copied into the shared approval store (it is not
-   * tenant-partitioned). Ids only. When set, the request's payload hash binds
-   * the body (sha256) and the channel, so the approval covers exactly that
-   * text to that channel. Default unchanged (the summary quotes the body).
+   * CD-11: the approval request's summary, ids only (the shared approval
+   * store is not tenant-partitioned, so the message is never copied into it).
+   * When absent, the summary names the tenant, channel and message hash and
+   * the tenant-scoped command that shows the message (`contentSource`).
+   * Either way the request's payload hash binds the body (sha256) and the
+   * channel, so the approval covers exactly that text to that channel.
    */
   approvalSummary?: string;
+  /**
+   * Where the approver reads the message: a tenant-relative path of a durable
+   * copy of exactly `body` under `customer/<tenant>/` (today: a deal document,
+   * `deals/<deal>/<quote|contract>-v<n>.md`). The default summary names it in
+   * `pnpm kyberion customer-channel outbound`. A source that does not hold
+   * exactly the body is not named.
+   */
+  contentSource?: string;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -507,20 +530,136 @@ export function findAudienceFloorViolations(body: string, floor: AudienceEgressF
   return [...violations];
 }
 
+/** Tenant-relative shape of a durable outbound copy the approver may read. */
+const OUTBOUND_CONTENT_SOURCE_PATTERN =
+  /^deals\/[A-Za-z0-9][A-Za-z0-9_-]{2,127}\/(?:quote|contract)-v[1-9][0-9]{0,5}\.md$/u;
+
+/**
+ * The file of a tenant outbound content source (`customer/<tenant>/<source>`),
+ * or null when the tenant slug or the source is not one an approver may read
+ * (only a deal's quote / contract documents; no other customer/ area).
+ */
+export function resolveCustomerOutboundContentPath(
+  tenantSlug: string,
+  source: string
+): string | null {
+  if (!isValidTenantSlug(tenantSlug)) return null;
+  if (!OUTBOUND_CONTENT_SOURCE_PATTERN.test(source) || source.includes('..')) return null;
+  try {
+    const filePath = assertSafeRepositoryPath(
+      path.join(pathResolver.rootDir(), 'customer', tenantSlug, source),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return filePath;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read a pending customer message for its approver: the tenant's durable copy
+ * at `source`, and whether it is exactly the text the approval request binds
+ * (`expectedSha256`, the request summary's hash). Null when the source is not
+ * readable for this tenant.
+ */
+export function readCustomerOutboundContent(input: {
+  tenantSlug: string;
+  source: string;
+  expectedSha256?: string;
+}): { text: string; sha256: string; matches: boolean | null } | null {
+  const filePath = resolveCustomerOutboundContentPath(input.tenantSlug, input.source);
+  if (!filePath) return null;
+  const text = readTextFile(filePath);
+  const sha256 = createHash('sha256').update(text, 'utf8').digest('hex');
+  return {
+    text,
+    sha256,
+    matches: input.expectedSha256 === undefined ? null : sha256 === input.expectedSha256,
+  };
+}
+
+/**
+ * Read an escalated customer message for the operator, in the tenant's own
+ * deal record: the customer note whose text hashes to `sha256` (the id the
+ * operator notification carries) and the reply that followed it. Null when the
+ * deal or the note is not there.
+ */
+export function readCustomerQuestion(input: {
+  tenantSlug: string;
+  dealId: string;
+  sha256: string;
+}): { deal_id: string; at: string; message: string; reply?: string } | null {
+  if (!isValidTenantSlug(input.tenantSlug)) return null;
+  const deal = getDeal(input.tenantSlug, input.dealId);
+  if (!deal) return null;
+  const notes = deal.notes;
+  for (let index = notes.length - 1; index >= 0; index -= 1) {
+    const note = notes[index];
+    if (note.role !== 'customer') continue;
+    if (createHash('sha256').update(note.text, 'utf8').digest('hex') !== input.sha256) continue;
+    const reply = notes.slice(index + 1).find((item) => item.role === 'kyberion');
+    return {
+      deal_id: deal.deal_id,
+      at: note.ts,
+      message: note.text,
+      ...(reply ? { reply: reply.text } : {}),
+    };
+  }
+  return null;
+}
+
+/**
+ * The ids-only approval summary of a customer message: tenant, surface,
+ * correlation id, length and hash (the channel id, which may be an email
+ * address, stays in the bound payload only) — and, when the caller named a durable copy
+ * holding exactly the body, the tenant-scoped command that shows it.
+ */
+function defaultOutboundApprovalSummary(
+  input: SendToCustomerInput,
+  bodySha256: string,
+  correlationId: string
+): string {
+  const tenant = input.binding.tenantSlug;
+  const readable =
+    input.contentSource !== undefined &&
+    readCustomerOutboundContent({
+      tenantSlug: tenant,
+      source: input.contentSource,
+      expectedSha256: bodySha256,
+    })?.matches === true;
+  const params = {
+    tenant,
+    surface: input.binding.binding.surface,
+    correlationId,
+    length: input.body.length,
+    sha256: bodySha256,
+  };
+  return readable
+    ? t('deal_ops:customer_outbound_summary', {
+        ...params,
+        command: `pnpm kyberion customer-channel outbound --tenant ${tenant} --source ${input.contentSource} --sha256 ${bodySha256}`,
+      })
+    : t('deal_ops:customer_outbound_summary_unreadable', params);
+}
+
 export async function sendToCustomer(input: SendToCustomerInput): Promise<SendToCustomerResult> {
   const floor = resolveCustomerAudienceFloor(input.binding.tenantSlug);
   const floorViolations = floor.active ? findAudienceFloorViolations(input.body, floor) : [];
+  // Ids only: the violating hosts are part of the message, so only their count.
   const violationNote =
     floorViolations.length > 0
-      ? `⚠ AUDIENCE EGRESS FLOOR VIOLATIONS (recommend deny or edit): ${floorViolations.join('; ')} — `
+      ? `${t('deal_ops:customer_outbound_floor_violations', { count: floorViolations.length })} — `
       : '';
+  const bodySha256 = createHash('sha256').update(input.body, 'utf8').digest('hex');
+  const correlationId =
+    input.correlationId ||
+    `customer-outbound:${input.binding.tenantSlug}:${Date.now().toString(36)}`;
   const approval = enforceApprovalGate({
     intentId: 'customer:outbound',
     operationId: 'customer:outbound',
     agentId: 'customer-conversation',
-    correlationId:
-      input.correlationId ||
-      `customer-outbound:${input.binding.tenantSlug}:${Date.now().toString(36)}`,
+    correlationId,
     channel: input.binding.binding.surface,
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
@@ -538,20 +677,16 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
           return charter ? { charter } : {};
         })()
       : {}),
-    // CD-11: an ids-only summary keeps the message out of the shared approval
-    // store; the approval then binds the exact body and channel by hash.
-    ...(input.approvalSummary !== undefined
-      ? {
-          payload: {
-            body_sha256: createHash('sha256').update(input.body, 'utf8').digest('hex'),
-            surface: input.binding.binding.surface,
-            channel_id: input.binding.binding.channel_id,
-          },
-        }
-      : {}),
+    // CD-11: the summary carries ids only, so the approval binds the exact
+    // body and channel by hash instead.
+    payload: {
+      body_sha256: bodySha256,
+      surface: input.binding.binding.surface,
+      channel_id: input.binding.binding.channel_id,
+    },
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
-      summary: `${violationNote}${input.approvalSummary ?? input.body.slice(0, 400)}`,
+      summary: `${violationNote}${input.approvalSummary ?? defaultOutboundApprovalSummary(input, bodySha256, correlationId)}`,
       severity: 'high',
     },
   });

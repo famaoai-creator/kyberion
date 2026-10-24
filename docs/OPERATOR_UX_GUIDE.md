@@ -596,6 +596,22 @@ deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜co
 `knowledge/confidential/<tenant>/support/known-issues.md` を接地)。binding の
 `"mode"` で固定も可能。能動送信は常に承認ゲート経由。
 
+紐付けのファイルは手で書かず、governed なコマンドで作る(テナントは登録済みで
+active であること、スキーマで検証、変更は監査に残る。別テナントに紐付いた
+チャネルは拒否):
+
+```bash
+pnpm kyberion customer-channel bind --tenant <t> --surface slack --channel C0123 \
+  [--name <担当者>] [--org <会社>] [--language ja] [--mode sales|support|requirements_hearing]
+pnpm kyberion customer-channel unbind --tenant <t> --surface slack --channel C0123  # active: false
+pnpm kyberion customer-channel list --tenant <t>
+```
+
+顧客への能動送信の承認依頼には id だけが載る(共有の承認の置き場はテナントで
+分かれていないため)。文面は依頼の要約にあるコマンドで、テナントの置き場から
+読む: `pnpm kyberion customer-channel outbound --tenant <t> --source deals/<deal>/quote-v1.md --sha256 <hash>`
+(`matches_approval` が承認で束縛した文面と同じかを示す)。
+
 録音の文字起こしは対応 Mac ならオンデバイス(設定ゼロ、外部送信なし)。受注
 (won)ハンドオフ時に、収集済み要件ドラフトはミッションの requirements draft へ
 自動昇格し、completeness / signoff ゲートに接続される。

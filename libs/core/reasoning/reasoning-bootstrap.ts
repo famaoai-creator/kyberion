@@ -60,6 +60,7 @@ import {
   registerReasoningBackend,
   resetReasoningBackend,
 } from './reasoning-backend.js';
+import type { ReasoningBackend } from './reasoning-backend-contracts.js';
 import {
   buildFailoverIntentExtractor,
   registerIntentExtractor,
@@ -865,4 +866,43 @@ export function resetReasoningBootstrap(): void {
 /** Which mode was selected on the last successful install, or null. */
 export function getInstalledReasoningMode(): ReasoningBackendMode | null {
   return installedMode;
+}
+
+/**
+ * D10: a backend for exactly one explicitly requested mode (the operator's
+ * `KYBERION_REASONING_BACKEND`), for callers whose payload must reach that
+ * provider or none. One candidate, no cross-provider failover: when the mode
+ * cannot be built (not allowed, CLI not installed) this is null, and when its
+ * provider is demoted the call fails instead of moving to another provider.
+ * The spend guard and in-place retries of the failover wrapper still apply.
+ */
+export function buildReasoningBackendForMode(
+  requestedMode: string
+): { backend: ReasoningBackend; mode: ReasoningBackendMode } | null {
+  let mode: ReasoningBackendMode;
+  try {
+    mode = resolveReasoningBackendSelectionFromContext({
+      requestedMode: requestedMode as ReasoningBackendMode,
+      env: process.env,
+      policy: loadReasoningBackendPolicy(),
+    }).mode;
+  } catch (error) {
+    logger.warn(
+      `[reasoning-bootstrap] explicit mode=${requestedMode} refused: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
+  if (mode === 'stub') return null;
+  const options: InstallReasoningOptions = {};
+  try {
+    const route = resolveReasoningRoute({ role: 'default' });
+    options.timeoutMs = route.limits.timeoutMs;
+    options.toolsEnabled = route.toolsEnabled;
+    options.allowedTools = route.allowedTools;
+  } catch {
+    // No default route — the backend keeps its own built-in defaults.
+  }
+  const bundle = buildReasoningRuntimeBundle(normalizeReasoningBackendMode(mode), options);
+  if (!bundle) return null;
+  return { backend: buildFailoverReasoningBackend([bundle.backend], { max_attempts: 1 }), mode };
 }

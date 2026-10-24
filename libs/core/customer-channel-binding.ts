@@ -37,7 +37,7 @@ export interface ResolvedCustomerBinding {
   binding: CustomerChannelBinding;
 }
 
-const BINDINGS_SCHEMA_PATH = pathResolver.knowledge(
+export const CUSTOMER_CHANNEL_BINDINGS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/customer-channel-binding.schema.json'
 );
 
@@ -53,7 +53,7 @@ function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBin
     const parsed = defineCatalog<{ bindings: CustomerChannelBinding[] }>({
       id: 'customer-channel-binding',
       path: safeFilePath,
-      schema: BINDINGS_SCHEMA_PATH,
+      schema: CUSTOMER_CHANNEL_BINDINGS_SCHEMA_PATH,
     }).load();
     return parsed.bindings;
   } catch (err) {
@@ -79,6 +79,15 @@ function isActiveTenant(tenantSlug: string, rootDir: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Is this tenant registered and active (fails closed)? The rule every binding read and write uses. */
+export function isActiveCustomerTenant(
+  tenantSlug: string,
+  options: CustomerChannelBindingListOptions = {}
+): boolean {
+  if (!isValidTenantSlug(tenantSlug)) return false;
+  return isActiveTenant(tenantSlug, path.resolve(options.rootDir ?? pathResolver.rootDir()));
 }
 
 function activeRegisteredTenantSlugs(rootDir: string): Set<string> {

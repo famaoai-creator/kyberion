@@ -8308,6 +8308,11 @@
         "ja": "決定台帳を操作",
         "qps-ploc": "⟦Ẇőřķ ẇïŧħ ŧħė ḓėƈïşïőñ ŀėḓɠėř ŀőřėɱ ïṗş⟧"
       },
+      "cli_cmd_script_customer_channel": {
+        "en": "Bind, unbind and list a tenant's customer channels, and read a customer message that waits for approval",
+        "ja": "テナントの顧客チャネルの紐付けを作成・解除・一覧し、承認待ちの顧客へのメッセージを確認",
+        "qps-ploc": "⟦Ƀïñḓ, ůñƀïñḓ ȧñḓ ŀïşŧ ȧ ŧėñȧñŧ'ş ƈůşŧőɱėř ƈħȧññėŀş, ȧñḓ řėȧḓ ȧ ƈůşŧőɱėř ɱėşşȧɠė ŧħȧŧ ẇȧïŧş ƒőř ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
       "cli_cmd_script_customer_decision": {
         "en": "Prepare, approve and send customer decision agendas, and track the answers",
         "ja": "顧客との調整セットを作成・承認・送付し、回答を確認",
@@ -32948,6 +32953,26 @@
         "en": "Customer question ({tenant} / {dealId})",
         "ja": "顧客からの確認事項 ({tenant} / {dealId})",
         "qps-ploc": "⟦Ƈůşŧőɱėř ɋůėşŧïőñ ({tenant} / {dealId}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "customer_outbound_floor_violations": {
+        "en": "⚠ Links outside the audience egress floor: {count} (recommend deny or edit)",
+        "ja": "⚠ 宛先の egress 下限に反するリンク: {count} 件（却下か修正を推奨）",
+        "qps-ploc": "⟦⚠ Ŀïñķş őůŧşïḓė ŧħė ȧůḓïėñƈė ėɠřėşş ƒŀőőř: {count} (řėƈőɱɱėñḓ ḓėñẏ őř ėḓïŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "customer_outbound_summary": {
+        "en": "Message to the customer of tenant {tenant} on {surface} ({correlationId}; {length} characters, sha256 {sha256}). The message is not copied here; read it with: {command}",
+        "ja": "テナント {tenant} の顧客への {surface} のメッセージ（{correlationId}、{length} 文字、sha256 {sha256}）。文面はここには写しません。次のコマンドで確認してください: {command}",
+        "qps-ploc": "⟦Ɱėşşȧɠė ŧő ŧħė ƈůşŧőɱėř őƒ ŧėñȧñŧ {tenant} őñ {surface} ({correlationId}; {length} ƈħȧřȧƈŧėřş, şħȧ256 {sha256}). Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "customer_outbound_summary_unreadable": {
+        "en": "Message to the customer of tenant {tenant} on {surface} ({correlationId}; {length} characters, sha256 {sha256}). The message is not copied here and has no tenant-scoped copy to read; reject it unless you know the exact text.",
+        "ja": "テナント {tenant} の顧客への {surface} のメッセージ（{correlationId}、{length} 文字、sha256 {sha256}）。文面はここには写さず、テナント内に確認できる写しもありません。文面を確かめられない場合は却下してください。",
+        "qps-ploc": "⟦Ɱėşşȧɠė ŧő ŧħė ƈůşŧőɱėř őƒ ŧėñȧñŧ {tenant} őñ {surface} ({correlationId}; {length} ƈħȧřȧƈŧėřş, şħȧ256 {sha256}). Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė ȧñḓ ħȧş ñő ŧėñȧñŧ-şƈőṗėḓ ƈőṗẏ ŧő řėȧḓ; řėĵėƈŧ ïŧ ůñŀėşş ẏőů ķñőẇ ŧħė ėẋȧƈŧ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "customer_question_body": {
+        "en": "A customer of tenant {tenant} on {surface} asked something the catalog cannot answer (deal {dealId}; {length} characters, sha256 {sha256}). The message is not copied here; read it with: {command}",
+        "ja": "テナント {tenant} の顧客が {surface} でカタログでは答えられない質問をしました（商談 {dealId}、{length} 文字、sha256 {sha256}）。文面はここには写しません。次のコマンドで確認してください: {command}",
+        "qps-ploc": "⟦Ȧ ƈůşŧőɱėř őƒ ŧėñȧñŧ {tenant} őñ {surface} ȧşķėḓ şőɱėŧħïñɠ ŧħė ƈȧŧȧŀőɠ ƈȧññőŧ ȧñşẇėř (ḓėȧŀ {dealId}; {length} ƈħȧřȧƈŧėřş, şħȧ256 {sha256}). Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       }
     },
     "browser_conversation": {

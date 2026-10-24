@@ -203,12 +203,15 @@ export async function runGenerate(opts: Record<string, string>, now: string): Pr
     ? readRepoText(opts['grounding-file'], 'grounding file')
     : undefined;
   installReasoningBackendsForService(AUDIT_AGENT);
+  // D10: an explicit backend choice wins — the draft goes to that backend or to none.
+  const requestedBackend = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
   const result = await withExecutionContextAsync(
     LEDGER_ROLE,
     () =>
       generateAgendaDraft(agenda, {
         intentText,
         now,
+        ...(requestedBackend ? { requestedBackend } : {}),
         ...(groundingText ? { groundingText } : {}),
       }),
     undefined,
@@ -236,8 +239,14 @@ export async function runGenerate(opts: Record<string, string>, now: string): Pr
     case_id: caseId,
     generated: result.generated,
     content_hash: agendaContentHash(written),
+    reasoning_backend: result.reasoning_backend,
   });
-  return { ...agendaSummary(written), generated: result.generated, notes: result.notes };
+  return {
+    ...agendaSummary(written),
+    generated: result.generated,
+    notes: result.notes,
+    reasoning_backend: result.reasoning_backend,
+  };
 }
 
 function activeRecord(

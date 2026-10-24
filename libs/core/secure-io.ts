@@ -491,7 +491,8 @@ export function safeWriteFile(
   options: SafeWriteOptions = {}
 ): void {
   const { mkdir = true } = options;
-  const resolved = guardLiteralWritePath(filePath);
+  // The whole new content: the guard checks it for content-rule roles (CD-09 / CD-10).
+  const resolved = guardLiteralWritePath(filePath, 'write', data);
   // Tier for the policy decision only; the canonical permission check runs
   // after policy evaluation, as close to the write as possible.
   const tierPath = canonicalGuardPath(resolved, 'follow');
@@ -548,7 +549,7 @@ export function safeWriteFile(
     }
   }
 
-  const canonical = assertCanonicalWritable(resolved, filePath, 'follow');
+  const canonical = assertCanonicalWritable(resolved, filePath, 'follow', 'write', data);
   const dir = path.dirname(resolved);
   if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
 
