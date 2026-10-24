@@ -114,7 +114,7 @@ type NormNode = NormElement | { text: string };
 // UI-01b: chart SVG geometry is part of the contract too (one layout module,
 // so both renderers must emit the same coordinates and paths).
 const KEEP_ATTR =
-  /^(?:data-[\w-]+|aria-[\w-]+|role|href|id|name|viewBox|d|x|y|x1|x2|y1|y2|cx|cy|r|rx|width|height|text-anchor|dominant-baseline|scope)$/;
+  /^(?:data-[\w-]+|aria-[\w-]+|role|href|id|for|name|viewBox|d|x|y|x1|x2|y1|y2|cx|cy|r|rx|width|height|text-anchor|dominant-baseline|scope)$/;
 
 function keepAttrs(
   names: Iterable<string>,
@@ -302,6 +302,10 @@ function textsOf(nodes: NormNode[]): string[] {
   return nodes.flatMap((node) => ('text' in node ? [node.text] : textsOf(node.children)));
 }
 
+function elementsOf(nodes: NormNode[]): NormElement[] {
+  return nodes.flatMap((node) => ('text' in node ? [] : [node, ...elementsOf(node.children)]));
+}
+
 for (const locale of LOCALES) {
   const scenarios = loadFixtures(locale);
   const bundle = getUiMessageBundle(locale);
@@ -324,6 +328,22 @@ for (const locale of LOCALES) {
         expect(reactTree).toEqual(vanillaTree);
       });
     }
+
+    it('the realistic policy fixture retains its visible label, input name and stacked layout', () => {
+      const scenario = scenarios.find((item) => item.id === 'settings-policy');
+      expect(scenario).toBeTruthy();
+      for (const normalize of [normalizeReact, normalizeVanilla]) {
+        const elements = elementsOf(normalize(scenario!.components, scenario!.rootId, bundle));
+        const label = elements.find((node) => node.attrs.id === 'kbf-policy-row-label');
+        const input = elements.find((node) => node.attrs.id === 'kbf-policy-input');
+        const row = elements.find((node) => node.cls.includes('kb-setting-row'));
+        expect(label?.tag).toBe('label');
+        expect(label?.attrs.for).toBe(input?.attrs.id);
+        expect(input?.attrs['aria-labelledby']).toBe(label?.attrs.id);
+        expect(input?.attrs['aria-describedby']).toBe('kbf-policy-input-help');
+        expect(row?.attrs['data-layout']).toBe('stacked');
+      }
+    });
 
     it('renderer-default text is in the requested locale', () => {
       const pills = scenarios.find((scenario) => scenario.id === 'status-pill');

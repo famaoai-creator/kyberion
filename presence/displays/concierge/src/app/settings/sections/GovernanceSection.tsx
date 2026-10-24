@@ -104,7 +104,7 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
   ];
 
   return (
-    <SettingsGroup title={t('governance.title')}>
+    <SettingsGroup id="settings-governance" title={t('governance.title')}>
       <div className="settings-row-block">
         <h4>{t('governance.pending_title')}</h4>
         {data.pending_approvals.length === 0 && (
