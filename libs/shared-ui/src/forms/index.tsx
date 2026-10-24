@@ -15,6 +15,7 @@ import {
 import { FileDrop } from './files.js';
 import { SecretField } from './secret.js';
 import { IntegrationItem, SaveBar, SettingRow, SettingsGroup } from './settings.js';
+import { SettingsNav } from './settings-nav.js';
 
 /**
  * UI-01c settings & form components (SURFACE_UI_UNIFICATION_PLAN §3.3).
@@ -23,6 +24,7 @@ import { IntegrationItem, SaveBar, SettingRow, SettingsGroup } from './settings.
  */
 
 export const KB_FORM_COMPONENT_TYPES = [
+  'ui:settings-nav',
   'ui:settings-group',
   'ui:setting-row',
   'ui:switch',
@@ -62,6 +64,8 @@ export function renderFormComponent(
   const p = <C extends (props: never) => unknown>(_component: C) =>
     ({ ...rawProps, id }) as unknown as Parameters<C>[0];
   switch (type) {
+    case 'ui:settings-nav':
+      return <SettingsNav {...p(SettingsNav)} />;
     case 'ui:settings-group':
       return <SettingsGroup {...p(SettingsGroup)}>{children}</SettingsGroup>;
     case 'ui:setting-row':
@@ -114,6 +118,7 @@ export {
   Select,
   SettingRow,
   SettingsGroup,
+  SettingsNav,
   Slider,
   Switch,
   TextField,

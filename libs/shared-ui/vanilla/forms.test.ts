@@ -341,6 +341,36 @@ describe('settings layout, integrations and the save bar', () => {
     expect(row.query('.kb-setting-row__control > .kb-field[data-control="switch"]')).not.toBeNull();
   });
 
+  it('a stacked policy row labels its child field while retaining field help', () => {
+    const { root } = mount([
+      {
+        id: 'policy-row',
+        type: 'ui:setting-row',
+        props: { label: 'Secretary policy', control_id: 'policy', layout: 'stacked' },
+        children: ['policy'],
+      },
+      {
+        id: 'policy',
+        type: 'ui:textarea',
+        props: {
+          name: 'profile.policy',
+          label: 'Secretary policy',
+          hide_label: true,
+          help: 'Describe your priorities.',
+          value: 'Keep mornings free.',
+        },
+      },
+    ]);
+    const row = root.query('.kb-setting-row')!;
+    expect(row.getAttribute('data-layout')).toBe('stacked');
+    const visibleLabel = row.query('label.kb-setting-row__label')!;
+    const input = row.query('textarea')!;
+    expect(visibleLabel.getAttribute('for')).toBe(input.getAttribute('id'));
+    expect(input.getAttribute('aria-labelledby')).toBe(visibleLabel.getAttribute('id'));
+    expect(input.getAttribute('aria-describedby')).toBe('kbf-policy-help');
+    expect(row.query('[id="kbf-policy-help"]')!.textContent).toBe('Describe your priorities.');
+  });
+
   it('integration-item: state pill with localized label (not color-only) and actions', () => {
     const { root, actions } = one(
       'ui:integration-item',

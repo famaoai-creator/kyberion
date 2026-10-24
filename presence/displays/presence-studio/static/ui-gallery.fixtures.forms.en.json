@@ -3,6 +3,98 @@
   "catalog": "kyberion-base",
   "sections": [
     {
+      "id": "settings-policy",
+      "title": "Secretary policy ui:setting-row layout=stacked",
+      "description": "A full-width writing surface with one visible field name, linked instructions, and a character count.",
+      "components": [
+        {
+          "id": "policy-group",
+          "type": "ui:settings-group",
+          "props": {
+            "title": "How your secretary works",
+            "description": "Set the priorities that should guide everyday decisions."
+          },
+          "children": ["policy-row"]
+        },
+        {
+          "id": "policy-row",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "Decision guidelines",
+            "control_id": "policy-input",
+            "layout": "stacked"
+          },
+          "children": ["policy-input"]
+        },
+        {
+          "id": "policy-input",
+          "type": "ui:textarea",
+          "props": {
+            "name": "profile.policy",
+            "label": "Decision guidelines",
+            "hide_label": true,
+            "help": "Describe what to prioritize and when to ask you before acting.",
+            "value": "Keep mornings free for focused work. Summarize urgent requests and ask me before sending messages to customers.",
+            "rows": 5,
+            "maxlength": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings-navigation",
+      "title": "Settings navigation ui:settings-nav",
+      "description": "Grouped native links retain browser navigation, show current location, and expose setup status in words.",
+      "components": [
+        {
+          "id": "settings-navigation-example",
+          "type": "ui:settings-nav",
+          "props": {
+            "label": "Settings sections",
+            "active": "profile",
+            "groups": [
+              {
+                "id": "personal",
+                "label": "Your workspace",
+                "items": [
+                  {
+                    "id": "profile",
+                    "label": "Profile",
+                    "description": "Your name and preferences",
+                    "icon": "user",
+                    "href": "#profile",
+                    "action": { "id": "settings.open", "payload": { "section": "profile" } }
+                  },
+                  {
+                    "id": "notifications",
+                    "label": "Notifications",
+                    "description": "When to reach you",
+                    "icon": "bell",
+                    "href": "#notifications",
+                    "badge": "2"
+                  }
+                ]
+              },
+              {
+                "id": "connections",
+                "label": "Connections",
+                "items": [
+                  {
+                    "id": "services",
+                    "label": "Services",
+                    "description": "Connected accounts",
+                    "icon": "plug",
+                    "href": "#services",
+                    "status": "needs_setup"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "form-settings",
       "title": "Settings ui:settings-group ui:setting-row ui:switch ui:segmented",
       "description": "A titled group of rows: label and description on the left, one control on the right. Rows stack on narrow screens.",
