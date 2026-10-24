@@ -76,17 +76,23 @@ export function createOnboardingExternalOperationAuthority(options: {
       throw new Error(
         '[EXTERNAL_AGENT_IDENTITY_MISMATCH] Installed NHI differs from actual execution actor'
       );
+    const effect = facts.effect as Record<string, unknown>;
+    const raw = buildExternalOperationTarget(facts.operationId, effect);
+    const target = parseExternalOperationGrant(raw);
+    // Confidential-tier runs may consume a grant only when the grant itself
+    // is scoped 'private' and the live-verified target repository is private —
+    // contracted development into the org's own private GitHub stays within
+    // the tenant trust boundary; anything else needs the human.
+    const privateRepoScoped =
+      (target as { visibility?: string } | undefined)?.visibility === 'private';
     if (
-      source.tier !== 'public' ||
+      (source.tier !== 'public' && !(source.tier === 'confidential' && privateRepoScoped)) ||
       envelope?.policy.external_egress === 'deny' ||
       (envelope && !envelope.policy.read_tiers.includes('public'))
     )
       return authority;
     const charter = findActiveCharter(scope, new Date());
     if (!charter || !facts.delegable) return authority;
-    const effect = facts.effect as Record<string, unknown>;
-    const raw = buildExternalOperationTarget(facts.operationId, effect);
-    const target = parseExternalOperationGrant(raw);
     if (
       !target ||
       !(charter.envelope.external_operations ?? []).some((grant) =>

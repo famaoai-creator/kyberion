@@ -213,7 +213,8 @@ function assertGhRead(args: string[]): void {
     args[0] === 'api' &&
     args.length === 4 &&
     args[2] === '--hostname' &&
-    /^repos\/[\w.-]+\/[\w.-]+\/commits\/[^\s]+$/.test(args[1])
+    (/^repos\/[\w.-]+\/[\w.-]+\/commits\/[^\s]+$/.test(args[1]) ||
+      /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]))
   )
     return;
   throw new Error(
@@ -521,6 +522,7 @@ export function ghPrMerge(
     'vcs:pr_merge',
     {
       repository,
+      repository_visibility: ghRepositoryVisibility({ ...params, repository }, run),
       ...bound,
       method: params.method || 'merge',
       deleteBranch: params.deleteBranch !== false,
@@ -625,6 +627,7 @@ export function ghPrCreate(
     'vcs:pr_create',
     {
       repository,
+      repository_visibility: ghRepositoryVisibility({ ...params, repository }, run),
       ...bound,
       title: params.title.trim(),
       body,
@@ -643,6 +646,28 @@ export function ghPrCreate(
     },
     true
   );
+}
+
+/** Verified repo visibility for delegation gating — never trust a claim. */
+export function ghRepositoryVisibility(
+  params: GhCallOptions & { repository?: { host: string; slug: string } },
+  run: VcsCommandRunner = safeExecResult
+): 'private' | 'public' | 'internal' | 'unknown' {
+  const repo = params.repository;
+  if (!repo) return 'unknown';
+  try {
+    const info = ghJsonSnapshot(
+      ['api', `repos/${repo.slug}`, '--hostname', repo.host],
+      params,
+      run
+    );
+    if (info.private === true || info.visibility === 'private') return 'private';
+    if (info.visibility === 'internal') return 'internal';
+    if (info.visibility === 'public' || info.private === false) return 'public';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }
 
 function ghJsonSnapshot(
