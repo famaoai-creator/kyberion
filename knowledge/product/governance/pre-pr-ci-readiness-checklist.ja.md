@@ -52,20 +52,20 @@ pnpm check -- --changed     # pr gate 全部 + 変更パスに該当する full-
 # 5. PR 全体を表すタイトルを決めて検査する
 pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
 
-# 6. 本文をテンプレートから作る（一時ファイルは active/shared/tmp/ に置く）
-cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/pr-body-<topic>.md
+# 6. 本文をテンプレートから作る（一時ファイルは public partition に置く）
+cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/public/shared/pr-body-<topic>.md
 #    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ Knowledge / 該当チェック欄を埋める
 
 # 6.5 push 前に preflight を通す（PR は作らない。title 検査 + `check --changed` + Knowledge 検査）
 pnpm kyberion pr preflight \
   --title "<type>(<scope>): <summary>" \
-  --body-file active/shared/tmp/pr-body-<topic>.md
+  --body-file active/shared/tmp/public/shared/pr-body-<topic>.md
 
 # 7. push してから作成する（`pr create` も同じ readiness gate を実行する）
 git push -u origin <branch>
 pnpm kyberion pr create \
   --title "<type>(<scope>): <summary>" \
-  --body-file active/shared/tmp/pr-body-<topic>.md \
+  --body-file active/shared/tmp/public/shared/pr-body-<topic>.md \
   --no-draft            # レビュー可能な場合。作業途中なら付けずに draft のまま
 
 # 8. CI を最後まで見る
@@ -79,12 +79,38 @@ gh pr checks <number> --watch
 - **`--title` を必ず渡す**。省略すると HEAD commit の件名がタイトルになり、最後の小さな修正 commit が
   PR 名になる。
 - **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
-  Test plan やチェック欄が抜ける。
+  Test plan やチェック欄が抜ける。**パスは checkout 内で、かつ `public` と明示された partition に置く**
+  — `active/shared/tmp/public/shared/<job>/pr-body.md`（推奨）または `active/shared/artifacts/public/…`
+  / `knowledge/public/…`。`body_source_tier` はファイルの置き場所で判定され、plain な
+  `active/shared/tmp/` やその他の floor では `protected_or_unknown` となり、charter の
+  `vcs:pr_create` grant への委任が不可能になって必ず人間承認が要る（
+  [onboarding-action-authority.md](../orchestration/onboarding-action-authority.md) 参照）。内容が
+  公開可能であることの確認は置き場所とは別に必ず行う。`/tmp/body.md` のような checkout 外の
+  絶対パスは secure-io に拒否され、readiness gate を通ったあとで失敗する。
 - **`## Knowledge` 欄を必ず埋める**。Mission ID を書いた PR は、そのミッションの学びの候補を全件
   `promoted` / `rejected` / `routed` のどれかで宣言する。ミッションなしの PR は `none — <理由>`。
+  宣言行の形式は `- promoted: <candidate_id> → <promoted record path>`（`routed:` は
+  `→ organization|personal`、`rejected:` と `none` は `— <理由>`）。ID とパスは裸のトークンとして
+  書く。前後の backtick・引用符と、パス後の半角スペース以降の注記はパーサが取り除くが、
+  パスは `promoted_ref` と完全一致させること。
   `pr create` は、未解決・未宣言の候補、diff に入っていない昇格記録、`knowledge/confidential/`・`knowledge/personal/`
   配下へのファイル追加（既に追跡済みのファイルの変更は対象外）があると PR を作らない。この検査は `--skip-readiness` でも迂回できない。ミッションの記録が
   main checkout にある場合は、主 worktree を自動で探す（明示するなら `--mission-root <path>`）。
+- **ミッション候補を `queued` / `hold` のままにしない**。未キュレーションの候補は
+  `unresolved_candidate` で `pr create` が止まる。`memory-approve` の `--curation-json` には
+  `{"title","summary","content","evidence_refs"}` が必須で、`evidence_refs` には候補の元 evidence の
+  フルパス（`active/missions/<tier>/<ID>/evidence/...`）だけを書く（`evidence/x.md` のような短縮形は
+  拒否される）。手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
+- **`[EXTERNAL_APPROVAL_REQUIRED]` は失敗ではなく正常な終点**。公開操作は人間ゲートで止まるのが
+  設計どおり。表示された依頼 ID を人間が
+  `pnpm kyberion approvals --approve <id>` で承認したあと、**同じ `pr create` コマンドを再実行する**
+  （その時点で `gh pr create` が走る）。
+  **charter の `vcs:pr_create` grant に委任して人間承認を省略するには3条件が必要**:
+  (a) grant が charter の `external_operations` に admission 済みであること、
+  (b) `--body-file` が public partition 上にあり `body_source_tier: "public"` であること、
+  (c) 呼び出しセッションが委任先 NHI として admission されていること — `pnpm onboarding nhi-session`
+  系の承認で発行される env pair（`KYBERION_NHI_ACTOR` 等）を付けて実行する。slug を env に書くだけでは
+  委任されない（セッション証明が要る）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
   PR 作成が走る。オプションはこの文書で確認する。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。

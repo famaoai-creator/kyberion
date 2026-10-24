@@ -73,7 +73,38 @@ export type DotTrigger =
       probe: import('../state-probe.js').StateProbeSpec;
       /** Minimum seconds between evaluations (default: one per sweep). */
       every_s?: number;
-    };
+    }
+  | DotFeedTrigger;
+
+/**
+ * Pull-side source adapter: polls a read-only service preset, turns new items
+ * into intake events under `source`, and lets the matching `event` trigger do
+ * the waking. A feed never wakes a dot by itself.
+ */
+export interface DotFeedTrigger {
+  kind: 'feed';
+  /** Declared intake source the items are ingested under (tenant binding comes from the policy). */
+  source: string;
+  service_id: string;
+  action: string;
+  params?: Record<string, unknown>;
+  /** Dotted path to the item array in the preset result (default: `items`, or the result itself when it is an array). */
+  items_path?: string;
+  /** Dotted path to a stable item identity (default: `id`). */
+  item_id_path?: string;
+  /** Dotted path to the ordering value (default: `item_id_path`). */
+  cursor_path?: string;
+  /** Event type stamped on ingested items (default: `feed`). */
+  event_type?: string;
+  /** Minimum seconds between polls (default 300, min 30). */
+  every_s?: number;
+  /** Newest items read per poll (default 50, max 200). */
+  max_items?: number;
+  /** First poll records the cursor and emits nothing (default) or emits what it sees. */
+  on_first_poll?: 'baseline' | 'emit';
+  /** Cursor overlap in seconds, for feeds that index late (default 0, max 3600). */
+  overlap_s?: number;
+}
 
 /** One cron-scheduled organization cadence (standup / retro). */
 export interface DotCadenceCron {
@@ -235,6 +266,31 @@ function assertOperationsCadenceTimezones(charter: DotCharter, sourcePath: strin
   }
 }
 
+/**
+ * A feed produces intake events; it must have an `event` trigger on the same
+ * source that accepts its type, or it would poll and ingest into a black hole.
+ */
+function assertFeedTriggersHaveConsumer(charter: DotCharter, sourcePath: string): void {
+  const eventTriggers = charter.attention.triggers.filter(
+    (trigger): trigger is Extract<DotTrigger, { kind: 'event' }> => trigger.kind === 'event'
+  );
+  for (const trigger of charter.attention.triggers) {
+    if (trigger.kind !== 'feed') continue;
+    const type = trigger.event_type ?? 'feed';
+    const consumer = eventTriggers.find((candidate) => candidate.sources.includes(trigger.source));
+    if (!consumer) {
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: feed trigger for source '${trigger.source}' has no matching event trigger — add {kind:'event', sources:['${trigger.source}']} so fetched items can wake this dot`
+      );
+    }
+    if (consumer.types && consumer.types.length > 0 && !consumer.types.includes(type)) {
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: feed trigger for source '${trigger.source}' emits type '${type}', which the event trigger does not accept — add '${type}' to its types or change event_type`
+      );
+    }
+  }
+}
+
 export function validateDotCharter(value: unknown, sourcePath = '<inline>'): DotCharter {
   const candidate =
     value && typeof value === 'object' && !Array.isArray(value) && '$schema' in value
@@ -257,6 +313,7 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
       `Invalid dot charter at ${sourcePath}: an operation binding requires an organization, excludes a project and cannot supervise organization-wide cadence`
     );
   assertOperationsCadenceTimezones(candidate as DotCharter, sourcePath);
+  assertFeedTriggersHaveConsumer(candidate as DotCharter, sourcePath);
   return candidate as DotCharter;
 }
 

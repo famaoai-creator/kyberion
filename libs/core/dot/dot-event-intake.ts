@@ -364,6 +364,11 @@ export function parseEventJsonPath(jsonPath: string): string[] {
     .filter(Boolean);
 }
 
+/** Read one dotted path out of an intake payload (own properties only). */
+export function readEventJsonPath(value: unknown, jsonPath: string): unknown {
+  return readPath(value, parseEventJsonPath(jsonPath));
+}
+
 const SUMMARY_FIELDS: readonly string[][] = [
   ['action'],
   ['repository', 'full_name'],
@@ -375,6 +380,11 @@ const SUMMARY_FIELDS: readonly string[][] = [
   ['conclusion'],
   ['subject'],
   ['title'],
+  // Pulled feeds (Slack search, ticket queries) carry their useful identity here.
+  ['channel', 'name'],
+  ['channel'],
+  ['user'],
+  ['text'],
 ];
 
 function buildEventSummary(source: string, type: string, payload: unknown): string {

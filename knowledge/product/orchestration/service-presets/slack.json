@@ -14,6 +14,26 @@
       "description": "Read-only identity check. Slack documents POST auth.test; ok must be true.",
       "parameters": {}
     },
+    "search_messages": {
+      "type": "api",
+      "path": "search.messages",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Keyword search over messages the authed token can see, bounded by that token's own visibility. Requires a user token with search:read; bot tokens cannot search. Read-only, safe to poll.",
+      "parameters": {
+        "query": {
+          "required": true,
+          "type": "string",
+          "description": "Slack search syntax, e.g. \"deploy failed\" in:#ops after:2026-10-01."
+        },
+        "sort": { "type": "string", "enum": ["score", "timestamp"], "default": "timestamp" },
+        "sort_dir": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
+        "count": { "type": "number", "default": 50 },
+        "page": { "type": "number", "default": 1 }
+      }
+    },
     "post_message": {
       "type": "auto",
       "alternatives": [

@@ -369,6 +369,45 @@ describe('dot charter', () => {
     );
   });
 
+  describe('feed triggers', () => {
+    const FEED = {
+      kind: 'feed',
+      source: 'slack',
+      service_id: 'slack',
+      action: 'search_messages',
+      event_type: 'slack_message',
+    };
+    const withTriggers = (triggers: unknown[]) => ({
+      ...VALID_CHARTER,
+      attention: { triggers },
+    });
+
+    it('accepts a feed with a matching event trigger', () => {
+      const charter = validateDotCharter(
+        withTriggers([FEED, { kind: 'event', sources: ['slack'], types: ['slack_message'] }])
+      );
+      expect(charter.attention.triggers).toHaveLength(2);
+    });
+
+    it('rejects a feed with no event trigger — it would ingest into a black hole', () => {
+      expect(() => validateDotCharter(withTriggers([FEED]))).toThrow(/no matching event trigger/);
+    });
+
+    it('rejects a feed whose emitted type the event trigger does not accept', () => {
+      expect(() =>
+        validateDotCharter(
+          withTriggers([FEED, { kind: 'event', sources: ['slack'], types: ['other'] }])
+        )
+      ).toThrow(/does not accept/);
+    });
+
+    it('rejects a poll cadence below the schema floor', () => {
+      expect(() => validateDotCharter(withTriggers([{ ...FEED, every_s: 5 }]))).toThrow(
+        /Invalid dot charter/
+      );
+    });
+  });
+
   describe('operations_cadence', () => {
     const orgCharter = {
       ...VALID_CHARTER,

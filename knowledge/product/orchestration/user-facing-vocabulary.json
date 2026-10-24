@@ -9658,6 +9658,11 @@
         "ja": "ローカルのテストイベントを dot イベント台帳に取り込む（--source, --file）",
         "qps-ploc": "⟦Ïñɠėşŧ ȧ ŀőƈȧŀ ŧėşŧ ėṽėñŧ ïñŧő ŧħė ḓőŧ ėṽėñŧ ŀėḓɠėř (--şőůřƈė, --ƒïŀė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "cli_cmd_script_dot_intake": {
+        "en": "Show which event or feed source wakes which dot, and what that wake may propose (--json)",
+        "ja": "どのイベント／フィード元がどの dot を起こし、その wake が何を提案できるかを表示（--json）",
+        "qps-ploc": "⟦Şħőẇ ẇħïƈħ ėṽėñŧ őř ƒėėḓ şőůřƈė ẇȧķėş ẇħïƈħ ḓőŧ, ȧñḓ ẇħȧŧ ŧħȧŧ ẇȧķė ɱȧẏ ṗřőṗőşė (--ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "cli_cmd_script_dot_release": {
         "en": "Request human approval to release a quarantined dot WorkItem after verifying its effects (--reason)",
         "ja": "効果を確認した上で、隔離中の dot WorkItem の解放を人間の承認に依頼する（--reason）",
