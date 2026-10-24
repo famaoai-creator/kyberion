@@ -161,6 +161,7 @@ const VITEST_LIVE_SUBTREES = [
   'shared/observability/work-coordination/',
   'shared/runtime/feedback-loop/',
   'shared/runtime/tenants/',
+  'shared/runtime/tenant-ledger/',
   'shared/runtime/service-receipts/',
   'shared/logs/traces/',
   'shared/coordination/orchestration/',

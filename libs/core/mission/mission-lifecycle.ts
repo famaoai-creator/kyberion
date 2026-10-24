@@ -1175,9 +1175,22 @@ export async function finishMission(
 
   maybeRunVolatileGc(upperId, traceCtx);
 
-  if (!ledger.verifyIntegrity()) {
+  // D9: a tenant mission's ledger events live in its tenant's ledger partition,
+  // so its chain is verified with the system ledger's.
+  let ledgerIntact = false;
+  try {
+    ledgerIntact = ledger.verifyScopedIntegrity({
+      tier: state.tier,
+      tenant_slug: state.tenant_slug,
+    });
+  } catch (err: any) {
     logger.warn(
-      `⚠️ [LEDGER_INTEGRITY] Global ledger integrity check failed for mission ${upperId}. The ledger may be corrupted — review ${upperId} audit trail before relying on it.`
+      `[LEDGER_INTEGRITY] ledger integrity for mission ${upperId} could not be checked — ${err?.message || err} | next: run pnpm audit:verify from an operator process | evidence: tenant ${state.tenant_slug ?? '(none)'}`
+    );
+  }
+  if (!ledgerIntact) {
+    logger.warn(
+      `⚠️ [LEDGER_INTEGRITY] Ledger integrity check failed for mission ${upperId} (system ledger${state.tenant_slug ? ` and tenant '${state.tenant_slug}' ledger` : ''}). The ledger may be corrupted — review ${upperId} audit trail before relying on it.`
     );
     traceCtx.addEvent('ledger.integrity_failed');
   }

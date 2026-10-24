@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   auditVerify: vi.fn(),
   auditVerifyTenantMirrors: vi.fn(),
   ledgerVerify: vi.fn(),
+  allLedgerVerify: vi.fn(),
   safeExistsSync: vi.fn(),
 }));
 
@@ -28,6 +29,7 @@ vi.mock('@agent/core/ledger', async (importOriginal) => {
     ...(actual as any),
     GLOBAL_LEDGER_PATH: 'active/audit/system-ledger.jsonl',
     verifyLedgerIntegrityDetailed: mocks.ledgerVerify,
+    verifyAllLedgerIntegrity: mocks.allLedgerVerify,
   };
 });
 
@@ -56,6 +58,19 @@ describe('audit_verify', () => {
       missingKey: false,
     });
     mocks.auditVerifyTenantMirrors.mockReturnValue({ ok: true, findings: [] });
+    mocks.allLedgerVerify.mockReturnValue({
+      ok: true,
+      ledgers: [
+        {
+          path: 'active/audit/system-ledger.jsonl',
+          ok: true,
+          total: 1,
+          corrupted: [],
+          missingKey: false,
+        },
+      ],
+      withheld: 0,
+    });
     mocks.safeExistsSync.mockImplementation((filePath?: string) => {
       // The production queue discovers tenant shards below this root. Keep
       // the fixture's global ledger/audit paths present while making absent
@@ -122,5 +137,46 @@ describe('audit_verify', () => {
     expect(report.ok).toBe(true);
     expect(mocks.auditVerify).toHaveBeenCalledWith({ since: '2026-07-04' });
     expect(mocks.ledgerVerify).toHaveBeenCalledWith('active/missions/demo/evidence/ledger.jsonl');
+  });
+
+  it('verifies tenant ledger partitions (D9) and fails on a broken tenant chain', async () => {
+    const tenantPath = 'active/shared/runtime/tenant-ledger/confidential/acme/ledger.jsonl';
+    mocks.allLedgerVerify.mockReturnValue({
+      ok: false,
+      ledgers: [
+        {
+          path: 'active/audit/system-ledger.jsonl',
+          ok: true,
+          total: 1,
+          corrupted: [],
+          missingKey: false,
+        },
+        {
+          path: tenantPath,
+          ok: false,
+          total: 2,
+          corrupted: ['line:2:parent_hash_mismatch'],
+          missingKey: false,
+          tier: 'confidential',
+          tenant_slug: 'acme',
+        },
+      ],
+      withheld: 1,
+    });
+    const { collectAuditVerifyReport, formatAuditVerifyReport } = await import('./audit_verify.js');
+
+    const report = collectAuditVerifyReport();
+
+    expect(report.ok).toBe(false);
+    // The system ledger is reported once (from the explicit path list).
+    expect(report.ledgers.map((ledger) => ledger.path)).toEqual([
+      'active/audit/system-ledger.jsonl',
+      tenantPath,
+    ]);
+    expect(report.ledgers[1]).toMatchObject({ tenant_slug: 'acme', tier: 'confidential' });
+    expect(report.tenantLedgersWithheld).toBe(1);
+    const text = formatAuditVerifyReport(report).join('\n');
+    expect(text).toContain('tenant=acme');
+    expect(text).toContain('tenant ledgers withheld: 1');
   });
 });
