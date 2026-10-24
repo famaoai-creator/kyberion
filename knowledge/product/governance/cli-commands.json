@@ -4257,6 +4257,17 @@
       "group": "operate"
     },
     {
+      "id": "script.customer-decision",
+      "module": "scripts/customer_decision.ts",
+      "command": "customer-decision default",
+      "noun": "customer-decision",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_decision",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.worktree.create",
       "module": "scripts/agent_worktree.ts",
       "command": "worktree create",

@@ -60,6 +60,22 @@
       "enabled": true
     },
     {
+      "id": "customer-room",
+      "kind": "ui",
+      "description": "Customer-facing decision room: one tenant per process, opened through an invite link; operator-launched because it is exposed publicly.",
+      "command": "node",
+      "args": ["dist/presence/displays/customer-room/server.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3046,
+      "healthPath": "/health",
+      "enabled": false,
+      "operatorNotesKey": "surface:surface_notes_customer_room",
+      "bestForKey": "surface:surface_best_for_customer_room"
+    },
+    {
       "id": "dev-idp",
       "kind": "service",
       "description": "Loopback-only disposable OIDC provider for local browser login. Authenticates nobody \u2014 binds 127.0.0.1, only redirects to loopback /auth/callback, and refuses NODE_ENV=production. Enable only for local setup/verification.",

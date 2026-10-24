@@ -211,6 +211,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/discussion-create-requests/confidential/',
       'active/shared/runtime/grants/personal/',
       'active/shared/runtime/grants/confidential/',
+      'active/shared/runtime/customer-decision-invites/personal/',
+      'active/shared/runtime/customer-decision-invites/confidential/',
     ]);
     for (const prefix of protectedRuntimeStatePrefixes())
       expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
@@ -233,6 +235,20 @@ describe('durable partitioned runtime state', () => {
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
       if (role !== 'discussion_request_store')
         expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
+    // Invite records: only the tenant-bound invite store role, only its own tenant.
+    expect(policy.authority_role_permissions.customer_decision_invite_store).toEqual({
+      allow_read: [
+        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
+      ],
+      allow_write: [
+        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
+      ],
+    });
+    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
+      if (role !== 'customer_decision_invite_store')
+        expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
+    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+      expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
     for (const store of ['hearing', 'grants', 'autonomy-learning']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))

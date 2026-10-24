@@ -112,6 +112,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/orchestration/hearing-scenarios.json',
   },
   {
+    id: 'customer-decision-template-aidlc-inception',
+    schemaPath: 'knowledge/product/schemas/customer-decision-template.schema.json',
+    dataPath: 'knowledge/product/orchestration/customer-decision-templates/aidlc-inception.json',
+  },
+  {
     id: 'charter-decision-vocabulary',
     schemaPath: 'knowledge/product/schemas/charter-decision-vocabulary.schema.json',
     dataPath: 'knowledge/product/governance/charter-decision-vocabulary.json',
@@ -866,6 +871,8 @@ function validateDesignTokenCatalog(violations: string[]) {
     ['presence/displays/concierge/src/app/kyberion-ui-tokens.css', `${expectedUiTokenBlock}\n`],
     // PA-03: the local pads get the same --kb-ui-* only layer.
     ['scripts/lib/pad-ui/design-tokens.css', `${expectedUiTokenBlock}\n`],
+    // CD-07: the customer-room display gets the same --kb-ui-* only layer.
+    ['presence/displays/customer-room/static/kyberion-ui-tokens.css', `${expectedUiTokenBlock}\n`],
   ];
   const stylesheetSourcePath = pathResolver.rootResolve(KB_UI_STYLESHEET_SOURCE);
   if (!safeExistsSync(stylesheetSourcePath)) {
@@ -883,6 +890,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       'presence/displays/computer-surface/static/kyberion-ui.css',
       'presence/displays/concierge/src/app/kyberion-ui.css',
       'scripts/lib/pad-ui/kyberion-ui.css',
+      'presence/displays/customer-room/static/kyberion-ui.css',
     ]) {
       generatedUiFiles.push([relativePath, expectedStylesheet]);
     }

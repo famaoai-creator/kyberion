@@ -211,6 +211,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/hearing/',
   // Standing grants (governance/grant-store.ts), tier/tenant partitioned.
   'shared/runtime/grants/',
+  // Customer decision invite links (customer-decision/invite.ts), tier/tenant partitioned.
+  'shared/runtime/customer-decision-invites/',
   // Tier/tenant-partitioned resource-usage ledgers (metrics.ts
   // RESOURCE_USAGE_LEDGER_ROOT); the shared `metrics` collector appends to them.
   'shared/runtime/usage-ledger/',

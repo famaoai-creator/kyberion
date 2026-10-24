@@ -1128,6 +1128,10 @@
       "types": "./dist/customer-conversation-modes.d.ts",
       "default": "./dist/customer-conversation-modes.js"
     },
+    "./customer-decision": {
+      "types": "./dist/customer-decision.d.ts",
+      "default": "./dist/customer-decision.js"
+    },
     "./customer-resolver": {
       "types": "./dist/customer-resolver.d.ts",
       "default": "./dist/customer-resolver.js"

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "customer-room",
+      "kind": "ui",
+      "description": "Customer-facing decision room: one tenant per process, opened through an invite link; operator-launched because it is exposed publicly.",
+      "command": "node",
+      "args": ["dist/presence/displays/customer-room/server.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3046,
+      "healthPath": "/health",
+      "enabled": false,
+      "operatorNotesKey": "surface:surface_notes_customer_room",
+      "bestForKey": "surface:surface_best_for_customer_room"
+    }
+  ]
+}

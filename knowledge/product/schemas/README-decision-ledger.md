@@ -46,6 +46,18 @@ knowledge/confidential/<tenant>/customers/<customer>/actors.json
 
 確定した決定は会話の一時領域(`active/shared/tmp/hearing/`)には残さない。
 
+## 書き込みの直列化
+
+台帳への書き込み(`appendDecisions` / `applyPromotions`)は、台帳ごとのプロセス間ロック(`withDecisionLedgerLock`、`decision-ledger-<tenant>-<case>`)を関数の中で取る。
+`pnpm decisions` と `pnpm kyberion customer-decision` のどちらから書いても、同じ台帳への書き込みは 1 本ずつ進み、読み直して書き戻す間に別の書き込みが消えることはない。
+ロックは同じプロセスの中では入れ子にできる。customer-decision は案件ロックを取ったあとで台帳ロックも取り、読み → 計画 → 書きの全体を包む(順序は常に案件 → 台帳)。
+
+## 顧客の決定と運用者の確認(customer-decision の層)
+
+`requires_customer` の項目(金額・契約)で顧客が決めた値は、台帳では `level: customer-value`、`state: decided` の記録のままです。
+運用者の確認(`customer-decision confirm`、承認ゲート `customer_decision:operator_confirm` を通る)は調整セット(`agendas/<id>.json` の `operator_confirmations`)に記録し、台帳の記録は変えない。
+そのため、確認済みかどうかを知りたい読み手は台帳の `state` だけで判断せず、有効な決定の解決(`resolveAgendaEffective`、`libs/core/customer-decision/effective.ts`)を使う。未確認の顧客の決定は `provisional`(`awaiting_operator_confirmation`)になる。
+
 ## 観測器(SD-06)— `decision-probes.schema.json`
 
 実装を読む観測器はテナント固有のコードにしない。案件の台帳に `probes.json`(何のファイルのどの正規表現を、どう読むか)を

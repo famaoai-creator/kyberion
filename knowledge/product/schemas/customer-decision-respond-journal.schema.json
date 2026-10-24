@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-respond-journal.schema.json",
+  "title": "Customer Decision Respond Journal",
+  "description": "CD-08: the write-ahead record of one customer-decision respond run, written before the ledger append and removed once every step is done. Stored at <case dir>/respond-journal/<receipt_id>.json. A run that stopped part way (a throw, the customer room's time limit) is completed from it on the next respond, confirm, submit or status of the case: the receipt (with its decision ids pre-assigned), the audit entry, the switches (from the effective decisions before the write) and the brief input. See libs/core/customer-decision/store.ts and scripts/customer_decision.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "receipt_id",
+    "tenant_slug",
+    "case_id",
+    "agenda_id",
+    "stage",
+    "receipt",
+    "before",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "receipt_id": { "type": "string", "pattern": "^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "stage": {
+      "description": "The last step known to be done: planned (nothing written yet), ledger_written, receipt_written, auditing (the audit entry may or may not be recorded: completion checks the audit chain before recording it), audited.",
+      "type": "string",
+      "enum": ["planned", "ledger_written", "receipt_written", "auditing", "audited"]
+    },
+    "receipt": {
+      "description": "The receipt this run writes (validated against customer-decision-receipt.schema.json on its own).",
+      "type": "object"
+    },
+    "before": {
+      "description": "The agenda's effective decisions before the ledger write (switch detection).",
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "created_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 }
+  }
+}
