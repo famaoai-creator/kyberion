@@ -22,6 +22,15 @@ export function loadMissionStateAtPath(statePath: string): MissionState | null {
 }
 
 /**
+ * Load mission state from an already resolved path WITHOUT swallowing errors:
+ * a read denial or a schema-invalid state throws, so a caller can tell
+ * "denied" from "absent". The caller checks the file exists first.
+ */
+export function readMissionStateAtPath(statePath: string): MissionState {
+  return missionStateCatalog(statePath).load();
+}
+
+/**
  * Reads mission state as an inference hint rather than as an authority.
  *
  * The governed catalog above enforces the full mission-state contract — nine

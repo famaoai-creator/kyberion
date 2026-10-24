@@ -36,7 +36,10 @@ import {
   runInCustomerDecisionConsumerSweep,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import {
+  runInResourceAccessScope,
+  type ResourceAccessScope,
+} from '../foundation/resource-access-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidCaseId, ledgerDir, readLedger } from '../decision-ledger/ledger.js';
 import {
@@ -77,7 +80,13 @@ import {
   listWorkItems,
   updateWorkItem,
 } from '../workforce/work-coordination.js';
-import { loadState } from './mission-state.js';
+import {
+  findArchivedMissionStatePath,
+  loadMissionStateIncludingArchive,
+  loadState,
+} from './mission-state.js';
+import { readMissionStateAtPath } from './mission-state-reader.js';
+import { boundTenant } from '../owner-scope.js';
 import type { MissionState } from './mission-types.js';
 
 export interface MissionDecisionCase {
@@ -85,6 +94,8 @@ export interface MissionDecisionCase {
   caseId: string;
   source: 'project' | 'deal';
   location: CustomerDecisionLocation;
+  /** The mission's project (`relationships.project.project_id`), when it has one. */
+  projectId?: string;
 }
 
 export interface MissionDecisionLockOptions {
@@ -92,6 +103,11 @@ export interface MissionDecisionLockOptions {
   /** The case to use instead of resolving it from mission state (tests, callers that know it). */
   decisionCase?: MissionDecisionCase | null;
   loadMissionState?: (missionId: string) => MissionState | null;
+  /**
+   * The tenant the caller works for (the CLI's `--tenant`): an archived tenant
+   * mission is read only for this tenant (else the process's bound tenant).
+   */
+  tenantSlug?: string;
   listTenantDeals?: (tenantSlug: string) => DealRecord[];
   caseExists?: (decisionCase: MissionDecisionCase) => boolean;
   /** Does `knowledge/confidential/<tenant>/decisions/` exist (tests)? */
@@ -280,6 +296,105 @@ function caseFor(
 }
 
 /**
+ * Reads an archived tenant mission's state: the mission authority, never
+ * outside the exact capability below (one `mission-state.json` plus the
+ * product schema), bound to the tenant.
+ */
+const ARCHIVED_MISSION_STATE_READ_ROLE = 'mission_controller';
+
+const ACCESS_DENIAL =
+  /\[(SECURITY|RESOURCE_SCOPE_DENIED|POLICY_VIOLATION|ROLE_[A-Z_]+|TENANT_[A-Z_]+)\]/u;
+
+/** A refusal by the access policy (not an absent or malformed state). */
+function isAccessDenial(error: unknown): boolean {
+  return ACCESS_DENIAL.test(error instanceof Error ? error.message : String(error));
+}
+
+const TENANT_ARCHIVE_STATE =
+  /^active\/archive\/missions\/(personal|confidential)\/([^/]+)\/[^/]+\/mission-state\.json$/u;
+
+/**
+ * The exact deny-only capability of an archived mission state read: that one
+ * `mission-state.json` (repo-relative) and the product schema, nothing else
+ * in the mission folder or the tenant's archive.
+ */
+export function archivedMissionStateCapability(
+  tenantSlug: string,
+  relativeStatePath: string
+): ResourceAccessScope {
+  return {
+    tenantSlug,
+    readExact: [relativeStatePath],
+    writeExact: [],
+    mkdirExact: [],
+    allowProductKnowledgeRead: true,
+  };
+}
+
+/**
+ * The state of a mission for its decision case, active or archived (`finish`
+ * archives a bolt). The archive's confidential tier is a protected store the
+ * operator CLI's own identity may not read: an archived tenant mission is read
+ * as {@link ARCHIVED_MISSION_STATE_READ_ROLE} bound to that tenant, inside an
+ * exact capability naming only its `mission-state.json`. Another tenant's
+ * mission, or one whose state names another tenant, is not visible (null).
+ * A read denial is not "not found": it warns and throws
+ * `[MISSION_STATE_ACCESS_DENIED]`.
+ */
+export function loadDecisionCaseMissionState(
+  missionId: string,
+  tenantSlug?: string
+): MissionState | null {
+  const upper = missionId.toUpperCase();
+  const active = loadState(upper);
+  if (active) return active;
+  const statePath = findArchivedMissionStatePath(upper);
+  if (!statePath) return null;
+  const relative = pathResolver.toRepoRelative(statePath);
+  const bound = boundTenant();
+  const requested = String(tenantSlug || '')
+    .trim()
+    .toLowerCase();
+  // A caller-supplied tenant never overrides the process's bound tenant.
+  if (requested && bound && requested !== bound) {
+    logger.warn(
+      `archived mission state not read — the requested tenant differs from the bound tenant | run the command for the bound tenant, or unset KYBERION_TENANT | mission=${upper} requested=${requested} bound=${bound}`
+    );
+    throw new Error(
+      `[MISSION_STATE_TENANT_MISMATCH] mission ${upper} was requested for tenant ${requested} but this process is bound to tenant ${bound}`
+    );
+  }
+  const tenant = requested || bound || '';
+  const partition = TENANT_ARCHIVE_STATE.exec(relative);
+  // An untenanted archive entry (public tier, legacy flat, shared partition):
+  // the ordinary visibility-checked read.
+  if (!partition || partition[2] === 'shared') {
+    return loadMissionStateIncludingArchive(upper, tenant ? { tenantSlug: tenant } : {});
+  }
+  if (!isValidTenantSlug(tenant) || partition[2] !== tenant) return null;
+  let state: MissionState | null;
+  try {
+    state = runInResourceAccessScope(archivedMissionStateCapability(tenant, relative), () =>
+      withExecutionContext(
+        ARCHIVED_MISSION_STATE_READ_ROLE,
+        () => (safeExistsSync(statePath) ? readMissionStateAtPath(statePath) : null),
+        undefined,
+        tenant
+      )
+    );
+  } catch (error) {
+    if (!isAccessDenial(error)) return null;
+    logger.warn(
+      `archived mission state not readable — ${diagnosticCode(error)}: the access policy refused the read, so the mission is not reported as absent | run the command for the mission's own tenant, or check role-assumption-policy for this process's SYSTEM_ROLE | mission=${upper} tenant=${tenant}`
+    );
+    throw new Error(
+      `[MISSION_STATE_ACCESS_DENIED] the state of archived mission ${upper} could not be read for tenant ${tenant}`
+    );
+  }
+  return state && state.tenant_slug?.toLowerCase() === tenant ? state : null;
+}
+
+/**
  * The decision case of a mission: its project's case, else the case of a deal
  * that lists the mission. Null when the mission has no tenant or no such case
  * directory exists. Throws only on store failures (callers log and go on).
@@ -289,7 +404,9 @@ export function resolveMissionDecisionCase(
   options: MissionDecisionLockOptions = {}
 ): MissionDecisionCase | null {
   if (options.decisionCase !== undefined) return options.decisionCase;
-  const state = (options.loadMissionState ?? loadState)(missionId.toUpperCase());
+  const state = options.loadMissionState
+    ? options.loadMissionState(missionId.toUpperCase())
+    : loadDecisionCaseMissionState(missionId, options.tenantSlug);
   const tenantSlug = state?.tenant_slug;
   if (!state || !tenantSlug || !isValidTenantSlug(tenantSlug)) return null;
   // One existence check for the tenant's decisions root before any deal scan:
@@ -299,9 +416,13 @@ export function resolveMissionDecisionCase(
   if (!rootExists(tenantSlug)) return null;
   const exists = options.caseExists ?? defaultCaseExists;
   const projectId = state.relationships?.project?.project_id;
+  // The mission's project travels with the case: WorkItems filed for it
+  // (rework, bolt changes) carry it as their typed context.
+  const withProject = (candidate: MissionDecisionCase): MissionDecisionCase =>
+    projectId && isValidCaseId(projectId) ? { ...candidate, projectId } : candidate;
   if (projectId) {
     const candidate = caseFor(tenantSlug, projectId, 'project');
-    if (candidate && exists(candidate)) return candidate;
+    if (candidate && exists(candidate)) return withProject(candidate);
   }
   const upper = missionId.toUpperCase();
   const deals = (options.listTenantDeals ?? listDeals)(tenantSlug).filter((deal) =>
@@ -309,7 +430,7 @@ export function resolveMissionDecisionCase(
   );
   for (const deal of deals) {
     const candidate = caseFor(tenantSlug, deal.deal_id, 'deal');
-    if (candidate && exists(candidate)) return candidate;
+    if (candidate && exists(candidate)) return withProject(candidate);
   }
   return null;
 }
@@ -361,6 +482,7 @@ export function pinTaskDecisions(
         ...lock,
         decisions: [...lock.decisions, ...proposals],
         ...('dir' in decisionCase.location ? {} : { tenant_slug: decisionCase.tenantSlug }),
+        ...(decisionCase.projectId ? { project_id: decisionCase.projectId } : {}),
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
         status: 'in_progress',
@@ -466,6 +588,7 @@ export function recordTaskDecisionProposals(
             now,
           }),
           ...('dir' in decisionCase.location ? {} : { tenant_slug: decisionCase.tenantSlug }),
+          ...(decisionCase.projectId ? { project_id: decisionCase.projectId } : {}),
           mission_id: input.missionId.toUpperCase(),
           task_id: input.taskId,
           status: 'in_progress',
@@ -663,8 +786,10 @@ export function fileDecisionReworkWorkItem(
   input: {
     tenantSlug: string;
     caseId: string;
-    lock: Pick<ConsumedDecisionLockRecord, 'consumer' | 'mission_id' | 'task_id'>;
+    lock: Pick<ConsumedDecisionLockRecord, 'consumer' | 'mission_id' | 'task_id' | 'project_id'>;
     refs: readonly string[];
+    /** The mission's project (else the lock's): the WorkItem's typed context. */
+    projectId?: string;
   },
   options: Pick<MissionDecisionLockOptions, 'workItemRootDir'> = {}
 ): string {
@@ -672,6 +797,7 @@ export function fileDecisionReworkWorkItem(
   const itemId = decisionReworkWorkItemId(input.lock.mission_id, input.lock.task_id, refs);
   const rootDir = options.workItemRootDir;
   if (getWorkItem(itemId, rootDir ? { rootDir } : {})) return itemId;
+  const projectId = input.projectId ?? input.lock.project_id;
   const params = {
     missionId: input.lock.mission_id,
     taskId: input.lock.task_id,
@@ -689,8 +815,10 @@ export function fileDecisionReworkWorkItem(
       priority: 'normal',
       source: 'local',
       sourceRef: `customer-decision:${input.caseId}:${input.lock.consumer}`,
+      ...(projectId ? { projectId } : {}),
       context: {
         tenant_slug: input.tenantSlug,
+        ...(projectId ? { project_id: projectId } : {}),
         mission_id: input.lock.mission_id,
         work_shape: 'solution_project',
       },
@@ -753,7 +881,13 @@ function settleLock(
   if (pending.length > 0) {
     const refs = [...new Set(pending.map((entry) => entry.ref))].sort();
     const workItemId = fileDecisionReworkWorkItem(
-      { tenantSlug: decisionCase.tenantSlug, caseId: decisionCase.caseId, lock, refs },
+      {
+        tenantSlug: decisionCase.tenantSlug,
+        caseId: decisionCase.caseId,
+        lock,
+        refs,
+        ...(decisionCase.projectId ? { projectId: decisionCase.projectId } : {}),
+      },
       options
     );
     if (!rework.some((entry) => entry.work_item_id === workItemId)) {

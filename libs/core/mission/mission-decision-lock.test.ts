@@ -159,6 +159,29 @@ describe('mission decision lock (CD-09)', () => {
       expect(listTenantDeals).not.toHaveBeenCalled();
     });
 
+    it("carries the mission's project on the case only when it is a valid case id", () => {
+      const deals = () => [deal('DEAL-1', [MISSION])];
+      const onlyDeal = (candidate: MissionDecisionCase) => candidate.caseId === 'DEAL-1';
+      const withProject = (projectId: string) =>
+        state({
+          relationships: { project: { project_id: projectId, relationship_type: 'belongs_to' } },
+        });
+      expect(
+        resolveMissionDecisionCase(MISSION, {
+          loadMissionState: () => withProject('PRJ-1'),
+          listTenantDeals: deals,
+          caseExists: onlyDeal,
+        })
+      ).toMatchObject({ caseId: 'DEAL-1', source: 'deal', projectId: 'PRJ-1' });
+      const invalid = resolveMissionDecisionCase(MISSION, {
+        loadMissionState: () => withProject('../not a case'),
+        listTenantDeals: deals,
+        caseExists: onlyDeal,
+      });
+      expect(invalid).toMatchObject({ caseId: 'DEAL-1', source: 'deal' });
+      expect(invalid).not.toHaveProperty('projectId');
+    });
+
     it('leaves a mission without a case alone, and a lookup failure never throws', () => {
       const none = { loadMissionState: () => null };
       expect(pinTaskDecisions(task, none)).toBeNull();

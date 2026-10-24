@@ -247,7 +247,7 @@ status: active
 
 **送り先**: 顧客 actor（`customers/<customer>/actors.json`）に、紐付け済みのチャネル（`channel-bindings.json` の surface と channel_id）への参照を持たせる（`actor-add --channel <surface>:<channel_id>`、存在する紐付けだけを受け付ける）。参照のない決定者には送らず、担当者の受信箱に「手でリマインドする」項目を作る（id だけ）。配信は `sendToCustomer` の `deliver` として surface の outbox に積む（outbox に直接積む経路は作らない）。
 
-**実行**: テナントのパイプライン（`knowledge/confidential/<tenant>/pipelines/`）から 1 日 1 回、テナントに閉じた sweep を動かす。テナントをまたぐ予定（sovereign）には足さない。担当者は `customer-decision reminders --tenant <t> --install` でテナントにパイプラインを置き、`customer-decision remind --tenant <t> [--dry-run]` で手でも動かせる。送った記録は調整セットの内容ハッシュの外（`bolt_routing` と同じ扱い）に残し、同じ段階の知らせは 1 回だけにする（重複防止のキーは調整セット・決定者・種類・日付）。
+**実行**: テナントのパイプライン（`knowledge/confidential/<tenant>/pipelines/`）から 1 日 1 回、テナントに閉じた sweep を動かす。テナントをまたぐ予定（sovereign）には足さない。担当者は `customer-decision reminders --tenant <t> --install --by user:<member>` でテナントにパイプラインを置き、`customer-decision remind --tenant <t> [--dry-run]` で手でも動かせる。送った記録は調整セットの内容ハッシュの外（`bolt_routing` と同じ扱い）に残し、同じ段階の知らせは 1 回だけにする（重複防止のキーは調整セット・決定者・種類・日付）。
 
 **担当者への引き継ぎ**: respond の後に、選択肢の外の回答（`free_text` / 意見だけの回答）と、コメントつきの回答を、担当者の受信箱と通知に回す（id と件数だけ。顧客の文面は案件の側に残す）。顧客向け画面に「ほかに確認したいこと」（調整セット全体への質問）の欄を足し、範囲外の質問として同じく担当者に回す。
 
@@ -324,7 +324,7 @@ pnpm kyberion customer-decision draft --tenant <t> --case <case> --agenda <id> -
 pnpm kyberion customer-decision actor-add --tenant <t> --case <case> --customer <c> --actor customer:<id> --name <name> --channel slack:<channel_id>   # 紐付け済みのチャネルだけ
 pnpm kyberion customer-decision remind --tenant <t> [--case <case>] --dry-run   # 今日送るリマインド（何も書かない）
 pnpm kyberion customer-decision remind --tenant <t> [--case <case>]             # 送る（承認ゲート経由。チャネルのない決定者は担当者の受信箱へ）
-pnpm kyberion customer-decision reminders --tenant <t> --install                # 日次のテナントパイプラインを置く（この後 project-trust の承認が要る）
+pnpm kyberion customer-decision reminders --tenant <t> --install --by user:<member>  # 日次のテナントパイプラインを置く（--by が資産台帳の ingested_by。この後 project-trust の承認が要る）
 KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/server.js   # 公開 ingress の背後で動かす
 ```
 
@@ -343,9 +343,13 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-10 の残り: 却下の受信箱への記録は `surface_runtime` で書く（`addInboxEntry` 1 回だけ）。`surface_runtime` は `active/shared/runtime/` にも書けるので、受信箱だけに絞った役割を用意する。
 - CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。
 - CD-10 の残り: 招待の置き場の tier ディレクトリができた後は、未登録のテナントも自分の招待ディレクトリを作れる。テナントの登録をそこでも求めるかは、ガバナンスの判断として決める。
+- E2E の残り: 終わった bolt の状態は `mission_controller` を 1 ファイルの capability の中で借りて読む。読み取り専用の、アーカイブ済みミッションの状態だけを読む役割を用意する。
 - CD-11 の残り: 決定者の紐付けが別の surface に移ると、前の保留中の承認依頼は取り消せずに残る（警告だけ）。surface をまたいで同じリマインドの依頼を探して取り消す。
 - CD-11 の残り: `sendToCustomer` のほかの呼び出し元は、承認依頼の要約に本文を写したまま（CD-11 より前から）。共有の承認の置き場に顧客の文面を置かないよう、id だけの要約にそろえる。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
 - 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。
 - `generate` で `ranking` 項目の選択肢（AI-DLC Unit の候補）も作る。今は運用者が `draft --file` で入れる必要がある。
+- E2E（2026-10-24）の残り（D8）: 顧客チャネルの紐付け（`customer-channel-binding`）を作る governed なコマンドがない。E2E では JSON を手で書いた。`actor-add --channel` と同じ検証（テナント、surface、チャネル id）を通す作成コマンドを足す。
+- E2E（2026-10-24）の残り（D10）: `generate` の推論バックエンドの選び方が `KYBERION_REASONING_BACKEND=claude-cli` を無視して codex-cli を選んだ（egress ゲートの拒否そのものは正しい）。バックエンドの選択を環境変数の指定に従わせ、選んだバックエンドを結果に記録する。
+- E2E（2026-10-24）の残り（D9）: ミッションの台帳（`ledger.record`）は記録の `scope` を渡されたデータの `tier` / `tenant_slug` からしか作らない。ミッション系の記録（`MISSION_CREATE`、`MISSION_ACTIVATE`、`MISSION_DISTILL`、`MISSION_FINISH` など）はどちらも渡さないため、confidential のテナントのミッションでも `tier: public` になる（`MISSION_CREATE` は `tier` だけ渡すので正規化に失敗し、`scope_kind: system` に落ちる）。ミッションの状態から tier とテナントを補うと、公開のグローバル台帳（`active/audit/system-ledger.jsonl`）のメタデータにテナントの slug が載るので、載せてよいかを決めてから直す。
