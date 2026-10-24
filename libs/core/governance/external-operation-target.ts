@@ -2,7 +2,16 @@
 export type ExternalOperationGrant =
   | { operation_id: 'vcs:pr_create'; repository: string }
   | { operation_id: 'vcs:pr_merge' | 'vcs:push'; repository: string; branch: string }
-  | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string };
+  | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string }
+  | {
+      operation_id: 'tenant:attest_provider';
+      tenant_slug: string;
+      provider: string;
+      training_use: 'none';
+      plan: string;
+      basis: string;
+      attested_by: string;
+    };
 
 /**
  * Declarative delegation registry: one entry per operation that may consult
@@ -115,6 +124,41 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     buildTarget: (effect) => buildBrowserNavigationTarget('browser:open_tab', effect),
     reputational_class: 'B',
   },
+  'tenant:attest_provider': {
+    fields: ['attested_by', 'basis', 'plan', 'provider', 'tenant_slug', 'training_use'],
+    buildTarget: (effect) => {
+      // Only the egress-opening claim is ever delegated; 'used'/'unknown'
+      // attestations need no human approval, so there is nothing to grant.
+      if (effect.training_use !== 'none') return undefined;
+      const claim = {
+        operation_id: 'tenant:attest_provider',
+        tenant_slug:
+          typeof effect.tenant_slug === 'string' ? effect.tenant_slug.trim() : effect.tenant_slug,
+        provider: typeof effect.provider === 'string' ? effect.provider.trim() : effect.provider,
+        training_use:
+          typeof effect.training_use === 'string'
+            ? effect.training_use.trim()
+            : effect.training_use,
+        plan: typeof effect.plan === 'string' ? effect.plan.trim() : effect.plan,
+        basis: typeof effect.basis === 'string' ? effect.basis.trim() : effect.basis,
+        attested_by:
+          typeof effect.attested_by === 'string' ? effect.attested_by.trim() : effect.attested_by,
+      };
+      for (const key of [
+        'tenant_slug',
+        'provider',
+        'training_use',
+        'plan',
+        'basis',
+        'attested_by',
+      ]) {
+        const v = claim[key as keyof typeof claim];
+        if (typeof v !== 'string' || !v) return undefined;
+      }
+      return claim;
+    },
+    reputational_class: 'A',
+  },
 };
 
 function buildBrowserNavigationTarget(
@@ -184,15 +228,23 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
     const v = value[field];
     if (typeof v !== 'string' || v.includes('*') || v !== v.trim()) return undefined;
   }
-  const normalized = spec.fields.includes('branch')
-    ? {
-        repository: normalizeRepositoryUrl(value.repository as string),
-        branch: normalizeBranch(value.branch),
-      }
-    : spec.fields.includes('repository')
-      ? { repository: normalizeRepositoryUrl(value.repository as string) }
-      : { origin: normalizeOrigin(value.origin as string) };
+  // URL/host-shaped fields normalize; literal claim fields (provider, plan,
+  // basis, attested_by, tenant_slug, training_use) must match verbatim —
+  // the grant is bound to one exact statement, not a family of claims.
+  const normalized: Record<string, string | undefined> = {};
+  for (const field of spec.fields) {
+    const v = value[field] as string;
+    normalized[field] =
+      field === 'repository'
+        ? normalizeRepositoryUrl(v)
+        : field === 'branch'
+          ? normalizeBranch(v)
+          : field === 'origin'
+            ? normalizeOrigin(v)
+            : v;
+  }
   if (Object.values(normalized).some((v) => !v)) return undefined;
+  if (op === 'tenant:attest_provider' && normalized.training_use !== 'none') return undefined;
   return { operation_id: op, ...normalized } as ExternalOperationGrant;
 }
 

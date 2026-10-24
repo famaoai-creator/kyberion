@@ -1,0 +1,116 @@
+{
+  "$schema": "../knowledge/product/schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "famao-ai-operations",
+  "version": "1.0.0",
+  "title": "Famao AI Operations Sentinel",
+  "purpose": "famao-ai 組織の定常運用ループ（Operation tick、意思決定の進捗監視、サービスヘルス、プロジェクト進捗）を常駐監視し、一人運用のオーナーへ判断要請だけを届ける。",
+  "status": "active",
+  "scope": {
+    "tier": "confidential",
+    "tenant_slug": "famao-ai",
+    "organization_id": "famao-ai"
+  },
+  "goal": {
+    "statement": "組織 famao-ai の定常運用ループを滞りなく回す。期限を迎えたオペレーションを tick し、未観測サービスを検知し、判断待ちの意思決定を整理してオーナーへ提示する。",
+    "success_signals": [
+      "未実行（overdue）のオペレーションが 0 件",
+      "未解決インシデントおよび判断遅延の意思決定が放置されていないこと"
+    ],
+    "budget": {
+      "max_turns_per_wake": 5,
+      "wall_clock_ms_per_wake": 600000,
+      "token_cap_per_day": 200000
+    },
+    "key_results": [
+      {
+        "kr_id": "overdue-ops",
+        "title": "Overdue operations for famao-ai",
+        "metric": { "source": "org_metric", "metric": "overdue_operations" },
+        "target": 0,
+        "direction": "decrease",
+        "baseline": 0,
+        "every_s": 900
+      },
+      {
+        "kr_id": "open-incidents",
+        "title": "Open incidents for famao-ai",
+        "metric": { "source": "org_metric", "metric": "open_incidents" },
+        "target": 0,
+        "direction": "maintain",
+        "baseline": 0,
+        "every_s": 900
+      }
+    ]
+  },
+  "attention": {
+    "triggers": [
+      {
+        "kind": "cron",
+        "cron": "0 9 * * 1-5",
+        "timezone": "Asia/Tokyo"
+      },
+      {
+        "kind": "probe",
+        "probe": {
+          "type": "file",
+          "path": "active/organizations/confidential/famao-ai/famao-ai/state/organization-state.json",
+          "expect": "changed"
+        }
+      },
+      {
+        "kind": "wake",
+        "channels": ["inbox", "surface"]
+      }
+    ]
+  },
+  "authority": {
+    "authority_role": "organization_operator",
+    "allowed_work_shapes": ["direct_reply", "pipeline", "mission", "task_session"],
+    "max_concurrent_delegations": 10,
+    "allowed_pipelines": [
+      "pipelines/ops-health-probe.json",
+      "pipelines/knowledge-hygiene-probe.json",
+      "pipelines/storage-janitor.json",
+      "pipelines/baseline-check.json",
+      "pipelines/continuous-operations-report.json",
+      "pipelines/continuous-managed-work.json"
+    ]
+  },
+  "decisions": {
+    "default_decision": "notify",
+    "veto_window_minutes": 60,
+    "escalate_channel": "surface"
+  },
+  "notification": {
+    "deliver_to": {
+      "surface": "surface",
+      "channel": "concierge"
+    },
+    "digest_cron": "0 9,18 * * 1-5",
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "08:00",
+      "timezone": "Asia/Tokyo"
+    }
+  },
+  "team": {
+    "responsibilities": ["organization.operations-loop.famao-ai"],
+    "goal_ref": "Famao AI runs its own operations autonomously and safely"
+  },
+  "operations_cadence": {
+    "tick_every_minutes": 15,
+    "standup": {
+      "cron": "45 8 * * 1-5",
+      "timezone": "Asia/Tokyo"
+    },
+    "retro": {
+      "cron": "0 17 * * 5",
+      "timezone": "Asia/Tokyo"
+    }
+  },
+  "runtime": {
+    "heartbeat_id": "dot-famao-ai-operations",
+    "max_idle_wake_ms": 345600000
+  }
+}

@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { listProjectRecords } from '@agent/core/project/project-registry';
 import {
   safeExistsSync,
@@ -62,11 +63,28 @@ function childDirectories(root: string): string[] {
   });
 }
 
+/**
+ * List a tier root's children. Tier roots under tenant-scope protected
+ * prefixes (e.g. `active/organizations/confidential/`) cannot be listed bare
+ * — the path needs a tenant segment — so when the direct listing is denied
+ * the check falls back to the canonical segments: `shared` plus every
+ * registered tenant slug (the tenant registry is the single source).
+ */
+function tierChildDirectories(tierRoot: string): string[] {
+  try {
+    return childDirectories(tierRoot);
+  } catch {
+    return ['shared', ...listTenantProfileSlugs()].filter((segment) =>
+      safeExistsSync(path.join(tierRoot, segment))
+    );
+  }
+}
+
 function collectScopedDirectories(root: string): string[] {
   const result: string[] = [];
   for (const tier of ['personal', 'confidential', 'public']) {
     const tierRoot = path.join(root, tier);
-    for (const tenantOrId of childDirectories(tierRoot)) {
+    for (const tenantOrId of tierChildDirectories(tierRoot)) {
       const candidate = path.join(tierRoot, tenantOrId);
       for (const entity of childDirectories(candidate)) {
         result.push(path.relative(root, path.join(candidate, entity)).replaceAll(path.sep, '/'));
@@ -80,7 +98,7 @@ function collectMissionDirectories(root: string): string[] {
   const result: string[] = [];
   for (const tier of ['personal', 'confidential', 'public']) {
     const tierRoot = path.join(root, tier);
-    for (const entry of childDirectories(tierRoot)) {
+    for (const entry of tierChildDirectories(tierRoot)) {
       const candidate = path.join(tierRoot, entry);
       const looksLikeMission =
         safeExistsSync(path.join(candidate, 'mission-state.json')) ||
