@@ -344,7 +344,7 @@ describe('customer-room attachment route', () => {
   });
   async function start(
     apiLimitPerMinute = 100,
-    attachment: { perMinute?: number; concurrency?: number } = {}
+    attachment: { perMinute?: number; concurrency?: number; perAddress?: number } = {}
   ): Promise<void> {
     const app = express();
     registerCustomerRoomRoutes(app, {
@@ -359,6 +359,7 @@ describe('customer-room attachment route', () => {
       apiLimitPerMinute,
       attachmentLimitPerMinute: attachment.perMinute,
       attachmentConcurrency: attachment.concurrency,
+      attachmentConcurrencyPerAddress: attachment.perAddress,
     });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -478,7 +479,7 @@ describe('customer-room attachment route', () => {
   });
 
   it('caps image fetches in flight and frees the slot when one finishes', async () => {
-    await start(100, { perMinute: 100, concurrency: 2 });
+    await start(100, { perMinute: 100, concurrency: 2, perAddress: 2 });
     const pending: Array<() => void> = [];
     next = () =>
       new Promise<FacadeOutcome>((resolve) => {
@@ -510,8 +511,42 @@ describe('customer-room attachment route', () => {
     expect((await fourth).status).toBe(200);
   });
 
+  it('lets one address hold at most its own share of the slots (default 2 of 4)', async () => {
+    await start(100, { perMinute: 100 });
+    const pending: Array<() => void> = [];
+    next = () =>
+      new Promise<FacadeOutcome>((resolve) => {
+        pending.push(() =>
+          resolve({
+            status: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              media_type: 'image/png',
+              bytes_base64: PNG.toString('base64'),
+            }),
+            aborted: false,
+          })
+        );
+      });
+    const first = fetchImage({ attachment_id: ID });
+    const second = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    // Two global slots are still free, but this address already has its two.
+    const third = await fetchImage({ attachment_id: ID });
+    expect(third.status).toBe(429);
+    expect(third.headers.get('retry-after')).toBe('1');
+    expect(calls).toHaveLength(2);
+    pending.shift()?.();
+    expect((await first).status).toBe(200);
+    const fourth = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    for (const resolve of pending.splice(0)) resolve();
+    expect((await second).status).toBe(200);
+    expect((await fourth).status).toBe(200);
+  });
+
   it('keeps the slot of a dropped request until its facade run settles', async () => {
-    await start(100, { perMinute: 100, concurrency: 1 });
+    await start(100, { perMinute: 100, concurrency: 1, perAddress: 1 });
     let settle: (() => void) | undefined;
     next = () =>
       new Promise<FacadeOutcome>((resolve) => {
@@ -549,7 +584,7 @@ describe('customer-room attachment route', () => {
   });
 
   it('does not count refused requests against the in-flight cap', async () => {
-    await start(100, { perMinute: 100, concurrency: 1 });
+    await start(100, { perMinute: 100, concurrency: 1, perAddress: 1 });
     for (let i = 0; i < 3; i += 1) {
       expect((await fetchImage({ attachment_id: 'bad' })).status).toBe(400);
     }
