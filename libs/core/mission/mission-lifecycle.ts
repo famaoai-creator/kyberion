@@ -1075,11 +1075,13 @@ export async function finishMission(
 
   // CD-10: a mission with a customer decision case gets the bolt review as
   // the operator's next step (a command only; the operator picks what the
-  // customer sees). Best-effort.
+  // customer sees). Best-effort. Resolved now (the state is still active) and
+  // printed as the closing line after the archive, where the operator looks —
+  // not buried among the retrospective / distill lines that follow.
+  let boltReviewCommand: string | null = null;
   try {
     const { boltReviewNextStep } = await import('./mission-bolt-review.js');
-    const command = boltReviewNextStep(upperId);
-    if (command) logger.info(t('customer_decision:bolt_review_next_step', { command }));
+    boltReviewCommand = boltReviewNextStep(upperId);
   } catch (err: unknown) {
     logger.warn(
       `bolt review next step skipped — ${err instanceof Error ? err.message : String(err)} | run customer-decision bolt-review by hand | mission=${upperId}`
@@ -1372,6 +1374,9 @@ export async function finishMission(
   };
   await saveState(upperId, state, { missionDir: archivePath });
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
+  if (boltReviewCommand) {
+    logger.success(t('customer_decision:bolt_review_next_step', { command: boltReviewCommand }));
+  }
 }
 
 /**

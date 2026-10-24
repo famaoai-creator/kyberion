@@ -51,7 +51,7 @@ function boltAgenda(overrides: Partial<DecisionAgenda> = {}): DecisionAgenda {
         item: 'bolt:MSN-BOLT-1',
         key: 'bolt.acceptance',
         kind: 'approval',
-        question: 'Do you accept the results of this bolt?',
+        question: 'Do you accept the results of this round of work?',
         background: 'What changed: the order form.',
         our_decision: { value: { approved: true } },
         requires_customer: false,
