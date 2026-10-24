@@ -2753,6 +2753,21 @@
       "unresolved": []
     },
     {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/daemon_watchdog.ts#requestDaemonRecovery",
       "roles": ["daemon_watchdog"],
       "unresolved": []
