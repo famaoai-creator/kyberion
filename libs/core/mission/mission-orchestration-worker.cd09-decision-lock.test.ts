@@ -80,6 +80,10 @@ vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => 
 vi.mock('./mission-decision-lock.js', () => ({
   pinTaskDecisions: mocks.pinTaskDecisions,
   reconcileTaskDecisions: mocks.reconcileTaskDecisions,
+  CUSTOMER_DECISION_BLOCKED_REASONS: [
+    'awaiting_customer_decision',
+    'customer_decision_check_failed',
+  ],
   // Every structured result re-checks the task's holds; none here.
   recordTaskDecisionProposals: () => ({
     case_found: false,

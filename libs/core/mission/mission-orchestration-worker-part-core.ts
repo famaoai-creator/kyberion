@@ -65,6 +65,7 @@ import {
   pinTaskDecisions,
   reconcileTaskDecisions,
   recordTaskDecisionProposals,
+  CUSTOMER_DECISION_BLOCKED_REASONS,
 } from './mission-decision-lock.js';
 
 export async function dispatchPlannedMissionTaskCore(
@@ -437,10 +438,26 @@ export async function dispatchPlannedMissionTaskCore(
 
   // CD-09: a requires_customer question holds the task until the customer
   // decides (the needs → blocked path). Public evidence: ids and counts only.
-  // A failed check on a known case is a hold too (fail closed).
+  // Fail closed, but say so: a check that failed on a known case, or a case
+  // lookup that failed for a task already held, blocks with a reason of its
+  // own (customer_decision_check_failed) so it is told apart from a real wait.
+  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
+  const decisionCheckFailed = Boolean(
+    decisionProposals &&
+    ((decisionProposals.case_found && decisionProposals.failed) ||
+      (decisionProposals.lookup_failed &&
+        typeof previousBlockedReason === 'string' &&
+        CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason)))
+  );
+  if (decisionCheckFailed) {
+    logger.warn(
+      `task ${input.task.task_id} blocked — its customer decision holds could not be checked (customer_decision_check_failed) | resume the mission once the decision case is readable | mission=${input.missionId} consumer=${decisionProposals?.consumer ?? ''}`
+    );
+  }
   if (
-    decisionProposals?.case_found &&
-    (decisionProposals.hold_proposal_ids.length > 0 || decisionProposals.failed)
+    decisionProposals &&
+    (decisionCheckFailed ||
+      (decisionProposals.case_found && decisionProposals.hold_proposal_ids.length > 0))
   ) {
     const hold = {
       consumer: decisionProposals.consumer,
@@ -449,18 +466,26 @@ export async function dispatchPlannedMissionTaskCore(
       hold_count: decisionProposals.hold_proposal_ids.length,
       hold_proposal_ids: decisionProposals.hold_proposal_ids,
       ...(decisionProposals.failed ? { recorded: false } : {}),
+      ...(decisionProposals.lookup_failed ? { case_lookup_failed: true } : {}),
     };
     updateWorkItem({
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
       metadata: {
-        summary: 'Task waits for a customer decision',
-        blocked_reason: 'awaiting_customer_decision',
+        summary: decisionCheckFailed
+          ? 'Task blocked: its customer decision holds could not be checked'
+          : 'Task waits for a customer decision',
+        blocked_reason: decisionCheckFailed
+          ? 'customer_decision_check_failed'
+          : 'awaiting_customer_decision',
         mission_id: input.missionId,
         task_id: input.task.task_id,
         team_role: input.teamRole,
-        customer_decision_hold: { status: 'awaiting', ...hold },
+        customer_decision_hold: {
+          status: decisionCheckFailed ? 'check_failed' : 'awaiting',
+          ...hold,
+        },
       },
     });
     const holdPath = taskClarificationFilePath(input.missionId, input.task.task_id);
@@ -472,7 +497,9 @@ export async function dispatchPlannedMissionTaskCore(
       provisioned: provisionMissionEntry({
         mission_id: input.missionId,
         task_id: input.task.task_id,
-        status: 'awaiting_customer_decision',
+        status: decisionCheckFailed
+          ? 'customer_decision_check_failed'
+          : 'awaiting_customer_decision',
         customer_decision_hold: hold,
         written_at: nowIso(),
       }),

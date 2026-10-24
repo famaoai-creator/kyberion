@@ -89,6 +89,10 @@ vi.mock('./mission-decision-lock.js', () => ({
   pinTaskDecisions: mocks.pinTaskDecisions,
   reconcileTaskDecisions: mocks.reconcileTaskDecisions,
   recordTaskDecisionProposals: mocks.recordTaskDecisionProposals,
+  CUSTOMER_DECISION_BLOCKED_REASONS: [
+    'awaiting_customer_decision',
+    'customer_decision_check_failed',
+  ],
 }));
 
 vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
@@ -441,7 +445,54 @@ describe(
         failed: true,
       });
       await dispatch([]);
-      expect(blockedCall()?.metadata?.blocked_reason).toBe('awaiting_customer_decision');
+      expect(blockedCall()?.metadata).toMatchObject({
+        blocked_reason: 'customer_decision_check_failed',
+        customer_decision_hold: { status: 'check_failed' },
+      });
+      expect(doneCalled()).toBe(false);
+    });
+
+    it('a resumed held task whose case lookup fails stays blocked; an unheld one goes on', async () => {
+      const lookupFailed = {
+        case_found: false,
+        lookup_failed: true,
+        consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+        recorded: 0,
+        proposal_ids: [],
+        hold_proposal_ids: [],
+      };
+      mocks.recordTaskDecisionProposals.mockReturnValue(lookupFailed);
+      // Without a prior hold: the lookup failure blocks nothing.
+      await dispatch([]);
+      expect(blockedCall()).toBeUndefined();
+      expect(doneCalled()).toBe(true);
+    });
+
+    it('a resumed task whose WorkItem shows awaiting_customer_decision fails closed on a lookup error', async () => {
+      const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+        '../workforce/work-coordination.js'
+      );
+      actual.importExternalWorkItem({
+        source: 'local',
+        sourceRef: `mission:${MISSION_ID}:task-1`,
+        title: 'Implement the widget procedure',
+        description: 'Implement the widget procedure',
+        status: 'blocked',
+        priority: 'normal',
+        projectId: MISSION_ID,
+        context: { mission_id: MISSION_ID, task_id: 'task-1' },
+        metadata: { blocked_reason: 'awaiting_customer_decision', task_id: 'task-1' },
+      });
+      mocks.recordTaskDecisionProposals.mockReturnValue({
+        case_found: false,
+        lookup_failed: true,
+        consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+        recorded: 0,
+        proposal_ids: [],
+        hold_proposal_ids: [],
+      });
+      await dispatch([]);
+      expect(blockedCall()?.metadata?.blocked_reason).toBe('customer_decision_check_failed');
       expect(doneCalled()).toBe(false);
     });
   }

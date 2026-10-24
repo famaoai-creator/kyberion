@@ -1282,6 +1282,51 @@ describe('mission work item dispatch', () => {
     expect(JSON.stringify(manifest)).not.toMatch(/secret|ui\.theme/u);
   });
 
+  it('keeps a WorkItem reply whose prose and summary mention customer_decisions (CD-09)', async () => {
+    createWorkItem({
+      title: `${missionId}: Explain the empty decisions`,
+      description:
+        'Explain why no customer decision was needed and return a structured task_result block.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-prose-mention`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/explain.md',
+        target_path: 'deliverables/explain.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+    const reply = makeTaskResultText({
+      summary: 'No customer_decisions were needed for this item.',
+      artifacts: [{ path: 'deliverables/explain.md', kind: 'markdown' }],
+      verification_done: ['Checked that customer_decisions stay empty.'],
+      gaps: [],
+      needs: [],
+      extraText: 'Note: customer_decisions is reserved for mission tasks.',
+    });
+    const delegateTask = vi.fn().mockResolvedValueOnce(reply);
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'review' },
+      { delegateTask }
+    );
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(manifest.records[0]).toMatchObject({
+      task_result: expect.objectContaining({
+        summary: 'No customer_decisions were needed for this item.',
+      }),
+    });
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const persisted = JSON.parse(String(safeReadFile(responseFile, { encoding: 'utf8' })));
+    expect(persisted.response_text).toBe(reply);
+  });
+
   it('blocks the work item and records a clarification packet when task_result needs remain', async () => {
     createWorkItem({
       title: `${missionId}: Request missing inputs`,

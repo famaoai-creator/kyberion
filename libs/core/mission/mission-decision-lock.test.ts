@@ -750,6 +750,43 @@ describe('mission decision lock (CD-09)', () => {
         );
       });
 
+      it('a resumed task with no questions and a case-lock timeout is blocked as a failed check', () => {
+        holdOn();
+        const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        const result = withCustomerDecisionCaseLock({ dir }, () =>
+          recordTaskDecisionProposals(
+            { ...task, requests: [] },
+            { decisionCase, now: LATER, lockTimeoutMs: 200 }
+          )
+        );
+        expect(result).toMatchObject({ case_found: true, failed: true, case_id: 'case-a' });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('customer_decision_check_failed')
+        );
+      });
+
+      it('a case lookup error falls back to the task WorkItem: held stays held, others are not', () => {
+        const lookupFails = {
+          loadMissionState: () => {
+            throw new Error('[ROLE_TENANT_SCOPE_MISMATCH] other tenant');
+          },
+        };
+        vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        expect(isTaskAwaitingCustomerDecision(task, lookupFails)).toBe(false);
+        for (const reason of ['awaiting_customer_decision', 'customer_decision_check_failed']) {
+          clearWorkCoordinationStore();
+          createWorkItem({
+            title: 'impl',
+            description: 'impl',
+            status: 'blocked',
+            source: 'local',
+            sourceRef: `mission:${MISSION}:impl`,
+            metadata: { blocked_reason: reason },
+          });
+          expect(isTaskAwaitingCustomerDecision(task, lookupFails)).toBe(true);
+        }
+      });
+
       it('record-evidence reconcile keeps a held lock in progress and reports the hold by id', () => {
         const ids = holdOn();
         expect(isTaskAwaitingCustomerDecision(task, { decisionCase })).toBe(true);
