@@ -2698,13 +2698,13 @@
       "unresolved": []
     },
     {
-      "site": "scripts/customer_decision.ts#runGenerate",
-      "roles": ["decision_ledger"],
+      "site": "scripts/customer_decision.ts#noteDealSwitches",
+      "roles": ["customer_decision_deal_note_writer"],
       "unresolved": []
     },
     {
-      "site": "scripts/customer_decision.ts#runRespond",
-      "roles": ["mission_controller"],
+      "site": "scripts/customer_decision.ts#runGenerate",
+      "roles": ["decision_ledger"],
       "unresolved": []
     },
     {
@@ -5172,6 +5172,37 @@
         "scripts/run_checks.ts#executeCheckGate"
       ],
       "policy_roles_not_reachable": []
+    },
+    "customer_room": {
+      "entries": ["presence/displays/customer-room/server.ts"],
+      "reviewed_infeasible": [],
+      "child_process_entries": [],
+      "reachable_roles": {},
+      "unresolved_sites": [],
+      "policy_roles_not_reachable": [
+        "audit_mirror_writer",
+        "autonomy_learning_store",
+        "chronos_gateway",
+        "chronos_tenant_runner",
+        "customer_decision_invite_store",
+        "infrastructure_sentinel",
+        "knowledge_steward",
+        "metrics_cap_reader",
+        "notification_preferences_reader",
+        "organization_operator",
+        "peer_catalog_reader",
+        "peer_responder_reader",
+        "peer_task_artifact_writer",
+        "person_charter_store",
+        "pipeline_journal_store",
+        "pr_publication_store",
+        "scope_locale_reader",
+        "slack_bridge",
+        "surface_runtime",
+        "tool_runtime_policy_reader",
+        "workspace_tenant_registry_index_reader",
+        "workspace_tenant_registry_reader"
+      ]
     },
     "dev_idp": {
       "entries": ["scripts/dev_oidc_idp.ts"],

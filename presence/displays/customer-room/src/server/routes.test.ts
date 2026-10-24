@@ -252,6 +252,30 @@ describe('customer-room routes', () => {
     expect(logs.join('\n')).not.toContain(TOKEN);
     expect(logs.join('\n')).not.toContain('inv-');
   });
+
+  it('logs the facade diagnostic code of an unexpected failure, never sends it to the customer', async () => {
+    await start();
+    next = () => out({ ok: false, reason: 'unavailable', diagnostic_code: 'LOCK_TIMEOUT' }, 1);
+    const failed = await post('/api/respond', { body: { content_hash: 'h', answers: [] } });
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(logs.at(-1)).toBe(
+      '[customer-room] respond -> 503 unavailable (diagnostic: LOCK_TIMEOUT)'
+    );
+    // A child that died without an answer is logged with why.
+    next = () => Promise.resolve({ status: 1, stdout: '', aborted: false });
+    await post('/api/view');
+    expect(logs.at(-1)).toBe(
+      '[customer-room] view -> 503 unavailable (diagnostic: child_exit_1_no_output)'
+    );
+    next = () => Promise.resolve({ status: null, stdout: '', aborted: true });
+    await post('/api/view');
+    expect(logs.at(-1)).toContain('(diagnostic: child_aborted)');
+    // A malformed code is not logged as one.
+    next = () => out({ ok: false, reason: 'unavailable', diagnostic_code: 'x y\nz' }, 1);
+    await post('/api/view');
+    expect(logs.at(-1)).toBe('[customer-room] view -> 503 unavailable');
+  });
 });
 
 describe('customer-room tenant', () => {

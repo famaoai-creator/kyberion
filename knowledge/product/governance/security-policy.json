@@ -911,6 +911,10 @@
         "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
       ]
     },
+    "customer_decision_deal_note_writer": {
+      "allow_read": ["customer/${KYBERION_TENANT}/deals/"],
+      "allow_write": ["customer/${KYBERION_TENANT}/deals/"]
+    },
     "customer_decision_invite_store": {
       "allow_read": [
         "active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/"

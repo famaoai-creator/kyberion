@@ -378,7 +378,16 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
       });
       continue;
     }
-    if (current.layer === 'customer' && sameValue(current.value, value)) {
+    const active = [...input.ledger]
+      .reverse()
+      .find(
+        (record) =>
+          record.status === 'active' && record.item === entry.item && record.key === entry.key
+      );
+    // Idempotency is checked against the ACTIVE customer record itself, not the
+    // effective layer, so a resubmit never appends a duplicate customer decision
+    // whatever the entry's layer order resolves to.
+    if (isActiveCustomerDecision(active) && sameValue(active.value, value)) {
       plan.answers.push({ answer: receiptAnswer, outcome: 'unchanged', value });
       continue;
     }
@@ -394,12 +403,6 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
       });
       continue;
     }
-    const active = [...input.ledger]
-      .reverse()
-      .find(
-        (record) =>
-          record.status === 'active' && record.item === entry.item && record.key === entry.key
-      );
     const record: DecisionAppendInput = {
       item: entry.item,
       key: entry.key,
@@ -421,6 +424,19 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
     plan.appends.push(record);
   }
   return { ok: true, plan };
+}
+
+/** An active `customer-value` / `decided` record taken on behalf of a customer actor. */
+export function isActiveCustomerDecision(
+  record: DecisionRecord | undefined
+): record is DecisionRecord {
+  return Boolean(
+    record &&
+    record.status === 'active' &&
+    record.level === 'customer-value' &&
+    record.state === 'decided' &&
+    record.decided_by?.on_behalf_of?.actor_id
+  );
 }
 
 function receiptOutcome(outcome: RespondOutcome): ReceiptAnswerOutcome {

@@ -333,6 +333,21 @@ describe('planCustomerResponse', () => {
       })
     );
     expect(changed.ok && changed.plan.appends[0].supersedes).toBe('D-0002');
+
+    // Idempotency reads the ACTIVE customer record, not the effective layer:
+    // even where another layer resolves first, a resubmit appends nothing.
+    const agenda = baseAgenda();
+    agenda.entries[0] = { ...agenda.entries[0], layers: ['ours', 'customer'] };
+    agenda.approval = { ...agenda.approval!, content_hash: agendaContentHash(agenda) };
+    const oursFirst = planCustomerResponse(
+      input({
+        agenda,
+        ledger: [{ ...decided[0], status: 'superseded' }, { ...decided[1] }],
+        answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+      })
+    );
+    expect(oursFirst.ok && oursFirst.plan.appends).toEqual([]);
+    expect(oursFirst.ok && oursFirst.plan.answers[0].outcome).toBe('unchanged');
   });
 
   it('binds the answer to the approved revision', () => {

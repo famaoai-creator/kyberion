@@ -9,6 +9,7 @@ import {
   briefFieldsFromDecisionInput,
   dealNoteForSwitches,
   projectBriefInput,
+  quoteCustomerText,
   readBriefInput,
   writeBriefInput,
 } from './reflect.js';
@@ -153,10 +154,27 @@ describe('brief reflection', () => {
     const dir = path.join(pathResolver.sharedTmp(`cd-reflect-${randomUUID()}`));
     dirs.push(dir);
     const input = projectBriefInput(agenda, effective, NOW);
-    expect(readBriefInput({ dir })).toBeUndefined();
+    expect(readBriefInput({ dir }, agenda.agenda_id)).toBeUndefined();
     writeBriefInput({ dir }, input);
-    expect(readBriefInput({ dir })).toEqual(input);
+    expect(readBriefInput({ dir }, agenda.agenda_id)).toEqual(input);
     expect(() => writeBriefInput({ dir }, { ...input, content_hash: 'bad' })).toThrow();
+  });
+
+  it('keeps one brief input per agenda of a case', () => {
+    const dir = path.join(pathResolver.sharedTmp(`cd-reflect-${randomUUID()}`));
+    dirs.push(dir);
+    const first = projectBriefInput(agenda, effective, NOW);
+    const other = projectBriefInput(
+      { ...agenda, agenda_id: 'agd-refl0002' },
+      effective.slice(0, 1),
+      NOW
+    );
+    writeBriefInput({ dir }, first);
+    writeBriefInput({ dir }, other);
+    // The second agenda of the case does not overwrite the first one's input.
+    expect(readBriefInput({ dir }, 'agd-refl0001')).toEqual(first);
+    expect(readBriefInput({ dir }, 'agd-refl0002')).toEqual(other);
+    expect(() => readBriefInput({ dir }, '../x')).toThrow(/AGENDA_ID_INVALID/u);
   });
 });
 
@@ -198,5 +216,47 @@ describe('dealNoteForSwitches', () => {
     );
     expect(text.split('\n')).toHaveLength(2);
     expect(text).toContain('The customer confirmed');
+  });
+
+  it('quotes customer-written text on one line, truncated and attributed', () => {
+    const written = `line one\nline two\u202e\u0007 ${'x'.repeat(400)}`;
+    const text = dealNoteForSwitches(
+      [
+        {
+          ...change,
+          entry_id: 'sec',
+          from: { layer: 'none' },
+          to: { layer: 'customer', value: written },
+        },
+      ],
+      agenda,
+      'en'
+    );
+    // One switch, one line: customer text cannot forge further note lines.
+    expect(text.split('\n')).toHaveLength(1);
+    expect(text).not.toMatch(/[\u0000-\u001f\u202e]/u);
+    expect(text).toContain('"line one line two');
+    expect(text).toContain('(written by the customer)');
+    expect(text).toContain('…');
+    expect(text.length).toBeLessThan(320);
+    expect(quoteCustomerText('a\r\nb')).toBe('a b');
+    // Approved option labels are ours, not customer text.
+    expect(dealNoteForSwitches([change], agenda, 'en')).not.toContain('written by the customer');
+  });
+
+  it('phrases an operator confirmation of a customer decision', () => {
+    const text = dealNoteForSwitches(
+      [
+        {
+          ...change,
+          kind: 'confirmed',
+          from: { layer: 'customer', value: 'fast', decision_id: 'D-0003' },
+          to: { layer: 'customer', value: 'fast', decision_id: 'D-0003' },
+        },
+      ],
+      agenda,
+      'ja'
+    );
+    expect(text).toBe('担当者がお客様の決定「性能目標は?」（高速）を確認しました。');
   });
 });

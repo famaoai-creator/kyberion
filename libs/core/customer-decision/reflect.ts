@@ -2,7 +2,9 @@
  * Reflecting customer decisions (CD-08): project an agenda's effective
  * decisions into the input of the MO-11 alignment brief, and phrase a
  * deal-note summary for decision switches. Pure functions plus a small
- * secure-io store for `<case dir>/brief-input.json`.
+ * secure-io store for `<case dir>/brief-input/<agenda_id>.json` — one brief
+ * input per agenda, because a case can hold several agendas and each one
+ * re-projects only its own entries.
  */
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -11,12 +13,14 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir } from '../secure-io.js';
 import { t } from '../t.js';
 import { agendaContentHash } from './hash.js';
-import type {
-  DecisionAgenda,
-  DecisionLayerName,
-  DecisionSwitch,
-  EffectiveDecision,
-  EffectiveDecisionStatus,
+import {
+  AGENDA_ID_PATTERN,
+  CUSTOMER_DECISION_LAYOUT,
+  type DecisionAgenda,
+  type DecisionLayerName,
+  type DecisionSwitch,
+  type EffectiveDecision,
+  type EffectiveDecisionStatus,
 } from './model.js';
 import { customerDecisionPaths, type CustomerDecisionLocation } from './store.js';
 
@@ -108,7 +112,6 @@ export function briefFieldsFromDecisionInput(
   return { scope: { in: scopeIn }, openItems };
 }
 
-const BRIEF_INPUT_FILE = 'brief-input.json';
 const BRIEF_INPUT_SCHEMA = 'knowledge/product/schemas/customer-decision-brief-input.schema.json';
 let briefInputCatalog: GovernedCatalog<CustomerDecisionBriefInput> | undefined;
 
@@ -124,8 +127,14 @@ export function validateBriefInput(value: unknown): CustomerDecisionBriefInput {
   return briefInputCatalog.validate(value);
 }
 
-function briefInputPath(location: CustomerDecisionLocation): string {
-  return path.join(customerDecisionPaths(location).dir, BRIEF_INPUT_FILE);
+function briefInputPath(location: CustomerDecisionLocation, agendaId: string): string {
+  if (!AGENDA_ID_PATTERN.test(agendaId))
+    throw new Error('[CUSTOMER_DECISION_AGENDA_ID_INVALID] invalid agenda id');
+  return path.join(
+    customerDecisionPaths(location).dir,
+    CUSTOMER_DECISION_LAYOUT.briefInputDir,
+    `${agendaId}.json`
+  );
 }
 
 export function writeBriefInput(
@@ -135,46 +144,91 @@ export function writeBriefInput(
   const validated = validateBriefInput(input);
   if (!('dir' in location) && validated.case_id !== location.caseId)
     throw new Error('[CUSTOMER_DECISION_CASE_MISMATCH] brief input case does not match location');
-  const file = assertSafeRepositoryPath(briefInputPath(location), { allowMissingLeaf: true });
+  const file = assertSafeRepositoryPath(briefInputPath(location, validated.agenda_id), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(path.dirname(file), { recursive: true });
   writeJson(file, validated);
   return validated;
 }
 
 export function readBriefInput(
-  location: CustomerDecisionLocation
+  location: CustomerDecisionLocation,
+  agendaId: string
 ): CustomerDecisionBriefInput | undefined {
-  const file = assertSafeRepositoryPath(briefInputPath(location), { allowMissingLeaf: true });
+  const file = assertSafeRepositoryPath(briefInputPath(location, agendaId), {
+    allowMissingLeaf: true,
+  });
   const raw = readJsonIfPresent<unknown>(file) ?? undefined;
   if (raw === undefined) return undefined;
   const input = validateBriefInput(raw);
   if (!('dir' in location) && input.case_id !== location.caseId)
     throw new Error('[CUSTOMER_DECISION_CASE_MISMATCH] brief input case does not match location');
+  if (input.agenda_id !== agendaId)
+    throw new Error(
+      '[CUSTOMER_DECISION_AGENDA_ID_MISMATCH] brief input agenda does not match its file'
+    );
   return input;
 }
 
-/** Plain deal-note text for decision switches (one line per switch). */
+/** Longest customer-written text quoted into a deal note (the note itself is capped at 2000). */
+export const DEAL_NOTE_CUSTOMER_TEXT_MAX = 200;
+
+/**
+ * Customer-supplied text as it may appear in a deal note: one line, control
+ * and bidi-override characters removed, whitespace collapsed, truncated.
+ */
+export function quoteCustomerText(text: string, max = DEAL_NOTE_CUSTOMER_TEXT_MAX): string {
+  const single = text
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return single.length > max ? `${single.slice(0, max - 1)}…` : single;
+}
+
+/**
+ * Plain deal-note text for decision switches (one line per switch). A value
+ * that is one of the approved options is shown by its (approved) label; any
+ * other value came from the customer (free text, a change-request comment),
+ * so it is quoted through {@link quoteCustomerText} and attributed to them.
+ * A `confirmed` switch whose previous side was already the customer's
+ * decision is the operator's confirmation (CD-08).
+ */
 export function dealNoteForSwitches(
   switches: DecisionSwitch[],
   agenda: DecisionAgenda,
   locale: 'ja' | 'en'
 ): string {
   const entries = new Map(agenda.entries.map((entry) => [entry.entry_id, entry]));
-  const label = (entryId: string, value: unknown): string => {
+  const label = (entryId: string, value: unknown, layer: string): string => {
     const option = entries
       .get(entryId)
       ?.options?.find((candidate) => JSON.stringify(candidate.value) === JSON.stringify(value));
-    return option ? option.label : displayValue(value, locale);
+    if (option) return option.label;
+    const written =
+      typeof value === 'string' ||
+      (Boolean(value) &&
+        typeof value === 'object' &&
+        typeof (value as { comment?: unknown }).comment === 'string');
+    if (layer !== 'customer' || !written) return displayValue(value, locale);
+    return t(
+      'customer_decision:deal_note_customer_text',
+      { text: quoteCustomerText(displayValue(value, locale)) },
+      locale
+    );
   };
   return switches
     .map((change) => {
       const item = entries.get(change.entry_id)?.question ?? change.item;
-      const to = label(change.entry_id, change.to.value);
+      const to = label(change.entry_id, change.to.value, change.to.layer);
+      if (change.kind === 'confirmed' && change.from.layer === 'customer')
+        return t('customer_decision:deal_note_operator_confirmed', { item, to }, locale);
       if (change.kind === 'confirmed')
         return t('customer_decision:deal_note_confirmed', { item, to }, locale);
       return t(
         'customer_decision:deal_note_value_changed',
-        { item, from: label(change.entry_id, change.from.value), to },
+        { item, from: label(change.entry_id, change.from.value, change.from.layer), to },
         locale
       );
     })

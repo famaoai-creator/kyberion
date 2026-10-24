@@ -17,13 +17,21 @@ import { DECISION_LEDGER_ROLES } from '@agent/core/decision-ledger';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExecResult,
+  safeExecResultAsync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
   safeRmSync,
+  safeWriteFile,
 } from '@agent/core/secure-io';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
-import { createFacadeSpawner, FACADE_SCRIPT } from './facade.js';
+import {
+  createFacadeSpawner,
+  FACADE_CHILD_CLEARED_ENV,
+  FACADE_SCRIPT,
+  facadeChildEnv,
+} from './facade.js';
 import { registerCustomerRoomRoutes } from './routes.js';
 
 const BUILT = safeExistsSync(pathResolver.rootResolve(FACADE_SCRIPT));
@@ -226,7 +234,7 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       entry_id: 'auth.method',
       to: { layer: 'customer', value: 'password' },
     });
-    const brief = JSON.parse(read('brief-input.json')) as {
+    const brief = JSON.parse(read(`brief-input/${'agd-roomtest'}.json`)) as {
       decisions: Array<Record<string, unknown>>;
     };
     expect(brief.decisions[0]).toMatchObject({
@@ -252,3 +260,210 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
     expect(await wrong.json()).toEqual({ ok: false, reason: 'invalid_link' });
   }, 30_000);
 });
+
+describe('customer-room facade child env', () => {
+  let scratch: string;
+  beforeAll(() => {
+    scratch = pathResolver.sharedTmp(`customer-room-env-${randomUUID()}`);
+    safeMkdir(scratch, { recursive: true });
+  });
+  afterAll(() => safeRmSync(scratch, { recursive: true, force: true }));
+
+  it('passes only the allowlist, the tenant binding and the root override — never an ambient role', async () => {
+    const childEnv = facadeChildEnv('acme-corp');
+    expect(childEnv.KYBERION_TENANT).toBe('acme-corp');
+    expect(childEnv.KYBERION_ROOT).toBe(process.env.KYBERION_ROOT || undefined);
+    for (const key of [...FACADE_CHILD_CLEARED_ENV, 'SYSTEM_ROLE']) expect(childEnv[key]).toBe('');
+    // A stand-in facade that prints the env it was started with.
+    const script = path.join(scratch, 'print-env.mjs');
+    safeWriteFile(script, 'process.stdout.write(JSON.stringify(process.env));\n', {
+      encoding: 'utf8',
+    });
+    const keys = [
+      'SYSTEM_ROLE',
+      'MISSION_ROLE',
+      'KYBERION_PERSONA',
+      'KYBERION_SUDO',
+      'KYBERION_DELEGATED_ROLE',
+      'CD_ROOM_SECRET_TEST',
+    ] as const;
+    const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    process.env.SYSTEM_ROLE = 'customer_room';
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_SUDO = 'true';
+    process.env.KYBERION_DELEGATED_ROLE = 'mission_controller@customer_room';
+    process.env.CD_ROOM_SECRET_TEST = 'do-not-leak';
+    try {
+      const outcome = await createFacadeSpawner({ tenant: 'acme-corp', scriptPath: script })(
+        'view',
+        { token: 'x' }
+      );
+      const seen = JSON.parse(outcome.stdout) as Record<string, string>;
+      expect(seen.KYBERION_TENANT).toBe('acme-corp');
+      expect(seen.PATH).toBeTruthy();
+      for (const key of keys) expect(seen[key] ?? '').toBe('');
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  }, 30_000);
+});
+
+describe.skipIf(!BUILT)(
+  'customer-decision respond under concurrency (built facade children)',
+  () => {
+    const CTENANT = 'cd-room-race';
+    let dir: string;
+    let hash: string;
+    const deciderTokens: string[] = [];
+    const facade = pathResolver.rootResolve(FACADE_SCRIPT);
+    const env = { KYBERION_TENANT: CTENANT };
+    const operator = (verb: string[]) =>
+      JSON.parse(
+        safeExecResult(
+          process.execPath,
+          [facade, ...verb, '--tenant', CTENANT, '--case', 'case-race', '--dir', dir, '--json'],
+          { cwd: pathResolver.rootDir(), env, timeoutMs: 30_000 }
+        ).stdout
+      ) as Record<string, unknown>;
+    const respond = (token: string, answers: unknown[]) =>
+      safeExecResultAsync(
+        process.execPath,
+        [facade, 'respond', '--tenant', CTENANT, '--dir', dir, '--json'],
+        {
+          cwd: pathResolver.rootDir(),
+          env,
+          timeoutMs: 30_000,
+          input: JSON.stringify({ token, content_hash: hash, answers }),
+        }
+      ).then((result) => JSON.parse(result.stdout) as Record<string, unknown>);
+    const entry = (n: number) => ({
+      entry_id: `q${n}`,
+      item: 'NFR',
+      key: `race.q${n}`,
+      kind: 'choice' as const,
+      question: `Question ${n}?`,
+      options: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+      requires_customer: false,
+    });
+
+    beforeAll(() => {
+      dir = pathResolver.sharedTmp(`customer-room-race-${randomUUID()}`);
+      safeMkdir(dir, { recursive: true });
+      const agenda: DecisionAgenda = {
+        version: '1.0.0',
+        agenda_id: 'agd-racetest',
+        tenant_slug: CTENANT,
+        case_id: 'case-race',
+        customer: 'acme',
+        title: 'Race',
+        phase: 'inception',
+        revision: 1,
+        locale: 'en',
+        entries: [1, 2, 3, 4].map(entry),
+        status: 'sent',
+        created_at: NOW,
+        updated_at: NOW,
+      };
+      agenda.approval = {
+        content_hash: agendaContentHash(agenda),
+        approved_at: NOW,
+        approved_by: 'user:alice',
+      };
+      hash = agenda.approval.content_hash;
+      withExecutionContext(
+        DECISION_LEDGER_ROLES.write,
+        () => writeAgenda({ dir }, agenda),
+        undefined,
+        CTENANT
+      );
+      operator(['actor-add', '--customer', 'acme', '--actor', 'customer:cto', '--name', 'CTO']);
+      for (let index = 0; index < 4; index += 1) {
+        const sent = operator([
+          'send',
+          '--agenda',
+          agenda.agenda_id,
+          '--name',
+          `Decider ${index}`,
+          '--role',
+          'decider',
+          '--actor',
+          'customer:cto',
+          '--ttl-days',
+          '1',
+        ]);
+        deciderTokens.push(String(sent.link).split('#t=')[1]);
+      }
+    }, 60_000);
+
+    afterAll(() => {
+      safeRmSync(dir, { recursive: true, force: true });
+      safeRmSync(
+        pathResolver.rootResolve(
+          `${PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites}/confidential/${CTENANT}`
+        ),
+        { recursive: true, force: true }
+      );
+    });
+
+    const ledgerLines = () =>
+      String(safeReadFile(path.join(dir, 'decisions.jsonl'), { encoding: 'utf8' }))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { id: string; key: string; value: unknown });
+    const receiptFiles = () =>
+      safeExistsSync(path.join(dir, 'receipts'))
+        ? (safeReaddir(path.join(dir, 'receipts')) as string[]).filter((name) =>
+            name.endsWith('.json')
+          )
+        : [];
+
+    it('keeps every decision of concurrent responses, with unique ids and one receipt each', async () => {
+      const results = await Promise.all(
+        deciderTokens.map((token, index) =>
+          respond(token, [{ entry_id: `q${index + 1}`, choice: 'option', value: 'b' }])
+        )
+      );
+      expect(results.every((result) => result.ok === true)).toBe(true);
+      const ledger = ledgerLines();
+      // No lost decision: all four answers are in the ledger.
+      expect(ledger.map((record) => record.key).sort()).toEqual([
+        'race.q1',
+        'race.q2',
+        'race.q3',
+        'race.q4',
+      ]);
+      expect(new Set(ledger.map((record) => record.id)).size).toBe(ledger.length);
+      expect(receiptFiles()).toHaveLength(4);
+      expect(
+        safeExistsSync(path.join(dir, 'respond-journal'))
+          ? (safeReaddir(path.join(dir, 'respond-journal')) as string[])
+          : []
+      ).toEqual([]);
+    }, 60_000);
+
+    it('turns a concurrent double submit into one decision and one receipt', async () => {
+      const before = receiptFiles().length;
+      const token = deciderTokens[0];
+      const answers = [{ entry_id: 'q1', choice: 'option', value: 'a' }];
+      const results = await Promise.all([
+        respond(token, answers),
+        respond(token, answers),
+        respond(token, answers),
+      ]);
+      expect(results.every((result) => result.ok === true)).toBe(true);
+      expect(new Set(results.map((result) => result.receipt_id)).size).toBe(1);
+      expect(results.filter((result) => result.duplicate === true)).toHaveLength(2);
+      expect(receiptFiles()).toHaveLength(before + 1);
+      expect(
+        ledgerLines().filter((record) => record.key === 'race.q1' && record.value === 'a')
+      ).toHaveLength(1);
+    }, 60_000);
+  }
+);

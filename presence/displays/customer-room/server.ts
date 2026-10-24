@@ -41,7 +41,9 @@ export function createCustomerRoomApp(tenant: string): express.Express {
     staticDir,
     jsDir: pathResolver.rootResolve('dist/presence/displays/customer-room/src/app'),
     renderPage: (acceptLanguage) => renderCustomerRoomPage(template, bundles, acceptLanguage),
-    log: (message) => logger.info(message),
+    // A facade failure carries a diagnostic code: a warning, so it survives the default level.
+    log: (message) =>
+      message.includes('(diagnostic:') ? logger.warn(message) : logger.info(message),
   });
   return app;
 }

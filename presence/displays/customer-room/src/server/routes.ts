@@ -99,10 +99,17 @@ function bearerToken(req: express.Request): string | null {
   return match && TOKEN_PATTERN.test(match[1]) ? match[1] : null;
 }
 
-/** Map one facade answer to `{status, body}`. Unknown or malformed output is `unavailable`. */
+const DIAGNOSTIC_CODE_PATTERN = /^[A-Za-z0-9_]{1,64}$/u;
+
+/**
+ * Map one facade answer to `{status, body}`. Unknown or malformed output is
+ * `unavailable`. `diagnostic` is the facade's reason code for an unexpected
+ * failure: logged by the room, never part of the body the customer gets.
+ */
 export function interpretFacadeOutput(stdout: string): {
   status: number;
   body: Record<string, unknown>;
+  diagnostic?: string;
 } {
   let parsed: unknown;
   try {
@@ -115,9 +122,18 @@ export function interpretFacadeOutput(stdout: string): {
   }
   if (parsed.ok === true) return { status: 200, body: parsed };
   const reason = typeof parsed.reason === 'string' ? parsed.reason : 'unavailable';
+  const diagnostic =
+    typeof parsed.diagnostic_code === 'string' &&
+    DIAGNOSTIC_CODE_PATTERN.test(parsed.diagnostic_code)
+      ? parsed.diagnostic_code
+      : undefined;
   const status = REASON_STATUS[reason];
   if (status === undefined) {
-    return { status: 503, body: failure('unavailable') as unknown as Record<string, unknown> };
+    return {
+      status: 503,
+      body: failure('unavailable') as unknown as Record<string, unknown>,
+      ...(diagnostic ? { diagnostic } : {}),
+    };
   }
   const body: Failure = failure(reason);
   if (reason === 'invalid_answers' && Array.isArray(parsed.errors)) {
@@ -127,7 +143,18 @@ export function interpretFacadeOutput(stdout: string): {
       .slice(0, 100)
       .map((item) => ({ entry_id: String(item.entry_id), error: String(item.error) }));
   }
-  return { status, body: body as unknown as Record<string, unknown> };
+  return {
+    status,
+    body: body as unknown as Record<string, unknown>,
+    ...(diagnostic ? { diagnostic } : {}),
+  };
+}
+
+/** Why a facade run produced no usable answer (for the room's log; no request data). */
+function outcomeDiagnostic(outcome: { status: number | null; aborted: boolean } | null): string {
+  if (!outcome) return 'spawn_failed';
+  if (outcome.aborted) return 'child_aborted';
+  return outcome.status === null ? 'child_not_run' : `child_exit_${outcome.status}_no_output`;
 }
 
 function limiter(limit: number) {
@@ -222,15 +249,16 @@ export function registerCustomerRoomRoutes(
         input = { token, content_hash: body.content_hash, answers: body.answers };
       }
       const outcome = await options.spawner(verb, input).catch(() => null);
-      const result =
+      const result: { status: number; body: Record<string, unknown>; diagnostic?: string } =
         outcome && !outcome.aborted && outcome.stdout.trim()
           ? interpretFacadeOutput(outcome.stdout)
           : {
               status: 503,
               body: failure('unavailable') as unknown as Record<string, unknown>,
+              diagnostic: outcomeDiagnostic(outcome),
             };
       log(
-        `[customer-room] ${verb} -> ${result.status}${result.body.ok === true ? '' : ` ${String(result.body.reason)}`}`
+        `[customer-room] ${verb} -> ${result.status}${result.body.ok === true ? '' : ` ${String(result.body.reason)}`}${result.diagnostic ? ` (diagnostic: ${result.diagnostic})` : ''}`
       );
       res.status(result.status).json(result.body);
     };

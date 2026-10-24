@@ -15,6 +15,10 @@
  * The first layer in the entry's order that has a candidate wins. An entry
  * with `requires_customer: true` only listens to the customer layer; until the
  * customer decides it is `awaiting_customer` and work that needs it waits.
+ * Such an entry is a money / contract decision (plan 決定の層 row 1): the
+ * customer's decision stays `provisional` (layer `customer`,
+ * `awaiting_operator_confirmation`) until the operator confirms that exact
+ * decision id (`agenda.operator_confirmations`, CD-08).
  *
  * Switches are detected by comparing two resolutions; freshness compares what a
  * task consumed at its start against the current resolution at its end
@@ -37,6 +41,11 @@ export interface ResolveEffectiveOptions {
   approvedOurDecisionIds: ReadonlySet<string>;
   now: string;
   milestonesPassed?: readonly string[];
+  /**
+   * Customer decision ids the operator confirmed for this entry. Only read
+   * for `requires_customer` entries.
+   */
+  operatorConfirmedIds?: ReadonlySet<string>;
 }
 
 interface LayerCandidate {
@@ -149,12 +158,17 @@ export function resolveEffectiveDecision(
           ? oursCandidate(entry, ledger, opts.approvedOurDecisionIds)
           : orgDefaultCandidate(entry);
     if (!candidate) continue;
+    const awaitingOperator =
+      candidate.layer === 'customer' &&
+      entry.requires_customer &&
+      !(candidate.decision_id && opts.operatorConfirmedIds?.has(candidate.decision_id));
     return {
       ...base,
       layer: candidate.layer,
       value: candidate.value,
       ...(candidate.decision_id ? { decision_id: candidate.decision_id } : {}),
-      status: candidate.layer === 'customer' ? 'confirmed' : 'provisional',
+      status: candidate.layer === 'customer' && !awaitingOperator ? 'confirmed' : 'provisional',
+      ...(awaitingOperator ? { awaiting_operator_confirmation: true } : {}),
       ...(candidate.decided_by ? { decided_by: candidate.decided_by } : {}),
       ...(candidate.at ? { at: candidate.at } : {}),
     };
@@ -196,13 +210,26 @@ export function resolveAgendaEffective(
 ): EffectiveDecision[] {
   const approved = approvedOurDecisionIds(agenda);
   const milestonesPassed = opts.milestonesPassed ?? agenda.milestones_passed ?? [];
+  const confirmed = operatorConfirmedIds(agenda);
   return agenda.entries.map((entry) =>
     resolveEffectiveDecision(entry, ledger, {
       approvedOurDecisionIds: approved,
       now: opts.now,
       milestonesPassed,
+      operatorConfirmedIds: confirmed.get(entry.entry_id) ?? new Set<string>(),
     })
   );
+}
+
+/** Operator-confirmed customer decision ids per entry (`agenda.operator_confirmations`). */
+export function operatorConfirmedIds(agenda: DecisionAgenda): Map<string, Set<string>> {
+  const byEntry = new Map<string, Set<string>>();
+  for (const confirmation of agenda.operator_confirmations ?? []) {
+    const ids = byEntry.get(confirmation.entry_id) ?? new Set<string>();
+    ids.add(confirmation.decision_id);
+    byEntry.set(confirmation.entry_id, ids);
+  }
+  return byEntry;
 }
 
 function switchSide(decision: EffectiveDecision | undefined): DecisionSwitch['from'] {

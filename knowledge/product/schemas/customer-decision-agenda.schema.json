@@ -63,6 +63,21 @@
         }
       }
     },
+    "operator_confirmations": {
+      "description": "CD-08: the operator's confirmation of a customer decision on a requires_customer (money / contract) entry. Outside the content hash; one ledger decision id per confirmation, so a later customer decision needs its own.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entry_id", "decision_id", "by", "at"],
+        "properties": {
+          "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+          "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+          "by": { "type": "string", "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "milestones_passed": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
@@ -116,8 +131,10 @@
           }
         },
         "layers": {
+          "description": "Layer order for this entry. The customer's decision is always the top layer: an explicit order contains \"customer\" (checked here) and starts with it (checked by the facade, customer-decision draft / generate / submit).",
           "type": "array",
           "items": { "$ref": "#/definitions/layer" },
+          "contains": { "const": "customer" },
           "minItems": 1,
           "uniqueItems": true
         },

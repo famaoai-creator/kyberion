@@ -9,8 +9,10 @@ comment), confirms, and submits. Contributors' answers are recorded as opinions;
 the decider's become the decision.
 
 One process serves **one tenant**. It is operator-launched (`enabled: false` in
-`active-surfaces.json`) because it is exposed publicly through the public
-ingress provider placed in front of it.
+`knowledge/product/governance/surfaces/customer-room.json`) because it is
+exposed publicly through the public ingress provider placed in front of it.
+Through `pnpm surfaces` it runs as `SYSTEM_ROLE=customer_room`, which may assume
+no role (`role-assumption-policy.json`): the room itself assumes none.
 
 ## Run
 
@@ -43,7 +45,15 @@ Routes — everything else is a plain 404:
 - `view` / `respond` run `dist/scripts/customer_decision.js view|respond --tenant <tenant> --json`
   as a child process (`src/server/facade.ts`), request on STDIN, with a time
   and output-size limit. The tenant comes only from the process environment;
-  a `tenant`/`case`/`dir` in a body or query string is ignored.
+  a `tenant`/`case`/`dir` in a body or query string is ignored (and the facade
+  refuses `--dir` outside test runs).
+- The child gets a minimal env (`facadeChildEnv`): the secure-io exec allowlist
+  with any ambient `MISSION_ROLE` / `KYBERION_PERSONA` / `KYBERION_SUDO` /
+  `MISSION_ID` blanked, `KYBERION_TENANT`, and `KYBERION_ROOT` when set — never
+  `SYSTEM_ROLE`. The facade assumes its own narrow tenant-bound roles.
+- An unexpected facade failure answers `unavailable` to the customer; the room
+  logs the facade's `diagnostic_code` (a reason code, never the token) as a
+  warning, and the facade records it in the audit chain.
 - The token is read from the `Authorization` header only (a query-string token is
   ignored), is never logged or echoed, and is cleared from the address bar by
   the page (`history.replaceState`) right after it is read.

@@ -228,13 +228,70 @@ describe('resolveEffectiveDecision', () => {
     expect(result).not.toHaveProperty('value');
   });
 
-  it('confirms a requires_customer entry once the customer decides', () => {
+  it('keeps a requires_customer customer decision provisional until the operator confirms it', () => {
     const result = resolveEffectiveDecision(
       entry({ requires_customer: true }),
       [customer('D-0001', 'release')],
       { approvedOurDecisionIds: new Set(), now: NOW }
     );
-    expect(result).toMatchObject({ layer: 'customer', status: 'confirmed', value: 'release' });
+    expect(result).toMatchObject({
+      layer: 'customer',
+      status: 'provisional',
+      value: 'release',
+      decision_id: 'D-0001',
+      awaiting_operator_confirmation: true,
+    });
+  });
+
+  it('confirms a requires_customer entry once the operator confirmed that exact decision', () => {
+    const ledger = [customer('D-0001', 'release')];
+    const confirmed = resolveEffectiveDecision(entry({ requires_customer: true }), ledger, {
+      approvedOurDecisionIds: new Set(),
+      now: NOW,
+      operatorConfirmedIds: new Set(['D-0001']),
+    });
+    expect(confirmed).toMatchObject({ layer: 'customer', status: 'confirmed', value: 'release' });
+    expect(confirmed).not.toHaveProperty('awaiting_operator_confirmation');
+    // A confirmation names one decision: a later customer decision needs its own.
+    const later = resolveEffectiveDecision(
+      entry({ requires_customer: true }),
+      [
+        customer('D-0001', 'release', { status: 'superseded' }),
+        customer('D-0002', 'hold', { supersedes: 'D-0001' }),
+      ],
+      { approvedOurDecisionIds: new Set(), now: NOW, operatorConfirmedIds: new Set(['D-0001']) }
+    );
+    expect(later).toMatchObject({ status: 'provisional', awaiting_operator_confirmation: true });
+  });
+
+  it('never needs operator confirmation for an entry that does not require the customer', () => {
+    const result = resolveEffectiveDecision(entry(), [customer('D-0001', 'password')], {
+      approvedOurDecisionIds: new Set(),
+      now: NOW,
+    });
+    expect(result).toMatchObject({ layer: 'customer', status: 'confirmed' });
+    expect(result).not.toHaveProperty('awaiting_operator_confirmation');
+  });
+
+  it('reads operator confirmations from the agenda, outside the content hash', () => {
+    const base = agenda({ entries: [entry({ entry_id: 'release', requires_customer: true })] });
+    const ledger = [customer('D-0001', 'release')];
+    expect(resolveAgendaEffective(base, ledger, { now: NOW })[0].status).toBe('provisional');
+    const confirmed: DecisionAgenda = {
+      ...base,
+      operator_confirmations: [
+        { entry_id: 'release', decision_id: 'D-0001', by: 'user:alice', at: NOW },
+      ],
+    };
+    expect(agendaContentHash(confirmed)).toBe(agendaContentHash(base));
+    expect(resolveAgendaEffective(confirmed, ledger, { now: NOW })[0].status).toBe('confirmed');
+    expect(
+      detectSwitches(
+        resolveAgendaEffective(base, ledger, { now: NOW }),
+        resolveAgendaEffective(confirmed, ledger, { now: NOW }),
+        { case_id: 'c', agenda_id: 'agd-test0001', now: NOW, newId: () => 'sw-test0001' }
+      ).map((item) => [item.kind, item.from.layer, item.to.layer])
+    ).toEqual([['confirmed', 'customer', 'customer']]);
   });
 
   it('honours a custom layer order (ours before customer)', () => {

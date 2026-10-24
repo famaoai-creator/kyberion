@@ -33455,6 +33455,16 @@
         "ja": "お客様が「{item}」を {to} で確定しました。",
         "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř ƈőñƒïřɱėḓ \"{item}\": {to}. ŀőřėɱ ïṗşůɱ ⟧"
       },
+      "deal_note_operator_confirmed": {
+        "en": "Our team confirmed the customer's decision on \"{item}\": {to}.",
+        "ja": "担当者がお客様の決定「{item}」（{to}）を確認しました。",
+        "qps-ploc": "⟦Őůř ŧėȧɱ ƈőñƒïřɱėḓ ŧħė ƈůşŧőɱėř'ş ḓėƈïşïőñ őñ \"{item}\": {to}. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "deal_note_customer_text": {
+        "en": "\"{text}\" (written by the customer)",
+        "ja": "「{text}」（お客様の記入）",
+        "qps-ploc": "⟦\"{text}\" (ẇřïŧŧėñ ƀẏ ŧħė ƈůşŧőɱėř) ŀőřėɱ ïṗşůɱ⟧"
+      },
       "value_not_set": {
         "en": "not set",
         "ja": "未設定",

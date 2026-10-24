@@ -101,8 +101,28 @@ export interface DecisionAgenda {
     pinned_ids: string[];
   };
   milestones_passed?: string[];
+  /**
+   * CD-08 / 決定の層 row 1: the operator's confirmation of a customer decision
+   * on a `requires_customer` entry (money / contract). Until the decision id
+   * the entry resolves to is listed here, that customer decision is
+   * `provisional`. Kept on the agenda, outside the content hash
+   * (`hash.ts` hashes title/phase/locale/customer/entries only), so a
+   * confirmation never invalidates the approval or the customer's pinned
+   * version; it names one ledger decision id, so a later customer decision
+   * needs its own confirmation. Append-only through `customer-decision confirm`.
+   */
+  operator_confirmations?: OperatorConfirmation[];
   created_at: string;
   updated_at: string;
+}
+
+export interface OperatorConfirmation {
+  entry_id: string;
+  /** The customer decision (ledger id) the operator confirmed. */
+  decision_id: string;
+  /** `user:<member>` */
+  by: string;
+  at: string;
 }
 
 export type EffectiveDecisionStatus =
@@ -119,6 +139,11 @@ export interface EffectiveDecision {
   decided_by?: string;
   at?: string;
   overridable: boolean;
+  /**
+   * A customer decision on a `requires_customer` entry the operator has not
+   * confirmed yet (status `provisional`, layer `customer`).
+   */
+  awaiting_operator_confirmation?: boolean;
 }
 
 export type ReceiptAnswerChoice = 'option' | 'keep' | 'free_text' | 'approve' | 'request_changes';
@@ -197,6 +222,10 @@ export const AGENDA_ENTRY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/u;
 export const CUSTOMER_DECISION_LAYOUT = {
   agendasDir: 'agendas',
   receiptsDir: 'receipts',
+  /** One MO-11 brief input per agenda: `brief-input/<agenda_id>.json`. */
+  briefInputDir: 'brief-input',
+  /** Write-ahead records of `respond` runs in flight: `respond-journal/<receipt_id>.json`. */
+  respondJournalDir: 'respond-journal',
   files: {
     switches: 'switches.jsonl',
   },
@@ -212,6 +241,20 @@ export function isReceiptId(value: unknown): value is string {
 
 export function isSwitchId(value: unknown): value is string {
   return typeof value === 'string' && SWITCH_ID_PATTERN.test(value);
+}
+
+/**
+ * The layer order an agenda entry may declare: the customer layer always
+ * comes first (the customer's decision is the top layer, plan 決定の層), so an
+ * explicit `layers` must start with `customer`. Returns the problem, or null.
+ */
+export function entryLayersProblem(
+  entry: Pick<AgendaEntry, 'layers'>
+): 'layers_missing_customer' | 'layers_customer_not_first' | null {
+  if (!entry.layers || entry.layers.length === 0) return null;
+  if (!entry.layers.includes('customer')) return 'layers_missing_customer';
+  if (entry.layers[0] !== 'customer') return 'layers_customer_not_first';
+  return null;
 }
 
 /** The layer order an entry uses (its own, or the default customer > ours > org_default). */

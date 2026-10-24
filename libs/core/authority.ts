@@ -78,6 +78,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   autonomy_learning_store: 'worker',
   pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
+  customer_decision_deal_note_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
@@ -692,6 +693,7 @@ interface PreparedExecutionContext {
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
+  'customer_decision_deal_note_writer',
   DISCUSSION_REQUEST_STORAGE_ROLE,
   PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',

@@ -175,3 +175,40 @@ status: active
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。
+
+## 実装状況（2026-10-24）
+
+段階 1（CD-01〜08）を実装した（ブランチ `feat/customer-decision-20261024`、ミッション `MSN-CUSTOMER-DECISION-20261024`）。
+
+| ID    | 状況                       | 実装の位置                                                                                                                                 |
+| ----- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| CD-01 | 完了                       | `libs/core/customer-decision/{model,store,hash}.ts`、`customer-decision-{agenda,receipt,switch}.schema.json`                               |
+| CD-02 | 完了                       | `libs/core/customer-decision/effective.ts`（有効な決定・切り替わり・照合・上書きの可否）。承認済みの決定は編集中も `in_force` で効力を保つ |
+| CD-03 | 完了                       | `hearing-scenarios.json` の `aidlc_inception`、`customer-decision-templates/aidlc-inception.json`、語彙 `customer_decision:*`              |
+| CD-04 | 完了                       | `libs/core/customer-decision/{template,draft}.ts`、`customer-decision generate`。推論が使えないときは組織の既定値を案にする                |
+| CD-05 | 完了                       | `customer-decision submit`（承認ゲート、内容ハッシュ、こちらの決定を台帳の proposed として固定）                                           |
+| CD-06 | 完了                       | `libs/core/customer-decision/invite.ts`、権限 `customer_decision_invite_store`（招待の置き場だけに絞った capability）                      |
+| CD-07 | 完了（対話ヒアリングは未） | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                       |
+| CD-08 | 完了                       | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）     |
+
+使い方（運用者）:
+
+```bash
+pnpm kyberion customer-decision draft --tenant <t> --case <case> --customer <c> --template aidlc-inception --locale ja
+pnpm kyberion customer-decision generate --tenant <t> --case <case> --agenda <id> --intent-file <path>
+pnpm kyberion customer-decision submit --tenant <t> --case <case> --agenda <id> --by user:<member>
+pnpm kyberion customer-decision actor-add --tenant <t> --case <case> --customer <c> --actor customer:<id> --name <name>
+pnpm kyberion customer-decision send --tenant <t> --case <case> --agenda <id> --name <name> --role decider --actor customer:<id>
+pnpm kyberion customer-decision status --tenant <t> --case <case> --agenda <id>
+KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/server.js   # 公開 ingress の背後で動かす
+```
+
+後続の改善（段階 1 の後）:
+
+- 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）。
+- 招待リンクを紐付け済みチャネルから送る（`sendToCustomer` の `deliver` を持つブリッジ側で行う。CLI はリンクを運用者に一度だけ表示する）。
+- 公開 ingress の背後では接続元がすべて 127.0.0.1 になるため、レート制限は全顧客で共有になる。信頼するプロキシ段数の設定を入れて `X-Forwarded-For` を使う。
+- 商談メモの項目名を問いの全文ではなく短いラベルにする（テンプレートに `label_key` を足す）。
+- CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。
+- 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
+- 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。

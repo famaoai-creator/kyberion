@@ -116,6 +116,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "customer_decision_deal_note_writer": {
+      "description": "Customer decision deal-note writer (scripts/customer_decision.ts respond / confirm, CD-08): reads and appends notes to the bound tenant's deal records under customer/<tenant>/deals/ only, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES). Assumed only for the best-effort deal note that a customer decision switch adds, so the customer-triggered respond path never needs mission_controller. No knowledge, decision ledger, agenda, receipt, invite or other customer/ authority.",
+      "default_persona": "worker",
+      "write_scopes": ["customer/${KYBERION_TENANT}/deals/"],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
+    },
     "customer_decision_invite_store": {
       "description": "Customer decision invite record storage (libs/core/customer-decision/invite.ts): reads and writes only the bound tenant's active/shared/runtime/customer-decision-invites/confidential/<tenant>/ records. Requires an exact deny-only tenant capability for one invite record (or a read-only listing of the tenant directory) before every operation. No knowledge, decision ledger, agenda, receipt or deployment authority.",
       "default_persona": "unknown",

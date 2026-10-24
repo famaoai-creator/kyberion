@@ -2,15 +2,21 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { safeAppendFileSync, safeRmSync } from '../secure-io.js';
+import { safeAppendFileSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { agendaContentHash } from './hash.js';
 import type { DecisionAgenda, DecisionReceipt, DecisionSwitch } from './model.js';
 import { AGENDA_ID_PATTERN, RECEIPT_ID_PATTERN, SWITCH_ID_PATTERN } from './model.js';
 import {
   appendSwitches,
+  customerDecisionCaseLockId,
   customerDecisionPaths,
   listAgendas,
   listReceipts,
+  listRespondJournals,
+  removeRespondJournal,
+  withCustomerDecisionCaseLock,
+  writeRespondJournal,
+  type RespondJournalRecord,
   newAgendaId,
   newReceiptId,
   newSwitchId,
@@ -241,6 +247,99 @@ describe('customer decision store', () => {
     expect(() => appendSwitches(location, [switchEvent({ switch_id: 'bad' })])).toThrow(
       /Invalid catalog/u
     );
+  });
+
+  it('refuses explicit layer orders without the customer layer', () => {
+    const base = agenda();
+    const withLayers = (layers: string[]) =>
+      agenda({
+        entries: [{ ...base.entries[0], layers: layers as never }, base.entries[1]],
+      });
+    expect(() => writeAgenda({ dir }, withLayers(['ours', 'org_default']))).toThrow(/layers/u);
+    expect(writeAgenda({ dir }, withLayers(['customer', 'ours'])).entries[0].layers).toEqual([
+      'customer',
+      'ours',
+    ]);
+  });
+
+  it('keeps operator confirmations on the agenda, outside the content hash', () => {
+    const confirmed = agenda({
+      operator_confirmations: [
+        { entry_id: 'release', decision_id: 'D-0002', by: 'user:alice', at: NOW },
+      ],
+    });
+    expect(writeAgenda({ dir }, confirmed).operator_confirmations).toHaveLength(1);
+    expect(agendaContentHash(confirmed)).toBe(agendaContentHash(agenda()));
+    expect(() =>
+      writeAgenda(
+        { dir },
+        agenda({
+          operator_confirmations: [
+            { entry_id: 'release', decision_id: 'nope', by: 'user:alice', at: NOW },
+          ],
+        })
+      )
+    ).toThrow(/decision_id/u);
+  });
+
+  it('locks a case across callers: tenant + case, or a hash of the test dir', () => {
+    expect(customerDecisionCaseLockId({ tenantSlug: 'acme-corp', caseId: 'case-a' })).toBe(
+      'customer-decision-case-acme-corp-case-a'
+    );
+    expect(customerDecisionCaseLockId({ dir })).toMatch(
+      /^customer-decision-case-dir-[a-f0-9]{24}$/u
+    );
+    expect(() => customerDecisionCaseLockId({ tenantSlug: 'acme-corp', caseId: '../x' })).toThrow(
+      /CASE_INVALID/u
+    );
+    // While one holder runs, the same case cannot be entered (not re-entrant, no queue jumping).
+    const inner = withCustomerDecisionCaseLock({ dir }, () => {
+      try {
+        withCustomerDecisionCaseLock({ dir }, () => 'second', 150);
+        return 'entered';
+      } catch (error) {
+        return (error as Error).message;
+      }
+    });
+    expect(inner).toMatch(/LOCK_TIMEOUT/u);
+    // Released afterwards; another case was never blocked.
+    expect(withCustomerDecisionCaseLock({ dir }, () => 'again')).toBe('again');
+  });
+
+  it('writes, advances, lists and removes respond journal records', () => {
+    const location = { dir };
+    const record: RespondJournalRecord = {
+      version: '1.0.0',
+      receipt_id: 'rcp-test0001',
+      tenant_slug: 'acme-corp',
+      case_id: 'case-a',
+      agenda_id: 'agd-test0001',
+      stage: 'planned',
+      receipt: receipt(),
+      before: [],
+      created_at: NOW,
+      updated_at: NOW,
+    };
+    expect(listRespondJournals(location)).toEqual([]);
+    writeRespondJournal(location, record);
+    writeRespondJournal(location, { ...record, stage: 'ledger_written' });
+    expect(listRespondJournals(location)).toEqual([{ ...record, stage: 'ledger_written' }]);
+    expect(() =>
+      writeRespondJournal(location, { ...record, receipt: receipt({ receipt_id: 'rcp-test0002' }) })
+    ).toThrow(/JOURNAL_MISMATCH/u);
+    expect(() =>
+      writeRespondJournal(location, { ...record, receipt: { ...receipt(), answers: 'x' as never } })
+    ).toThrow();
+    // A record that cannot be read is reported, never silently dropped or deleted.
+    const broken = path.join(customerDecisionPaths(location).respondJournal, 'rcp-test0009.json');
+    safeMkdir(path.dirname(broken), { recursive: true });
+    safeWriteFile(broken, '{"version":"1.0.0"}', { encoding: 'utf8' });
+    const invalid: string[] = [];
+    expect(listRespondJournals(location, (id) => invalid.push(id))).toHaveLength(1);
+    expect(invalid).toEqual(['rcp-test0009']);
+    removeRespondJournal(location, 'rcp-test0001');
+    removeRespondJournal(location, 'rcp-test0001');
+    expect(listRespondJournals(location)).toEqual([]);
   });
 
   it('generates ids that match the grammar', () => {
