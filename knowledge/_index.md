@@ -75,6 +75,7 @@
 - [Discussion Room — facilitated multi-agent discussion](./product/architecture/discussion-room.md) (public | Ecosystem Architect)
 - [Dot-Initiated Workflow — observation → claim → execution → learning](./product/architecture/dot-initiated-workflow.md) (public | Unknown)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
+- [Event Feed Intake — pull-side sources for resident dots](./product/architecture/event-feed-intake.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
 - [Existing front-desk navigation](./product/architecture/front-desk-navigation.md) (public | Unknown)
 - [External Identity → Member Mapping and the Human Role Model](./product/architecture/external-identity-member-mapping.md) (public | ecosystem_architect)
