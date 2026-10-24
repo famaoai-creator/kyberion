@@ -27,6 +27,7 @@
  * daily op starts (`reminder-op.ts`, no SYSTEM_ROLE, bound to the run's
  * tenant — the customer room's rule). No role is widened.
  */
+import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import { t } from '@agent/core/t';
 import { withExecutionContextAsync } from '@agent/core/authority';
@@ -153,7 +154,9 @@ async function deliverReminder(
   const binding = findTenantCustomerChannelBinding(tenant, channel.surface, channel.channelId);
   const body = renderCustomerRoutineTemplate(reminder.template);
   if (!binding || body === null) return { outcome: 'failed' };
-  const correlationId = `customer-decision-reminder:${tenant}:${reminder.reminder_id}`;
+  // Bound to the content: an approval (or a charter consumption) covers this
+  // exact text to this exact channel, never an edited text or another channel.
+  const correlationId = reminderCorrelationId(tenant, reminder, channel, body);
   // Bound to the tenant (the facade's tenant-bound role), so the gate reads
   // the tenant's charter through its exact charter scope — the same binding
   // a chronos tenant run has from its environment.
@@ -170,6 +173,12 @@ async function deliverReminder(
         template: reminder.template,
         correlationId,
         nonInteractive: true,
+        // A scheduled sweep has no human present: open a durable request so a
+        // human is actually asked (the decision lands on the next sweep or a
+        // manual `remind`), scoped to the tenant so only its approvers see the
+        // message the request summary carries.
+        enqueueRequest: true,
+        requestScope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
         deliver: async (text) =>
           enqueueSurfaceOutboxMessage({
             surface: channel.surface,
@@ -185,18 +194,41 @@ async function deliverReminder(
     undefined,
     tenant
   );
+  // A rejected (or lapsed, or rebound) request is final: record it denied and
+  // stop asking. `human_required` would mean no request was opened — not a
+  // pending approval — so it is retried rather than recorded.
+  const finalRefusal =
+    result.approvalRequestStatus === 'rejected' ||
+    result.approvalRequestStatus === 'expired' ||
+    result.approvalRequestStatus === 'effect_mismatch';
   const outcome: ReminderOutcome =
     result.status === 'sent'
       ? 'sent'
-      : result.status === 'approval_pending'
-        ? 'approval_pending'
-        : result.status === 'denied'
-          ? 'denied'
+      : result.status === 'denied' || finalRefusal
+        ? 'denied'
+        : result.status === 'approval_pending'
+          ? result.approvalRequestId && result.approvalRequestStatus !== 'human_required'
+            ? 'approval_pending'
+            : 'failed'
           : 'delivery_failed';
   return {
     outcome,
     ...(result.approvalRequestId ? { approval_request_id: result.approvalRequestId } : {}),
   };
+}
+
+/** `customer-decision-reminder:<tenant>:<reminder>:<hash of channel + body>`. */
+export function reminderCorrelationId(
+  tenant: string,
+  reminder: Pick<PlannedReminder, 'reminder_id'>,
+  channel: { surface: string; channelId: string },
+  body: string
+): string {
+  const digest = createHash('sha256')
+    .update([channel.surface, channel.channelId, body].join('\u0000'))
+    .digest('hex')
+    .slice(0, 16);
+  return `customer-decision-reminder:${tenant}:${reminder.reminder_id}:${digest}`;
 }
 
 function mergeReminders(
@@ -264,7 +296,12 @@ async function sweepAgenda(
     let record: AgendaReminderRecord | undefined;
     try {
       const actor = state.actors.find((item) => item.id === reminder.actor_id);
-      const channel = resolveChannel(tenant, actor);
+      // A title the fixed template refuses (too long, a link, a mention, …)
+      // cannot go out unattended: the operator reminds by hand.
+      const channel: ChannelResolution =
+        renderCustomerRoutineTemplate(reminder.template) === null
+          ? { manualReason: 'template_refused' }
+          : resolveChannel(tenant, actor);
       if (dryRun) {
         outcome = channel.manualReason ? 'would_remind_manually' : 'would_send';
         result.reminders.push({ ...base, outcome });

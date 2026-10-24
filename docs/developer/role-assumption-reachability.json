@@ -175,6 +175,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/customer-channel-binding.ts#isActiveTenant",
+      "roles": ["workspace_tenant_registry_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/customer-decision/invite.ts#asInviteStore",
       "roles": ["customer_decision_invite_store"],
       "unresolved": []

@@ -26,6 +26,7 @@
  * one inbox entry per receipt, ids and counts only.
  */
 import { createHash } from 'node:crypto';
+import { isOverrideWindowOpen } from './effective.js';
 import { agendaContentHash } from './hash.js';
 import { agendaAnswerState } from './respond.js';
 import type { CustomerDecisionInvite } from './invite.js';
@@ -88,8 +89,12 @@ export interface PlannedReminder {
   send_on: string;
   /** The decider's valid invites (ids only). */
   invite_ids: string[];
-  /** The fixed template and its parameters: the agenda title and the target date. */
-  template: { id: string; params: { title: string; date: string }; locale: 'ja' | 'en' };
+  /**
+   * The fixed template and its parameters: the agenda title and the date
+   * (for `override_closing` the closing moment in the agenda's display zone:
+   * `date`, `time`, `zone`).
+   */
+  template: { id: string; params: Record<string, string>; locale: 'ja' | 'en' };
 }
 
 export interface ReminderPlanInput {
@@ -122,14 +127,41 @@ function validDeciders(
   return byActor;
 }
 
+/**
+ * The display zone of an agenda's customer-facing times: Japan time for a
+ * `ja` agenda, UTC otherwise (the agenda carries no time zone of its own).
+ */
+const DISPLAY_ZONES: Readonly<Record<'ja' | 'en', { zone: 'JST' | 'UTC'; offsetMs: number }>> = {
+  ja: { zone: 'JST', offsetMs: 9 * 60 * 60 * 1000 },
+  en: { zone: 'UTC', offsetMs: 0 },
+};
+
+export function agendaDisplayZone(locale: 'ja' | 'en'): { zone: 'JST' | 'UTC'; offsetMs: number } {
+  return DISPLAY_ZONES[locale] ?? DISPLAY_ZONES.en;
+}
+
+/** A closing moment as the customer reads it: local date, `HH:MM` and the zone label. */
+export function displayClosingMoment(
+  at: string,
+  locale: 'ja' | 'en'
+): { date: string; time: string; zone: string } | null {
+  const ms = Date.parse(at);
+  if (!Number.isFinite(ms)) return null;
+  const { zone, offsetMs } = agendaDisplayZone(locale);
+  const local = new Date(ms + offsetMs).toISOString();
+  return { date: local.slice(0, 10), time: local.slice(11, 16), zone };
+}
+
 function plan(
   agenda: DecisionAgenda,
   kind: AgendaReminderKind,
   actorId: string,
   targetDate: string,
   sendOn: string,
-  inviteIds: string[]
+  inviteIds: string[],
+  closingAt?: string
 ): PlannedReminder {
+  const closing = closingAt ? displayClosingMoment(closingAt, agenda.locale) : null;
   return {
     reminder_id: reminderId(agenda.agenda_id, actorId, kind, targetDate),
     kind,
@@ -139,10 +171,48 @@ function plan(
     invite_ids: [...inviteIds].sort(),
     template: {
       id: REMINDER_TEMPLATE_IDS[kind],
-      params: { title: agenda.title, date: targetDate },
+      params: closing
+        ? { title: agenda.title, date: closing.date, time: closing.time, zone: closing.zone }
+        : { title: agenda.title, date: targetDate },
       locale: agenda.locale,
     },
   };
+}
+
+/**
+ * Has this decider answered every entry still open to an answer (override
+ * window open at `now`) in the current approved revision? Receipts of any of
+ * the actor's invites count together; an answer counts when it is a decision
+ * (`decided` / `unchanged` / `change_request`), not a comment-only opinion
+ * and not a general question alone. With nothing open, there is nothing to
+ * remind about.
+ */
+export function hasAnsweredAll(
+  agenda: DecisionAgenda,
+  receipts: readonly DecisionReceipt[],
+  actorId: string,
+  contentHash: string,
+  now: string
+): boolean {
+  const open = agenda.entries
+    .filter((entry) => isOverrideWindowOpen(entry, now, agenda.milestones_passed ?? []))
+    .map((entry) => entry.entry_id);
+  const answered = new Set<string>();
+  for (const receipt of receipts) {
+    if (
+      receipt.agenda_id !== agenda.agenda_id ||
+      receipt.content_hash !== contentHash ||
+      receipt.participant.role !== 'decider' ||
+      receipt.participant.actor_id !== actorId
+    )
+      continue;
+    for (const answer of receipt.answers) {
+      if (answer.outcome !== undefined && answer.outcome === 'opinion') continue;
+      if (answer.outcome === undefined && answer.choice === 'free_text') continue;
+      answered.add(answer.entry_id);
+    }
+  }
+  return open.every((entryId) => answered.has(entryId));
 }
 
 /**
@@ -161,18 +231,8 @@ export function scheduleAgendaReminders(input: ReminderPlanInput): PlannedRemind
   const reminders: PlannedReminder[] = [];
 
   if (agenda.respond_by && isCalendarDate(agenda.respond_by)) {
-    const answered = new Set(
-      input.receipts
-        .filter(
-          (receipt) =>
-            receipt.agenda_id === agenda.agenda_id &&
-            receipt.content_hash === hash &&
-            receipt.participant.role === 'decider'
-        )
-        .map((receipt) => receipt.participant.actor_id)
-    );
     for (const [actorId, inviteIds] of deciders) {
-      if (answered.has(actorId)) continue;
+      if (hasAnsweredAll(agenda, input.receipts, actorId, hash, now)) continue;
       reminders.push(
         plan(
           agenda,
@@ -188,7 +248,8 @@ export function scheduleAgendaReminders(input: ReminderPlanInput): PlannedRemind
   }
 
   const effective = new Map(input.effective.map((decision) => [decision.entry_id, decision]));
-  const deadlines = new Set<string>();
+  // UTC deadline date → the earliest closing moment on that date (shown to the customer).
+  const deadlines = new Map<string, string>();
   for (const entry of agenda.entries) {
     const until = entry.override_until;
     if (!until || until.kind !== 'date') continue;
@@ -198,12 +259,14 @@ export function scheduleAgendaReminders(input: ReminderPlanInput): PlannedRemind
     const layer = effective.get(entry.entry_id)?.layer;
     if (layer !== 'ours' && layer !== 'org_default') continue;
     const date = utcDate(until.at);
-    if (date) deadlines.add(date);
+    if (!date) continue;
+    const earlier = deadlines.get(date);
+    if (!earlier || Date.parse(until.at) < Date.parse(earlier)) deadlines.set(date, until.at);
   }
-  for (const date of [...deadlines].sort()) {
+  for (const [date, closingAt] of [...deadlines].sort(([a], [b]) => a.localeCompare(b))) {
     for (const [actorId, inviteIds] of deciders) {
       reminders.push(
-        plan(agenda, 'override_closing', actorId, date, addUtcDays(date, -2), inviteIds)
+        plan(agenda, 'override_closing', actorId, date, addUtcDays(date, -2), inviteIds, closingAt)
       );
     }
   }

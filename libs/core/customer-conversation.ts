@@ -10,7 +10,8 @@ import { normalizeLocale } from './locale-normalize.js';
 import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
-import { enforceApprovalGate } from './governance/approval-gate.js';
+import { enforceApprovalGate, type ApprovalGateResult } from './governance/approval-gate.js';
+import type { EventScopeInput } from './event-scope.js';
 import { charterInputForCustomerOutbound } from './governance/charter-call-site.js';
 import {
   isRenderedRoutineTemplate,
@@ -356,6 +357,17 @@ export interface SendToCustomerInput {
   hasHuman?: boolean;
   hasUI?: boolean;
   nonInteractive?: boolean;
+  /**
+   * CD-11: open a durable approval request even on a non-interactive boundary
+   * (a scheduled sweep), so a human is actually asked. Default unchanged.
+   */
+  enqueueRequest?: boolean;
+  /**
+   * CD-11: the viewer scope of the approval request (e.g. the tenant), so the
+   * request — whose summary carries the message — is listed only to that
+   * scope's approvers. Default unchanged (no scope).
+   */
+  requestScope?: EventScopeInput;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -364,6 +376,8 @@ export interface SendToCustomerResult {
   sent: boolean;
   status: 'sent' | 'approval_pending' | 'denied' | 'delivery_failed';
   approvalRequestId?: string;
+  /** The gate's reason for a held message (`created`, `pending`, `rejected`, `expired`, …). */
+  approvalRequestStatus?: ApprovalGateResult['requestStatus'];
   reason?: string;
 }
 
@@ -502,6 +516,8 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
     ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
+    ...(input.enqueueRequest !== undefined ? { enqueueRequest: input.enqueueRequest } : {}),
+    ...(input.requestScope ? { requestScope: input.requestScope } : {}),
     // A message that breaches the audience egress floor always goes to a human.
     ...(floorViolations.length === 0
       ? (() => {
@@ -524,6 +540,7 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       sent: false,
       status: approval.status === 'pending' ? 'approval_pending' : 'denied',
       approvalRequestId: approval.requestId,
+      ...(approval.requestStatus ? { approvalRequestStatus: approval.requestStatus } : {}),
       reason: approval.message,
     };
   }

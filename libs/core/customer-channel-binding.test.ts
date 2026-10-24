@@ -93,6 +93,18 @@ describe('customer-channel-binding', () => {
     // Another tenant's binding is never found through this tenant.
     expect(findTenantCustomerChannelBinding('acme', 'slack', 'C9', { rootDir })).toBeNull();
     expect(readTenantCustomerChannelBindings('../acme', { rootDir })).toEqual([]);
+    // A tenant that is not registered and active has no bindings (fails closed).
+    expect(readTenantCustomerChannelBindings('other', { rootDir })).toEqual([]);
+    fs.writeFileSync(
+      path.join(rootDir, 'knowledge', 'personal', 'tenants', 'acme.json'),
+      JSON.stringify({
+        tenant_slug: 'acme',
+        display_name: 'Acme',
+        status: 'suspended',
+        assigned_role: 'owner',
+      })
+    );
+    expect(findTenantCustomerChannelBinding('acme', 'slack', 'C1', { rootDir })).toBeNull();
   });
 
   it('ignores schema-invalid binding files', () => {

@@ -33541,9 +33541,9 @@
         "qps-ploc": "⟦Ŧőḓȧẏ ({date}) ïş ŧħė ȧñşẇėř ḓȧŧė ƒőř “{title}”. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "reminder_override_closing": {
-        "en": "You can still change your answers to “{title}” until {date}. After that, the items you have not decided follow our proposal. Please open it from the link we sent you.",
-        "ja": "「{title}」のご回答は {date} まで変更できます。それ以降、まだお決めいただいていない項目はこちらの案で進めます。お送りしたリンクから開いてください。",
-        "qps-ploc": "⟦Ẏőů ƈȧñ şŧïŀŀ ƈħȧñɠė ẏőůř ȧñşẇėřş ŧő “{title}” ůñŧïŀ {date}. Ȧƒŧėř ŧħȧŧ, ŧħė ïŧėɱş ẏőů ħȧṽė ñőŧ ḓėƈïḓėḓ ƒőŀŀőẇ őůř ṗřőṗőşȧŀ. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+        "en": "You can still change your answers to “{title}” until {date} {time} ({zone}). After that, the items you have not decided follow our proposal. Please open it from the link we sent you.",
+        "ja": "「{title}」のご回答は {date} {time}（{zone}）まで変更できます。それ以降、まだお決めいただいていない項目はこちらの案で進めます。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şŧïŀŀ ƈħȧñɠė ẏőůř ȧñşẇėřş ŧő “{title}” ůñŧïŀ {date} {time} ({zone}). Ȧƒŧėř ŧħȧŧ, ŧħė ïŧėɱş ẏőů ħȧṽė ñőŧ ḓėƈïḓėḓ ƒőŀŀőẇ őůř ṗřőṗőşȧŀ. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "reminder_outbound_title": {
         "en": "Customer decision reminder {reminderId} for agenda {agendaId}",

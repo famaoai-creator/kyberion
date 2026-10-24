@@ -9,11 +9,14 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
   CUSTOMER_ACTOR_ID_PATTERN,
   CUSTOMER_SLUG_PATTERN,
   appendDecisions,
+  customerActorsPath,
   readCustomerActors,
   readLedger,
   writeCustomerActors,
@@ -513,6 +516,16 @@ export function runActorAdd(opts: Record<string, string>): unknown {
         ...(opts['confirm-target'] ? { confirm_target: opts['confirm-target'] } : {}),
         ...(kept ? { channel: kept } : {}),
       };
+      // Channel bindings name no customer, so a channel can be linked to
+      // another customer's decider by mistake: warn when another customer's
+      // actor already uses it (the reminder would reach that customer's chat).
+      const sharedWith = actor.channel
+        ? customersSharingChannel(location, tenant, customer, actor.channel)
+        : [];
+      if (sharedWith.length)
+        logger.warn(
+          `customer decision actor channel is also used by another customer — check that ${actor.channel?.surface}:${actor.channel?.channel_id} is ${customer}'s chat | customers=${sharedWith.join(',')} | actor=${actorId}`
+        );
       const registry = writeCustomerActors(location, {
         version: '1.0.0',
         tenant_slug: tenant,
@@ -531,14 +544,49 @@ export function runActorAdd(opts: Record<string, string>): unknown {
           decides: actor.decides,
           updated: Boolean(existing),
           ...(actor.channel ? { channel_surface: actor.channel.surface } : {}),
+          ...(sharedWith.length ? { channel_shared_with_customers: sharedWith } : {}),
         },
       });
-      return { customer, actor, actors: registry.actors.length };
+      return {
+        customer,
+        actor,
+        actors: registry.actors.length,
+        ...(sharedWith.length
+          ? {
+              warnings: sharedWith.map((other) => `channel_shared_with_customer:${other}`),
+            }
+          : {}),
+      };
     })
   );
 }
 
 const CHANNEL_SURFACES = ['slack', 'telegram', 'email', 'imessage', 'discord'] as const;
+
+/**
+ * Other customers of the tenant with an actor on this channel (call as the
+ * ledger role). A scratch `--dir` case has one actor file, so nothing to compare.
+ */
+function customersSharingChannel(
+  location: DecisionLedgerLocation,
+  tenant: string,
+  customer: string,
+  channel: NonNullable<DecisionCustomerActor['channel']>
+): string[] {
+  if ('dir' in location) return [];
+  const root = path.dirname(path.dirname(customerActorsPath(tenant, customer)));
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root)
+    .filter((name) => name !== customer && CUSTOMER_SLUG_PATTERN.test(name))
+    .filter((other) =>
+      readCustomerActors(location, other).some(
+        (item) =>
+          item.channel?.surface === channel.surface &&
+          item.channel.channel_id === channel.channel_id
+      )
+    )
+    .sort();
+}
 
 /**
  * CD-11 `--channel <surface>:<channel_id>`: a channel the tenant has bound
