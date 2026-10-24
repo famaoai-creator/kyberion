@@ -1003,6 +1003,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineCustomerDecisionReminders(step, params, ctx);
   },
+  'core:customer_decision_learning': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineCustomerDecisionLearning(step, params, ctx);
+  },
   'core:pr_shadow_observe': async (dctx) => {
     const { step, params, ctx } = dctx;
 

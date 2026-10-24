@@ -29,6 +29,15 @@
  *            else an operator inbox task; --dry-run writes nothing
  *   reminders --install --by user:<member> [--force]    install the daily tenant reminder pipeline (pipeline:promote);
  *            --by is the asset ledger's ingested_by (no identity env needed)
+ *   overview [--case <id>] [--now <iso>]   read-only tenant overview (CD-12; JSON contract
+ *            `CustomerDecisionOverview`, libs/core/customer-decision/overview.ts): status counts,
+ *            deadlines, change requests, hand-offs, reminders and held tasks per agenda; never
+ *            reconciles, routes or writes; refuses a --tenant other than a bound KYBERION_TENANT
+ *   learning [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]   count overturned
+ *            decisions, recurring questions and change requests (CD-12), write the tenant report
+ *            decisions/_reports/learning-<date>.json and queue organization learning candidates
+ *            (source customer_decision, once per suggestion and date); --dry-run writes nothing
+ *   learning --install --by user:<member> [--force]     install the weekly tenant learning pipeline
  *
  * Customer-room verbs (token on STDIN only, never argv; --case is optional and
  * must match the invite when given):
@@ -52,7 +61,8 @@
  * (status, confirm, close / withdraw, revoke), `reconcile.ts` (respond
  * completion and recovery), `customer-facing.ts` (view / respond / attachment),
  * `task-proposals.ts` (draft --from-tasks, the task part of status),
- * `bolt-review.ts` (CD-10 bolt-review draft and answer routing). This file
+ * `bolt-review.ts` (CD-10 bolt-review draft and answer routing), `reminders.ts`
+ * (CD-11), `overview.ts` / `learning.ts` (CD-12 overview and learning). This file
  * is the entry point; the room spawns `dist/scripts/customer_decision.js`.
  *
  * Consistency: every read → plan → write sequence on a case runs under the
@@ -95,6 +105,8 @@ import { runCustomerFacing } from './customer-decision/customer-facing.js';
 import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
 import { runBoltReview } from './customer-decision/bolt-review.js';
 import { runRemind, runRemindersInstall } from './customer-decision/reminders.js';
+import { runOverview } from './customer-decision/overview.js';
+import { runLearning, runLearningInstall } from './customer-decision/learning.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -134,6 +146,10 @@ export async function runCustomerDecision(
       return runRemind(opts, flags, now);
     case 'reminders':
       return runRemindersInstall(opts, flags);
+    case 'overview':
+      return runOverview(opts, now);
+    case 'learning':
+      return flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now);
     case 'confirm':
       return runConfirm(opts, now);
     case 'close':
