@@ -1073,6 +1073,19 @@ export async function finishMission(
     );
   }
 
+  // CD-10: a mission with a customer decision case gets the bolt review as
+  // the operator's next step (a command only; the operator picks what the
+  // customer sees). Best-effort.
+  try {
+    const { boltReviewNextStep } = await import('./mission-bolt-review.js');
+    const command = boltReviewNextStep(upperId);
+    if (command) logger.info(t('customer_decision:bolt_review_next_step', { command }));
+  } catch (err: unknown) {
+    logger.warn(
+      `bolt review next step skipped — ${err instanceof Error ? err.message : String(err)} | run customer-decision bolt-review by hand | mission=${upperId}`
+    );
+  }
+
   // Retrospective Loop (⑤ Review の自動化): measure how the team worked,
   // persist token/cost statistics, and queue process/team improvement
   // proposals for operator ratification. The mission is already completed

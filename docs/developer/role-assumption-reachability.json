@@ -876,6 +876,21 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-bolt-review.ts#asMilestoneStore",
+      "roles": ["customer_decision_milestone_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-bolt-review.ts#fileBoltReviewWorkItem",
+      "roles": ["workspace_tenant_registry_reader"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-coordination-bus.ts#MissionCoordinationBus.appendEvent",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -3869,6 +3884,17 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "discussion_request_store": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts#POST",
@@ -4238,6 +4264,22 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -4988,6 +5030,17 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -5242,6 +5295,7 @@
         "chronos_tenant_runner",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -5289,6 +5343,7 @@
         "chronos_tenant_runner",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -5425,6 +5480,20 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -5764,6 +5833,7 @@
         "chronos_gateway",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "knowledge_steward",
         "metrics_cap_reader",
         "notification_preferences_reader",
@@ -5974,6 +6044,7 @@
         "chronos_tenant_runner",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "knowledge_steward",
         "organization_operator",
         "peer_catalog_reader",
@@ -6110,6 +6181,22 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -6556,6 +6643,24 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -7060,6 +7165,24 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -7537,6 +7660,7 @@
         "chronos_tenant_runner",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -7707,6 +7831,24 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -8153,6 +8295,22 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -8621,6 +8779,18 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "decision_ledger": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -9005,6 +9175,21 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -9352,6 +9537,7 @@
         "chronos_tenant_runner",
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
+        "customer_decision_milestone_store",
         "knowledge_steward",
         "metrics_cap_reader",
         "mission_controller",
@@ -9459,6 +9645,24 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -9855,6 +10059,20 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {
@@ -10286,6 +10504,24 @@
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -10684,6 +10920,24 @@
             "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
             "libs/core/mission/mission-decision-lock.ts#readCase",
             "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
+        "customer_decision_milestone_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#startMission",
+            "libs/core/mission/mission-bolt-review.ts#passBoltReviewMilestones",
+            "libs/core/mission/mission-bolt-review.ts#asMilestoneStore"
           ]
         },
         "ecosystem_architect": {

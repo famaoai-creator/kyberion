@@ -7,6 +7,8 @@
  *   GET  /js/app/*.js   the page's compiled modules
  *   POST /api/view      Authorization: Bearer <token>            -> facade `view`
  *   POST /api/respond   Authorization: Bearer <token>, {content_hash, answers} -> facade `respond`
+ *   POST /api/attachment Authorization: Bearer <token>, {attachment_id}       -> facade `attachment`
+ *                        (the image bytes; png / jpeg / webp only, nosniff, no-store)
  *
  * One process serves one tenant, fixed at start; nothing in a request can
  * change it. The token is read from the Authorization header only, handed to
@@ -22,7 +24,8 @@ export const CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
   "script-src 'self'",
   "style-src 'self'",
-  "img-src 'self' data:",
+  // blob: carries the agenda images the page fetched with the token header.
+  "img-src 'self' data: blob:",
   "connect-src 'self'",
   "font-src 'self'",
   "frame-ancestors 'none'",
@@ -32,6 +35,42 @@ export const CONTENT_SECURITY_POLICY = [
 
 export const TOKEN_PATTERN = /^inv-[a-f0-9]{16}\.[A-Za-z0-9_-]{43}$/u;
 export const MAX_BODY_BYTES = 64 * 1024;
+export const ATTACHMENT_ID_PATTERN = /^[a-f0-9]{64}$/u;
+export const MAX_ATTACHMENT_BYTES = 512 * 1024;
+/** The only image types the room serves, and the leading bytes each must start with. */
+const ATTACHMENT_TYPES: Record<string, (bytes: Buffer) => boolean> = {
+  'image/png': (bytes) =>
+    bytes.length >= 8 &&
+    bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/jpeg': (bytes) =>
+    bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
+  'image/webp': (bytes) =>
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    bytes.subarray(8, 12).toString('latin1') === 'WEBP',
+};
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/u;
+const MAX_ATTACHMENT_BASE64 = Math.ceil(MAX_ATTACHMENT_BYTES / 3) * 4;
+
+/**
+ * The image in a facade `attachment` answer, or null when it is not one the
+ * room may serve (type outside the allowlist, not base64, empty, too large,
+ * or bytes that do not start like the declared type).
+ */
+export function decodeAttachment(
+  body: Record<string, unknown>
+): { mediaType: string; bytes: Buffer } | null {
+  const mediaType = body.media_type;
+  const encoded = body.bytes_base64;
+  if (typeof mediaType !== 'string' || !Object.hasOwn(ATTACHMENT_TYPES, mediaType)) return null;
+  if (typeof encoded !== 'string' || encoded.length === 0) return null;
+  if (encoded.length > MAX_ATTACHMENT_BASE64 || encoded.length % 4 !== 0) return null;
+  if (!BASE64_PATTERN.test(encoded)) return null;
+  const bytes = Buffer.from(encoded, 'base64');
+  if (bytes.length === 0 || bytes.length > MAX_ATTACHMENT_BYTES) return null;
+  return ATTACHMENT_TYPES[mediaType](bytes) ? { mediaType, bytes } : null;
+}
+
 export const ASSET_FILES: readonly string[] = [
   'app.css',
   'kyberion-ui.css',
@@ -240,6 +279,16 @@ export function registerCustomerRoomRoutes(
       let input: Record<string, unknown>;
       if (verb === 'view') {
         input = { token };
+      } else if (verb === 'attachment') {
+        // Only the id is forwarded, and only in the shape of a stored image's content hash.
+        if (
+          typeof body.attachment_id !== 'string' ||
+          !ATTACHMENT_ID_PATTERN.test(body.attachment_id)
+        ) {
+          res.status(400).json(failure('invalid_request'));
+          return;
+        }
+        input = { token, attachment_id: body.attachment_id };
       } else {
         // Only these two fields are forwarded; a `tenant` (or anything else) in the body is dropped.
         if (typeof body.content_hash !== 'string' || !Array.isArray(body.answers)) {
@@ -249,7 +298,7 @@ export function registerCustomerRoomRoutes(
         input = { token, content_hash: body.content_hash, answers: body.answers };
       }
       const outcome = await options.spawner(verb, input).catch(() => null);
-      const result: { status: number; body: Record<string, unknown>; diagnostic?: string } =
+      let result: { status: number; body: Record<string, unknown>; diagnostic?: string } =
         outcome && !outcome.aborted && outcome.stdout.trim()
           ? interpretFacadeOutput(outcome.stdout)
           : {
@@ -257,6 +306,23 @@ export function registerCustomerRoomRoutes(
               body: failure('unavailable') as unknown as Record<string, unknown>,
               diagnostic: outcomeDiagnostic(outcome),
             };
+      if (verb === 'attachment' && result.body.ok === true) {
+        const image = decodeAttachment(result.body);
+        if (image) {
+          log(`[customer-room] ${verb} -> 200`);
+          res.setHeader('Content-Type', image.mediaType);
+          res.setHeader('Content-Length', String(image.bytes.length));
+          res.setHeader('Content-Disposition', 'inline');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.status(200).end(image.bytes);
+          return;
+        }
+        result = {
+          status: 503,
+          body: failure('unavailable') as unknown as Record<string, unknown>,
+          diagnostic: 'attachment_not_servable',
+        };
+      }
       log(
         `[customer-room] ${verb} -> ${result.status}${result.body.ok === true ? '' : ` ${String(result.body.reason)}`}${result.diagnostic ? ` (diagnostic: ${result.diagnostic})` : ''}`
       );
@@ -273,6 +339,9 @@ export function registerCustomerRoomRoutes(
   });
   app.post('/api/respond', apiLimiter, jsonBody, (req, res, next) => {
     void handleApi('respond')(req, res).catch(next);
+  });
+  app.post('/api/attachment', apiLimiter, jsonBody, (req, res, next) => {
+    void handleApi('attachment')(req, res).catch(next);
   });
 
   // Body-parser failures (too large, malformed) and anything unexpected: a plain reason code.

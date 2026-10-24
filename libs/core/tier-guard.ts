@@ -21,6 +21,10 @@ import {
   isCustomerDecisionConsumerCapability,
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
 } from './foundation/customer-decision-consumer-capability.js';
+import {
+  isCustomerDecisionMilestoneCapability,
+  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+} from './foundation/customer-decision-milestone-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -1075,6 +1079,15 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability',
+    };
+  if (
+    normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
+    !isCustomerDecisionMilestoneCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability',
     };
   if (
     normalizedRole === 'concierge_management_reader' &&

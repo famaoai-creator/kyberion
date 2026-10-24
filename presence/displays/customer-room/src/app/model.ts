@@ -6,7 +6,8 @@
 
 export type RoomLocale = 'ja' | 'en';
 export type EntryKind = 'choice' | 'approval' | 'ranking' | 'hearing';
-export type AnswerChoice = 'option' | 'keep' | 'free_text' | 'approve' | 'request_changes';
+export type AnswerChoice =
+  'option' | 'keep' | 'free_text' | 'approve' | 'request_changes' | 'reject';
 
 export interface ViewOption {
   label: string;
@@ -31,6 +32,24 @@ export interface ViewEntry {
   overridable: boolean;
   /** Approval entries: the draft value being approved. */
   draft?: unknown;
+  /** Images shown with the item (fetched one by one through `/api/attachment`). */
+  attachments?: ViewAttachment[];
+  /** External links shown with the item (already https and non-internal). */
+  links?: ViewLink[];
+}
+
+export type AttachmentMediaType = 'image/png' | 'image/jpeg' | 'image/webp';
+
+export interface ViewAttachment {
+  id: string;
+  name: string;
+  media_type: AttachmentMediaType;
+  bytes: number;
+}
+
+export interface ViewLink {
+  label: string;
+  url: string;
 }
 
 export interface ViewParticipant {
@@ -71,8 +90,8 @@ export interface AnswerPayload {
 
 /** What the person has entered for one item so far. */
 export interface Draft {
-  /** `option`: one of `optionIndex`; `keep`; `approve` / `request_changes` for approvals. */
-  choice?: 'option' | 'keep' | 'approve' | 'request_changes';
+  /** `option`: one of `optionIndex`; `keep`; `approve` / `request_changes` / `reject` for approvals. */
+  choice?: 'option' | 'keep' | 'approve' | 'request_changes' | 'reject';
   optionIndex?: number;
   /** Ranking: option indices, in the order picked. */
   ranking: number[];
@@ -180,6 +199,7 @@ export type ValueWording =
   | { kind: 'text'; text: string }
   | { kind: 'approved' }
   | { kind: 'changes_requested' }
+  | { kind: 'rejected' }
   | { kind: 'none' };
 
 /** How a stored value is shown: an option's label, free text, or an approval wording. */
@@ -201,9 +221,11 @@ export function describeValue(entry: ViewEntry, value: unknown): ValueWording {
     return { kind: 'text', text: String(value) };
   }
   if (typeof value === 'object') {
-    const approved = (value as Record<string, unknown>).approved;
-    if (approved === true) return { kind: 'approved' };
-    if (approved === false) return { kind: 'changes_requested' };
+    const record = value as Record<string, unknown>;
+    if (record.approved === true) return { kind: 'approved' };
+    if (record.approved === false) {
+      return record.rejected === true ? { kind: 'rejected' } : { kind: 'changes_requested' };
+    }
   }
   return { kind: 'none' };
 }
@@ -212,6 +234,8 @@ export type DraftView =
   | { kind: 'text'; text: string }
   | { kind: 'list'; items: string[] }
   | { kind: 'pairs'; pairs: Array<[string, string]> }
+  /** `{approved: true}`: "accept as delivered", shown in words, never as a raw row. */
+  | { kind: 'accept' }
   | { kind: 'none' };
 
 function plain(value: unknown): string {
@@ -229,6 +253,9 @@ export function describeDraft(draft: unknown): DraftView {
     return items.length > 0 ? { kind: 'list', items } : { kind: 'none' };
   }
   if (typeof draft === 'object') {
+    const record = draft as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (keys.length === 1 && record.approved === true) return { kind: 'accept' };
     const pairs = Object.entries(draft as Record<string, unknown>)
       .map(([key, value]): [string, string] => [key, plain(value)])
       .filter(([, value]) => value.trim());
@@ -255,10 +282,84 @@ export function keepAvailable(entry: ViewEntry): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Attachments and links
+// ---------------------------------------------------------------------------
+
+export const ATTACHMENT_MEDIA_TYPES: readonly AttachmentMediaType[] = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+];
+export const MAX_ATTACHMENT_BYTES = 512 * 1024;
+const ATTACHMENT_ID = /^[a-f0-9]{64}$/u;
+
+function isRecordValue(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function isAttachmentMediaType(value: unknown): value is AttachmentMediaType {
+  return ATTACHMENT_MEDIA_TYPES.some((type) => type === value);
+}
+
+/** The item's images that can be fetched; anything malformed is left out. */
+export function entryAttachments(entry: Pick<ViewEntry, 'attachments'>): ViewAttachment[] {
+  if (!Array.isArray(entry.attachments)) return [];
+  const items: unknown[] = entry.attachments;
+  return items.filter(
+    (item): item is ViewAttachment =>
+      isRecordValue(item) &&
+      typeof item.id === 'string' &&
+      ATTACHMENT_ID.test(item.id) &&
+      typeof item.name === 'string' &&
+      isAttachmentMediaType(item.media_type) &&
+      typeof item.bytes === 'number' &&
+      Number.isFinite(item.bytes) &&
+      item.bytes > 0 &&
+      item.bytes <= MAX_ATTACHMENT_BYTES
+  );
+}
+
+export interface ShownLink {
+  label: string;
+  href: string;
+  host: string;
+}
+
+/** The item's links that are https with a host; the host is shown next to the label. */
+export function entryLinks(entry: Pick<ViewEntry, 'links'>): ShownLink[] {
+  if (!Array.isArray(entry.links)) return [];
+  const shown: ShownLink[] = [];
+  const items: unknown[] = entry.links;
+  for (const item of items) {
+    if (!isRecordValue(item) || typeof item.url !== 'string') continue;
+    let url: URL;
+    try {
+      url = new URL(item.url);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) continue;
+    const label = typeof item.label === 'string' && item.label.trim() ? item.label.trim() : '';
+    shown.push({ label: label || url.hostname, href: url.href, host: url.hostname });
+  }
+  return shown;
+}
+
+/** A file size in KB (at least 1), in the page language. */
+export function formatSize(bytes: number, locale: RoomLocale): string {
+  const kb = Math.max(1, Math.round(bytes / 1024));
+  return new Intl.NumberFormat(locale, {
+    style: 'unit',
+    unit: 'kilobyte',
+    maximumFractionDigits: 0,
+  }).format(kb);
+}
+
+// ---------------------------------------------------------------------------
 // Drafts -> answers
 // ---------------------------------------------------------------------------
 
-export type DraftIssue = 'comment_required' | 'selection_invalid';
+export type DraftIssue = 'comment_required' | 'reason_required' | 'selection_invalid';
 
 export interface BuiltAnswers {
   answers: AnswerPayload[];
@@ -266,8 +367,17 @@ export interface BuiltAnswers {
 }
 
 /** Vocabulary key of the inline help for a draft issue. */
-export function issueMessageKey(issue: DraftIssue): 'comment_missing' | 'selection_invalid' {
-  return issue === 'comment_required' ? 'comment_missing' : 'selection_invalid';
+export function issueMessageKey(
+  issue: DraftIssue
+): 'comment_missing' | 'reject_reason_missing' | 'selection_invalid' {
+  if (issue === 'comment_required') return 'comment_missing';
+  if (issue === 'reason_required') return 'reject_reason_missing';
+  return 'selection_invalid';
+}
+
+/** Choices whose comment is required (and where it is shown as required). */
+export function commentRequired(choice: Draft['choice']): boolean {
+  return choice === 'request_changes' || choice === 'reject';
 }
 
 function withComment(answer: AnswerPayload, comment: string): AnswerPayload {
@@ -296,6 +406,11 @@ export function buildAnswer(
       return comment
         ? { answer: { ...base, choice: 'request_changes', comment } }
         : { issue: 'comment_required' };
+    case 'reject':
+      if (entry.kind !== 'approval') return { issue: 'selection_invalid' };
+      return comment
+        ? { answer: { ...base, choice: 'reject', comment } }
+        : { issue: 'reason_required' };
     case 'option': {
       const option = draft.optionIndex === undefined ? undefined : entry.options[draft.optionIndex];
       return option
@@ -336,11 +451,6 @@ export function buildAnswers(
     else issues.push({ entry_id: entry.entry_id, issue: built.issue });
   }
   return { answers, issues };
-}
-
-/** Items that have an answer ready (what "items remaining" counts down). */
-export function answeredCount(entries: readonly ViewEntry[], drafts: Map<string, Draft>): number {
-  return buildAnswers(entries, drafts).answers.length;
 }
 
 // ---------------------------------------------------------------------------

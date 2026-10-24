@@ -43,6 +43,33 @@ export interface AgendaOption {
   impact?: AgendaOptionImpact;
 }
 
+/** Image media types an agenda entry may attach (CD-10 bolt review). */
+export type AgendaAttachmentMediaType = 'image/png' | 'image/jpeg' | 'image/webp';
+export const AGENDA_ATTACHMENT_MEDIA_TYPES: readonly AgendaAttachmentMediaType[] = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+];
+
+/**
+ * An image shown with an entry (a screenshot of the bolt's result). The bytes
+ * live in the case (`attachments/<id>.<ext>`); `id` is their sha256, so the
+ * content hash of the agenda binds the exact image the customer saw.
+ */
+export interface AgendaAttachment {
+  /** sha256 hex of the bytes. */
+  id: string;
+  name: string;
+  media_type: AgendaAttachmentMediaType;
+  bytes: number;
+}
+
+/** An external link shown with an entry (a public preview URL; https only). */
+export interface AgendaLink {
+  label: string;
+  url: string;
+}
+
 export interface AgendaEntry {
   entry_id: string;
   item: string;
@@ -57,6 +84,10 @@ export interface AgendaEntry {
   org_default?: { value: unknown; source: string };
   requires_customer: boolean;
   override_until?: { kind: 'date'; at: string } | { kind: 'milestone'; milestone: string };
+  /** CD-10: images shown with the entry. In the content hash. */
+  attachments?: AgendaAttachment[];
+  /** CD-10: external links shown with the entry. In the content hash. */
+  links?: AgendaLink[];
 }
 
 export type AgendaStatus =
@@ -104,6 +135,19 @@ export interface DecisionAgenda {
   };
   milestones_passed?: string[];
   /**
+   * CD-10: the mission (bolt) this agenda reviews. Set by
+   * `customer-decision bolt-review`; outside the content hash (it is not
+   * shown to the customer). The next mission of the case passes the
+   * `bolt-after:<id>` milestone when it starts.
+   */
+  bolt_mission_id?: string;
+  /**
+   * CD-10: where the customer's bolt-review answers went (a backlog WorkItem
+   * for `request_changes`, an operator notification for `reject`). Ids only,
+   * outside the content hash; appended by the facade after respond / status.
+   */
+  bolt_routing?: BoltReviewRouting[];
+  /**
    * CD-08 / 決定の層 row 1: the operator's confirmation of a customer decision
    * on a `requires_customer` entry (money / contract). Until the decision id
    * the entry resolves to is listed here, that customer decision is
@@ -129,6 +173,20 @@ export interface OperatorConfirmation {
   request_id?: string;
 }
 
+export interface BoltReviewRouting {
+  entry_id: string;
+  /** The ledger decision id, or the receipt id of a change request (no ledger write). */
+  ref: string;
+  outcome: 'request_changes' | 'reject';
+  /** `request_changes`: the backlog WorkItem filed. */
+  work_item_id?: string;
+  /** `reject`: when the operator was notified. */
+  notified_at?: string;
+  /** `reject`: the inbox entry added. */
+  inbox_entry_id?: string;
+  at: string;
+}
+
 export type EffectiveDecisionStatus =
   'confirmed' | 'provisional' | 'awaiting_customer' | 'undecided';
 
@@ -150,7 +208,8 @@ export interface EffectiveDecision {
   awaiting_operator_confirmation?: boolean;
 }
 
-export type ReceiptAnswerChoice = 'option' | 'keep' | 'free_text' | 'approve' | 'request_changes';
+export type ReceiptAnswerChoice =
+  'option' | 'keep' | 'free_text' | 'approve' | 'request_changes' | 'reject';
 
 /**
  * What a receipt answer did: `decided` (a ledger record was appended),
@@ -271,6 +330,8 @@ export const CUSTOMER_DECISION_LAYOUT = {
   respondJournalDir: 'respond-journal',
   /** CD-09: what each task consumed at its start: `consumers/<consumer>.json`. */
   consumersDir: 'consumers',
+  /** CD-10: images shown with agenda entries: `attachments/<sha256>.<ext>`. */
+  attachmentsDir: 'attachments',
   files: {
     switches: 'switches.jsonl',
   },

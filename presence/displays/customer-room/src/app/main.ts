@@ -4,13 +4,16 @@
  * against this process's own two API routes. All copy comes from the
  * `customer_room` vocabulary domain (embedded by the server, en + ja).
  */
-import { respond, viewAgenda, type ApiResult, type FetchFn } from './api.js';
+import { fetchAttachment, respond, viewAgenda, type ApiResult, type FetchFn } from './api.js';
 import {
-  answeredCount,
   buildAnswers,
+  commentRequired,
   describeDraft,
   describeValue,
   emptyDraft,
+  entryAttachments,
+  entryLinks,
+  formatSize,
   isPendingCustomer,
   issueMessageKey,
   keepAvailable,
@@ -26,6 +29,7 @@ import {
   type ScreenState,
   type ViewEntry,
   type ViewOpen,
+  type ViewAttachment,
   type ViewReceipt,
 } from './model.js';
 
@@ -83,6 +87,139 @@ function clear(): void {
   root.replaceChildren();
 }
 
+// ---------------------------------------------------------------------------
+// Images: fetched with the token header, shown from blob: URLs
+// ---------------------------------------------------------------------------
+
+/** One object URL per image for the open form; null = could not be shown. */
+const imageUrls = new Map<string, Promise<string | null>>();
+let imageObserver: IntersectionObserver | null = null;
+
+/** Revoke every image URL (leaving the form, reloading, leaving the page). */
+function releaseImages(): void {
+  imageObserver?.disconnect();
+  imageObserver = null;
+  const pending = [...imageUrls.values()];
+  imageUrls.clear();
+  for (const url of pending) {
+    void url.then((value) => {
+      if (value) URL.revokeObjectURL(value);
+    });
+  }
+}
+
+function imageUrl(attachment: ViewAttachment): Promise<string | null> {
+  const known = imageUrls.get(attachment.id);
+  if (known) return known;
+  const created =
+    heldToken === null
+      ? Promise.resolve(null)
+      : fetchAttachment(fetchFn, heldToken, attachment.id).then((blob) =>
+          blob ? URL.createObjectURL(blob) : null
+        );
+  imageUrls.set(attachment.id, created);
+  return created;
+}
+
+function showImage(frame: HTMLElement, attachment: ViewAttachment): void {
+  const urls = imageUrls;
+  void imageUrl(attachment).then((url) => {
+    // The form was left meanwhile: nothing to show, the URL is already revoked.
+    if (urls !== imageUrls || !frame.isConnected) return;
+    if (!url) {
+      frame.replaceChildren(el('p', 'kb-text kb-text--muted', t('attachment_failed')));
+      frame.dataset.state = 'failed';
+      return;
+    }
+    const img = el('img', 'cr-attachment__image');
+    // The caption already names the image; a file name is not a useful description.
+    img.alt = '';
+    img.decoding = 'async';
+    img.addEventListener('error', () => {
+      frame.replaceChildren(el('p', 'kb-text kb-text--muted', t('attachment_failed')));
+      frame.dataset.state = 'failed';
+    });
+    img.src = url;
+    frame.replaceChildren(img);
+    frame.dataset.state = 'shown';
+  });
+}
+
+/** Fetch an image when its frame comes near the screen (all at once without IntersectionObserver). */
+function loadWhenVisible(frame: HTMLElement, attachment: ViewAttachment): void {
+  if (typeof IntersectionObserver === 'undefined') {
+    showImage(frame, attachment);
+    return;
+  }
+  imageObserver ??= new IntersectionObserver(
+    (seen, observer) => {
+      for (const item of seen) {
+        if (!item.isIntersecting) continue;
+        observer.unobserve(item.target);
+        const target = item.target as HTMLElement;
+        const found = session?.view.entries
+          .flatMap((entry) => entryAttachments(entry))
+          .find((candidate) => candidate.id === target.dataset.attachment);
+        if (found) showImage(target, found);
+      }
+    },
+    { rootMargin: '200px 0px' }
+  );
+  imageObserver.observe(frame);
+}
+
+function attachmentsBlock(entry: ViewEntry): HTMLElement | null {
+  const attachments = entryAttachments(entry);
+  if (attachments.length === 0) return null;
+  const block = el('div', 'kb-stack cr-attachments');
+  block.dataset.gap = 'sm';
+  block.append(el('p', 'kb-text kb-text--caption', t('attachments_heading')));
+  for (const attachment of attachments) {
+    const figure = el('figure', 'cr-attachment');
+    const frame = el('div', 'cr-attachment__frame');
+    frame.dataset.attachment = attachment.id;
+    frame.dataset.state = 'loading';
+    const waiting = el('p', 'kb-text kb-text--muted', t('attachment_loading'));
+    frame.append(waiting);
+    figure.append(
+      frame,
+      el(
+        'figcaption',
+        'kb-text kb-text--caption',
+        t('attachment_caption', {
+          name: attachment.name,
+          size: formatSize(attachment.bytes, locale),
+        })
+      )
+    );
+    block.append(figure);
+    loadWhenVisible(frame, attachment);
+  }
+  return block;
+}
+
+function linksBlock(entry: ViewEntry): HTMLElement | null {
+  const links = entryLinks(entry);
+  if (links.length === 0) return null;
+  const block = el('div', 'cr-links');
+  block.append(el('p', 'kb-text kb-text--caption', t('links_heading')));
+  const list = el('ul', 'kb-list');
+  for (const link of links) {
+    const item = el('li', 'kb-list__item');
+    const body = el('div', 'kb-list__body');
+    const anchor = el('a', 'kb-list__title cr-link', link.label);
+    anchor.href = link.href;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.referrerPolicy = 'no-referrer';
+    body.append(anchor, el('p', 'kb-list__meta', t('link_host', { host: link.host })));
+    item.append(body);
+    list.append(item);
+  }
+  block.append(list);
+  return block;
+}
+
 /** After a screen change: the new heading takes focus and the page starts at the top. */
 function focusHeading(): void {
   const heading = root.querySelector('h1');
@@ -121,6 +258,7 @@ const STATE_KEYS: Record<ScreenState, { title: string; body: string; tone: strin
 };
 
 function showState(state: ScreenState): void {
+  releaseImages();
   clear();
   const keys = STATE_KEYS[state];
   const card = el('section', 'kb-callout cr-state');
@@ -199,6 +337,8 @@ function currentLine(entry: ViewEntry): string {
       return t(line, { value: t('value_approved'), source });
     case 'changes_requested':
       return t(line, { value: t('value_changes_requested'), source });
+    case 'rejected':
+      return t(line, { value: t('value_rejected'), source });
     default:
       return entry.requires_customer ? t('source_awaiting') : t('current_none');
   }
@@ -210,7 +350,9 @@ function draftBlock(entry: ViewEntry): HTMLElement | null {
   const box = el('div', 'kb-callout cr-draft');
   box.dataset.tone = 'neutral';
   box.append(el('p', 'kb-text kb-text--caption', t('draft_heading')));
-  if (view.kind === 'text') {
+  if (view.kind === 'accept') {
+    box.append(el('p', 'kb-text', t('draft_accept')));
+  } else if (view.kind === 'text') {
     box.append(el('p', 'kb-text', view.text));
   } else if (view.kind === 'list') {
     const list = el('ul', 'cr-draft__list');
@@ -270,7 +412,12 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
     head.append(badge);
   }
   card.append(head, el('h2', 'kb-section__title', entry.question));
-  if (entry.background) card.append(el('p', 'kb-text kb-text--muted', entry.background));
+  if (entry.background)
+    card.append(el('p', 'kb-text kb-text--muted cr-background', entry.background));
+  const images = attachmentsBlock(entry);
+  if (images) card.append(images);
+  const links = linksBlock(entry);
+  if (links) card.append(links);
 
   const current = el('div', 'kb-callout cr-current');
   current.dataset.tone = 'info';
@@ -313,6 +460,10 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
       }),
       radio(name, t('request_changes'), draft.choice === 'request_changes', () => {
         draft.choice = 'request_changes';
+        rerender();
+      }),
+      radio(name, t('reject'), draft.choice === 'reject', () => {
+        draft.choice = 'reject';
         rerender();
       })
     );
@@ -380,7 +531,7 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
     card.append(group);
   }
 
-  const needsComment = draft.choice === 'request_changes';
+  const needsComment = commentRequired(draft.choice);
   const commentField = el('label', 'kb-field');
   commentField.append(
     el(
@@ -406,12 +557,16 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
   });
   commentField.append(comment);
   if (needsComment) {
-    const hint = el('span', 'kb-field__help', t('request_changes_hint'));
+    const hint = el(
+      'span',
+      'kb-field__help',
+      t(draft.choice === 'reject' ? 'reject_hint' : 'request_changes_hint')
+    );
     hint.id = `hint-${entry.entry_id}`;
     commentField.append(hint);
     comment.setAttribute('aria-describedby', hint.id);
   }
-  if (issue === 'comment_required') {
+  if (issue === 'comment_required' || issue === 'reason_required') {
     const problem = el('span', 'kb-field__help cr-field-error', t(issueMessageKey(issue)));
     problem.id = `err-${entry.entry_id}`;
     problem.setAttribute('role', 'alert');
@@ -433,12 +588,16 @@ let reviewHint: HTMLElement | null = null;
 function updateProgress(): void {
   if (!session || !progressNode) return;
   const total = session.view.entries.length;
-  const answered = answeredCount(session.view.entries, session.drafts);
+  const built = buildAnswers(session.view.entries, session.drafts);
+  const answered = built.answers.length;
   const remaining = total - answered;
   progressNode.textContent =
     remaining > 0 ? t('remaining', { count: remaining }) : t('remaining_done');
-  if (reviewButton) reviewButton.disabled = answered === 0;
-  if (reviewHint) reviewHint.hidden = answered > 0;
+  // An incomplete answer (e.g. reject without a reason) keeps the button usable:
+  // pressing it shows what is missing next to the item.
+  const reviewable = answered > 0 || built.issues.length > 0;
+  if (reviewButton) reviewButton.disabled = !reviewable;
+  if (reviewHint) reviewHint.hidden = reviewable;
 }
 
 function showForm(): void {
@@ -531,6 +690,8 @@ function answerSummary(entry: ViewEntry, answer: AnswerPayload): string {
       return t('approve');
     case 'request_changes':
       return t('request_changes');
+    case 'reject':
+      return t('reject');
     case 'option': {
       const wording = describeValue(entry, answer.value);
       return wording.kind === 'text' ? wording.text : '';
@@ -545,6 +706,7 @@ function showReview(): void {
   const { view, drafts } = session;
   const built = buildAnswers(view.entries, drafts);
   if (built.issues.length > 0) {
+    // Cards re-render in place; their images come from the cache.
     session.issues = new Map(built.issues.map((item) => [item.entry_id, item.issue]));
     for (const item of built.issues) {
       const card = root.querySelector(`[data-entry="${item.entry_id}"]`);
@@ -563,6 +725,7 @@ function showReview(): void {
     return;
   }
   session.issues.clear();
+  releaseImages();
   session.pendingConfirmation =
     view.participant.role === 'decider' && needsOurConfirmation(view.entries, built.answers);
   clear();
@@ -651,6 +814,7 @@ async function send(
 }
 
 function showReceipt(body: Record<string, unknown>): void {
+  releaseImages();
   clear();
   const decider = session?.view.participant.role === 'decider';
   const card = el('section', 'kb-callout cr-state');
@@ -698,6 +862,7 @@ async function load(): Promise<void> {
     showState('invalid_link');
     return;
   }
+  releaseImages();
   showLoading();
   const result = await viewAgenda(fetchFn, heldToken);
   const body = result.body;
@@ -724,6 +889,9 @@ async function restart(): Promise<void> {
 async function start(): Promise<void> {
   await load();
 }
+
+// Leaving the page (or the back/forward cache) releases every image URL.
+window.addEventListener('pagehide', releaseImages);
 
 setLocale(locale);
 void start();

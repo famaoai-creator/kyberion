@@ -44,6 +44,7 @@ import {
 } from './common.js';
 import { reconcileCase, unreconciledDecisions } from './reconcile.js';
 import { taskProposalStatus } from './task-proposals.js';
+import { boltReviewStatus, routeBoltReview } from './bolt-review.js';
 
 function effectiveView(decision: EffectiveDecision): Record<string, unknown> {
   return {
@@ -61,7 +62,8 @@ function effectiveView(decision: EffectiveDecision): Record<string, unknown> {
 
 /**
  * `status --agenda <id>`: the agenda's decisions, invites, receipts and
- * switches. Without `--agenda`, the case's task proposals only (CD-09). Both
+ * switches, and for a bolt review (CD-10) where the answers went (routing is
+ * retried first). Without `--agenda`, the case's task proposals only (CD-09). Both
  * forms carry `task_proposals` (pending proposals and held tasks).
  */
 export function runStatus(opts: Record<string, string>, now: string): unknown {
@@ -69,8 +71,15 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
   const agendaId = opts.agenda?.trim();
+  // CD-10: retry the routing of bolt-review answers a respond could not
+  // finish — after completing interrupted responses, so their receipts count.
+  let early: ReturnType<typeof reconcileCase> | undefined;
+  if (agendaId) {
+    early = withCaseLock(location, () => reconcileCase(tenant, location, now));
+    routeBoltReview(tenant, location, agendaId, now);
+  }
   return withCaseLock(location, () => {
-    const reconciled = reconcileCase(tenant, location, now);
+    const reconciled = early ?? reconcileCase(tenant, location, now);
     if (!agendaId) {
       return {
         case_id: caseId,
@@ -127,6 +136,7 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
           pending
         ),
         task_proposals: taskProposalStatus(tenant, agenda.case_id, location, now),
+        ...(agenda.bolt_mission_id ? { bolt_review: boltReviewStatus(agenda) } : {}),
       };
     });
   });
