@@ -95,6 +95,7 @@ describe('customer-room routes', () => {
       '/api/health',
       '/api/view',
       '/api/respond',
+      '/api/attachment',
       '/api/agendas',
       '/api/state',
       '/assets/index.html',
@@ -123,6 +124,9 @@ describe('customer-room routes', () => {
     }
     expect(CONTENT_SECURITY_POLICY).not.toContain('unsafe-inline');
     expect(CONTENT_SECURITY_POLICY).toContain("script-src 'self'");
+    // blob: only for images (the page shows fetched attachments from object URLs).
+    expect(CONTENT_SECURITY_POLICY).toContain("img-src 'self' data: blob:");
+    expect(CONTENT_SECURITY_POLICY.match(/blob:/gu)).toHaveLength(1);
     const api = await post('/api/view');
     expect(api.headers.get('cache-control')).toBe('no-store');
   });
@@ -275,6 +279,147 @@ describe('customer-room routes', () => {
     next = () => out({ ok: false, reason: 'unavailable', diagnostic_code: 'x y\nz' }, 1);
     await post('/api/view');
     expect(logs.at(-1)).toBe('[customer-room] view -> 503 unavailable');
+  });
+});
+
+describe('customer-room attachment route', () => {
+  let server: Server;
+  let base: string;
+  let calls: Call[];
+  let logs: string[];
+  let next: () => Promise<FacadeOutcome>;
+  const ID = 'ab'.repeat(32);
+  const PNG = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from('rest-of-image'),
+  ]);
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
+  const out = (body: unknown, status = 0): Promise<FacadeOutcome> =>
+    Promise.resolve({ status, stdout: JSON.stringify(body), aborted: false });
+  const image = (mediaType: string, bytes: Buffer) =>
+    out({ ok: true, media_type: mediaType, bytes_base64: bytes.toString('base64') });
+
+  beforeEach(() => {
+    calls = [];
+    logs = [];
+    next = () => image('image/png', PNG);
+  });
+  async function start(apiLimitPerMinute = 100): Promise<void> {
+    const app = express();
+    registerCustomerRoomRoutes(app, {
+      spawner: async (verb, input) => {
+        calls.push({ verb, input });
+        return next();
+      },
+      staticDir: new URL('../../static', import.meta.url).pathname,
+      jsDir: new URL('../../static', import.meta.url).pathname,
+      renderPage: () => '',
+      log: (message) => logs.push(message),
+      apiLimitPerMinute,
+    });
+    server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  }
+  afterEach(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const fetchImage = (body: unknown, token: string | null = TOKEN, query = '') =>
+    fetch(`${base}/api/attachment${query}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify(body),
+    });
+
+  it.each([
+    ['image/png', PNG],
+    ['image/jpeg', JPEG],
+    ['image/webp', WEBP],
+  ])('serves %s bytes with a fixed type, nosniff, inline and no-store', async (type, bytes) => {
+    await start();
+    next = () => image(type, bytes);
+    const response = await fetchImage({ attachment_id: ID, tenant: 'evil', token: 'x' });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe(type);
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('content-disposition')).toBe('inline');
+    expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+    expect(Buffer.from(await response.arrayBuffer()).equals(bytes)).toBe(true);
+    // Only the header token and the id reach the facade.
+    expect(calls).toEqual([{ verb: 'attachment', input: { token: TOKEN, attachment_id: ID } }]);
+    expect(logs.join('\n')).not.toContain(TOKEN);
+  });
+
+  it('takes the token from the Authorization header only and checks the id shape', async () => {
+    await start();
+    for (const [body, token, query, status] of [
+      [{ attachment_id: ID }, null, `?token=${TOKEN}`, 404],
+      [{ attachment_id: ID, token: TOKEN }, null, '', 404],
+      [{ attachment_id: ID }, 'not-a-token', '', 404],
+      [{ attachment_id: '../../etc/passwd' }, TOKEN, '', 400],
+      [{ attachment_id: ID.toUpperCase() }, TOKEN, '', 400],
+      [{ attachment_id: `${ID}0` }, TOKEN, '', 400],
+      [{}, TOKEN, '', 400],
+    ] as const) {
+      const response = await fetchImage(body, token, query);
+      expect(response.status, JSON.stringify(body)).toBe(status);
+      expect(response.headers.get('content-type')).toContain('application/json');
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ['invalid_link', 404],
+    ['expired', 410],
+    ['revoked', 410],
+    ['some_internal_code', 503],
+  ])('maps facade reason %s to the view shape and HTTP %i', async (reason, status) => {
+    await start();
+    next = () => out({ ok: false, reason }, 1);
+    const response = await fetchImage({ attachment_id: ID });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({
+      ok: false,
+      reason: status === 503 ? 'unavailable' : reason,
+    });
+  });
+
+  it('refuses anything that is not an allowlisted, in-limit image', async () => {
+    await start();
+    const big = Buffer.concat([PNG, Buffer.alloc(512 * 1024)]);
+    for (const outcome of [
+      () => image('image/svg+xml', Buffer.from('<svg onload=alert(1)>')),
+      () => image('text/html', PNG),
+      () => image('image/png', JPEG),
+      () => image('image/jpeg', Buffer.from('<html>')),
+      () => image('image/png', big),
+      () => out({ ok: true, media_type: 'image/png', bytes_base64: 'not base64!' }),
+      () => out({ ok: true, media_type: 'image/png', bytes_base64: '' }),
+      () => out({ ok: true, media_type: 'image/png' }),
+      () => Promise.resolve({ status: null, stdout: '', aborted: true }),
+    ]) {
+      next = outcome;
+      const response = await fetchImage({ attachment_id: ID });
+      expect(response.status).toBe(503);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(await response.json()).toEqual({ ok: false, reason: 'unavailable' });
+    }
+    expect(logs.at(-2)).toBe(
+      '[customer-room] attachment -> 503 unavailable (diagnostic: attachment_not_servable)'
+    );
+  });
+
+  it('is under the API rate limit', async () => {
+    await start(5);
+    const statuses: number[] = [];
+    for (let i = 0; i < 7; i += 1) statuses.push((await fetchImage({ attachment_id: ID })).status);
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429, 429]);
   });
 });
 

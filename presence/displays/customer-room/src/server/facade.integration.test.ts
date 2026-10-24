@@ -6,13 +6,19 @@
  * store of a throwaway tenant. Skipped when the facade is not built.
  */
 import express from 'express';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '@agent/core/authority';
-import { agendaContentHash, writeAgenda, type DecisionAgenda } from '@agent/core/customer-decision';
+import {
+  agendaContentHash,
+  writeAgenda,
+  writeAgendaAttachment,
+  type AgendaAttachment,
+  type DecisionAgenda,
+} from '@agent/core/customer-decision';
 import { DECISION_LEDGER_ROLES } from '@agent/core/decision-ledger';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -37,6 +43,7 @@ import { registerCustomerRoomRoutes } from './routes.js';
 const BUILT = safeExistsSync(pathResolver.rootResolve(FACADE_SCRIPT));
 const TENANT = 'cd-room-it';
 const NOW = '2026-10-24T00:00:00.000Z';
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 4, 3, 2, 1]);
 
 describe.skipIf(!BUILT)('customer-room against the built facade', () => {
   let dir: string;
@@ -258,6 +265,174 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
     );
     expect(wrong.status).toBe(404);
     expect(await wrong.json()).toEqual({ ok: false, reason: 'invalid_link' });
+  }, 30_000);
+});
+
+describe.skipIf(!BUILT)('customer-room attachments against the built facade', () => {
+  // Shares nothing with the suite above except the helpers: its own case dir and tenant.
+  const ATENANT = 'cd-room-att';
+  let dir: string;
+  let server: Server;
+  let base: string;
+  let token: string;
+  let hash: string;
+  let image: AgendaAttachment;
+  const post = (route: string, body: unknown, bearer = token) =>
+    fetch(`${base}${route}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify(body),
+    });
+
+  beforeAll(async () => {
+    dir = pathResolver.sharedTmp(`customer-room-att-${randomUUID()}`);
+    safeMkdir(dir, { recursive: true });
+    const asWriter = <T>(fn: () => T): T =>
+      withExecutionContext(DECISION_LEDGER_ROLES.write, fn, undefined, ATENANT);
+    image = asWriter(() => writeAgendaAttachment({ dir }, 'screen.png', PNG));
+    // Stored in the case but never on the agenda: the invite must not reach it.
+    asWriter(() =>
+      writeAgendaAttachment({ dir }, 'other.png', Buffer.concat([PNG, Buffer.from([9])]))
+    );
+    const agenda: DecisionAgenda = {
+      version: '1.0.0',
+      agenda_id: 'agd-roomatt',
+      tenant_slug: ATENANT,
+      case_id: 'case-att',
+      customer: 'acme',
+      title: 'Bolt review',
+      phase: 'inception',
+      revision: 1,
+      locale: 'en',
+      entries: [
+        {
+          entry_id: 'bolt_review',
+          item: 'bolt:MSN-ROOM-IT',
+          key: 'bolt.acceptance',
+          kind: 'approval',
+          question: 'Do you accept the results of this bolt?',
+          our_decision: { value: { approved: true } },
+          requires_customer: false,
+          attachments: [image],
+          links: [{ label: 'Preview', url: 'https://preview.example.com/b1' }],
+        },
+      ],
+      status: 'sent',
+      created_at: NOW,
+      updated_at: NOW,
+    };
+    agenda.approval = {
+      content_hash: agendaContentHash(agenda),
+      approved_at: NOW,
+      approved_by: 'user:alice',
+    };
+    hash = agenda.approval.content_hash;
+    asWriter(() => writeAgenda({ dir }, agenda));
+    const operator = (verb: string[]) =>
+      JSON.parse(
+        safeExecResult(
+          process.execPath,
+          [
+            pathResolver.rootResolve(FACADE_SCRIPT),
+            ...verb,
+            '--tenant',
+            ATENANT,
+            '--case',
+            agenda.case_id,
+            '--dir',
+            dir,
+            '--json',
+          ],
+          {
+            cwd: pathResolver.rootDir(),
+            env: { ...process.env, KYBERION_TENANT: ATENANT },
+            timeoutMs: 30_000,
+          }
+        ).stdout
+      ) as Record<string, unknown>;
+    operator(['actor-add', '--customer', 'acme', '--actor', 'customer:cto', '--name', 'CTO']);
+    const sent = operator([
+      'send',
+      '--agenda',
+      agenda.agenda_id,
+      '--name',
+      'CTO',
+      '--role',
+      'decider',
+      '--actor',
+      'customer:cto',
+      '--ttl-days',
+      '1',
+    ]);
+    token = String(sent.link).split('#t=')[1];
+    const app = express();
+    registerCustomerRoomRoutes(app, {
+      spawner: createFacadeSpawner({ tenant: ATENANT, extraArgs: ['--dir', dir] }),
+      staticDir: pathResolver.rootResolve('presence/displays/customer-room/static'),
+      jsDir: pathResolver.rootResolve('dist/presence/displays/customer-room/src/app'),
+      renderPage: () => '',
+    });
+    server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  }, 30_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server?.close(() => resolve()));
+    safeRmSync(dir, { recursive: true, force: true });
+    safeRmSync(
+      pathResolver.rootResolve(
+        `${PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites}/confidential/${ATENANT}`
+      ),
+      { recursive: true, force: true }
+    );
+  });
+
+  it('lists the image and link on the item and serves exactly the stored bytes', async () => {
+    const view = (await (await post('/api/view', {})).json()) as {
+      entries: Array<Record<string, unknown>>;
+    };
+    expect(view.entries[0]).toMatchObject({
+      attachments: [{ id: image.id, name: 'screen.png', media_type: 'image/png', bytes: 13 }],
+      links: [{ label: 'Preview', url: 'https://preview.example.com/b1' }],
+    });
+    const served = await post('/api/attachment', { attachment_id: image.id });
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/png');
+    expect(served.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(served.headers.get('cache-control')).toBe('no-store');
+    expect(Buffer.from(await served.arrayBuffer()).equals(PNG)).toBe(true);
+  }, 30_000);
+
+  it('answers an id that is not on the agenda like an unknown link', async () => {
+    const other = createHash('sha256')
+      .update(Buffer.concat([PNG, Buffer.from([9])]))
+      .digest('hex');
+    for (const id of [other, 'f'.repeat(64)]) {
+      const response = await post('/api/attachment', { attachment_id: id });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ ok: false, reason: 'invalid_link' });
+    }
+  }, 30_000);
+
+  it('records a reject with its reason and refuses one without', async () => {
+    const missing = await post('/api/respond', {
+      content_hash: hash,
+      answers: [{ entry_id: 'bolt_review', choice: 'reject' }],
+    });
+    expect(missing.status).toBe(422);
+    const response = await post('/api/respond', {
+      content_hash: hash,
+      answers: [{ entry_id: 'bolt_review', choice: 'reject', comment: 'Not what we asked for' }],
+    });
+    expect(response.status).toBe(200);
+    const view = (await (await post('/api/view', {})).json()) as {
+      entries: Array<{ current: Record<string, unknown> }>;
+    };
+    expect(view.entries[0].current).toMatchObject({
+      layer: 'customer',
+      value: { approved: false, rejected: true },
+    });
   }, 30_000);
 });
 

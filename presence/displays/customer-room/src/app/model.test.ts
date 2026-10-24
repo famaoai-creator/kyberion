@@ -4,9 +4,13 @@ import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildAnswer,
   buildAnswers,
+  commentRequired,
   describeDraft,
   describeValue,
   emptyDraft,
+  entryAttachments,
+  entryLinks,
+  formatSize,
   isPendingCustomer,
   issueMessageKey,
   keepAvailable,
@@ -120,6 +124,28 @@ describe('answer building', () => {
       answer: { entry_id: 'nfr.auth', choice: 'request_changes', comment: 'fix X' },
     });
   });
+  it('approval: reject needs a reason, and only approvals can be rejected', () => {
+    const approval = entry({ kind: 'approval', options: [] });
+    expect(buildAnswer(approval, draft({ choice: 'reject' }))).toEqual({
+      issue: 'reason_required',
+    });
+    expect(buildAnswer(approval, draft({ choice: 'reject', comment: ' \n ' }))).toEqual({
+      issue: 'reason_required',
+    });
+    expect(buildAnswer(approval, draft({ choice: 'reject', comment: ' not usable ' }))).toEqual({
+      answer: { entry_id: 'nfr.auth', choice: 'reject', comment: 'not usable' },
+    });
+    expect(buildAnswer(entry(), draft({ choice: 'reject', comment: 'x' }))).toEqual({
+      issue: 'selection_invalid',
+    });
+    expect(commentRequired('reject')).toBe(true);
+    expect(commentRequired('request_changes')).toBe(true);
+    expect(commentRequired('approve')).toBe(false);
+    expect(commentRequired(undefined)).toBe(false);
+    expect(
+      buildAnswers([approval], new Map([['nfr.auth', draft({ choice: 'reject' })]])).issues
+    ).toEqual([{ entry_id: 'nfr.auth', issue: 'reason_required' }]);
+  });
   it('hearing: free text', () => {
     const hearing = entry({ kind: 'hearing', options: [] });
     expect(buildAnswer(hearing, draft({ text: '  our goal  ' }))).toEqual({
@@ -208,6 +234,30 @@ describe('validation messages and approval drafts', () => {
   it('maps issues to vocabulary keys', () => {
     expect(issueMessageKey('comment_required')).toBe('comment_missing');
     expect(issueMessageKey('selection_invalid')).toBe('selection_invalid');
+    expect(issueMessageKey('reason_required')).toBe('reject_reason_missing');
+  });
+  it('shows an accept-as-delivered draft in words, not as an "approved: true" row', () => {
+    expect(describeDraft({ approved: true })).toEqual({ kind: 'accept' });
+    expect(describeDraft({ approved: true, scope: 'web' })).toEqual({
+      kind: 'pairs',
+      pairs: [
+        ['approved', 'true'],
+        ['scope', 'web'],
+      ],
+    });
+    expect(describeDraft({ approved: false })).toEqual({
+      kind: 'pairs',
+      pairs: [['approved', 'false']],
+    });
+  });
+  it('names a rejected bolt review as rejected, not as a change request', () => {
+    const approval = entry({ kind: 'approval', options: [] });
+    expect(describeValue(approval, { approved: false, rejected: true, comment: 'no' })).toEqual({
+      kind: 'rejected',
+    });
+    expect(describeValue(approval, { approved: false, comment: 'fix' })).toEqual({
+      kind: 'changes_requested',
+    });
   });
   it('renders a draft as text, list or rows', () => {
     expect(describeDraft('Hello')).toEqual({ kind: 'text', text: 'Hello' });
@@ -222,6 +272,51 @@ describe('validation messages and approval drafts', () => {
     expect(describeDraft(undefined)).toEqual({ kind: 'none' });
     expect(describeDraft('  ')).toEqual({ kind: 'none' });
     expect(describeDraft([])).toEqual({ kind: 'none' });
+  });
+});
+
+describe('attachments and links in the view', () => {
+  const ID = 'a'.repeat(64);
+  it('keeps only fetchable images', () => {
+    const shown = entryAttachments({
+      attachments: [
+        { id: ID, name: 'form.png', media_type: 'image/png', bytes: 2048 },
+        { id: 'b'.repeat(64), name: 'x.webp', media_type: 'image/webp', bytes: 10 },
+        { id: '../../x', name: 'bad', media_type: 'image/png', bytes: 10 },
+        { id: 'c'.repeat(64), name: 'evil.svg', media_type: 'image/png', bytes: 0 },
+        { id: 'd'.repeat(64), name: 'svg', media_type: 'image/svg+xml' as 'image/png', bytes: 9 },
+        { id: 'e'.repeat(64), name: 'huge.png', media_type: 'image/png', bytes: 600 * 1024 },
+      ],
+    });
+    expect(shown.map((item) => item.name)).toEqual(['form.png', 'x.webp']);
+    expect(entryAttachments({})).toEqual([]);
+  });
+  it('keeps only https links and shows their host', () => {
+    expect(
+      entryLinks({
+        links: [
+          { label: ' Preview ', url: 'https://preview.example.com/b1?x=1' },
+          { label: '', url: 'https://docs.example.org/' },
+          { label: 'js', url: 'javascript:alert(1)' },
+          { label: 'plain', url: 'http://preview.example.com/' },
+          { label: 'creds', url: 'https://user:pw@example.com/' },
+          { label: 'broken', url: 'not a url' },
+        ],
+      })
+    ).toEqual([
+      {
+        label: 'Preview',
+        href: 'https://preview.example.com/b1?x=1',
+        host: 'preview.example.com',
+      },
+      { label: 'docs.example.org', href: 'https://docs.example.org/', host: 'docs.example.org' },
+    ]);
+    expect(entryLinks({})).toEqual([]);
+  });
+  it('formats sizes in KB in the page language', () => {
+    expect(formatSize(2048, 'en')).toBe('2 kB');
+    expect(formatSize(10, 'en')).toBe('1 kB');
+    expect(formatSize(300 * 1024, 'ja')).toContain('300');
   });
 });
 
@@ -252,7 +347,8 @@ describe('vocabulary coverage', () => {
       }
     }
     for (const lit of main.matchAll(/'((?:state|impact)_[a-z_]+)'/gu)) keys.add(lit[1]);
-    for (const lit of model.matchAll(/'(source_[a-z_]+|comment_missing)'/gu)) keys.add(lit[1]);
+    for (const lit of model.matchAll(/'(source_[a-z_]+|comment_missing|reject_reason_missing)'/gu))
+      keys.add(lit[1]);
     for (const lit of main.matchAll(
       /'(current_line[a-z_]*|review_lead_[a-z]+|receipt_[a-z]+|reload|retry_action)'/gu
     )) {

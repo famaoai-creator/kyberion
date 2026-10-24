@@ -1,7 +1,7 @@
 /**
  * The only door from the customer room to Kyberion: the built governed
  * facade (`dist/scripts/customer_decision.js`) run as a child process for
- * `view` / `respond`. The request goes in on STDIN (the token is never an
+ * `view` / `respond` / `attachment`. The request goes in on STDIN (the token is never an
  * argument); the tenant comes from this process's own configuration.
  *
  * The child gets a minimal, explicit env ({@link facadeChildEnv}): the
@@ -22,7 +22,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResultAsync } from '@agent/core/secure-io';
 
-export type FacadeVerb = 'view' | 'respond';
+export type FacadeVerb = 'view' | 'respond' | 'attachment';
 
 export interface FacadeOutcome {
   /** Child exit status; null when it could not run. */
