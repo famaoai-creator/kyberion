@@ -1,0 +1,9 @@
+{
+  "role": "archived_mission_state_reader",
+  "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
+  "default_persona": "unknown",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential"]
+}

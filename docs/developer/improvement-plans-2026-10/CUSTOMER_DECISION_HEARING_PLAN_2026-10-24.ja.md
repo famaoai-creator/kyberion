@@ -272,7 +272,7 @@ status: active
 - 上書きの締め切りの知らせは、締め切りの時刻を調整セットの表示の時間帯（`ja` は日本時間、`en` は UTC）で `{date} {time}（{zone}）` として出す。語彙 `customer_decision:reminder_override_closing` の文面にこの 2 つの差し込みを足す必要がある（語彙の更新は別の作業で取り込む）。
 - 紐付けには顧客の id がないため、`actor-add --channel` は別の顧客の決定者がすでに使っているチャネルに警告（`warnings: channel_shared_with_customer:<顧客>`）を出すだけで、拒まない。紐付けに顧客を持たせて照合するのは後続（紐付けのスキーマの変更）。
 - 子プロセスの結合テスト（`scripts/customer_decision.reminders.boundary.test.ts` の日次の op）は、`dist/` がソースより古いときは理由つきで skip する。
-- 受信箱の書き込みは CD-10 と同じく `surface_runtime` で行う（受信箱だけに絞った役割は CD-10 の残りと一緒に用意する）。
+- 受信箱の書き込みは CD-10 と同じく、受信箱だけに絞った役割 `deliverable_inbox_writer` で行う（当初は `surface_runtime` だった。ブランチ `fix/customer-decision-hardening-20261025` で置き換えた）。
 
 ## 未決事項
 
@@ -339,19 +339,25 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。
 - CD-09 の残り: 1 つの固定ファイルだけを対象にする capability は、照合（sweep）とタスクの境界とで同じ形になり、guard では区別できない。タスク境界の呼び出し元が自分の固定ファイルだけに書けることを、capability の中の owner で guard が確かめるようにする。
 - CD-09 の残り（CD-10 のレビューで判明）: `customer_decision_consumer_store` も共有の core 役割で、capability の作り方が公開されているため、SYSTEM_ROLE の任意のプロセスが任意の consumer の固定ファイルを書き換えられる（`rework` の記録や `hold` を消して手戻りの WorkItem を作り直させる、保留中のタスクを解除させる、など）。milestone と同じく、store の書き込みで変更の形（`rework` と `hold` と `task_proposal` は消さず追記だけ、`status` は `in_progress → completed` だけ）を確かめるようにする。
+  - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: 確かめる場所を store ではなく guard にした。`customer_decision_consumer_store` の書き込みでは、tier-guard が secure-io の `safeWriteFile` に渡された新しい内容と、ディスク上の固定ファイルを比べる（`customerDecisionConsumerWriteProblem`）。識別子（case・consumer・mission・task・tenant・project）は変えられない。`rework` は追記だけ。`task_proposal` は消せず、`requires_customer` と `resolved` も外せない。新しく付ける `resolved` は、運用者が確認した顧客の決定（議題の `operator_confirmations` と、台帳の `customer-value` / `decided` の記録）を指す必要がある。`hold` は消せず、`at` と WorkItem も変わらない。`resolved_at` は、`requires_customer` の提案がすべて解決したときだけ付けられる。完了のままの固定ファイルは、`completed_at` と固定した決定を変えられない。内容を渡さない書き込み（追記・コピー・移動・リンク・削除）は、この役割では拒否する。再固定も記録を残すようにし、解決した hold は消さずに `resolved_at` 付きで残す。完了した固定ファイルを `in_progress` に戻す動き（新しい worker の実行での再固定）はそのまま残した。guard はこの再固定と、なりすましの「再実行」を区別できない。
+- CD-09 の残り（guard の内容の確かめのレビューで判明）: 完了した固定ファイルを `in_progress` に戻して再固定し、もう一度完了させる（completed → in_progress → completed）と、固定した決定を置き換えられる。guard は、本当の worker の再実行となりすましを区別できない。worker の dispatch の実行回数など、再実行の証拠を固定ファイルに結び付けて確かめるようにする。
 - CD-10 の残り: `customer_decision_milestone_store` は共有の core 役割で、内容の確かめ（`milestones_passed` への追記だけ）は store の `writeAgenda` の中にある。capability を自分で作るプロセスは `safeWriteFile` で直接書けるので、役割を `startMission` に届くシステム役割だけに絞るか、guard の側で書き込みの内容を確かめる。consumer store と同じ対応にする。
+  - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: guard の側で確かめる。tier-guard が書き込みの内容をディスク上の議題と比べ、既存の議題には `milestones_passed` への追記と `updated_at` の変更しか認めない（`customerDecisionMilestoneWriteProblem`）。内容を渡さない書き込みは拒否する。
 - CD-10 の残り: 却下の受信箱への記録は `surface_runtime` で書く（`addInboxEntry` 1 回だけ）。`surface_runtime` は `active/shared/runtime/` にも書けるので、受信箱だけに絞った役割を用意する。
-- CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。
+  - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: `deliverable_inbox_writer`（共有の core 役割）を用意した。CD-10 の却下と、CD-11 の引き継ぎ・手動リマインドの受信箱への記録は、この役割で書く。guard が書き込みを `active/shared/inbox/entries.jsonl` と、受信箱自身のロックファイルだけに絞る。
+- CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: `/api/attachment` は API 全体の回数制限を使わず、接続元ごとの固定窓（120 回/分、`libs/core/foundation/rate-limit.ts` の `fixedWindowLimiter`、表が満杯なら新しい接続元を断り、制限中の接続元を追い出さない）と、facade の子プロセスの同時実行の上限（4）を持つ）
 - CD-10 の残り: 招待の置き場の tier ディレクトリができた後は、未登録のテナントも自分の招待ディレクトリを作れる。テナントの登録をそこでも求めるかは、ガバナンスの判断として決める。
+- ハードニングの残り: 承認の置き場をテナントごとに物理的に分ける（今は id だけの要約とスコープの絞り込みで守っている）。
 - E2E の残り: 終わった bolt の状態は `mission_controller` を 1 ファイルの capability の中で借りて読む。読み取り専用の、アーカイブ済みミッションの状態だけを読む役割を用意する。
+  - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: `archived_mission_state_reader`（テナントに縛る、読み取り専用）を用意した。自分のテナントのアーカイブにある `mission-state.json` 1 つだけを指す capability がないと引き受けられない。共有の役割にはせず、到達性レポートで届くシステム役割にだけ載せた。
 - CD-11 の残り: 決定者の紐付けが別の surface に移ると、前の保留中の承認依頼は取り消せずに残る（警告だけ）。surface をまたいで同じリマインドの依頼を探して取り消す。
-- CD-11 の残り: `sendToCustomer` のほかの呼び出し元は、承認依頼の要約に本文を写したまま（CD-11 より前から）。共有の承認の置き場に顧客の文面を置かないよう、id だけの要約にそろえる。
+- CD-11 の残り: `sendToCustomer` のほかの呼び出し元は、承認依頼の要約に本文を写したまま（CD-11 より前から）。共有の承認の置き場に顧客の文面を置かないよう、id だけの要約にそろえる。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: `sendToCustomer` はどの呼び出し元でも承認依頼の要約に文面を写さず、本文の sha256 とチャネルを payload で束縛する。リンク違反も件数だけを載せる。見積書・契約書は `contentSource` を渡し、承認者は要約にある `pnpm kyberion customer-channel outbound --tenant <t> --source deals/<deal>/<quote|contract>-v<n>.md --sha256 <hash>` でテナントの置き場から文面を読む）
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
 - 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。
 - `generate` で `ranking` 項目の選択肢（AI-DLC Unit の候補）も作る。今は運用者が `draft --file` で入れる必要がある。
-- E2E（2026-10-24）の残り（D8）: 顧客チャネルの紐付け（`customer-channel-binding`）を作る governed なコマンドがない。E2E では JSON を手で書いた。`actor-add --channel` と同じ検証（テナント、surface、チャネル id）を通す作成コマンドを足す。
-- E2E（2026-10-24）の残り（D10）: `generate` の推論バックエンドの選び方が `KYBERION_REASONING_BACKEND=claude-cli` を無視して codex-cli を選んだ（egress ゲートの拒否そのものは正しい）。バックエンドの選択を環境変数の指定に従わせ、選んだバックエンドを結果に記録する。
+- E2E（2026-10-24）の残り（D8）: 顧客チャネルの紐付け（`customer-channel-binding`）を作る governed なコマンドがない。E2E では JSON を手で書いた。`actor-add --channel` と同じ検証（テナント、surface、チャネル id）を通す作成コマンドを足す。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: `pnpm kyberion customer-channel bind|unbind|list`。登録済みで active なテナントだけ、スキーマで検証、別テナントに紐付いたチャネルと検証に通らない既存ファイルは拒否、変更は監査に残す。書き込みは `customer_create` 役割で行う（このファイルだけに絞った役割は後続）。）
+- E2E（2026-10-24）の残り（D10）: `generate` の推論バックエンドの選び方が `KYBERION_REASONING_BACKEND=claude-cli` を無視して codex-cli を選んだ（egress ゲートの拒否そのものは正しい）。バックエンドの選択を環境変数の指定に従わせ、選んだバックエンドを結果に記録する。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: 原因は既定のフェイルオーバーの連鎖。指定したバックエンドが降格中か、CLI の検出で外れると、次の候補（codex-cli）に黙って移る。`generate` は `KYBERION_REASONING_BACKEND` があるとき、そのモードだけの 1 候補のバックエンド（`buildReasoningBackendForMode`）に送り、使えなければ組織の既定値にする。結果と監査に `reasoning_backend: {requested, used}` を記録する）
 - E2E（2026-10-24）の残り（D9）: ミッションの台帳（`ledger.record`）は記録の `scope` を渡されたデータの `tier` / `tenant_slug` からしか作らない。ミッション系の記録（`MISSION_CREATE`、`MISSION_ACTIVATE`、`MISSION_DISTILL`、`MISSION_FINISH` など）はどちらも渡さないため、confidential のテナントのミッションでも `tier: public` になる（`MISSION_CREATE` は `tier` だけ渡すので正規化に失敗し、`scope_kind: system` に落ちる）。ミッションの状態から tier とテナントを補うと、公開のグローバル台帳（`active/audit/system-ledger.jsonl`）のメタデータにテナントの slug が載るので、載せてよいかを決めてから直す。
   - **決定（2026-10-24、ユーザー）: 案 B**。テナントのミッションの記録はテナント自身の台帳に正しい scope で書き、システム台帳にはテナントの slug もテナントのミッションのメタデータも一切載せない。テナントを持たない（public / shared）ミッションは今まで通り。
   - **実装済み**（ブランチ `fix/tenant-mission-ledger-scope-20261024`）: `ledger.record` はミッションの置き場所（tier-guard が守るパス。アーカイブ先も含む）から tier とテナントを、状態から組織・プロジェクトを補う。状態のテナントや tier が置き場所と食い違うとき、別のテナントに束縛されたプロセスのとき、このプロセスから見えないミッションのときは、例外を投げずに警告を出してテナント側の記録を書かない（システム台帳にも回さない）。public のテナントの記録は confidential 側の台帳に置く。詳細の記録はこれまで通りミッションの `evidence/ledger.jsonl`、メタデータはテナントごとの `active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/ledger.jsonl`（テナントに束縛されたロール `tenant_ledger_store` で読み書き）に書く。`pnpm audit:verify`・`system:pulse_status`・`finish` はテナントの台帳のハッシュチェーンも検証し、`loadForScope` はフィルタが名指すテナントの台帳を読み手自身の権限で読む。テナントのオフボーディングはその台帳も書き出して消す。既存のシステム台帳の記録は書き換えない（追記のみのチェーン）。

@@ -69,7 +69,10 @@ Routes — everything else is a plain 404:
   each image with the token header and shows it from a `blob:` URL (the CSP allows
   `blob:` for `img-src` only); external links open with `rel="noopener noreferrer"`.
 - No operator `ViewerContext`, no other Kyberion API, no proxying. 64 KB body limit,
-  per-IP rate limit, strict CSP (no inline script), `Referrer-Policy: no-referrer`,
+  per-IP rate limit (images have their own per-IP budget, 120/min, and at most 4
+  facade runs in flight, so an agenda with many images does not use up the
+  view/respond budget; a full address table refuses new addresses rather than
+  evicting a limited one), strict CSP (no inline script), `Referrer-Policy: no-referrer`,
   `Cache-Control: no-store`, `X-Frame-Options: DENY`.
 
 ## Language

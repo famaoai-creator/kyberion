@@ -30,6 +30,8 @@ import {
   isCustomerDecisionMilestoneCapability,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
+import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
+import type { WriteContent } from './foundation/customer-decision-write-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -1007,9 +1009,12 @@ function recordGroupAccess(input: {
   });
 }
 
+export type { WriteContent };
+
 function requestResourceDenial(
   relativePath: string,
-  operation: ResourceAccessOperation
+  operation: ResourceAccessOperation,
+  content?: WriteContent
 ): { allowed: false; reason: string } | null {
   const denial = resourceAccessDenial(relativePath, operation);
   if (denial) return denial;
@@ -1111,6 +1116,18 @@ function requestResourceDenial(
       reason:
         '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability',
     };
+  const narrowDenial = narrowStoreRoleDenial({
+    role: normalizedRole,
+    relativePath,
+    operation,
+    scope: currentResourceAccessScope(),
+    content,
+    readRepoFile: (relative) => {
+      const target = path.join(projectRoot(), relative);
+      return rawExistsSync(target) ? rawReadTextFile(target) : undefined;
+    },
+  });
+  if (narrowDenial) return { allowed: false, reason: narrowDenial };
   if (
     normalizedRole === 'concierge_management_reader' &&
     (!currentResourceAccessScope() || operation === 'write' || operation === 'mkdir')
@@ -1134,12 +1151,14 @@ function requestResourceDenial(
 
 export function validateWritePermission(
   filePath: string,
-  operation: 'write' | 'mkdir' = 'write'
+  operation: 'write' | 'mkdir' = 'write',
+  content?: WriteContent
 ): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
   const resourceDenial = requestResourceDenial(
     normalizePath(path.relative(projectRoot(), resolvedPath)),
-    operation
+    operation,
+    content
   );
   if (resourceDenial) return resourceDenial;
   try {

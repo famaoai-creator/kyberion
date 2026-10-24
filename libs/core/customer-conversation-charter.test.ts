@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./governance/approval-gate.js', () => ({ enforceApprovalGate: vi.fn() }));
@@ -167,6 +168,45 @@ describe('sendToCustomer × accountability charter', () => {
     ]) {
       expect(renderCustomerRoutineTemplate({ ...base, params })).toBeNull();
     }
+  });
+
+  it('never copies the message into the approval request; the payload binds body and channel', async () => {
+    charterFor.mockReturnValue(undefined);
+    const body = 'Confidential pricing: 1,234,000 JPY, see https://evil.example.net/x';
+    await sendToCustomer({
+      ...input(body),
+      binding: {
+        tenantSlug: 'acme',
+        binding: { surface: 'email', channel_id: 'cto@customer.example' },
+      },
+    } as never);
+    const params = gate.mock.calls[0][0];
+    const draftText = JSON.stringify(params.draft);
+    expect(draftText).not.toContain('1,234,000');
+    expect(draftText).not.toContain('evil.example.net');
+    expect(draftText).not.toContain('cto@customer.example');
+    expect(params.payload).toEqual({
+      body_sha256: createHash('sha256').update(body, 'utf8').digest('hex'),
+      surface: 'email',
+      channel_id: 'cto@customer.example',
+    });
+    // A floor violation is flagged by count only; no source → the approver is told so.
+    expect(params.draft?.title).toBe('⚠ Reply');
+    expect(params.draft?.summary).toMatch(/^⚠ .*: 1 /u);
+    expect(params.draft?.summary).toContain(String(params.payload?.body_sha256));
+    expect(params.draft?.summary).not.toContain('customer-channel outbound');
+    // Another body is another payload: an approval never covers edited text.
+    await sendToCustomer(input(`${body}!`));
+    expect(gate.mock.calls[1][0].payload?.body_sha256).not.toBe(params.payload?.body_sha256);
+  });
+
+  it('keeps an ids-only caller summary and still binds the body', async () => {
+    charterFor.mockReturnValue(undefined);
+    await sendToCustomer({ ...input('Hello there'), approvalSummary: 'Reminder r-1' });
+    expect(gate.mock.calls[0][0].draft?.summary).toBe('Reminder r-1');
+    expect(gate.mock.calls[0][0].payload).toMatchObject({
+      body_sha256: createHash('sha256').update('Hello there', 'utf8').digest('hex'),
+    });
   });
 
   it('passes enqueueRequest and the request scope to the gate only when given, and reports the request status (CD-11)', async () => {

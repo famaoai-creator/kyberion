@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { createHash } from 'node:crypto';
+import { writeJson } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -41,6 +43,14 @@ import { formatNumber } from './format.js';
  *    approve verdict exists for that exact version (defense layer 3).
  *  - every outbound send goes through sendToCustomer (approval gate).
  */
+
+/** The latest unquotable list of a deal (tenant-side; the operator notification has a count). */
+const UNQUOTABLE_FILE = 'quote-unquotable.json';
+
+/** The tenant-scoped command that shows one deal document to the operator. */
+function dealDocumentReadCommand(tenantSlug: string, dealId: string, fileName: string): string {
+  return `pnpm kyberion customer-channel outbound --tenant ${tenantSlug} --source deals/${dealId}/${fileName}`;
+}
 
 function dealDocsDir(tenantSlug: string, dealId: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
@@ -180,9 +190,19 @@ export function generateQuoteForDeal(input: {
   const quote = buildQuoteFromPriceBook(input.requests, priceBook);
   if (!quote.ok) {
     // Unknown work never gets an invented price — it goes to the operator.
+    // Ids and a count only: operator notifications are not tenant-partitioned
+    // and the task kinds can come from customer text. The list stays in the
+    // tenant's deal folder.
+    const dir = dealDocsDir(input.tenantSlug, input.dealId);
+    safeMkdir(dir, { recursive: true });
+    writeJson(dealDocumentPath(dir, UNQUOTABLE_FILE), {
+      deal_id: deal.deal_id,
+      recorded_at: nowIso(),
+      unquotable: quote.unquotable,
+    });
     void notifyOperator('question', {
       title: `見積不能項目あり (${input.tenantSlug} / ${deal.deal_id})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
-      body: quote.unquotable.map((entry) => `- ${entry.task_kind}: ${entry.reason}`).join('\n'),
+      body: `見積不能項目 ${quote.unquotable.length} 件。内容はここには写しません。確認: ${dealDocumentReadCommand(input.tenantSlug, deal.deal_id, UNQUOTABLE_FILE)}`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
       correlation_id: `${deal.deal_id}:unquotable`,
     });
     return { ok: false, unquotable: quote.unquotable };
@@ -213,7 +233,8 @@ export function generateQuoteForDeal(input: {
   });
   void notifyOperator('approval_required', {
     title: `見積書ドラフト完成 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
-    body: `合計 ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}。送付には承認が必要です。`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    // The total is tenant pricing: the shared notification names the document only.
+    body: `見積書 v${version} ができました（金額はここには写しません）。確認: ${dealDocumentReadCommand(input.tenantSlug, deal.deal_id, `quote-v${version}.md`)}。送付には承認が必要です。`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     link_hint: quoteRef,
     correlation_id: `${deal.deal_id}:quote-v${version}`,
   });
@@ -380,7 +401,13 @@ export async function sendDealDocumentToCustomer(input: {
     binding: input.binding,
     title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     body,
-    correlationId: `${input.dealId}:${input.kind}-v${input.version}`,
+    // The approver reads the document in the tenant's deal folder; the shared
+    // approval store gets ids only (sendToCustomer).
+    contentSource: `deals/${input.dealId}/${input.kind}-v${input.version}.md`,
+    // Per channel: the same document to another channel is a new approval
+    // (the approval binds the channel), not a permanent effect mismatch. The
+    // channel id (maybe an email address) goes in as a hash.
+    correlationId: `${input.dealId}:${input.kind}-v${input.version}:${input.binding.binding.surface}:${createHash('sha256').update(input.binding.binding.channel_id, 'utf8').digest('hex').slice(0, 16)}`,
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
     ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
