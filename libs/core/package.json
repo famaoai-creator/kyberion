@@ -3452,6 +3452,10 @@
       "types": "./dist/mission/mission-assessment.d.ts",
       "default": "./dist/mission/mission-assessment.js"
     },
+    "./mission/mission-bolt-review": {
+      "types": "./dist/mission/mission-bolt-review.d.ts",
+      "default": "./dist/mission/mission-bolt-review.js"
+    },
     "./mission/mission-classification": {
       "types": "./dist/mission/mission-classification.d.ts",
       "default": "./dist/mission/mission-classification.js"

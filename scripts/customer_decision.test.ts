@@ -12,8 +12,10 @@ import {
 } from '@agent/core/secure-io';
 import { ScriptExitError } from '@agent/core/script-harness';
 import { readLedger } from '@agent/core/decision-ledger';
+import { logger } from '@agent/core/core';
 import {
   agendaContentHash,
+  listAgendas,
   listReceipts,
   readAgenda,
   readSwitches,
@@ -39,6 +41,12 @@ const mocks = vi.hoisted(() => ({
   },
   getDeal: vi.fn(),
   appendDealNote: vi.fn(),
+  addInboxEntry: vi.fn(),
+  notify: vi.fn((_event: string, _payload: unknown, _options?: unknown) => ({
+    status: 'accepted' as const,
+  })),
+  fileBoltReviewWorkItem: vi.fn(),
+  realFileBolt: undefined as undefined | ((...args: unknown[]) => unknown),
 }));
 
 vi.mock('@agent/core/governance/approval-gate', () => ({ enforceApprovalGate: mocks.gate }));
@@ -67,6 +75,23 @@ vi.mock('@agent/core/customer-decision', async (importOriginal) => {
     writeReceipt: (...args: unknown[]) => mocks.writeReceipt(...args),
     appendSwitches: (...args: unknown[]) => mocks.appendSwitches(...args),
     writeRespondJournal: (...args: unknown[]) => mocks.writeRespondJournal(...args),
+  };
+});
+// CD-10: a rejected bolt review reaches the operator; never the real inbox in tests.
+vi.mock('@agent/core/deliverable-inbox', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/deliverable-inbox')>()),
+  addInboxEntry: mocks.addInboxEntry,
+}));
+vi.mock('@agent/core/surface/operator-notifications', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/operator-notifications')>()),
+  notifyOperatorWithReceiptSync: mocks.notify,
+}));
+vi.mock('@agent/core/mission/mission-bolt-review', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/mission/mission-bolt-review')>();
+  mocks.realFileBolt = actual.fileBoltReviewWorkItem as never;
+  return {
+    ...actual,
+    fileBoltReviewWorkItem: (...args: unknown[]) => mocks.fileBoltReviewWorkItem(...args),
   };
 });
 vi.mock('@agent/core/deal-store', async (importOriginal) => ({
@@ -263,7 +288,12 @@ describe('customer-decision facade', () => {
       verb: 'send',
       opts: { tenant: 't' },
       flags: new Set(['json']),
+      lists: { tenant: ['t'] },
     });
+    // A repeated option keeps every value in order (bolt-review --attach).
+    expect(
+      parseCustomerDecisionArgs(['bolt-review', '--attach', 'a.png', '--attach', 'b.png']).lists
+    ).toEqual({ attach: ['a.png', 'b.png'] });
   });
 
   it('drafts from the template, then edits the draft in place', async () => {
@@ -1891,6 +1921,312 @@ describe('customer-decision facade', () => {
         ]);
         expect(authEntry(agendaId)).toMatchObject({ requires_customer: false });
         expect((await taskStatus()).pending.count).toBe(1);
+      });
+    });
+  });
+
+  describe('bolt review (CD-10)', () => {
+    const MISSION_ID = 'MSN-BOLT-FACADE';
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7, 7]);
+    const PNG_OTHER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 8, 8, 8, 8]);
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+    const SUMMARY = 'The order form now saves drafts.';
+    const COMMENT = 'Please move the save button — secret-comment-text';
+    const inCase = () => ({ tenantSlug: TENANT, caseId: CASE });
+    const boltRun = (argv: string[], missionCase = inCase) =>
+      runCustomerDecision(argv, { now: () => NOW, missionCase });
+    const file = (name: string, data: string | Buffer) => {
+      const target = path.join(dir, name);
+      safeWriteFile(target, data);
+      return target;
+    };
+    const draftArgs = (missionId = MISSION_ID, extra: string[] = []) => [
+      'bolt-review',
+      ...base(),
+      '--mission',
+      missionId,
+      '--customer',
+      'acme',
+      '--locale',
+      'en',
+      '--summary-file',
+      file('summary.md', SUMMARY),
+      ...extra,
+    ];
+    const attachmentRun = async (body: unknown, tenant = TENANT) => {
+      try {
+        return (await runCustomerDecision(['attachment', '--tenant', tenant, '--dir', dir], {
+          now: () => NOW,
+          stdin: JSON.stringify(body),
+        })) as Record<string, unknown>;
+      } catch (error) {
+        expect(error).toBeInstanceOf(ScriptExitError);
+        return (error as ScriptExitError).returnValue as Record<string, unknown>;
+      }
+    };
+    const sendReview = async (agendaId: string) => {
+      approveNext();
+      await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+      await run(['actor-add', ...base(), '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+      const sent = (await run([
+        'send',
+        ...base(),
+        '--agenda',
+        agendaId,
+        '--name',
+        'Hanako',
+        '--role',
+        'decider',
+        '--actor',
+        ACTOR,
+      ])) as { link: string };
+      return sent.link.split('#t=')[1];
+    };
+    const answer = async (token: string, choice: string, comment?: string) => {
+      const view = await customerRun('view', { token });
+      return customerRun('respond', {
+        token,
+        content_hash: view.out.content_hash,
+        answers: [{ entry_id: 'bolt_review', choice, ...(comment ? { comment } : {}) }],
+      });
+    };
+    type Coordination = typeof import('@agent/core/workforce/work-coordination');
+    const withCoordination = async (fn: (coordination: Coordination) => Promise<void>) => {
+      const coordination = await import('@agent/core/workforce/work-coordination');
+      coordination.setWorkCoordinationNamespace(`customer-decision-cd10-${process.pid}`);
+      coordination.clearWorkCoordinationStore();
+      try {
+        await fn(coordination);
+      } finally {
+        coordination.clearWorkCoordinationStore();
+        coordination.clearWorkCoordinationNamespace();
+      }
+    };
+    const boltItems = (coordination: Coordination) =>
+      coordination.listWorkItems({}).filter((item) => item.item_id.startsWith('WI-CDB-'));
+
+    const agendaCount = () => listAgendas({ dir }).length;
+
+    beforeEach(() => {
+      mocks.addInboxEntry.mockReset();
+      mocks.notify.mockClear();
+      mocks.fileBoltReviewWorkItem.mockReset();
+      mocks.fileBoltReviewWorkItem.mockImplementation((...args: unknown[]) =>
+        mocks.realFileBolt!(...args)
+      );
+    });
+
+    it('drafts one approval entry open until the next bolt, with the images and preview link', async () => {
+      const drafted = (await boltRun(
+        draftArgs(MISSION_ID, [
+          '--attach',
+          file('form.png', PNG),
+          '--attach',
+          file('form-again.png', PNG),
+          '--preview-url',
+          'https://preview.example.com/b1',
+        ])
+      )) as Record<string, unknown>;
+      expect(drafted).toMatchObject({
+        status: 'draft',
+        entries: 1,
+        bolt_mission_id: MISSION_ID,
+        attachments: 1,
+        links: 1,
+      });
+      const agenda = agendaOf(drafted.agenda_id as string);
+      expect(agenda.bolt_mission_id).toBe(MISSION_ID);
+      expect(agenda.entries).toHaveLength(1);
+      expect(agenda.entries[0]).toMatchObject({
+        entry_id: 'bolt_review',
+        item: `bolt:${MISSION_ID}`,
+        key: 'bolt.acceptance',
+        kind: 'approval',
+        question: 'Do you accept the results of this bolt?',
+        our_decision: { value: { approved: true } },
+        override_until: { kind: 'milestone', milestone: `bolt-after:${MISSION_ID}` },
+        links: [{ label: 'Preview', url: 'https://preview.example.com/b1' }],
+        attachments: [{ name: 'form.png', media_type: 'image/png', bytes: PNG.length }],
+      });
+      expect(agenda.entries[0].background).toContain(SUMMARY);
+      // The same mission cannot be reviewed twice at once (one open item per bolt).
+      await expect(boltRun(draftArgs())).rejects.toThrow(/already asked in open agenda/u);
+    });
+
+    it('refuses internal links, bad images and missions outside the case', async () => {
+      for (const url of [
+        'http://preview.example.com/',
+        'https://localhost:3000/',
+        'https://10.0.0.5/',
+        'https://staging.internal/',
+      ])
+        await expect(boltRun(draftArgs(MISSION_ID, ['--preview-url', url]))).rejects.toThrow(
+          /--preview-url refused/u
+        );
+      await expect(
+        boltRun(draftArgs(MISSION_ID, ['--attach', file('fake.png', JPEG)]))
+      ).rejects.toThrow(/TYPE_MISMATCH/u);
+      await expect(
+        boltRun(
+          draftArgs(MISSION_ID, [
+            '--attach',
+            file('big.png', Buffer.concat([PNG, Buffer.alloc(512 * 1024)])),
+          ])
+        )
+      ).rejects.toThrow(/at most 524288 bytes/u);
+      await expect(
+        boltRun(draftArgs(), () => ({ tenantSlug: TENANT, caseId: 'other-case' }))
+      ).rejects.toThrow(/does not belong to case/u);
+      await expect(boltRun(draftArgs(), () => null)).rejects.toThrow(
+        /not found or has no decision case/u
+      );
+      expect(agendaCount()).toBe(0);
+    });
+
+    it('serves only images listed on the sent agenda, same shape as an unknown link otherwise', async () => {
+      const drafted = (await boltRun(
+        draftArgs(MISSION_ID, ['--attach', file('form.png', PNG)])
+      )) as { agenda_id: string };
+      // Another review in the case stores another image the invite never shows.
+      const other = (await boltRun(
+        draftArgs('MSN-BOLT-OTHER', ['--attach', file('other.png', PNG_OTHER)])
+      )) as { agenda_id: string };
+      const token = await sendReview(drafted.agenda_id);
+      const view = await customerRun('view', { token });
+      const entry = (view.out.entries as Array<Record<string, unknown>>)[0];
+      const attachments = entry.attachments as Array<Record<string, unknown>>;
+      expect(attachments).toEqual([
+        {
+          id: expect.stringMatching(/^[a-f0-9]{64}$/u),
+          name: 'form.png',
+          media_type: 'image/png',
+          bytes: PNG.length,
+        },
+      ]);
+      expect(entry.links).toBeUndefined();
+      const served = await attachmentRun({ token, attachment_id: attachments[0].id });
+      expect(served).toEqual({
+        ok: true,
+        media_type: 'image/png',
+        bytes_base64: PNG.toString('base64'),
+      });
+      const otherId = agendaOf(other.agenda_id).entries[0].attachments![0].id;
+      const unknown = { ok: false, reason: 'invalid_link' };
+      expect(await attachmentRun({ token, attachment_id: otherId })).toEqual(unknown);
+      expect(await attachmentRun({ token, attachment_id: 'f'.repeat(64) })).toEqual(unknown);
+      expect(await attachmentRun({ token, attachment_id: '../../x' })).toEqual(unknown);
+      expect(
+        await attachmentRun({
+          token: 'inv-0000000000000000.nope',
+          attachment_id: attachments[0].id,
+        })
+      ).toEqual(unknown);
+      // Another tenant's room never opens this tenant's invite.
+      expect(
+        await attachmentRun({ token, attachment_id: attachments[0].id }, 'other-tenant')
+      ).toEqual(unknown);
+      // Fetching images does not count as a use of the invite.
+      const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
+        invites: Array<{ uses: number }>;
+      };
+      expect(status.invites[0].uses).toBe(1);
+    });
+
+    it('request_changes files one backlog WorkItem (ids only); status shows it', async () => {
+      await withCoordination(async (coordination) => {
+        const drafted = (await boltRun(draftArgs())) as { agenda_id: string };
+        const token = await sendReview(drafted.agenda_id);
+        expect((await answer(token, 'request_changes', COMMENT)).out).toMatchObject({ ok: true });
+        // The same answer twice: still one item.
+        expect((await answer(token, 'request_changes', COMMENT)).out).toMatchObject({ ok: true });
+        const items = boltItems(coordination);
+        expect(items).toHaveLength(1);
+        expect(items[0]).toMatchObject({
+          status: 'backlog',
+          context: { tenant_slug: TENANT, mission_id: MISSION_ID, work_shape: 'solution_project' },
+          metadata: { agenda_id: drafted.agenda_id, entry_id: 'bolt_review' },
+        });
+        expect(JSON.stringify(items[0])).not.toContain('secret-comment-text');
+        expect(mocks.addInboxEntry).not.toHaveBeenCalled();
+        const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
+          bolt_review: Record<string, unknown>;
+        };
+        expect(status.bolt_review).toMatchObject({
+          mission_id: MISSION_ID,
+          milestone: `bolt-after:${MISSION_ID}`,
+          next_bolt_started: false,
+          routing: [
+            {
+              entry_id: 'bolt_review',
+              outcome: 'request_changes',
+              work_item_id: items[0].item_id,
+              notified: false,
+            },
+          ],
+        });
+        // status re-runs the routing: nothing new.
+        expect(boltItems(coordination)).toHaveLength(1);
+      });
+    });
+
+    it('a routing failure never fails the response; status retries it', async () => {
+      await withCoordination(async (coordination) => {
+        const drafted = (await boltRun(draftArgs())) as { agenda_id: string };
+        const token = await sendReview(drafted.agenda_id);
+        const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        mocks.fileBoltReviewWorkItem.mockImplementationOnce(() => {
+          throw new Error('[WORK_STORE_DOWN] store unavailable');
+        });
+        expect((await answer(token, 'request_changes', COMMENT)).out).toMatchObject({ ok: true });
+        expect(boltItems(coordination)).toEqual([]);
+        const ours = warn.mock.calls
+          .map((call) => String(call[0]))
+          .filter((line) => !line.includes('[locale]'));
+        expect(
+          ours.some((line) => line.startsWith('bolt review routing skipped — WORK_STORE_DOWN'))
+        ).toBe(true);
+        expect(ours.join('\n')).not.toContain('secret-comment-text');
+        const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
+          bolt_review: { routing: unknown[] };
+        };
+        expect(status.bolt_review.routing).toHaveLength(1);
+        expect(boltItems(coordination)).toHaveLength(1);
+      });
+    });
+
+    it('reject notifies the operator with ids only and files no WorkItem', async () => {
+      await withCoordination(async (coordination) => {
+        const drafted = (await boltRun(draftArgs())) as { agenda_id: string };
+        const token = await sendReview(drafted.agenda_id);
+        expect((await answer(token, 'reject')).out).toMatchObject({
+          ok: false,
+          reason: 'invalid_answers',
+          errors: [{ entry_id: 'bolt_review', error: 'text_required' }],
+        });
+        expect((await answer(token, 'reject', COMMENT)).out).toMatchObject({ ok: true });
+        expect(boltItems(coordination)).toEqual([]);
+        expect(mocks.addInboxEntry).toHaveBeenCalledTimes(1);
+        expect(mocks.notify).toHaveBeenCalledTimes(1);
+        expect(mocks.notify.mock.calls[0][0]).toBe('question');
+        const sent = JSON.stringify([mocks.addInboxEntry.mock.calls, mocks.notify.mock.calls]);
+        expect(sent).toContain(drafted.agenda_id);
+        expect(sent).toContain(MISSION_ID);
+        expect(sent).not.toContain('secret-comment-text');
+        const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
+          bolt_review: { routing: Array<Record<string, unknown>> };
+        };
+        expect(status.bolt_review.routing).toEqual([
+          expect.objectContaining({
+            outcome: 'reject',
+            notified: true,
+            inbox_entry_id: expect.stringMatching(/^INBOX-CDB-/u),
+          }),
+        ]);
+        // Routed once: status does not notify again.
+        expect(mocks.notify).toHaveBeenCalledTimes(1);
+        // The reject is a customer decision that is not approved.
+        const ledger = readLedger({ dir });
+        expect(ledger.at(-1)?.value).toMatchObject({ approved: false, rejected: true });
       });
     });
   });

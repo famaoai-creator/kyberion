@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/customer-decision-template.schema.json",
+  "version": "1.0.0",
+  "template_id": "bolt-review",
+  "phase": "aidlc_construction",
+  "title_key": "customer_decision:template_bolt_review_title",
+  "entries": [
+    {
+      "entry_id": "bolt_review",
+      "item": "bolt",
+      "key": "bolt.acceptance",
+      "kind": "approval",
+      "question_key": "customer_decision:bolt_review_question",
+      "background_key": "customer_decision:bolt_review_background",
+      "requires_customer": false
+    }
+  ]
+}
