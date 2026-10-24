@@ -389,6 +389,22 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
+**Repository security scans under coverage.** A green PR shard does not prove the
+unsharded main core run passes with V8 coverage. When a repository-wide AST contract
+times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)
+with PR and smoke commands before changing a timeout. Keep the source roots,
+exclusions, reviewed allowlist, stale-entry check and decoded import forms intact.
+Build the raw-import inventory once per fresh scan and derive both violations and
+allowlist freshness from it; do not reread/reparse every file for each assertion or
+cache verdicts across runs. Partition independent source roots into named tests so
+each keeps the normal test deadline. Parse the actual filename for JSX/TSX, omit
+unused parent pointers and stop walking once a match is found. A plain-text `fs`
+prefilter misses escaped specifiers. Gate: `security-boundary.contract.test.ts`,
+including escaped specifiers, import-equals and JSX text/expression fixtures. Record
+coverage-on before/after timings; a single-file coverage run can pass its assertions
+yet fail the unchanged global coverage thresholds, so report those outcomes
+separately and verify the full core run before claiming main is repaired.
+
 **Query performance: bound work before relaxing time budgets.** When a query smoke
 test exceeds its cross-platform budget, retain the failing timing evidence and
 count expensive operations on a deterministic tied-score fixture. Ranking
