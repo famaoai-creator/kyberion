@@ -4828,7 +4828,6 @@
         "presence/displays/concierge/src/app/settings/sections/form-scope.tsx",
         "presence/displays/concierge/src/app/settings/settings-api.ts",
         "presence/displays/concierge/src/app/settings/settings-navigation.ts",
-        "presence/displays/concierge/src/app/settings/settings-readiness.tsx",
         "presence/displays/concierge/src/app/setup/company/CompanySetupView.tsx",
         "presence/displays/concierge/src/app/setup/company/company-setup-client.ts",
         "presence/displays/concierge/src/app/setup/company/company-setup-model.ts",
