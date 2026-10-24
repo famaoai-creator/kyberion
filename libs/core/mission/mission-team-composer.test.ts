@@ -1,3 +1,5 @@
+import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
+import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
@@ -176,7 +178,7 @@ describe('mission-team-composer classification integration', () => {
     ).toBe(true);
   });
 
-  it('honors an explicitly selected available provider for every team role', () => {
+  it('honors an explicitly selected available provider for every projectable team role', () => {
     const available = discoverProviders()
       .filter((entry) => entry.installed && entry.healthy && entry.provider !== 'gemini')
       .map((entry) => entry.provider);
@@ -196,11 +198,23 @@ describe('mission-team-composer classification integration', () => {
         requested_model_id: 'codex',
       })
     );
-    expect(
-      plan.assignments
-        .filter((assignment) => assignment.status === 'assigned')
-        .every((assignment) => assignment.provider === 'codex' && assignment.modelId === 'codex')
-    ).toBe(true);
+    const assigned = plan.assignments.filter((assignment) => assignment.status === 'assigned');
+    // codex cannot project the `planner` tier (refused cell in
+    // reasoning-providers/codex.json) — planner-tier roles must fall back to
+    // another provider rather than silently inheriting an unenforceable one.
+    for (const assignment of assigned) {
+      const tier = resolveDelegationCapabilityProfile({
+        teamRole: assignment.team_role,
+        purpose: 'implementation',
+      });
+      if (providerCanProjectProfile('codex', tier)) {
+        expect(assignment.provider).toBe('codex');
+        expect(assignment.modelId).toBe('codex');
+      } else {
+        expect(assignment.provider).not.toBe('codex');
+        expect(assignment.notes).toContain('capability-tier fallback');
+      }
+    }
   });
 
   it('rejects obsolete Gemini ACP even when discovery still reports it installed', () => {

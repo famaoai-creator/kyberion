@@ -194,6 +194,8 @@ interface SelectionCandidate {
   authorityRecord: AuthorityRoleRecord;
   resolvedTarget: ResolvedAgentProviderTarget;
   score: number;
+  /** Set when the preferred provider could not project the role's tier and an alternate was substituted. */
+  projectionFallback?: { from: string; tier: string };
 }
 
 function selectedModelHasHint(modelId: string, preferredModels: Set<string>): boolean {
@@ -337,6 +339,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         agentId
       );
       let resolvedTarget: ResolvedAgentProviderTarget;
+      let projectionFallback: { from: string; tier: string } | undefined;
       try {
         resolvedTarget = resolveAgentProviderTarget(
           {
@@ -418,6 +421,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
             // Try the next alternate; resolution failures here are not fatal.
           }
         }
+        if (recovered) projectionFallback = { from: failedProvider, tier: requiredTier };
         if (!recovered) {
           blockedReasons.add(
             `No provider can project the "${requiredTier}" capability tier for this candidate.`
@@ -492,6 +496,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
             authorityRecord,
             resolvedTarget,
             score,
+            ...(projectionFallback ? { projectionFallback } : {}),
           } satisfies SelectionCandidate,
         ];
       });
@@ -564,6 +569,10 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       notes: `${teamRoleRecord.autonomy_level} autonomy; capability-first match (${winner.resolvedTarget.strategy})${
         separationFallback
           ? '; WARNING separation-of-duties fallback — no independent actor available'
+          : ''
+      }${
+        winner.projectionFallback
+          ? `; capability-tier fallback — ${winner.projectionFallback.from} cannot project ${winner.projectionFallback.tier}`
           : ''
       }`,
     };
