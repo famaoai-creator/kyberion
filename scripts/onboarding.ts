@@ -34,6 +34,11 @@ export async function main(
     await authorityMain(args.slice(1), print);
     return;
   }
+  if (args[0] === 'nhi-session') {
+    const { main: nhiSessionMain } = await import('./onboarding_nhi_session.js');
+    await nhiSessionMain(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'apply') {
     await applyOnboardingMain(args.slice(1), print);
     return;
