@@ -36,7 +36,10 @@ import {
   runInCustomerDecisionConsumerSweep,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import {
+  runInResourceAccessScope,
+  type ResourceAccessScope,
+} from '../foundation/resource-access-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidCaseId, ledgerDir, readLedger } from '../decision-ledger/ledger.js';
 import {
@@ -311,6 +314,24 @@ const TENANT_ARCHIVE_STATE =
   /^active\/archive\/missions\/(personal|confidential)\/([^/]+)\/[^/]+\/mission-state\.json$/u;
 
 /**
+ * The exact deny-only capability of an archived mission state read: that one
+ * `mission-state.json` (repo-relative) and the product schema, nothing else
+ * in the mission folder or the tenant's archive.
+ */
+export function archivedMissionStateCapability(
+  tenantSlug: string,
+  relativeStatePath: string
+): ResourceAccessScope {
+  return {
+    tenantSlug,
+    readExact: [relativeStatePath],
+    writeExact: [],
+    mkdirExact: [],
+    allowProductKnowledgeRead: true,
+  };
+}
+
+/**
  * The state of a mission for its decision case, active or archived (`finish`
  * archives a bolt). The archive's confidential tier is a protected store the
  * operator CLI's own identity may not read: an archived tenant mission is read
@@ -330,9 +351,20 @@ export function loadDecisionCaseMissionState(
   const statePath = findArchivedMissionStatePath(upper);
   if (!statePath) return null;
   const relative = pathResolver.toRepoRelative(statePath);
-  const tenant = String(tenantSlug || boundTenant() || '')
+  const bound = boundTenant();
+  const requested = String(tenantSlug || '')
     .trim()
     .toLowerCase();
+  // A caller-supplied tenant never overrides the process's bound tenant.
+  if (requested && bound && requested !== bound) {
+    logger.warn(
+      `archived mission state not read — the requested tenant differs from the bound tenant | run the command for the bound tenant, or unset KYBERION_TENANT | mission=${upper} requested=${requested} bound=${bound}`
+    );
+    throw new Error(
+      `[MISSION_STATE_TENANT_MISMATCH] mission ${upper} was requested for tenant ${requested} but this process is bound to tenant ${bound}`
+    );
+  }
+  const tenant = requested || bound || '';
   const partition = TENANT_ARCHIVE_STATE.exec(relative);
   // An untenanted archive entry (public tier, legacy flat, shared partition):
   // the ordinary visibility-checked read.
@@ -342,21 +374,13 @@ export function loadDecisionCaseMissionState(
   if (!isValidTenantSlug(tenant) || partition[2] !== tenant) return null;
   let state: MissionState | null;
   try {
-    state = runInResourceAccessScope(
-      {
-        tenantSlug: tenant,
-        readExact: [relative],
-        writeExact: [],
-        mkdirExact: [],
-        allowProductKnowledgeRead: true,
-      },
-      () =>
-        withExecutionContext(
-          ARCHIVED_MISSION_STATE_READ_ROLE,
-          () => (safeExistsSync(statePath) ? readMissionStateAtPath(statePath) : null),
-          undefined,
-          tenant
-        )
+    state = runInResourceAccessScope(archivedMissionStateCapability(tenant, relative), () =>
+      withExecutionContext(
+        ARCHIVED_MISSION_STATE_READ_ROLE,
+        () => (safeExistsSync(statePath) ? readMissionStateAtPath(statePath) : null),
+        undefined,
+        tenant
+      )
     );
   } catch (error) {
     if (!isAccessDenial(error)) return null;
@@ -395,7 +419,7 @@ export function resolveMissionDecisionCase(
   // The mission's project travels with the case: WorkItems filed for it
   // (rework, bolt changes) carry it as their typed context.
   const withProject = (candidate: MissionDecisionCase): MissionDecisionCase =>
-    projectId ? { ...candidate, projectId } : candidate;
+    projectId && isValidCaseId(projectId) ? { ...candidate, projectId } : candidate;
   if (projectId) {
     const candidate = caseFor(tenantSlug, projectId, 'project');
     if (candidate && exists(candidate)) return withProject(candidate);

@@ -59,7 +59,9 @@ export interface CustomerDecisionIo {
    * The decision case a mission resolves to (tests); defaults to
    * `resolveMissionDecisionCase` (the mission's project, else a deal listing it).
    */
-  missionCase?: (missionId: string) => { tenantSlug: string; caseId: string } | null;
+  missionCase?: (
+    missionId: string
+  ) => { tenantSlug: string; caseId: string; projectId?: string } | null;
 }
 
 export function parseCustomerDecisionArgs(argv: readonly string[]): ParsedArgs {

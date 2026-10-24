@@ -35,13 +35,13 @@ describe('customer-room callout', () => {
     expect(column.childNodes.map((node) => (node as FakeElement).localName)).toEqual(['h1', 'p']);
   });
 
-  it('main.ts builds every section / div callout through createCallout', () => {
+  it('main.ts builds every callout (the error line too) through createCallout', () => {
     const source = safeReadFile(
       pathResolver.rootResolve('presence/displays/customer-room/src/app/main.ts'),
       { encoding: 'utf8' }
     ) as string;
     // A block callout built by hand would append its title/body into the row.
-    expect(source).not.toMatch(/el\(\s*'(section|div)',\s*'kb-callout\b/u);
-    expect(source.match(/createCallout\(/gu)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(source).not.toMatch(/el\(\s*'\w+',\s*'kb-callout\b/u);
+    expect(source.match(/createCallout\(/gu)?.length ?? 0).toBeGreaterThanOrEqual(7);
   });
 });
