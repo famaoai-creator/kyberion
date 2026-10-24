@@ -4,6 +4,8 @@ import {
   buildProviderChildEnv,
   resolveActiveProviderPermissionArgs,
   resolveEffectiveProviderPermissionProfile,
+  assertProviderCanProjectProfile,
+  resolveCliProviderDescriptorOrNull,
   resolveProviderPermissionArgs,
   type ProviderId,
 } from './provider-permission-profiles.js';
@@ -306,5 +308,42 @@ describe('provider-permission-profiles', () => {
         expect(env.MISSION_ID, `provider=${provider}`).toBe('MSN-1');
       }
     });
+  });
+});
+
+describe('assertProviderCanProjectProfile', () => {
+  it('passes when the CLI provider declares a projection for the tier', () => {
+    expect(() => assertProviderCanProjectProfile('claude', 'explorer')).not.toThrow();
+    expect(() => assertProviderCanProjectProfile('claude-cli', 'implementer')).not.toThrow();
+  });
+
+  it('refuses fail-closed when the provider explicitly refuses the tier', () => {
+    expect(() => assertProviderCanProjectProfile('codex', 'planner')).toThrow(
+      /PROVIDER_PROFILE_REFUSED/
+    );
+    expect(() => assertProviderCanProjectProfile('devin-cli', 'planner')).toThrow(
+      /PROVIDER_PROFILE_REFUSED/
+    );
+  });
+
+  it('refuses fail-closed on an unknown provider identifier', () => {
+    expect(() => assertProviderCanProjectProfile('made-up-cli', 'explorer')).toThrow(
+      /PROVIDER_PROFILE_REFUSED/
+    );
+  });
+
+  it('is a no-op for absent identifiers and non-CLI (API) adapters', () => {
+    expect(() => assertProviderCanProjectProfile(undefined, 'implementer')).not.toThrow();
+    expect(() => assertProviderCanProjectProfile(null, 'planner')).not.toThrow();
+    expect(() => assertProviderCanProjectProfile('anthropic', 'planner')).not.toThrow();
+  });
+});
+
+describe('resolveCliProviderDescriptorOrNull', () => {
+  it('returns the descriptor only for registry CLI adapters', () => {
+    expect(resolveCliProviderDescriptorOrNull('claude-cli')?.provider).toBe('claude');
+    expect(resolveCliProviderDescriptorOrNull('anthropic')).toBeUndefined();
+    expect(resolveCliProviderDescriptorOrNull('stub')).toBeUndefined();
+    expect(resolveCliProviderDescriptorOrNull(undefined)).toBeUndefined();
   });
 });
