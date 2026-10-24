@@ -14,6 +14,8 @@ import { loadProviderConfig } from '../provider/provider-config.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
 import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce/workforce-load.js';
 import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
+import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
+import { resolveCapabilityProfileForTeamRole } from '../subagent-capability-profiles.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -281,6 +283,9 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
   const selectionHints = resolveTeamRoleSelectionHints(teamRoleRecord);
   const preferredAgents = new Set(selectionHints.preferred_agents);
   const preferredModels = new Set(selectionHints.preferred_models);
+  // The KD-05 tier this role's delegation must run under — providers that
+  // cannot project it are excluded during candidacy, not just at dispatch.
+  const requiredTier = resolveCapabilityProfileForTeamRole(teamRole);
   const candidates = Object.entries(agents)
     .flatMap(([agentId, profile]) => {
       if (!profile.team_roles.includes(teamRole)) return [];
@@ -364,6 +369,18 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       }
       if (explicitSelection && resolvedTarget.strategy === 'unresolved') {
         blockedReasons.add('No available provider/model satisfies the requested selection.');
+        return [];
+      }
+      // Capability-projection candidacy: a provider that cannot structurally
+      // project this team role's KD-05 tier is excluded here (so a fallback
+      // candidate can win) rather than refused later at dispatch.
+      if (
+        resolvedTarget.provider &&
+        !providerCanProjectProfile(resolvedTarget.provider, requiredTier)
+      ) {
+        blockedReasons.add(
+          `Provider "${resolvedTarget.provider}" cannot project the "${requiredTier}" capability tier.`
+        );
         return [];
       }
       const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
