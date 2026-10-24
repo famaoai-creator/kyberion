@@ -935,6 +935,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent",
+      "roles": ["organization_operator"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-coordination-bus.ts#MissionCoordinationBus.appendEvent",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -3253,6 +3258,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_doctrine.ts#publishOrganizationDoctrine",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/organization_first_run.ts#runOrganizationFirstRun",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -4103,13 +4113,16 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -4544,25 +4557,21 @@
         },
         "organization_operator": {
           "example_path": [
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-maintenance.ts#resumeMission",
             "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
             "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
             "libs/core/mission/mission-orchestration-worker.ts#<module>",
             "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
             "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -5307,16 +5316,15 @@
         "organization_operator": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -5811,16 +5819,15 @@
             "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -6605,16 +6612,15 @@
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -7096,20 +7102,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "scripts/mcp_server.ts#<module>",
-            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
-            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
-            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -7704,24 +7709,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/bridge/nexus-daemon.ts#<module>",
-            "presence/bridge/nexus-daemon.ts#nexusLoop",
-            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
-            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
-            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
-            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
-            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -8450,17 +8450,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
-            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
-            "scripts/run_agent_runtime_supervisor.ts#main",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -8968,25 +8970,21 @@
         },
         "organization_operator": {
           "example_path": [
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-maintenance.ts#resumeMission",
             "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
             "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
             "libs/core/mission/mission-orchestration-worker.ts#<module>",
             "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
             "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -9458,16 +9456,15 @@
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
             "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -9895,16 +9892,15 @@
             "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
             "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -10399,16 +10395,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-results.ts#main",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -10840,16 +10839,15 @@
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItems",
+            "libs/core/mission/mission-workitem-dispatch.ts#dispatchMissionWorkItemsRound",
+            "libs/core/mission/mission-workitem-dispatch-execution.ts#buildWorkItemDispatchContext",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -11320,16 +11318,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "presence/displays/terminal-hud/src/index.ts#<module>",
-            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
-            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {
@@ -11763,17 +11764,19 @@
         },
         "organization_operator": {
           "example_path": [
-            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
-            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
-            "scripts/run_agent_runtime_supervisor.ts#main",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#<module>",
-            "scripts/dot_continuous_operations_step.ts#runDotContinuousOperationsStep",
-            "scripts/organization_continuous_operations.ts#runOrganizationContinuousOperations"
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts#buildTaskDispatchContext",
+            "libs/core/task/task-knowledge-provisioning.ts#provisionTaskKnowledge",
+            "libs/core/mission/mission-context-pack.ts#resolveMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#buildMissionContextPack",
+            "libs/core/mission/mission-context-pack.ts#loadScopedOrganizationIntent"
           ]
         },
         "person_charter_store": {

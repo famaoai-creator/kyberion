@@ -36,7 +36,8 @@ import {
 } from './scoped-learning-domain.js';
 import type { HumanDecidedBy } from '../mission/mission-types.js';
 
-export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
+export type MemoryCandidateSourceType =
+  'mission' | 'task_session' | 'artifact' | 'incident' | 'authored';
 export type MemoryCandidateKind =
   'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt' | 'archive_advisory';
 /** D7: sensitivity tier is single-sourced from the scope envelope (MemoryScopeEnvelope['tier']). */

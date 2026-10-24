@@ -1,0 +1,21 @@
+{
+  "record_id": "mem-MSN-INTENT-LOOP-20261024-2026_10_24",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Response parsers are a distinct seam when adding view data",
+  "summary": "When a backend view gains fields for a UI, the response parser must be extended and tested too — builder+component tests alone let shipped UI go dead-code.",
+  "candidate_id": "mem-MSN-INTENT-LOOP-20261024-2026_10_24",
+  "evidence_refs": [
+    "active/missions/public/MSN-INTENT-LOOP-20261024/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-INTENT-LOOP-20261024/evidence/retrospective.md"
+  ],
+  "created_at": "2026-10-24T15:37:34.856Z",
+  "applicability": ["mission", "mission:MSN-INTENT-LOOP-20261024"],
+  "reusable_steps": [
+    "When a backend view gains fields for a UI, the response parser must be extended and tested too — builder+component tests alone let shipped UI go dead-code"
+  ],
+  "expected_outcome": "When extending a management/control-plane view with new fields for a surface, treat the response parser (e.g. chronos organization-operating-model-response.ts) as a third implementation site: extend it and add a parse-level test asserting the fields survive. An independent review caught the new objective roll-up fields being stripped at exactly this boundary.",
+  "source_branch": "feat/intent-loop-20261024",
+  "source_commit": "ac84fa4e6840af2b61ae3b53c455b49576380cfd"
+}
