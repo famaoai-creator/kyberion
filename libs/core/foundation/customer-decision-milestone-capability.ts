@@ -92,3 +92,66 @@ export function isCustomerDecisionMilestoneCapability(
     return false;
   }
 }
+
+/** Stable JSON for value comparison (key order never makes two equal values differ). */
+export function caseRecordCanonicalJson(value: unknown): string {
+  const sortKeys = (input: unknown): unknown => {
+    if (Array.isArray(input)) return input.map(sortKeys);
+    if (input && typeof input === 'object') {
+      return Object.keys(input as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = sortKeys((input as Record<string, unknown>)[key]);
+          return acc;
+        }, {});
+    }
+    return input;
+  };
+  return JSON.stringify(sortKeys(value));
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * The guard-side content rule of a milestone store write (CD-10): the agenda
+ * must already exist, and the new content may differ from it only by
+ * milestones appended to `milestones_passed` and a new `updated_at`. Enforced
+ * by the tier guard on every write the role makes through secure-io (the
+ * store's own `writeAgenda` check is the friendly early refusal), so a process
+ * that builds the capability itself cannot rewrite an agenda. Returns the
+ * refusal reason, or null when the change is allowed.
+ */
+export function customerDecisionMilestoneWriteProblem(
+  previous: unknown,
+  next: unknown
+): string | null {
+  const refused = (why: string) => `[CUSTOMER_DECISION_MILESTONE_WRITE_REFUSED] ${why}`;
+  const before = asRecord(previous);
+  const after = asRecord(next);
+  if (!before) return refused('the milestone store may only update an existing agenda');
+  if (!after) return refused('the new agenda content is not a JSON object');
+  const passed = (record: Record<string, unknown>) =>
+    Array.isArray(record.milestones_passed) ? record.milestones_passed : [];
+  const was = passed(before);
+  const now = passed(after);
+  if (
+    (after.milestones_passed !== undefined && !Array.isArray(after.milestones_passed)) ||
+    now.length <= was.length ||
+    !was.every((milestone, index) => now[index] === milestone) ||
+    !now.every((milestone) => typeof milestone === 'string')
+  )
+    return refused('the milestone store may only append to milestones_passed');
+  const rest = (record: Record<string, unknown>) => {
+    const { milestones_passed: _passed, updated_at: _updated, ...others } = record;
+    void _passed;
+    void _updated;
+    return others;
+  };
+  if (caseRecordCanonicalJson(rest(before)) !== caseRecordCanonicalJson(rest(after)))
+    return refused('the milestone store may change only milestones_passed and updated_at');
+  return null;
+}

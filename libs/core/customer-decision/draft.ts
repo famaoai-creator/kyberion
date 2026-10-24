@@ -17,7 +17,8 @@ import type {
   ReasoningBackend,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend-contracts.js';
-import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { getLastServedReasoningMode, getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { buildReasoningBackendForMode } from '../reasoning/reasoning-bootstrap.js';
 import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { t } from '../t.js';
 import type { AgendaEntry, DecisionAgenda } from './model.js';
@@ -33,6 +34,17 @@ export interface GenerateAgendaDraftOptions {
   now: string;
   backend?: Pick<ReasoningBackend, 'name' | 'prompt'>;
   groundingText?: string;
+  /**
+   * D10: the backend mode the operator chose explicitly
+   * (`KYBERION_REASONING_BACKEND`). The draft then goes to exactly that
+   * backend or to none (organization defaults): never to another provider
+   * through failover. Ignored when `backend` is given.
+   */
+  requestedBackend?: string;
+  /** Test seam for the explicit backend (default: the governed bootstrap). */
+  buildBackendForMode?: (
+    mode: string
+  ) => { backend: Pick<ReasoningBackend, 'name' | 'prompt'>; mode: string } | null;
 }
 
 export interface GenerateAgendaDraftResult {
@@ -40,6 +52,29 @@ export interface GenerateAgendaDraftResult {
   /** True when at least one proposal came from the backend (not the org-default fallback). */
   generated: boolean;
   notes: string[];
+  /** D10: the backend asked (`requested` when chosen explicitly, `used` null when none was). */
+  reasoning_backend: { requested?: string; used: string | null };
+}
+
+/** The backend the draft goes to, and what to record about it. */
+function selectDraftBackend(
+  opts: GenerateAgendaDraftOptions,
+  notes: string[]
+): {
+  backend: Pick<ReasoningBackend, 'name' | 'prompt'> | null;
+  explicitMode?: string;
+} {
+  if (opts.backend) return { backend: opts.backend };
+  const requested = opts.requestedBackend?.trim();
+  if (!requested) return { backend: getReasoningBackend() };
+  const built = (opts.buildBackendForMode ?? buildReasoningBackendForMode)(requested);
+  if (!built) {
+    notes.push(
+      `reasoning backend ${requested} was requested but is not available here; used organization defaults`
+    );
+    return { backend: null, explicitMode: requested };
+  }
+  return { backend: built.backend, explicitMode: built.mode };
 }
 
 interface Proposal {
@@ -209,14 +244,23 @@ export async function generateAgendaDraft(
     (entry) => !entry.requires_customer && entry.our_decision === undefined
   );
   let proposals = new Map<string, Proposal>();
+  const requested = opts.backend ? undefined : opts.requestedBackend?.trim() || undefined;
+  let used: string | null = null;
   if (eligible.length > 0) {
-    const backend = opts.backend ?? getReasoningBackend();
-    const raw = await askBackend(
-      backend,
-      agenda,
-      buildPrompt(eligible, opts.intentText, opts.groundingText, agenda.locale),
-      notes
-    );
+    const selected = selectDraftBackend(opts, notes);
+    const backend = selected.backend;
+    const raw = backend
+      ? await askBackend(
+          backend,
+          agenda,
+          buildPrompt(eligible, opts.intentText, opts.groundingText, agenda.locale),
+          notes
+        )
+      : undefined;
+    if (raw !== undefined && backend) {
+      // The explicit backend has one candidate; the default chain may have failed over.
+      used = selected.explicitMode ?? getLastServedReasoningMode()?.mode ?? backend.name;
+    }
     if (raw !== undefined) {
       const parsed = parseDraftProposals(raw, eligible, notes);
       if (parsed === null)
@@ -251,5 +295,10 @@ export async function generateAgendaDraft(
     }
     return entry;
   });
-  return { agenda: { ...agenda, entries, updated_at: opts.now }, generated, notes };
+  return {
+    agenda: { ...agenda, entries, updated_at: opts.now },
+    generated,
+    notes,
+    reasoning_backend: { ...(requested ? { requested } : {}), used },
+  };
 }

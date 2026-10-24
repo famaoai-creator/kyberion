@@ -342,7 +342,10 @@ describe('customer-room attachment route', () => {
     logs = [];
     next = () => image('image/png', PNG);
   });
-  async function start(apiLimitPerMinute = 100): Promise<void> {
+  async function start(
+    apiLimitPerMinute = 100,
+    attachment: { perMinute?: number; concurrency?: number; perAddress?: number } = {}
+  ): Promise<void> {
     const app = express();
     registerCustomerRoomRoutes(app, {
       spawner: async (verb, input) => {
@@ -354,6 +357,9 @@ describe('customer-room attachment route', () => {
       renderPage: () => '',
       log: (message) => logs.push(message),
       apiLimitPerMinute,
+      attachmentLimitPerMinute: attachment.perMinute,
+      attachmentConcurrency: attachment.concurrency,
+      attachmentConcurrencyPerAddress: attachment.perAddress,
     });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -452,11 +458,137 @@ describe('customer-room attachment route', () => {
     );
   });
 
-  it('is under the API rate limit', async () => {
-    await start(5);
+  it('has its own per-address budget, separate from the view/respond budget', async () => {
+    await start(2, { perMinute: 5 });
     const statuses: number[] = [];
     for (let i = 0; i < 7; i += 1) statuses.push((await fetchImage({ attachment_id: ID })).status);
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429, 429]);
+    const limited = await fetchImage({ attachment_id: ID });
+    expect(limited.headers.get('cache-control')).toBe('no-store');
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(await limited.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(calls).toHaveLength(5);
+    // Images did not use the API budget: view still answers.
+    next = () => out({ ok: true, state: 'open' });
+    const view = await fetch(`${base}/api/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+      body: '{}',
+    });
+    expect(view.status).toBe(200);
+  });
+
+  it('caps image fetches in flight and frees the slot when one finishes', async () => {
+    await start(100, { perMinute: 100, concurrency: 2, perAddress: 2 });
+    const pending: Array<() => void> = [];
+    next = () =>
+      new Promise<FacadeOutcome>((resolve) => {
+        pending.push(() =>
+          resolve({
+            status: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              media_type: 'image/png',
+              bytes_base64: PNG.toString('base64'),
+            }),
+            aborted: false,
+          })
+        );
+      });
+    const first = fetchImage({ attachment_id: ID });
+    const second = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    const third = await fetchImage({ attachment_id: ID });
+    expect(third.status).toBe(429);
+    expect(third.headers.get('retry-after')).toBe('1');
+    expect(calls).toHaveLength(2);
+    pending.shift()?.();
+    expect((await first).status).toBe(200);
+    const fourth = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    for (const resolve of pending.splice(0)) resolve();
+    expect((await second).status).toBe(200);
+    expect((await fourth).status).toBe(200);
+  });
+
+  it('lets one address hold at most its own share of the slots (default 2 of 4)', async () => {
+    await start(100, { perMinute: 100 });
+    const pending: Array<() => void> = [];
+    next = () =>
+      new Promise<FacadeOutcome>((resolve) => {
+        pending.push(() =>
+          resolve({
+            status: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              media_type: 'image/png',
+              bytes_base64: PNG.toString('base64'),
+            }),
+            aborted: false,
+          })
+        );
+      });
+    const first = fetchImage({ attachment_id: ID });
+    const second = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    // Two global slots are still free, but this address already has its two.
+    const third = await fetchImage({ attachment_id: ID });
+    expect(third.status).toBe(429);
+    expect(third.headers.get('retry-after')).toBe('1');
+    expect(calls).toHaveLength(2);
+    pending.shift()?.();
+    expect((await first).status).toBe(200);
+    const fourth = fetchImage({ attachment_id: ID });
+    await expect.poll(() => pending.length).toBe(2);
+    for (const resolve of pending.splice(0)) resolve();
+    expect((await second).status).toBe(200);
+    expect((await fourth).status).toBe(200);
+  });
+
+  it('keeps the slot of a dropped request until its facade run settles', async () => {
+    await start(100, { perMinute: 100, concurrency: 1, perAddress: 1 });
+    let settle: (() => void) | undefined;
+    next = () =>
+      new Promise<FacadeOutcome>((resolve) => {
+        settle = () =>
+          resolve({
+            status: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              media_type: 'image/png',
+              bytes_base64: PNG.toString('base64'),
+            }),
+            aborted: false,
+          });
+      });
+    let closed = 0;
+    server.on('connection', (socket) => socket.once('close', () => (closed += 1)));
+    const controller = new AbortController();
+    const dropped = fetch(`${base}/api/attachment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ attachment_id: ID }),
+      signal: controller.signal,
+    }).catch(() => null);
+    await expect.poll(() => settle !== undefined).toBe(true);
+    controller.abort();
+    await dropped;
+    // The server saw the client go away (its socket closed) before the next request.
+    await expect.poll(() => closed).toBeGreaterThan(0);
+    // The child still runs: the cap holds even though the client went away.
+    expect((await fetchImage({ attachment_id: ID })).status).toBe(429);
+    expect(calls).toHaveLength(1);
+    settle?.();
+    next = () => image('image/png', PNG);
+    await expect.poll(async () => (await fetchImage({ attachment_id: ID })).status).toBe(200);
+  });
+
+  it('does not count refused requests against the in-flight cap', async () => {
+    await start(100, { perMinute: 100, concurrency: 1, perAddress: 1 });
+    for (let i = 0; i < 3; i += 1) {
+      expect((await fetchImage({ attachment_id: 'bad' })).status).toBe(400);
+    }
+    expect((await fetchImage({ attachment_id: ID })).status).toBe(200);
   });
 });
 
