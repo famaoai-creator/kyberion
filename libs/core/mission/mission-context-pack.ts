@@ -33,7 +33,7 @@ import {
 } from './mission-team-plan-composer.js';
 import { getWorkItem, type WorkItem } from '../workforce/work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from '../task/task-session.js';
-import { loadScopedOrganizationIntent } from './mission-context-pack-organization.js';
+import { loadScopedOrganizationIntent } from './mission-context-pack-knowledge.js';
 import { summarizeText } from './mission-context-pack-render.js';
 import { slugify } from '../foundation/text.js';
 import { compileScopedContextPack, type ContextSecurityScope } from '../context-security-scope.js';
