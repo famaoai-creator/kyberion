@@ -178,7 +178,11 @@ export function gitCommit(
 
 export function gitPush(
   cwd: string,
-  options: { remote?: string; ref?: string; setUpstream?: boolean } = {},
+  options: {
+    remote?: string;
+    ref?: string;
+    setUpstream?: boolean;
+  } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
   if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildExternalOperationTarget,
+  externalOperationGrantMatches,
   parseExternalOperationGrant,
   parseExternalOperationGrants,
 } from './external-operation-target.js';
@@ -221,6 +222,41 @@ describe('exact public operation target grants', () => {
     expect(
       parseExternalOperationGrant({ ...merge, repository: 'ssh://git@github.com/acme/project' })
     ).toBeUndefined();
+  });
+  it('parses optional visibility:private grants and binds verified-private effects', () => {
+    const grant = {
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch: 'main',
+      visibility: 'private' as const,
+    };
+    expect(parseExternalOperationGrant(grant)).toEqual({
+      operation_id: 'vcs:push',
+      repository: 'https://github.com/acme/project',
+      branch: 'main',
+      visibility: 'private',
+    });
+    // Non-private values and unknown optional keys still fail closed.
+    expect(parseExternalOperationGrant({ ...grant, visibility: 'public' })).toBeUndefined();
+    expect(parseExternalOperationGrant({ ...grant, unknown_field: 'x' })).toBeUndefined();
+    // Effect target gains visibility only when verified private.
+    const effect = {
+      url: 'https://github.com/acme/project.git',
+      destination: 'refs/heads/main',
+      repository_visibility: 'private',
+    };
+    expect(buildExternalOperationTarget('vcs:push', effect)).toEqual(grant);
+    expect(
+      buildExternalOperationTarget('vcs:push', { ...effect, repository_visibility: 'public' })
+    ).toEqual({ operation_id: 'vcs:push', repository: grant.repository, branch: 'main' });
+    // A 'private'-scoped grant never matches an unverified/public target.
+    expect(
+      externalOperationGrantMatches(parseExternalOperationGrant(grant)!, {
+        operation_id: 'vcs:push',
+        repository: grant.repository,
+        branch: 'main',
+      } as never)
+    ).toBe(false);
   });
   it('delegates pr_merge and push to exact repo+branch grants only', () => {
     const mergeGrant = {
