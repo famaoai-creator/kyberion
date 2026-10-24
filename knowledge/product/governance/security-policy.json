@@ -64,6 +64,8 @@
       "active/shared/runtime/usage-ledger/confidential/",
       "active/shared/runtime/execution-metrics/personal/",
       "active/shared/runtime/execution-metrics/confidential/",
+      "active/shared/runtime/tenant-ledger/personal/",
+      "active/shared/runtime/tenant-ledger/confidential/",
       "active/shared/runtime/hearing/personal/",
       "active/shared/runtime/hearing/confidential/",
       "active/shared/runtime/discussion-create-requests/personal/",
@@ -638,6 +640,18 @@
     "audit_mirror_writer": {
       "allow_read": [],
       "allow_write": ["customer/${KYBERION_TENANT}/logs/audit/"]
+    },
+    "tenant_ledger_store": {
+      "allow_read": [
+        "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/public/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/public/${KYBERION_TENANT}/"
+      ]
     },
     "generation_scheduler": {
       "allow_read": ["knowledge/personal/tenants/"],
