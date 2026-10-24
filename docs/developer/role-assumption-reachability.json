@@ -886,6 +886,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-coordination-bus.ts#MissionCoordinationBus.appendEvent",
       "roles": ["mission_controller"],
       "unresolved": []

@@ -29,6 +29,8 @@ const SOURCE_ROOT = rootDir();
 const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/cd-facade-boundary-' + process.pid);
 const TENANT = 'cd-facade-boundary';
 const OTHER = 'cd-facade-boundary-other';
+/** Not in the fixture's tenant registry. */
+const UNREGISTERED = 'cd-facade-unregistered';
 const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const ACTOR = 'customer:acme-cto';
@@ -188,5 +190,144 @@ describe('customer-decision facade without a confidential persona', () => {
     } finally {
       delete process.env.KYBERION_TENANT;
     }
+  }, 60_000);
+
+  const sendFor = async (tenant: string, entries: unknown[], extra: string[] = []) => {
+    const args = ['--tenant', tenant, '--case', CASE, '--dir', dir];
+    const drafted = (await run([
+      'draft',
+      ...args,
+      '--customer',
+      'acme',
+      '--title',
+      'T',
+      ...extra,
+    ])) as {
+      agenda_id: string;
+    };
+    const file = path.join(dir, 'edit.json');
+    io.safeWriteFile(file, JSON.stringify({ entries }));
+    await run(['draft', ...args, '--agenda', drafted.agenda_id, '--file', file]);
+    mocks.gate.mockReturnValueOnce({ allowed: true, status: 'approved', requestId: 'apr-2' });
+    await run(['submit', ...args, '--agenda', drafted.agenda_id, '--by', 'user:alice']);
+    await run(['actor-add', ...args, '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+    return run([
+      'send',
+      ...args,
+      '--agenda',
+      drafted.agenda_id,
+      '--name',
+      'Hanako',
+      '--role',
+      'decider',
+      '--actor',
+      ACTOR,
+    ]) as Promise<{ link: string; agenda_id: string }>;
+  };
+
+  it('a tenant missing from the registry gets an actionable refusal, not a policy error', async () => {
+    const inviteRoot = path.join(
+      ROOT,
+      'active/shared/runtime/customer-decision-invites/confidential'
+    );
+    // A fresh runtime root: no tier directory yet (the first send creates it).
+    initialContext('ecosystem_architect', () =>
+      initialIO.safeRmSync(inviteRoot, { recursive: true, force: true })
+    );
+    await expect(
+      sendFor(UNREGISTERED, [
+        {
+          entry_id: 'release',
+          item: 'RELEASE2',
+          key: 'release.go',
+          kind: 'approval',
+          question: 'Release?',
+          requires_customer: true,
+        },
+      ])
+    ).rejects.toThrow(/CD_INVITE_TENANT_NOT_REGISTERED/u);
+    expect(io.safeExistsSync(path.join(inviteRoot, UNREGISTERED))).toBe(false);
+    // A registered tenant creates the tier directory on its first send.
+    const sent = await sendFor(TENANT, [
+      {
+        entry_id: 'release',
+        item: 'RELEASE3',
+        key: 'release.go',
+        kind: 'approval',
+        question: 'Release?',
+        requires_customer: true,
+      },
+    ]);
+    expect(sent.link).toContain('#t=');
+    expect(io.safeExistsSync(path.join(inviteRoot, TENANT))).toBe(true);
+  }, 60_000);
+
+  it('a rejected bolt review reaches the real inbox under the facade identity (CD-10)', async () => {
+    for (const key of keys) expect(process.env[key]).toBeUndefined();
+    const drafted = (await facade.runCustomerDecision(
+      [
+        'bolt-review',
+        '--tenant',
+        TENANT,
+        '--case',
+        CASE,
+        '--dir',
+        dir,
+        '--mission',
+        'MSN-BOUNDARY-BOLT',
+        '--customer',
+        'acme',
+        '--summary-file',
+        (() => {
+          const summary = path.join(dir, 'summary.md');
+          io.safeWriteFile(summary, 'What changed.');
+          return summary;
+        })(),
+      ],
+      { now: () => NOW, missionCase: () => ({ tenantSlug: TENANT, caseId: CASE }) }
+    )) as { agenda_id: string };
+    const args = ['--tenant', TENANT, '--case', CASE, '--dir', dir];
+    mocks.gate.mockReturnValueOnce({ allowed: true, status: 'approved', requestId: 'apr-3' });
+    await run(['submit', ...args, '--agenda', drafted.agenda_id, '--by', 'user:alice']);
+    await run(['actor-add', ...args, '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+    const sent = (await run([
+      'send',
+      ...args,
+      '--agenda',
+      drafted.agenda_id,
+      '--name',
+      'Hanako',
+      '--role',
+      'decider',
+      '--actor',
+      ACTOR,
+    ])) as { link: string };
+    const token = sent.link.split('#t=')[1];
+    const view = await customer('view', TENANT, { token });
+    const response = await customer('respond', TENANT, {
+      token,
+      content_hash: view.out.content_hash,
+      answers: [
+        { entry_id: 'bolt_review', choice: 'reject', comment: 'not this — secret-comment' },
+      ],
+    });
+    expect(response.out).toMatchObject({ ok: true });
+    const { listInboxEntries } = await import('@agent/core/deliverable-inbox');
+    const entries = initialContext('surface_runtime', () =>
+      listInboxEntries({ missionId: 'MSN-BOUNDARY-BOLT' })
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      entry_id: expect.stringMatching(/^INBOX-CDB-/u),
+      kind: 'customer_decision_bolt_rejected',
+      tenant_slug: TENANT,
+    });
+    expect(JSON.stringify(entries[0])).not.toContain('secret-comment');
+    const agenda = (await run(['status', ...args, '--agenda', drafted.agenda_id])) as {
+      bolt_review: { routing: Array<Record<string, unknown>> };
+    };
+    expect(agenda.bolt_review.routing).toEqual([
+      expect.objectContaining({ outcome: 'reject', inbox_entry_id: entries[0].entry_id }),
+    ]);
   }, 60_000);
 });
